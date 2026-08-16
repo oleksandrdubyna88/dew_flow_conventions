@@ -68,3 +68,24 @@ holding the whole document hostage.
 - [ ] The completion check ran: every plan the work touched was re-read and promoted if finished.
 - [ ] Promoted plans carry `IMPLEMENTED <date>` **and their deviations**.
 - [ ] Both folder READMEs match their folders.
+
+## A boundary between two plans is named on BOTH sides (MANDATORY)
+
+When a new plan takes a slice of an existing one — the common case, because a plan large enough to be worth
+writing is large enough to be built in pieces — it is not enough for the newcomer to say which slice it
+took. **Go back and write the same boundary into the older document.**
+
+Measured here 2026-08-16: a plan authored a day after another read it and delimited its slice carefully, in
+prose, in two sections. The older plan said nothing. A reader starting from the older one would have built
+commit stamping and chunk variants a second time, and neither author would have been careless — the
+division existed, it was simply legible from one direction only.
+
+The cheap shape that holds:
+
+- **A table, not a paragraph**, in both documents: item · which plan builds it · what the other one's part is.
+- **State the order** — which plan goes first, and why. Usually the one that lands a field or a seam the
+  other generalizes.
+- **Say what is disjoint**, so the table is read as complete rather than as examples.
+
+A division of labour named on one side is not a division of labour. And the failure it produces — duplicated
+work discovered late — is the same one that closing repository boundaries was meant to end.
