@@ -28,6 +28,31 @@ where what ships is an ARTEFACT rather than source, you looked inside the artefa
 ([development-workflow.md](development-workflow.md) — *Verify the artefact, not the source*). Report the
 observations, not the intention.
 
+### 3. In a shared tree, "it builds here" is not "this commit builds"
+
+Your working tree contains other people's uncommitted files. A green build over it proves the TREE
+compiles, never that your COMMIT does — and the two diverge the moment your change references a type
+somebody else has written but not yet committed.
+
+Measured here on 2026-08-16, twice in one morning. A commit named for round-robin subscriptions swept in
+two DI registrations and a documentation section belonging to a reliability fix running in parallel; the
+types those lines reference existed only in the other agent's uncommitted work, so **that commit does not
+compile on its own** — it was repaired by the next one, and anyone bisecting through it meets a build
+error that has nothing to do with either change. Separately, a `todo/README.md` row was committed
+pointing at a plan file that stayed untracked, so `HEAD` carried a link to a document no clone contains.
+
+So, before committing in a tree you share:
+
+- **Stage by path, then look at what you staged** — `git diff --staged` — and ask of each hunk: is this
+  mine, and does it stand up without anything still sitting unstaged beside it?
+- **A file you did not write is not made yours by being in a file you did edit.** Two agents editing one
+  file is the case the rule above is about; say so in your summary and leave their lines.
+- **A reference and its target are one commit.** A README row and its plan, a registration and the type
+  it registers, a call site and its method: committing one without the other publishes a broken tree even
+  though yours is fine.
+- When in doubt about whether the commit stands alone, the cheap check is to read the staged diff for
+  names your commit does not itself introduce.
+
 ### When verification is BLOCKED — ask, do not guess
 
 Blocked is a normal state on this hardware: a running host holds the DLLs, the GPU is taken by a pass,

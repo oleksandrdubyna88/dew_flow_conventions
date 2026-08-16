@@ -67,7 +67,9 @@ holding the whole document hostage.
 - [ ] New plans are in `todo/`, with a status line on line 2–3, verified references, a build order, a test plan and a DoD.
 - [ ] The completion check ran: every plan the work touched was re-read and promoted if finished.
 - [ ] Promoted plans carry `IMPLEMENTED <date>` **and their deviations**.
-- [ ] Both folder READMEs match their folders.
+- [ ] Both folder READMEs match their folders — and a README row is committed in the SAME commit as the
+      plan it links, never before it ([git-workflow.md](git-workflow.md) § *a reference and its target are
+      one commit*; a row pointing at an untracked file is a broken link in every clone but yours).
 
 ## A boundary between two plans is named on BOTH sides (MANDATORY)
 
