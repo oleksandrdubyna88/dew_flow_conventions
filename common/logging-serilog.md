@@ -26,6 +26,24 @@ logs/{yyyy-MM-dd}/{app}-{HH-mm-ss}-{pid}.log
   by day appends every run into one file, and the question actually being asked is almost always "what did
   *that* run do". The timestamp is taken once at startup; the pid disambiguates two hosts started in the same
   second (an AppHost starting several children does exactly that).
+- **A run that outlives the day continues in a `00-00-00` segment** under the next day's folder — same pid,
+  so it is still one run. A run starting at 15:00 writes `…/2026-08-16/app-15-00-00-1234.log` and continues
+  in `…/2026-08-17/app-00-00-00-1234.log`.
+
+  This is not the rolling sink forbidden below, and the difference is the whole point: rolling by day merges
+  *different runs* into one file, while these two files belong to *one run* and say so by pid. It exists
+  because "a file per run" and "this process never restarts" had never been held against each other — a file
+  per run is right, but its mitigating rotation IS the restart, and the 24/7 premise is that there is none.
+  Together they produced one file growing for months.
+
+  The boundary is the **clock**, not twenty-four hours of elapsed time. Elapsed-time segments drift a little
+  each day until the files stop lining up with the folders they live in, and correlating two hosts becomes
+  arithmetic. Segmenting on the clock also fixes something nobody had noticed: before it, a run that crossed
+  midnight kept writing into the folder of the day it *started*.
+
+  The name of a continuation segment is `00-00-00` rather than the moment its first line arrived — the
+  segment BEGINS at the boundary, and a reader comparing it with the previous day's file should see the two
+  meet rather than a gap of however long the host was quiet.
 - `logs/` is git-ignored in every repo.
 - **Everything is UTC** — the folder, the file name, and the timestamp on every line. Not a preference: the
   Rust sidecar has no timezone library and names its folder from a unix timestamp, so a local-time .NET host
@@ -112,6 +130,13 @@ The same choice, made explicitly, applies to every other directory a host append
 spools, artifact folders). Never inside a library; the host that writes the files owns their
 retirement.
 
+**With one exception that is a rule of its own: a directory DRAINED by a consumer is not the writer's to
+prune.** A telemetry spool is read and removed by an ingester, and the emitting process cannot know which
+records that ingester has taken — deleting on a timer would destroy data nobody read, which is worse than
+the growth it fixes. There the owner is the CONSUMER, and the emitting repo says so in writing rather than
+reaching for the startup prune because it is the same shape of directory. Naming the owner is the
+requirement; being the owner is not.
+
 ### Failures during startup must still be logged
 
 Configure Serilog **before** the host is built, and wrap the run in `try/catch/finally` with
@@ -150,6 +175,7 @@ The sidecar has no Serilog; it has `tracing`, and the CONTRACT is what is shared
 - Never `Console.WriteLine` for anything that is a log. It has no level, no timestamp, no source, and it
   cannot be filtered.
 - Never a rolling-by-day file sink for host logs — it merges runs, which is the opposite of the requirement.
+  The midnight SEGMENT above is not that: it splits one run at the boundary and never joins two.
 - Never a `SystemConsoleTheme` — it silently drops colour under an orchestrator.
 - Never write logs to stdout in a process whose stdout carries a protocol.
 - Never configure logging inside a library. Libraries take `ILogger<T>` and say nothing about sinks.
@@ -161,6 +187,7 @@ The sidecar has no Serilog; it has `tracing`, and the CONTRACT is what is shared
 - [ ] The repo has exactly one `AddDewFlowLogging` and every host calls it before `Build()`.
 - [ ] Console output is coloured through an ANSI theme, and is visible as colour in the Aspire dashboard.
 - [ ] A run produces `logs/{yyyy-MM-dd}/{app}-{HH-mm-ss}-{pid}.log`, and a second run produces a second file.
+- [ ] A run that crosses midnight produces a `00-00-00` segment under the next day's folder, same pid.
 - [ ] A stdio host's console sink goes to stderr.
 - [ ] Levels are configured in `appsettings.json`, not in code.
 - [ ] `logs/` is git-ignored.
