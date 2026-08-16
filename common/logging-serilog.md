@@ -87,6 +87,31 @@ config edit and a restart — never an edited call site, never a rebuilt binary.
 `Information`, with `Microsoft.AspNetCore` and `System.Net.Http.HttpClient` at `Warning`: request and
 handler chatter drowns the application's own story at Information.
 
+### A CLI verb that builds a service container is a host
+
+The 2026-08-16 audit found the family's benchmark CLI registering `.AddLogging()` with zero
+providers plus a `NullLoggerFactory` in its live `run`/`judge` path
+(`dew_flow_benchmark · hosts/Cli/RunCommand.cs:204`) — while the repo's correct `AddDewFlowLogging`
+sat unused one project over. Every `LogWarning` about crash-recovery and failed metrics went
+nowhere, in the code path whose whole diagnosability budget this rule exists to protect. So: any
+code path that builds a `ServiceCollection`/host — a CLI verb included — wires the same two sinks
+as every other host. Code that *looks* instrumented and says nothing is worse than no logging,
+because nobody goes looking for the gap.
+
+### Retention — `logs/` must not grow forever
+
+A file per run with no reaper is a disk that eventually fills — and on a machine running 24/7 the
+"eventually" is a date. Every repo names its retention owner, one of exactly two:
+
+1. **The host prunes at startup** (default): delete day-folders under its own `logs/` root older
+   than 14 days, best-effort, logged at Information. Startup is the right moment — it is cheap,
+   idempotent, and a host that never restarts is not producing new files either.
+2. **An operator job owns it** — then the repo's README says so, and which job.
+
+The same choice, made explicitly, applies to every other directory a host appends to (telemetry
+spools, artifact folders). Never inside a library; the host that writes the files owns their
+retirement.
+
 ### Failures during startup must still be logged
 
 Configure Serilog **before** the host is built, and wrap the run in `try/catch/finally` with
@@ -128,6 +153,8 @@ The sidecar has no Serilog; it has `tracing`, and the CONTRACT is what is shared
 - Never a `SystemConsoleTheme` — it silently drops colour under an orchestrator.
 - Never write logs to stdout in a process whose stdout carries a protocol.
 - Never configure logging inside a library. Libraries take `ILogger<T>` and say nothing about sinks.
+- Never register `.AddLogging()` with no providers (or a `NullLoggerFactory`) in a production
+  container — wire the real sinks or do not accept `ILogger<T>` dependencies there at all.
 
 ## Definition of Done
 
@@ -137,6 +164,8 @@ The sidecar has no Serilog; it has `tracing`, and the CONTRACT is what is shared
 - [ ] A stdio host's console sink goes to stderr.
 - [ ] Levels are configured in `appsettings.json`, not in code.
 - [ ] `logs/` is git-ignored.
+- [ ] CLI hosts included: every code path that builds a container wires the same sinks.
+- [ ] The repo names its `logs/` retention owner (startup prune or a named operator job).
 - [ ] A new repository **mounts the submodule** (see the repo README) — it never copies this file.
 
 The `AnsiConsoleSink` / `UtcTimestampEnricher` / `<Repo>Logging` *code* is still per-repo by deliberate

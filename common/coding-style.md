@@ -27,6 +27,8 @@ MANY SMALL FILES > FEW LARGE FILES:
 - User-friendly messages in UI-facing code; detailed context in server-side logs.
 - Expected failures are values, not exceptions (the C#-specific shape is in
   [../csharp/doctrine.md](../csharp/doctrine.md)).
+- `try/catch` **placement** is a rule of its own — per independent unit, setup included, catch-all
+  at every detached edge, nowhere else: [reliability.md](reliability.md) § Where `try/catch` lives.
 
 ## Input validation
 
