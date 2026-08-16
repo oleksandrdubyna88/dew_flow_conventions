@@ -25,6 +25,31 @@ status line on the second or third line, so a reader knows its standing before r
 A plan carries: the symptom or goal **before** any solution, references to real code as `file.cs:line`
 (verified, not guessed), a build order, a test plan, and a Definition of Done checklist.
 
+### A plan that creates something that GROWS names its budget — before the first write
+
+Reviewed across 21 plans on 2026-08-16: the single most repeated omission was a design that adds a
+table, a collection, a directory, a cache or a spawned process and says nothing about how large it gets
+or who retires it. It is not a small omission at this family's volumes. One review pass found a variant
+matrix whose corpora were assumed to be 24 and were actually the cross product — **96**, at ~2 GB each,
+≈190 GB for one target repository — against a recorded incident where 24.38 GB of vector store was
+already the crisis; four new append-only payload tables with no retention line between them; and a
+`Building` state with no sweep, which blocks every cell of its variant forever after one restart.
+
+[reliability.md](reliability.md) § *Everything that grows has an owner* governs the CODE. This governs
+the PLAN, and it is deliberately earlier: retention chosen after the first write is a migration and a
+conversation about data somebody already values, while retention chosen in the plan is a sentence. So
+any plan introducing a growth surface carries a short section naming, for each one:
+
+- **the projected size** at the plan's own stated volumes — a number, computed, not "small";
+- **who retires it** — a window, a rollup, an eviction rule, or an explicit *"kept forever, projected
+  N GB, stored on X"*, which is a legitimate answer once it is a decision rather than an oversight;
+- **what happens when it is interrupted** — anything with an in-flight state also names the sweep that
+  ends rows a crash stranded, and the host that invokes it.
+
+Two anti-patterns this exists to stop, both observed: a growth bound described in a sibling plan and
+assumed by this one without a link (the two then disagree — one deletes on finish, the other needs the
+artefact back later), and a state machine whose non-terminal state has no timeout.
+
 ## Promoting a finished plan
 
 1. `git mv todo/PLAN_x.md research/PLAN_x.md`
@@ -65,6 +90,7 @@ holding the whole document hostage.
 ## Definition of Done
 
 - [ ] New plans are in `todo/`, with a status line on line 2–3, verified references, a build order, a test plan and a DoD.
+- [ ] Every growth surface the plan creates names its projected size, who retires it, and its sweep.
 - [ ] The completion check ran: every plan the work touched was re-read and promoted if finished.
 - [ ] Promoted plans carry `IMPLEMENTED <date>` **and their deviations**.
 - [ ] Both folder READMEs match their folders — and a README row is committed in the SAME commit as the
