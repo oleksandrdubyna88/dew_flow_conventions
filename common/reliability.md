@@ -90,6 +90,36 @@ compliance. Catch a *specific* type only where this layer genuinely handles *tha
   state instead of a stranded one (`dew_flow_benchmark` — zero signal handling; every orchestrator
   stop has the same effect as a crash).
 
+### A timeout is not a cancellation — and .NET spells them the same
+
+The two facts are opposite in meaning and identical in type:
+
+| what happened | exception | the token |
+|---|---|---|
+| the caller gave up | `OperationCanceledException` | `IsCancellationRequested == true` |
+| **we** gave up — `HttpClient.Timeout`, a linked `CancelAfter` | `TaskCanceledException` (a SUBCLASS of the above) | **not** cancelled |
+
+So `catch (Exception ex) when (ex is not OperationCanceledException)` — which reads as "handle
+everything except the caller giving up" — **excludes our own timeout**, the one case the catch exists
+for. Found live on 2026-08-16 in `dew_flow_rag_qln`: a 4-second sidecar probe timing out escaped the
+handler, escaped the endpoint, and Kestrel answered **500** — six times in one day, on the operator's
+Runtime page, which is the one place to look when something is slow. The same repository held
+**twelve** copies of that filter. It is a language trap, not a lapse.
+
+**Filter on the token's state, never on the exception's type:**
+
+```csharp
+catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+```
+
+(`dew_flow_benchmark · src/Bench.Infrastructure/Models/OpenAiCompatibleRuntime.cs:73` — the reference.)
+
+The same trap has a second face on the throwing side: a launcher whose timeout surfaced as
+`OperationCanceledException` made every caller read "we overran" as "the host is shutting down", so a
+docker probe that merely took too long travelled out of a `BackgroundService` and stopped it. Fixed by
+throwing a distinct `TimeoutException`. **If you own the wait, give up in your own words** — a typed
+value or a distinct exception — so no downstream filter has to guess which of you quit.
+
 ## Everything that grows has an owner
 
 - **In memory:** every cache, dictionary or list that grows with traffic is bounded or evicted.
@@ -137,5 +167,7 @@ overflows `int` into an unhandled exception any client can trigger with one call
 - [ ] Every new growth surface (memory, table, directory) names its bound or retention in the
       summary.
 - [ ] `CancellationToken` reaches the leaf I/O; the host handles Ctrl+C / SIGTERM.
+- [ ] No handler distinguishes "we timed out" from "the caller cancelled" by exception TYPE — the
+      token's state decides, and a wait you own gives up in its own words.
 - [ ] Health reflects the new component's liveness if it has a failure mode worth seeing.
 - [ ] Client-supplied numbers are clamped at the boundary.
