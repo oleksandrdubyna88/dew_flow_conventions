@@ -76,6 +76,37 @@ Two assertions usually need rewriting when you do this — anything that says "t
 run's history rather than the guarantee under test. State the guarantee instead, or the test passes once and
 fails forever after.
 
+## Passes alone, fails in the suite — that is a SHARED-STATE defect, never a flake (MANDATORY)
+
+The reflex is to re-run it, watch it go green, and move on. That reflex is how an architectural defect
+ships. Measured here on 2026-08-16, the day of the reliability audit: a benchmark commit was verified
+green — 415 tests, 0 failed — and the same binaries in the other configuration failed
+`A_cell_stranded_by_a_dead_host_is_handed_back` with `Expected report.Requeued to be 1, but found 2`.
+In isolation the test passed. It was not flaky, and it was not one bug but two:
+
+- the test asserted a **global count** where the store's sweep has no run filter, so a sibling test's
+  stranded cell was counted too — the "this run created N" mistake named two sections above; and
+- the sweep it was testing decided purely on ELAPSED TIME, with no ownership check — which had been
+  harmless while the sweep was dead code and became live that same morning, in a system whose design
+  invites several workers. The interference in the suite was the only visible symptom of it.
+
+So, when a test passes alone and fails in the suite:
+
+1. **Do not re-run it hoping.** Read what the two runs share — a database, a directory, a port, a
+   static, a clock, a GPU. The failure is a message about that shared thing.
+2. **Suspect the code before the test.** A test that is only correct when it runs alone is often
+   describing a subject that is only correct when it runs alone, and the production system will not.
+3. **Fix the assertion to state the guarantee**, not the run's history — then the test stops depending
+   on what else exists, and starts depending on what must be true.
+
+## A green suite proves only the configuration you ran
+
+The run above was green in Release and red in Debug on the same source. Whatever differs between your
+configurations — optimizations, assertions, timing, test ordering, parallelism — differs for the code
+under test too. Run the whole suite in the configuration the fix will actually ship in, and when a
+change touches concurrency, ordering, or shared state, run both. Reporting one configuration's green
+as "the suite passes" is the same overstatement as reporting a subset's.
+
 ## Every bug fix starts with a RED test (MANDATORY)
 
 The order is fixed — never fix first and test after:
@@ -121,3 +152,7 @@ is a red build. Do not relax it to make a reference convenient — the reference
 - [ ] New behaviour has tests; a fix has a test that was observed failing for the real symptom.
 - [ ] Both observations are in the summary.
 - [ ] Test names state guarantees.
+- [ ] The WHOLE suite was run, in the configuration that ships — and in both when the change touches
+      concurrency, ordering, or shared state.
+- [ ] No failure was dismissed as flaky: a test that passes alone and fails in the suite was traced to
+      the state the two runs share.
