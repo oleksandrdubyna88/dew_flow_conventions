@@ -56,8 +56,33 @@ artefact back later), and a state machine whose non-terminal state has no timeou
 2. Status becomes `> Status: **IMPLEMENTED, <YYYY-MM-DD>.**` — **and record the deviations.** What
    shipped differently from the plan is the most valuable part of the record, and the part a future
    reader actually needs.
-3. Fix relative links in both directions and every inbound `.cs` / `.md` reference.
+3. Fix the links. **There are THREE cases, not two** — see below.
 4. Update the *Currently open* table in the repo's `todo/README.md`.
+
+### The three link cases, because "both directions" hides one
+
+This step used to read "fix relative links in both directions", and it failed twice on 2026-08-16 —
+in two different repositories, found by accident. "Both directions" invites you to think about links
+whose **target** moved, and there are two of those. The one that breaks is the third, where the target
+never moved at all:
+
+| # | The link | What happens | Fix |
+|---|---|---|---|
+| 1 | **The mover's own links to plans still in `todo/`** | The source moved, the target did not. Nothing about the target changed, so nothing draws attention to it — and the link now resolves inside `research/`, where the file is not. | **Add** `../todo/` |
+| 2 | The mover's own links to things already in `research/` | Now siblings | **Drop** the `../research/` |
+| 3 | Inbound links pointing AT the mover | From `todo/`: add `../research/`. From `research/`: drop the `../todo/` | Rewrite each |
+
+Case 1 is the invisible one and it is the one that broke: a promoted plan kept a sibling-style link to
+the founding plan it implements, which was still open, so it pointed at a `research/` file that does not
+exist. Both instances survived every subsequent read of those documents.
+
+Also fix every inbound `.cs` / `.md` reference outside these folders — a plan is cited from code
+comments, and those citations are paths rather than links, so no renderer will ever complain.
+
+**Verify by walking, not by remembering.** The check is mechanical: for every markdown link in `todo/`
+and `research/`, resolve it relative to its own file and assert the target exists. Nothing in this
+family currently runs that check — the predecessor repository had it as a test and it was lost in the
+split into four. Until it is restored, run the walk by hand as part of the promotion.
 
 **Check at task completion, every time.** Before reporting work done, ask whether it finished a plan —
 or whether a plan's status line simply no longer matches reality. Promote it in the same task, not
@@ -93,6 +118,8 @@ holding the whole document hostage.
 - [ ] Every growth surface the plan creates names its projected size, who retires it, and its sweep.
 - [ ] The completion check ran: every plan the work touched was re-read and promoted if finished.
 - [ ] Promoted plans carry `IMPLEMENTED <date>` **and their deviations**.
+- [ ] All three link cases were fixed, and checked by resolving every link rather than from memory —
+      including the invisible one, the mover's own links to plans that stayed in `todo/`.
 - [ ] Both folder READMEs match their folders — and a README row is committed in the SAME commit as the
       plan it links, never before it ([git-workflow.md](git-workflow.md) § *a reference and its target are
       one commit*; a row pointing at an untracked file is a broken link in every clone but yours).
