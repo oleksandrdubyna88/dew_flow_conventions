@@ -40,6 +40,19 @@ MANY SMALL FILES > FEW LARGE FILES:
 Every string a user reads — CLI output, API messages, UI labels, commit messages, documentation — is
 English. No mixed-language chrome.
 
+## Absent is not zero, and asked-for is not reported
+
+Two distinctions that cost this family real time when they were collapsed:
+
+- **A measurement that could not be taken must not render as `0`.** A volume Docker could not read and a
+  store that is genuinely empty are different facts; drawn on a chart, the first becomes a cliff someone
+  investigates. Carry a "known" flag, render absence as `—`, and let a total skip what it could not measure
+  rather than counting it as nothing.
+- **A value a service REPORTED and a value someone CONFIGURED are not the same kind of fact.** A sidecar once
+  answered `provider: "cuda"` for a binary that could not register CUDA — the field everyone read as active
+  was the requested one. Anything rendered as fact must have been answered by the thing itself; anything read
+  from the environment says so.
+
 ## Code quality checklist
 
 Before marking work complete:

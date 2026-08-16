@@ -22,3 +22,25 @@
    conventions. CI green, conflicts resolved, branch up to date before requesting human review.
 
 4. **Commit & push** — conventional commits per [git-workflow.md](git-workflow.md).
+
+## Verify the ARTEFACT, not the source (MANDATORY)
+
+A build step that does not run leaves the previous artefact in place, and every downstream signal keeps
+saying "success". Measured here: a VS Code extension was packaged without a `vscode:prepublish` script, so
+the `.vsix` carried JavaScript three versions old. It installed cleanly, reported success, and behaved
+exactly as before — while the operator restarted the editor twice looking for a change that was never
+shipped.
+
+The type check made it worse rather than catching it: `tsc --noEmit` proves the SOURCE compiles while
+emitting nothing, so it confirmed the correctness of code that was not in the package.
+
+So, whenever what ships is a built artefact rather than the working tree:
+
+- **Look inside it.** Unzip the package, grep the compiled output for a symbol only the new version has, read
+  the DLL's timestamp. "Successfully installed" is the installer's opinion about a file, not about its
+  contents.
+- **Make the build unskippable** — a prepublish hook, a packaging step that compiles — so the next person
+  cannot repeat it.
+- The same trap has a sibling on this machine: a host holding DLLs makes `dotnet build` report
+  `0 error(s)` for projects it silently could not copy. A clean build line is not proof that the binary you
+  are about to run is fresh.
