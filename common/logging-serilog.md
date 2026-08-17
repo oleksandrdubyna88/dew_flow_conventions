@@ -168,7 +168,15 @@ The sidecar has no Serilog; it has `tracing`, and the CONTRACT is what is shared
 
 - an stdout layer **with** ANSI (`.with_ansi(true)`),
 - a file layer **without** ANSI, at the same `logs/{day}/{app}-{time}-{pid}.log` path,
-- level from `RUST_LOG`, defaulting to the same floor.
+- the same midnight segment for a run that outlives the day,
+- level from `RUST_LOG`, defaulting to the same floor,
+- the same **retention owner**: prune day folders at startup, same 14-day default, best effort, logged.
+  Configuration is the crate's own — an env var (`SIDECAR_LOG_RETENTION_DAYS`) rather than a
+  `Serilog:RetentionDays` key — because the CONTRACT is the window and the owner, not the mechanism.
+
+The sidecar is the process this matters most for and was the last to get it: the orchestrator starts it
+once and it serves until the machine does not, so it is the host least likely to ever be restarted by
+anything but a reboot.
 
 ## Never
 
