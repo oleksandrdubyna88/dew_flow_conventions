@@ -29,5 +29,23 @@ A new repository joins with one `git submodule add` — see [ROLLOUT.md](ROLLOUT
 `settings/settings.json` is the reference copy of the family's `.claude/settings.json`. Settings cannot
 be shared by mount, so each repo holds a copy and keeps it byte-identical to the reference.
 
+## `tools/` — the rules that check themselves
+
+A rule nothing enforces is a rule that decays quietly. `common/planning-docs.md` described how to promote
+a finished plan for as long as it existed, and by the time anyone counted, one repository had a plan
+asking in writing to be moved and another had two promoted plans absent from its own index.
+
+| Tool | Enforces | Run |
+|---|---|---|
+| [`tools/plan-lifecycle.mjs`](tools/plan-lifecycle.mjs) | [`common/planning-docs.md`](common/planning-docs.md) | `node .claude/rules/shared/tools/plan-lifecycle.mjs` |
+
+**One implementation, not one per repository.** A copy each would mean the same rule in two languages —
+one of the four consumers is Rust — and `common/logging-serilog.md` already documents what that costs.
+These checks read markdown rather than code, so nothing about them needs to be written twice. Node is on
+every GitHub runner, so a Rust repository pays no toolchain for it.
+
+A consumer wires it as one CI step, and its checkout needs `submodules: true` to have the file at all —
+see [ROLLOUT.md](ROLLOUT.md).
+
 The previous-generation `ClaudeRag` repository is **frozen**: its rules were the seed of these, but it
 is not a source any more.

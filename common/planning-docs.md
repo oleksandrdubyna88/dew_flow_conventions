@@ -80,9 +80,21 @@ Also fix every inbound `.cs` / `.md` reference outside these folders — a plan 
 comments, and those citations are paths rather than links, so no renderer will ever complain.
 
 **Verify by walking, not by remembering.** The check is mechanical: for every markdown link in `todo/`
-and `research/`, resolve it relative to its own file and assert the target exists. Nothing in this
-family currently runs that check — the predecessor repository had it as a test and it was lost in the
-split into four. Until it is restored, run the walk by hand as part of the promotion.
+and `research/`, resolve it relative to its own file and assert the target exists.
+
+*Restored 2026-08-17.* This paragraph used to end "nothing in this family currently runs that check —
+the predecessor repository had it as a test and it was lost in the split into four". It is now
+[`tools/plan-lifecycle.mjs`](../tools/plan-lifecycle.mjs), run by every consumer's CI:
+
+```bash
+node .claude/rules/shared/tools/plan-lifecycle.mjs
+```
+
+Six findings, all of them failures this family has actually made: a plan with no status line where the
+convention says to look, a finished plan left in `todo/`, an unstarted one sitting in `research/`, a
+link between the folders that does not resolve, the open table drifting from its folder, and a promoted
+plan the research index never mentions. One implementation for all four repositories rather than a copy
+each — the check reads markdown, not code, and one of the four is Rust.
 
 **Check at task completion, every time.** Before reporting work done, ask whether it finished a plan —
 or whether a plan's status line simply no longer matches reality. Promote it in the same task, not
