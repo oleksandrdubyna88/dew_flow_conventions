@@ -29,25 +29,32 @@ import * as path from "node:path";
  *  little slack for a title block, and nothing like "somewhere in section 2". */
 const STATUS_WITHIN_LINES = 6;
 
-/** Phrases that claim work is finished. */
-const DONE_MARKERS = ["implemented", "code complete", "shipped"];
-
-/** Phrases that admit something is not finished. A status carrying BOTH is a partially implemented plan,
- *  which the rule explicitly allows to sit in either folder. */
-const OPEN_MARKERS = [
-  "plan only", "not started", "proposed", "in progress", "open", "outstanding", "pending",
-  "remains", "remaining", "still owed", "not implemented", "nothing implemented", "untouched",
-  "is not built", "are not built", "never built",
-];
-
 /**
- * Phrases that contain a done-marker while DENYING it. "plan only, nothing implemented yet" is the
- * commonest opening line in `todo/`, and a naive substring scan reads the word "implemented" in it as a
- * claim of completion — which makes the unstarted-in-research check silently unable to fire.
+ * A plan in `todo/` that is actually finished — and the two ways to tell WITHOUT guessing at prose.
+ *
+ * The first attempt scored phrases: "shipped"/"implemented" against a list of open-work words. Run against
+ * the two real cases it was meant to judge, it was wrong BOTH ways.
+ *
+ * - `dew_flow_rag_qln · todo/PLAN_gpu_arbitration.md` says *"steps 1–3 shipped … **Steps 4–7 are the
+ *   work**: no consumer participates, so today it arbitrates nothing"* — plainly open, and flagged as
+ *   finished, because none of those words was on the open list. A false failure is how a check gets
+ *   switched off, so this one mattered most.
+ * - `PLAN_runtime_panel`, the case the check was WRITTEN for, said *"the panel SHIPPED … two DoD items
+ *   remain open; the plan belongs in `research/` and is awaiting a promotion"* — and was not flagged,
+ *   because "remain open" read as open work. It had no teeth for its own founding case.
+ *
+ * So prose scoring is out. What is left is crisp and answers both: the convention's own promoted form, and
+ * a plan SAYING it is in the wrong folder. A partially implemented plan — the normal state of half this
+ * folder — matches neither and is left alone, which is what the rule asks for anyway.
  */
-const NEGATIONS = [
-  "nothing implemented", "nothing is implemented", "not implemented", "never implemented",
-  "no code implemented", "nothing yet implemented",
+const PROMOTED_VERDICT = /status:\s*\*\*\s*implemented\b/i;
+
+/** A plan that reports its own misfiling. Both phrasings are taken from the real status line above. */
+const SELF_REPORTED_MISFILING = [
+  "belongs in `research/`",
+  "belongs in research/",
+  "awaiting a promotion",
+  "awaiting promotion",
 ];
 
 /** A markdown link to a local file, e.g. `](../research/PLAN_x.md)`. */
@@ -104,19 +111,16 @@ function statusParagraph(file) {
   return paragraph.join(" ").toLowerCase();
 }
 
-const claimsDone = (status) =>
-  DONE_MARKERS.some((m) =>
-    NEGATIONS.reduce((text, negation) => text.split(negation).join(" "), status).includes(m));
-
-const admitsOpenWork = (status) => OPEN_MARKERS.some((m) => status.includes(m));
-
-/** Finished, and admitting nothing outstanding. In `todo/` that is a misfiling. */
-const isFullyDone = (status) => claimsDone(status) && !admitsOpenWork(status);
+/** Finished, by the convention's own promoted form or by the plan's own admission. In `todo/` either is a
+ *  misfiling; anything less certain is left alone deliberately — see the constants above. */
+const isFullyDone = (status) =>
+  PROMOTED_VERDICT.test(status) || SELF_REPORTED_MISFILING.some((m) => status.includes(m));
 
 /** Not started. In `research/` that is a misfiling — the folder documents the system as it is, and an
- *  unstarted plan documents nothing. */
+ *  unstarted plan documents nothing. These three openings are unambiguous in a way "shipped" is not. */
 const isUnstarted = (status) =>
-  !claimsDone(status) && ["plan only", "not started", "proposed"].some((m) => status.includes(m));
+  !PROMOTED_VERDICT.test(status)
+  && ["plan only", "not started", "proposed"].some((m) => status.includes(m));
 
 /** The rows of the "Currently open" table alone — from its heading to the next one. */
 function openSectionRows(readme) {
@@ -143,7 +147,7 @@ function checkStatuses(root, findings) {
       if (status.length === 0) {
         findings.push(`status    ${folder}/${file} — no status line in the first ${STATUS_WITHIN_LINES} lines`);
       } else if (folder === "todo" && isFullyDone(status)) {
-        findings.push(`misfiled  ${folder}/${file} — nothing left open; it belongs in research/`);
+        findings.push(`misfiled  ${folder}/${file} — its status reads as promoted; it belongs in research/`);
       } else if (folder === "research" && isUnstarted(status)) {
         findings.push(`misfiled  ${folder}/${file} — unstarted; it belongs in todo/`);
       }
