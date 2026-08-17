@@ -27,10 +27,17 @@ Commit `.gitmodules` + the mount + the deletions together.
 - **CI DOES need the submodule, since 2026-08-17.** This note used to read "CI does not need the
   submodule — builds and tests never read `.claude/`. Do not add `submodules: recursive` to workflows
   for this." That was true of its premise and the premise moved: `tools/plan-lifecycle.mjs` lives here
-  and every consumer's CI runs it, so the file has to be on disk. Each workflow's checkout therefore
-  carries `submodules: true` (`recursive` where another submodule already needs it, as in
-  `dew_flow_rag_qln`). This repository must stay reachable to CI — public, or the workflow token needs
-  access.
+  and every consumer's CI runs it, so the file has to be on disk. Each workflow fetches **that one
+  submodule** rather than setting `submodules: true`, which would drag `dew_flow_rag_qln`'s whole
+  `external/dew_flow_mcp` checkout in for a markdown walk on every push:
+
+  ```yaml
+        - uses: actions/checkout@v4
+        - run: git submodule update --init --depth 1 .claude/rules/shared
+        - run: node .claude/rules/shared/tools/plan-lifecycle.mjs
+  ```
+
+  This repository must stay reachable to CI — public, or the workflow token needs access.
 - **`dew_flow_mcp` is public**: after mounting, this repository's URL is part of a public tree. Keep
   this repository public, or the public clone experience breaks at `submodule update`.
 - A fresh clone of a consumer needs `git submodule update --init .claude/rules/shared` before Claude
