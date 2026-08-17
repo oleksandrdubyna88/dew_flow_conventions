@@ -166,7 +166,25 @@ function checkLinks(root, findings) {
       const text = fs.readFileSync(path.join(dir, file), "utf8");
       for (const [, target] of text.matchAll(LOCAL_MD_LINK)) {
         if (target.includes("://")) continue;
-        if (!fs.existsSync(path.resolve(dir, target))) {
+
+        const resolved = path.resolve(dir, target);
+
+        // A link that climbs out of the repository is a CROSS-REPOSITORY link, and the rule forbids it in
+        // as many words: "cross-repository citations are paths, not links — a relative link that resolves
+        // only on one machine is worse than a citation that names its source". Reported as its own finding
+        // rather than as a missing file, because on a developer's machine the sibling checkout usually IS
+        // there and the link resolves. That is precisely the failure: it passes where it is written and
+        // fails everywhere else. Existence is deliberately not consulted here — consulting it is what made
+        // this class invisible.
+        if (!resolved.startsWith(root + path.sep)) {
+          findings.push(
+            `link      ${folder}/${file} -> ${target} — leaves the repository; cite the path ` +
+              "(`repo · folder/file.md:line`) instead of linking it",
+          );
+          continue;
+        }
+
+        if (!fs.existsSync(resolved)) {
           findings.push(`link      ${folder}/${file} -> ${target}`);
         }
       }
