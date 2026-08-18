@@ -49,6 +49,23 @@ const STATUS_WITHIN_LINES = 6;
  */
 const PROMOTED_VERDICT = /status:\s*\*\*\s*implemented\b/i;
 
+/**
+ * A plan claiming its work is finished IN TOTAL, in words other than the convention's own.
+ *
+ * Added 2026-08-18 after a third miss, and this one had been sitting in `todo/` for a day:
+ * `PLAN_unclaimed_collections` opened *"Status: **all six steps built 2026-08-17. The open tail is what the
+ * claim source cannot see"*. Every word of that is true and none of them is "implemented", so the check
+ * called the folder clean while an implemented plan read as outstanding work — exactly the failure this file
+ * exists to prevent.
+ *
+ * The discriminator is TOTALITY, not the verb: half this folder legitimately says "steps 1-3 implemented",
+ * "phase 3 shipped", "items 1-9 are DONE", and every one of those is a partial plan that belongs where it
+ * is. So the match needs an "all"/"every" quantifier reaching a completion verb inside one clause, and
+ * refuses when a negation precedes it — "not all steps are done" is the opposite claim.
+ */
+const TOTALITY_VERDICT =
+  /(?<!\bnot\s)(?<!\bnothing\s)\b(?:all|every)\b[^.;]{0,60}?\b(?:built|shipped|done|implemented|complete)\b/i;
+
 /** A plan that reports its own misfiling. Both phrasings are taken from the real status line above. */
 const SELF_REPORTED_MISFILING = [
   "belongs in `research/`",
@@ -114,7 +131,9 @@ function statusParagraph(file) {
 /** Finished, by the convention's own promoted form or by the plan's own admission. In `todo/` either is a
  *  misfiling; anything less certain is left alone deliberately — see the constants above. */
 const isFullyDone = (status) =>
-  PROMOTED_VERDICT.test(status) || SELF_REPORTED_MISFILING.some((m) => status.includes(m));
+  PROMOTED_VERDICT.test(status)
+  || TOTALITY_VERDICT.test(status)
+  || SELF_REPORTED_MISFILING.some((m) => status.includes(m));
 
 /** Not started. In `research/` that is a misfiling — the folder documents the system as it is, and an
  *  unstarted plan documents nothing. These three openings are unambiguous in a way "shipped" is not. */
