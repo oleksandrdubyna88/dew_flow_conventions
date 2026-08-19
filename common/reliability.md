@@ -3,7 +3,10 @@
 > Written from the 2026-08-16 four-repo audit, on the eve of the first long unattended runs. Every
 > rule below names the audit finding that made it; none is hypothetical. The mission they serve:
 > **no hangs, no leaks, no silent deaths — and every failure diagnosable from the log after the
-> fact.** Citations are `repo · path:line` per [planning-docs.md](planning-docs.md).
+> fact.** Citations are `repo · path:line` per [planning-docs.md](planning-docs.md) — **as of the
+> audit date**: they are the evidence that made the rule, not live pointers, and most named
+> violations are since fixed (each repo's `research/PLAN_reliability_tail.md` tracks its closures).
+> Do not "correct" a citation to today's line numbers; the rule text is the durable part.
 
 ## Every wait has a ceiling
 

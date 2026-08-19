@@ -35,7 +35,11 @@ Commit `.gitmodules` + the mount + the deletions together.
         - uses: actions/checkout@v4
         - run: git submodule update --init --depth 1 .claude/rules/shared
         - run: node .claude/rules/shared/tools/plan-lifecycle.mjs
+        - run: node .claude/rules/shared/tools/pin-check.mjs
   ```
+
+  `pin-check.mjs` needs the parent repository's history for `rev-parse HEAD:<path>` only — the
+  default checkout provides that; it does not need the other submodules fetched.
 
   This repository must stay reachable to CI — public, or the workflow token needs access.
 - **`dew_flow_mcp` is public**: after mounting, this repository's URL is part of a public tree. Keep

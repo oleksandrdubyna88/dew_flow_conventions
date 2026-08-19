@@ -2,8 +2,8 @@
 
 One copy of every cross-repository rule, consumed by each `dew_flow_*` repository as a git submodule
 mounted at `.claude/rules/shared`. Claude Code loads rules from subdirectories, so everything under
-`common/` (always loaded) and `csharp/` (path-scoped frontmatter) applies in the consumer exactly as a
-local rule would.
+`common/` (always loaded), `csharp/` and `rust/` (path-scoped frontmatter) applies in the consumer
+exactly as a local rule would.
 
 ## Editing discipline (MANDATORY)
 
@@ -13,6 +13,11 @@ local rule would.
 - **A rule change and the pin bumps are one task**: edit here → commit + push → in EVERY consumer
   `git submodule update --remote .claude/rules/shared` + commit, in the same task, never later. Drift
   that is visible as a stale pin is still drift; keep it at zero by habit.
+- The habit is now also a check: [`tools/pin-check.mjs`](tools/pin-check.mjs) runs in every
+  consumer's CI and fails while **any** submodule pin (this one, and `dew_flow_rag_qln`'s
+  `external/dew_flow_mcp` alike) is not at its remote's tip. The 2026-08-19 audit found three
+  consumers two commits behind — one missing `gpu-lease.md` entirely — which is why the pin has a
+  check instead of an owner.
 - Repo-specific rules stay in the consumer's own `.claude/rules/` beside `shared/`.
 
 ## Consumers
@@ -21,7 +26,7 @@ local rule would.
 |---|---|
 | `dew_flow_rag_qln` | .NET |
 | `dew_flow_mcp` | .NET, public |
-| `dew_flow_sidecar_rust` | Rust — the C#-scoped rules simply never match |
+| `dew_flow_sidecar_rust` | Rust — `csharp/` never matches; `rust/doctrine.md` is its doctrine |
 | `dew_flow_benchmark` | .NET |
 
 A new repository joins with one `git submodule add` — see [ROLLOUT.md](ROLLOUT.md).
@@ -38,6 +43,7 @@ asking in writing to be moved and another had two promoted plans absent from its
 | Tool | Enforces | Run |
 |---|---|---|
 | [`tools/plan-lifecycle.mjs`](tools/plan-lifecycle.mjs) | [`common/planning-docs.md`](common/planning-docs.md) | `node .claude/rules/shared/tools/plan-lifecycle.mjs` |
+| [`tools/pin-check.mjs`](tools/pin-check.mjs) | Editing discipline (pins at remote tips) | `node .claude/rules/shared/tools/pin-check.mjs` |
 
 **One implementation, not one per repository.** A copy each would mean the same rule in two languages —
 one of the four consumers is Rust — and `common/logging-serilog.md` already documents what that costs.
