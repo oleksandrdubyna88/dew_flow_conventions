@@ -48,7 +48,9 @@ logs/{yyyy-MM-dd}/{app}-{HH-mm-ss}-{pid}.log
 - **Everything is UTC** — the folder, the file name, and the timestamp on every line. Not a preference: the
   Rust sidecar has no timezone library and names its folder from a unix timestamp, so a local-time .NET host
   and a UTC sidecar put the same evening's logs into two different day folders, and the one time anyone
-  correlates them is while chasing a failure across both. One clock, everywhere.
+  correlates them is while chasing a failure across both. One clock, everywhere. The same clock governs
+  everything that is STORED — see [utc-timestamps.md](utc-timestamps.md), which exists because the rule was
+  written here for logs and not for data, and a column drifted a day for a week.
 
 ### Colour: Serilog's console theme does NOT work here — measured
 
