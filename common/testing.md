@@ -51,6 +51,61 @@ So, for every contract that crosses a repository:
    break on the day — nobody had run it against a live engine.
 4. **Reconciling by hand is what failed.** Do not propose it as the fix.
 
+## A fixture the code REJECTS proves nothing — and it proves it in green (MANDATORY)
+
+The failure mode of a stubbed test is not a red suite. It is a fixture the production code quietly
+declines — a validator returns false, a lookup misses, a guard takes its safe branch — so the test
+RUNS, PASSES, and asserts something other than its name.
+
+Measured on 2026-08-26, five times in one session, in one repository:
+
+| the fixture | what the code silently did | what the test then proved |
+|---|---|---|
+| a key wrap keyed `type` instead of `kind` | not recognised as that kind of wrap → the "safe" branch | it exercised the very path it existed to prove was NOT taken |
+| an entity without a required `isSshEnabled` | the whole payload failed validation → an early throw | three "nothing was written" tests never reached the guard they name |
+| a share item of `{ id }` alone | dropped by the shape check | "pending shares survive the rewrite" passed against zero shares |
+| a 7-character secret | below the masker's 8-character floor | "the secret is masked" read as a masking defect in the module |
+| a colour on the dependent instead of the target | the relationship still formed, the colour was `undefined` | the relationship assertion passed for the wrong reason |
+
+Three of the five were caught only because a NEIGHBOURING test failed. Had those files been entirely
+about refusals — "nothing was written", "the call was rejected" — every one would have been green and
+worthless.
+
+**So:**
+
+1. **Build the fixture against the REAL validator, not against a reading of the type.** If the code has
+   an `isFoo()` / `TryParse` / schema check that the value must pass, call it in the test setup, or
+   assert once that the fixture passes it. A type says which fields MAY exist; the validator says which
+   must.
+2. **Never guess a value the code COMPUTES — read it back from the function that computes it.** File
+   names, cache keys, socket paths, ids. A guessed name does not fail; it silently matches nothing, and
+   the test then exercises the empty-input path. (Here: backup file names carry a provider suffix only
+   when two accounts share an email, so every guessed name made the "existing file" invisible.)
+3. **Be suspicious of a test that passed the first time.** It is not evidence of anything by itself —
+   but combined with a fixture you assembled by hand it is the moment to check that the subject actually
+   saw what you think you gave it.
+4. **A file full of negative assertions needs one positive.** If every test says "nothing happened",
+   add one that makes something happen with the same fixture. That is the test that fails when the
+   fixture is wrong.
+
+This is the same class as *A test can only inspect what is PRESENT* below, one step earlier: there the
+subject never arrived, here it arrived and was rejected.
+
+## A structural test that matches nothing passes forever
+
+A test that scans the tree — for a forbidden call, a missing registration, a stale link — is only a
+control while its search still finds things. Change the code's formatting and the pattern can stop
+matching everything, at which point the test passes permanently and enforces nothing. It will never go
+red to tell you.
+
+So a scan gets **two** tests: the prohibition, and one asserting the scan still finds a KNOWN instance —
+the sanctioned call site, the one legitimate exception, the module that is allowed to do the thing.
+
+Measured 2026-08-26: a guard against `path.join(materializedKeysDir(…))` outside one module was written
+across lines on purpose, because three of the six offending sites were formatted over three lines and a
+line-by-line scan would have reported none of them. Its companion test — "the scan still finds the
+sanctioned join in the owning module" — is what proves the pattern is alive after the next reformat.
+
 ## A test can only inspect what is PRESENT
 
 A test that examines artefacts — assemblies in an output folder, files on disk, rows in a store — is only as
@@ -98,6 +153,30 @@ So, when a test passes alone and fails in the suite:
    describing a subject that is only correct when it runs alone, and the production system will not.
 3. **Fix the assertion to state the guarantee**, not the run's history — then the test stops depending
    on what else exists, and starts depending on what must be true.
+
+## A green suite proves only the BINARIES you ran — check they are the ones you built
+
+A test run says nothing about source the runner never loaded. Three ways that happens, all measured in
+this family:
+
+- **The compiler emitted despite errors.** TypeScript writes its output even when `tsc` reports type
+  errors, so a suite can be green against the last version that compiled while the file you just edited
+  is red. Read the compiler's exit status, not only the runner's.
+- **The build was blocked and left the previous binaries.** A running host holding a DLL, a locked
+  output directory, a refused write — the build fails, the old binaries remain, and the runner happily
+  reports them. `0 errors` in a log is not proof of a fresh binary; a TIMESTAMP is.
+- **Restoring a file from a backup kept its old timestamp**, so the build skipped it and the run
+  measured the version you thought you had replaced. Restore by writing the file, not by copying one
+  whose mtime predates the build.
+
+The habit that covers all three: after a build that matters, look at the output's modification time
+against the source's, and treat any suite result taken over a failed build as no result at all.
+
+**And when the build output lives somewhere other than where the project puts it, expect phantom
+failures.** Tests that resolve a fixture, a manifest or a generated contract relative to the repository
+root break in a relocated build and look exactly like real regressions — measured: 23 of them, all
+imaginary. Build in place; if you need an isolated copy, extract the WHOLE repository (see
+[git-workflow.md](git-workflow.md) — *Verify the STAGED tree*).
 
 ## A green suite proves only the configuration you ran
 
@@ -156,3 +235,6 @@ is a red build. Do not relax it to make a reference convenient — the reference
       concurrency, ordering, or shared state.
 - [ ] No failure was dismissed as flaky: a test that passes alone and fails in the suite was traced to
       the state the two runs share.
+- [ ] Fixtures were built against the real validator, and any value the code computes was read back
+      from the function that computes it rather than guessed.
+- [ ] Any tree-scanning test has a companion asserting its pattern still matches a known instance.

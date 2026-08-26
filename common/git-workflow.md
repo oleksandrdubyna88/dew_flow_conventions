@@ -53,6 +53,82 @@ So, before committing in a tree you share:
 - When in doubt about whether the commit stands alone, the cheap check is to read the staged diff for
   names your commit does not itself introduce.
 
+### 4. On a file someone else is also editing, `git add <path>` is ALWAYS wrong
+
+Rule 1 says "stage by path". That protects every file you did NOT touch, and does **nothing** for a
+file you DID touch that somebody else is editing — because `git add <path>` stages the whole
+working-tree version of it, theirs included.
+
+Measured 2026-08-26, three times in one day, in both directions:
+
+- a one-line `package.json` change committed **102 insertions**, 101 of them a peer's uncommitted
+  palette, under a message about a broker fix;
+- a shared design document was committed by one session carrying ~41 lines of another's unsaved text,
+  and then partly deleted by that other session committing from an index staged before the first
+  landed — both commits looked clean;
+- an agent that had used the blob dance correctly on one commit reached for `git add` on the very next
+  one and swept four hunks of a peer's security fix into a commit about ssh options.
+
+The last is the important one: **knowing the technique is not the safeguard; using it every time is.**
+A file counts as hot the moment any other session has it open, which in these trees is the default and
+not the exception.
+
+So, for a hot file, stage by hunk (`git add -p`) or rebuild it as a blob:
+
+```bash
+git show HEAD:path/to/file > scratch          # take the snapshot NOW, not earlier
+# re-apply ONLY your hunks to the scratch copy
+blob=$(git hash-object -w scratch)
+git update-index --cacheinfo 100644,$blob,path/to/file
+```
+
+The worktree is never touched, so after your commit the file's remaining diff is exactly the other
+session's work, which they then commit themselves. Take the `git show HEAD:` snapshot in the same
+breath as the hashing: a peer committing into that file in between makes your blob silently revert
+their landed change.
+
+### 5. Check the staged diff's SIZE, not only its deletions
+
+A deletions-only check catches a stale index and misses an unintended INSERTION entirely — which is how
+101 foreign lines rode into a one-line change. Before committing:
+
+```bash
+git diff --staged --stat
+```
+
+and read the NUMBER against what you meant to change. A one-line edit showing `102 +++++` is the whole
+signature. Deletions you did not intend mean a stale index; insertions you did not intend mean somebody
+else is in that file.
+
+### 6. Verify the STAGED tree, not the working tree
+
+In a shared checkout the working tree is usually red from someone else's half-finished work, and a
+suite run over it says nothing about your commit — in either direction. Build what you are actually
+committing:
+
+```bash
+git archive $(git write-tree) | tar -x -C /tmp/staged
+cp -r node_modules /tmp/staged/...        # or junction; whatever the build needs
+cd /tmp/staged/... && <build> && <test>
+```
+
+This is the only way to say "this commit is green" while the tree around it is not, and it is what makes
+rule 3 checkable rather than aspirational. Extract the **whole repository**, not the subdirectory you
+work in: tests that resolve fixtures, manifests or generated contracts relative to the repository root
+fail in a partial extract and look like real regressions. (Measured: a partial extract produced 7
+convincing failures, a full one produced 0.)
+
+### 7. `git status` tells you WHAT is happening and never WHO — ask, do not infer
+
+Untracked files and foreign hunks carry no author. Inferring one from the count of sessions you happen
+to know about is how, on 2026-08-26, an agent told a peer in writing that a third session's work was
+theirs — and then offered to wait for that peer to "land" a change they had never started, which would
+have been an indefinite wait for both.
+
+`git worktree list` beside `git status --short`, because a session working in a worktree is invisible to
+both `git status` and any session listing. Then one message asking "is this yours?" — it costs nothing,
+and a wrong attribution sends someone hunting through work they never did.
+
 ### When verification is BLOCKED — ask, do not guess
 
 Blocked is a normal state on this hardware: a running host holds the DLLs, the GPU is taken by a pass,
