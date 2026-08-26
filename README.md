@@ -2,8 +2,8 @@
 
 One copy of every cross-repository rule, consumed by each `dew_flow_*` repository as a git submodule
 mounted at `.claude/rules/shared`. Claude Code loads rules from subdirectories, so everything under
-`common/` (always loaded), `csharp/` and `rust/` (path-scoped frontmatter) applies in the consumer
-exactly as a local rule would.
+`common/` (always loaded), `csharp/`, `rust/` and `typescript/` (path-scoped frontmatter) applies in
+the consumer exactly as a local rule would.
 
 ## Editing discipline (MANDATORY)
 
@@ -13,6 +13,14 @@ exactly as a local rule would.
 - **A rule change and the pin bumps are one task**: edit here → commit + push → in EVERY consumer
   `git submodule update --remote .claude/rules/shared` + commit, in the same task, never later. Drift
   that is visible as a stale pin is still drift; keep it at zero by habit.
+- **Bumping a pin moves that repository's tip, so a consumer that is ITSELF pinned goes stale.**
+  `dew_flow_rag_qln` pins `external/dew_flow_mcp` and `external/dew_flow_benchmark`, so bumping the
+  rules pin in those two repositories leaves rag_qln reporting two stale pins that have nothing to do
+  with any rule. Measured 2026-08-26, both directions in one afternoon. Two consequences: do the
+  pinned-BY repositories last, and — because those two are CODE pins, not rules — a bump there is a
+  change to what rag_qln builds against, so it is subject to *never commit work you have not seen
+  working* and needs its build run. A rules-pin bump never needs that; a code-pin bump always does.
+  Do not treat them as the same chore because the same tool reports both.
 - The habit is now also a check: [`tools/pin-check.mjs`](tools/pin-check.mjs) runs in every
   consumer's CI and fails while **any** submodule pin (this one, and `dew_flow_rag_qln`'s
   `external/dew_flow_mcp` alike) is not at its remote's tip. The 2026-08-19 audit found three
@@ -28,7 +36,7 @@ exactly as a local rule would.
 | `dew_flow_mcp` | .NET, public |
 | `dew_flow_sidecar_rust` | Rust — `csharp/` never matches; `rust/doctrine.md` is its doctrine |
 | `dew_flow_benchmark` | .NET |
-| `dew_flow_creds_for_devs` | TypeScript — a VS Code extension; `csharp/` and `rust/` never match |
+| `dew_flow_creds_for_devs` | TypeScript — a VS Code extension; `typescript/doctrine.md` is its doctrine, `csharp/` and `rust/` never match |
 
 A new repository joins with one `git submodule add` — see [ROLLOUT.md](ROLLOUT.md).
 
