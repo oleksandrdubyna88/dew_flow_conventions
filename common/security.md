@@ -76,6 +76,56 @@ look at how it reaches the sink.
 Measured: a third interpolation site was cleared during a sweep on exactly that reasoning ("it is only
 a constant icon"), and it was one "let the icon vary by kind" away from being the same defect.
 
+## A measure you have not OBSERVED working is a comment (MANDATORY)
+
+The previous rule is about a measure applied at some of its sites. This one is about a measure that
+was applied everywhere and did nothing — which is worse, because the sites are all present and the
+comment beside each of them says what it protects against.
+
+Measured 2026-08-26. The Remote-SSH bridge sent `ssh` two options and documented them as
+protections: `StreamLocalBindMask=0177` "clears every bit but the owner's, which on a shared host is
+the boundary", and `StreamLocalBindUnlink=yes` "a socket left by a dropped session would otherwise
+make every later bind fail". A unit test asserted both were in the argv. Everything read as covered.
+
+On a real host, both were **inert**. For a `-R` forward the socket is created by the SERVER, so
+sshd's copies of those options govern and the client's are ignored:
+
+- the client asked for `StreamLocalBindMask=0000` — deliberately world-writable — and the socket
+  still came out `srw-------`;
+- a socket left by an ended session was not removed and the next bind was refused, despite the client
+  sending `StreamLocalBindUnlink=yes`.
+
+The socket was owner-only the whole time, by sshd's default. So the protection was real, was not
+ours, and could be turned off by an administrator we would never hear from — while the code, the
+comment and the test all said we had it handled.
+
+### The two mistakes, separately
+
+1. **The test asserted PRESENCE, not EFFECT.** `argv.includes('StreamLocalBindMask=0177')` proves the
+   flag was sent. Whether it does anything is a fact about the receiver. A test that can only see
+   your side of a delegated decision cannot be evidence about the decision.
+2. **The docstring stated the effect as fact.** It was written from the option's name and a man page
+   sentence, and read for weeks as an observation. A reader arriving at that code stops there, which
+   is exactly what a comment claiming a protection is for.
+
+### What to do instead
+
+- **Anything you delegate — an `ssh` flag, an `sshd`/DB/kernel setting, an HTTP header the peer must
+  honour, a container option, a filesystem mode you request rather than set — is the receiver's
+  decision.** Whether it took effect is observable only by looking at the result, on a real one.
+- **Until you have looked, write what you asked for, not what it achieves.** "We pass
+  `StreamLocalBindMask=0177`" is honest; "the socket is owner-only" is a claim.
+- **Prefer observing to asserting.** Where the effect cannot be set from your side, check it at run
+  time and say so when it is wrong: the bridge now reads the socket's real mode after connecting and
+  warns, naming the host setting responsible, because that is the only true statement available.
+- **Delete an inert measure rather than keeping it "just in case".** It costs nothing to send and
+  everything to read: it is where the next person stops checking. Removing it, with the measurement
+  recorded, leaves the code saying what is true.
+
+The general form: **a security control at a boundary you do not own is a request until you have seen
+the answer.** Ask what would look different if the option did nothing at all — and if the answer is
+"nothing", that is the state you are in until you measure.
+
 ## Security response protocol
 
 If a security issue is found:

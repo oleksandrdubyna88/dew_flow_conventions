@@ -28,7 +28,16 @@ The Rust sidecar runs `cargo test` — the executables-only rule is about the VS
 Happy path plus the failure and edge paths the feature introduces. A feature without tests is not done
 and is not committed. Say in the summary what was added and what the runner printed.
 
-## A green suite is not evidence about a CROSS-REPOSITORY contract (MANDATORY)
+## A green suite is not evidence about a contract with TWO IMPLEMENTATIONS (MANDATORY)
+
+> Previously titled "cross-repository". The trigger is not the repository boundary — it is that the
+> same names are written down twice. A second implementation inside one repository fails identically,
+> and reading this rule as being about repositories is how it was walked past on 2026-08-26: a new
+> .NET CLI in the same repo as the TypeScript broker, with a generated contract file and a test on
+> each side asserting its own tables matched that file. Both green. Neither asserted that the binary
+> could reach the broker at all, and `/v1/use/exportEnv` had been unreachable in every released
+> build — the route grammar rejected a capital letter, so the `env` verb had never worked from any
+> client. The first end-to-end run found it in seconds.
 
 Two repositories that agree on a wire or file format each hold a copy of the names. Two suites can be green
 while the contract is broken, because **each compares its own list against itself**.
@@ -90,6 +99,23 @@ worthless.
 
 This is the same class as *A test can only inspect what is PRESENT* below, one step earlier: there the
 subject never arrived, here it arrived and was rejected.
+
+## Asserting that you SENT a protective option is not testing that it protects
+
+A test can only see your side of anything you delegate — a flag handed to `ssh`, a header a peer must
+honour, a mode you request rather than set. Asserting the value is in the argv proves you sent it; it
+is silent about whether the receiver does anything with it, which is the only part anybody cares
+about.
+
+Measured 2026-08-26: two `ssh -R` options were asserted present by a unit test and were **inert** —
+for a remote forward the server's copies govern and the client's are ignored. A client asking for mode
+`0000` still produced `srw-------`. The test was green throughout and could not have been otherwise.
+
+So: for a delegated option, either **observe the effect** (on a real counterpart, once, and record the
+measurement beside the code) or **describe the code as sending a request** rather than as providing a
+protection. Ask what would look different if the option did nothing — if the answer is "nothing", the
+test is about your intentions. See [security.md](security.md) — *A measure you have not OBSERVED
+working is a comment*.
 
 ## A structural test that matches nothing passes forever
 
@@ -238,3 +264,6 @@ is a red build. Do not relax it to make a reference convenient — the reference
 - [ ] Fixtures were built against the real validator, and any value the code computes was read back
       from the function that computes it rather than guessed.
 - [ ] Any tree-scanning test has a companion asserting its pattern still matches a known instance.
+- [ ] A contract with two implementations has ONE live check that exercises them against each other —
+      two suites agreeing with the same file is not that check.
+- [ ] No test asserts that a delegated option was SENT as though that were evidence it takes effect.
