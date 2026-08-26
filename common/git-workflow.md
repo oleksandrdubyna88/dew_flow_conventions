@@ -129,6 +129,36 @@ have been an indefinite wait for both.
 both `git status` and any session listing. Then one message asking "is this yours?" — it costs nothing,
 and a wrong attribution sends someone hunting through work they never did.
 
+### 8. `git mv` stages the ORIGINAL content — your edit to the moved file is still unstaged
+
+`git mv` is `mv` plus `git add`, and the `git add` runs **before** you edit the file at its new
+path. So the rename goes into the index carrying the OLD bytes, and everything you then write into
+the moved file sits unstaged beside it. `git status` shows this honestly and easily missed:
+
+```
+RM  todo/PLAN_x.md -> research/PLAN_x.md
+^^
+R = the rename, staged.  M = your edit, NOT staged.
+```
+
+Commit there and the file arrives at its destination with its original content. The shape this
+takes in practice: a plan promoted to `research/` whose status line still reads *"nothing
+implemented yet"* — the move landed, the rewrite did not, and the document now says the opposite of
+why it was moved.
+
+**After any `git mv`, `git add` the DESTINATION path explicitly**, and read the staged content
+rather than the working tree:
+
+```bash
+git mv todo/PLAN_x.md research/PLAN_x.md
+$EDITOR research/PLAN_x.md          # rewrite the status line
+git add research/PLAN_x.md          # <- the step that is easy to skip
+git show :research/PLAN_x.md | head # <- and the one that proves it
+```
+
+`R100` in `git diff --cached --name-status` means "renamed, byte-identical". After a move whose
+whole point was to change the file, `R100` is the bug, not the summary.
+
 ### When verification is BLOCKED — ask, do not guess
 
 Blocked is a normal state on this hardware: a running host holds the DLLs, the GPU is taken by a pass,
@@ -161,6 +191,21 @@ and any deviation from the plan the work followed. A message that reads as verif
 worse than no message, because the next reader stops looking.
 
 Note: attribution is disabled globally via `~/.claude/settings.json` — no generated-with trailers.
+
+## One version string, one build — even for a build only you installed
+
+A version identifies bytes. The moment two different builds answer to the same string, every later
+report about that version is ambiguous, and the ambiguity outlives everyone who could resolve it:
+"fixed in 0.62.0" and "still broken in 0.62.0" are then both true.
+
+The tempting exception is the local one — a build nobody but you installed, fixed within the hour,
+rebuilt from the same version. Take the bump anyway. On 2026-08-26 an extension was cut at 0.62.0,
+installed on the owner's machine, and found an hour later to carry a script break-out; the fix was
+shipped as **0.62.1** rather than as a second 0.62.0, and the changelog says which build the first
+string meant. That costs one line and removes a question nobody would otherwise be able to answer
+six months later.
+
+This applies to anything installed, packaged or handed over — not only to what reaches a registry.
 
 ## Pull request workflow
 

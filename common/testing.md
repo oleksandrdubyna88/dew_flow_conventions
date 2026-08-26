@@ -117,6 +117,33 @@ protection. Ask what would look different if the option did nothing — if the a
 test is about your intentions. See [security.md](security.md) — *A measure you have not OBSERVED
 working is a comment*.
 
+## A test that repeats a list the code also holds will not notice the third entry
+
+When a test names the things it checks — eight section ids, ten palette colours, six kinds — it has
+become a second copy of a list the code already has, and the two agree only until somebody adds to
+one. The failure is silent in the worst direction: the test stays **green** while no longer covering
+what it claims to.
+
+Two instances on 2026-08-26, in one afternoon and in one file each:
+
+- A check named *"every fieldset the visibility switch touches exists exactly once"* listed eight
+  ids by hand. Seven sections were added; it passed, having checked the eight it knew.
+- A palette test named ten colours. An eleventh was added, and the test went **red** — for a change
+  that did not alter the behaviour it described at all. The same duplication, failing the other way.
+
+**Derive the list from the source of truth**: iterate the catalog, the exported const, the enum.
+`for (const section of FORM_SECTIONS)` cannot miss a section, and `DEP_COLOR_KEYS.map(…)` cannot go
+red because the palette grew.
+
+When a member genuinely is special — one section may legitimately not render — say so **in the
+source of truth** (`optional: true`) and filter on it, so the check stays a hard equality for
+everything else instead of being softened for all of them because of one.
+
+> For a defect that is a CLASS rather than an instance — an escaper skipped at some of its sites, a
+> path built unsafely in more places than anyone remembered — the enumeration comes BEFORE the fix,
+> and the scan it produces stays behind as a test. That rule and its counted evidence live in
+> [security.md](security.md) — *A measure applied at SOME of its sites*.
+
 ## A structural test that matches nothing passes forever
 
 A test that scans the tree — for a forbidden call, a missing registration, a stale link — is only a
