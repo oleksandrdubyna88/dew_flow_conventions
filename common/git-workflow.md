@@ -53,7 +53,7 @@ So, before committing in a tree you share:
 - When in doubt about whether the commit stands alone, the cheap check is to read the staged diff for
   names your commit does not itself introduce.
 
-### 4. On a file someone else is also editing, `git add <path>` is ALWAYS wrong
+### 4. On a file someone else is also editing, committing it WHOLE is always wrong
 
 Rule 1 says "stage by path". That protects every file you did NOT touch, and does **nothing** for a
 file you DID touch that somebody else is editing — because `git add <path>` stages the whole
@@ -86,6 +86,35 @@ The worktree is never touched, so after your commit the file's remaining diff is
 session's work, which they then commit themselves. Take the `git show HEAD:` snapshot in the same
 breath as the hashing: a peer committing into that file in between makes your blob silently revert
 their landed change.
+
+
+**`git commit -- <path>` is the same trap, and it is the one that catches people who read this rule.**
+Rule 1 says "stage by path", so `git commit -- <paths>` reads like the disciplined form of it — it is
+not. It commits the **working-tree** version of those paths, theirs included, exactly as `git add`
+would. Measured 2026-08-27: an agent who had checked `git diff --cached` and found the index clear
+committed one line of `package.json` by path and took a peer's two command declarations with it; their
+matching `register()` calls were not yet committed, and `main` was red for 119 seconds. A clear index
+means only that nobody is mid-commit. It says nothing about who else has edited the file you are about
+to commit.
+
+**Which hunks are yours: match your own IDENTIFIERS, never your memory of what you wrote.** In a tree
+with an unknown number of hands, "these are mine" is a guess (rule 7). What is checkable is whether a
+hunk's added lines mention symbols you introduced:
+
+```bash
+git diff -- path/to/file > all.patch
+# keep only hunks whose added lines match identifiers YOU added; drop every other hunk
+git apply --cached --recount kept.patch
+```
+
+Keep-by-identifier, not drop-by-attribution: the remainder is then "everything I cannot prove is mine",
+which is the correct thing to leave behind. On 2026-08-27 a session applied this filter correctly and
+then described the dropped remainder as a named peer's in its summary — the filter was sound, the
+sentence about it was a guess dressed as a fact.
+
+**Typecheck the staged snapshot on its own** before committing (rule 6). A commit can be correct in
+your working tree and broken in isolation, which is exactly what a swept declaration is: the manifest
+entry lands, the code that registers it does not.
 
 ### 5. Check the staged diff's SIZE, not only its deletions
 
@@ -158,6 +187,33 @@ git show :research/PLAN_x.md | head # <- and the one that proves it
 
 `R100` in `git diff --cached --name-status` means "renamed, byte-identical". After a move whose
 whole point was to change the file, `R100` is the bug, not the summary.
+
+
+### 9. "It is green" is a claim about a COMMIT, never about now
+
+On a main that several sessions push to, a working-tree check cannot observe a window that has already
+closed. Measured 2026-08-27: one session reported `main` red; two others checked and reported it green.
+All three were right — of different commits. `main` had been red for 119 seconds and had healed two
+minutes before either check ran, and no amount of care in reading the tree could have seen it.
+
+So a claim about build state carries the sha it is about, and is settled by **that sha's CI run**:
+
+```bash
+gh run list --json headSha,workflowName,conclusion \
+  --jq '.[] | select(.headSha|startswith("<sha>"))'
+```
+
+- "red as of `e383f59`, per its `ci · extension` run" — checkable, and still true tomorrow.
+- "main is red right now" — unfalsifiable within a minute of saying it, and reliably wrong by the time
+  anyone reads it.
+
+The same applies to a green claim: `git log` proving your commit is on main says nothing about whether
+CI passed on it. Two different questions, two different commands.
+
+A corollary for the tooling used to answer such questions: when a grep says *absent*, be sure the
+pattern could have matched a present instance. A search for `register('x'` finds nothing when the call
+was wrapped across lines, and reports it as "not registered". Match the identifier anywhere in the
+file, then confirm with the test that actually asserts the property.
 
 ### When verification is BLOCKED — ask, do not guess
 
