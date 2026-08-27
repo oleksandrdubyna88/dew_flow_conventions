@@ -59,6 +59,40 @@ artefact back later), and a state machine whose non-terminal state has no timeou
 3. Fix the links. **There are THREE cases, not two** — see below.
 4. Update the *Currently open* table in the repo's `todo/README.md`.
 
+
+### The `git mv` goes LAST, not first
+
+The numbering above is the order of a checklist, not the order to work in. Done literally — move,
+then rewrite, then fix links — the rename sits **staged** for the whole of the rest, and a `git mv`
+has already staged itself: any peer's plain `git commit` in that window carries it away. No shared
+file, no `git add <path>`, nothing to notice.
+
+Measured 2026-08-27, on a session that had written the rule about this an hour earlier. What made it
+more than a wrong commit message is the shape it left: the **add** was swept and the **delete** of
+`todo/PLAN_x.md` was not, so the plan sat in BOTH folders at HEAD and the lifecycle check went red —
+the swept-HALF that [git-workflow.md](git-workflow.md) rule 10 step 2 exists to make you look for.
+
+**"Commit the `git mv` immediately" does not rescue a promotion**, which is why it needs saying here
+rather than being left to that rule: a promotion is a move *plus* a status rewrite *plus* link fixes
+in several files, and committing the move alone lands a plan in `research/` still claiming it is
+unfinished. The window is structural, not carelessness — unless you invert the order:
+
+```bash
+$EDITOR todo/PLAN_x.md          # status → IMPLEMENTED, links written for the DESTINATION
+$EDITOR <inbound referrers>     # every case-3 link, and todo/README.md
+git mv todo/PLAN_x.md research/PLAN_x.md
+git add research/PLAN_x.md      # git mv staged the ORIGINAL bytes — see rule 8
+git commit -- research/PLAN_x.md todo/PLAN_x.md <the rest>
+```
+
+Every edit happens while the file is still in `todo/`, where nothing about it is staged; the move is
+the last thing done and is committed in the same breath. The exposure shrinks from the length of the
+whole promotion to the seconds between `git mv` and `git commit`.
+
+The cost is one transient inconsistency: between the rewrite and the move, `todo/PLAN_x.md` claims
+IMPLEMENTED and carries destination-relative links, so a peer running the lifecycle check in that
+gap sees a finding. That is smaller, shorter and self-correcting — unlike half a move on `main`.
+
 ### The three link cases, because "both directions" hides one
 
 This step used to read "fix relative links in both directions", and it failed twice on 2026-08-16 —

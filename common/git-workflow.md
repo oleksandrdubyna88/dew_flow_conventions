@@ -232,6 +232,13 @@ The window in which someone else can take it is then seconds rather than the len
 swept rename is not lost — the file is where it belongs — but it lands under a message that did not
 intend it, and the commit that *did* intend it is left describing a move it no longer contains.
 
+
+For a **plan promotion** this needs one more turn of the screw, because "commit it immediately" is
+not available there: a promotion is a move plus a status rewrite plus link fixes in several files,
+and committing the move alone lands a plan in `research/` still claiming it is unfinished. The order
+inverts instead — every edit first, `git mv` last, committed in the same breath. See
+[planning-docs.md](planning-docs.md), *The `git mv` goes LAST*.
+
 ### 9. "It is green" is a claim about a COMMIT, never about now
 
 On a main that several sessions push to, a working-tree check cannot observe a window that has already
