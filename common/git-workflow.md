@@ -147,7 +147,7 @@ work in: tests that resolve fixtures, manifests or generated contracts relative 
 fail in a partial extract and look like real regressions. (Measured: a partial extract produced 7
 convincing failures, a full one produced 0.)
 
-### 7. `git status` tells you WHAT is happening and never WHO — ask, do not infer
+### 7. `git status` answers WHAT and `git log` cannot answer WHO — never name an owner
 
 Untracked files and foreign hunks carry no author. Inferring one from the count of sessions you happen
 to know about is how, on 2026-08-26, an agent told a peer in writing that a third session's work was
@@ -157,6 +157,28 @@ have been an indefinite wait for both.
 `git worktree list` beside `git status --short`, because a session working in a worktree is invisible to
 both `git status` and any session listing. Then one message asking "is this yours?" — it costs nothing,
 and a wrong attribution sends someone hunting through work they never did.
+
+
+**Stronger than "ask": never name an owner at all.** `git status` answers WHAT and `git log` cannot
+answer WHO — every session commits under the one configured author, so a day of four agents reads as
+54 commits by one person. There is no query that returns whose hunk this is, which means any sentence
+naming an owner is a guess however confident it sounds.
+
+This was stated as a caution and then violated three times on 2026-08-27 — twice *after* the session
+had written that it had learnt the lesson. Two of the three were in messages that also contained
+correct work: a hunk filter applied soundly, then its remainder described as a named peer's; a
+correction about attribution, followed by a plan attributed to the session receiving it. A caution
+does not survive being right about everything else in the paragraph.
+
+The sound form needs no attribution at all. Filter by your OWN identifiers (rule 4), call the
+remainder **"not mine"**, and stop:
+
+- ✅ "these six hunks are not mine — I dropped them"
+- ✅ "git cannot say whose this is, and neither can I"
+- ❌ "your hunks are intact and unstaged" — even when meant as a courtesy
+- ❌ "whoever owns X committed it in <sha>" — the sha is a fact, the owner is not
+
+If you genuinely need to know, ask everyone rather than telling someone.
 
 ### 8. `git mv` stages the ORIGINAL content — your edit to the moved file is still unstaged
 
@@ -188,6 +210,27 @@ git show :research/PLAN_x.md | head # <- and the one that proves it
 `R100` in `git diff --cached --name-status` means "renamed, byte-identical". After a move whose
 whole point was to change the file, `R100` is the bug, not the summary.
 
+
+
+**A staged `git mv` is exposed to every other session, and needs no hot working tree to be taken.**
+Rule 4 is about a file two people are editing; a rename is worse, because the move has *already*
+staged itself. A peer's plain `git commit` — not `git add <path>`, not a shared file, just a commit —
+carries your rename away with it. Measured twice on 2026-08-27, in both directions between two
+sessions.
+
+**So commit a `git mv` immediately, in its own commit**, rather than leaving it staged while you keep
+working:
+
+```bash
+git mv todo/PLAN_x.md research/PLAN_x.md
+$EDITOR research/PLAN_x.md
+git add research/PLAN_x.md
+git commit -- research/PLAN_x.md todo/PLAN_x.md    # now, not at the end of the task
+```
+
+The window in which someone else can take it is then seconds rather than the length of your task. A
+swept rename is not lost — the file is where it belongs — but it lands under a message that did not
+intend it, and the commit that *did* intend it is left describing a move it no longer contains.
 
 ### 9. "It is green" is a claim about a COMMIT, never about now
 
