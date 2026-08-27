@@ -258,6 +258,32 @@ pattern could have matched a present instance. A search for `register('x'` finds
 was wrapped across lines, and reports it as "not registered". Match the identifier anywhere in the
 file, then confirm with the test that actually asserts the property.
 
+
+### 10. When you HAVE swept someone's work: do not revert it
+
+Rules 4 and 8 are about prevention. This is the one that matters after prevention failed, and the
+instinct it corrects is strong: on finding that your commit carried a peer's uncommitted work, the
+urge is to undo it. **In a tree several sessions are editing, undoing is the more expensive
+mistake.**
+
+A swept change is not lost — it is on main, doing its job. What is wrong is only its attribution.
+Reverting turns a wrong commit message into a genuine regression: the peer's file returns to its old
+state under them, their next commit conflicts or silently re-lands it, and the CI that was green goes
+red for a reason nobody can trace to a decision. Two sessions reached this conclusion independently
+on 2026-08-27 — one over swept command declarations, one over a swept `git mv` — and both were right.
+
+So:
+
+1. **Leave it.** A wrong commit message is cheaper than a revert, every time.
+2. **Check whether you broke anything**, because a swept half is the dangerous shape: a manifest entry
+   whose registration is still uncommitted, a rename whose content edit is not. Resolve the specific
+   sha (rule 9), not the tree.
+3. **Tell the peer**, and say plainly whether main is broken and what they will see — typically a
+   `git diff` emptier than they left it, and hunks already applied.
+4. **Speak only about your own commits.** Rule 7 still holds: you cannot say whose the swept work was,
+   only that yours took it. "The staleness predates me, but two of the three commits that widened it
+   are mine" is the available shape, and it is a better answer than either "not mine" or a guess.
+
 ### When verification is BLOCKED — ask, do not guess
 
 Blocked is a normal state on this hardware: a running host holds the DLLs, the GPU is taken by a pass,
