@@ -13,6 +13,10 @@ the consumer exactly as a local rule would.
 - **A rule change and the pin bumps are one task**: edit here → commit + push → in EVERY consumer
   `git submodule update --remote .claude/rules/shared` + commit, in the same task, never later. Drift
   that is visible as a stale pin is still drift; keep it at zero by habit.
+- **`pin-check` reads the pin from HEAD, not from the index.** After
+  `git submodule update --remote` + `git add`, it still reports STALE — the pin it compares is the one
+  in the last commit. Only the commit makes it green. Do not read that first STALE as a second failure
+  and start debugging the bump; run the check after committing, or not at all until then.
 - **Bumping a pin moves that repository's tip, so a consumer that is ITSELF pinned goes stale.**
   `dew_flow_rag_qln` pins `external/dew_flow_mcp` and `external/dew_flow_benchmark`, so bumping the
   rules pin in those two repositories leaves rag_qln reporting two stale pins that have nothing to do
