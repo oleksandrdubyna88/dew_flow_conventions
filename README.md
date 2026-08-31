@@ -41,6 +41,7 @@ the consumer exactly as a local rule would.
 | `dew_flow_sidecar_rust` | Rust — `csharp/` never matches; `rust/doctrine.md` is its doctrine |
 | `dew_flow_benchmark` | .NET |
 | `dew_flow_creds_for_devs` | TypeScript — a VS Code extension; `typescript/doctrine.md` is its doctrine, `csharp/` and `rust/` never match |
+| `dew_flow_connect_other_ais` | .NET + TypeScript — the ConnectOtherAIs review gate: a C# AOT MCP server and a VS Code extension, so `csharp/` and `typescript/` both match |
 
 A new repository joins with one `git submodule add` — see [ROLLOUT.md](ROLLOUT.md).
 
