@@ -23,6 +23,12 @@
 
 4. **Commit & push** — conventional commits per [git-workflow.md](git-workflow.md).
 
+5. **Release & deploy** — the `.http` contract suite runs **before** the release
+   ([http-contracts.md](http-contracts.md)); the thing that is now running is checked **after** it
+   ([post-deploy-checks.md](post-deploy-checks.md)). Where nothing is deployed anywhere yet, your own
+   installation is the target and the check still runs at every release — the three rules below are all
+   about signals that stayed green while nothing shipped, and none of them looks at what is running.
+
 ## Verify the ARTEFACT, not the source (MANDATORY)
 
 A build step that does not run leaves the previous artefact in place, and every downstream signal keeps
