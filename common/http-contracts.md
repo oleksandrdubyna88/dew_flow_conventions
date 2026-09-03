@@ -154,6 +154,22 @@ picker and hang a headless run forever. `--name` is silently ignored whenever `-
 is why `--tag` materialises a filtered tree rather than naming requests (both measured in the
 `ClaudeRag` spike).
 
+### What the coverage check does NOT claim
+
+`http-coverage.mjs` reads **C# `Map*` and Rust `.route(` registrations**. It cannot see an HTTP server
+written in anything else, and it cannot see one whose paths are computed rather than literal — a Node
+`http.createServer` with hand-rolled path parsing is invisible to it, whatever the verdict says.
+
+So *"26 of 26 covered"* is a statement about the surfaces the scanner can enumerate, never about every
+HTTP surface in a repository. Measured here: `dew_flow_creds_for_devs` serves TWO — the vault server
+in C#, and a broker inside its VS Code extension that a CLI and an MCP client talk to over loopback.
+The armed check covers the first and is structurally blind to the second, which is covered instead by
+65 tests that start the real server and fetch it over real HTTP.
+
+**When a repository has a surface the scanner cannot see, say so where the suite lives** — its
+`http/README.md` — so the next reader does not read a green check as a claim it never made. A
+different tier covering something properly is a good answer; an unrecorded one is not.
+
 The other half of the rule is checked by
 [`http-coverage.mjs`](../tools/http-coverage.mjs) — every route the repository serves has at least one
 request. It reads the application's own route table when given one (`--routes`), and falls back to a
