@@ -1,0 +1,29 @@
+# Fixture suite for the vault group. Two of the three fixture routes are covered on purpose — the
+# third (DELETE /api/vault/{id}) is what http-coverage.mjs must report as MISSING.
+
+@contentType = application/json
+
+# @name vault_get_returns_the_callers_blob
+# @prod
+GET {{baseUrl}}/api/vault
+Accept: {{contentType}}
+
+?? status == 200
+
+###
+# @name vault_put_replaces_the_blob
+PUT {{baseUrl}}/api/vault
+Content-Type: {{contentType}}
+
+{ "entries": [] }
+
+?? status == 204
+
+###
+# @name vault_get_without_a_token_is_401
+GET {{baseUrl}}/api/vault
+
+?? status == 401
+
+###
+# @uncovered 503 — reached only when the store is down; not provokable from a request

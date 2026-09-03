@@ -119,17 +119,32 @@ and a script block for anything a matcher cannot state:
 ```
 
 **Before every release the whole suite runs against a stack started for the purpose**, and the verdict
-is the exit code, never the log tail. The runner that produces those codes (`tools/http-run.mjs`) lands
-with [the rollout plan](../todo/PLAN_prod_checks_and_http_contracts.md); until a repository has it, run
-httpyac directly:
+is the exit code, never the log tail:
 
 ```bash
-npx httpyac send "http/**/*.http" --all --junit --output none --timeout 60000
+npm install --save-dev httpyac@6.16.7          # once, in the repository that has an API
+node .claude/rules/shared/tools/http-run.mjs   # 0 pass · 1 CONTRACT · 3 environment · 4 config · 5 no report
+node .claude/rules/shared/tools/http-run.mjs --tag prod --target https://live.example.com
 ```
 
-`--all` is not optional: without it httpyac can drop into an interactive region picker, which hangs a
-headless run forever (measured during the `ClaudeRag` spike, along with `--name` being silently ignored
-whenever `--all` is passed — so filtering is done by selecting FILES).
+| Exit | Meaning | What you do |
+|---|---|---|
+| `0` | pass | done |
+| `1` | **contract regression** | the API answered, and answered differently than the suite requires |
+| `3` | environment | the stack did not start, or nothing answered — the contract was NOT exercised |
+| `4` | configuration | the message names the missing piece; fix and re-run |
+| `5` | no valid report | the run proved nothing. There is no "probably fine" |
+
+`--all` is passed for you and is not optional: without it httpyac can drop into an interactive region
+picker and hang a headless run forever. `--name` is silently ignored whenever `--all` is present, which
+is why `--tag` materialises a filtered tree rather than naming requests (both measured in the
+`ClaudeRag` spike).
+
+The other half of the rule is checked by
+[`http-coverage.mjs`](../tools/http-coverage.mjs) — every route the repository serves has at least one
+request. It reads the application's own route table when given one (`--routes`), and falls back to a
+text scan of the sources, which is a bootstrap rather than the destination: *enumerate, never retype*
+([testing.md](testing.md)). Adopt it with `--warn`, drop the flag when the backfill is done.
 
 **A stack that would not start is an ENVIRONMENT failure, never a contract regression.** Report which
 one you have: *"the suite could not run"* and *"the API changed"* are opposite statements, and only one

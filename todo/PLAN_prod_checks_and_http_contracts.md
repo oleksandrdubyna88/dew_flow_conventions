@@ -1,8 +1,8 @@
 # PLAN — `.http` contracts and post-deploy checks, with the tools that enforce them
 
-> Status: **rules written 2026-09-03; tools and per-repository rollout not started.** Scope:
-> `common/http-contracts.md`, `common/post-deploy-checks.md`, three Node tools in `tools/`, and one
-> `http/` tree plus one `POST_DEPLOY.md` in each of the six consumers.
+> Status: **rules and tools shipped 2026-09-03; the per-repository rollout (phases 3–5) is the open
+> work.** Scope: `common/http-contracts.md`, `common/post-deploy-checks.md`, three Node tools in
+> `tools/`, and one `http/` tree plus one `POST_DEPLOY.md` in each of the six consumers.
 >
 > Related: [common/http-contracts.md](../common/http-contracts.md),
 > [common/post-deploy-checks.md](../common/post-deploy-checks.md),
@@ -63,15 +63,15 @@ be rediscovered:
 `common/http-contracts.md`, `common/post-deploy-checks.md`, and a release step in
 `common/development-workflow.md` pointing at both.
 
-### Phase 2 — the tools, `tools/*.mjs`, Node
+### Phase 2 — the tools, `tools/*.mjs`, Node *(done 2026-09-03)*
 
 One implementation for the whole family, per the README's `tools/` section: these read markdown and
 source text, so nothing about them needs writing twice, and a Rust repository pays no toolchain.
 
 | Tool | Job |
 |---|---|
-| `http-run.mjs` | httpyac wrapper ported from `ClaudeRag`: fresh-report validation, environment-vs-contract classification, the five exit codes. Takes `--target`, `--tag prod`, a path. |
-| `http-coverage.mjs` | Route inventory from source against paths present in `http/**`. A route with no request fails; `@uncovered` declarations are counted and printed. |
+| `http-run.mjs` | httpyac wrapper ported from `ClaudeRag`: fresh-report validation, environment-vs-contract classification, the five exit codes. Takes `--target`, `--tag`, a path. |
+| `http-coverage.mjs` | Route inventory (from `--routes`, else a source scan) against paths present in `http/**`. A route with no request fails; `@uncovered` declarations are counted and printed. |
 | `post-deploy-check.mjs` | Structural (CI, no network): cap of twelve, a command or an explicit `manual` on every item, the stamp present. Runner (`--target`): executes the auto items, PASS/FAIL per line, non-zero on any failure. |
 
 Two constraints both tools inherit from [common/testing.md](../common/testing.md):
@@ -79,8 +79,31 @@ Two constraints both tools inherit from [common/testing.md](../common/testing.md
 - **A scan that matches nothing passes forever.** Each parser ships with a companion test asserting it
   still finds a known instance on a fixture — otherwise one reformat makes both tools permanently green.
 - **Enumerate, never retype.** A text scan for route registrations is a bootstrap, not the destination.
-  The right shape is the application printing its own route table (`--print-routes`) with the tool
-  comparing against that; `http-coverage.mjs` accepts either, and a repository graduates when it can.
+  The right shape is the application printing its own route table with the tool comparing against that;
+  `http-coverage.mjs` accepts either, and a repository graduates when it can.
+
+**What shipped differently from the plan above** — the part worth keeping:
+
+- **Three shared modules, not three standalone scripts.** `lib/http-files.mjs` (the `.http` parser),
+  `lib/junit.mjs` (the report reader and the environment-versus-contract verdict) and `lib/proc.mjs`
+  (a child process with a ceiling and a tree kill). Two tools need the same three facts out of a `.http`
+  file, and a second reading of that format is how they would come to disagree about which requests
+  exist.
+- **`--tag` materialises a filtered tree** rather than naming requests, because `--name` is silently
+  ignored whenever `--all` is passed — and `--all` cannot be dropped. Each filtered file keeps its
+  prelude, or the surviving requests lose the variables they use.
+- **httpyac is not a dependency of THIS repository.** Each consumer installs it pinned; the runner
+  resolves the package and runs its entry with `node`, which avoids the `.bin/*.cmd` that recent Node
+  refuses to spawn without a shell — and a shell string is what `security.md` forbids.
+- **The tests are one `tools/selftest.test.mjs`** on `node:test`, no dependency, 28 cases. They were
+  green on the first run, which by `testing.md` is a reason for suspicion rather than confidence — so
+  the scan was deliberately narrowed to a line-anchored form and the companion test was **observed
+  failing** with the real symptom (`2 route registration(s) scanned` instead of 3, `1/2 covered`
+  instead of `2/3`), then restored.
+- **`http-run.mjs` has no end-to-end exit-code test here**, because that needs httpyac installed and
+  this repository has no API to install it for. Its two decision points — the JUnit reader and the
+  verdict — are unit-tested, and the exit codes are exercised in the first repository that adopts a
+  suite. Said plainly rather than left as an assumed gap.
 
 ### Phase 3 — pilot: `dew_flow_creds_for_devs`
 

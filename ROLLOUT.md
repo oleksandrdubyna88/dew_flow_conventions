@@ -36,6 +36,9 @@ Commit `.gitmodules` + the mount + the deletions together.
         - run: git submodule update --init --depth 1 .claude/rules/shared
         - run: node .claude/rules/shared/tools/plan-lifecycle.mjs
         - run: node .claude/rules/shared/tools/pin-check.mjs
+        # adopt these two with --warn, drop the flag when the backfill is done
+        - run: node .claude/rules/shared/tools/post-deploy-check.mjs --warn
+        - run: node .claude/rules/shared/tools/http-coverage.mjs --warn   # only where the repo serves HTTP
   ```
 
   `pin-check.mjs` needs the parent repository's history for `rev-parse HEAD:<path>` only — the

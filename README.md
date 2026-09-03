@@ -84,6 +84,19 @@ asking in writing to be moved and another had two promoted plans absent from its
 |---|---|---|
 | [`tools/plan-lifecycle.mjs`](tools/plan-lifecycle.mjs) | [`common/planning-docs.md`](common/planning-docs.md) | `node .claude/rules/shared/tools/plan-lifecycle.mjs` |
 | [`tools/pin-check.mjs`](tools/pin-check.mjs) | Editing discipline (pins at remote tips) | `node .claude/rules/shared/tools/pin-check.mjs` |
+| [`tools/http-coverage.mjs`](tools/http-coverage.mjs) | [`common/http-contracts.md`](common/http-contracts.md) — every route has a request | `node .claude/rules/shared/tools/http-coverage.mjs [--warn]` |
+| [`tools/http-run.mjs`](tools/http-run.mjs) | The same rule's other half — the suite actually runs, and its verdict is an exit code | `node .claude/rules/shared/tools/http-run.mjs [--tag prod] [--target <url>]` |
+| [`tools/post-deploy-check.mjs`](tools/post-deploy-check.mjs) | [`common/post-deploy-checks.md`](common/post-deploy-checks.md) — the file's shape in CI, its items against the live target | `node .claude/rules/shared/tools/post-deploy-check.mjs [--target <value>]` |
+
+The last three are new and every repository adopts them the same way: **`--warn` first**, so the
+finding is visible without a red build, then the flag comes off once the backfill is done. A check
+that goes red on the day it lands teaches people to switch it off.
+
+The tools have their own tests — `node tools/selftest.test.mjs` from this repository's root, 28 cases
+over fixtures whose right answers are known. Two of them exist because `common/testing.md` demands it:
+the route scan has a companion asserting it still finds a route **formatted across three lines**, which
+is exactly what a line-anchored scan silently loses, and the JUnit reader is asserted to call an
+unreadable report INVALID rather than empty-and-green.
 
 **One implementation, not one per repository.** A copy each would mean the same rule in two languages —
 one of the four consumers is Rust — and `common/logging-serilog.md` already documents what that costs.

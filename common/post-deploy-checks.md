@@ -126,9 +126,23 @@ Where the repository already has HTTP requests, **the check reuses them** instea
 curl: the prod-safe subset is exactly the `# @prod` tag, and the runner sends those. One artefact, two
 audiences.
 
-The runner, and the structural check that enforces this file's own shape — the cap, a command or an
-explicit `manual` on every item, the stamp present — land with
-[the rollout plan](../todo/PLAN_prod_checks_and_http_contracts.md).
+[`post-deploy-check.mjs`](../tools/post-deploy-check.mjs) is both halves, and the difference between
+them is this rule in one command:
+
+```bash
+node .claude/rules/shared/tools/post-deploy-check.mjs                    # CI: shape only, nothing is run
+node .claude/rules/shared/tools/post-deploy-check.mjs --target <value>   # after a deploy: the items, for real
+```
+
+Structural mode executes nothing and touches no network — it asks whether the file is there, still
+under its cap, still says when it was last verified and against what, and whether every item carries a
+command or admits to being manual. Only `--target` produces evidence, because only `--target` talks to
+the machine that is running.
+
+The target arrives at each command as **`$TARGET`**, exported rather than pasted into the text: the
+command line is the repository's own content, the one value from outside is never concatenated into it,
+and every command runs under a timeout that kills its process tree
+([security.md](security.md), [reliability.md](reliability.md)).
 
 ## Never
 
