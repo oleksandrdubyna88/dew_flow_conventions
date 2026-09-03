@@ -1,7 +1,9 @@
 # PLAN — `.http` contracts and post-deploy checks, with the tools that enforce them
 
-> Status: **rules, tools and the `dew_flow_creds_for_devs` pilot shipped 2026-09-03; phase 4 (the
-> other five repositories) is the open work.** Scope: `common/http-contracts.md`,
+> Status: **shipped 2026-09-03 across all six repositories.** The open tail is small and named: the
+> `rag_qln` backfill (five of thirteen groups written, coverage reporting rather than failing), the
+> authentication decision for the vault's prod-side checks, and the ~20-site null-dereference class
+> that phase 4 enumerated in `rag_qln` and did not fix. Scope: `common/http-contracts.md`,
 > `common/post-deploy-checks.md`, three Node tools in `tools/`, and one `http/` tree plus one
 > `POST_DEPLOY.md` in each of the six consumers.
 >
@@ -167,7 +169,42 @@ So Phase 3 ships the anonymous checks and the full local `.http` suite, and the 
 waits on a decision: **(a)** anonymous only, **(b)** a canary token on the `Local` scheme, **(c)** a
 read-only machine identity added to the server. Recorded as an open question, not as a gap in the rule.
 
-### Phase 4 — rollout
+### Phase 4 — rollout *(done 2026-09-03, one repository partially by design)*
+
+| Repository | Suite | Coverage | `POST_DEPLOY.md` | Run against |
+|---|---|---|---|---|
+| `dew_flow_mcp` | 4 requests, 13 checks | **2/2**, armed | 5 items, 4 auto | a live host |
+| `dew_flow_sidecar_rust` | 10 requests, 24 checks | **6/6**, armed | 5 items, 4 auto | the prebuilt binary |
+| `dew_flow_benchmark` | 20 requests, 37 checks | **12/12**, armed | 4 items, 3 auto | both hosts + a real Postgres |
+| `dew_flow_rag_qln` | 20 requests, 49 checks | **19/49**, `--warn` | 4 items, 3 auto | a live daemon + Postgres |
+| `dew_flow_connect_other_ais` | none — no HTTP surface | n/a | 4 items, 2 auto | the real release + the marketplace |
+
+Every suite was **run**, not merely written, and every automated checklist item was watched passing
+against something live. Three were also watched FAILING on purpose — a wrong commit hash, a wrong exe
+hash, and the benchmark's two store items with the database container stopped.
+
+`rag_qln` is partial deliberately: 49 registrations, five groups written, coverage reporting rather
+than failing until the backfill lands. That is the rule's own instruction, not a shortcut.
+
+**What the rollout found, and where it went:**
+
+- **A 500 in `rag_qln`** — `POST /api/companies` on an omitted `key`, a positional record binding null.
+  A CLASS: ~20 unguarded dereferences across three endpoint files. NOT fixed — that is a decision for
+  the tree's owner under `security.md`'s "a measure applied at SOME of its sites". Recorded in
+  `http/README.md` there, and the pattern became **doctrine 4a**, which the vault's identical defect
+  the same morning is the second instance of.
+- **`/api/bench/health` answers `ok` with its database stopped** while `/api/bench/runs` answers 500.
+  Observed directly. The checklist there uses no health route because of it; the endpoint itself is a
+  live violation of `reliability.md` and is left for its owner.
+- **A grouped route read as MISSING** — `http-coverage` compared a `MapGroup` tail against a full path.
+  Fixed, with the fixture and the red test.
+- **Two traps in the checklist commands** — `process.exit()` in an async callback crashing Node on
+  Windows after printing the right answer, and an unescaped `|` splitting a table row. Both fixed in
+  all six checklists; both recorded in the rule.
+- The tools' own suite is **33 tests**. (The commit that landed the grouped-route fix says 35 in its
+  message; the number was wrong when written and is corrected here rather than by rewriting `main`.)
+
+### Phase 4 as planned (kept for the record)
 
 `rag_qln` (61, backfilled group by group), `benchmark` (15), `sidecar_rust` (6, axum), `mcp` (3 — plus a
 note that its real contract is the tool surface), `connect_other_ais` (no HTTP; `POST_DEPLOY.md` only,
@@ -198,7 +235,10 @@ the rules commit, `dew_flow_rag_qln` last because it is itself pinned by two oth
 - [x] Three tools in `tools/`, each with its fixtures, and rows in the README `tools/` table.
 - [x] `dew_flow_creds_for_devs` has `http/` for all six groups, a `POST_DEPLOY.md` under twelve items,
       and both checks wired into its workflows.
-- [ ] The remaining five repositories have `POST_DEPLOY.md`; the four with HTTP have `http/`.
-- [ ] `http-coverage.mjs` is failing (not warning) in every repository whose groups are covered.
+- [x] The remaining five repositories have `POST_DEPLOY.md`; the four with HTTP have `http/`.
+- [x] `http-coverage.mjs` is failing (not warning) in every repository whose groups are covered —
+      armed in four, reporting in `rag_qln` while its backfill runs.
 - [ ] The authentication question for prod-side checks is answered and recorded.
-- [ ] Pins bumped in all six consumers in the same task as each rules commit.
+- [ ] `rag_qln`'s remaining eight groups are covered and its coverage check is armed.
+- [ ] The null-dereference class in `rag_qln` is enumerated, fixed and left behind as a scan.
+- [x] Pins bumped in all six consumers in the same task as each rules commit.
