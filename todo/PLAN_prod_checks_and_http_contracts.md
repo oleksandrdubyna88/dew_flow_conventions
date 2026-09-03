@@ -1,8 +1,9 @@
 # PLAN — `.http` contracts and post-deploy checks, with the tools that enforce them
 
-> Status: **rules and tools shipped 2026-09-03; the per-repository rollout (phases 3–5) is the open
-> work.** Scope: `common/http-contracts.md`, `common/post-deploy-checks.md`, three Node tools in
-> `tools/`, and one `http/` tree plus one `POST_DEPLOY.md` in each of the six consumers.
+> Status: **rules, tools and the `dew_flow_creds_for_devs` pilot shipped 2026-09-03; phase 4 (the
+> other five repositories) is the open work.** Scope: `common/http-contracts.md`,
+> `common/post-deploy-checks.md`, three Node tools in `tools/`, and one `http/` tree plus one
+> `POST_DEPLOY.md` in each of the six consumers.
 >
 > Related: [common/http-contracts.md](../common/http-contracts.md),
 > [common/post-deploy-checks.md](../common/post-deploy-checks.md),
@@ -105,7 +106,45 @@ Two constraints both tools inherit from [common/testing.md](../common/testing.md
   verdict — are unit-tested, and the exit codes are exercised in the first repository that adopts a
   suite. Said plainly rather than left as an assumed gap.
 
-### Phase 3 — pilot: `dew_flow_creds_for_devs`
+### Phase 3 — pilot: `dew_flow_creds_for_devs` *(done 2026-09-03)*
+
+**Shipped:** 59 requests across six groups (`platform`, `vault`, `team`, `shares`, `metrics`,
+`org-recovery`), **26 of 26 routes covered**, 12 declared `@uncovered` gaps, a seven-item
+`POST_DEPLOY.md`, and three CI steps. Verified by running: `http-run` exit 0, twice consecutively
+(the suite leaves the store as it found it), and the `--tag prod` subset — 6 requests, 24 checks —
+separately.
+
+**The pilot's first run found a live defect**, which is the whole argument for the tier:
+`POST /api/shares` answered **500** to any client omitting `entityKind`, a field the record documents
+as optional. The source-generated deserializer does not apply the property initializer, so
+`EntityKind` arrived null and `IsValid()` dereferenced it. Reachable by anyone who can authenticate,
+and invisible to 164 green tests because every envelope they build happens to send the field. Fixed
+behind two RED tests; suite 164/164 after.
+
+**What the exercise found in the TOOLS**, all four fixed with a red test first: the JUnit reader
+under-counted 92 cases as 26 (greedy attribute matching ate self-closing tags); the failure line named
+neither the request nor the observed value; the checklist table split on escaped `\|`; and two
+additions the pilot needed — `--require-env`, and carrying the suite's `httpyac.config.js` into a
+tag-filtered tree.
+
+**Deviations worth keeping:**
+
+- **Three single-route prefixes share one `platform/` folder.** `/api/health`, `/api/client-config`
+  and `/api/whoami` are what a person means by "the platform endpoints" and are always read together.
+  The grouping table's last row is the escape hatch; it was used deliberately and said so in the file.
+- **The suite signs its own tokens.** `httpyac.config.js` mints four `Local`-scheme identities from
+  `VAULT_LOCAL_SIGNING_KEY`, which is what makes the authenticated half runnable headless at all. The
+  key never enters the repository.
+- **The environment contract was WRONG until it was run**: the roster needs three officers, not two,
+  and a two-officer roster silently disables corporate recovery — so every officer request would have
+  failed with a 403 that looks contractual. Written down in `http/README.md`.
+- **The two `target-vault` routes are covered by their refusals**, not by their success paths. The
+  refusal — *a session that does not exist must never expose a target's vault* — is the assertion that
+  matters, and it is reachable; the ceremony's success path is not.
+- **The authentication question is unresolved and was NOT worked around.** `POST_DEPLOY.md` runs five
+  anonymous items; the authenticated round trip is named in the file as absent, with the reason.
+
+### Phase 3 as planned (kept for the record)
 
 The only repository with a real deployed server. 26 registrations across `/api/vault`, `/api/shares`,
 `/api/org-recovery`, `/api/team`, `/api/metrics`, plus the two anonymous routes
@@ -155,9 +194,9 @@ the rules commit, `dew_flow_rag_qln` last because it is itself pinned by two oth
 
 ## Definition of Done
 
-- [ ] Both rules exist in `common/` and are reachable from `development-workflow.md`.
-- [ ] Three tools in `tools/`, each with its fixtures, and rows in the README `tools/` table.
-- [ ] `dew_flow_creds_for_devs` has `http/` for all six groups, a `POST_DEPLOY.md` under twelve items,
+- [x] Both rules exist in `common/` and are reachable from `development-workflow.md`.
+- [x] Three tools in `tools/`, each with its fixtures, and rows in the README `tools/` table.
+- [x] `dew_flow_creds_for_devs` has `http/` for all six groups, a `POST_DEPLOY.md` under twelve items,
       and both checks wired into its workflows.
 - [ ] The remaining five repositories have `POST_DEPLOY.md`; the four with HTTP have `http/`.
 - [ ] `http-coverage.mjs` is failing (not warning) in every repository whose groups are covered.
