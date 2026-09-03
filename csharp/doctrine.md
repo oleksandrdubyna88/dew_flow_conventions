@@ -33,6 +33,37 @@ than rendering an unknown as a zero; that is how a gap in instrumentation become
 subject. Allowed nullables: JS-interop lifetimes (`IJSObjectReference?`), optional cancel tokens,
 legitimate "not found" returns, optional `RenderFragment?` slots.
 
+### 4a. A DTO field the client omitted is NULL, whatever its initializer says (MANDATORY)
+
+The nullable-reference compiler is silent here and the type reads as non-null, so this is a trap
+rather than a lapse. **A deserializer does not run your defaults**, and the two ways it happens are
+both ordinary:
+
+- **A positional record.** `record CompanyInput(string Name, string Key)` — an omitted `key` binds to
+  `null`. There is no initializer to skip; the parameter is simply not supplied.
+- **A record with property initializers, under the source generator.** `public string EntityKind
+  { get; init; } = "credential";` — measured on 2026-09-03: an omitted field arrived **null**, not
+  `"credential"`.
+
+Then `input.Key.Trim()` or `EntityKind.Length` dereferences it, and an unhandled
+`NullReferenceException` becomes **500** for a request that is well formed by the contract's own
+documentation. Both instances were found on the same day, in two different repositories, by an
+`.http` suite's first run — and were invisible to green test suites in both, because every fixture
+those suites build happens to send the field.
+
+So:
+
+1. **Normalise where the value is READ, not at one call site.** A guard at the endpoint moves the
+   dereference rather than removing it — `dew_flow_creds_for_devs` had the same field read by
+   `IsValid()`, by `PayloadBytes()` and by the stored entity. One property (`Kind =>
+   string.IsNullOrWhiteSpace(EntityKind) ? "credential" : EntityKind`) fixes all three.
+2. **Treat it as a CLASS, not an instance.** `common/security.md` — *a measure applied at SOME of its
+   sites* — governs: enumerate every unguarded dereference of a client-controlled field first, and
+   leave the scan behind as a test. One repository here has ~20 such sites; fixing the one that
+   happened to be found would have left nineteen.
+3. **The suite that finds it must not enshrine it.** Assert the refusal or the default that OUGHT to
+   happen; never write a request asserting the 500.
+
 ## 5. Expected failures are values, not exceptions
 
 One shared outcome shape per repo (`Outcome<T>`: ok/fail); a closed record hierarchy (private

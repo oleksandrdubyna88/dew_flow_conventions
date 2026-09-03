@@ -44,6 +44,8 @@ const SKIP_DIRS = new Set(["node_modules", ".git", "bin", "obj", "target", "dist
 const DOTNET_MAP = /\bMap(Get|Post|Put|Delete|Patch|Head|Options)\s*(?:<[^>]*>)?\s*\(\s*"([^"]*)"/g;
 /** axum's `.route("/x", get(handler))` — the method comes from the handler argument when it is there. */
 const RUST_ROUTE = /\.route\s*\(\s*"([^"]*)"\s*,\s*(?:([a-z]+)\s*\()?/g;
+/** `MapGroup("/api/mcp")` and axum's `.nest("/api", …)` — a route inside one carries only its TAIL. */
+const GROUP_PREFIX = /\b(?:MapGroup|nest)\s*\(\s*"([^"]*)"/g;
 
 const options = {
   http: { type: "string", default: "http" },
@@ -71,14 +73,23 @@ function walkSources(dir, files = []) {
   return files;
 }
 
-/** Route registrations found in source text. Literal paths only — that is the whole limitation. */
+/**
+ * Route registrations found in source text. Literal paths only — that is the whole limitation.
+ *
+ * Every route also carries the GROUP PREFIXES declared in its file. A route mapped inside a group
+ * holds only its tail (`/health`, served at `/api/mcp/health`), and a tail is indistinguishable from
+ * an absolute path — both start with `/`. Measured on the `dew_flow_mcp` pilot: two routes reported
+ * MISSING while a green suite was exercising both. Attaching the file's prefixes lets the match try
+ * `prefix + tail` as well, which is far tighter than matching by suffix and guessing.
+ */
 export function scanRoutes(text, file = "") {
+  const prefixes = [...text.matchAll(GROUP_PREFIX)].map((m) => m[1]).filter((p) => p.startsWith("/"));
   const routes = [];
   for (const match of text.matchAll(DOTNET_MAP)) {
-    routes.push({ method: match[1].toUpperCase(), path: match[2], file });
+    routes.push({ method: match[1].toUpperCase(), path: match[2], file, prefixes });
   }
   for (const match of text.matchAll(RUST_ROUTE)) {
-    routes.push({ method: (match[2] ?? "any").toUpperCase(), path: match[1], file });
+    routes.push({ method: (match[2] ?? "any").toUpperCase(), path: match[1], file, prefixes });
   }
   return routes;
 }
@@ -112,13 +123,23 @@ export function pathsMatch(routePath, requestPath) {
  * on the `MapGroup` call. The scan cannot resolve that without parsing C#, so such a route is matched
  * by SUFFIX — deliberately loose. The `--routes` table is what removes the guesswork.
  */
+function candidatePaths(route) {
+  const prefixed = (route.prefixes ?? []).map((prefix) => {
+    const base = prefix.replace(/\/+$/, "");
+    if (route.path === "") return base;
+    return route.path.startsWith("/") ? `${base}${route.path}` : `${base}/${route.path}`;
+  });
+  return [route.path, ...prefixed];
+}
+
 function matchesAnyRequest(route, requests) {
-  const rooted = route.path.startsWith("/");
+  const candidates = candidatePaths(route);
   return requests.some((request) => {
     if (route.method !== "ANY" && request.method !== route.method && route.method !== "") return false;
-    if (rooted) return pathsMatch(route.path, request.path);
-    const tail = route.path === "" ? "" : route.path;
-    return request.path.endsWith(tail) || pathsMatch(tail, request.path);
+    if (candidates.some((candidate) => candidate !== "" && pathsMatch(candidate, request.path))) return true;
+    // Last resort, and only for a tail the scan could not root: a group whose prefix is declared in
+    // another file. Deliberately loose, and the reason `--routes` exists.
+    return !route.path.startsWith("/") && route.path !== "" && request.path.endsWith(route.path);
   });
 }
 

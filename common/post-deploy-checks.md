@@ -144,6 +144,18 @@ command line is the repository's own content, the one value from outside is neve
 and every command runs under a timeout that kills its process tree
 ([security.md](security.md), [reliability.md](reliability.md)).
 
+### Two traps in the commands themselves, both measured
+
+- **`process.exit()` inside an async callback crashes Node on Windows** — `Assertion failed:
+  !(handle->flags & UV_HANDLE_CLOSING)` — *after* printing the right answer, and the crash's exit code
+  reads as a FAILED check. A check that cries wolf is a check somebody switches off. Set
+  `process.exitCode` instead and let the process end on its own; the fetch pool closes in
+  milliseconds.
+- **A pipe inside a table cell must be escaped `\|`**, or the row splits into extra cells and the
+  `Auto` column reads as empty. A shell `||`, a JS default and a regex alternation all contain one.
+
+Both were found writing the first four checklists, not reading about them.
+
 ## Never
 
 - Never mark an item verified that you did not watch run.

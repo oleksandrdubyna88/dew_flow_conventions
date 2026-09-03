@@ -44,7 +44,7 @@ function runTool(tool, args, cwd = fixtureRepo) {
 
 test("a request block is found with its name, its tags and its verb", () => {
   const blocks = parseHttpFile(httpFixture).filter((b) => !b.isPrelude);
-  assert.equal(blocks.length, 3);
+  assert.equal(blocks.length, 4);
   assert.equal(blocks[0].name, "vault_get_returns_the_callers_blob");
   assert.ok(blocks[0].tags.has("prod"));
   assert.equal(blocks[0].request.method, "GET");
@@ -152,8 +152,18 @@ test("the scan finds every route in the fixture, the one formatted across lines 
   assert.deepEqual(named.sort(), [
     "DELETE /api/vault/{id}",
     "GET /api/vault",
+    "GET /health",
     "PUT /api/vault",
   ]);
+});
+
+test("a grouped route carries its file's prefixes, so its tail can be rooted", () => {
+  // The mcp pilot's failure: `MapGet("/health")` inside `MapGroup("/api/mcp")` is served at
+  // /api/mcp/health, and a tail is indistinguishable from an absolute path — both start with `/`.
+  // Without the prefixes both of that server's routes reported MISSING while a green suite was
+  // exercising both, which is the shape that gets a check switched off.
+  const grouped = scanRoutes(sourceFixture).find((r) => r.path === "/health");
+  assert.deepEqual(grouped.prefixes, ["/api/admin"]);
 });
 
 test("the scan reads an axum route with the method from its handler", () => {
@@ -173,8 +183,9 @@ test("http-coverage names the route the fixture suite does not cover, and fails"
   const { code, out } = runTool("http-coverage.mjs", []);
   assert.equal(code, 1);
   assert.match(out, /MISSING\s+DELETE \/api\/vault\/\{id\}/);
-  assert.match(out, /2\/3 route\(s\) covered/);
+  assert.match(out, /3\/4 route\(s\) covered/);
   assert.match(out, /1 @uncovered declaration/);
+  assert.doesNotMatch(out, /MISSING\s+GET \/health/, "a grouped route must be rooted by its prefix");
 });
 
 test("--warn reports the same finding and exits 0 — the state a repository adopts in", () => {

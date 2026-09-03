@@ -26,4 +26,11 @@ GET {{baseUrl}}/api/vault
 ?? status == 401
 
 ###
+# The grouped route, addressed the way a client actually addresses it: prefix included.
+# @name admin_health
+GET {{baseUrl}}/api/admin/health
+
+?? status == 200
+
+###
 # @uncovered 503 — reached only when the store is down; not provokable from a request

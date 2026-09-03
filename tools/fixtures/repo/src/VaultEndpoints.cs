@@ -16,5 +16,12 @@ public static class VaultEndpoints
             async (HttpContext ctx) => Results.NoContent());
 
         app.MapDelete("/api/vault/{id}", (string id) => Results.NoContent());
+
+        // A route mapped inside a GROUP carries only its tail. `/health` here is served at
+        // `/api/admin/health`, and a scanner that compares the tail against a request's full path
+        // finds nothing — which is how the mcp pilot's two routes both reported MISSING while a
+        // green suite was exercising them.
+        var admin = app.MapGroup("/api/admin");
+        admin.MapGet("/health", () => Results.Ok());
     }
 }

@@ -10,7 +10,7 @@ Last verified: 2026-09-03 · d:/rsd/dew_flow_mcp · pin fd01c72 (both items PASS
 
 | # | What a person loses if this is broken | Check | Auto |
 |---|---|---|---|
-| 1 | A session in that repository silently works under rules that do not include the newest one — the exact failure the file names, invisible from inside | `node -e "process.exit(require('fs').existsSync(process.env.TARGET + '/.claude/rules/shared/common/http-contracts.md') ? 0 : 1)"` | auto |
+| 1 | A session in that repository silently works under rules that do not include the newest one — the exact failure the file names, invisible from inside | `node -e "process.exitCode=+(require('fs').existsSync(process.env.TARGET + '/.claude/rules/shared/common/http-contracts.md') ? 0 : 1)"` | auto |
 | 2 | The pin lags this repository's tip, so the rule exists here and nowhere that reads it | `node -e "process.chdir(process.env.TARGET); require('child_process').execFileSync(process.execPath, ['.claude/rules/shared/tools/pin-check.mjs'], { stdio: 'inherit' })"` | auto |
 
 Both commands are written as `node -e` rather than shell one-liners on purpose: this family develops on
