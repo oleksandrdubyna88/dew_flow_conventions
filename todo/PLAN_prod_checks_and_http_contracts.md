@@ -1,9 +1,9 @@
 # PLAN — `.http` contracts and post-deploy checks, with the tools that enforce them
 
-> Status: **shipped 2026-09-03 across all six repositories.** The open tail is small and named: the
-> `rag_qln` backfill (five of thirteen groups written, coverage reporting rather than failing), the
-> authentication decision for the vault's prod-side checks, and the ~20-site null-dereference class
-> that phase 4 enumerated in `rag_qln` and did not fix. Scope: `common/http-contracts.md`,
+> Status: **shipped 2026-09-03 across all six repositories, with coverage armed in every one of
+> them.** One item of open tail remains, and it is a decision rather than work: the authentication
+> question for the vault's prod-side checks. The `rag_qln` backfill and the null-dereference class it
+> exposed were both closed the same day (phase 5 below). Scope: `common/http-contracts.md`,
 > `common/post-deploy-checks.md`, three Node tools in `tools/`, and one `http/` tree plus one
 > `POST_DEPLOY.md` in each of the six consumers.
 >
@@ -211,7 +211,33 @@ note that its real contract is the tool surface), `connect_other_ais` (no HTTP; 
 about the extension and the AOT binary). `http-coverage.mjs` starts as a warning in each repository and
 becomes a failure when its groups are covered.
 
-### Phase 5 — pin cascade
+### Phase 5 — closing the tail in `dew_flow_rag_qln` *(done 2026-09-03)*
+
+**The class, fixed the way `security.md` asks.** The enumeration came from the MECHANISM rather than
+from a grep: `ClientBoundInputTests` binds every client-facing contract from `{}` **and** from a body
+whose strings are all explicitly `null`. That second arm is what made the fix bigger than the text
+scan suggested — an omitted parameter takes its constructor default, an explicit null is passed and no
+default rescues it. **31 properties across 7 records**, all now normalised, with the test as the guard
+that a new input record cannot arrive without one and a companion asserting the enumeration still
+finds the contracts it names. Watched red on both arms; 875 tests green after; `{"name":"x"}` and
+`{"name":"x","key":null}` both answer 200 against a live daemon.
+
+**The backfill, and the tool change it forced.** Eight groups written — gpu, corpus, agents, passes,
+search, the bench proxy, a settings round trip and the Claude probes — taking the suite to 52 requests
+and 118 checks over 11 files, run three times consecutively to prove the store is left as found.
+
+Arming coverage there exposed the flaw in the tool's own design: six of forty-nine routes cannot be
+reached from a request BY CONSTRUCTION (a vector store the daemon refuses to guess, a card, an
+OS-level write). Coverage would have been red forever, and a permanently red check is one somebody
+switches off. So an `@uncovered` line may now **name its route**, and `http-coverage` counts it as
+DECLARED with the reason printed beside it. A declaration is a decision on the record; silence is the
+gap. That is the difference between a check that can be armed and one that cannot.
+
+**Two things recorded rather than asserted**, because asserting either would enshrine it: a corpus pin
+heartbeat answers `renewed: true` with `expiresUtc` 0001-01-01, and `index-state` surfaces a
+startup-shaped configuration refusal as a per-request 500.
+
+### Phase 6 — pin cascade
 
 `git submodule update --remote .claude/rules/shared` + commit in all six consumers, in the same task as
 the rules commit, `dew_flow_rag_qln` last because it is itself pinned by two others. Per
@@ -239,6 +265,8 @@ the rules commit, `dew_flow_rag_qln` last because it is itself pinned by two oth
 - [x] `http-coverage.mjs` is failing (not warning) in every repository whose groups are covered —
       armed in four, reporting in `rag_qln` while its backfill runs.
 - [ ] The authentication question for prod-side checks is answered and recorded.
-- [ ] `rag_qln`'s remaining eight groups are covered and its coverage check is armed.
-- [ ] The null-dereference class in `rag_qln` is enumerated, fixed and left behind as a scan.
+- [x] `rag_qln`'s remaining eight groups are covered and its coverage check is armed — 52 requests,
+      118 checks, 43 routes covered and 6 declared, coverage failing rather than warning.
+- [x] The null-dereference class in `rag_qln` is enumerated, fixed and left behind as a scan —
+      `ClientBoundInputTests`, 31 properties across 7 records.
 - [x] Pins bumped in all six consumers in the same task as each rules commit.
