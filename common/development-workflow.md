@@ -103,12 +103,14 @@ So the artefact you roll back to has to exist already:
 4. **The rollback is one command, written down where somebody will find it at two in the morning** —
    the repository's own release section, not a comment inside a workflow file.
 
-**Measured 2026-09-03 in `dew_flow_creds_for_devs`**, which gets the first half right and the second
+**Measured 2026-09-03 in `dew_flow_creds_for_devs`**, which had the first half right and the second
 half wrong. `deploy/update.sh --rollback` pulls a version-tagged image from the registry and never
-builds — correct, and the shape to copy. But it remembers exactly one previous image
-(`echo "$PREVIOUS" >"$STATE_FILE"`, overwriting), and a rollback does not record where it rolled back
-FROM, so a second consecutive `--rollback` returns to the same place it just came from. Two bad
-releases in a row and the tool has nothing left to offer, on a host somebody is depending on.
+builds — correct, and the shape to copy. But it remembered exactly one previous image
+(`echo "$PREVIOUS" >"$STATE_FILE"`, overwriting), and a rollback did not record where it rolled back
+FROM, so a second consecutive `--rollback` returned to the same place it had just come from. Two bad
+releases in a row and the tool had nothing left to offer, on a host somebody depends on. Fixed the
+same day the rule was written — the state file is now a trail of three that `--rollback` pops from,
+and a plain refresh cannot bury the real previous by pushing a duplicate of the current image.
 
 The extension half of the same repository is the pattern that works: every release attaches its
 `.vsix` to a GitHub release, so every version ever shipped is one download away and a rollback is
