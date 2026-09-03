@@ -24,8 +24,14 @@ const ENVIRONMENT = [
   /\bReferenceError\b/, /\bTypeError\b/,
 ];
 
-const TESTCASE = /<testcase\b([^>]*)(?:\/>|>([\s\S]*?)<\/testcase>)/g;
-const FAILURE = /<(failure|error)\b([^>]*)(?:\/>|>([\s\S]*?)<\/\1>)/g;
+// The attribute run is NON-GREEDY, and that is the whole of a measured bug: `[^>]*` swallowed the
+// `/` of a self-closing `<testcase … />`, the self-closing branch could then never match, and the
+// reader fell through to "find the next </testcase>" — eating every passing case in between. A real
+// report of 92 cases was read as 26. It failed nothing; it just under-counted, silently.
+const TESTCASE = /<testcase\b([^>]*?)\s*(?:\/>|>([\s\S]*?)<\/testcase>)/g;
+const FAILURE = /<(failure|error)\b([^>]*?)\s*(?:\/>|>([\s\S]*?)<\/\1>)/g;
+/** httpyac puts the useful text — the value that was actually seen — in a JSON body, not the attribute. */
+const DETAILED_MESSAGE = /"message"\s*:\s*"((?:[^"\\]|\\.)*)"/;
 const ATTRIBUTE = (name) => new RegExp(`${name}="([^"]*)"`);
 
 function attribute(attributes, name) {
@@ -56,9 +62,12 @@ export function parseJUnit(xml) {
     const failures = [];
     for (const failure of body.matchAll(FAILURE)) {
       const [, kind, failureAttributes, text = ""] = failure;
+      // `message="status == 400"` restates the expectation; the body carries `status (500) == 400`,
+      // which is the half that says what went wrong. Prefer it when it is there.
+      const detailed = DETAILED_MESSAGE.exec(text)?.[1]?.replace(/\\"/g, '"').replace(/\\n/g, " ");
       failures.push({
         kind,
-        message: decode(attribute(failureAttributes, "message") || text.trim()).trim(),
+        message: decode(detailed || attribute(failureAttributes, "message") || text.trim()).trim(),
       });
     }
     cases.push({

@@ -88,6 +88,28 @@ test("a document that is not a report is INVALID, never an empty pass", () => {
   assert.equal(parseJUnit(junit("")).valid, false); // zero cases exercised nothing
 });
 
+test("consecutive self-closing cases are counted separately, not swallowed into one", () => {
+  // Measured against a real httpyac report on 2026-09-03: 92 test cases were read as 26. Greedy
+  // attribute matching consumed the `/` of a self-closing tag, so the reader fell through to the
+  // "find the next </testcase>" branch and ate every passing case in between. Nothing failed —
+  // the count was simply wrong, in the direction that hides cases.
+  const report = parseJUnit(junit(
+    '<testcase name="a" classname="first" />' +
+    '<testcase name="b" classname="second" />' +
+    '<testcase name="c" classname="third"><failure message="AssertionError: nope" /></testcase>'));
+  assert.equal(report.cases.length, 3);
+  assert.deepEqual(report.cases.map((c) => c.classname), ["first", "second", "third"]);
+  assert.equal(verdict(report).failed.length, 1);
+});
+
+test("the failure message is the one that names the actual value, not the bare expectation", () => {
+  const report = parseJUnit(junit(
+    '<testcase name="status == 400" classname="share_is_400">' +
+    '<failure message="status == 400" type="AssertionError">' +
+    '{"message":"status (500) == 400","name":"AssertionError"}</failure></testcase>'));
+  assert.match(report.cases[0].failures[0].message, /status \(500\) == 400/);
+});
+
 test("a report with no failures passes", () => {
   const report = parseJUnit(junit('<testcase name="health" />'));
   assert.equal(report.valid, true);
@@ -198,6 +220,23 @@ test("an item that says neither auto nor manual is a finding", () => {
   assert.match(findings.join(" "), /neither "auto" nor "manual"/);
 });
 
+test("a pipe escaped as \\| stays inside its cell — a shell or a JS default writes one", () => {
+  // Found writing the vault's own checklist: `process.env.EXPECTED_CONTRACT||'2'` split the row into
+  // extra cells, and the Auto column then read as empty. Markdown's own escape is `\|`; a table
+  // reader that does not honour it silently mangles every command that contains one.
+  const { headers, rows } = parseTable(table([
+    "| 1 | a thing | `node -e \"process.exit(process.env.X\\|\\|'2'==='2'?0:1)\"` | auto |",
+  ]));
+  assert.equal(headers.length, 4);
+  assert.equal(rows[0].length, 4);
+  assert.match(rows[0][2], /process\.env\.X\|\|'2'/);
+  const { findings, items } = inspect(table([
+    "| 1 | a thing | `node -e \"process.exit(process.env.X\\|\\|'2'==='2'?0:1)\"` | auto |",
+  ]));
+  assert.deepEqual(findings, []);
+  assert.match(items[0].command, /\|\|/);
+});
+
 test("the table reader finds the table under prose, and only its rows", () => {
   const { headers, rows } = parseTable(table(["| 1 | a | `true` | auto |", "| 2 | b | x | manual |"]));
   assert.equal(headers.length, 4);
@@ -245,6 +284,13 @@ test("a missing suite is a configuration error that names where the requests bel
   const { code, out } = runTool("http-run.mjs", ["no-such-tree"]);
   assert.equal(code, 4);
   assert.match(out, /http-contracts\.md puts the requests in http\/<group>\//);
+});
+
+test("a required environment variable that is unset stops the run before it can look like 401s", () => {
+  const { code, out } = runTool("http-run.mjs", ["--require-env", "DEW_FLOW_SURELY_UNSET_VARIABLE"]);
+  assert.equal(code, 4);
+  assert.match(out, /required environment variable\(s\) not set: DEW_FLOW_SURELY_UNSET_VARIABLE/);
+  assert.match(out, /this is not an API failure/);
 });
 
 test("httpyac absent is a configuration error carrying the pinned install command", () => {

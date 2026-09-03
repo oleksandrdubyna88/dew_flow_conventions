@@ -23,6 +23,7 @@
  *       path                 tree holding the .http files (default: http)
  *       --target <url>       base url, handed to httpyac as --var baseUrl=<url>
  *       --tag <name>         run only requests carrying "# @<name>" (e.g. prod)
+ *       --require-env <NAME> refuse to start unless this variable is set; repeatable
  *       --var name=value     an extra variable (repeatable)
  *       --env <name>         httpyac environment name
  *       --timeout <ms>       per-request timeout (default 60000)
@@ -49,6 +50,7 @@ const KNOWN_GOOD = "6.16.7";
 const options = {
   target: { type: "string" },
   tag: { type: "string" },
+  "require-env": { type: "string", multiple: true, default: [] },
   var: { type: "string", multiple: true, default: [] },
   env: { type: "string" },
   timeout: { type: "string", default: "60000" },
@@ -69,18 +71,21 @@ function log(line = "") {
  * the `.bin` shim on Windows is a `.cmd`, which recent Node refuses to spawn without a shell, and a
  * shell string is what [common/security.md](../common/security.md) forbids. This route needs neither.
  */
-function locateHttpyac(root) {
-  const require = createRequire(path.join(root, "package.json"));
-  let manifestPath;
-  try {
-    manifestPath = require.resolve("httpyac/package.json");
-  } catch {
-    return { found: false };
+function locateHttpyac(...roots) {
+  for (const root of roots) {
+    let manifestPath;
+    try {
+      manifestPath = createRequire(path.join(root, "package.json")).resolve("httpyac/package.json");
+    } catch {
+      continue; // not installed from here — try the next root
+    }
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const bin = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.httpyac;
+    if (bin) {
+      return { found: true, entry: path.join(path.dirname(manifestPath), bin), version: manifest.version };
+    }
   }
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  const bin = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.httpyac;
-  if (!bin) return { found: false };
-  return { found: true, entry: path.join(path.dirname(manifestPath), bin), version: manifest.version };
+  return { found: false };
 }
 
 /**
@@ -91,6 +96,14 @@ function locateHttpyac(root) {
  */
 function materialiseTagged(files, sourceRoot, destination, tag) {
   fs.rmSync(destination, { recursive: true, force: true });
+  fs.mkdirSync(destination, { recursive: true });
+  // httpyac looks for its config from each file's directory upwards, and the filtered tree lives
+  // somewhere else entirely — so a suite whose variables come from a config beside it would run
+  // with none of them. Carry the config along rather than leaving that to be discovered as 401s.
+  for (const name of ["httpyac.config.js", ".httpyac.config.js", "httpyac.config.mjs"]) {
+    const config = path.join(sourceRoot, name);
+    if (fs.existsSync(config)) fs.copyFileSync(config, path.join(destination, name));
+  }
   const written = [];
   for (const file of files) {
     const filtered = filterByTag(fs.readFileSync(file, "utf8"), tag);
@@ -114,6 +127,16 @@ async function main() {
   const flags = parsed.values;
   const root = process.cwd();
   const suiteRoot = path.resolve(root, parsed.positionals[0] ?? "http");
+
+  // A secret the suite needs and does not have is CONFIGURATION, and saying so here is the only
+  // place it can still be said plainly: once the run starts, a missing token arrives as a wall of
+  // 401s that reads exactly like an auth regression.
+  const missing = flags["require-env"].filter((name) => !process.env[name]);
+  if (missing.length > 0) {
+    log(`http-run: required environment variable(s) not set: ${missing.join(", ")}.`);
+    log("  The suite needs them to authenticate. Set them and re-run — this is not an API failure.");
+    return EXIT.configurationError;
+  }
 
   if (!fs.existsSync(suiteRoot)) {
     log(`http-run: no suite at ${path.relative(root, suiteRoot) || suiteRoot}.`);
@@ -142,10 +165,12 @@ async function main() {
     }
   }
 
-  const httpyac = locateHttpyac(root);
+  // The repository root, or beside the suite: a repo whose only Node dependency is this suite keeps
+  // the pin next to the requests rather than growing a package.json at its root for one tool.
+  const httpyac = locateHttpyac(root, suiteRoot);
   if (!httpyac.found) {
     log("http-run: httpyac is not installed in this repository.");
-    log(`  npm install --save-dev httpyac@${KNOWN_GOOD}`);
+    log(`  npm install --save-dev httpyac@${KNOWN_GOOD}   (at the repository root, or in ${path.relative(root, suiteRoot) || "the suite folder"})`);
     log("  The pin belongs in the repository that has an API — a repository without one installs nothing.");
     return EXIT.configurationError;
   }
@@ -196,13 +221,16 @@ async function main() {
   }
 
   const outcome = verdict(report);
-  log(`http-run: ${report.cases.length} request(s), ${outcome.failed.length} failed.`);
+  const requests = new Set(report.cases.map((c) => c.classname)).size;
+  log(`http-run: ${requests} request(s), ${report.cases.length} check(s), ${outcome.failed.length} failed.`);
 
   if (outcome.outcome === "pass") return EXIT.ok;
 
   for (const testCase of outcome.failed) {
     const kind = outcome.contractual.includes(testCase) ? "CONTRACT" : "environment";
-    log(`  ${kind.padEnd(11)} ${testCase.name}`);
+    // The request's name first: an assertion reading "status == 400" names neither what was asked
+    // for nor where, and that is the line somebody has to act on.
+    log(`  ${kind.padEnd(11)} ${testCase.classname || "(unnamed request)"} › ${testCase.name}`);
     for (const failure of testCase.failures) {
       const message = flags.verbose ? failure.message : failure.message.split("\n")[0];
       log(`              ${message}`);

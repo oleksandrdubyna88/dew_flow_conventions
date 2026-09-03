@@ -53,7 +53,13 @@ export function parseTable(text) {
     line.trim().startsWith("|") && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] ?? ""));
   if (start < 0) return { headers: [], rows: [] };
 
-  const cells = (line) => line.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+  // `\|` is markdown's own escape, and a checklist needs it: a shell `||`, a JS default, a regex
+  // alternation all put a pipe inside a cell. Splitting naively turns one row into six and the
+  // columns then read as empty — which is a finding about the file rather than about the check.
+  const cells = (line) => line.trim()
+    .replace(/^\|/, "").replace(/(?<!\\)\|$/, "")
+    .split(/(?<!\\)\|/)
+    .map((cell) => cell.trim().replace(/\\\|/g, "|"));
   const headers = cells(lines[start]);
   const rows = [];
   for (let i = start + 2; i < lines.length; i += 1) {
