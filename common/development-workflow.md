@@ -77,6 +77,43 @@ So, wherever a release fans out across platforms, runtimes or packages:
 - **Never move a tag to repair this.** Ship the next patch version; a moved tag makes every checkout
   that already fetched it wrong in a way nothing reports.
 
+## A rollback must not BUILD, and it must reach further back than one (MANDATORY)
+
+Rolling back is the thing you do when a release is hurting people, and it is the one operation that
+must be boring. "Re-run the pipeline on the previous tag" is not a rollback. It fails twice over:
+
+- **It is slow at the exact moment speed is the point.** A build is minutes; an incident is minutes.
+- **It does not necessarily produce the same bytes.** A moving base image, a floating transitive
+  dependency, a toolchain that updated between then and now, a registry that has changed what a
+  mutable tag means. What comes out is a NEW deployment wearing an old version number — and if it
+  also fails, you have learnt nothing about which change was at fault.
+
+So the artefact you roll back to has to exist already:
+
+1. **Every deployable is published as an immutable, version-addressed artefact before it is
+   deployed** — a registry tag that is never overwritten, a release asset. `latest` and `edge` are
+   pointers to whatever is newest; they are never rollback targets.
+2. **The artefacts of at least the LAST THREE deployments stay retrievable, and the rollback
+   mechanism can reach all three.** One is not enough, and the reason is the case that actually
+   happens: the last two are both bad. A depth of one turns that into a rebuild under pressure,
+   which is the thing this rule exists to remove.
+3. **A CI artifact with a retention window is not a rollback source.** `actions/upload-artifact`
+   expires — fourteen days in one repository here — and the deployment you need is usually the one
+   just outside it. A release asset and a registry tag do not expire.
+4. **The rollback is one command, written down where somebody will find it at two in the morning** —
+   the repository's own release section, not a comment inside a workflow file.
+
+**Measured 2026-09-03 in `dew_flow_creds_for_devs`**, which gets the first half right and the second
+half wrong. `deploy/update.sh --rollback` pulls a version-tagged image from the registry and never
+builds — correct, and the shape to copy. But it remembers exactly one previous image
+(`echo "$PREVIOUS" >"$STATE_FILE"`, overwriting), and a rollback does not record where it rolled back
+FROM, so a second consecutive `--rollback` returns to the same place it just came from. Two bad
+releases in a row and the tool has nothing left to offer, on a host somebody is depending on.
+
+The extension half of the same repository is the pattern that works: every release attaches its
+`.vsix` to a GitHub release, so every version ever shipped is one download away and a rollback is
+installing a file rather than building one.
+
 ## The other side ships on its own clock (MANDATORY)
 
 The rule above is about an artefact that was not rebuilt. This one is about an artefact that was
