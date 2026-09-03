@@ -55,6 +55,20 @@ Say so in one line, where the requests are:
 One comment line is the whole cost. What it buys is the difference between *"the wire cannot reach
 this"* and *"nobody thought about it"* — indistinguishable in a file that simply says nothing.
 
+**When a whole ROUTE is out of reach, the declaration names it**, and the reason may wrap onto plain
+`#` lines beneath:
+
+```
+# @uncovered GET /api/rag/projects/{id}/index-state — it resolves a collection through the vector
+#            store, and the daemon deliberately refuses to guess one.
+```
+
+`http-coverage.mjs` then counts that route as **declared** rather than missing. This is what makes an
+armed coverage check possible at all: some routes cannot be reached from a request by construction —
+they need a vector store, a card, a second account — and without a way to record that decision the
+check would stay red forever, which is a check somebody switches off. A declaration is a decision on
+the record; silence is the gap.
+
 ### `# @prod` — the tag that means "safe against something live"
 
 A request is prod-safe only when it **reads and changes nothing**: no writes, no deletes, no

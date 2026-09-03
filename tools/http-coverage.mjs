@@ -46,6 +46,8 @@ const DOTNET_MAP = /\bMap(Get|Post|Put|Delete|Patch|Head|Options)\s*(?:<[^>]*>)?
 const RUST_ROUTE = /\.route\s*\(\s*"([^"]*)"\s*,\s*(?:([a-z]+)\s*\()?/g;
 /** `MapGroup("/api/mcp")` and axum's `.nest("/api", …)` — a route inside one carries only its TAIL. */
 const GROUP_PREFIX = /\b(?:MapGroup|nest)\s*\(\s*"([^"]*)"/g;
+/** `@uncovered DELETE /api/x — why` — a declaration that names the route it stands for. */
+const DECLARED_ROUTE = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\S+)\s*[—-]?\s*(.*)$/s;
 
 const options = {
   http: { type: "string", default: "http" },
@@ -132,6 +134,12 @@ function candidatePaths(route) {
   return [route.path, ...prefixed];
 }
 
+/** Does a declaration stand for this route? Same matching a request gets, prefixes included. */
+function sameRoute(declaration, route) {
+  if (declaration.method !== route.method && route.method !== "ANY" && route.method !== "") return false;
+  return candidatePaths(route).some((candidate) => candidate !== "" && pathsMatch(candidate, declaration.path));
+}
+
 function matchesAnyRequest(route, requests) {
   const candidates = candidatePaths(route);
   return requests.some((request) => {
@@ -196,16 +204,37 @@ function main() {
     ? collectRequests(httpRoot)
     : { requests: [], uncovered: [] };
 
-  const missing = routes.filter((route) => !matchesAnyRequest(route, requests));
-  const covered = routes.length - missing.length;
+  // An `@uncovered` line that NAMES a route — `@uncovered DELETE /api/x — why` — is a declared gap:
+  // a decision on the record, for a route no request can reach (it needs a vector store, a card, a
+  // second account). Without this the check could never be armed anywhere that has one, and a
+  // permanently red check is one somebody switches off. A declaration that names only a status stays
+  // what it was: a note, counted and not linked to any route.
+  const declarations = uncovered
+    .map((entry) => ({ ...entry, match: DECLARED_ROUTE.exec(entry.text) }))
+    .filter((entry) => entry.match !== null)
+    .map((entry) => ({
+      method: entry.match[1].toUpperCase(),
+      path: entry.match[2],
+      why: entry.match[3]?.trim() ?? "",
+      file: entry.file,
+    }));
+
+  const unmatched = routes.filter((route) => !matchesAnyRequest(route, requests));
+  const declared = unmatched.filter((route) => declarations.some((d) => sameRoute(d, route)));
+  const missing = unmatched.filter((route) => !declarations.some((d) => sameRoute(d, route)));
+  const covered = routes.length - unmatched.length;
 
   console.log(`http-coverage: ${requests.length} request(s) in ${flags.http}, ${uncovered.length} @uncovered declaration(s).`);
-  console.log(`http-coverage: ${covered}/${routes.length} route(s) covered.`);
+  console.log(`http-coverage: ${covered}/${routes.length} route(s) covered, ${declared.length} declared.`);
 
   if (flags.verbose) {
     for (const route of routes.filter((r) => matchesAnyRequest(r, requests))) {
       console.log(`  covered    ${route.method} ${route.path}`);
     }
+  }
+  for (const route of declared) {
+    const why = declarations.find((d) => sameRoute(d, route))?.why ?? "";
+    console.log(`  DECLARED   ${route.method} ${route.path} — ${why}`);
   }
   for (const route of missing) {
     console.log(`  MISSING    ${route.method} ${route.path}${route.file ? `  (${route.file})` : ""}`);
@@ -214,7 +243,8 @@ function main() {
   if (missing.length === 0) return 0;
   console.log("");
   console.log(`${missing.length} route(s) have no request. http-contracts.md: an endpoint ships with its`);
-  console.log(".http in the same commit — write them under http/<group>/, or declare the gap.");
+  console.log(".http in the same commit — write them under http/<group>/, or declare the gap by naming");
+  console.log("the route: `# @uncovered DELETE /api/x — why no request can reach it`.");
   return flags.warn ? 0 : 1;
 }
 

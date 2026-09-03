@@ -54,8 +54,9 @@ test("a request block is found with its name, its tags and its verb", () => {
 test("an @uncovered declaration is read as a declaration, never as a request", () => {
   const blocks = parseHttpFile(httpFixture);
   const declared = blocks.flatMap((b) => b.uncovered);
-  assert.equal(declared.length, 1);
+  assert.equal(declared.length, 2);
   assert.match(declared[0], /^503 —/);
+  assert.match(declared[1], /^DELETE \/api\/vault\/\{id\}/);
   assert.ok(blocks.every((b) => b.uncovered.length === 0 || b.request === null));
 });
 
@@ -179,19 +180,18 @@ test("a placeholder matches a value, on either side, and a shorter path does not
   assert.ok(!pathsMatch("/api/vault", "/api/team"));
 });
 
-test("http-coverage names the route the fixture suite does not cover, and fails", () => {
+test("a route with no request but a declaration NAMING it is accounted for, not missing", () => {
+  // The alternative is a check nobody can ever arm: a route that genuinely cannot be reached from a
+  // request — it needs a vector store, a card, a second account — would keep it red forever, and a
+  // permanently red check is one somebody switches off. A declaration that names the route and says
+  // why is a decision on the record; silence is the gap this tool exists to find.
   const { code, out } = runTool("http-coverage.mjs", []);
-  assert.equal(code, 1);
-  assert.match(out, /MISSING\s+DELETE \/api\/vault\/\{id\}/);
-  assert.match(out, /3\/4 route\(s\) covered/);
-  assert.match(out, /1 @uncovered declaration/);
-  assert.doesNotMatch(out, /MISSING\s+GET \/health/, "a grouped route must be rooted by its prefix");
-});
-
-test("--warn reports the same finding and exits 0 — the state a repository adopts in", () => {
-  const { code, out } = runTool("http-coverage.mjs", ["--warn"]);
   assert.equal(code, 0);
-  assert.match(out, /MISSING/);
+  assert.match(out, /DECLARED\s+DELETE \/api\/vault\/\{id\}/);
+  assert.match(out, /a second account's vault/);
+  assert.match(out, /3\/4 route\(s\) covered/);
+  assert.doesNotMatch(out, /MISSING/, "every route is either covered or declared");
+  assert.doesNotMatch(out, /MISSING\s+GET \/health/, "a grouped route must be rooted by its prefix");
 });
 
 // ── POST_DEPLOY.md, shape and run ────────────────────────────────────────────────────────────────

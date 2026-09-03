@@ -13,6 +13,8 @@ import * as path from "node:path";
 
 const REQUEST_LINE = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\S+)/;
 const META_LINE = /^\s*#\s*@(\w+)(?:\s+(.*))?$/;
+/** A plain `#` comment — which, directly under an `@uncovered`, continues its reason. */
+const CONTINUATION = /^\s*#(?!\s*@)\s*\S/;
 
 /** Directories never worth walking for `.http` files. */
 const SKIP_DIRS = new Set(["node_modules", ".git", "bin", "obj", "target", "dist", "artifacts"]);
@@ -54,10 +56,12 @@ export function parseHttpFile(text) {
   const lines = text.split(/\r?\n/);
   const blocks = [];
   let current = { rawLines: [], meta: [], name: "", tags: new Set(), request: null };
+  let continuing = false;
 
   const push = () => {
     if (current.rawLines.length > 0) blocks.push(finish(current));
     current = { rawLines: [], meta: [], name: "", tags: new Set(), request: null };
+    continuing = false;
   };
 
   for (const line of lines) {
@@ -70,6 +74,14 @@ export function parseHttpFile(text) {
       current.tags.add(tag);
       if (tag === "name" && rest) current.name = rest.trim();
       if (tag === "uncovered") current.meta.push({ tag, text: (rest ?? "").trim() });
+      continuing = tag === "uncovered";
+    } else if (continuing && CONTINUATION.test(line)) {
+      // A declaration's reason wraps — it is prose, and prose does not fit in one line. A plain `#`
+      // comment directly under one continues it; anything else (a blank line, a request, another
+      // tag) ends it, so a paragraph further down cannot be swallowed into the reason.
+      current.meta.at(-1).text += ` ${line.replace(/^\s*#\s*/, "").trim()}`;
+    } else {
+      continuing = false;
     }
 
     if (!current.request) {

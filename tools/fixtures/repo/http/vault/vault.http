@@ -34,3 +34,5 @@ GET {{baseUrl}}/api/admin/health
 
 ###
 # @uncovered 503 — reached only when the store is down; not provokable from a request
+# @uncovered DELETE /api/vault/{id} — a declared gap that NAMES its route: the delete needs a second
+#            account's vault to exist, and standing one up is machinery this rule does not ask for.
