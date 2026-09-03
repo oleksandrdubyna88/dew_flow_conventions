@@ -45,6 +45,32 @@ So, whenever what ships is a built artefact rather than the working tree:
   `0 error(s)` for projects it silently could not copy. A clean build line is not proof that the binary you
   are about to run is fresh.
 
+## A release that shipped SOME of its platforms is worse than one that failed (MANDATORY)
+
+The third sibling. The first rule above is an artefact that was not rebuilt; the second is one that
+was built and never deployed. This one is built, published, marked **Latest** — and incomplete.
+
+Measured 2026-09-03. A six-RID release matrix lost one job to a test failure. The other five
+published, the release was created, GitHub marked it Latest, and the whole thing read as success in
+every list. A linux-x64 user pressing Install then found **no asset for their platform**: not an
+error anyone could act on, just an absence, on the newest version, with five siblings present to
+prove the release "worked". The tag had to be burned and the fix shipped as a new one.
+
+A partial publish is the worst of the three because every signal is green *and* the artefact exists.
+There is nothing to notice.
+
+So, wherever a release fans out across platforms, runtimes or packages:
+
+- **The publish step depends on the WHOLE matrix.** `needs:` the fan-out job and let a single failed
+  leg keep the release from being created at all. A tag that produced nothing is a tag you retry; a
+  tag that produced five sixths is a trap with a version number.
+- **Assert the count after publishing**, from the release itself rather than from the workflow's
+  opinion of itself: the number of assets equals the number of targets, and each expected name is
+  present. A matrix that silently shrinks — a runner image retired, a leg skipped by an `if:` —
+  passes every job-level check.
+- **Never move a tag to repair this.** Ship the next patch version; a moved tag makes every checkout
+  that already fetched it wrong in a way nothing reports.
+
 ## The other side ships on its own clock (MANDATORY)
 
 The rule above is about an artefact that was not rebuilt. This one is about an artefact that was

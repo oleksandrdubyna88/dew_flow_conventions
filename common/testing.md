@@ -255,6 +255,17 @@ The order is fixed — never fix first and test after:
 **If the fix already landed**, prove the test has teeth: revert the fix, watch the test go red with the
 real symptom, restore it, confirm green.
 
+**Revert the line the observable BEHAVIOUR depends on — not any line you changed.** A fix is often
+two parts (parse the setting, then act on it; add a name to a list, then read the list), and a test
+written against the first part stays green when the second is deleted. Measured three times in one day
+in one repository: a test that used a code path with its own correct arm and never reached the broken
+one; a test one layer below the parser it meant to cover; a settings test that passed with the wiring
+that consumed the setting entirely removed. All three were green, and none of them was a test of the
+defect.
+
+The check is mechanical: **delete the production line whose absence a user would notice, and watch
+THAT go red.** If it does not, the test is at the wrong layer — move it up until it is.
+
 ## Name the guarantee, and give a refuted approach a shape
 
 A test name states what must be true — `First_position_is_balanced_across_the_whole_matrix_at_an_odd_repeat_count`,

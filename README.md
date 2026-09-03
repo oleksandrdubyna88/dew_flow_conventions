@@ -5,6 +5,32 @@ mounted at `.claude/rules/shared`. Claude Code loads rules from subdirectories, 
 `common/` (always loaded), `csharp/`, `rust/` and `typescript/` (path-scoped frontmatter) applies in
 the consumer exactly as a local rule would.
 
+## Which rules a session actually has (MANDATORY)
+
+**The sentence above is true only for a session ROOTED in the consumer.** Claude Code loads
+`.claude/` from the directory it was opened in — not from the additional working directories it can
+also edit, and not from the repository a commit is going to. A session opened in repository A with
+repository B as an extra folder edits B under **A's** rules: B's `CLAUDE.md`, B's repo-local rules and
+this whole submodule are invisible to it, and nothing announces that.
+
+Measured 2026-09-03: a session rooted in the frozen `ClaudeRag` checkout did a day of work in
+`dew_flow_connect_other_ais` and committed with `git add -A` twice — the one thing
+[git-workflow.md](common/git-workflow.md) rule 1 forbids by name. Nothing foreign was swept, because
+that checkout happened to have no other session in it. That is luck, not method.
+
+So, **before the first commit in any `dew_flow_*` tree, read that repository's own rules** rather than
+assuming they are loaded:
+
+```bash
+cat CLAUDE.md
+ls .claude/rules/ .claude/rules/shared/common/
+node .claude/rules/shared/tools/pin-check.mjs
+```
+
+The rules that govern are the ones belonging to **the repository you are committing to**, never the
+one the session was opened in. When they are not in your context, the fix is one `cat`, and the cost
+of skipping it is a commit that breaks a rule written precisely because breaking it is expensive.
+
 ## Editing discipline (MANDATORY)
 
 - Shared rules are edited **here and only here**. A consumer repository never carries its own copy of a

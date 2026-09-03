@@ -31,6 +31,10 @@ a timeout that merely stops *waiting* leaves an orphan holding locks and handles
 Not duplication — [reuse-first.md](reuse-first.md) covers that. This is one protective measure that
 exists, is correct, and is applied to the places somebody thought of.
 
+The same shape for decisions that are NOT protective — a fallback, a normalisation, a list of known
+names — is [reuse-first.md](reuse-first.md) § *A decision applied at SOME of its sites*. Read
+whichever matches what you are holding; the method below is the same in both.
+
 Counted in a single repository:
 
 | the measure | applied at | missing at |

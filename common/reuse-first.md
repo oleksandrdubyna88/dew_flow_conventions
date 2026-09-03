@@ -46,6 +46,44 @@ Find the closest existing thing and read it before writing yours.
 The asking matters. Rewriting neighbouring code uninvited turns a small change into a large diff nobody
 asked to review; imitating bad code spreads it. Naming it and asking is the only move that does neither.
 
+## A decision applied at SOME of its sites — and it is usually not a security measure (MANDATORY)
+
+[security.md](security.md) carries this shape for PROTECTIVE measures, with the measured table of
+escapes and sanitisers applied to the places somebody thought of. It is the same defect for any
+decision at all, and the non-protective version is the one that keeps landing, because nothing about
+it feels like a security question while you are making it.
+
+Measured 2026-09-02/03 in one repository, in one day, by that product's own review gate:
+
+| the decision | right at | wrong at |
+|---|---|---|
+| refuse a request with no finding schema instead of sending `{}` | the callee, where it had just been fixed | the CALLER, which kept its own copy of the fallback |
+| normalise an endpoint to `/v1` | the panel's probe | the review launch — so the model list looked healthy and every round 404'd |
+| the list of runtime names this build knows | the type, and the parser | a third place, the auth arm, which answered `0 reviewer(s)` while `providers` said healthy |
+
+Three of the nine defects that campaign found, and the pattern held for the two before it: a
+duplicate-reviewer-key crash from one runtime list in two places, and a surface-name check in three
+copies where adding a surface updated two.
+
+**Why it survives review.** The fix is correct. The commit is correct. The file you are looking at is
+correct — and the second site is somewhere you have no reason to open, often written by the same
+person on the same day. "I remember removing that" is the sentence, and it is worth nothing
+([measurement.md](measurement.md) — *a claim about code is settled by opening the file*).
+
+### What to do instead
+
+1. **One road in.** A decision that must hold everywhere belongs in the function everyone calls, not
+   in each caller. `LocalRuntime.OpenAiBaseOf` exists because two places were normalising by hand and
+   one of them was not.
+2. **When you fix a decision, grep for its SHAPE in the same task** — the literal it produces, the
+   flag it reads, the fallback value it substitutes — before you call it fixed. Not for the places
+   you remember; for the pattern. The enumeration is the deliverable, not the fix.
+3. **If the shape spans lines, match across lines.** A line-scan found none of the three-line sites in
+   the security audit.
+4. **Leave the enumeration behind as a test** where the sites can be named structurally, per
+   [testing.md](testing.md) — *a structural test that matches nothing passes forever*.
+5. **Say which method you used.** "I looked and it is fine" is worth exactly what the sweep was worth.
+
 ## Never
 
 - Do **not** copy a block of code "for now" intending to unify later. There is no later; the second
@@ -54,6 +92,7 @@ asked to review; imitating bad code spreads it. Naming it and asking is the only
 - Do **not** rewrite neighbouring code you were not asked to change. Name it, propose it, ask.
 - Do **not** imitate a pattern you can see is wrong because "everything here does it that way". Write
   the new code well and say what you found.
+- Do **not** report a decision as fixed before sweeping for its other sites — mechanically, by shape.
 
 ## Definition of Done
 
