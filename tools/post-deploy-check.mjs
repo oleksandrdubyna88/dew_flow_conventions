@@ -145,7 +145,12 @@ async function runItems(items, target, timeoutMs) {
     if (item.manual || item.command.length === 0) continue;
     const result = await run(item.command, [], { env, timeoutMs, shell: true });
     const ok = result.code === 0 && !result.timedOut;
-    console.log(`  ${ok ? "PASS" : "FAIL"}  ${item.number}. ${item.symptom}`);
+    // A PASSING item's own output is kept, not swallowed. Measured on the first real deploy this
+    // ran against: the certificate item computes and prints how many days are left, and printing
+    // only failures threw that away — so the one number that gives EARLY warning was visible
+    // exactly when it was already too late to be a warning.
+    const said = ok ? result.out.trim().split("\n").filter(Boolean).at(-1) : "";
+    console.log(`  ${ok ? "PASS" : "FAIL"}  ${item.number}. ${item.symptom}${said ? `  — ${said}` : ""}`);
     if (!ok) {
       failed += 1;
       console.log(`        ${item.command}`);

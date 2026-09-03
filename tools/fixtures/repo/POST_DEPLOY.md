@@ -10,5 +10,5 @@ Last verified: 2026-09-03 · ok · fixture
 
 | # | What a person loses if this is broken | Check | Auto |
 |---|---|---|---|
-| 1 | Nothing reaches the deployment at all | `node -e "process.exit(process.env.TARGET === 'ok' ? 0 : 1)"` | auto |
+| 1 | Nothing reaches the deployment at all | `node -e "const ok=process.env.TARGET==='ok';if(ok)console.log('fixture target reached');process.exitCode=+(ok?0:1)"` | auto |
 | 2 | The editor command opens no panel | Run the command from the palette and watch the panel appear | manual |

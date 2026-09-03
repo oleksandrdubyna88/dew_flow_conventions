@@ -254,6 +254,14 @@ test("the table reader finds the table under prose, and only its rows", () => {
   assert.equal(rows.length, 2);
 });
 
+test("a passing item keeps what its command said — the number that warns EARLY", () => {
+  // The certificate item prints how many days are left. Printing it only on failure means the
+  // warning arrives after the certificate has already expired, which is not a warning.
+  const { code, out } = runTool("post-deploy-check.mjs", ["--target", "ok"]);
+  assert.equal(code, 0);
+  assert.match(out, /PASS {2}1\..*— fixture target reached/);
+});
+
 test("the target reaches a command as an environment variable, and a wrong one FAILS the run", () => {
   const pass = runTool("post-deploy-check.mjs", ["--target", "ok"]);
   assert.equal(pass.code, 0);
