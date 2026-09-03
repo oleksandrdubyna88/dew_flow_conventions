@@ -116,6 +116,47 @@ The extension half of the same repository is the pattern that works: every relea
 `.vsix` to a GitHub release, so every version ever shipped is one download away and a rollback is
 installing a file rather than building one.
 
+## Self-hosted means somebody has to delete things — and it must be a script (MANDATORY)
+
+Every hosted service prunes for you. A self-hosted one does not, and the moment you run your own
+runner, your own deploy host, your own registry or your own artefact directory, you own a writer that
+gains an item per build and never loses one. Disks do not fill gradually under this: they fill on a
+release day, several releases in, and the symptom is a deploy that fails for a reason that has nothing
+to do with the change.
+
+**The default is CURRENT plus three previous, and that number is not free-standing** — it is the
+rollback depth from the rule above. Keeping fewer breaks the rollback; keeping more is a choice that
+needs a reason. Best of all, make the retention BE the rollback trail rather than a second policy
+maintained beside it, and the two cannot drift apart.
+
+1. **Enumerate the writers before you believe you have them.** Container images on the deploy host,
+   build workspaces on the runner, artefact and package directories, extracted archives, logs, and
+   backups. Each one is separate, and this family has already shipped a directory where two of three
+   were bounded (see the measurement below) — which is
+   [reuse-first.md](reuse-first.md)'s *a decision applied at SOME of its sites* in a place nobody
+   thinks to look for it.
+2. **The pruning is a SCRIPT, running inside the operation that creates the item** — the same deploy,
+   the same job. Not a documented manual step, and not a cron somebody set up by hand on a host whose
+   next owner cannot find it. A retention policy nobody executes is a comment.
+3. **Prune OURS ONLY, by name.** `docker system prune -af` is not the answer on a shared host: it
+   deletes caches and images other tenants depend on, and it will do it silently on somebody else's
+   worst day.
+4. **Never let retention empty the shelf.** If everything visible is a candidate, the view is wrong,
+   not the disk — refuse and say so. A pruner that can delete the last good artefact is a worse
+   outage than the full disk it was written to prevent.
+5. **Prune AFTER the new thing is proven, never before.** A prune that runs before the health check
+   deletes the artefact the rollback is about to need.
+
+**Measured 2026-09-03 in `dew_flow_creds_for_devs`'s `deploy/`, where two of three writers were
+already bounded and the third was not.** Container logs are capped (`max-size: 10m`, `max-file: 5` on
+every service). Backups are pruned by `backup-once.sh` — and it already carries rule 4 in as many
+words: *"NEVER let retention empty the destination. A clock skew, a paused server, or a destination
+that was unreachable for a month must not turn 'prune old backups' into 'delete every backup'."*
+Docker images had nothing at all: every `./update.sh <version>` pulled a new one and left every
+previous one on the host for ever. Same directory, same hand, two of three. Fixed the same day — the
+prune keeps exactly what `--rollback` can reach, touches only images of our own repository, and runs
+only once the new container reports healthy.
+
 ## The other side ships on its own clock (MANDATORY)
 
 The rule above is about an artefact that was not rebuilt. This one is about an artefact that was
