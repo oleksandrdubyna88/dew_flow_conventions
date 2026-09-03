@@ -56,6 +56,19 @@ artefact back later), and a state machine whose non-terminal state has no timeou
 2. Status becomes `> Status: **IMPLEMENTED, <YYYY-MM-DD>.**` — **and record the deviations.** What
    shipped differently from the plan is the most valuable part of the record, and the part a future
    reader actually needs.
+
+   **A deviation that records something as impossible names what was CHECKED, not what was
+   concluded.** Measured 2026-09-03: a plan deferred a wordlist with *"not available as plain data
+   from any reachable package, and inventing it is exactly the failure this verification exists to
+   prevent"*. Every clause was true — three npm packages carry it only inside WebAssembly — and the
+   conclusion did not follow: the canonical upstream source is a plain header, and nobody had opened
+   it. The feature waited a month on a search nobody could see the edges of.
+
+   Written as *"checked: npm, three packages — none carries it as data; upstream source NOT checked"*,
+   the hole is visible in one line to the next reader, who is usually you. This is
+   [measurement.md](measurement.md)'s rule 3 — *a conclusion may not be wider than the conditions
+   measured* — in the setting where the "run" was a search: name the conditions, and the negative
+   result stops being a verdict.
 3. Fix the links. **There are THREE cases, not two** — see below.
 4. Update the *Currently open* table in the repo's `todo/README.md`.
 
@@ -164,6 +177,8 @@ holding the whole document hostage.
 - [ ] Every growth surface the plan creates names its projected size, who retires it, and its sweep.
 - [ ] The completion check ran: every plan the work touched was re-read and promoted if finished.
 - [ ] Promoted plans carry `IMPLEMENTED <date>` **and their deviations**.
+- [ ] A deviation recording something as impossible names what was CHECKED, so the next reader can
+      see the edges of the search.
 - [ ] All three link cases were fixed, and checked by resolving every link rather than from memory —
       including the invisible one, the mover's own links to plans that stayed in `todo/`.
 - [ ] Both folder READMEs match their folders — and a README row is committed in the SAME commit as the

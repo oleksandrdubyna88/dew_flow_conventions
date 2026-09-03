@@ -65,6 +65,18 @@ Three of the nine defects that campaign found, and the pattern held for the two 
 duplicate-reviewer-key crash from one runtime list in two places, and a surface-name check in three
 copies where adding a surface updated two.
 
+**And a review FINDING is a report of a shape, not of a site.** Measured 2026-09-03 in
+`dew_flow_creds_for_devs`. A code round found that a payment value could be copied for the entry a
+REUSED viewer panel had just replaced, and quoted the file it had been reading. The fix landed there
+and was reported as done. The same shape — an `await` between reading the current entry and acting on
+it — sat on four more paths, routed eleven lines earlier and returning *before* that guard; one was
+reachable, and it shipped in a release and was fixed in the next one.
+
+A reviewer quotes where they happened to be looking. The extent is yours to enumerate, and the
+finding's own words are usually the grep: "the options are captured before the await" describes a
+shape, and searching for that shape rather than for that file is the difference between a fix and a
+fixed FILE.
+
 **Why it survives review.** The fix is correct. The commit is correct. The file you are looking at is
 correct — and the second site is somewhere you have no reason to open, often written by the same
 person on the same day. "I remember removing that" is the sentence, and it is worth nothing

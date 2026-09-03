@@ -297,6 +297,32 @@ So:
    only that yours took it. "The staleness predates me, but two of the three commits that widened it
    are mine" is the available shape, and it is a better answer than either "not mine" or a guess.
 
+### 11. After a merge, re-read the files TOOLING parses
+
+`git merge` is textual. It resolves by line, knows nothing about what a file MEANS, and its silence is
+not agreement — a clean auto-merge can produce a document that is syntactically fine and semantically
+wrong. Nothing downstream complains, because the files this bites are the ones no test reads.
+
+Measured 2026-09-03 in `dew_flow_creds_for_devs`. Merging `main` into a release branch auto-merged
+`CHANGELOG.md` with no conflict and put the other branch's version section **above the file's own
+preamble**, keeping that branch's heading style — unbracketed, where every other heading in the file
+is `## [x]`. The release workflow slices notes from `'## [' + version + ']'` to the next `'
+## ['`,
+so an unbracketed heading between two versions is invisible as a terminator and one release's notes
+would have been published carrying another's. The build was green, the tests were green, and the
+defect was in a file neither of them opens.
+
+So after any merge, before committing it:
+
+- **List what tooling reads** in the merged paths — a changelog a release workflow slices, an index
+  table a check compares against a folder, a manifest, a generated contract, a `README` table. Then
+  open those files, not the diff.
+- **Run the consumer, not your eye.** The slicer above is nine lines of `node -e`; running it over
+  three versions took a minute and answered the question the diff could not. Where the consumer is a
+  workflow you cannot run locally, run its ESSENTIAL step by hand.
+- **A merge is not exempt from rule 2.** "Never commit work you have not seen working" covers the
+  merge commit too, and for a merge the thing you have not seen working is usually not the code.
+
 ### When verification is BLOCKED — ask, do not guess
 
 Blocked is a normal state on this hardware: a running host holds the DLLs, the GPU is taken by a pass,

@@ -123,6 +123,34 @@ docker probe that merely took too long travelled out of a `BackgroundService` an
 throwing a distinct `TimeoutException`. **If you own the wait, give up in your own words** — a typed
 value or a distinct exception — so no downstream filter has to guess which of you quit.
 
+## Before designing a lock, name the atomic operation it rests on
+
+A lock is not a data structure you write; it is one atomic operation you borrow, plus bookkeeping. If
+you cannot name the operation — the one call that either succeeds or fails and cannot half-happen —
+then what you are building is advisory coordination, and it must say so where a caller reads it.
+
+Measured 2026-09-03 in `dew_flow_creds_for_devs`. A plan proposed coordinating two VS Code windows
+through a lease key in the shared `globalState`, with a write-then-read-back to settle a tie: take it,
+re-read it, proceed only if it is still ours. Its review round returned **three Blocking findings from
+three vendors independently**, all the same — the store's `update` is asynchronous and a foreign write
+arrives through a broadcast with no ordering against a local read, so both windows read empty, both
+write, and each re-reads its own value. Two enter. The plan document had already written down that the
+store has no compare-and-swap, one paragraph above the design that assumed one.
+
+What to do instead:
+
+1. **Name it first, in the plan.** `mkdir` without `recursive`, `O_EXCL` on create, a conditional PUT,
+   a `SETNX`, a unique-index insert. The corrected design above became an atomic directory create in a
+   directory every window already shares.
+2. **Freshness is a HEARTBEAT, not a deadline.** A holder that renews a deadline goes on being a
+   holder while wedged; a holder that stops writing a timestamp stops being one without having to
+   notice, which is what a killed process and a stuck one have in common.
+3. **Release is fenced.** The holder writes an id unique to the acquisition, and release removes the
+   lock only if that id is still there — otherwise a holder that overran its expiry deletes the lock of
+   whoever replaced it, and two run again.
+4. **State the residual in the primitive's own header.** Every one of these leaves a narrow window.
+   The header is where a caller will read it; a paragraph in a plan is not.
+
 ## Everything that grows has an owner
 
 - **In memory:** every cache, dictionary or list that grows with traffic is bounded or evicted.
@@ -174,3 +202,5 @@ overflows `int` into an unhandled exception any client can trigger with one call
       token's state decides, and a wait you own gives up in its own words.
 - [ ] Health reflects the new component's liveness if it has a failure mode worth seeing.
 - [ ] Client-supplied numbers are clamped at the boundary.
+- [ ] Any lock names the atomic operation it rests on, expires on a heartbeat, fences its release,
+      and states its residual race in its own header.
