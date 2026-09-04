@@ -115,6 +115,23 @@ function walk(dir, mounts, found) {
 const mounts = mountPaths();
 const canonical = mounts.map((m) => `${m}/${CANONICAL.replaceAll("\\", "/")}`).find((p) => fs.existsSync(p));
 
+// A mount UNDER a rule tree is this family's rules submodule, whatever it is named. Distinguishing
+// it from a code submodule is what separates the two ways there can be no canonical file: a
+// repository that never adopted the rule (fine, nothing to check) from one that mounts it and did
+// not get it (an uninitialised or broken submodule — a repository with no gate rule at all, which
+// must not read as adoption).
+const rulesMounts = mounts.filter((m) => RULE_TREES.some((t) => m.startsWith(`${t}/`) || m === t));
+
+if (canonical === undefined && rulesMounts.length > 0) {
+  console.error(
+    `gate-snippet-check: ${rulesMounts.join(", ")} is mounted but carries no ${CANONICAL.replaceAll("\\", "/")}. ` +
+      "The rule this repository loads is not there — run " +
+      `git submodule update --init ${rulesMounts[0]}, and if it is initialised, the mount is pinned ` +
+      "to a commit older than the rule.",
+  );
+  process.exit(warnOnly ? 0 : 1);
+}
+
 if (canonical === undefined) {
   console.log(
     "gate-snippet-check: no mounted coai-review-gate.md — this repository has not adopted the shared rule, " +

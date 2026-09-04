@@ -351,6 +351,16 @@ test("--warn reports the copy in full and still exits 0, for a backfill that can
   assert.match(out, /--warn — reported, not failed/);
 });
 
+test("a declared rules mount with nothing behind it FAILS, rather than reading as never adopted", () => {
+  // The dangerous middle state: .gitmodules says the rule is mounted, and the directory is empty.
+  // No copies to find, so a check that only hunted copies would exit 0 over a repository whose AI
+  // has no gate rule at all.
+  const { code, out } = runTool("gate-snippet-check.mjs", [], gateFixture("unmounted"));
+  assert.equal(code, 1);
+  assert.match(out, /is mounted but carries no common\/coai-review-gate\.md/);
+  assert.match(out, /git submodule update --init \.claude\/rules\/shared/);
+});
+
 test("a repository that mounts no rule has nothing to check, and says so rather than passing silently", () => {
   const empty = fs.mkdtempSync(path.join(here, "..", "tmp-gate-"));
   try {
