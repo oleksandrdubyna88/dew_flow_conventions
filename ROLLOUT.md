@@ -39,6 +39,8 @@ Commit `.gitmodules` + the mount + the deletions together.
         # adopt these two with --warn, drop the flag when the backfill is done
         - run: node .claude/rules/shared/tools/post-deploy-check.mjs --warn
         - run: node .claude/rules/shared/tools/http-coverage.mjs --warn   # only where the repo serves HTTP
+        - run: node .claude/rules/shared/tools/gate-snippet-check.mjs     # --warn only where a paste
+                                                                         # cannot be removed yet
   ```
 
   `pin-check.mjs` needs the parent repository's history for `rev-parse HEAD:<path>` only — the

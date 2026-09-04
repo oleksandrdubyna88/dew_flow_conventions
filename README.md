@@ -87,12 +87,13 @@ asking in writing to be moved and another had two promoted plans absent from its
 | [`tools/http-coverage.mjs`](tools/http-coverage.mjs) | [`common/http-contracts.md`](common/http-contracts.md) — every route has a request | `node .claude/rules/shared/tools/http-coverage.mjs [--warn]` |
 | [`tools/http-run.mjs`](tools/http-run.mjs) | The same rule's other half — the suite actually runs, and its verdict is an exit code | `node .claude/rules/shared/tools/http-run.mjs [--tag prod] [--target <url>]` |
 | [`tools/post-deploy-check.mjs`](tools/post-deploy-check.mjs) | [`common/post-deploy-checks.md`](common/post-deploy-checks.md) — the file's shape in CI, its items against the live target | `node .claude/rules/shared/tools/post-deploy-check.mjs [--target <value>]` |
+| [`tools/gate-snippet-check.mjs`](tools/gate-snippet-check.mjs) | [`common/coai-review-gate.md`](common/coai-review-gate.md) is the ONLY copy — a consumer carrying its own is named | `node .claude/rules/shared/tools/gate-snippet-check.mjs [--warn]` |
 
 The last three are new and every repository adopts them the same way: **`--warn` first**, so the
 finding is visible without a red build, then the flag comes off once the backfill is done. A check
 that goes red on the day it lands teaches people to switch it off.
 
-The tools have their own tests — `node tools/selftest.test.mjs` from this repository's root, 28 cases
+The tools have their own tests — `node tools/selftest.test.mjs` from this repository's root, 38 cases
 over fixtures whose right answers are known. Two of them exist because `common/testing.md` demands it:
 the route scan has a companion asserting it still finds a route **formatted across three lines**, which
 is exactly what a line-anchored scan silently loses, and the JUnit reader is asserted to call an

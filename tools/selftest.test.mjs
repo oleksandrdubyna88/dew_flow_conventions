@@ -317,3 +317,48 @@ test("httpyac absent is a configuration error carrying the pinned install comman
   assert.equal(code, 4);
   assert.match(out, /npm install --save-dev httpyac@\d+\.\d+\.\d+/);
 });
+
+// ── gate-snippet-check.mjs ───────────────────────────────────────────────────────────────────────
+//
+// Three consumer shapes, each a real directory the tool is run in: the adopted one, the one that
+// kept its paste, and the one whose copy sits in a nested local rule no list of names would have
+// enumerated — which is the case that decides whether a walk was worth writing.
+
+const gateFixture = (shape) => path.join(here, "fixtures", "gate", shape);
+
+test("a consumer whose only copy is the mounted rule passes", () => {
+  const { code, out } = runTool("gate-snippet-check.mjs", [], gateFixture("clean"));
+  assert.equal(code, 0);
+  assert.match(out, /OK — the gate rule is only at \.claude\/rules\/shared\/common\/coai-review-gate\.md \(v5\)/);
+});
+
+test("a pasted copy fails even when it is the SAME version as the mounted rule", () => {
+  const { code, out } = runTool("gate-snippet-check.mjs", [], gateFixture("pasted"));
+  assert.equal(code, 1);
+  assert.match(out, /OWN COPY CLAUDE\.md — identical version, still a second copy/);
+});
+
+test("a copy in a nested local rule is found, and its version is named against the mounted one", () => {
+  const { code, out } = runTool("gate-snippet-check.mjs", [], gateFixture("nested"));
+  assert.equal(code, 1);
+  assert.match(out, /OWN COPY \.claude\/rules\/common\/house-rules\.md — v2 against v5 mounted/);
+});
+
+test("--warn reports the copy in full and still exits 0, for a backfill that cannot land yet", () => {
+  const { code, out } = runTool("gate-snippet-check.mjs", ["--warn"], gateFixture("nested"));
+  assert.equal(code, 0);
+  assert.match(out, /OWN COPY \.claude\/rules\/common\/house-rules\.md/);
+  assert.match(out, /--warn — reported, not failed/);
+});
+
+test("a repository that mounts no rule has nothing to check, and says so rather than passing silently", () => {
+  const empty = fs.mkdtempSync(path.join(here, "..", "tmp-gate-"));
+  try {
+    fs.writeFileSync(path.join(empty, "CLAUDE.md"), "## Multi-model review gate (ConnectOtherAIs)\n");
+    const { code, out } = runTool("gate-snippet-check.mjs", [], empty);
+    assert.equal(code, 0);
+    assert.match(out, /has not adopted the shared rule/);
+  } finally {
+    fs.rmSync(empty, { recursive: true, force: true });
+  }
+});
