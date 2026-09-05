@@ -60,6 +60,9 @@ of skipping it is a commit that breaks a rule written precisely because breaking
 - **`main` is closed, here and in every consumer that protects it.** A change is a branch and a pull
   request, merged by rebase or squash; the automated reviewer's comments are verified and then fixed or
   answered before the merge — [common/pull-requests.md](common/pull-requests.md).
+- **What the machinery reports is work, down to zero** — CodeRabbit, SonarCloud, Dependabot, secret and
+  code scanning: verify, fix or answer with a reason, and when a fix would break the product, ask and
+  change the rule rather than the number — [common/automated-checks.md](common/automated-checks.md).
 
 ## Consumers
 
