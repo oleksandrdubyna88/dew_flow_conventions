@@ -30,6 +30,9 @@
 6. **Releases still start from tags** (`mcp-v*`, `extension-v*`, `server-v*`), cut on `main` **after**
    the merge, never on a branch.
 
+> What the reviewer and the scanners REPORT — and the obligation to bring it to zero, or to ask when a
+> fix would break the product — is [automated-checks.md](automated-checks.md).
+
 ## For an agent working autonomously
 
 The *Work autonomously* order of the review gate names this: open the pull request, wait, read,
