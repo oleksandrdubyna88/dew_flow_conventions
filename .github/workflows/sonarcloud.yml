@@ -24,6 +24,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The gate measures coverage of NEW code, so the scan needs a report rather than a promise.
+      # Node's own runner produces lcov; the selftest is the only test there is.
+      - name: Test with coverage
+        run: |
+          mkdir -p coverage
+          node --test --experimental-test-coverage --test-reporter=lcov                --test-reporter-destination=coverage/lcov.info tools/selftest.test.mjs
       - uses: SonarSource/sonarqube-scan-action@v5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
