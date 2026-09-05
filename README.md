@@ -57,6 +57,9 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   consumers two commits behind — one missing `gpu-lease.md` entirely — which is why the pin has a
   check instead of an owner.
 - Repo-specific rules stay in the consumer's own `.claude/rules/` beside `shared/`.
+- **`main` is closed, here and in every consumer that protects it.** A change is a branch and a pull
+  request, merged by rebase or squash; the automated reviewer's comments are verified and then fixed or
+  answered before the merge — [common/pull-requests.md](common/pull-requests.md).
 
 ## Consumers
 
