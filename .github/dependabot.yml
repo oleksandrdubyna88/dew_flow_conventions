@@ -1,0 +1,17 @@
+# Dependabot version updates. This repository has no package manifests — the tools use node's
+# built-ins only — so the one ecosystem to watch is the actions its CI runs on.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "Europe/Kyiv"
+    groups:
+      actions:
+        patterns: ["*"]
+    labels: ["dependencies", "ci"]
+    commit-message:
+      prefix: "ci(deps)"
