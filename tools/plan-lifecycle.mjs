@@ -93,7 +93,7 @@ const OPEN_SECTION = /^##\s+Currently open\s*$/im;
 const isPlan = (name) => /^PLAN_[A-Za-z0-9_]+\.md$/.test(name);
 
 const plansIn = (dir) =>
-  fs.existsSync(dir) ? fs.readdirSync(dir).filter(isPlan).sort() : [];
+  fs.existsSync(dir) ? fs.readdirSync(dir).filter(isPlan).sort((a, b) => a.localeCompare(b)) : [];
 
 const markdownIn = (dir) =>
   fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".md")).sort() : [];
@@ -154,7 +154,7 @@ function openSectionRows(readme) {
 
   return {
     found: true,
-    rows: [...section.matchAll(INDEX_ROW)].map((m) => m[1]).sort(),
+    rows: [...section.matchAll(INDEX_ROW)].map((m) => m[1]).sort((a, b) => a.localeCompare(b)),
   };
 }
 
@@ -285,7 +285,7 @@ function main() {
   }
 
   console.error(`plan-lifecycle: ${findings.length} finding(s) — see common/planning-docs.md\n`);
-  for (const finding of findings.sort()) console.error(`  ${finding}`);
+  for (const finding of findings.sort((a, b) => a.localeCompare(b))) console.error(`  ${finding}`);
   console.error("\nPromote a finished plan with /promote-plan; it performs the whole move in one pass.");
   return 1;
 }

@@ -372,3 +372,20 @@ test("a repository that mounts no rule has nothing to check, and says so rather 
     fs.rmSync(empty, { recursive: true, force: true });
   }
 });
+
+// ---------- lib/paths.mjs: a flag cannot name a path outside the repository ----------
+import { within } from "./lib/paths.mjs";
+import * as pathForWithin from "node:path";
+
+test("within: a relative path under the root resolves, the root itself is allowed", () => {
+  const root = pathForWithin.resolve("tools", "fixtures");
+  assert.equal(within(root, "repo/http"), pathForWithin.join(root, "repo", "http"));
+  assert.equal(within(root, "."), root);
+});
+
+test("within: a parent, a sibling and an absolute path elsewhere are refused by name", () => {
+  const root = pathForWithin.resolve("tools", "fixtures");
+  for (const bad of ["..", "../selftest.test.mjs", pathForWithin.resolve("tools")]) {
+    assert.throws(() => within(root, bad, "--artifacts"), /--artifacts .* outside the repository/);
+  }
+});

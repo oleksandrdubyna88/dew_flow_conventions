@@ -31,6 +31,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { within } from "./lib/paths.mjs";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
@@ -165,7 +166,7 @@ async function runItems(items, target, timeoutMs) {
 
 async function main() {
   const { values: flags } = parseArgs({ options });
-  const file = path.resolve(process.cwd(), flags.file);
+  const file = within(process.cwd(), flags.file, "--file");
 
   if (!fs.existsSync(file)) {
     console.log(`post-deploy-check: ${flags.file} is missing.`);

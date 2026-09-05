@@ -32,6 +32,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { within } from "./lib/paths.mjs";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
@@ -173,14 +174,14 @@ function defaultSources(root) {
 function main() {
   const { values: flags } = parseArgs({ options });
   const root = process.cwd();
-  const httpRoot = path.resolve(root, flags.http);
+  const httpRoot = within(root, flags.http, "--http");
 
   let routes;
   if (flags.routes) {
-    routes = loadRouteTable(path.resolve(root, flags.routes));
+    routes = loadRouteTable(within(root, flags.routes, "--routes"));
     console.log(`http-coverage: ${routes.length} route(s) from ${flags.routes} (the application's own table).`);
   } else {
-    const sources = (flags.source.length > 0 ? flags.source.map((s) => path.resolve(root, s)) : defaultSources(root))
+    const sources = (flags.source.length > 0 ? flags.source.map((s) => within(root, s, "--source")) : defaultSources(root))
       .filter((dir) => fs.existsSync(dir));
     const files = sources.flatMap((dir) => walkSources(dir));
     routes = files.flatMap((file) => scanRoutes(fs.readFileSync(file, "utf8"), path.relative(root, file)));
