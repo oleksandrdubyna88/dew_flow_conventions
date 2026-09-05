@@ -45,7 +45,24 @@
 6. **The pull request description is the record.** What was asked, what shipped, what the tests
    showed (observed output, not "tests pass"), and what the automated reviewer said that was NOT acted
    on and why. The merge commit — rebase or squash — carries that text into `main`'s history.
-7. **Releases still start from tags** (`mcp-v*`, `extension-v*`, `server-v*`), cut on `main` **after**
+7. **At most SIX open pull requests per repository, and never more without asking.** Past six, stop
+   opening and start landing: the next thing you do is get an open one merged, not open a seventh.
+   Opening beyond the cap needs the person's agreement, asked for in one sentence that says what is
+   already queued and why this cannot wait behind it.
+
+   **Why a number and not "be reasonable".** A queue of pull requests against one branch is not free
+   to hold: every merge makes every other one BEHIND, each rebase re-runs every check, and a shared
+   guard like the submodule pin turns one merge into a red build on all the rest. The cost grows with
+   the SQUARE of the queue, and it is paid in wall-clock time by whoever is waiting for any single
+   change in it. Measured here on 2026-09-05: eighteen open at once across two repositories, six of
+   them held for hours by one stale line in a workflow on `main`, and the queue took longer to drain
+   than the work in it had taken to write.
+
+   Six is not a law of nature; it is the largest number that still drains in one pass while somebody
+   watches. A repository that genuinely needs more — a migration landing in ordered slices — gets it
+   by asking, and the reason goes in the description of the seventh.
+
+8. **Releases still start from tags** (`mcp-v*`, `extension-v*`, `server-v*`), cut on `main` **after**
    the merge, never on a branch.
 
 > What the reviewer and the scanners REPORT — and the obligation to bring it to zero, or to ask when a
@@ -79,6 +96,8 @@ gh pr merge --rebase --delete-branch        # or --squash for a fix-up trail
 - [ ] The diff went through the `coai` gate before the pull request was opened, and every finding was
       resolved — or the description says why the gate does not apply to this change.
 - [ ] The change reached `main` through a pull request merged by rebase or squash.
+- [ ] Opening it left no more than six pull requests open on that repository — or the person agreed to
+      the seventh, and the description says why.
 - [ ] About five minutes after opening, the CI checks and the reviewer's comments were read.
 - [ ] Every reviewer comment was verified against the code and the rules, then fixed or answered in
       the thread, and the thread resolved.
