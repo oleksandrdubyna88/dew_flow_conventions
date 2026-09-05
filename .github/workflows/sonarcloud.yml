@@ -33,7 +33,11 @@ jobs:
         run: |
           mkdir -p coverage
           node --test --experimental-test-coverage --test-reporter=lcov                --test-reporter-destination=coverage/lcov.info tools/selftest.test.mjs
-      - uses: SonarSource/sonarqube-scan-action@v5
+      # Pinned to a SHA, and to v8: v4 and v5 carry an argument-injection advisory (GHSA, high),
+      # which Dependabot raised on this repository's default branch on 2026-09-05. A tag is a moving
+      # target and SonarCloud's own githubactions:S7637 says so; the comment is what makes the SHA
+      # readable a year from now.
+      - uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
