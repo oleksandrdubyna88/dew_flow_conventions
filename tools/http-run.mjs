@@ -35,6 +35,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { within } from "./lib/paths.mjs";
 import { createRequire } from "node:module";
 import { parseArgs } from "node:util";
 
@@ -126,7 +127,7 @@ async function main() {
   }
   const flags = parsed.values;
   const root = process.cwd();
-  const suiteRoot = path.resolve(root, parsed.positionals[0] ?? "http");
+  const suiteRoot = within(root, parsed.positionals[0] ?? "http", "suite root");
 
   // A secret the suite needs and does not have is CONFIGURATION, and saying so here is the only
   // place it can still be said plainly: once the run starts, a missing token arrives as a wall of
@@ -150,7 +151,7 @@ async function main() {
     return EXIT.configurationError;
   }
 
-  const artifacts = path.resolve(root, flags.artifacts);
+  const artifacts = within(root, flags.artifacts, "--artifacts");
   fs.mkdirSync(artifacts, { recursive: true });
   const reportPath = path.join(artifacts, "report.xml");
   fs.rmSync(reportPath, { force: true }); // never read a report you did not just produce
