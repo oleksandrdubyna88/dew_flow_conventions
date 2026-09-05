@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit for dew_flow_conventions — the family's shared Claude Code rules (markdown) and the
+# small node tools that enforce them (tools/*.mjs, run in every consumer's CI).
+language: "ru-RU"
+
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "main"
+  path_filters:
+    - "!**/node_modules/**"
+    - "!tools/fixtures/**"
+  path_instructions:
+    - path: "common/**/*.md"
+      instructions: |
+        These are rules loaded into every Claude Code session across the dew_flow family. Review for:
+        a rule that contradicts another rule in common/; a MANDATORY rule with no Definition of Done
+        section; a rule that names a file, flag or tool that does not exist in the family; a rule whose
+        measured claim carries no date or source. The narrative style (dated observations, "measured
+        here on …") is deliberate — do not flag it. A rule change is not complete without the consumer
+        pin bumps (README.md, Editing discipline); say so if the PR description does not mention them.
+    - path: "tools/*.mjs"
+      instructions: |
+        Node ESM run in CI on Linux and Windows: no shell globs (a glob was the bug twice), paths built
+        with node:path, exit code 1 with a named finding on failure and 0 with the finding printed on
+        success. Every tool has a case in tools/selftest.test.mjs.
+  tools:
+    gitleaks:
+      enabled: true
+    actionlint:
+      enabled: true
+    yamllint:
+      enabled: true
+    markdownlint:
+      enabled: false
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "README.md"
+      - "common/**/*.md"

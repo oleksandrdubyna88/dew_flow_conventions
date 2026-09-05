@@ -1,0 +1,30 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tools:
+    name: tools · selftest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The tools that every consumer's CI runs (plan-lifecycle, pin-check, gate-snippet-check,
+      # http-coverage, post-deploy-check) test themselves against tools/fixtures. A tool that
+      # breaks here breaks every consumer's build on its next pin bump, so it is checked here first.
+      - name: Selftest
+        run: node --test tools/selftest.test.mjs

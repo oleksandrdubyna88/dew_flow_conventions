@@ -1,5 +1,9 @@
 # Git Workflow
 
+> How a commit REACHES `main` — a pull request, the automated reviewer's comments verified and
+> answered, a rebase or squash merge — is [pull-requests.md](pull-requests.md). This file governs the
+> commit itself.
+
 ## Commit your OWN work, and only after it is verified (MANDATORY)
 
 Superseded 2026-08-16 the earlier rule that a commit should cover *everything* `git status` shows. That
