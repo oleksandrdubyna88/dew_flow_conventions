@@ -6,6 +6,11 @@ concerns, module map); each `module_[name].md` deep-dives one logical module (pu
 core entities, entry points, external dependencies). Where a sentence describes something that does not
 run, it is a bug in the file.
 
+One module doc is required in **every** repository by name: **`research/module_tests.md`**, the scenario
+harness and its flow catalogue — where the harness lives, the exact command that runs it, every flow marked
+`covered` or `not covered` with a reason, and what it does not prove. The rule that requires it is
+[scenario-tests.md](scenario-tests.md).
+
 **Session start:** read `research/architecture.md` and the relevant `module_[name].md` before any
 changes.
 
