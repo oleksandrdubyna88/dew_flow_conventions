@@ -243,6 +243,70 @@ under test too. Run the whole suite in the configuration the fix will actually s
 change touches concurrency, ordering, or shared state, run both. Reporting one configuration's green
 as "the suite passes" is the same overstatement as reporting a subset's.
 
+## A test that reads the clock expires, and it expires green
+
+A fixture with a date in it, asserted against code that asks what day it is, passes on the day it was
+written and fails from the next morning — with a message about the product, not about the calendar.
+
+Measured twice on 2026-09-06, in one repository, in one day. A guard existed to forbid the rounds-log
+page rendering an empty table; its fixture round was stamped `2026-09-05` and the page opens on
+**today**, from `new Date()` in the browser. The next morning the row fell outside the default filter,
+the page rendered nothing, and the guard failed with *"the page rendered no rows"* — the exact symptom
+it was built to catch, arriving for a reason that had nothing to do with the page. An hour went into
+the page before the date was noticed.
+
+Two fixes, both legitimate, and the choice is about what you are asserting:
+
+- **Derive the fixture from now** — build the stamps from today at a fixed hour. Simple, no machinery,
+  and right when the test does not care what "now" is.
+- **Freeze the clock the code under test reads** — hand it a stopped `Date`, an `ILocalClock`, a fixed
+  instant. Right when the assertion is *about* time, and it makes every future assertion in that test
+  stable too.
+
+**And pick the hour, not just the day.** The trap has a second floor: a page building its range from
+the LOCAL day while records carry UTC. An instant near either edge of a day lands on the neighbouring
+local day under some offsets, so the same test is green in Berlin and red in Los Angeles. Local noon
+is the only hour no inhabited offset can move out of its own day.
+
+`DateTime.Now`, `Date.now()`, `SystemTime::now()` in a test are the smell. If the code under test
+calls one, the test cannot be time-independent by choosing nicer numbers — the clock has to become an
+argument.
+
+## A check that only runs during a release has never run
+
+A pattern in a workflow, a condition in a deploy script, a branch of a cron job: its only execution is
+a rare, expensive environment, so it is written once, read once, and believed.
+
+Measured 2026-09-06. A packaging step gained a check that the release archive really carries the
+native library the binary loads — the right check, written for exactly the right reason. Its regular
+expression allowed only a line start or a separator before the archive name. `tar tzf` prints
+`NAME/lib…` at the start of a line and passed; `7z l` prints a TABLE whose last column is
+`NAME\e_sqlite3.dll` after whitespace, and failed. Both Windows RIDs would have died at the last step
+of the release, on the check meant to protect the release. It was found by a reviewer, not by running.
+
+So: **extract the pattern and exercise it in the ordinary suite, against fixtures of the real shapes.**
+A test that reads the workflow, pulls the pattern out of it and runs it against a real `tar` listing
+and a real `7z` listing costs twenty lines and moves the feedback from "the release fails" to "the push
+fails". The same applies to a deploy script's version comparison, a cron job's date arithmetic, and any
+`if` whose false branch nobody has seen taken.
+
+## Starting is not working — a delivery check must USE the capability
+
+A binary that starts, answers `--version` and `--help`, and completes a protocol handshake has proven
+that it starts. It has not proven it can do the thing it exists for.
+
+Measured 2026-09-06: a Native-AOT server shipped without the native SQLite library it loads at run
+time. The AOT publish check, a full `tools/list` exchange and 751 unit tests were all green, because
+not one of them touched the database. The installed build threw `DllNotFoundException` the first time
+anything did — and because that write was best-effort by design, it failed in **silence**: rounds ran,
+findings were answered, nothing was recorded. It was found by installing the release and using it.
+
+The check that closes this is small and specific: make the published artefact perform its core
+capability once. Open a database. Write a row. Serve one request that reaches storage. Send one message
+through the transport that matters. One line in the release job, on every platform the job builds for —
+and where a platform's binary cannot be executed on the runner, the skip is explicit and reasoned, not
+an absence.
+
 ## Every bug fix starts with a RED test (MANDATORY)
 
 The order is fixed — never fix first and test after:

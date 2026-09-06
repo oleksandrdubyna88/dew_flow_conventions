@@ -71,6 +71,14 @@
 8. **Releases still start from tags** (`mcp-v*`, `extension-v*`, `server-v*`), cut on `main` **after**
    the merge, never on a branch.
 
+9. **When two branches block each other, the one that can move carries both changes.** Measured
+   2026-09-06: a pin bump could not go green because it inherited a test that had expired overnight,
+   and the branch fixing that test could not go green because the pin was stale. Two pull requests,
+   each waiting for the other, each re-running its checks on every rebase of a moving `main`. The way
+   out is not patience — it is to take the small change into the branch that can pass, say so in the
+   message, and close the other as already applied. A deadlock between your own branches is a
+   sequencing mistake, not a queue.
+
 > What the reviewer and the scanners REPORT — and the obligation to bring it to zero, or to ask when a
 > fix would break the product — is [automated-checks.md](automated-checks.md).
 
