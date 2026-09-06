@@ -182,11 +182,45 @@ What to do instead:
   hashing of gigabytes on the probe path (`dew_flow_sidecar_rust · src/main.rs:1042` — first
   `/health` SHA-256-hashes every provider DLL beside the exe).
 
+## Paid work is written down as it is earned
+
+When one unit of work costs money or minutes, the unit of work is the unit of SAVING. A pass that
+computes for an hour and writes its file at the end is a pass that loses an hour to any fault in it —
+and the fault will be in the last unit, because that is where the untested input is.
+
+Measured twice in two days, in the same pass. A judgement over fourteen recorded runs spends one CLI
+turn per finding and wrote `runs.json` once, after the loop. On 2026-09-05 it was stopped twelve runs
+in, deliberately, to change the model: twelve runs of answers — about a hundred paid turns — existed
+only in memory and went. On 2026-09-06 the same pass reached its **fourteenth run of fourteen** and
+died there on an out-of-range citation; thirteen judged runs went the same way. The second loss was
+the first loss with the fix known and not carried over.
+
+Three properties, and each one was learned by not having it:
+
+1. **Write after every unit**, before the next one starts. A few hundred kilobytes against a paid API
+   call is not a trade worth thinking about.
+2. **Record who produced it**, so a restart can skip what is already answered and a *different*
+   producer re-does everything rather than leaving the file half in one opinion and half in another.
+3. **Write beside the file and move it over.** Saving per unit creates a reader arriving mid-write
+   where there was none, and half a JSON array reads as corruption. A move is one operation; a write
+   of six hundred kilobytes is not.
+
+The shape generalises past judgements: an indexing pass, a migration, a bulk send, any loop whose
+iterations are individually expensive. If losing the loop would cost real money or a real hour, the
+loop is resumable or it is not finished.
+
 ## Boundary numbers are clamped
 
 Every numeric field a client sends is range-validated before arithmetic, and window math is
 `checked` or done in `long` (`dew_flow_mcp · SandboxedFileReader.cs:41` — `startLine + lineCount`
 overflows `int` into an unhandled exception any client can trigger with one call).
+
+**A model's answer is a client's input.** A number that came out of an LLM has been through no
+validation at all, and it will be wrong in the way that hurts: a reviewer citing line 500 of a
+fifty-line file made a code window start at 420 and end at 50, and `Enumerable.Range` with a count of
+−369 took down an entire judgement on its last run of fourteen (2026-09-06). Line numbers, indices,
+counts, offsets, file paths: clamp them, or refuse them, exactly as if a stranger had sent them —
+because one did.
 
 ## Definition of Done
 
