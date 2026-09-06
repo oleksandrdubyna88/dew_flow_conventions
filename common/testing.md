@@ -1,5 +1,9 @@
 # Testing
 
+> **What must EXIST is a rule of its own.** Every repository owns a scenario harness — in the product's
+> language, driving the real product, covering every flow, catalogued in `research/module_tests.md` —
+> [scenario-tests.md](scenario-tests.md). Everything below governs how a test is written, run and believed.
+
 ## Running tests — executables only, never `dotnet test` (MANDATORY)
 
 Every .NET test project in this family is **xUnit v3 on native Microsoft Testing Platform**. There is no
@@ -305,3 +309,5 @@ is a red build. Do not relax it to make a reference convenient — the reference
 - [ ] A contract with two implementations has ONE live check that exercises them against each other —
       two suites agreeing with the same file is not that check.
 - [ ] No test asserts that a delegated option was SENT as though that were evidence it takes effect.
+- [ ] Any flow added in this task shipped with its scenario test, and `research/module_tests.md` names it
+      — [scenario-tests.md](scenario-tests.md).
