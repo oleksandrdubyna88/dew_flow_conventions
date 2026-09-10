@@ -33,7 +33,7 @@ jobs:
         run: |
           npm ci --ignore-scripts
           mkdir -p coverage
-          node --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/lcov.info tools/selftest.test.mjs tools/rules.test.mjs tools/migrate-rules.test.mjs tools/proc.test.mjs tools/smoke-rules.test.mjs
+          node --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/lcov.info tools/selftest.test.mjs tools/rules.test.mjs tools/migrate-rules.test.mjs tools/proc.test.mjs tools/smoke-rules.test.mjs tools/adapter-check.test.mjs
       # Pinned to a SHA, and to v8: v4 and v5 carry an argument-injection advisory (GHSA, high),
       # which Dependabot raised on this repository's default branch on 2026-09-05. A tag is a moving
       # target and SonarCloud's own githubactions:S7637 says so; the comment is what makes the SHA
