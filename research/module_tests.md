@@ -40,5 +40,14 @@ mode and retained advisory/host-policy caveats. The external 180-second timeout 
 The HTTP-only selection regression failed before the dependency was declared and passed
 afterward. The complete suite now contains 55 cases (one Windows symlink privilege skip).
 
+PR follow-up adds an in-process real-Git CLI protocol scenario, so coverage measures the
+actual implementation rather than fixture copies. A dot-segment regression first omitted
+`csharp.doctrine` for `src/./file.cs`; normalization restores the same selection as the
+canonical path. Repeated leading `./` and separators are covered too.
+The follow-up suite passed 56/57 on Windows (one symlink privilege skip) and 57/57
+in an isolated WSL/Linux checkout on 2026-09-10. A Windows-created worktree cannot be
+used directly by Linux Git because its `.git` file contains a Windows absolute path;
+the Linux run used the same source over a native Linux clone, without rewriting that file.
+
 Not yet covered: consumer migration scenarios, successful complete Codex behavior, compaction,
 fresh clone/rollback and the six-consumer rollout. These remain open in the plan.

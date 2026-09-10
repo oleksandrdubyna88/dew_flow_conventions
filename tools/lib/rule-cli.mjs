@@ -40,12 +40,7 @@ function source(repo,name) {
   return {path:name,hash:sha256(text),bytes:Buffer.byteLength(text),text};
 }
 
-function validateInstructions(repo,files,selfHosted) {
-  const agents=source(repo,"AGENTS.md");
-  const claude=source(repo,"CLAUDE.md");
-  if(agents.text !== bootstrap(selfHosted?"ENTRY.md":undefined)) throw new Error("AGENTS.md differs from the shared bootstrap; review the local instruction chain before changes");
-  if(claude.text.trim() !== "@AGENTS.md") throw new Error("CLAUDE.md must contain only @AGENTS.md");
-  if(agents.bytes>4096) throw new Error("AGENTS.md exceeds 4 KiB");
+function instructionDirectories(repo,files) {
   const directories=new Set([repo]);
   for(const file of files) {
     let dir=path.dirname(within(repo,file));
@@ -55,12 +50,25 @@ function validateInstructions(repo,files,selfHosted) {
       dir=path.dirname(dir);
     }
   }
-  for(const dir of directories) {
+  return directories;
+}
+
+function rejectOverrides(repo,files) {
+  for(const dir of instructionDirectories(repo,files)) {
     for(const name of ["AGENTS.override.md","AGENTS.md","CLAUDE.md","GEMINI.md"]) {
       if(dir===repo && ["AGENTS.md","CLAUDE.md"].includes(name)) continue;
       if(fs.existsSync(path.join(dir,name))) throw new Error(`Unresolved additional instruction source: ${path.join(dir,name)}; equivalence incomplete`);
     }
   }
+}
+
+function validateInstructions(repo,files,selfHosted) {
+  const agents=source(repo,"AGENTS.md");
+  const claude=source(repo,"CLAUDE.md");
+  if(agents.text !== bootstrap(selfHosted?"ENTRY.md":undefined)) throw new Error("AGENTS.md differs from the shared bootstrap; review the local instruction chain before changes");
+  if(claude.text.trim() !== "@AGENTS.md") throw new Error("CLAUDE.md must contain only @AGENTS.md");
+  if(agents.bytes>4096) throw new Error("AGENTS.md exceeds 4 KiB");
+  rejectOverrides(repo,files);
   if(fs.existsSync(path.join(repo,".claude/rules")) && fs.readdirSync(path.join(repo,".claude/rules")).length) {
     throw new Error("Legacy .claude/rules is nonempty; move policy to .agents/rules before claiming one source");
   }
@@ -69,11 +77,11 @@ function validateInstructions(repo,files,selfHosted) {
   return [agents,claude,source(repo,selfHosted?"ENTRY.md":".agents/conventions/ENTRY.md"),project,...required];
 }
 
-function revision(repo,selfHosted) {
-  const actual=git(sharedRoot,"rev-parse","HEAD");
+function revision(repo,selfHosted,installedRoot) {
+  const actual=git(installedRoot,"rev-parse","HEAD");
   if(selfHosted) return {mode:"self-host working tree",actual,dirty:!!git(repo,"status","--porcelain","--untracked-files=normal")};
   const mounted=path.join(repo,".agents/conventions");
-  if(fs.realpathSync(mounted) !== fs.realpathSync(sharedRoot)) throw new Error("Run this repository's own mounted resolver");
+  if(fs.realpathSync(mounted) !== fs.realpathSync(installedRoot)) throw new Error("Run this repository's own mounted resolver");
   const pinned=git(repo,"ls-files","--stage","--",".agents/conventions").match(/^160000 ([a-f0-9]{40,64}) 0\t/);
   if(!pinned || pinned[1] !== actual) throw new Error(`Conventions checkout ${actual} differs from the index gitlink ${pinned?.[1] ?? "missing"}`);
   if(git(mounted,"status","--porcelain","--untracked-files=normal")) throw new Error("Mounted conventions has uncommitted changes; instruction version incomplete");
@@ -81,13 +89,14 @@ function revision(repo,selfHosted) {
   return {mode:"pinned submodule",actual,indexPin:pinned[1],headPin:headPin?.[1]??null,staged:headPin?.[1]!==pinned[1]};
 }
 
-export function run(argv) {
+// The installed root is injected by in-process integration tests; the CLI never accepts it.
+export function run(argv,installedRoot=sharedRoot) {
   const options=parseArgs(argv);
   const repo=path.resolve(git(path.resolve(options.repo),"rev-parse","--show-toplevel"));
-  const selfHosted=fs.realpathSync(repo) === fs.realpathSync(sharedRoot);
+  const selfHosted=fs.realpathSync(repo) === fs.realpathSync(installedRoot);
   const instructions=validateInstructions(repo,options.files,selfHosted);
-  const version=revision(repo,selfHosted);
-  const catalog=loadCatalog(sharedRoot,path.join(repo,".agents/rules"));
+  const version=revision(repo,selfHosted,installedRoot);
+  const catalog=loadCatalog(installedRoot,path.join(repo,".agents/rules"));
   const selected=options.command === "check" ? catalog : selectRules(catalog,options.tasks,options.files);
   for(const id of options.only) if(!selected.some(rule=>rule.id===id)) throw new Error(`--only ${id} is not selected for this scope`);
   const emitted=options.only.length?selected.filter(rule=>options.only.includes(rule.id)):selected;

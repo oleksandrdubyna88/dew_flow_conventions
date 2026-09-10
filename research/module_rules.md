@@ -33,6 +33,17 @@ mounted source fails; source-repository development is explicitly labelled worki
 Global/managed instruction policy is not visible to this process. `resolved` means source
 selection succeeded, not that an agent read or complied with it.
 
+Equivalent dot segments and repeated separators are normalized before glob matching;
+parent traversal remains rejected. Scoped override detection has a separate ancestry walk.
+Integration tests can inject an installed source root through the internal module API;
+the executable accepts no root override. This lets coverage observe the real CLI protocol
+without changing the resolver's pinned-submodule contract.
+
+Sonar S4036 is treated as a false positive for this developer CLI's constant `git` executable:
+the operator owns PATH and the process runs with the same identity, without privilege transfer.
+Task and repository inputs are passed only as arguments. The scoped analyzer exclusion and
+its rationale live in `sonar-project.properties`; it does not cover arbitrary process calls.
+
 The S1 review found a root-target loop: `--file .` started ancestry at the parent and
 never reached the repository again. Directory-like targets now fail validation and ancestry
 also has a filesystem-root guard. The CLI regression was observed timing out before the fix.

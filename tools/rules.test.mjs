@@ -6,6 +6,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync, execFileSync } from "node:child_process";
 import { loadCatalog, selectRules, sha256 } from "./lib/rule-catalog.mjs";
+import {run} from "./lib/rule-cli.mjs";
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "rules Unicode пробел "));
@@ -147,6 +148,37 @@ function cliFixture(t) {
   const cli=(args,cwd=root)=>spawnSync(process.execPath,[path.join(root,"tools/rules.mjs"),...args],{cwd,encoding:"utf8",timeout:10000,maxBuffer:1024*1024});
   return {root,cli};
 }
+
+test("CLI protocol validates scope, adapters and read boundaries in process",t=>{
+  const {root}=cliFixture(t);
+  const invoke=args=>run([...args,"--repo",root],root);
+  assert.equal(JSON.parse(invoke(["check"])).status,"resolved");
+  const scope=["--task","inspect","--file","src/два слова/New.ts"];
+  assert.ok(JSON.parse(invoke(["explain",...scope])).rules.some(rule=>rule.id==="typescript.doctrine"));
+  assert.match(invoke(["read",...scope,"--only","common.security"]),/END RULE common.security/);
+  for(const [args,error] of [
+    [["missing"],/Usage/], [["check","--only","common.security"],/only applies/],
+    [["explain","--unknown","x"],/Unknown option/], [["explain","--task"],/Missing value/],
+    [["read","--task","implement"],/32 KiB/], [["read","--task","inspect","--only","absent.rule"],/not selected/],
+  ])assert.throws(()=>invoke(args),error);
+  fs.mkdirSync(path.join(root,"src"));
+  fs.writeFileSync(path.join(root,"src/AGENTS.override.md"),"An override");
+  assert.throws(()=>invoke(["explain",...scope]),/additional instruction/);
+  fs.unlinkSync(path.join(root,"src/AGENTS.override.md"));
+  fs.writeFileSync(path.join(root,"CLAUDE.md"),"A second body");
+  assert.throws(()=>invoke(["check"]),/only @AGENTS/);
+  fs.writeFileSync(path.join(root,"CLAUDE.md"),"@AGENTS.md\n");
+  fs.writeFileSync(path.join(root,"AGENTS.md"),"A divergent adapter");
+  assert.throws(()=>invoke(["check"]),/bootstrap/);
+});
+
+test("equivalent dot-segment paths select the same policy",()=>{
+  const catalog=loadCatalog(sourceRoot);
+  const ids=file=>selectRules(catalog,["inspect"],[file]).map(rule=>rule.id);
+  assert.deepEqual(ids("src/./file.cs"),ids("src/file.cs"));
+  assert.deepEqual(ids("././Directory.Build.props"),ids("Directory.Build.props"));
+  assert.deepEqual(ids("src//file.cs"),ids("src/file.cs"));
+});
 
 test("real CLI loads from nested directories, bounds reads and reports missing/override policy",t=>{
   const {root,cli}=cliFixture(t);
