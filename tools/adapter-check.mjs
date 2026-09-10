@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { git } from './lib/git.mjs';
 import { within } from './lib/paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -115,9 +116,25 @@ function refusedDoorFindings(repo) {
   return findings;
 }
 
+/**
+ * The repository root of whatever directory was named.
+ *
+ * <p>`ENTRY.md` step 1 resolves a root exactly this way, and the reasons are the same three: a
+ * nested start is normal, a worktree's `.git` is a file rather than a directory, and a directory
+ * that is not in a repository at all should be refused rather than checked. It also means the path
+ * every read is built from comes from git's own answer, not from the string a caller typed.</p>
+ */
+function rootOf(directory) {
+  try {
+    return git(path.resolve(directory), 'rev-parse', '--show-toplevel');
+  } catch {
+    throw new Error(`${path.resolve(directory)} is not inside a git repository`);
+  }
+}
+
 /** The findings for one repository — empty when its adapter is whole. */
 export function adapterFindings(repo, reference = REFERENCE) {
-  const root = path.resolve(repo);
+  const root = rootOf(repo);
   // The reference is this repository's own file, not anything a caller named.
   const hook = readIn(reference, 'hooks/load-instructions.mjs', 'reference hook');
   const wanted = sessionStartCommands(
@@ -132,7 +149,7 @@ export function adapterFindings(repo, reference = REFERENCE) {
 }
 
 function report(repo) {
-  const findings = adapterFindings(path.resolve(repo));
+  const findings = adapterFindings(repo);
   if (findings.length === 0) {
     process.stdout.write('adapter-check: OK — the Claude adapter is wired and matches the reference.\n');
 
