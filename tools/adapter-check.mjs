@@ -38,21 +38,39 @@ export function sessionStartCommands(settings) {
     .map((hook) => hook.command);
 }
 
-/** One file's text with line endings normalised — a CRLF checkout is not drift. */
-function text(file) {
-  return fs.readFileSync(file, 'utf8').replaceAll('\r\n', '\n');
+/**
+ * The three filesystem doors, each validating the path it is about to use.
+ *
+ * <p>`within` is called HERE rather than in the callers, and that is the whole point: S8707 follows
+ * the CLI argument to the call that reads, and a check one frame up is a check its taint tracker
+ * cannot see. Putting the two together also removes the way this goes wrong for a reader — a caller
+ * that resolves a path and forgets to validate it looks exactly like one that did.</p>
+ *
+ * <p>Line endings are normalised on read, because a CRLF checkout of a copied file is not drift.</p>
+ */
+function readIn(root, relative, what) {
+  return fs.readFileSync(within(root, relative, what), 'utf8').replaceAll('\r\n', '\n');
+}
+
+function existsIn(root, relative, what) {
+  return fs.existsSync(within(root, relative, what));
+}
+
+function listIn(root, relative, what) {
+  const dir = within(root, relative, what);
+
+  return fs.existsSync(dir) ? fs.readdirSync(dir) : [];
 }
 
 /** The settings file declares every SessionStart command the reference declares. */
 function settingsFindings(repo, wanted) {
-  const file = within(repo, SETTINGS, 'settings');
-  if (!fs.existsSync(file)) {
+  if (!existsIn(repo, SETTINGS, 'settings')) {
     return [`${SETTINGS} is missing — copy settings/settings.json and keep your own permissions`];
   }
 
   let declared;
   try {
-    declared = sessionStartCommands(JSON.parse(text(file)));
+    declared = sessionStartCommands(JSON.parse(readIn(repo, SETTINGS, 'settings')));
   } catch (error) {
     return [`${SETTINGS} does not parse: ${error.message}`];
   }
@@ -65,11 +83,10 @@ function settingsFindings(repo, wanted) {
 
 /** The hook is there, and byte-for-byte what this repository publishes. */
 function hookFindings(repo, reference) {
-  const file = within(repo, HOOK, 'hook');
-  if (!fs.existsSync(file)) {
+  if (!existsIn(repo, HOOK, 'hook')) {
     return [`${HOOK} is missing — copy settings/hooks/load-instructions.mjs verbatim`];
   }
-  if (text(file) !== reference) {
+  if (readIn(repo, HOOK, 'hook') !== reference) {
     return [`${HOOK} has drifted from settings/hooks/load-instructions.mjs — `
       + 'change the reference and re-copy, never the copy alone'];
   }
@@ -86,13 +103,11 @@ function hookFindings(repo, reference) {
  */
 function refusedDoorFindings(repo) {
   const findings = [];
-  const legacy = within(repo, LEGACY, 'legacy rules');
-  if (fs.existsSync(legacy) && fs.readdirSync(legacy).length > 0) {
+  if (listIn(repo, LEGACY, 'legacy rules').length > 0) {
     findings.push(`${LEGACY} is populated — the resolver refuses that as a second source; `
       + 'policy belongs in .agents/rules');
   }
-  const adapter = within(repo, ADAPTER, 'adapter');
-  if (fs.existsSync(adapter) && text(adapter).trim() !== '@AGENTS.md') {
+  if (existsIn(repo, ADAPTER, 'adapter') && readIn(repo, ADAPTER, 'adapter').trim() !== '@AGENTS.md') {
     findings.push(`${ADAPTER} is not exactly \`@AGENTS.md\` — the resolver refuses that; `
       + 'the hook is how Claude loads instructions here');
   }
@@ -103,8 +118,11 @@ function refusedDoorFindings(repo) {
 /** The findings for one repository — empty when its adapter is whole. */
 export function adapterFindings(repo, reference = REFERENCE) {
   const root = path.resolve(repo);
-  const hook = text(path.join(reference, 'hooks/load-instructions.mjs'));
-  const wanted = sessionStartCommands(JSON.parse(text(path.join(reference, 'settings.json'))));
+  // The reference is this repository's own file, not anything a caller named.
+  const hook = readIn(reference, 'hooks/load-instructions.mjs', 'reference hook');
+  const wanted = sessionStartCommands(
+    JSON.parse(readIn(reference, 'settings.json', 'reference settings')),
+  );
 
   return [
     ...settingsFindings(root, wanted),
