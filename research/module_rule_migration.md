@@ -20,12 +20,20 @@ The bounded journal lists remaining legacy references and dirty source inputs re
 the selected committed base is still the source of migrated content. Output must be outside
 both the consumer checkout and conventions checkout, including resolved ancestor aliases.
 Product code adapters are a separate reviewed consumer change. Markdown links are rebased
-and validated. An undeclared neutral directory fails the gate-snippet check.
+and validated. A neutral mount directory, PROJECT or local rule tree without a declared
+neutral mount fails the gate-snippet check. The conventions source itself is distinguished
+by the installed tool's root. Migration and smoke share the bounded runner in `tools/lib/git.mjs`.
 
 `tools/smoke-rules.mjs` runs an installed native CLI against a disposable worktree. It calls
 the mounted resolver to establish expected sources, asks the agent to discover its own
 instructions, and examines successful tool-result bodies. Assistant prose cannot substitute
-for a canonical source read. CLI completion, complete bodies, and unchanged checkout state
+for a canonical source read. `tools/lib/rule-trace.mjs` also correlates successful output
+with the selected resolver's `read` invocation (Claude tool-use id or Codex command event).
+A duplicate script, unlinked output, shell chain or unsupported command shape is incomplete
+evidence. The prompt requests one absolute resolver command per call. A restricted parser
+accepts direct Node invocations and one recognized shell wrapper; it is not a shell interpreter.
+Reports include source-command hashes and at most eight 512-character resolver-call diagnostics.
+CLI completion, complete bodies, and unchanged checkout state
 are separate evidence; the final answer still needs behavioral review. The latest result
 per agent is stored atomically in Git metadata, with two fixed 32 KiB slots. Full model traces
 are captured only in memory, limited to 256 KiB. A lock prevents concurrent ownership of a slot.

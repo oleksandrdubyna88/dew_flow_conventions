@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import {execFileSync} from "node:child_process";
+import {git,gitOutput} from "./git.mjs";
 import {bootstrap} from "./rule-cli.mjs";
 import {TASKS,sha256} from "./rule-catalog.mjs";
 import {within} from "./paths.mjs";
@@ -25,11 +25,6 @@ export function rebaseLinks(text,from,to,validate=()=>{}) {
     return `](${relative}${suffix}${match[2]??""})`;
   });
 }
-
-function gitOutput(repo,args) {
-  return execFileSync("git",["-C",repo,...args],{encoding:"utf8",timeout:30000,maxBuffer:4*1024*1024,windowsHide:true,stdio:["ignore","pipe","pipe"]});
-}
-export function git(repo,...args) {return gitOutput(repo,args).trimEnd();}
 
 function blob(repo,base,file) {return gitOutput(repo,["show",`${base}:${file}`]).replaceAll("\r\n","\n");}
 function existsAt(repo,base,file) {

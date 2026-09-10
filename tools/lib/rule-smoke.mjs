@@ -1,37 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import {execFileSync} from "node:child_process";
-import {git} from "./rule-migration.mjs";
+import {git} from "./git.mjs";
 import {normalizedText,sha256,targetPath} from "./rule-catalog.mjs";
 import {within} from "./paths.mjs";
 import {run} from "./proc.mjs";
 import {bootstrap} from "./rule-cli.mjs";
-
-export function traceEvidence(agent,trace,expected) {
-  const events=trace.split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line));
-  const outputs=[];
-  let completed=false, final="";
-  const models=new Set();
-  for(const event of events) {
-    if(agent==="codex") {
-      const item=event.item;
-      if(event.type==="item.completed" && item?.type==="command_execution" && item.exit_code===0) outputs.push(item.aggregated_output??"");
-      if(event.type==="item.completed" && item?.type==="agent_message") final=item.text??"";
-      if(event.type==="turn.completed") completed=true;
-    } else {
-      if(event.type==="user") for(const block of event.message?.content??[]) {
-        if(block.type==="tool_result" && !block.is_error) outputs.push(typeof block.content==="string"?block.content:(block.content??[]).filter(item=>item.type==="text").map(item=>item.text).join("\n"));
-      }
-      if(event.type==="assistant" && event.message?.model) models.add(event.message.model);
-      if(event.type==="result") {completed=event.subtype==="success" && !event.is_error;final=event.result??"";}
-    }
-  }
-  const normalized=outputs.map(output=>output.replaceAll("\r\n","\n"));
-  const reads=expected.map(rule=>({id:rule.id,hash:rule.hash,complete:normalized.some(output=>
-    output.includes(`BEGIN RULE ${rule.id} sha256:${rule.hash}\n${rule.text}\nEND RULE ${rule.id}`))}));
-  return {completed,reads,models:[...models],final:final.slice(0,12000),finalTruncated:final.length>12000,
-    allSourcesRead:reads.length>0&&reads.every(rule=>rule.complete)};
-}
+import {traceEvidence} from "./rule-trace.mjs";
+export {traceEvidence} from "./rule-trace.mjs";
 
 export function smokeResolver(root) {
   const mounted=path.join(root,".agents/conventions/tools/rules.mjs");
@@ -112,7 +88,7 @@ export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
   const resolver=smokeResolver(root);
   const manifest=JSON.parse(execFileSync(process.execPath,[resolver,"explain","--repo",root,"--task","inspect",...scope.flatMap(file=>["--file",file])],{encoding:"utf8",timeout:10000,maxBuffer:262144}));
   const expected=manifest.rules.map(rule=>({...rule,text:normalizedText(within(root,rule.source))}));
-  const prompt=`Read the repository instructions and explain the rules governing hypothetical new files ${scope.map(file=>JSON.stringify(file)).join(", ")}. This is read-only inspection, not implementation. Follow the repository loading procedure. The installed resolver command is node "${resolver.replaceAll("\\","/")}". Report the selected rule ids and hashes and a concrete constraint from each applicable language. Do not delegate, call reviewers, edit files, inspect credentials, or read outside this repository.`;
+  const prompt=`Read the repository instructions and explain the rules governing hypothetical new files ${scope.map(file=>JSON.stringify(file)).join(", ")}. This is read-only inspection, not implementation. Follow the repository loading procedure. Invoke node "${resolver.replaceAll("\\","/")}" as a single command per tool call, with --repo "${root.replaceAll("\\","/")}"; do not prefix cd or combine shell commands. Keep the final answer concise: selected rule ids/hashes and a concrete constraint from each applicable language. Do not delegate, call reviewers, edit files, inspect credentials, or read outside this repository.`;
   const cli=nativeCli(agent,working,prompt,resolver,explicitCli);
   const snapshotPaths=[...manifest.instructions.map(item=>item.path),...manifest.rules.map(item=>item.source),...scope];
   const directory=git(root,"rev-parse","--path-format=absolute","--git-path","rules-smoke");
@@ -152,7 +128,7 @@ export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
     const result=await run(cli.command,cli.args,{cwd:working,timeoutMs:180000,maxOutputBytes:262144,containTree:true,signal:controller.signal});
     const unchanged=before===snapshot(root,snapshotPaths);
     let evidence,parseFailed=false;
-    try{evidence=traceEvidence(agent,result.out,expected);}catch{parseFailed=true;}
+    try{evidence=traceEvidence(agent,result.out,expected,{resolver,cwd:working});}catch{parseFailed=true;}
     const complete=result.code===0&&!parseFailed&&unchanged&&evidence.completed&&evidence.allSourcesRead;
     const outcome={...initial,status:complete?"source reads verified; behavior requires review":"incomplete",unchanged,
       exitCode:result.code,timedOut:result.timedOut,overflow:result.overflow,cancelled:result.cancelled,spawnFailed:result.spawnFailed,parseFailed,

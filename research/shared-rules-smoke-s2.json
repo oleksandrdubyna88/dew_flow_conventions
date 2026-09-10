@@ -140,5 +140,105 @@
     "traceHash": "6ac73c03ea3c888fd46ac317c6d2155d0725d7a11c4da3f3e7e800e3e7e4cefd",
     "manualAssessment": "Reviewed complete final answer: both language constraints and all selected rule identities are identified; the agent distinguishes inspect from implementation and detects stale consumer documentation. Source hashes are verified from tool output. This does not prove general obedience or completed six-consumer rollout.",
     "harnessState": "S2 working tree after narrowed CLI approval and bounded snapshot changes, before the final snapshot allocation/realpath guard adjustment; final snapshot code is exercised by the subsequent full suite."
+  },
+  "correlatedFollowup": {
+    "harnessState": "5f683aa plus final S2 resolver-command correlation changes",
+    "manualAssessment": "Read the complete final answer: correctly selects C# without Rust/TypeScript, states complexity <=4, records for data and Outcome for expected failures; distinguishes inspect selection from implement/test requirements. This scoped answer is consistent with the canonical sources. It is not evidence of general model obedience or complete Codex acceptance.",
+    "precedingCombinedRun": {
+      "started": "2026-09-10T09:22:20.397Z",
+      "traceHash": "09b8d34c85ea4130d2e0ba4d97852b37823a49cf9e3108d0f36964785921b918",
+      "explanation": "Combined C#/TypeScript trace exceeded the fixed 256-KiB cap; retained as an incomplete observation, followed by narrower single-language scope.",
+      "status": "incomplete",
+      "overflow": true
+    },
+    "report": {
+      "status": "source reads verified; behavior requires review",
+      "agent": "claude",
+      "platform": "win32",
+      "started": "2026-09-10T09:29:48.116Z",
+      "pid": 21952,
+      "version": {
+        "mode": "pinned submodule",
+        "actual": "d66ab1ecbe8edc89c17d039ed613ecb4bfbd7589",
+        "indexPin": "d66ab1ecbe8edc89c17d039ed613ecb4bfbd7589",
+        "headPin": null,
+        "staged": true
+      },
+      "scope": [
+        "src_mcp/core/Example.cs"
+      ],
+      "cwd": ".",
+      "report": "D:\\rsd\\dew_flow_connect_other_ais\\.git\\worktrees\\coai\\rules-smoke\\latest-claude.json",
+      "promptHash": "971bb281e1b328836e979bc9b73c417063fa086fb7248b43c7962f6acb591794",
+      "unchangedScope": "Git HEAD/index/status plus instruction, selected rule, requested file and host-setting content; other file content is not hashed",
+      "unchanged": true,
+      "exitCode": 0,
+      "timedOut": false,
+      "overflow": false,
+      "cancelled": false,
+      "spawnFailed": false,
+      "parseFailed": false,
+      "completed": true,
+      "reads": [
+        {
+          "id": "common.coding-style",
+          "hash": "0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7",
+          "complete": true,
+          "sourceCommandHash": "8ec49dbc59297d7b3d63513496fef1c4375c1872c0804cf1557a4434b0661168"
+        },
+        {
+          "id": "common.knowledge-base",
+          "hash": "44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68",
+          "complete": true,
+          "sourceCommandHash": "8ec49dbc59297d7b3d63513496fef1c4375c1872c0804cf1557a4434b0661168"
+        },
+        {
+          "id": "common.security",
+          "hash": "d560615d5234e51715204c6ef20eb7cb8a9700aa1fc6658b7f7931bc4bf66543",
+          "complete": true,
+          "sourceCommandHash": "8ec49dbc59297d7b3d63513496fef1c4375c1872c0804cf1557a4434b0661168"
+        },
+        {
+          "id": "csharp.doctrine",
+          "hash": "d91d0dd2e3225534a57df285314720f8c394bc4e3d85ba10998b8990303bdff9",
+          "complete": true,
+          "sourceCommandHash": "8ec49dbc59297d7b3d63513496fef1c4375c1872c0804cf1557a4434b0661168"
+        },
+        {
+          "id": "local.common.review-gate",
+          "hash": "5a8567d94f0b2090c8e4b0946b195cf4ebb0795bedbc747966519f539591adc7",
+          "complete": true,
+          "sourceCommandHash": "8ec49dbc59297d7b3d63513496fef1c4375c1872c0804cf1557a4434b0661168"
+        },
+        {
+          "id": "local.common.vendor-routing",
+          "hash": "c3d885655ab354725129b9a9f3a034e05a362db0168bca82fb740b6ccce9e486",
+          "complete": true,
+          "sourceCommandHash": "8ec49dbc59297d7b3d63513496fef1c4375c1872c0804cf1557a4434b0661168"
+        }
+      ],
+      "sourceCalls": [
+        {
+          "command": "node \"D:/rsd/.worktrees/shared-rules/coai/.agents/conventions/tools/rules.mjs\" check --repo \"D:/rsd/.worktrees/shared-rules/coai\"",
+          "accepted": false
+        },
+        {
+          "command": "node \"D:/rsd/.worktrees/shared-rules/coai/.agents/conventions/tools/rules.mjs\" explain --repo \"D:/rsd/.worktrees/shared-rules/coai\" --task inspect --file src_mcp/core/Example.cs",
+          "accepted": false
+        },
+        {
+          "command": "node \"D:/rsd/.worktrees/shared-rules/coai/.agents/conventions/tools/rules.mjs\" read --repo \"D:/rsd/.worktrees/shared-rules/coai\" --task inspect --file src_mcp/core/Example.cs",
+          "accepted": true
+        }
+      ],
+      "models": [
+        "claude-opus-5"
+      ],
+      "final": "Instruction loading complete. `check` → `status: \"resolved\"`, conventions submodule pinned at `d66ab1e` (index pin matches actual, staged); required sources `README.md` and `research/architecture.md` read per PROJECT's `requires`.\n\n## Selection for `src_mcp/core/Example.cs`\n\nScope: `--task inspect --file src_mcp/core/Example.cs` → 6 rules, 26,661 bytes, read in one pass (`remaining: []`, all BEGIN/END boundaries and hashes verified).\n\n| rule id | sha256 (prefix) | why selected |\n|---|---|---|\n| `common.coding-style` | `0ba570017a0414b2e` | always |\n| `common.knowledge-base` | `44712b79711c35be5` | always |\n| `common.security` | `d560615d5234e5171` | always |\n| `csharp.doctrine` | `d91d0dd2e32255343` | path `**/*.cs` |\n| `local.common.review-gate` | `5a8567d94f0b2090c` | task `inspect` |\n| `local.common.vendor-routing` | `c3d885655ab354725` | task `inspect` |\n\nOnly one language family matches the path — C#. No Rust/TypeScript doctrine applies, and per ENTRY I'm not inventing an unwritten one.\n\n## A concrete constraint from each\n\n**C# — `csharp.doctrine`:** cyclomatic complexity **≤ 4** per method (extract, or use a switch expression); `record` for every data container, `class` only for stateful services; expected failures are values (`Outcome<T>`), never `throw` for control flow, and never a per-call-site `(bool ok, T value, string reason)` tuple.\n\n**Family core — `common.coding-style`:** 200–400 lines typical, **800 max**, and a file split happens by extracting a named unit with its own responsibility — never a `partial` to duck the limit.\n\n**Family core — `common.security`:** external processes launch as **exe + argv, never a shell string, always with a timeout that kills the entire process tree** (`Process.Kill(entireProcessTree: true)` before the launcher returns) — directly relevant in `src_mcp/core`'s neighbourhood, which spawns reviewer CLIs.\n\n**Family core — `common.knowledge-base`:** a new file in the pure core makes `research/module_core.md` (and `architecture.md` if the seam is cross-module) part of the same change — a sentence describing something that doesn't run is a bug in the file.\n\n**Local — `local.common.review-gate`:** never hand `review_code` a bare diff; every code round carries the scope (goal, numbered must-be-true statements, constraints) — the server refuses one without it.\n\n**Local — `local.common.vendor-routing`:** a Claude model runs through the `claude` CLI, never `agy` or `codex`.\n\nTwo scoping notes: this selection is for the read-only `inspect` action you asked for. Actually creating that file would be tasks `implement` (+`test`), which additionally pull in `common.development-workflow` → `common.reuse-first`, `common.testing`, `common.scenario-tests`, `common.reliability`, `common.durable-status` and `common.utc-timestamps` — that round of `explain`/`read` would have to be run before the edit. And `src_mcp/core` is the pure core per PROJECT.md; the stdout/JSON-RPC non-negotiable binds anything on the protocol path.",
+      "finalTruncated": false,
+      "allSourcesRead": true,
+      "traceBytes": 212629,
+      "traceHash": "655a5ebbc4d9583349883360354bfb11019a12d2dc78fd776836082781d1c1a7"
+    }
   }
 }

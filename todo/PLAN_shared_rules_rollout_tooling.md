@@ -74,4 +74,8 @@ undeclared neutral directories, CLI discovery, resolver selection, bounded snaps
 Claude approvals and progress reporting. See research/shared-rules-review-s2.json.
 The updated suite passes 71 cases in WSL and 70 plus one symlink skip on Windows. A second Claude
 smoke completed all seven reads with an untruncated answer; behavior remains scoped to that task.
-Final code-gate review is pending. No consumer is published.
+Final code round on `5f683aa` versus source main `026b20e`: **proceed**, all three
+architecture reviewers answered (not the earlier twelve-reviewer panel); all eight returned
+findings received decisions and the session reached Done. Accepted final fixes correlate
+source output with the actual resolver call, reject partial neutral layouts, and extract the
+shared Git runner. Tests now total 73. PR/CI publication remains pending; no consumer is published.

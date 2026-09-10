@@ -25,6 +25,7 @@
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 
 /** The sentence the block is recognised by — the same one the extension's panel looks for. */
 const MARKER = "Multi-model review gate (ConnectOtherAIs)";
@@ -113,8 +114,11 @@ function walk(dir, mounts, found) {
 }
 
 const mounts = mountPaths();
-if (fs.existsSync(".agents/conventions") && !mounts.includes(".agents/conventions")) {
-  console.error("gate-snippet-check: .agents/conventions exists but is not a declared submodule. Reconcile the instruction source.");
+const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const selfHosted = fs.realpathSync(".") === fs.realpathSync(sourceRoot) && fs.existsSync("ENTRY.md");
+const neutral = [".agents/conventions", ".agents/PROJECT.md", ".agents/rules"].some(name => fs.existsSync(name));
+if (neutral && !selfHosted && !mounts.includes(".agents/conventions")) {
+  console.error("gate-snippet-check: neutral instructions exist but .agents/conventions is not a declared submodule. Reconcile the instruction source.");
   process.exit(warnOnly ? 0 : 1);
 }
 const canonical = mounts.map((m) => `${m}/${CANONICAL.replaceAll("\\", "/")}`).find((p) => fs.existsSync(p));

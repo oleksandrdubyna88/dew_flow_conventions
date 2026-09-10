@@ -84,3 +84,17 @@ in an isolated WSL/Linux checkout on 2026-09-10. A Windows-created worktree cann
 used directly by Linux Git because its `.git` file contains a Windows absolute path;
 the Linux run used the same source over a native Linux clone, without rewriting that file.
 
+Final S2 review regressions reject canonical-looking output from an unrelated command,
+unlinked Claude results and shell chains. A partially migrated PROJECT/local tree without
+its declared neutral mount also fails. These cases were observed failing before correction.
+The 73-case suite passed 72 with one symlink privilege skip on Windows and all 73 on WSL;
+the seven trace/snapshot cases also passed separately after adding bounded call diagnostics.
+Earlier native evidence predates invocation correlation and does not prove that stronger
+criterion. The combined-language strict run exceeded its 256-KiB trace cap and remains
+incomplete; neither overflow nor an unsupported command shape is converted into a pass.
+The following C#-only Claude run completed under the same bound (212,629 trace bytes):
+all six sources were linked to the mounted resolver call, checkout measurements were
+unchanged, and the full final answer correctly distinguished inspect from implement and
+named concrete C# constraints. The evidence file retains that answer and manual assessment.
+This is one scoped observation, not complete Codex or six-consumer compatibility acceptance.
+

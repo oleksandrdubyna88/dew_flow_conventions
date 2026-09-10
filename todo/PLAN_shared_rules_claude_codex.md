@@ -18,8 +18,8 @@ fallback selector were rejected because they reintroduce stale state/duplication
 
 Two epics, four stories (each tested, documented and code-reviewed before the next):
 
-**Current code-review scope is S1 only.** S2–S4 are future stories and are not claimed
-implemented in this diff. S1 acceptance: canonical bodies preserved, deterministic validated
+**S1 is merged; S2 tooling passed its code gate and awaits PR/CI.** S3–S4 rollout is not
+claimed implemented. S1 acceptance: canonical bodies preserved, deterministic validated
 selection and source bootstrap work, existing tools remain green on Windows/WSL, new behavior
 is exercised through real CLI calls. Full live-agent/consumer rollout is acceptance of S2–S4.
 The coai server reviews commit SHAs, not an unstaged working tree; a local review-snapshot
@@ -27,7 +27,7 @@ commit is required before review. It is not pushed or shipped until findings are
 
 1. **Shared delivery**
    - S1: metadata on all 24 original bodies, validated resolver, source bootstrap,
-     deterministic tests, CI and migration inventory. In progress.
+     deterministic tests, CI and migration inventory. Merged in PR #16.
    - S2: migration tooling, compatibility checks and bounded real-agent smoke harness.
 2. **Consumer rollout**
    - S3: isolated ConnectOtherAIs canary, Rust and CredsForDevs migrations.
@@ -69,6 +69,19 @@ dependency; other claims were either already fixed in 27f3150 or rejected with s
 The gate session is Done. HTTP selection was reproduced RED and fixed GREEN before the
 final S1 commit. WSL nested Claude smoke also completed successfully. S1 is complete;
 S2–S4 and complete Codex behavioral acceptance remain open.
+
+Consumer boundary (also recorded in coai's `todo/PLAN_shared_rules_adoption.md`):
+
+| Item | Implemented by | Dependency |
+|---|---|---|
+| Canonical rules, resolver, migration and bounded smoke tools | Conventions S1/S2 | Reviewed source lands first |
+| Reviewer discovery, panel gate lookup, generated distributable gate text and CI | ConnectOtherAIs adoption plan | Pin reviewed source, verify canary before publishing other consumers |
+| Rust/Creds and MCP/benchmark/rag adoption | S3/S4 of this plan | Canary accepted; pinned-by repositories last |
+
+These slices are disjoint: coai does not implement another rule selector, and conventions
+does not own product discovery. S2 gate session `3f126e89` reached Done after `proceed`
+with 3/3 architecture reviewers; coai plan session `8e812028` reached CodeReview with
+3/3 plan reviewers and every returned finding resolved. Native Codex acceptance is still incomplete.
 
 Цель: правило редактируется один раз и применяется обоими агентами. У каждого потребителя один закреплённый checkout conventions; тексты правил не копируются в отдельные версии для Claude и Codex. Различаются только способы подключения и настройки исполняющей среды.
 

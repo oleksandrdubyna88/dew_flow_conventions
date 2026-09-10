@@ -731,5 +731,199 @@
       "reason": "Emit start and periodic progress on stderr, reserving stdout for final JSON."
     }
   ],
-  "gatingCount": 30
+  "gatingCount": 30,
+  "finalRound": {
+    "session": "3f126e89",
+    "base": "026b20e4f933d318adbaedba755b4ecf0801683a",
+    "head": "5f683aa3a49177d83d21db0e53307effdddd702f",
+    "result": {
+      "verdict": "proceed",
+      "gatingCount": 5,
+      "threshold": 5,
+      "reviewers": "all 3 reviewers answered",
+      "findings": [
+        {
+          "severity": "Major",
+          "category": "Architecture",
+          "file": "tools/lib/rule-smoke.mjs",
+          "line": 40,
+          "title": "Smoke evidence accepts canonical-looking text from any successful tool output",
+          "why": "If a model reads a duplicate file containing the expected BEGIN/END wrapper, or emits that wrapper through another successful command, `normalized.some(...)` marks the rule read even though the mounted resolver was never invoked. The harness then reports verified source reads from the wrong source.",
+          "fix": "Record the resolver command or source path for each tool event and accept evidence only from successful invocations of the mounted resolver for the expected rule.",
+          "providers": [
+            "codex"
+          ],
+          "role": "Architecture",
+          "isGating": true
+        },
+        {
+          "severity": "Major",
+          "category": "Architecture",
+          "file": "tools/gate-snippet-check.mjs",
+          "line": 130,
+          "title": "The gate checker passes a partially migrated neutral layout with no conventions mount",
+          "why": "A checkout containing `.agents/PROJECT.md` or `.agents/rules` but no `.agents/conventions` has `rulesMounts.length === 0`; the missing-canonical failure is therefore skipped and the checker exits successfully, leaving the migrated consumer without its shared source.",
+          "fix": "When neutral instruction paths are present, require exactly one declared `.agents/conventions` mount and fail if it is absent.",
+          "providers": [
+            "codex"
+          ],
+          "role": "Architecture",
+          "isGating": true
+        },
+        {
+          "severity": "Major",
+          "category": "Architecture",
+          "file": "tools/lib/rule-smoke.mjs",
+          "line": 4,
+          "title": "Smoke harness imports internal implementation details from migration module instead of shared utility abstractions",
+          "why": "tools/lib/rule-smoke.mjs imports git from tools/lib/rule-migration.mjs. rule-migration is an application-level migration workflow component, whereas rule-smoke is an inspection and test harness component. Making smoke depend on migration couples verification to migration internals, rather than having both depend on a lower-level git runner or shared library.",
+          "fix": "Extract the git runner helper into a dedicated lower-level module (such as tools/lib/git.mjs or tools/lib/proc.mjs) and import it independently in both rule-migration.mjs and rule-smoke.mjs.",
+          "providers": [
+            "gemini"
+          ],
+          "role": "Architecture",
+          "isGating": true
+        },
+        {
+          "severity": "Major",
+          "category": "Architecture",
+          "file": "tools/lib/rule-smoke.mjs",
+          "line": 39,
+          "title": "smokeResolver couples smoke harness to self-host conventions repository layout and bootstrap internals",
+          "why": "smokeResolver inspects bootstrap('ENTRY.md') and checks AGENTS.md in the target consumer repository root to decide if it is in source-repository mode. If a consumer repository has its own ENTRY.md or AGENTS.md that doesn't match the exact string bootstrap('ENTRY.md'), or if conventions is hosted in a layout where tools/rules.mjs exists alongside another bootstrap, smoke throws an incomplete loading error. The resolver discovery should be mediated by checking the mounted conventions directory (.agents/conventions/tools/rules.mjs) or an explicit resolver path, rather than reaching into the root repository's adapter text to inspect conventions' own bootstrap template.",
+          "fix": "Separate target repository inspection from source repo bootstrap matching; determine consumer resolver solely via the mounted path (.agents/conventions/tools/rules.mjs) and let source-mode resolution be explicitly configured or isolated to self-tests.",
+          "providers": [
+            "gemini"
+          ],
+          "role": "Architecture",
+          "isGating": true
+        },
+        {
+          "severity": "Minor",
+          "category": "Architecture",
+          "file": "tools/lib/rule-migration.mjs",
+          "line": 12,
+          "title": "movedPath encapsulates both mount path translation and rule tree translation into a single leaky helper",
+          "why": "movedPath performs rewriteMount (substituting OLD_MOUNT with NEW_MOUNT) and immediately chains a regex replacement of .claude/rules/ with .agents/rules/. When called from rebaseLinks, links pointing to arbitrary targets inside the old mount or arbitrary files under .claude/rules are conflated. If an instruction references a non-rule file under .claude/rules/shared, rewriteMount translates it to .agents/conventions, but the subsequent replace can corrupt any path containing matching directory prefixes.",
+          "fix": "Separate rule relocation logic from submodule mount relocation logic so paths within the submodule mount and paths within the local rule tree are transformed by distinct, non-overlapping functions.",
+          "providers": [
+            "gemini"
+          ],
+          "role": "Architecture",
+          "isGating": false
+        },
+        {
+          "severity": "Blocking",
+          "category": "Architecture",
+          "file": "tools/lib/rule-migration.mjs",
+          "line": 139,
+          "title": "applyMigration bypasses the requested conventions submodule checkout by using the local source path as URL override",
+          "why": "Line 139 runs `git submodule update --init` in the output worktree with `-c submodule.${plan.mount.name}.url=${plan.source}`. When a migration is run against a consumer that needs to be deployed, committed, or cloned in CI/remote environments, the worktree git configuration records or pulls from the local source directory rather than the consumer's real repository remote or the approved conventions remote. Furthermore, any subsequent `git submodule update` or fresh clone in a clean environment will fail or diverge because the submodule checkout relies on the caller machine's local directory path rather than synchronizing from the configured origin URL.",
+          "fix": "Use the actual configured remote URL for the submodule fetch or clone, ensuring that only the target commit (`newSha`) is detached without binding submodule origin or cache configuration to the local migration source path.",
+          "providers": [
+            "local"
+          ],
+          "role": "Architecture",
+          "isGating": true
+        },
+        {
+          "severity": "Major",
+          "category": "Architecture",
+          "file": "tools/lib/rule-smoke.mjs",
+          "line": 39,
+          "title": "nativeCli hardcodes user-level global paths for Codex and Claude CLI entrypoints, breaking portability across hosts and environments",
+          "why": "On Windows, line 39 looks for Codex at `process.env.APPDATA + '/npm/node_modules/@openai/codex/bin/codex.js'` and line 43 looks for Claude at `process.env.USERPROFILE + '/.local/bin/claude.exe'`. If an agent CLI is installed via Volta, nvm, pnpm, scoop, winget, yarn, or in standard PATH locations, `nativeCli` throws an unrecoverable error ('Installed native Codex npm entry not found') or attempts to execute an absent executable, even when the CLI is available and functional in PATH.",
+          "fix": "Resolve CLI executables dynamically using PATH lookup (such as `where.exe` / `which` or searching standard PATH directories) before falling back to default vendor install locations.",
+          "providers": [
+            "local"
+          ],
+          "role": "Architecture",
+          "isGating": true
+        },
+        {
+          "severity": "Minor",
+          "category": "Architecture",
+          "file": "tools/lib/rule-migration.mjs",
+          "line": 114,
+          "title": "Local rule migration assigns all supported tasks regardless of the rule's original scope or domain",
+          "why": "When migrating unscoped `.claude/rules/*.md` files into `.agents/rules/`, line 114 injects `tasks: Object.keys(TASKS)`. This forces every local rule to be loaded and evaluated across all tasks (inspect, test, refactor, implement, etc.), defeating task-scoped selection and polluting model context windows during focused tasks where those rules are irrelevant.",
+          "fix": "Preserve explicit task mappings or leave `tasks` unconstrained/empty unless specifically declared, or provide a CLI parameter to configure default task scopes per migrated rule.",
+          "providers": [
+            "local"
+          ],
+          "role": "Architecture",
+          "isGating": false
+        }
+      ],
+      "discounted": [
+        {
+          "severity": "Blocking",
+          "category": "Architecture",
+          "file": "tools/lib/rule-migration.mjs",
+          "line": 139,
+          "title": "applyMigration bypasses the requested conventions submodule checkout by using the local source path as URL override",
+          "why": "Line 139 runs `git submodule update --init` in the output worktree with `-c submodule.${plan.mount.name}.url=${plan.source}`. When a migration is run against a consumer that needs to be deployed, committed, or cloned in CI/remote environments, the worktree git configuration records or pulls from the local source directory rather than the consumer's real repository remote or the approved conventions remote. Furthermore, any subsequent `git submodule update` or fresh clone in a clean environment will fail or diverge because the submodule checkout relies on the caller machine's local directory path rather than synchronizing from the configured origin URL.",
+          "fix": "Use the actual configured remote URL for the submodule fetch or clone, ensuring that only the target commit (`newSha`) is detached without binding submodule origin or cache configuration to the local migration source path.",
+          "providers": [
+            "local"
+          ],
+          "role": "Architecture",
+          "isGating": true
+        }
+      ],
+      "rejectedEntries": [],
+      "instruction": "The gate passed. Record a decision for EVERY finding via resolve (rejections need reasons); the next stage opens after that.",
+      "cost": {
+        "tokensIn": 171401,
+        "tokensOut": 11530
+      },
+      "commands": [
+        "Work AUTONOMOUSLY. Say that you are working autonomously, and keep saying what you are writing right now as you go. Autonomous means these orders, not a mood: (1) every bug and every problem spot gets a RED-GREEN-RED test — a failing test first, then the fix, then the test green, then a check that the test really fails without the fix; (2) the documentation is updated with every change — the README, the manifest if there is one, the module docs and every other file that describes what you changed; (3) before any release, run ALL the tests that exist, not only the ones near your change; (4) if the repository has a release or pull request process, do it — and on a pull request, wait about five minutes, then check whether automatic comments appeared, read them and fix what they name; (5) if a deploy triggers automatically, verify the result against the target environment — dev, stage or test — and read its logs for errors before calling it done; (6) re-read your own code against the repository's rules and follow them, not only the ones you remember. A question that does not block you is not asked now: write it down and put every one of them at the END of your final summary. A question that DOES block you is asked at once — but before you ask it, re-read every epic and story you have written so far and gather every other blocking question you can foresee, so the person is interrupted once with all of them rather than repeatedly with one. Where you can proceed under a stated assumption, do that instead of asking, and say what you assumed."
+      ],
+      "commandsPreamble": "COMMANDS from the operator of this gate. They come from switches a person set in the panel and they outrank your own defaults for this task. Follow them, and say in your summary which ones you applied."
+    },
+    "resolvedStage": "Done",
+    "decisions": [
+      {
+        "finding": 0,
+        "action": "accept",
+        "reason": "Correlate successful command output with a recognized invocation of the selected resolver. Claude tool_result ids must match Bash tool_use ids. Regression reproduced false acceptance of a duplicate command's body."
+      },
+      {
+        "finding": 1,
+        "action": "accept",
+        "reason": "Neutral PROJECT/rules with no declared neutral mount now fail. Source-repository execution is explicitly distinguished by the installed tool root. Regression reproduced the false unadopted result."
+      },
+      {
+        "finding": 2,
+        "action": "accept",
+        "reason": "Extract the existing bounded Git runner into tools/lib/git.mjs and reuse it from migration and smoke, retaining its timeout/output limits."
+      },
+      {
+        "finding": 3,
+        "action": "reject",
+        "reason": "The implementation checks the mounted resolver first. Only source-repository fallback requires the exact shared bootstrap, as the accepted contract specifies. Unrelated root ENTRY already has a passing regression; unsupported alternate layouts must report incomplete."
+      },
+      {
+        "finding": 4,
+        "action": "reject",
+        "reason": "The second replacement is anchored to ^.claude/rules/. After rewriteMount a shared target starts with .agents/conventions, so it cannot match that replacement. Link tests include shared and nested-local targets with preserved query/fragment. No corrupting example was supplied."
+      },
+      {
+        "finding": 5,
+        "action": "reject",
+        "reason": "Already disproved: the local URL is a per-command fetch override and git submodule sync restores the declared URL. .gitmodules retains the remote. Real fresh-clone/init/read and rollback scenarios pass."
+      },
+      {
+        "finding": 6,
+        "action": "reject",
+        "reason": "This describes superseded code. installedCli now searches native executables in PATH and accepts an explicit installed executable/JavaScript entry through --cli; defaults are fallback locations. Tests and a real CLI run cover the implementation."
+      },
+      {
+        "finding": 7,
+        "action": "reject",
+        "reason": "Legacy unscoped local policy applied to all tasks. Mapping it to all known tasks preserves that scope without inventing restrictions; scoped frontmatter is explicitly refused pending a deliberate mapping."
+      }
+    ]
+  }
 }

@@ -5,7 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {execFileSync,spawnSync} from "node:child_process";
-import {rebaseLinks,migrationPlan,applyMigration,git} from "./lib/rule-migration.mjs";
+import {rebaseLinks,migrationPlan,applyMigration} from "./lib/rule-migration.mjs";
+import {git} from "./lib/git.mjs";
 
 test("moved project links resolve to the same repository targets",()=>{
   const original='Read [design](research/architecture.md) and [gate](.claude/rules/shared/common/coai-review-gate.md). Keep [web](https://example.org/a) and [local](#here).';
@@ -52,6 +53,9 @@ test("the existing gate checker recognizes missing neutral mounts and relocated 
   fs.unlinkSync(path.join(root,".gitmodules"));
   assert.equal(check().code,1,"an undeclared neutral directory must not pass as unadopted");
   assert.match(check().out,/not a declared submodule/);
+  fs.rmSync(path.join(root,".agents/conventions"),{recursive:true});
+  fs.writeFileSync(path.join(root,".agents/PROJECT.md"),"A partially migrated project");
+  assert.equal(check().code,1,"neutral instructions without a mount cannot pass as unadopted");
 });
 
 test("real Git migration leaves source work intact and prepares exactly one relocated submodule",t=>{
