@@ -141,11 +141,11 @@ export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
     save(initial);
     const result=await run(cli.command,cli.args,{cwd:working,timeoutMs:180000,maxOutputBytes:262144,containTree:true,signal:controller.signal});
     const unchanged=before===snapshot(root,snapshotPaths);
-    let evidence,parseFailed=false;
-    try{evidence=traceEvidence(agent,result.out,expected,{resolver,cwd:working});}catch{parseFailed=true;}
-    const complete=result.code===0&&!parseFailed&&unchanged&&evidence.completed&&evidence.allSourcesRead;
+    const evidence=traceEvidence(agent,result.out,expected,{resolver,cwd:working,repo:root});
+    const complete=result.code===0&&!evidence.parseFailed&&unchanged&&evidence.completed&&evidence.allSourcesRead;
     const outcome={...initial,status:complete?"source reads verified; behavior requires review":"incomplete",unchanged,
-      exitCode:result.code,timedOut:result.timedOut,overflow:result.overflow,cancelled:result.cancelled,spawnFailed:result.spawnFailed,parseFailed,
+      exitCode:result.code,timedOut:result.timedOut,overflow:result.overflow,cancelled:result.cancelled,spawnFailed:result.spawnFailed,
+      ...(result.spawnError?{spawnError:result.spawnError}:{}),
       ...evidence,traceBytes:Buffer.byteLength(result.out),traceHash:sha256(result.out)};
     save(outcome);
     return outcome;

@@ -24,6 +24,10 @@ test("links escaping the repository are rejected before migration",()=>{
   assert.throws(()=>rebaseLinks('[outside](../secret.md)',"CLAUDE.md",".agents/PROJECT.md"),/outside/);
 });
 
+test("reference-style Markdown links cannot silently change targets after migration",()=>{
+  assert.throws(()=>rebaseLinks('Read [architecture][arch].\n\n[arch]: research/architecture.md',"CLAUDE.md",".agents/PROJECT.md"),/reference.*CLAUDE\.md/i);
+});
+
 test("the existing gate checker recognizes missing neutral mounts and relocated local copies",t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"neutral-gate-"));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
@@ -102,6 +106,11 @@ test("real Git migration leaves source work intact and prepares exactly one relo
   assert.equal(plan.journal.status,"dry-run");
   assert.equal(fs.existsSync(output),false);
   assert.equal(git(repo,"rev-parse","HEAD"),base);
+  const dryCli=spawnSync(process.execPath,[path.join(conventions,"tools/migrate-rules.mjs"),
+    "--repo",repo,"--conventions",conventions,"--sha",sha,"--base",base,
+    "--output",output,"--branch","migrate-test","--rewrite","scripts/check.ps1"],{encoding:"utf8",timeout:30000});
+  assert.equal(dryCli.status,0,dryCli.stderr);
+  assert.deepEqual(JSON.parse(dryCli.stdout),JSON.parse(JSON.stringify(plan.journal)));
   const result=applyMigration(plan);
   assert.equal(result.status,"prepared: validation required");
   assert.equal(fs.readFileSync(path.join(repo,"README.md"),"utf8"),"User's unfinished work.\n");
@@ -178,4 +187,18 @@ test("real Git migration leaves source work intact and prepares exactly one relo
   assert.equal(fs.readFileSync(path.join(clone,"CLAUDE.md"),"utf8").replaceAll("\r\n","\n"),"Read [architecture](research/architecture.md).\n");
   assert.equal(fs.existsSync(path.join(clone,".agents/PROJECT.md")),false);
   assert.equal(git(path.join(clone,".claude/rules/shared"),"rev-parse","HEAD"),plan.mount.oldSha);
+
+  // A real checkout hook makes the journal path unwritable as a FILE after worktree creation.
+  const hook=path.join(repo,".git/hooks/post-checkout");
+  fs.writeFileSync(hook,'#!/bin/sh\nmkdir "$(git rev-parse --git-path rules-migration.json)"\n',{mode:0o755});
+  const interrupted=path.join(temp,"interrupted");
+  const interruptedPlan=migrationPlan({...options,output:interrupted,branch:"journal-failure"});
+  assert.throws(()=>applyMigration(interruptedPlan),error=>{
+    assert.match(error.message,/Migration incomplete in disposable worktree/);
+    assert.ok(error.message.includes(interrupted));
+    assert.ok(error.message.includes(base));
+    assert.match(error.message,/journal unavailable/i);
+    return true;
+  });
+  assert.ok(fs.existsSync(interrupted),"failed output is retained for explicit recovery");
 });

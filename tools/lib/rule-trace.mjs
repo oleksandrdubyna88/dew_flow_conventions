@@ -14,23 +14,31 @@ function words(command) {
   return result;
 }
 
-export function resolverRead(command,{resolver,cwd},wrapped=false) {
+const comparable=value=>process.platform==="win32"?value.toLowerCase():value;
+
+function matchesRepo(args,{repo,cwd}) {
+  const positions=args.flatMap((arg,index)=>arg==="--repo"?[index]:[]);
+  if(!repo||positions.length!==1)return false;
+  const value=args[positions[0]+1];
+  return !!value&&!value.startsWith("--")&&comparable(path.resolve(cwd,value))===comparable(path.resolve(repo));
+}
+
+export function resolverRead(command,{resolver,cwd,repo},wrapped=false) {
   if(typeof command!=="string"||/[;&|<>`$\r\n]/.test(command))return false;
   const args=words(command.trim());
   if(args.length<3)return false;
   const executable=path.basename(args[0].replaceAll("\\","/")).toLowerCase();
   if(!wrapped&&["bash","sh"].includes(executable)&&args.length===3&&["-c","-lc"].includes(args[1])) {
-    return resolverRead(args[2],{resolver,cwd},true);
+    return resolverRead(args[2],{resolver,cwd,repo},true);
   }
   if(!wrapped&&["powershell","powershell.exe","pwsh","pwsh.exe"].includes(executable)) {
     const position=args.findIndex(arg=>arg.toLowerCase()==="-command");
     const flags=args.slice(1,position).every(arg=>["-nologo","-noprofile","-noninteractive"].includes(arg.toLowerCase()));
-    return position>0&&position===args.length-2&&flags&&resolverRead(args.at(-1),{resolver,cwd},true);
+    return position>0&&position===args.length-2&&flags&&resolverRead(args.at(-1),{resolver,cwd,repo},true);
   }
   if(!["node","node.exe"].includes(executable)||args[2]!=="read")return false;
-  const comparable=value=>process.platform==="win32"?value.toLowerCase():value;
   if(!["node","node.exe"].includes(args[0])&&comparable(path.resolve(args[0]))!==comparable(process.execPath))return false;
-  return comparable(path.resolve(cwd,args[1]))===comparable(path.resolve(resolver));
+  return comparable(path.resolve(cwd,args[1]))===comparable(path.resolve(resolver))&&matchesRepo(args.slice(3),{repo,cwd});
 }
 
 function sourceCollector(origin) {
@@ -82,7 +90,7 @@ function claudeEvents(events,capture) {
   return {completed,final,models:[...models]};
 }
 
-export function traceEvidence(agent,trace,expected,origin) {
+function decodedEvidence(agent,trace,expected,origin) {
   const events=trace.split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line));
   const {outputs,sourceCalls,capture}=sourceCollector(origin);
   const {completed,final,models}=agent==="codex"?codexEvents(events,capture):claudeEvents(events,capture);
@@ -92,4 +100,14 @@ export function traceEvidence(agent,trace,expected,origin) {
   });
   return {completed,reads,sourceCalls,models,final:final.slice(0,12000),finalTruncated:final.length>12000,
     allSourcesRead:reads.length>0&&reads.every(rule=>rule.complete)};
+}
+
+export function traceEvidence(agent,trace,expected,origin) {
+  try {return {...decodedEvidence(agent,trace,expected,origin),parseFailed:false};}
+  catch(error) {
+    // Parser messages can embed raw trace content. Retain the error kind without persisting it.
+    return {parseFailed:true,parseError:`${error.name}: native event stream could not be decoded`,
+      completed:false,allSourcesRead:false,final:"",finalTruncated:false,sourceCalls:[],models:[],
+      reads:expected.map(({id,hash})=>({id,hash,complete:false}))};
+  }
 }

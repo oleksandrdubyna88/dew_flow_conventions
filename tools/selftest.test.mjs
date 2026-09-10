@@ -40,6 +40,12 @@ function runTool(tool, args, cwd = fixtureRepo) {
   return { code: result.status, out: `${result.stdout}${result.stderr}` };
 }
 
+test("migration CLI names incomplete arguments and exits with failure",()=>{
+  const result=runTool("migrate-rules.mjs",[]);
+  assert.equal(result.code,1);
+  assert.match(result.out,/migrate-rules: INCOMPLETE.*Missing --repo/);
+});
+
 // ── .http parsing ────────────────────────────────────────────────────────────────────────────────
 
 test("a request block is found with its name, its tags and its verb", () => {

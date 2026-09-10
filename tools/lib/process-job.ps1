@@ -121,6 +121,8 @@ try {
     $code = [ProcessJob]::Run($commandPath, [string[]]$inputData.args, (Get-Location).Path)
     [Environment]::Exit($code)
 } catch {
+    # Per-launch marker cannot be confused with a target that merely returns exit code 125.
+    [Console]::Error.WriteLine($inputData.errorMarker + 'Target launch or process supervision failed')
     [Console]::Error.WriteLine('process supervisor: ' + $_.Exception.Message)
     [Environment]::Exit(125)
 }

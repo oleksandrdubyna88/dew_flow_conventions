@@ -113,3 +113,12 @@ active-owner refusal. This covers orchestration in ordinary CI while paid native
 separate. PR review refactoring split destination/source validation, patch construction,
 report ownership and event decoding without changing their contracts.
 
+
+PR #17 follow-up: 78 cases; Windows 77 passed plus the existing directory-link skip, WSL
+78 passed. New regressions were observed failing before their fixes: missing Windows target
+reported spawnFailed=false, missing/duplicate/wrong --repo accepted as source evidence,
+reference definitions silently moved, malformed traces threw away the result, and a real
+Git checkout hook made journal creation fail without recovery context. The tests now verify
+explicit incomplete outcomes, target exit 125 remains distinct, and journal failure preserves
+the disposable worktree. CLI error handling runs in selftest; the existing real-Git scenario
+also invokes a successful migration dry-run through the public CLI.

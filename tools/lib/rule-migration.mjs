@@ -12,6 +12,7 @@ export const rewriteMount=text=>text.replaceAll(OLD_MOUNT,NEW_MOUNT);
 const movedPath=value=>rewriteMount(value).replace(/^\.claude\/rules\//,".agents/rules/");
 
 export function rebaseLinks(text,from,to,validate=()=>{}) {
+  if(/^ {0,3}\[[^\]\r\n]+\]:/m.test(text))throw new Error(`Unsupported Markdown reference definition in ${from}; use inline links before migration`);
   return text.replace(/\]\(([^)]+)\)/g,(whole,inside)=>{
     if(/^(?:[a-z][a-z0-9+.-]*:|#)/i.test(inside)) return whole;
     const match=/^(\S+?)(\s+["'][\s\S]*["'])?$/.exec(inside);
@@ -161,13 +162,21 @@ export function migrationPlan({repo,conventions,sha,base="HEAD",output,branch,re
   return {root,source,base:baseSha,newSha,output:destination,branch,mount,patches,protectedFiles,journal};
 }
 
+function migrationFailure(plan,record,error) {
+  let journalNote="";
+  try {record("incomplete",error.message);}
+  catch {journalNote=" Journal unavailable; preserve this output, inspect it, then use a new output/branch from the recorded base.";}
+  return new Error(`Migration incomplete in disposable worktree ${plan.output}; source unchanged, base ${plan.base}, branch ${plan.branch}. ${error.message}${journalNote}`);
+}
+
 export function applyMigration(plan) {
   fs.mkdirSync(path.dirname(plan.output),{recursive:true});
   git(plan.root,"worktree","add","-b",plan.branch,plan.output,plan.base);
-  const journalPath=git(plan.output,"rev-parse","--path-format=absolute","--git-path","rules-migration.json");
+  let journalPath;
   const record=(status,error)=>fs.writeFileSync(journalPath,JSON.stringify({...plan.journal,status,error:error?.slice(0,1000)},null,2)+"\n");
-  record("incomplete: preparing");
   try {
+    journalPath=git(plan.output,"rev-parse","--path-format=absolute","--git-path","rules-migration.json");
+    record("incomplete: preparing");
     git(plan.output,"-c","protocol.file.allow=always","-c",`submodule.${plan.mount.name}.url=${plan.source}`,"submodule","update","--init","--",OLD_MOUNT);
     git(path.join(plan.output,OLD_MOUNT),"checkout","--detach",plan.newSha);
     fs.mkdirSync(path.join(plan.output,".agents"),{recursive:true});
@@ -200,7 +209,6 @@ export function applyMigration(plan) {
     record("prepared: validation required");
     return {...plan.journal,status:"prepared: validation required",journal:journalPath};
   } catch(error) {
-    record("incomplete",error.message);
-    throw new Error(`Migration incomplete in disposable worktree ${plan.output}; source unchanged, base ${plan.base}. ${error.message}`);
+    throw migrationFailure(plan,record,error);
   }
 }

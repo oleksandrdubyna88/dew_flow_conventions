@@ -83,6 +83,8 @@ the harness cannot prove absence of all external policy or external effects.
 
 ```yaml
 - uses: actions/checkout@v4
+  with:
+    submodules: true
 - uses: actions/setup-node@v4
   with:
     node-version: 22
@@ -105,6 +107,9 @@ An interrupted migration leaves the disposable output and an incomplete journal 
 metadata (`rules-migration.json`), naming the original base. Inspect before retrying; the
 tool never resets a caller checkout. Create a fresh output/branch from that recorded base,
 retaining the incomplete output until its changes are accounted for.
+If journal creation itself fails, the error still names the output, branch and original base;
+preserve that output and use a fresh output/branch after inspection. Recovery never depends
+on an unreadable or absent journal.
 
 A published migration rolls back through a revert PR restoring the previous gitlink,
 adapters and paths together. In a disposable clone, deinitialize the neutral submodule,

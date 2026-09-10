@@ -11,9 +11,27 @@ import {resolverRead} from "./lib/rule-trace.mjs";
 const text="The complete canonical source.\n";
 const rule={id:"common.sample",text,hash:sha256(text)};
 const payload=`BEGIN RULE ${rule.id} sha256:${rule.hash}\n${text}\nEND RULE ${rule.id}`;
-const origin={resolver:path.resolve(".agents/conventions/tools/rules.mjs"),cwd:process.cwd()};
-const readCommand=`node "${origin.resolver.replaceAll("\\","/")}" read --task inspect`;
+const origin={resolver:path.resolve(".agents/conventions/tools/rules.mjs"),cwd:process.cwd(),repo:process.cwd()};
+const readCommand=`node "${origin.resolver.replaceAll("\\","/")}" read --task inspect --repo "${origin.repo.replaceAll("\\","/")}"`;
 const evidence=(agent,trace,expected)=>traceEvidence(agent,trace,expected,origin);
+
+test("source proof binds exactly one repository argument to the inspected worktree",()=>{
+  const prefix=`node "${origin.resolver.replaceAll("\\","/")}" read`;
+  for(const command of [prefix,`${prefix} --repo "${path.resolve("other")}"`,`${readCommand} --repo "${origin.repo}"`]) {
+    assert.equal(resolverRead(command,origin),false,command);
+  }
+  assert.equal(resolverRead(readCommand,origin),true);
+});
+
+test("malformed native trace reports unparsed evidence explicitly",()=>{
+  const result=evidence("claude",'{"type":',[rule]);
+  assert.equal(result.parseFailed,true);
+  assert.match(result.parseError,/SyntaxError/);
+  assert.equal(result.completed,false);
+  assert.equal(result.allSourcesRead,false);
+  assert.equal(result.final,"");
+  assert.deepEqual(result.reads,[{id:rule.id,hash:rule.hash,complete:false}]);
+});
 test("canonical-looking output from another command is not source-read evidence",()=>{
   const event=command=>JSON.stringify({type:"item.completed",item:{type:"command_execution",command,exit_code:0,aggregated_output:payload}});
   assert.equal(evidence("codex",event('node duplicate.mjs'),[rule]).allSourcesRead,false);

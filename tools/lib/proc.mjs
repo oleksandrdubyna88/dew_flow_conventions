@@ -7,6 +7,7 @@
 
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 
 const contained = Symbol("job supervisor");
 
@@ -40,11 +41,12 @@ export function run(command, args, { cwd, env, timeoutMs = 60_000, shell = false
   }
   if (containTree && shell) throw new Error("Contained processes require exe and argv, not a shell");
   const useJob = containTree && process.platform === "win32";
+  const errorMarker = useJob ? `conventions-supervisor-${randomUUID()}:` : "";
   // PowerShell 7 is the supported Windows host; execution policy is never overridden.
   const actualCommand = useJob ? "pwsh.exe" : command;
   const actualArgs = useJob ? ["-NoProfile", "-NonInteractive", "-File",
     fileURLToPath(new URL("./process-job.ps1", import.meta.url)), "-Request",
-    Buffer.from(JSON.stringify({command,args})).toString("base64")] : args;
+    Buffer.from(JSON.stringify({command,args,errorMarker})).toString("base64")] : args;
   return new Promise((resolve) => {
     const child = spawn(actualCommand, actualArgs, {
       cwd,
@@ -79,9 +81,12 @@ export function run(command, args, { cwd, env, timeoutMs = 60_000, shell = false
     child.on("close", code => {
       clearTimeout(timer);
       signal?.removeEventListener("abort",cancel);
+      const err=Buffer.concat(output.err).toString("utf8");
+      const supervisorError=errorMarker&&err.split("\n").find(line=>line.startsWith(errorMarker));
+      if(supervisorError)spawnError={code:supervisorError.slice(errorMarker.length).trim().slice(0,512)};
       resolve({ code: overflow || cancelled || timedOut ? -1 : code ?? -1,
         out: Buffer.concat(output.out).toString("utf8"),
-        err: Buffer.concat(output.err).toString("utf8"),
+        err,
         timedOut, overflow, cancelled, spawnFailed: !!spawnError,
         ...(spawnError ? {spawnError:spawnError.code ?? "spawn failed"} : {}) });
     });

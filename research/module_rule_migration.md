@@ -27,6 +27,10 @@ Preflight separates destination validation, source/version validation and patch 
 Smoke report/lock ownership and vendor trace decoding are separate functions so failure
 handling can be reviewed independently. Both Git callers retain the same operator-owned
 PATH trust boundary documented for the resolver; the scoped S4036 decision covers this helper too.
+Reference-style Markdown definitions are refused in preflight with the source named; callers
+must convert them to inline links before migration. A journal-creation failure reports the
+output, branch and base even when writing the failure journal also fails. A real checkout
+hook test creates a directory at the expected journal path to exercise this failure.
 
 `tools/smoke-rules.mjs` runs an installed native CLI against a disposable worktree. It calls
 the mounted resolver to establish expected sources, asks the agent to discover its own
@@ -37,6 +41,10 @@ A duplicate script, unlinked output, shell chain or unsupported command shape is
 evidence. The prompt requests one absolute resolver command per call. A restricted parser
 accepts direct Node invocations and one recognized shell wrapper; it is not a shell interpreter.
 Reports include source-command hashes and at most eight 512-character resolver-call diagnostics.
+Each accepted invocation must also name exactly one `--repo` matching the inspected worktree.
+Malformed native streams return explicit incomplete evidence and the parser error kind, without
+persisting raw trace excerpts in the error. Windows supervisor failures carry a per-launch
+marker distinct from a target's own exit 125; the bounded smoke report keeps that spawn error.
 CLI completion, complete bodies, and unchanged checkout state
 are separate evidence; the final answer still needs behavioral review. The latest result
 per agent is stored atomically in Git metadata, with two fixed 32 KiB slots. Full model traces

@@ -4,6 +4,15 @@ import {run} from "./lib/proc.mjs";
 import fs from "node:fs";
 import {setTimeout as delay} from "node:timers/promises";
 
+test("contained launch failure differs from a target returning supervisor exit 125",async()=>{
+  const missing=await run("missing-conventions-executable-734981",[],{timeoutMs:15000,containTree:true});
+  assert.equal(missing.spawnFailed,true,missing.err);
+  assert.ok(missing.spawnError);
+  const target=await run(process.execPath,["-e","process.exitCode=125"],{timeoutMs:15000,containTree:true});
+  assert.equal(target.code,125,target.err);
+  assert.equal(target.spawnFailed,false);
+});
+
 async function assertReaped(pid) {
   // kill(pid, 0) also sees a terminated zombie until its new parent reaps it. Keep requiring
   // ESRCH, but give the OS a bounded interval after pipe closure to remove the process entry.
