@@ -1,6 +1,25 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
 import {run} from "./lib/proc.mjs";
+import fs from "node:fs";
+import {setTimeout as delay} from "node:timers/promises";
+
+async function assertReaped(pid) {
+  // kill(pid, 0) also sees a terminated zombie until its new parent reaps it. Keep requiring
+  // ESRCH, but give the OS a bounded interval after pipe closure to remove the process entry.
+  const deadline=performance.now()+2000;
+  do {
+    try { process.kill(pid,0); }
+    catch(error) { if(error.code==="ESRCH")return; throw error; }
+    await delay(20);
+  } while(performance.now()<deadline);
+  let state="unavailable";
+  if(process.platform==="linux") {
+    try { state=fs.readFileSync(`/proc/${pid}/status`,"utf8").split("\n").filter(line=>/^(State|PPid):/.test(line)).join("; "); }
+    catch(error) { if(error.code!=="ENOENT")throw error; }
+  }
+  assert.fail(`process ${pid} remains after bounded reap interval (${state})`);
+}
 
 test("bounded process capture reports overflow instead of retaining unlimited output",async()=>{
   const result=await run(process.execPath,["-e","process.stdout.write('x'.repeat(200000))"],{maxOutputBytes:4096,timeoutMs:15000,containTree:true});
@@ -20,10 +39,7 @@ test("exited parent cannot strand a descendant holding inherited output pipes",a
   const result=await run(process.execPath,["-e",script],{timeoutMs:5000,containTree:true});
   const descendant=Number(result.out.trim());
   assert.ok(descendant>0,result.err);
-  // Probe the actual process, not merely a 'kill requested' flag.
-  let alive=true;
-  try{process.kill(descendant,0);}catch(error){if(error.code==="ESRCH")alive=false;else throw error;}
-  assert.equal(alive,false,`descendant ${descendant} survived containment`);
+  await assertReaped(descendant);
 });
 
 test("deadline terminates the running process and its descendant before returning",async()=>{
@@ -36,6 +52,6 @@ test("deadline terminates the running process and its descendant before returnin
   assert.equal(pids.length,2,result.err);
   for(const pid of pids) {
     assert.ok(pid>0);
-    assert.throws(()=>process.kill(pid,0),error=>error.code==="ESRCH",`process ${pid} survived timeout`);
+    await assertReaped(pid);
   }
 });

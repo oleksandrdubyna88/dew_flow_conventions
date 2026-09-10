@@ -98,3 +98,10 @@ unchanged, and the full final answer correctly distinguished inspect from implem
 named concrete C# constraints. The evidence file retains that answer and manual assessment.
 This is one scoped observation, not complete Codex or six-consumer compatibility acceptance.
 
+PR #17 coverage exposed an immediate PID-probe failure after the parent exited, while the
+same source passed the normal CI suite. The probe now allows up to two seconds for OS reaping
+and still requires ESRCH (a zombie is not accepted as disappearance); failure reports Linux
+State/PPid. This tests the same real process boundary without assuming synchronous PID removal.
+See [kill(2)](https://man7.org/linux/man-pages/man2/kill.2.html): PID existence includes a
+terminated process awaiting wait. The CI outcome is recorded separately from that explanation.
+
