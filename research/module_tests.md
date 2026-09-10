@@ -40,5 +40,27 @@ mode and retained advisory/host-policy caveats. The external 180-second timeout 
 The HTTP-only selection regression failed before the dependency was declared and passed
 afterward. The complete suite now contains 55 cases (one Windows symlink privilege skip).
 
-Not yet covered: consumer migration scenarios, successful complete Codex behavior, compaction,
-fresh clone/rollback and the six-consumer rollout. These remain open in the plan.
+The S2 suite adds `tools/migrate-rules.test.mjs`, `tools/proc.test.mjs` and
+`tools/smoke-rules.test.mjs`; all run through `npm test` and the coverage job. Scenarios use
+real Git repositories/submodules, with spaces and Unicode: dry-run/no source edits, apply,
+nested local rule relocation, dirty/wrong/missing mounted sources, committed gitlink, fresh
+clone/init/read and rollback to the legacy layout. Invalid SHA, existing adapters and
+untracked policy fail before worktree creation. The gate checker detects neutral mount
+absence, PROJECT/local copies and duplicate mounts.
+
+Process tests observe a real descendant's disappearance after parent exit and timeout,
+assert wall-time bounds, output bounds, argv fidelity and nonzero exit status. Source-evidence
+tests reject assistant claims, errored tools and partial canonical bodies. Real native-agent
+smoke is an explicit local rollout action, never an ordinary CI model call.
+
+Two new regressions failed before their fixes: a second declared mount was accepted, and
+empty intermediate directories left the old automatic rule tree nonempty. Both now pass.
+Windows job inheritance assumptions also failed a real timeout test; see the migration module.
+
+Not yet covered: successful complete Codex behavior, compaction and the six-consumer rollout.
+These remain open in the plan; deterministic migration tests are not behavioral acceptance.
+
+S2 development run, 2026-09-10: 66 cases, Windows 65 passed plus the explicit symlink skip,
+WSL 66 passed. The real coai canary smoke completed with Claude (`claude-opus-5`), read all
+seven selected canonical sources, and left checkout state unchanged. Evidence is in
+[shared-rules-smoke-s2.json](shared-rules-smoke-s2.json); its stored answer limitation is explicit.

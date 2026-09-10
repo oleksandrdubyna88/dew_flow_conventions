@@ -5,7 +5,7 @@
   "type": "module",
   "engines": { "node": ">=20" },
   "scripts": {
-    "test": "node --test tools/selftest.test.mjs tools/rules.test.mjs",
+    "test": "node --test tools/selftest.test.mjs tools/rules.test.mjs tools/migrate-rules.test.mjs tools/proc.test.mjs tools/smoke-rules.test.mjs",
     "check": "node tools/rules.mjs check --repo ."
   },
   "dependencies": {

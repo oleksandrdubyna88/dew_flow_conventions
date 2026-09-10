@@ -70,7 +70,7 @@ the one forbidden move; it turns the machinery into decoration.
 
 ## Mirrors
 
-A shared rule, mounted through the `.claude/rules/shared` submodule. Repositories where these tools are
+A shared rule, mounted through the `.agents/conventions` submodule. Repositories where these tools are
 on today: `dew_flow_connect_other_ais`, `dew_flow_conventions`, `dew_flow_creds_for_devs` (CodeRabbit,
 SonarCloud, GitHub security checks); every `dew_flow_*` repository (Dependabot alerts and automated
 security fixes, secret scanning where GitHub allows it).

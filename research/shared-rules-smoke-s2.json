@@ -1,0 +1,67 @@
+{
+  "subject": "dew_flow_connect_other_ais isolated staged migration",
+  "consumerBase": "9aa679df29494f5f051bc6595690fdf936db5f43",
+  "started": "2026-09-10T08:37:15.164Z",
+  "agent": "claude",
+  "platform": "win32",
+  "conventions": {
+    "mode": "pinned submodule",
+    "actual": "d66ab1ecbe8edc89c17d039ed613ecb4bfbd7589",
+    "indexPin": "d66ab1ecbe8edc89c17d039ed613ecb4bfbd7589",
+    "headPin": null,
+    "staged": true
+  },
+  "scope": [
+    "src_mcp/core/Example.cs",
+    "src_vs_code/src/Example.ts"
+  ],
+  "models": [
+    "claude-opus-5"
+  ],
+  "status": "source reads verified; behavior requires review",
+  "unchanged": true,
+  "exitCode": 0,
+  "timedOut": false,
+  "overflow": false,
+  "completed": true,
+  "reads": [
+    {
+      "id": "common.coding-style",
+      "hash": "0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7",
+      "complete": true
+    },
+    {
+      "id": "common.knowledge-base",
+      "hash": "44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68",
+      "complete": true
+    },
+    {
+      "id": "common.security",
+      "hash": "d560615d5234e51715204c6ef20eb7cb8a9700aa1fc6658b7f7931bc4bf66543",
+      "complete": true
+    },
+    {
+      "id": "csharp.doctrine",
+      "hash": "d91d0dd2e3225534a57df285314720f8c394bc4e3d85ba10998b8990303bdff9",
+      "complete": true
+    },
+    {
+      "id": "local.common.review-gate",
+      "hash": "5a8567d94f0b2090c8e4b0946b195cf4ebb0795bedbc747966519f539591adc7",
+      "complete": true
+    },
+    {
+      "id": "local.common.vendor-routing",
+      "hash": "c3d885655ab354725129b9a9f3a034e05a362db0168bca82fb740b6ccce9e486",
+      "complete": true
+    },
+    {
+      "id": "typescript.doctrine",
+      "hash": "e36b5996468c3e0a48b908438635f7ab579f2fa6d9a8f7702574eb07f2c40f09",
+      "complete": true
+    }
+  ],
+  "traceBytes": 256181,
+  "traceHash": "f91be5323e602f5e79fbf812e2ed950dda9202f0ea0554e678781606e7e7e898",
+  "limitation": "Source reads verified. The initial harness stored only the first 4096 characters of the final answer, so complete behavioral review is not claimed. The harness now preserves a larger final answer and explicitly reports truncation."
+}

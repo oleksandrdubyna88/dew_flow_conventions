@@ -1,62 +1,102 @@
----
-paths:
-  - "__rollout-doc-only__/**"
----
-# Rollout — mounting this repository into a consumer
+# Rollout — one shared source for Claude Code and Codex
 
-> The `paths` frontmatter above never matches a real file, so this document is not loaded into Claude
-> sessions as a rule. It is the checklist for a human or agent performing a mount.
+A consumer pins one checkout at `.agents/conventions`, keeps project-specific instructions
+in `.agents/PROJECT.md` and `.agents/rules`, and uses the root adapters described in
+[ENTRY.md](ENTRY.md). Host permissions and personal settings remain separate.
 
-## First mount (per repository, one commit)
+## Migrate an existing consumer
 
-```bash
-git -C <repo> submodule add https://github.com/oleksandrdubyna88/dew_flow_conventions.git .claude/rules/shared
+Choose a reviewed conventions commit reachable from the remote before publishing a consumer
+pin. Run from a conventions checkout with `npm ci --ignore-scripts` completed:
+
+```text
+node tools/migrate-rules.mjs --repo <consumer> --conventions <source> --sha <approved-sha> --base origin/main --output <new-worktree> --branch feat/shared-rules
 ```
 
-Then delete the superseded local copies (state as of 2026-08-16):
+Default mode is read-only: it validates committed inputs, the selected SHA and instruction
+links, then prints the exact path/hash plan. Repeat with `--apply` to create a new worktree.
+The source checkout stays untouched, including unfinished changes. Existing outputs, extra
+policy sources and host settings referencing the old mount require reconciliation.
+The tool preserves the submodule URL/section, settings and unrelated code pins.
 
-- **all four repos**: `.claude/rules/common/logging-serilog.md`
-- **`dew_flow_benchmark`** additionally: `.claude/rules/common/testing.md`,
-  `.claude/rules/common/planning-docs.md`, `.claude/rules/csharp/nuget-packages.md` — and repoint the
-  three links in `CLAUDE.md` to `.claude/rules/shared/common/...` / `shared/csharp/...`.
+In the prepared worktree:
 
-Commit `.gitmodules` + the mount + the deletions together.
-
-## Notes
-
-- **CI DOES need the submodule, since 2026-08-17.** This note used to read "CI does not need the
-  submodule — builds and tests never read `.claude/`. Do not add `submodules: recursive` to workflows
-  for this." That was true of its premise and the premise moved: `tools/plan-lifecycle.mjs` lives here
-  and every consumer's CI runs it, so the file has to be on disk. Each workflow fetches **that one
-  submodule** rather than setting `submodules: true`, which would drag `dew_flow_rag_qln`'s whole
-  `external/dew_flow_mcp` checkout in for a markdown walk on every push:
-
-  ```yaml
-        - uses: actions/checkout@v4
-        - run: git submodule update --init --depth 1 .claude/rules/shared
-        - run: node .claude/rules/shared/tools/plan-lifecycle.mjs
-        - run: node .claude/rules/shared/tools/pin-check.mjs
-        # adopt these two with --warn, drop the flag when the backfill is done
-        - run: node .claude/rules/shared/tools/post-deploy-check.mjs --warn
-        - run: node .claude/rules/shared/tools/http-coverage.mjs --warn   # only where the repo serves HTTP
-        - run: node .claude/rules/shared/tools/gate-snippet-check.mjs     # --warn only where a paste
-                                                                         # cannot be removed yet
-  ```
-
-  `pin-check.mjs` needs the parent repository's history for `rev-parse HEAD:<path>` only — the
-  default checkout provides that; it does not need the other submodules fetched.
-
-  This repository must stay reachable to CI — public, or the workflow token needs access.
-- **`dew_flow_mcp` is public**: after mounting, this repository's URL is part of a public tree. Keep
-  this repository public, or the public clone experience breaks at `submodule update`.
-- A fresh clone of a consumer needs `git submodule update --init .claude/rules/shared` before Claude
-  sessions see the shared rules.
-
-## Updating a pin later
-
-```bash
-git -C <repo> submodule update --remote .claude/rules/shared
-git -C <repo> add .claude/rules/shared && git -C <repo> commit -m "chore: bump conventions"
+```text
+npm ci --ignore-scripts --prefix .agents/conventions
+node .agents/conventions/tools/rules.mjs check --repo .
+node .agents/conventions/tools/rules.mjs explain --repo . --task inspect --file <planned-file>
+node .agents/conventions/tools/rules.mjs read --repo . --task inspect --file <planned-file>
+node .agents/conventions/tools/gate-snippet-check.mjs
 ```
 
-Run in every consumer in the **same task** as the rule edit — see README, Editing discipline.
+Large reads require one `--only <id>` at a time, with the same scope. Check complete BEGIN/END
+bodies and hashes. Actual SHA is compared with the staged gitlink; HEAD is reported separately.
+Commit only the reported paths after reviewing the diff and running the consumer's checks.
+
+The rewrite allowlist is root README/POST_DEPLOY and `.github/workflows`. Review product
+adapters separately; the tool does not rewrite source code or historical research. Unscoped
+local rules receive every supported task, including inspection. Scoped frontmatter is refused
+until its applicability has an explicit mapping.
+
+## Native agent smoke
+
+Run against a disposable worktree, with Node 20+ and the installed vendor CLI:
+
+```text
+node tools/smoke-rules.mjs --repo <worktree> --agent claude --file src/Example.cs --file ui/Example.ts
+node tools/smoke-rules.mjs --repo <worktree> --agent codex --cwd src --file src/Example.cs
+```
+
+Windows containment requires PowerShell 7 with local scripts permitted by existing policy;
+the tool never changes execution policy. Linux uses a process group. Each cell has a
+180-second deadline and a 256 KiB output cap. The Windows supervisor owns a kill-on-close
+Job Object, so an exited direct child cannot strand its descendants.
+
+The harness checks full canonical bodies in successful tool outputs, CLI completion and
+unchanged checkout state. A final model claim alone is insufficient. Successful source reads
+still require review of the recorded final answer for behavioral compliance. Quota, denied
+permissions, absent CLI and incomplete output are failures. No installs, login, account
+switching or automatic retries occur.
+
+Two fixed evidence slots per worktree live under Git metadata (`rules-smoke/latest-*.json`),
+at most 32 KiB each plus atomic-write temporary files. A new run replaces that agent's previous
+evidence. Full transcripts are not retained. Export reviewed evidence into `research/` when
+it belongs in the durable rollout record. Global/managed instructions remain host inputs;
+the harness cannot prove absence of all external policy or external effects.
+
+## CI and fresh clone
+
+```yaml
+- uses: actions/checkout@v4
+- uses: actions/setup-node@v4
+  with:
+    node-version: 22
+- run: git submodule update --init .agents/conventions
+- run: npm ci --ignore-scripts --prefix .agents/conventions
+- run: node .agents/conventions/tools/rules.mjs check --repo .
+- run: node .agents/conventions/tools/plan-lifecycle.mjs
+- run: node .agents/conventions/tools/gate-snippet-check.mjs
+```
+
+Keep existing HTTP/post-deploy and pin-freshness checks. Pin freshness compares committed
+pins with remote tips; during rollout an approved older pin is intentional and recorded
+explicitly. Do not silently update code dependencies to make a rules migration pass.
+A fresh clone needs the same initialization/install before either agent loads rules.
+The public conventions URL must remain accessible to consumers.
+
+## Recovery and later updates
+
+An interrupted migration leaves the disposable output and an incomplete journal in Git
+metadata (`rules-migration.json`), naming the original base. Inspect before retrying; the
+tool never resets a caller checkout. Create a fresh output/branch from that recorded base,
+retaining the incomplete output until its changes are accounted for.
+
+A published migration rolls back through a revert PR restoring the previous gitlink,
+adapters and paths together. In a disposable clone, deinitialize the neutral submodule,
+check out the recorded base, then initialize `.claude/rules/shared`; the integration test
+performs this with a real Git submodule. Never use destructive recovery in a shared checkout.
+
+For later updates fetch the reviewed commit into the mount, check out that exact SHA, run
+checks, stage the gitlink and open a bump PR. Never use remote HEAD as a missing-instruction
+fallback. Migrate the canary first; update pinned repositories before their consumers,
+and build whenever a code pin changes.

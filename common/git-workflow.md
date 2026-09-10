@@ -19,7 +19,7 @@ someone else's half-finished change and burying it in a message about yours.
 **First, make sure you are holding this rule at all.** A session is governed by the rules of the
 repository it was OPENED in, and commits are made to the repository the files live in — which in
 this family is routinely a different one. If this file is not in your context, read it from the tree
-you are about to commit to (`.claude/rules/shared/common/git-workflow.md`) before staging anything.
+you are about to commit to (`.agents/conventions/common/git-workflow.md`) before staging anything.
 See [the README](../README.md) — *Which rules a session actually has*.
 
 **Two obligations, and they are not negotiable separately.**

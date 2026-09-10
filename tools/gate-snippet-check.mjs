@@ -36,10 +36,10 @@ const VERSION = /<!-- coai-snippet v(\d+) -->/;
 const CANONICAL = path.join("common", "coai-review-gate.md");
 
 /** The files a CLI reads as instructions — the classic home of a pasted copy. */
-const INSTRUCTION_FILES = ["CLAUDE.md", "AGENTS.md", "GEMINI.md", ".github/copilot-instructions.md"];
+const INSTRUCTION_FILES = ["CLAUDE.md", "AGENTS.md", "GEMINI.md", ".agents/PROJECT.md", ".github/copilot-instructions.md"];
 
 /** Where a repository keeps rules once there are too many for one page. */
-const RULE_TREES = [".claude/rules", ".cursor/rules"];
+const RULE_TREES = [".claude/rules", ".cursor/rules", ".agents/rules"];
 
 /** Generated or vendored trees are somebody else's content, never this repository's copy. */
 const NOT_OURS = new Set(["node_modules", "bin", "obj", ".git", "dist", "out", "artifacts", "vendor", "packages"]);
@@ -120,7 +120,12 @@ const canonical = mounts.map((m) => `${m}/${CANONICAL.replaceAll("\\", "/")}`).f
 // repository that never adopted the rule (fine, nothing to check) from one that mounts it and did
 // not get it (an uninitialised or broken submodule — a repository with no gate rule at all, which
 // must not read as adoption).
-const rulesMounts = mounts.filter((m) => RULE_TREES.some((t) => m.startsWith(`${t}/`) || m === t));
+const rulesMounts = mounts.filter((m) => m === ".agents/conventions" || RULE_TREES.some((t) => m.startsWith(`${t}/`) || m === t));
+
+if (rulesMounts.length > 1) {
+  console.error(`gate-snippet-check: multiple rule mounts: ${rulesMounts.join(", ")}. Reconcile to one canonical source.`);
+  process.exit(warnOnly ? 0 : 1);
+}
 
 if (canonical === undefined && rulesMounts.length > 0) {
   console.error(

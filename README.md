@@ -101,12 +101,12 @@ asking in writing to be moved and another had two promoted plans absent from its
 
 | Tool | Enforces | Run |
 |---|---|---|
-| [`tools/plan-lifecycle.mjs`](tools/plan-lifecycle.mjs) | [`common/planning-docs.md`](common/planning-docs.md) | `node .claude/rules/shared/tools/plan-lifecycle.mjs` |
-| [`tools/pin-check.mjs`](tools/pin-check.mjs) | Editing discipline (pins at remote tips) | `node .claude/rules/shared/tools/pin-check.mjs` |
-| [`tools/http-coverage.mjs`](tools/http-coverage.mjs) | [`common/http-contracts.md`](common/http-contracts.md) — every route has a request | `node .claude/rules/shared/tools/http-coverage.mjs [--warn]` |
-| [`tools/http-run.mjs`](tools/http-run.mjs) | The same rule's other half — the suite actually runs, and its verdict is an exit code | `node .claude/rules/shared/tools/http-run.mjs [--tag prod] [--target <url>]` |
-| [`tools/post-deploy-check.mjs`](tools/post-deploy-check.mjs) | [`common/post-deploy-checks.md`](common/post-deploy-checks.md) — the file's shape in CI, its items against the live target | `node .claude/rules/shared/tools/post-deploy-check.mjs [--target <value>]` |
-| [`tools/gate-snippet-check.mjs`](tools/gate-snippet-check.mjs) | [`common/coai-review-gate.md`](common/coai-review-gate.md) is the ONLY copy — a consumer carrying its own is named | `node .claude/rules/shared/tools/gate-snippet-check.mjs [--warn]` |
+| [`tools/plan-lifecycle.mjs`](tools/plan-lifecycle.mjs) | [`common/planning-docs.md`](common/planning-docs.md) | `node .agents/conventions/tools/plan-lifecycle.mjs` |
+| [`tools/pin-check.mjs`](tools/pin-check.mjs) | Editing discipline (pins at remote tips) | `node .agents/conventions/tools/pin-check.mjs` |
+| [`tools/http-coverage.mjs`](tools/http-coverage.mjs) | [`common/http-contracts.md`](common/http-contracts.md) — every route has a request | `node .agents/conventions/tools/http-coverage.mjs [--warn]` |
+| [`tools/http-run.mjs`](tools/http-run.mjs) | The same rule's other half — the suite actually runs, and its verdict is an exit code | `node .agents/conventions/tools/http-run.mjs [--tag prod] [--target <url>]` |
+| [`tools/post-deploy-check.mjs`](tools/post-deploy-check.mjs) | [`common/post-deploy-checks.md`](common/post-deploy-checks.md) — the file's shape in CI, its items against the live target | `node .agents/conventions/tools/post-deploy-check.mjs [--target <value>]` |
+| [`tools/gate-snippet-check.mjs`](tools/gate-snippet-check.mjs) | [`common/coai-review-gate.md`](common/coai-review-gate.md) is the ONLY copy — a consumer carrying its own is named | `node .agents/conventions/tools/gate-snippet-check.mjs [--warn]` |
 
 The last three are new and every repository adopts them the same way: **`--warn` first**, so the
 finding is visible without a red build, then the flag comes off once the backfill is done. A check
