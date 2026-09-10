@@ -29,6 +29,16 @@ const KEYS = new Set(["id", "load", "paths", "tasks", "depends"]);
 const LIMITS = Object.freeze({ metadata: 2048, file: 256 * 1024, files: 256, catalog: 4 * 1024 * 1024, core: 16 * 1024 });
 export const sha256 = text => createHash("sha256").update(text).digest("hex");
 
+export function projectRequirements(text) {
+  const match=/^---\n([\s\S]*?)\n---\n/.exec(text);
+  if(!match) return [];
+  const document=parseDocument(match[1],{uniqueKeys:true});
+  if(document.errors.length || document.warnings.length) throw new Error(`PROJECT metadata: ${[...document.errors,...document.warnings].join("; ")}`);
+  const metadata=document.toJS({maxAliasCount:0});
+  if(!metadata || Array.isArray(metadata) || typeof metadata!=="object" || Object.keys(metadata).some(key=>key!=="requires")) throw new Error("PROJECT metadata allows only requires");
+  return stringList(metadata,"requires","PROJECT").map(targetPath);
+}
+
 export function normalizedText(file) {
   if (fs.lstatSync(file).isSymbolicLink()) throw new Error(`Symlink instruction source: ${file}`);
   if (fs.statSync(file).size > LIMITS.file) throw new Error(`Instruction exceeds ${LIMITS.file} bytes: ${file}`);
@@ -93,7 +103,7 @@ export function loadCatalog(root, localRoot) {
   if (rules.length > LIMITS.files || rules.reduce((n,r)=>n+r.bytes,0) > LIMITS.catalog) throw new Error("Rule catalog budget exceeded");
   const byId = new Map();
   for (const rule of rules) {
-    if (byId.has(rule.id)) throw new Error(`Duplicate rule id: ${rule.id}`);
+    if (byId.has(rule.id)) throw new Error(`Duplicate rule id ${rule.id}: ${byId.get(rule.id).file} and ${rule.file}`);
     byId.set(rule.id,rule);
   }
   const done=new Set();
@@ -106,20 +116,28 @@ export function loadCatalog(root, localRoot) {
   }
   rules.forEach(rule=>visit(rule.id));
   if (!rules.some(rule=>rule.load === "always")) throw new Error("Missing always-loaded core rules");
-  const core=selectRules(rules,["inspect"],[]).filter(rule=>rule.reasons.includes("always") || rule.reasons.some(reason=>reason.startsWith("dependency:")));
+  const coreIds=new Set();
+  function addCore(id) {
+    if(coreIds.has(id)) return;
+    coreIds.add(id);
+    byId.get(id).depends.forEach(addCore);
+  }
+  rules.filter(rule=>rule.load === "always").forEach(rule=>addCore(rule.id));
+  const core=rules.filter(rule=>coreIds.has(rule.id));
   if (core.reduce((n,r)=>n+r.bytes,0)>LIMITS.core) throw new Error("Always-loaded core exceeds 16 KiB budget");
   return rules;
 }
 
 export function targetPath(value) {
   const normalized=value.replaceAll("\\","/");
-  if (!normalized || normalized.startsWith("/") || /^[A-Za-z]:/.test(normalized) || normalized.split("/").includes("..")) {
-    throw new Error(`Target must be root-relative and inside the repository: ${value}`);
+  if (!normalized || normalized.includes("\0") || normalized.length>4096 || normalized.endsWith("/") || normalized.endsWith("/.") || normalized === "." || normalized.startsWith("/") || /^[A-Za-z]:/.test(normalized) || normalized.split("/").includes("..")) {
+    throw new Error(`Target must name a root-relative file inside the repository: ${value}`);
   }
   return normalized.replace(/^\.\//,"");
 }
 
 export function selectRules(catalog,tasks,files) {
+  if(tasks.length>64 || files.length>256) throw new Error("Scope exceeds limit: 64 tasks and 256 files per call");
   if (!tasks.length) throw new Error(`At least one --task is required; legal: ${Object.keys(TASKS).join(", ")}`);
   tasks.forEach(task=>{ if (!Object.hasOwn(TASKS,task)) throw new Error(`Unknown task ${task}; legal: ${Object.keys(TASKS).join(", ")}`); });
   const normalized=files.map(targetPath);

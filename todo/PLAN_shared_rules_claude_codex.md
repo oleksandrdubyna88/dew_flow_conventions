@@ -51,6 +51,17 @@ Node 20.20.2. WSL `codex` points to the Windows npm package and fails with missi
 
 The design below records the approved target; unchecked rollout items remain pending.
 
+S1 checkpoint `8c5a418`: 53 deterministic cases, all pass on WSL; Windows has one
+explicit symlink-privilege skip. Code review round 1: all 12 reviewers answered, `revise`,
+34 findings; 8 accepted (including overlapping diagnostic findings), every decision recorded
+in `research/shared-rules-review-s1.json`. Root-target hang and core-budget classification
+were reproduced RED and fixed GREEN. Required PROJECT documents and dependency-load errors
+are now validated. Remaining review round is pending on the corrected commit.
+
+Real self-host inspection: Claude completed and its source-read trace matched the selected
+hashes. Codex read canonical sources but hit its subscription usage limit before final completion;
+recorded as incomplete. This does not stop deterministic work or imply a successful Codex rollout.
+
 Цель: правило редактируется один раз и применяется обоими агентами. У каждого потребителя один закреплённый checkout conventions; тексты правил не копируются в отдельные версии для Claude и Codex. Различаются только способы подключения и настройки исполняющей среды.
 
 Этот план конкретизирует раздел 2 и часть разделов 3/5/6 [общего backlog](PLAN_product_improvements.md). Исправления F1–F4/F6–F9 из [аудита](REVIEW_product_audit_2026-09-09.md) остаются в общем backlog. Здесь — загрузка правил, F5, совместимость агентов и переход на новую структуру. Ни настройки агентов, ни submodules потребителей этим документом не изменены.

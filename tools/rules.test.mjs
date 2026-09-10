@@ -81,6 +81,19 @@ test("unknown tasks and escaped target paths fail instead of selecting only core
   assert.throws(()=>selectRules(catalog,["imlpement"],[]),/imlpement/);
   assert.throws(()=>selectRules(catalog,["audit"],["../outside.cs"]),/relative|outside/i);
   assert.throws(()=>selectRules(catalog,[],[]),/task/i);
+  for(const file of [".","./","src/..","src/./","src/../."]) {
+    assert.throws(()=>selectRules(catalog,["inspect"],[file]),/relative|file|outside/i);
+  }
+  assert.throws(()=>selectRules(catalog,["inspect"],Array(257).fill("a.cs")),/scope.*limit/i);
+});
+
+test("inspect-only dependency bytes are not charged against the always-core budget",t=>{
+  const {root,put}=fixture(t);
+  put("common/a.md",'id: common.a\nload: conditional\ntasks: ["inspect"]\ndepends: ["common.b"]');
+  put("common/b.md",'id: common.b\nload: conditional\ntasks: ["gpu"]',"Reference ".repeat(2000));
+  assert.doesNotThrow(()=>loadCatalog(root));
+  put("common/a.md",'id: common.a\nload: always\ndepends: ["common.b"]');
+  assert.throws(()=>loadCatalog(root),/core.*budget/i);
 });
 
 test("hashes change on canonical edits without a persistent cache", t => {
@@ -121,7 +134,7 @@ test("central build props continue to select the NuGet policy",()=>{
 
 function cliFixture(t) {
   const {root}=fixture(t);
-  for(const name of ["tools","node_modules","common","csharp","rust","typescript","AGENTS.md","CLAUDE.md","ENTRY.md",".agents"]) {
+  for(const name of ["tools","node_modules","common","csharp","rust","typescript","AGENTS.md","CLAUDE.md","ENTRY.md",".agents","README.md","research"]) {
     fs.cpSync(path.join(sourceRoot,name),path.join(root,name),{recursive:true});
   }
   execFileSync("git",["init","-q",root],{timeout:10000});
@@ -134,6 +147,9 @@ test("real CLI loads from nested directories, bounds reads and reports missing/o
   const {root,cli}=cliFixture(t);
   fs.mkdirSync(path.join(root,"src/два слова"),{recursive:true});
   const args=["explain","--task","inspect","--file","src/New.cs","--file","ui/New.ts"];
+  const rootTarget=cli(["explain","--task","inspect","--file","."]);
+  assert.equal(rootTarget.error,undefined,"root target must fail immediately, not time out");
+  assert.equal(rootTarget.status,1);
   const nested=cli(args,path.join(root,"src/два слова"));
   assert.equal(nested.status,0,nested.stderr);
   const manifest=JSON.parse(nested.stdout);
@@ -161,8 +177,16 @@ test("real CLI loads from nested directories, bounds reads and reports missing/o
   assert.equal(conflict.status,1);
   assert.match(conflict.stderr,/AGENTS.override/);
   fs.unlinkSync(path.join(root,"src/AGENTS.override.md"));
+  fs.unlinkSync(path.join(root,"research/architecture.md"));
+  const absentReference=cli(["check"]);
+  assert.equal(absentReference.status,1);
+  assert.match(absentReference.stderr,/Missing instruction source.*architecture/);
   fs.unlinkSync(path.join(root,".agents/PROJECT.md"));
   const missing=cli(["check"]);
   assert.equal(missing.status,1);
   assert.match(missing.stderr,/Missing instruction source.*PROJECT/);
+  fs.renameSync(path.join(root,"node_modules"),path.join(root,"uninstalled-dependencies"));
+  const noDependencies=cli(["check"]);
+  assert.equal(noDependencies.status,1);
+  assert.match(noDependencies.stderr,/rules check: INCOMPLETE.*npm ci --ignore-scripts/s);
 });

@@ -1,3 +1,6 @@
+---
+requires: ["README.md", "research/architecture.md", "research/module_rules.md"]
+---
 # Conventions project instructions
 
 This repository owns the shared policy and Node tools for the active dew_flow repositories.

@@ -14,6 +14,8 @@ source hashes prove identical model behavior or erase higher-priority instructio
 2. Read `<root>/.agents/PROJECT.md` completely. Markdown links in PROJECT are relative
    to that file; shell commands and inline code paths are relative to repository root
    unless the project explicitly says otherwise. Read project-design documents it requires.
+   PROJECT may declare `requires: ["research/architecture.md"]` in YAML frontmatter;
+   these paths are root-relative, validated as required sources and included in the manifest.
 3. Use `<root>/.agents/conventions/tools/rules.mjs` below. In the conventions source
    repository itself, use `<root>/tools/rules.mjs`. Node 20+ is required. If locked
    dependencies are missing, run `npm ci --ignore-scripts --prefix <conventions-root>`
