@@ -140,7 +140,7 @@ the predecessor repository had it as a test and it was lost in the split into fo
 [`tools/plan-lifecycle.mjs`](../tools/plan-lifecycle.mjs), run by every consumer's CI:
 
 ```bash
-node .claude/rules/shared/tools/plan-lifecycle.mjs
+node .agents/conventions/tools/plan-lifecycle.mjs
 ```
 
 Six findings, all of them failures this family has actually made: a plan with no status line where the

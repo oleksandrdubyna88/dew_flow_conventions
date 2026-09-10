@@ -27,11 +27,13 @@ source hashes prove identical model behavior or erase higher-priority instructio
    the authorized task; never update to remote HEAD as a missing-file fallback.
    Independent read-only investigation may continue.
 5. Run `node <resolver> explain --repo <root> --task <task> --file <planned-path>`.
-   Repeat `--task` and `--file` for every applicable action, inspected source, planned
+   Repeat `--task` and `--file` for every applicable action, task subject source, planned
    new file, and old/new name in a rename. An empty initial diff is normal: supply the
    proposed files before creating them. Run `explain --task inspect` to see the task
    vocabulary; choose every relevant task, not just the easiest one. Use `policy` for
    instruction changes and `docs` for documentation. Include `gpu` before GPU work.
+   Required instructions and design references read solely for this preflight are not task
+   subject files; include them in scope when the task itself inspects or changes them.
 6. Read every selected rule completely with `node <resolver> read` and the **same scope**.
    If the payload exceeds 32 KiB, use `--only <id>` per rule from `explain`. Each response
    names the remaining ids; it is only that response's coverage, not durable session state.

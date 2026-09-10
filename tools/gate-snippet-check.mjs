@@ -25,6 +25,7 @@
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 
 /** The sentence the block is recognised by — the same one the extension's panel looks for. */
 const MARKER = "Multi-model review gate (ConnectOtherAIs)";
@@ -36,10 +37,10 @@ const VERSION = /<!-- coai-snippet v(\d+) -->/;
 const CANONICAL = path.join("common", "coai-review-gate.md");
 
 /** The files a CLI reads as instructions — the classic home of a pasted copy. */
-const INSTRUCTION_FILES = ["CLAUDE.md", "AGENTS.md", "GEMINI.md", ".github/copilot-instructions.md"];
+const INSTRUCTION_FILES = ["CLAUDE.md", "AGENTS.md", "GEMINI.md", ".agents/PROJECT.md", ".github/copilot-instructions.md"];
 
 /** Where a repository keeps rules once there are too many for one page. */
-const RULE_TREES = [".claude/rules", ".cursor/rules"];
+const RULE_TREES = [".claude/rules", ".cursor/rules", ".agents/rules"];
 
 /** Generated or vendored trees are somebody else's content, never this repository's copy. */
 const NOT_OURS = new Set(["node_modules", "bin", "obj", ".git", "dist", "out", "artifacts", "vendor", "packages"]);
@@ -113,6 +114,13 @@ function walk(dir, mounts, found) {
 }
 
 const mounts = mountPaths();
+const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const selfHosted = fs.realpathSync(".") === fs.realpathSync(sourceRoot) && fs.existsSync("ENTRY.md");
+const neutral = [".agents/conventions", ".agents/PROJECT.md", ".agents/rules"].some(name => fs.existsSync(name));
+if (neutral && !selfHosted && !mounts.includes(".agents/conventions")) {
+  console.error("gate-snippet-check: neutral instructions exist but .agents/conventions is not a declared submodule. Reconcile the instruction source.");
+  process.exit(warnOnly ? 0 : 1);
+}
 const canonical = mounts.map((m) => `${m}/${CANONICAL.replaceAll("\\", "/")}`).find((p) => fs.existsSync(p));
 
 // A mount UNDER a rule tree is this family's rules submodule, whatever it is named. Distinguishing
@@ -120,7 +128,12 @@ const canonical = mounts.map((m) => `${m}/${CANONICAL.replaceAll("\\", "/")}`).f
 // repository that never adopted the rule (fine, nothing to check) from one that mounts it and did
 // not get it (an uninitialised or broken submodule — a repository with no gate rule at all, which
 // must not read as adoption).
-const rulesMounts = mounts.filter((m) => RULE_TREES.some((t) => m.startsWith(`${t}/`) || m === t));
+const rulesMounts = mounts.filter((m) => m === ".agents/conventions" || RULE_TREES.some((t) => m.startsWith(`${t}/`) || m === t));
+
+if (rulesMounts.length > 1) {
+  console.error(`gate-snippet-check: multiple rule mounts: ${rulesMounts.join(", ")}. Reconcile to one canonical source.`);
+  process.exit(warnOnly ? 0 : 1);
+}
 
 if (canonical === undefined && rulesMounts.length > 0) {
   console.error(

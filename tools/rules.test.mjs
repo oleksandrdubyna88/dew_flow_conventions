@@ -124,7 +124,8 @@ test("all original rule bodies and every inventoried section survive migration",
     const body=actual.text.replace(/^---\n[\s\S]*?\n---\n/,"");
     assert.deepEqual(body.split("\n").filter(line=>/^#{1,4} /.test(line)),original.sections);
     // The inventory is evidence against the original commit, not a parallel applicability map.
-    assert.equal(sha256(body),original.originalBodySha256,original.id);
+    // Reverse the explicit S2 path migration before comparing immutable baseline evidence.
+    assert.equal(sha256(body.replaceAll(".agents/conventions",".claude/rules/shared")),original.originalBodySha256,original.id);
   }
 });
 

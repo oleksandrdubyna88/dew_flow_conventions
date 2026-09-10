@@ -40,6 +40,41 @@ mode and retained advisory/host-policy caveats. The external 180-second timeout 
 The HTTP-only selection regression failed before the dependency was declared and passed
 afterward. The complete suite now contains 55 cases (one Windows symlink privilege skip).
 
+The S2 suite adds `tools/migrate-rules.test.mjs`, `tools/proc.test.mjs` and
+`tools/smoke-rules.test.mjs`; all run through `npm test` and the coverage job. Scenarios use
+real Git repositories/submodules, with spaces and Unicode: dry-run/no source edits, apply,
+nested local rule relocation, dirty/wrong/missing mounted sources, committed gitlink, fresh
+clone/init/read and rollback to the legacy layout. Invalid SHA, existing adapters and
+untracked policy fail before worktree creation. The gate checker detects neutral mount
+absence, PROJECT/local copies and duplicate mounts.
+
+Process tests observe a real descendant's disappearance after parent exit and timeout,
+assert wall-time bounds, output bounds, argv fidelity and nonzero exit status. Source-evidence
+tests reject assistant claims, errored tools and partial canonical bodies. Real native-agent
+smoke is an explicit local rollout action, never an ordinary CI model call.
+
+Two new regressions failed before their fixes: a second declared mount was accepted, and
+empty intermediate directories left the old automatic rule tree nonempty. Both now pass.
+Windows job inheritance assumptions also failed a real timeout test; see the migration module.
+
+Not yet covered: successful complete Codex behavior, compaction and the six-consumer rollout.
+These remain open in the plan; deterministic migration tests are not behavioral acceptance.
+
+S2 development run, 2026-09-10: 66 cases, Windows 65 passed plus the explicit symlink skip,
+WSL 66 passed. The real coai canary smoke completed with Claude (`claude-opus-5`), read all
+seven selected canonical sources, and left checkout state unchanged. Evidence is in
+[shared-rules-smoke-s2.json](shared-rules-smoke-s2.json); its stored answer limitation is explicit.
+
+S2 review fixes were verified with 71 cases: Windows 70 passed plus the same symlink skip;
+WSL all 71 passed. Regression failures reproduced output nested in the conventions source,
+an unrelated root ENTRY shadowing the mounted resolver, and an undeclared neutral directory
+being reported as unadopted (the latter also fails when its production guard is removed).
+Snapshot tests detect changed inspected content and reject large inspected files while leaving
+unrelated large file bodies unread. The migration scenario checks explicit script rewrites,
+remaining-reference reports and dirty input disclosure. A second real Claude run completed
+with the narrower resolver-only Bash approvals, all seven sources, an untruncated final answer,
+and unchanged measured state. Its scope and manual assessment are in the evidence file.
+
 PR follow-up adds an in-process real-Git CLI protocol scenario, so coverage measures the
 actual implementation rather than fixture copies. A dot-segment regression first omitted
 `csharp.doctrine` for `src/./file.cs`; normalization restores the same selection as the
@@ -49,5 +84,41 @@ in an isolated WSL/Linux checkout on 2026-09-10. A Windows-created worktree cann
 used directly by Linux Git because its `.git` file contains a Windows absolute path;
 the Linux run used the same source over a native Linux clone, without rewriting that file.
 
-Not yet covered: consumer migration scenarios, successful complete Codex behavior, compaction,
-fresh clone/rollback and the six-consumer rollout. These remain open in the plan.
+Final S2 review regressions reject canonical-looking output from an unrelated command,
+unlinked Claude results and shell chains. A partially migrated PROJECT/local tree without
+its declared neutral mount also fails. These cases were observed failing before correction.
+The 73-case suite passed 72 with one symlink privilege skip on Windows and all 73 on WSL;
+the seven trace/snapshot cases also passed separately after adding bounded call diagnostics.
+Earlier native evidence predates invocation correlation and does not prove that stronger
+criterion. The combined-language strict run exceeded its 256-KiB trace cap and remains
+incomplete; neither overflow nor an unsupported command shape is converted into a pass.
+The following C#-only Claude run completed under the same bound (212,629 trace bytes):
+all six sources were linked to the mounted resolver call, checkout measurements were
+unchanged, and the full final answer correctly distinguished inspect from implement and
+named concrete C# constraints. The evidence file retains that answer and manual assessment.
+This is one scoped observation, not complete Codex or six-consumer compatibility acceptance.
+
+PR #17 coverage exposed an immediate PID-probe failure after the parent exited, while the
+same source passed the normal CI suite. The probe now allows up to two seconds for OS reaping
+and still requires ESRCH (a zombie is not accepted as disappearance); failure reports Linux
+State/PPid. This tests the same real process boundary without assuming synchronous PID removal.
+See [kill(2)](https://man7.org/linux/man-pages/man2/kill.2.html): PID existence includes a
+terminated process awaiting wait. The CI outcome is recorded separately from that explanation.
+
+The real Git migration scenario also drives the complete smoke/report/lock cycle for both
+vendor event formats. Its explicitly labelled fixture CLI invokes the real mounted resolver
+and emits transport events; it does not call a model and is never native-agent evidence.
+It checks correlated reads, unchanged scope, persisted report identity, lock cleanup and
+active-owner refusal. This covers orchestration in ordinary CI while paid native runs remain
+separate. PR review refactoring split destination/source validation, patch construction,
+report ownership and event decoding without changing their contracts.
+
+
+PR #17 follow-up: 78 cases; Windows 77 passed plus the existing directory-link skip, WSL
+78 passed. New regressions were observed failing before their fixes: missing Windows target
+reported spawnFailed=false, missing/duplicate/wrong --repo accepted as source evidence,
+reference definitions silently moved, malformed traces threw away the result, and a real
+Git checkout hook made journal creation fail without recovery context. The tests now verify
+explicit incomplete outcomes, target exit 125 remains distinct, and journal failure preserves
+the disposable worktree. CLI error handling runs in selftest; the existing real-Git scenario
+also invokes a successful migration dry-run through the public CLI.

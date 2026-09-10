@@ -1,0 +1,244 @@
+{
+  "subject": "dew_flow_connect_other_ais isolated staged migration",
+  "consumerBase": "9aa679df29494f5f051bc6595690fdf936db5f43",
+  "started": "2026-09-10T08:37:15.164Z",
+  "agent": "claude",
+  "platform": "win32",
+  "conventions": {
+    "mode": "pinned submodule",
+    "actual": "d66ab1ecbe8edc89c17d039ed613ecb4bfbd7589",
+    "indexPin": "d66ab1ecbe8edc89c17d039ed613ecb4bfbd7589",
+    "headPin": null,
+    "staged": true
+  },
+  "scope": [
+    "src_mcp/core/Example.cs",
+    "src_vs_code/src/Example.ts"
+  ],
+  "models": [
+    "claude-opus-5"
+  ],
+  "status": "source reads verified; behavior requires review",
+  "unchanged": true,
+  "exitCode": 0,
+  "timedOut": false,
+  "overflow": false,
+  "completed": true,
+  "reads": [
+    {
+      "id": "common.coding-style",
+      "hash": "0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7",
+      "complete": true
+    },
+    {
+      "id": "common.knowledge-base",
+      "hash": "44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68",
+      "complete": true
+    },
+    {
+      "id": "common.security",
+      "hash": "d560615d5234e51715204c6ef20eb7cb8a9700aa1fc6658b7f7931bc4bf66543",
+      "complete": true
+    },
+    {
+      "id": "csharp.doctrine",
+      "hash": "d91d0dd2e3225534a57df285314720f8c394bc4e3d85ba10998b8990303bdff9",
+      "complete": true
+    },
+    {
+      "id": "local.common.review-gate",
+      "hash": "5a8567d94f0b2090c8e4b0946b195cf4ebb0795bedbc747966519f539591adc7",
+      "complete": true
+    },
+    {
+      "id": "local.common.vendor-routing",
+      "hash": "c3d885655ab354725129b9a9f3a034e05a362db0168bca82fb740b6ccce9e486",
+      "complete": true
+    },
+    {
+      "id": "typescript.doctrine",
+      "hash": "e36b5996468c3e0a48b908438635f7ab579f2fa6d9a8f7702574eb07f2c40f09",
+      "complete": true
+    }
+  ],
+  "traceBytes": 256181,
+  "traceHash": "f91be5323e602f5e79fbf812e2ed950dda9202f0ea0554e678781606e7e7e898",
+  "limitation": "Source reads verified. The initial harness stored only the first 4096 characters of the final answer, so complete behavioral review is not claimed. The harness now preserves a larger final answer and explicitly reports truncation.",
+  "followup": {
+    "status": "source reads verified; behavior requires review",
+    "agent": "claude",
+    "platform": "win32",
+    "started": "2026-09-10T09:04:40.728Z",
+    "pid": 23836,
+    "version": {
+      "mode": "pinned submodule",
+      "actual": "d66ab1ecbe8edc89c17d039ed613ecb4bfbd7589",
+      "indexPin": "d66ab1ecbe8edc89c17d039ed613ecb4bfbd7589",
+      "headPin": null,
+      "staged": true
+    },
+    "scope": [
+      "src_mcp/core/Example.cs",
+      "src_vs_code/src/Example.ts"
+    ],
+    "cwd": ".",
+    "report": "D:\\rsd\\dew_flow_connect_other_ais\\.git\\worktrees\\coai\\rules-smoke\\latest-claude.json",
+    "promptHash": "b93b4d21d96f96001e645d6256a2786ebe0495a073edc5fd03d3a2754812e4b0",
+    "unchangedScope": "Git HEAD/index/status plus instruction, selected rule, requested file and host-setting content; other file content is not hashed",
+    "unchanged": true,
+    "exitCode": 0,
+    "timedOut": false,
+    "overflow": false,
+    "cancelled": false,
+    "spawnFailed": false,
+    "parseFailed": false,
+    "completed": true,
+    "reads": [
+      {
+        "id": "common.coding-style",
+        "hash": "0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7",
+        "complete": true
+      },
+      {
+        "id": "common.knowledge-base",
+        "hash": "44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68",
+        "complete": true
+      },
+      {
+        "id": "common.security",
+        "hash": "d560615d5234e51715204c6ef20eb7cb8a9700aa1fc6658b7f7931bc4bf66543",
+        "complete": true
+      },
+      {
+        "id": "csharp.doctrine",
+        "hash": "d91d0dd2e3225534a57df285314720f8c394bc4e3d85ba10998b8990303bdff9",
+        "complete": true
+      },
+      {
+        "id": "local.common.review-gate",
+        "hash": "5a8567d94f0b2090c8e4b0946b195cf4ebb0795bedbc747966519f539591adc7",
+        "complete": true
+      },
+      {
+        "id": "local.common.vendor-routing",
+        "hash": "c3d885655ab354725129b9a9f3a034e05a362db0168bca82fb740b6ccce9e486",
+        "complete": true
+      },
+      {
+        "id": "typescript.doctrine",
+        "hash": "e36b5996468c3e0a48b908438635f7ab579f2fa6d9a8f7702574eb07f2c40f09",
+        "complete": true
+      }
+    ],
+    "models": [
+      "claude-opus-5"
+    ],
+    "final": "Instruction loading complete. Procedure followed: root resolved → `.agents/PROJECT.md` + its `requires` (`README.md`, `research/architecture.md`) read → `check` → `explain` → `read` (all selected rules, in three `--only` batches, each with BEGIN/END boundaries and matching hashes).\n\n## Loader state\n\n`check` → `status: \"resolved\"`, `advisory: true`. Conventions submodule **pinned**, `actual == indexPin == d66ab1ecbe8edc89c17d039ed613ecb4bfbd7589` (staged), no unresolved overrides. Instruction sources: `AGENTS.md` `482fb2ea…`, `CLAUDE.md` `336cc4fb…`, `.agents/conventions/ENTRY.md` `a209ba9d…`, `.agents/PROJECT.md` `66153ef6…`, `README.md` `0406e357…`, `research/architecture.md` `fd45d984…`.\n\n## Selected rules — `--task inspect --file src_mcp/core/Example.cs --file src_vs_code/src/Example.ts`\n\n| id | sha256 | why selected |\n|---|---|---|\n| `common.coding-style` | `0ba57001…f215ae7` | always |\n| `common.knowledge-base` | `44712b79…cdab5ff68` | always |\n| `common.security` | `d560615d…31b4bf66543` | always |\n| `csharp.doctrine` | `d91d0dd2…8990303bdff9` | path: `src_mcp/core/Example.cs` (`**/*.cs`) |\n| `typescript.doctrine` | `e36b5996…2574e0e` *(full: `e36b5996468c3e0a48b908438635f7ab579f2fa6d9a8f7702574eb07f2c40f09`)* | path: `src_vs_code/src/Example.ts` (`**/*.ts`) |\n| `local.common.review-gate` | `5a8567d9…39591adc7` | task: `inspect` |\n| `local.common.vendor-routing` | `c3d88565…6ccce9e486` | task: `inspect` |\n\nTotal 32 499 bytes; `remaining: []` after the three read batches. Selection is paths OR tasks plus always-rules; no dependencies were pulled in (none of the seven declares `depends`).\n\n**Not selected, and why** — worth knowing before anyone actually writes these files: `csharp.nuget-packages` needs a `.csproj`/props path or the `dependencies` task; `common.logging-serilog` matches `**/Program.cs`, not an arbitrary `.cs`; `rust.doctrine` has no matching path. And `inspect` selects only the two local rules — creating these files is task `implement`, which per the metadata in `check` additionally selects `common.development-workflow` (+ its dependency `common.reuse-first`), `common.git-workflow`, `common.testing`, `common.reliability`, `common.scenario-tests`, `common.durable-status`, `common.coai-review-gate`, `common.planning-docs`, `common.post-deploy-checks`, `common.http-contracts`, `common.logging-serilog`, `common.utc-timestamps`. Those are **not** loaded in this read-only scope; the entry requires re-running `explain`/`read` before touching them.\n\n## `src_mcp/core/Example.cs` — a concrete C# constraint\n\nFrom `csharp.doctrine` §6: **every method that reads no state is `private static`, and cyclomatic complexity is ≤ 4** — extract or use a switch expression rather than a fourth branch. Two more that bite a file in `core/` specifically:\n\n- §5 — expected failures are values: one shared `Outcome<T>` per repo, never `throw` for control flow, and explicitly **no ad-hoc `(bool ok, T value, string reason)` tuple** (\"the outcome type wearing a disguise\").\n- §7 — public contracts expose `IReadOnlyList<T> { get; init; }` defaulting to `[]`, never `List<T> { get; set; }`; §2 — `record` for data, `class` only for stateful services.\n- §4a is MANDATORY and applies the moment the type is deserialized: an omitted field on a positional record or a source-generated `init` property arrives **null** whatever the initializer says (measured 2026-09-03) — normalise where the value is *read*, not at one call site.\n\n## `src_vs_code/src/Example.ts` — a concrete TypeScript constraint\n\nFrom `typescript.doctrine` §1 (MANDATORY): **never `${JSON.stringify(…)}` inside a template literal that becomes a `<script>`.** `JSON.stringify` leaves `<` alone, so any value containing `</script>` breaks out of the element; use the repository's shared escaper (the family reference is `jsonForScript` in `webviewHtml.ts`), never a hand-rolled `.replace()` at the call site. Three instances, three people, one shipped. The rule is enforced by a scan test (`scriptInterpolation.test.ts`) that fails naming file and line.\n\nAlso binding on any new `.ts` here: §3 — no `as SomeOptions` cast standing in for a real type in a fixture (use `function options(overrides: Partial<T> = {}): T` *without* the trailing cast); §4 — `tsc` emits despite errors, so read a clean `tsc` exit before trusting any suite number, and never build with `--outDir`.\n\n## What binds both files\n\n- `common.coding-style`: immutability is CRITICAL (return a new value, never mutate); many small files — 200–400 lines typical, **800 max**, and splitting via a `partial`/equivalent to duck the limit is called out as the wrong split; an unknown name fails **naming the legal values**, never a silent fallback; absent must not render as `0`.\n- `common.security`: the MANDATORY one is *a measure applied at SOME of its sites* — put the measure on the single road in (the function that builds the markup/path/key escapes it), enumerate sites mechanically with a multi-line-capable grep, write the scan **before** the fix, and leave it behind as a test. Plus: external processes as exe + argv, never a shell string, always with a timeout that kills the entire process tree.\n- `common.knowledge-base`: adding either file obliges an update to the matching `research/module_*.md` (and `research/architecture.md` if a cross-module seam changed) in the same task.\n- `local.common.review-gate`: `review_code` refuses a bare diff — every code round carries the scope (symptom/goal, numbered must-be-trues, constraints) plus the diff.\n- `local.common.vendor-routing`: a Claude model runs on the `claude` CLI, never `agy` or `codex`.\n\n## One mismatch found (read-only, not corrected)\n\n`.agents/PROJECT.md:6` says local rules live in `.claude/rules/common/`, and `research/architecture.md:215-216` says the conventions submodule is mounted at `.claude/rules/shared`. The resolver reports the local rules at `.agents/rules/common/` and the submodule at `.agents/conventions` — matching the staged renames in this branch. Under `common.knowledge-base` (\"where a sentence describes something that does not run, it is a bug in the file\") both sentences are stale; the resolver output, not the prose, is authoritative on the current paths.",
+    "finalTruncated": false,
+    "allSourcesRead": true,
+    "traceBytes": 241896,
+    "traceHash": "6ac73c03ea3c888fd46ac317c6d2155d0725d7a11c4da3f3e7e800e3e7e4cefd",
+    "manualAssessment": "Reviewed complete final answer: both language constraints and all selected rule identities are identified; the agent distinguishes inspect from implementation and detects stale consumer documentation. Source hashes are verified from tool output. This does not prove general obedience or completed six-consumer rollout.",
+    "harnessState": "S2 working tree after narrowed CLI approval and bounded snapshot changes, before the final snapshot allocation/realpath guard adjustment; final snapshot code is exercised by the subsequent full suite."
+  },
+  "correlatedFollowup": {
+    "harnessState": "5f683aa plus final S2 resolver-command correlation changes",
+    "manualAssessment": "Read the complete final answer: correctly selects C# without Rust/TypeScript, states complexity <=4, records for data and Outcome for expected failures; distinguishes inspect selection from implement/test requirements. This scoped answer is consistent with the canonical sources. It is not evidence of general model obedience or complete Codex acceptance.",
+    "precedingCombinedRun": {
+      "started": "2026-09-10T09:22:20.397Z",
+      "traceHash": "09b8d34c85ea4130d2e0ba4d97852b37823a49cf9e3108d0f36964785921b918",
+      "explanation": "Combined C#/TypeScript trace exceeded the fixed 256-KiB cap; retained as an incomplete observation, followed by narrower single-language scope.",
+      "status": "incomplete",
+      "overflow": true
+    },
+    "report": {
+      "status": "source reads verified; behavior requires review",
+      "agent": "claude",
+      "platform": "win32",
+      "started": "2026-09-10T09:29:48.116Z",
+      "pid": 21952,
+      "version": {
+        "mode": "pinned submodule",
+        "actual": "d66ab1ecbe8edc89c17d039ed613ecb4bfbd7589",
+        "indexPin": "d66ab1ecbe8edc89c17d039ed613ecb4bfbd7589",
+        "headPin": null,
+        "staged": true
+      },
+      "scope": [
+        "src_mcp/core/Example.cs"
+      ],
+      "cwd": ".",
+      "report": "D:\\rsd\\dew_flow_connect_other_ais\\.git\\worktrees\\coai\\rules-smoke\\latest-claude.json",
+      "promptHash": "971bb281e1b328836e979bc9b73c417063fa086fb7248b43c7962f6acb591794",
+      "unchangedScope": "Git HEAD/index/status plus instruction, selected rule, requested file and host-setting content; other file content is not hashed",
+      "unchanged": true,
+      "exitCode": 0,
+      "timedOut": false,
+      "overflow": false,
+      "cancelled": false,
+      "spawnFailed": false,
+      "parseFailed": false,
+      "completed": true,
+      "reads": [
+        {
+          "id": "common.coding-style",
+          "hash": "0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7",
+          "complete": true,
+          "sourceCommandHash": "8ec49dbc59297d7b3d63513496fef1c4375c1872c0804cf1557a4434b0661168"
+        },
+        {
+          "id": "common.knowledge-base",
+          "hash": "44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68",
+          "complete": true,
+          "sourceCommandHash": "8ec49dbc59297d7b3d63513496fef1c4375c1872c0804cf1557a4434b0661168"
+        },
+        {
+          "id": "common.security",
+          "hash": "d560615d5234e51715204c6ef20eb7cb8a9700aa1fc6658b7f7931bc4bf66543",
+          "complete": true,
+          "sourceCommandHash": "8ec49dbc59297d7b3d63513496fef1c4375c1872c0804cf1557a4434b0661168"
+        },
+        {
+          "id": "csharp.doctrine",
+          "hash": "d91d0dd2e3225534a57df285314720f8c394bc4e3d85ba10998b8990303bdff9",
+          "complete": true,
+          "sourceCommandHash": "8ec49dbc59297d7b3d63513496fef1c4375c1872c0804cf1557a4434b0661168"
+        },
+        {
+          "id": "local.common.review-gate",
+          "hash": "5a8567d94f0b2090c8e4b0946b195cf4ebb0795bedbc747966519f539591adc7",
+          "complete": true,
+          "sourceCommandHash": "8ec49dbc59297d7b3d63513496fef1c4375c1872c0804cf1557a4434b0661168"
+        },
+        {
+          "id": "local.common.vendor-routing",
+          "hash": "c3d885655ab354725129b9a9f3a034e05a362db0168bca82fb740b6ccce9e486",
+          "complete": true,
+          "sourceCommandHash": "8ec49dbc59297d7b3d63513496fef1c4375c1872c0804cf1557a4434b0661168"
+        }
+      ],
+      "sourceCalls": [
+        {
+          "command": "node \"D:/rsd/.worktrees/shared-rules/coai/.agents/conventions/tools/rules.mjs\" check --repo \"D:/rsd/.worktrees/shared-rules/coai\"",
+          "accepted": false
+        },
+        {
+          "command": "node \"D:/rsd/.worktrees/shared-rules/coai/.agents/conventions/tools/rules.mjs\" explain --repo \"D:/rsd/.worktrees/shared-rules/coai\" --task inspect --file src_mcp/core/Example.cs",
+          "accepted": false
+        },
+        {
+          "command": "node \"D:/rsd/.worktrees/shared-rules/coai/.agents/conventions/tools/rules.mjs\" read --repo \"D:/rsd/.worktrees/shared-rules/coai\" --task inspect --file src_mcp/core/Example.cs",
+          "accepted": true
+        }
+      ],
+      "models": [
+        "claude-opus-5"
+      ],
+      "final": "Instruction loading complete. `check` → `status: \"resolved\"`, conventions submodule pinned at `d66ab1e` (index pin matches actual, staged); required sources `README.md` and `research/architecture.md` read per PROJECT's `requires`.\n\n## Selection for `src_mcp/core/Example.cs`\n\nScope: `--task inspect --file src_mcp/core/Example.cs` → 6 rules, 26,661 bytes, read in one pass (`remaining: []`, all BEGIN/END boundaries and hashes verified).\n\n| rule id | sha256 (prefix) | why selected |\n|---|---|---|\n| `common.coding-style` | `0ba570017a0414b2e` | always |\n| `common.knowledge-base` | `44712b79711c35be5` | always |\n| `common.security` | `d560615d5234e5171` | always |\n| `csharp.doctrine` | `d91d0dd2e32255343` | path `**/*.cs` |\n| `local.common.review-gate` | `5a8567d94f0b2090c` | task `inspect` |\n| `local.common.vendor-routing` | `c3d885655ab354725` | task `inspect` |\n\nOnly one language family matches the path — C#. No Rust/TypeScript doctrine applies, and per ENTRY I'm not inventing an unwritten one.\n\n## A concrete constraint from each\n\n**C# — `csharp.doctrine`:** cyclomatic complexity **≤ 4** per method (extract, or use a switch expression); `record` for every data container, `class` only for stateful services; expected failures are values (`Outcome<T>`), never `throw` for control flow, and never a per-call-site `(bool ok, T value, string reason)` tuple.\n\n**Family core — `common.coding-style`:** 200–400 lines typical, **800 max**, and a file split happens by extracting a named unit with its own responsibility — never a `partial` to duck the limit.\n\n**Family core — `common.security`:** external processes launch as **exe + argv, never a shell string, always with a timeout that kills the entire process tree** (`Process.Kill(entireProcessTree: true)` before the launcher returns) — directly relevant in `src_mcp/core`'s neighbourhood, which spawns reviewer CLIs.\n\n**Family core — `common.knowledge-base`:** a new file in the pure core makes `research/module_core.md` (and `architecture.md` if the seam is cross-module) part of the same change — a sentence describing something that doesn't run is a bug in the file.\n\n**Local — `local.common.review-gate`:** never hand `review_code` a bare diff; every code round carries the scope (goal, numbered must-be-true statements, constraints) — the server refuses one without it.\n\n**Local — `local.common.vendor-routing`:** a Claude model runs through the `claude` CLI, never `agy` or `codex`.\n\nTwo scoping notes: this selection is for the read-only `inspect` action you asked for. Actually creating that file would be tasks `implement` (+`test`), which additionally pull in `common.development-workflow` → `common.reuse-first`, `common.testing`, `common.scenario-tests`, `common.reliability`, `common.durable-status` and `common.utc-timestamps` — that round of `explain`/`read` would have to be run before the edit. And `src_mcp/core` is the pure core per PROJECT.md; the stdout/JSON-RPC non-negotiable binds anything on the protocol path.",
+      "finalTruncated": false,
+      "allSourcesRead": true,
+      "traceBytes": 212629,
+      "traceHash": "655a5ebbc4d9583349883360354bfb11019a12d2dc78fd776836082781d1c1a7"
+    }
+  }
+}

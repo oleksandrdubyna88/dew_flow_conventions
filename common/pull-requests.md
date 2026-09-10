@@ -126,6 +126,6 @@ gh pr merge --rebase --delete-branch        # or --squash for a fix-up trail
 
 ## Mirrors
 
-This is a shared rule; consumers mount it through the `.claude/rules/shared` submodule. Repositories
+This is a shared rule; consumers mount it through the `.agents/conventions` submodule. Repositories
 with an automated reviewer today: `dew_flow_connect_other_ais`, `dew_flow_conventions`,
 `dew_flow_creds_for_devs`. Adding one to another repository is a one-line change to the list above.

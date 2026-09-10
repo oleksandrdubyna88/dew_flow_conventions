@@ -7,7 +7,7 @@ paths: ["**/Program.cs","**/main.rs"]
 # Logging — Serilog, coloured to the console, and on disk per run (MANDATORY)
 
 > **One copy, consumed everywhere.** This rule lives in `dew_flow_conventions` and reaches every
-> `dew_flow_*` repository through the `.claude/rules/shared` submodule. The per-repo mirror copies and
+> `dew_flow_*` repository through the `.agents/conventions` submodule. The per-repo mirror copies and
 > their checklist are gone — this file is the only one to edit, and an edit is followed by a pin bump in
 > every consumer in the same task.
 

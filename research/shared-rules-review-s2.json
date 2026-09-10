@@ -1,0 +1,929 @@
+{
+  "stage": "code",
+  "round": 1,
+  "reviewers": "all 12 reviewers answered",
+  "findings": [
+    {
+      "severity": "Major",
+      "category": "Architecture",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 139,
+      "title": "applyMigration bypasses the requested conventions submodule checkout by using the local source path as URL override",
+      "why": "Line 139 runs `git submodule update --init` in the output worktree with `-c submodule.${plan.mount.name}.url=${plan.source}`. When a migration is run against a consumer that needs to be deployed, committed, or cloned in CI/remote environments, the worktree git configuration records or pulls from the local source directory rather than the consumer's real repository remote or the approved conventions remote. Furthermore, any subsequent `git submodule update` or fresh clone in a clean environment will fail or diverge because the submodule checkout relies on the caller machine's local directory path rather than synchronizing from the configured origin URL.",
+      "fix": "Use the actual configured remote URL for the submodule fetch or clone, ensuring that only the target commit (`newSha`) is detached without binding submodule origin or cache configuration to the local migration source path.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "Architecture",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Architecture",
+      "file": "tools/lib/rule-smoke.mjs",
+      "line": 39,
+      "title": "nativeCli hardcodes user-level global paths for Codex and Claude CLI entrypoints, breaking portability across hosts and environments",
+      "why": "On Windows, line 39 looks for Codex at `process.env.APPDATA + '/npm/node_modules/@openai/codex/bin/codex.js'` and line 43 looks for Claude at `process.env.USERPROFILE + '/.local/bin/claude.exe'`. If an agent CLI is installed via Volta, nvm, pnpm, scoop, winget, yarn, or in standard PATH locations, `nativeCli` throws an unrecoverable error ('Installed native Codex npm entry not found') or attempts to execute an absent executable, even when the CLI is available and functional in PATH.",
+      "fix": "Resolve CLI executables dynamically using PATH lookup (such as `where.exe` / `which` or searching standard PATH directories) before falling back to default vendor install locations.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "Architecture",
+      "isGating": true
+    },
+    {
+      "severity": "Minor",
+      "category": "Architecture",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 114,
+      "title": "Local rule migration assigns all supported tasks regardless of the rule's original scope or domain",
+      "why": "When migrating unscoped `.claude/rules/*.md` files into `.agents/rules/`, line 114 injects `tasks: Object.keys(TASKS)`. This forces every local rule to be loaded and evaluated across all tasks (inspect, test, refactor, implement, etc.), defeating task-scoped selection and polluting model context windows during focused tasks where those rules are irrelevant.",
+      "fix": "Preserve explicit task mappings or leave `tasks` unconstrained/empty unless specifically declared, or provide a CLI parameter to configure default task scopes per migrated rule.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "Architecture",
+      "isGating": false
+    },
+    {
+      "severity": "Blocking",
+      "category": "Security",
+      "file": "tools/lib/process-job.ps1",
+      "line": 97,
+      "title": "Unescaped argument concatenation in process-job.ps1 allows command line argument injection",
+      "why": "In Quote(), backslashes preceding quotes or at the end of strings are substituted using the PowerShell backtick escape (`$1`$1\\\") rather than standard Windows CommandLineToArgvW rules ($1$1\\\"). Because the C# string literal inside Add-Type is interpreted by PowerShell when compiling or executing, or more critically because Regex.Replace string substitution syntax uses '$1' (not '`$1'), the literal backtick is injected into the replacement string. If an argument ends with a backslash or contains quotes/spaces (e.g. prompt or directory path), the resulting command line constructed in line 97 becomes malformed or unescapes arguments, allowing injection of arbitrary parameters or breaking out of arguments when passed to CreateProcessW.",
+      "fix": "Replace Quote() with standard Win32 command-line escaping rules (escaping runs of backslashes before double-quotes with double backslashes and doubling trailing backslashes: Regex.Replace(value, @\"(\\*)\"\"\", @\"$1$1\\\"\") and Regex.Replace(..., @\"(\\\\+)$\", @\"$1$1\")) without PowerShell backtick escapes inside the C# definition.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Blocking",
+      "category": "Security",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 139,
+      "title": "Arbitrary submodule configuration injection via unvalidated submodule URL in applyMigration",
+      "why": "applyMigration executes git -c submodule.${plan.mount.name}.url=${plan.source} submodule update ... where plan.source comes directly from --conventions input without validation. If plan.source contains newline characters or git configuration directives (e.g. setting protocol.ext or command execution directives), git -c injects arbitrary configuration entries into git execution.",
+      "fix": "Validate that plan.source and plan.mount.url contain no newlines, null bytes, or git config option control characters, and use --config-env or validate against a strict path/URL regex before passing to git -c.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Reliability",
+      "file": "tools/lib/rule-smoke.mjs",
+      "line": 86,
+      "title": "Smoke lock verification throws unhandled exception on dead process causing permanent deadlock",
+      "why": "When checking a stale lock from a dead process, if process.kill(owner.pid, 0) detects ESRCH, line 93 unconditionally throws Error('Previous smoke owner ... is dead; run incomplete. Inspect ... then recover its named .lock/.tmp files before retrying'). Because no automated cleanup or safe recovery flag exists and the file cannot be cleared by another run, any interrupted run permanently bricks future automated smoke runs until manual filesystem intervention.",
+      "fix": "Allow an explicit recovery or force option (or check if stale after verification/timeout) to atomically unlink the dead PID's lock file instead of leaving the worktree permanently locked.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Reliability",
+      "file": "tools/lib/rule-smoke.mjs",
+      "line": 99,
+      "title": "Uncaught save() failure inside finally causes unhandled rejection and leaks the lock",
+      "why": "In smoke(), save(initial) is called before entering try...finally (or save(outcome) inside try). If save() throws (e.g. report exceeds 32 KiB as checked in line 97), the initial save throws before try/finally, leaving the lock file on disk permanently without releasing it. Furthermore, if save(outcome) throws inside try, outcome reporting is aborted.",
+      "fix": "Acquire the lock immediately inside a try block or wrap lock creation and initial save in try/finally so fs.unlinkSync(lock) is guaranteed to execute on failure.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Minor",
+      "category": "Reliability",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 164,
+      "title": "Protected file comparison fails on Windows due to CRLF vs LF discrepancy",
+      "why": "Line 164 compares blob(plan.output, plan.base, file) (which normalizes CRLF to LF) against fs.readFileSync(path.join(plan.output, file), 'utf8').replaceAll('\\r\\n', '\\n'). However, if Git checkouts on Windows perform filter or line ending conversions or if blob show returns unnormalized line endings for non-blob files, exact string comparison throws an unexpected 'Protected host file changed' error on unmodified repositories.",
+      "fix": "Normalize line endings consistently on both sides using normalizedText() before comparing content.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "SecurityReliability",
+      "isGating": false
+    },
+    {
+      "severity": "Minor",
+      "category": "Security",
+      "file": "tools/lib/rule-smoke.mjs",
+      "line": 45,
+      "title": "Bash wildcard allowedTools allow arbitrary command execution in Claude smoke test",
+      "why": "nativeCli grants Claude permissions including 'Bash(node *)', 'Bash(git rev-parse *)', and 'Bash(pwd)'. With 'Bash(node *)', the agent can execute arbitrary shell commands or malicious scripts via node -e or node -r despite the task intending to be read-only inspection.",
+      "fix": "Restrict allowedTools to specific non-arbitrary invocations (e.g., exact node command lines running the resolver tools/rules.mjs) rather than open wildcards.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "SecurityReliability",
+      "isGating": false
+    },
+    {
+      "severity": "Major",
+      "category": "Ux",
+      "file": "tools/smoke-rules.mjs",
+      "line": 6,
+      "title": "Smoke CLI option parsing fails silently or misparses arguments due to a step-by-two loop over repeated flags",
+      "why": "The loop increments by `i += 2`, expecting pairs. When a user or documentation specifies multiple `--file` arguments consecutively (e.g. `--file src/Example.cs --file ui/Example.ts` as explicitly documented in ROLLOUT.md), `argv[i]` at index 0 is `--file`, `value` is `src/Example.cs`. On the next iteration `i = 2`, `argv[i]` is `--file`, so it takes `ui/Example.ts` as the value and pushes it. However, if a flag is passed without a pair or if flags are ordered with any single/odd argument, or when combined with optional flags, passing `--file a --file b --agent claude` causes fragile parsing: any slight difference in ordering or misplaced token throws an unhelpful 'Missing value' error naming the wrong token or crashes. Furthermore, `--agent` or `--repo` passed with an extra space or standard CLI variations leads to immediate exit with code 1 and no usage help, leaving the user with an ambiguous error message naming a symptom but not the accepted syntax.",
+      "fix": "Use a standard argument parsing loop (`while (argv.length)` / `for (let i = 0; i < argv.length; i++)`) that inspects whether each flag expects a value, increments dynamically, and provides a clear usage message on unknown/missing options.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Performance",
+      "file": "tools/lib/rule-smoke.mjs",
+      "line": 62,
+      "title": "Unbounded recursive directory traversal and synchronous whole-file hashing on snapshot blocks smoke startup and teardown",
+      "why": "In `snapshot()`, `ls-files` lists all cached and untracked files (`--others --exclude-standard`). If a repository has a large source tree, vendor directory, or untracked build artifacts with 10x files (e.g. 50,000 files in a monorepo or build output), `snapshot` runs synchronous `fs.readFileSync` and SHA256 hashing across every single file twice (before and after the 180s command). In a repository with large files or thousands of items, this synchronous loop blocks the Node event loop for dozens of seconds and allocates huge buffers for every untracked file.",
+      "fix": "Limit the snapshot scope to git index status and tracked files via `git status --porcelain=v1` or `git rev-parse HEAD` and `git diff-index`, avoiding reading and hashing all file contents on disk synchronously.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": true
+    },
+    {
+      "severity": "Minor",
+      "category": "Ux",
+      "file": "tools/lib/rule-smoke.mjs",
+      "line": 84,
+      "title": "Dead owner lock detection crashes on dead PID and forces manual filesystem surgery instead of providing a diagnostic recovery path",
+      "why": "When a previous smoke process crashed or was killed, `smoke()` inspects `owner.pid`. When `process.kill(owner.pid, 0)` throws `ESRCH` (meaning the previous process is dead), the code explicitly throws: `Previous smoke owner ${owner.pid} is dead; run incomplete. Inspect ${report}, then recover its named .lock/.tmp files before retrying`. The user is blocked and must manually locate git internal metadata paths (which are hidden under `.git/rules-smoke/...` in a worktree) and delete `.lock` files, with no automated `--clean` or `--force` flag provided by `smoke-rules.mjs`.",
+      "fix": "Provide a `--force` or `--clean` CLI option to `smoke-rules.mjs` or instruct the exact command to unlock/clean stale lockfiles when ESRCH is detected.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": false
+    },
+    {
+      "severity": "Major",
+      "category": "Convention",
+      "file": "tools/gate-snippet-check.mjs",
+      "line": 123,
+      "title": "Missing validation for canonical file in new neutral mount",
+      "why": "The rule `common/coai-review-gate.md` is now expected to be at `.agents/conventions/common/coai-review-gate.md`. The diff adds a check for multiple mounts but does not verify that the canonical file actually exists in the new neutral mount location before passing. If the new mount is empty or missing the file, the check passes silently, violating the rule that the canonical source must be present.",
+      "fix": "Add a check to ensure the canonical file exists at the new neutral mount path before allowing the check to pass, or explicitly handle the case where the canonical file is missing from the new mount but present in old trees.",
+      "providers": [
+        "local"
+      ],
+      "role": "Conventions",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Convention",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 105,
+      "title": "Missing validation for existing neutral mount in migration plan",
+      "why": "The rule states that `newMount` must be unique and not conflict with existing mounts. The diff adds logic to check for existing instruction sources but does not explicitly validate that the `NEW_MOUNT` path (`.agents/conventions`) is not already present in the repository before the migration begins. This could lead to a migration overwriting an existing neutral mount without explicit reconciliation.",
+      "fix": "Ensure that the `migrationPlan` function validates that the `NEW_MOUNT` path is not already in use before proceeding, or explicitly handles the case where it exists.",
+      "providers": [
+        "local"
+      ],
+      "role": "Conventions",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Convention",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 145,
+      "title": "Missing validation for removal of old mount after migration",
+      "why": "The rule requires that the old mount (`.claude/rules/shared`) be removed after the migration. The diff adds logic to move the submodule but does not explicitly validate that the old mount path is removed after the migration is complete. This could lead to a situation where both old and new mounts exist, violating the rule of having a single canonical source.",
+      "fix": "Add a check to ensure that the `OLD_MOUNT` path is removed after the migration is complete, or explicitly handle the case where it remains.",
+      "providers": [
+        "local"
+      ],
+      "role": "Conventions",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Convention",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 135,
+      "title": "Missing validation for CLAUDE.md update after migration",
+      "why": "The rule requires that `CLAUDE.md` be updated to reference the new `PROJECT.md` file after the migration. The diff adds logic to rewrite the `CLAUDE.md` file but does not explicitly validate that the reference to `PROJECT.md` is correctly updated. This could lead to a situation where `CLAUDE.md` still references the old path, violating the rule of having a single canonical source.",
+      "fix": "Add a check to ensure that the `CLAUDE.md` file is updated to reference the new `PROJECT.md` file after the migration is complete.",
+      "providers": [
+        "local"
+      ],
+      "role": "Conventions",
+      "isGating": true
+    },
+    {
+      "severity": "Blocking",
+      "category": "Architecture",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 68,
+      "title": "Disposable worktree output path validation allows overlap with source checkout",
+      "why": "The `migrationPlan` function resolves the `output` path relative to its parent directory but compares it against the `root` (consumer). If a user runs the migration tool from within the `dew_flow_conventions` repository itself (or a sibling), the `output` path could resolve to a location inside the source checkout. The `applyMigration` function then creates a worktree there, potentially overwriting source files or creating a nested structure that breaks the 'source checkout stays untouched' invariant, leading to a corrupted conventions repo during a consumer migration.",
+      "fix": "Add a check in `migrationPlan` to verify that the `output` directory is not a sibling or child of the `conventions` source checkout, preventing accidental overwrites or circular dependencies during the disposable worktree creation.",
+      "providers": [
+        "local"
+      ],
+      "role": "Architecture",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Reliability",
+      "file": "tools/lib/proc.mjs",
+      "line": 72,
+      "title": "Race condition in process containment cleanup may leave zombie descendants",
+      "why": "In `tools/lib/proc.mjs`, the `signal` listener is removed inside the `child.on('close')` handler. If the `signal` is aborted (e.g., by a timeout) *after* the child process has closed but *before* the `close` event fires, the `cancel` function (which calls `killTree`) might be called, but the `signal` listener removal happens too late. More critically, if the child exits and the `close` handler runs, but the `signal` was already aborted, the `killTree` call inside `cancel` might be missed if the logic relies on the order of events. Specifically, if `signal?.aborted` is true at the start, `cancel` is called immediately. If the child exits *after* `cancel` but *before* `killTree` completes (due to async nature of `spawn`), the descendant might not be killed if `killTree` relies on the child's PID which might be stale or if the job handle isn't properly closed. The specific regression noted in the plan (Windows Process.Start not inheriting job) is addressed by explicit assignment, but the",
+      "fix": "Ensure `killTree` is called on the `child` process *before* the `signal` listener is removed in the `close` handler, or explicitly handle the case where `signal` aborts after `close` has fired but before the promise resolves.",
+      "providers": [
+        "local"
+      ],
+      "role": "Architecture",
+      "isGating": true
+    },
+    {
+      "severity": "Minor",
+      "category": "Performance",
+      "file": "tools/lib/rule-smoke.mjs",
+      "line": 10,
+      "title": "Inefficient source read verification logic in smoke harness",
+      "why": "The `traceEvidence` function in `tools/lib/rule-smoke.mjs` iterates over `normalized` outputs for *each* expected rule to check if it's present. If the output is large (e.g., 256 KiB) and there are many rules, this results in O(N*M) string scanning where N is the number of rules and M is the number of output chunks. A single pass over the output with a set of expected hashes would be O(N+M), significantly reducing CPU time for large rule sets and preventing potential timeouts in the 180-second smoke test window.",
+      "fix": "Replace the `traceEvidence` function's `outputs.map` with a single pass that checks for the presence of the rule hash and text simultaneously, avoiding multiple string traversals for large outputs.",
+      "providers": [
+        "local"
+      ],
+      "role": "Architecture",
+      "isGating": false
+    },
+    {
+      "severity": "Blocking",
+      "category": "Security",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 68,
+      "title": "Disposable worktree output can overwrite source checkout if paths resolve identically",
+      "why": "The migration tool creates a new worktree at `output` based on `base`. If a user passes a relative path for `output` that resolves to the same directory as `root` (e.g., running from the root and passing `--output .` or a sibling path that resolves to the same inode), the `git worktree add` command could overwrite the source checkout's working tree or index. The code checks `realDestination === realRoot` but uses `fs.realpathSync` which resolves symlinks. If the user passes a path like `../sibling-repo` where `sibling-repo` is actually a symlink to `root`, the check might pass, but the worktree creation could corrupt the source. More critically, if `output` is a subdirectory of `root` (e.g., `--output .agents/conventions`), the tool might try to add a worktree inside the source checkout, potentially overwriting files or creating a circular reference if not handled carefully. The check `realDestination.startsWith(realRoot+path.sep)` is present, but if `output` is `.` (current dir), it's",
+      "fix": "Add a check to ensure the `output` directory is strictly outside the `root` directory, or vice versa, to prevent the migration tool from overwriting the source checkout if the user passes a relative path that resolves to the same tree.",
+      "providers": [
+        "local"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Reliability",
+      "file": "tools/lib/proc.mjs",
+      "line": 56,
+      "title": "Signal listener leak if process exits before listener is attached",
+      "why": "The code adds a signal listener for `SIGINT` and `SIGTERM` to cancel the process. If the process is killed by a signal before the `try` block completes (e.g., during the `run` call), the listener might not be removed, leading to a potential memory leak or double-cancellation if the process is restarted. The `finally` block removes the listener, but if the `try` block throws an error before the listener is added (e.g., in `run`), the listener might not be removed. The code should ensure the listener is always removed, even if an error occurs before it's added.",
+      "fix": "Ensure the `signal` listener is removed in the `finally` block or use a `try/finally` structure that guarantees cleanup even if an error occurs before the listener is added.",
+      "providers": [
+        "local"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Security",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 72,
+      "title": "Unvalidated SHA parameter can lead to unexpected behavior or injection",
+      "why": "The `sha` parameter is used in `git rev-parse` to resolve the conventions commit. If the user passes a malicious or malformed SHA (e.g., `HEAD~1000000` or a path with special characters), the `git` command might resolve to an unexpected commit or throw an error. The code checks for `--verify` but doesn't validate the format of the `sha` string before passing it to `git`. This could lead to a situation where the migration tool uses an unintended commit, potentially overwriting files or creating a broken state.",
+      "fix": "Add a check to ensure the `sha` parameter is a valid commit SHA before using it in `git rev-parse`.",
+      "providers": [
+        "local"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Reliability",
+      "file": "tools/lib/rule-smoke.mjs",
+      "line": 78,
+      "title": "Lock file can be a symlink, leading to race conditions or stale locks",
+      "why": "The code checks if the `lock` file is a symlink and throws an error if it is. However, if the `lock` file is created as a symlink by a previous run (e.g., due to a bug or manual intervention), the check might not catch it if the symlink points to a valid file. This could lead to a situation where the lock is acquired by a different process, causing race conditions or stale locks. The code should ensure the `lock` file is a regular file before acquiring it.",
+      "fix": "Add a check to ensure the `lock` file is not a symlink before acquiring it.",
+      "providers": [
+        "local"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Security",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 68,
+      "title": "Output directory might not be writable, leading to migration failure",
+      "why": "The code creates the `output` directory using `fs.mkdirSync` with `{recursive:true}`. If the directory is not writable (e.g., due to permissions or a read-only filesystem), the migration tool might fail silently or throw an error. The code should check if the directory is writable before attempting to create it, or handle the error gracefully.",
+      "fix": "Add a check to ensure the `output` directory is writable before creating it.",
+      "providers": [
+        "local"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Blocking",
+      "category": "Ux",
+      "file": "tools/lib/rule-smoke.mjs",
+      "line": 108,
+      "title": "Smoke evidence truncates model output before behavioral review, hiding failures",
+      "why": "The `smoke` function caps output at 256 KiB (line 108) but the `traceEvidence` function (line 10) only stores the first 12,000 characters of the final answer (`final:final.slice(0,12000)`). If a model's reasoning or constraint explanation exceeds 12 KiB, the evidence file records `finalTruncated: true` but the reviewer sees only a partial answer. A specific failure where the model correctly identifies a rule but fails to apply a specific constraint in the last 500 lines of its response will be recorded as 'source reads verified' (because the read succeeded) but the behavioral review will miss the error.",
+      "fix": "Increase the `maxOutputBytes` limit in `run()` calls or the `traceBytes` cap in `traceEvidence` to accommodate full model transcripts, or explicitly truncate and log the truncation point before the 32 KiB slot limit.",
+      "providers": [
+        "local"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Performance",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 45,
+      "title": "Migration tool loads entire repository history into memory for every rule check",
+      "why": "The `migrationPlan` function calls `blob(root, baseSha, file)` (line 45) for every file in the repository to check for legacy mount references. If a consumer repository has 10,000 files and the base commit is large, this creates 10,000 separate `git show` calls, each loading the full file content into a string. For a repository with large binary assets or long history, this will cause O(N) memory growth and O(N^2) disk I/O, potentially causing the process to swap or crash on large repos.",
+      "fix": "Stream the `blob` content or use `git cat-file -p` with a buffer limit instead of loading the entire file into memory for every rule.",
+      "providers": [
+        "local"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Reliability",
+      "file": "tools/lib/proc.mjs",
+      "line": 58,
+      "title": "Process containment may fail to kill descendants if spawn fails mid-flight",
+      "why": "The `run` function attaches a `child.on('error')` handler (line 58) that sets `spawnError`, but if the error occurs after the process has started but before the `close` event fires (e.g., a race condition in Windows job assignment), the `killTree` call in the `close` handler (line 63) might not be triggered if the process exits immediately. If the child process spawns a descendant that inherits the job handle, and the parent exits without explicitly closing the job, the descendant could survive as a zombie process, stranding resources.",
+      "fix": "Add a fallback mechanism to handle `spawnError` if the process exits before the `close` event fires, or ensure `killTree` is called on the `error` event.",
+      "providers": [
+        "local"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": true
+    },
+    {
+      "severity": "Minor",
+      "category": "Architecture",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 85,
+      "title": "Migration tool accepts symlinked output directories, risking data loss",
+      "why": "The `applyMigration` function (line 85) creates the output directory with `fs.mkdirSync` but does not check if the path is a symlink. If a user passes a symlinked path (e.g., `--output /mnt/linked/worktree`), the tool might create the worktree inside the symlink target, potentially overwriting data in an unexpected location or leaving the original symlink dangling if the target is removed.",
+      "fix": "Add a validation step to ensure the `output` directory is not a symlink before creating the worktree.",
+      "providers": [
+        "local"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": false
+    },
+    {
+      "severity": "Minor",
+      "category": "Ux",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 130,
+      "title": "Migration tool lacks a safe preview of Git operations before mutation",
+      "why": "The `applyMigration` function (line 130) performs multiple `git` commands (submodule update, checkout, mv, add) without a dry-run mode. If a user runs `--apply` on a large repository with a slow network connection, they might not see any output until the operation completes. If it fails halfway, the worktree is left in an inconsistent state (e.g., submodule moved but not added), requiring manual recovery.",
+      "fix": "Add a `--dry-run` flag to `applyMigration` that prints the exact commands to be run without executing them.",
+      "providers": [
+        "local"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": false
+    },
+    {
+      "severity": "Major",
+      "category": "Architecture",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 7,
+      "title": "The migration leaves legacy mount references outside three hardcoded file classes.",
+      "why": "A consumer operational script such as `tools/check-rules.mjs` containing `.claude/rules/shared/tools/...` is migrated successfully, but the old submodule is moved and the script still points at the removed path, so the migrated consumer fails at runtime while the migration report omits the stale reference.",
+      "fix": "Implement the plan's explicit operational-script allowlist and scan/report every remaining legacy reference, failing preflight when an executable or operational reference is neither rewritten nor explicitly classified.",
+      "providers": [
+        "codex"
+      ],
+      "role": "Architecture",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Architecture",
+      "file": "tools/lib/rule-smoke.mjs",
+      "line": 64,
+      "title": "Smoke selects the resolver from the presence of ENTRY.md instead of the resolver's actual location.",
+      "why": "A migrated consumer with the required root `ENTRY.md` but only `.agents/conventions/tools/rules.mjs` causes smoke to invoke nonexistent `tools/rules.mjs` before starting the native CLI; if a stale root resolver exists, smoke can instead validate the wrong source.",
+      "fix": "Select the resolver by checking the actual mounted resolver path (and optionally a real root resolver), then require the selected path to exist and verify it belongs to the mounted gitlink.",
+      "providers": [
+        "codex"
+      ],
+      "role": "Architecture",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Architecture",
+      "file": "tools/gate-snippet-check.mjs",
+      "line": 120,
+      "title": "The gate checker does not detect a neutral conventions copy unless it is declared as a submodule mount.",
+      "why": "If `.agents/conventions` is a tracked ordinary directory containing `common/coai-review-gate.md` and `.gitmodules` has no neutral gitlink, it is absent from `mounts` and `rulesMounts`, so the checker can treat the consumer as unadopted and pass despite the plan requiring one canonical mounted source.",
+      "fix": "Inspect `.agents/conventions` independently of `.gitmodules`, require it to be a gitlink at the expected path, and reject ordinary directories or vendored copies as invalid mounts.",
+      "providers": [
+        "codex"
+      ],
+      "role": "Architecture",
+      "isGating": true
+    },
+    {
+      "severity": "Blocking",
+      "category": "Security",
+      "file": "tools/lib/rule-smoke.mjs",
+      "line": 45,
+      "title": "Claude smoke runs with unrestricted Node and shell execution on the host",
+      "why": "A malicious instruction in the disposable repository can prompt Claude to run `node -e` through `Bash(node *)`, read host credentials or environment data, and exfiltrate it over the network; `--no-session-persistence` and a disposable worktree do not contain the process.",
+      "fix": "Run the CLI inside an OS sandbox with repository-only read access and networking disabled, or remove Bash entirely and enforce repository-scoped tool paths.",
+      "providers": [
+        "codex"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Security",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 78,
+      "title": "The migration accepts any locally reachable conventions commit as an approved policy source",
+      "why": "Passing `--sha` for an attacker-created commit present in the local conventions checkout succeeds because only local object existence is checked; the resulting consumer gitlink then publishes unreviewed instructions that native agents will trust.",
+      "fix": "Require the selected SHA to be reachable from an explicitly configured trusted remote/ref or an approved commit allowlist/signature before allowing apply.",
+      "providers": [
+        "codex"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Reliability",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 110,
+      "title": "Migration silently drops dirty edits to committed instruction inputs",
+      "why": "If `CLAUDE.md` or a tracked local rule has an uncommitted edit, the plan reads `git show <base>:...` and creates the output from that old committed body, so publishing the prepared worktree omits the person's current policy change even though the source checkout remains dirty.",
+      "fix": "Fail preflight when migration inputs or `.gitmodules` are dirty, or explicitly merge those working-tree edits into the generated patches and report conflicts.",
+      "providers": [
+        "codex"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Blocking",
+      "category": "Ux",
+      "file": "tools/lib/rule-migration.mjs",
+      "line": 84,
+      "title": "Migration rejects every nested committed local rule as untracked",
+      "why": "The base tree is listed without `-r`, so `files` contains only top-level entries. `actualPolicies` then walks `.claude/rules` and treats any nested committed rule such as `.claude/rules/common/deep/local.md` as untracked, causing dry-run to fail for normal consumers.",
+      "fix": "List the base tree recursively, for example by adding `-r` to the `git ls-tree` invocation.",
+      "providers": [
+        "codex"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Performance",
+      "file": "tools/lib/rule-smoke.mjs",
+      "line": 51,
+      "title": "Each smoke run synchronously hashes the entire checkout twice",
+      "why": "A consumer with 100,000 tracked files or 10 GB of source causes `snapshot` to read and hash every file before and after the native CLI, adding two full-disk passes and blocking the Node process before any result is shown.",
+      "fix": "Limit the snapshot to Git/index state and the instruction and requested paths, or stream only the bounded paths needed to detect smoke mutations.",
+      "providers": [
+        "codex"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": true
+    },
+    {
+      "severity": "Minor",
+      "category": "Ux",
+      "file": "tools/lib/rule-smoke.mjs",
+      "line": 102,
+      "title": "A native smoke run provides no live progress while its output is captured",
+      "why": "When the CLI takes several minutes or reaches the documented 180-second deadline, `run` captures stdout/stderr and the command prints nothing until completion, so the person invoking the harness sees an apparently hung process despite the work continuing.",
+      "fix": "Print an initial phase/status and periodic heartbeat (or expose the latest report status) while retaining bounded captured output.",
+      "providers": [
+        "codex"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": false
+    }
+  ],
+  "session": "3f126e89",
+  "verdict": "revise",
+  "status": "All findings resolved; accepted fixes implemented and tested. Final code round pending.",
+  "decisions": [
+    {
+      "finding": 0,
+      "action": "reject",
+      "reason": "Per-command local URL supports offline object reuse; git submodule sync restores the declared remote. .gitmodules retains its URL. Fresh-clone/init tests and the coai mount verify it."
+    },
+    {
+      "finding": 1,
+      "action": "accept",
+      "reason": "Add explicit CLI location overrides and portable executable discovery without installs/login."
+    },
+    {
+      "finding": 2,
+      "action": "reject",
+      "reason": "Only unscoped sources take this path, so all tasks preserve their original applicability. Scoped frontmatter is refused."
+    },
+    {
+      "finding": 3,
+      "action": "reject",
+      "reason": "The C# is inside an expanding PowerShell here-string. Backticks escape dollar signs there and never reach Regex.Replace. Real argv tests cover quotes, spaces, trailing backslashes, empty strings, Unicode and shell-looking literals; no shell evaluates argv."
+    },
+    {
+      "finding": 4,
+      "action": "reject",
+      "reason": "Git receives one -c key=value argv element, not config source or shell text. Section names are validated and source resolves to an existing Git checkout."
+    },
+    {
+      "finding": 5,
+      "action": "reject",
+      "reason": "Dead owners produce an explicit incomplete diagnostic naming the report and recovery files. This one-shot tool does not promise automatic retries. Read-then-delete recovery was deliberately removed to avoid deleting a concurrently acquired lock."
+    },
+    {
+      "finding": 6,
+      "action": "reject",
+      "reason": "Both save(initial) and save(outcome) are inside try/finally in the reviewed commit; finally removes the lock. The claimed ordering does not exist."
+    },
+    {
+      "finding": 7,
+      "action": "reject",
+      "reason": "Both bodies normalize CRLF to LF. Protected-settings integration passes on Windows and WSL."
+    },
+    {
+      "finding": 8,
+      "action": "accept",
+      "reason": "Narrow automatic Bash permission to resolver operations; document trusted-repository scope, not OS sandbox guarantees."
+    },
+    {
+      "finding": 9,
+      "action": "reject",
+      "reason": "Every supported flag takes one value; repeated file pairs work in the actual two-file smoke. Missing/unknown arguments fail explicitly. Add help as a usability improvement."
+    },
+    {
+      "finding": 10,
+      "action": "accept",
+      "reason": "Bound snapshot reads rather than synchronously loading arbitrary large checkout files."
+    },
+    {
+      "finding": 11,
+      "action": "reject",
+      "reason": "Same explicit dead-owner recovery decision as finding 5; no infinite retry or silent success occurs."
+    },
+    {
+      "finding": 12,
+      "action": "reject",
+      "reason": "The existing missing-canonical guard now includes neutral mounts. A regression observes missing neutral mount failure before creating its canonical file."
+    },
+    {
+      "finding": 13,
+      "action": "reject",
+      "reason": "actualPolicies and committed-base validation both reject preexisting neutral instructions and mounts."
+    },
+    {
+      "finding": 14,
+      "action": "reject",
+      "reason": "Real integration verifies old path absence, .gitmodules, gitlink, and calls the mounted resolver which rejects residual legacy rules."
+    },
+    {
+      "finding": 15,
+      "action": "reject",
+      "reason": "CLAUDE is written as @AGENTS.md and verified by the actual resolver and integration test."
+    },
+    {
+      "finding": 16,
+      "action": "accept",
+      "reason": "Extend overlap refusal to the conventions source checkout as well as the consumer checkout."
+    },
+    {
+      "finding": 17,
+      "action": "reject",
+      "reason": "Node handlers execute serially; abort registration precedes an aborted-state check, removal happens on close. Windows atomically assigns a non-inherited job, Linux kills the group. Real tests observe descendant disappearance and deadline wall time."
+    },
+    {
+      "finding": 18,
+      "action": "reject",
+      "reason": "The scan is bounded by 256 KiB trace and 256 rules; no measured throughput issue warrants a second matching algorithm."
+    },
+    {
+      "finding": 19,
+      "action": "reject",
+      "reason": "Resolved ancestry, Windows case normalization and existing-destination refusal already reject equal/child consumer paths. Accepted finding 16 adds the conventions-source boundary."
+    },
+    {
+      "finding": 20,
+      "action": "reject",
+      "reason": "Async callbacks cannot run between synchronous spawn and listener registration in this JS turn. Close removes the listener; aborted-state check handles prior cancellation."
+    },
+    {
+      "finding": 21,
+      "action": "reject",
+      "reason": "rev-parse --verify --end-of-options resolves both revisions as commits; invalid SHA is tested. References are argv, not shell code."
+    },
+    {
+      "finding": 22,
+      "action": "reject",
+      "reason": "lstat detects a symlink even with a valid target, and wx refuses a raced existing link. The proposed guard already exists."
+    },
+    {
+      "finding": 23,
+      "action": "reject",
+      "reason": "Nonwritable output is an explicit filesystem/Git failure, with original files untouched. access prechecks cannot eliminate permission races."
+    },
+    {
+      "finding": 24,
+      "action": "reject",
+      "reason": "Status explicitly separates source reads from behavioral review and records finalTruncated. Archived evidence explicitly declines behavioral completion; increasing trace limits does not prove behavior."
+    },
+    {
+      "finding": 25,
+      "action": "reject",
+      "reason": "ls-tree enumerates one bounded tree, not repository history. Blob output is bounded. The claimed history load does not occur."
+    },
+    {
+      "finding": 26,
+      "action": "reject",
+      "reason": "Failed spawn has no child tree. A started Windows child is atomically in its job; the job handle is excluded from inherited handles. The proposed failure mechanism cannot occur."
+    },
+    {
+      "finding": 27,
+      "action": "reject",
+      "reason": "Existing output is refused and ancestor symlinks resolve before overlap validation. No recursive deletion or overwrite is involved."
+    },
+    {
+      "finding": 28,
+      "action": "reject",
+      "reason": "Dry-run is already the default and reports base, SHA, output, branch, mounts and exact changed paths/hashes before apply."
+    },
+    {
+      "finding": 29,
+      "action": "accept",
+      "reason": "Add explicit extra operational paths and a bounded report of remaining legacy references; keep historical evidence unchanged."
+    },
+    {
+      "finding": 30,
+      "action": "accept",
+      "reason": "Prefer the actual mounted resolver; ENTRY existence alone cannot identify source-repository mode."
+    },
+    {
+      "finding": 31,
+      "action": "accept",
+      "reason": "Reject undeclared neutral directories; retain gitlink verification in the resolver."
+    },
+    {
+      "finding": 32,
+      "action": "accept",
+      "reason": "Remove broad Bash(node *) auto-allow and permit only required resolver operations. Document host policy as the boundary; hostile-repository OS sandboxing is outside this trusted-repository rollout."
+    },
+    {
+      "finding": 33,
+      "action": "reject",
+      "reason": "The user selects a reviewed SHA; the tool prepares local reviewable work and never publishes or grants approval. Remote-only enforcement would prohibit the planned prepublication canary. Publishing still requires remote availability."
+    },
+    {
+      "finding": 34,
+      "action": "reject",
+      "reason": "Migrating a named committed base while preserving dirty source work is the accepted design. Importing uncommitted work would violate it. Report dirty migration inputs explicitly instead."
+    },
+    {
+      "finding": 35,
+      "action": "reject",
+      "reason": "The command already uses -rz, which includes recursive -r. The real nested common/deep/local.md fixture migrates on both platforms."
+    },
+    {
+      "finding": 36,
+      "action": "accept",
+      "reason": "Apply the same bounded-snapshot fix as finding 10; state the scope and limits."
+    },
+    {
+      "finding": 37,
+      "action": "accept",
+      "reason": "Emit start and periodic progress on stderr, reserving stdout for final JSON."
+    }
+  ],
+  "gatingCount": 30,
+  "finalRound": {
+    "session": "3f126e89",
+    "base": "026b20e4f933d318adbaedba755b4ecf0801683a",
+    "head": "5f683aa3a49177d83d21db0e53307effdddd702f",
+    "result": {
+      "verdict": "proceed",
+      "gatingCount": 5,
+      "threshold": 5,
+      "reviewers": "all 3 reviewers answered",
+      "findings": [
+        {
+          "severity": "Major",
+          "category": "Architecture",
+          "file": "tools/lib/rule-smoke.mjs",
+          "line": 40,
+          "title": "Smoke evidence accepts canonical-looking text from any successful tool output",
+          "why": "If a model reads a duplicate file containing the expected BEGIN/END wrapper, or emits that wrapper through another successful command, `normalized.some(...)` marks the rule read even though the mounted resolver was never invoked. The harness then reports verified source reads from the wrong source.",
+          "fix": "Record the resolver command or source path for each tool event and accept evidence only from successful invocations of the mounted resolver for the expected rule.",
+          "providers": [
+            "codex"
+          ],
+          "role": "Architecture",
+          "isGating": true
+        },
+        {
+          "severity": "Major",
+          "category": "Architecture",
+          "file": "tools/gate-snippet-check.mjs",
+          "line": 130,
+          "title": "The gate checker passes a partially migrated neutral layout with no conventions mount",
+          "why": "A checkout containing `.agents/PROJECT.md` or `.agents/rules` but no `.agents/conventions` has `rulesMounts.length === 0`; the missing-canonical failure is therefore skipped and the checker exits successfully, leaving the migrated consumer without its shared source.",
+          "fix": "When neutral instruction paths are present, require exactly one declared `.agents/conventions` mount and fail if it is absent.",
+          "providers": [
+            "codex"
+          ],
+          "role": "Architecture",
+          "isGating": true
+        },
+        {
+          "severity": "Major",
+          "category": "Architecture",
+          "file": "tools/lib/rule-smoke.mjs",
+          "line": 4,
+          "title": "Smoke harness imports internal implementation details from migration module instead of shared utility abstractions",
+          "why": "tools/lib/rule-smoke.mjs imports git from tools/lib/rule-migration.mjs. rule-migration is an application-level migration workflow component, whereas rule-smoke is an inspection and test harness component. Making smoke depend on migration couples verification to migration internals, rather than having both depend on a lower-level git runner or shared library.",
+          "fix": "Extract the git runner helper into a dedicated lower-level module (such as tools/lib/git.mjs or tools/lib/proc.mjs) and import it independently in both rule-migration.mjs and rule-smoke.mjs.",
+          "providers": [
+            "gemini"
+          ],
+          "role": "Architecture",
+          "isGating": true
+        },
+        {
+          "severity": "Major",
+          "category": "Architecture",
+          "file": "tools/lib/rule-smoke.mjs",
+          "line": 39,
+          "title": "smokeResolver couples smoke harness to self-host conventions repository layout and bootstrap internals",
+          "why": "smokeResolver inspects bootstrap('ENTRY.md') and checks AGENTS.md in the target consumer repository root to decide if it is in source-repository mode. If a consumer repository has its own ENTRY.md or AGENTS.md that doesn't match the exact string bootstrap('ENTRY.md'), or if conventions is hosted in a layout where tools/rules.mjs exists alongside another bootstrap, smoke throws an incomplete loading error. The resolver discovery should be mediated by checking the mounted conventions directory (.agents/conventions/tools/rules.mjs) or an explicit resolver path, rather than reaching into the root repository's adapter text to inspect conventions' own bootstrap template.",
+          "fix": "Separate target repository inspection from source repo bootstrap matching; determine consumer resolver solely via the mounted path (.agents/conventions/tools/rules.mjs) and let source-mode resolution be explicitly configured or isolated to self-tests.",
+          "providers": [
+            "gemini"
+          ],
+          "role": "Architecture",
+          "isGating": true
+        },
+        {
+          "severity": "Minor",
+          "category": "Architecture",
+          "file": "tools/lib/rule-migration.mjs",
+          "line": 12,
+          "title": "movedPath encapsulates both mount path translation and rule tree translation into a single leaky helper",
+          "why": "movedPath performs rewriteMount (substituting OLD_MOUNT with NEW_MOUNT) and immediately chains a regex replacement of .claude/rules/ with .agents/rules/. When called from rebaseLinks, links pointing to arbitrary targets inside the old mount or arbitrary files under .claude/rules are conflated. If an instruction references a non-rule file under .claude/rules/shared, rewriteMount translates it to .agents/conventions, but the subsequent replace can corrupt any path containing matching directory prefixes.",
+          "fix": "Separate rule relocation logic from submodule mount relocation logic so paths within the submodule mount and paths within the local rule tree are transformed by distinct, non-overlapping functions.",
+          "providers": [
+            "gemini"
+          ],
+          "role": "Architecture",
+          "isGating": false
+        },
+        {
+          "severity": "Blocking",
+          "category": "Architecture",
+          "file": "tools/lib/rule-migration.mjs",
+          "line": 139,
+          "title": "applyMigration bypasses the requested conventions submodule checkout by using the local source path as URL override",
+          "why": "Line 139 runs `git submodule update --init` in the output worktree with `-c submodule.${plan.mount.name}.url=${plan.source}`. When a migration is run against a consumer that needs to be deployed, committed, or cloned in CI/remote environments, the worktree git configuration records or pulls from the local source directory rather than the consumer's real repository remote or the approved conventions remote. Furthermore, any subsequent `git submodule update` or fresh clone in a clean environment will fail or diverge because the submodule checkout relies on the caller machine's local directory path rather than synchronizing from the configured origin URL.",
+          "fix": "Use the actual configured remote URL for the submodule fetch or clone, ensuring that only the target commit (`newSha`) is detached without binding submodule origin or cache configuration to the local migration source path.",
+          "providers": [
+            "local"
+          ],
+          "role": "Architecture",
+          "isGating": true
+        },
+        {
+          "severity": "Major",
+          "category": "Architecture",
+          "file": "tools/lib/rule-smoke.mjs",
+          "line": 39,
+          "title": "nativeCli hardcodes user-level global paths for Codex and Claude CLI entrypoints, breaking portability across hosts and environments",
+          "why": "On Windows, line 39 looks for Codex at `process.env.APPDATA + '/npm/node_modules/@openai/codex/bin/codex.js'` and line 43 looks for Claude at `process.env.USERPROFILE + '/.local/bin/claude.exe'`. If an agent CLI is installed via Volta, nvm, pnpm, scoop, winget, yarn, or in standard PATH locations, `nativeCli` throws an unrecoverable error ('Installed native Codex npm entry not found') or attempts to execute an absent executable, even when the CLI is available and functional in PATH.",
+          "fix": "Resolve CLI executables dynamically using PATH lookup (such as `where.exe` / `which` or searching standard PATH directories) before falling back to default vendor install locations.",
+          "providers": [
+            "local"
+          ],
+          "role": "Architecture",
+          "isGating": true
+        },
+        {
+          "severity": "Minor",
+          "category": "Architecture",
+          "file": "tools/lib/rule-migration.mjs",
+          "line": 114,
+          "title": "Local rule migration assigns all supported tasks regardless of the rule's original scope or domain",
+          "why": "When migrating unscoped `.claude/rules/*.md` files into `.agents/rules/`, line 114 injects `tasks: Object.keys(TASKS)`. This forces every local rule to be loaded and evaluated across all tasks (inspect, test, refactor, implement, etc.), defeating task-scoped selection and polluting model context windows during focused tasks where those rules are irrelevant.",
+          "fix": "Preserve explicit task mappings or leave `tasks` unconstrained/empty unless specifically declared, or provide a CLI parameter to configure default task scopes per migrated rule.",
+          "providers": [
+            "local"
+          ],
+          "role": "Architecture",
+          "isGating": false
+        }
+      ],
+      "discounted": [
+        {
+          "severity": "Blocking",
+          "category": "Architecture",
+          "file": "tools/lib/rule-migration.mjs",
+          "line": 139,
+          "title": "applyMigration bypasses the requested conventions submodule checkout by using the local source path as URL override",
+          "why": "Line 139 runs `git submodule update --init` in the output worktree with `-c submodule.${plan.mount.name}.url=${plan.source}`. When a migration is run against a consumer that needs to be deployed, committed, or cloned in CI/remote environments, the worktree git configuration records or pulls from the local source directory rather than the consumer's real repository remote or the approved conventions remote. Furthermore, any subsequent `git submodule update` or fresh clone in a clean environment will fail or diverge because the submodule checkout relies on the caller machine's local directory path rather than synchronizing from the configured origin URL.",
+          "fix": "Use the actual configured remote URL for the submodule fetch or clone, ensuring that only the target commit (`newSha`) is detached without binding submodule origin or cache configuration to the local migration source path.",
+          "providers": [
+            "local"
+          ],
+          "role": "Architecture",
+          "isGating": true
+        }
+      ],
+      "rejectedEntries": [],
+      "instruction": "The gate passed. Record a decision for EVERY finding via resolve (rejections need reasons); the next stage opens after that.",
+      "cost": {
+        "tokensIn": 171401,
+        "tokensOut": 11530
+      },
+      "commands": [
+        "Work AUTONOMOUSLY. Say that you are working autonomously, and keep saying what you are writing right now as you go. Autonomous means these orders, not a mood: (1) every bug and every problem spot gets a RED-GREEN-RED test — a failing test first, then the fix, then the test green, then a check that the test really fails without the fix; (2) the documentation is updated with every change — the README, the manifest if there is one, the module docs and every other file that describes what you changed; (3) before any release, run ALL the tests that exist, not only the ones near your change; (4) if the repository has a release or pull request process, do it — and on a pull request, wait about five minutes, then check whether automatic comments appeared, read them and fix what they name; (5) if a deploy triggers automatically, verify the result against the target environment — dev, stage or test — and read its logs for errors before calling it done; (6) re-read your own code against the repository's rules and follow them, not only the ones you remember. A question that does not block you is not asked now: write it down and put every one of them at the END of your final summary. A question that DOES block you is asked at once — but before you ask it, re-read every epic and story you have written so far and gather every other blocking question you can foresee, so the person is interrupted once with all of them rather than repeatedly with one. Where you can proceed under a stated assumption, do that instead of asking, and say what you assumed."
+      ],
+      "commandsPreamble": "COMMANDS from the operator of this gate. They come from switches a person set in the panel and they outrank your own defaults for this task. Follow them, and say in your summary which ones you applied."
+    },
+    "resolvedStage": "Done",
+    "decisions": [
+      {
+        "finding": 0,
+        "action": "accept",
+        "reason": "Correlate successful command output with a recognized invocation of the selected resolver. Claude tool_result ids must match Bash tool_use ids. Regression reproduced false acceptance of a duplicate command's body."
+      },
+      {
+        "finding": 1,
+        "action": "accept",
+        "reason": "Neutral PROJECT/rules with no declared neutral mount now fail. Source-repository execution is explicitly distinguished by the installed tool root. Regression reproduced the false unadopted result."
+      },
+      {
+        "finding": 2,
+        "action": "accept",
+        "reason": "Extract the existing bounded Git runner into tools/lib/git.mjs and reuse it from migration and smoke, retaining its timeout/output limits."
+      },
+      {
+        "finding": 3,
+        "action": "reject",
+        "reason": "The implementation checks the mounted resolver first. Only source-repository fallback requires the exact shared bootstrap, as the accepted contract specifies. Unrelated root ENTRY already has a passing regression; unsupported alternate layouts must report incomplete."
+      },
+      {
+        "finding": 4,
+        "action": "reject",
+        "reason": "The second replacement is anchored to ^.claude/rules/. After rewriteMount a shared target starts with .agents/conventions, so it cannot match that replacement. Link tests include shared and nested-local targets with preserved query/fragment. No corrupting example was supplied."
+      },
+      {
+        "finding": 5,
+        "action": "reject",
+        "reason": "Already disproved: the local URL is a per-command fetch override and git submodule sync restores the declared URL. .gitmodules retains the remote. Real fresh-clone/init/read and rollback scenarios pass."
+      },
+      {
+        "finding": 6,
+        "action": "reject",
+        "reason": "This describes superseded code. installedCli now searches native executables in PATH and accepts an explicit installed executable/JavaScript entry through --cli; defaults are fallback locations. Tests and a real CLI run cover the implementation."
+      },
+      {
+        "finding": 7,
+        "action": "reject",
+        "reason": "Legacy unscoped local policy applied to all tasks. Mapping it to all known tasks preserves that scope without inventing restrictions; scoped frontmatter is explicitly refused pending a deliberate mapping."
+      }
+    ]
+  }
+}

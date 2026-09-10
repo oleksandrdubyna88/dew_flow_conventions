@@ -1,8 +1,8 @@
 # `todo/` — open work on the shared rules
 
 Plans for work that is **not finished**, per [common/planning-docs.md](../common/planning-docs.md). A
-plan whose work has shipped moves to `research/` with an `IMPLEMENTED <date>` status; this repository
-has had nothing to promote yet, so that folder does not exist until the first promotion creates it.
+plan whose work has shipped moves to `research/` with an `IMPLEMENTED <date>` status.
+The current implementation is documented in [research](../research/README.md).
 
 A plan here is about the rules themselves or their rollout across the consumers. Work inside one
 consumer belongs in that repository's own `todo/`.

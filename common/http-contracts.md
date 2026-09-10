@@ -144,8 +144,8 @@ is the exit code, never the log tail:
 
 ```bash
 npm install --save-dev httpyac@6.16.7          # once, in the repository that has an API
-node .claude/rules/shared/tools/http-run.mjs   # 0 pass · 1 CONTRACT · 3 environment · 4 config · 5 no report
-node .claude/rules/shared/tools/http-run.mjs --tag prod --target https://live.example.com
+node .agents/conventions/tools/http-run.mjs   # 0 pass · 1 CONTRACT · 3 environment · 4 config · 5 no report
+node .agents/conventions/tools/http-run.mjs --tag prod --target https://live.example.com
 ```
 
 | Exit | Meaning | What you do |

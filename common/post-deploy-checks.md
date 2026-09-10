@@ -135,8 +135,8 @@ audiences.
 them is this rule in one command:
 
 ```bash
-node .claude/rules/shared/tools/post-deploy-check.mjs                    # CI: shape only, nothing is run
-node .claude/rules/shared/tools/post-deploy-check.mjs --target <value>   # after a deploy: the items, for real
+node .agents/conventions/tools/post-deploy-check.mjs                    # CI: shape only, nothing is run
+node .agents/conventions/tools/post-deploy-check.mjs --target <value>   # after a deploy: the items, for real
 ```
 
 Structural mode executes nothing and touches no network — it asks whether the file is there, still
