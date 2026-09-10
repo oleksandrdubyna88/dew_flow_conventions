@@ -1,3 +1,8 @@
+---
+id: "common.durable-status"
+load: "conditional"
+tasks: ["implement","ui","audit"]
+---
 # Durable status for status-changing actions (MANDATORY)
 
 Any button or action that changes the status of something or starts a process **must reflect the real,

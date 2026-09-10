@@ -1,3 +1,7 @@
+---
+id: "common.coding-style"
+load: "always"
+---
 # Coding Style
 
 ## Immutability (CRITICAL)

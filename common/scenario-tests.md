@@ -1,3 +1,8 @@
+---
+id: "common.scenario-tests"
+load: "conditional"
+tasks: ["implement","test","audit","policy"]
+---
 # Scenario tests — every repository has a harness of its own, and every flow is in it (MANDATORY)
 
 > [testing.md](testing.md) governs how a test is written, run and believed. This rule governs what must

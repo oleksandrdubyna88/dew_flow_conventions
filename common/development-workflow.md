@@ -1,3 +1,9 @@
+---
+id: "common.development-workflow"
+load: "conditional"
+tasks: ["plan","implement","docs","policy","test","pr","release","deploy","dependencies"]
+depends: ["common.reuse-first"]
+---
 # Development Workflow
 
 > Extends [git-workflow.md](git-workflow.md) with the process that happens before git operations.

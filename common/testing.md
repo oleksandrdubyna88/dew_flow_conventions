@@ -1,3 +1,8 @@
+---
+id: "common.testing"
+load: "conditional"
+tasks: ["implement","test","audit","policy","release"]
+---
 # Testing
 
 > **What must EXIST is a rule of its own.** Every repository owns a scenario harness — in the product's

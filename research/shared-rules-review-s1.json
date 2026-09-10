@@ -1,0 +1,657 @@
+{
+  "subject": "8c5a418b01988261cf974524149a523adddc25ea",
+  "stage": "S1 code review, round 1",
+  "verdict": "revise",
+  "reviewers": "all 12 reviewers answered",
+  "gatingCount": 22,
+  "findings": [
+    {
+      "severity": "Major",
+      "category": "Convention",
+      "file": "common/development-workflow.md",
+      "line": 5,
+      "title": "Rule `common.development-workflow` declares a dependency on `common.reuse-first` but the dependency is not listed in its frontmatter.",
+      "why": "The rule `common.development-workflow` explicitly states `depends: [\"common.reuse-first\"]` in its frontmatter (line 5), but the resolver logic expects this to be declared in the metadata to ensure transitive loading. The diff shows the `depends` key was added, but the value is missing or malformed in the provided diff context compared to the expected schema. Wait, looking closer at the diff: `depends: [\"common.reuse-first\"]` is present. The issue is that the rule `common.reuse-first` itself does not have a `depends` field, but that's fine. The real issue is that the rule `common.development-workflow` has `depends: [\"common.reuse-first\"]` but the `common.reuse-first` rule does not have a `load: always` or a matching condition to ensure it's loaded. Actually, looking at the diff for `common/reuse-first.md`, it has `load: conditional`. If the task doesn't match `common.reuse-first`'s tasks or paths, it won't load. The rule `common.development-workflow` requires `common.reuse-first` to be",
+      "fix": "Add `depends: [\"common.reuse-first\"]` to the frontmatter of `common/development-workflow.md`.",
+      "providers": [
+        "local"
+      ],
+      "role": "Conventions",
+      "isGating": true
+    },
+    {
+      "severity": "Blocking",
+      "category": "Architecture",
+      "file": "tools/rules.mjs",
+      "line": 68,
+      "title": "Resolver assumes mounted conventions is a directory with a `.git` folder, failing on worktrees or bare clones.",
+      "why": "The `revision` function at line 68 calls `git(repo,\"status\",...)` on the `sharedRoot` (the conventions repo itself) to check for dirty state. If the conventions repository is checked out as a worktree (where `.git` is a file pointing to the main repo) or a bare clone, `git status` may fail or behave unexpectedly, causing the entire instruction validation to fail with a generic error. This breaks the bootstrap for consumers using worktrees.",
+      "fix": "Change `git(repo,\"status\",\"--porcelain\",\"--untracked-files=normal\")` to `git(repo,\"status\",\"--porcelain\",\"--untracked-files=hidden\")` or explicitly check for `.git` file existence before running status.",
+      "providers": [
+        "local"
+      ],
+      "role": "Architecture",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Reliability",
+      "file": "tools/lib/rule-catalog.mjs",
+      "line": 108,
+      "title": "Duplicate rule ID detection fails silently if the duplicate is in a different file but same ID.",
+      "why": "The `loadCatalog` function at line 108 checks `if (byId.has(rule.id))` and throws. However, the error message `Duplicate rule id: ${rule.id}` does not specify *which* file caused the conflict. If a user adds a new rule with an existing ID, the error is ambiguous, making debugging difficult and potentially leading to silent failures if the error is swallowed by a higher-level handler that doesn't parse the message.",
+      "fix": "Add a check to ensure `metadata.id` is unique across the entire catalog before throwing on duplicate, or change the error to include the conflicting file path.",
+      "providers": [
+        "local"
+      ],
+      "role": "Architecture",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Architecture",
+      "file": "tools/rules.mjs",
+      "line": 68,
+      "title": "Missing validation of repository root before checking submodule status.",
+      "why": "The `revision` function at line 68 assumes `repo` is a valid git repository. If a consumer passes a path that is not a git root (e.g., a subdirectory without `.git`), `git(repo,\"status\",...)` will fail. The error message `Conventions checkout ... differs from the index gitlink` becomes misleading because the failure is actually due to the path not being a repo root, not a version mismatch.",
+      "fix": "Add a check to ensure `options.repo` is a valid git root before calling `git(repo,\"status\",...)` in the `revision` function.",
+      "providers": [
+        "local"
+      ],
+      "role": "Architecture",
+      "isGating": true
+    },
+    {
+      "severity": "Minor",
+      "category": "Ux",
+      "file": "tools/rules.mjs",
+      "line": 68,
+      "title": "Ambiguous error message when submodule is missing or broken.",
+      "why": "The error message at line 68 `Conventions checkout ${actual} differs from the index gitlink ${pinned?.[1] ?? \"missing\"}` does not distinguish between a missing submodule, a broken submodule, or a version mismatch. If the submodule is missing entirely, the user sees `missing` but doesn't know if they need to run `git submodule update` or if the `.gitmodules` file is wrong.",
+      "fix": "Add a check to ensure `options.repo` is a valid git root before calling `git(repo,\"status\",...)` in the `revision` function.",
+      "providers": [
+        "local"
+      ],
+      "role": "Architecture",
+      "isGating": false
+    },
+    {
+      "severity": "Nit",
+      "category": "Convention",
+      "file": "tools/lib/rule-catalog.mjs",
+      "line": 108,
+      "title": "Inconsistent error message formatting across validation functions.",
+      "why": "The error messages in `rule-catalog.mjs` vary in format. Some include the file path (e.g., `${file}: ${key} must be...`), while others (like the duplicate ID check at line 108) only include the ID. This inconsistency makes it harder for developers to quickly locate the source of an error when scanning logs.",
+      "fix": "Standardize the error message format to include the file path and line number (if applicable) for all validation errors.",
+      "providers": [
+        "local"
+      ],
+      "role": "Architecture",
+      "isGating": false
+    },
+    {
+      "severity": "Blocking",
+      "category": "Security",
+      "file": "tools/lib/rule-catalog.mjs",
+      "line": 24,
+      "title": "Path traversal in rule file loading allows reading arbitrary files outside the conventions directory",
+      "why": "The `normalizedText` function reads a file passed as an argument without verifying it resides within the `root` directory. An attacker or a malicious rule file could pass a path like `../../etc/passwd` (or a symlink pointing there) as the `file` argument to `ruleFrom`. The function calls `fs.readFileSync(file, 'utf8')` directly. If the caller (e.g., `loadCatalog`) is passed a malicious path, it reads the file. While `loadCatalog` walks the directory tree, the `walk` function uses `fs.readdirSync` which is safe, but if a rule file itself contains a reference to an external file (via a `paths` or `depends` field that resolves to a path outside the tree, or if the `walk` function is bypassed), the `normalizedText` function is the bottleneck. More critically, if `loadCatalog` is called with a `localRoot` that is a symlink to an external directory, or if a rule file's `paths` glob matches an external file (unlikely but possible with `..`), the `normalizedText` check is the only barrier. The",
+      "fix": "Add a check in `normalizedText` to verify the file is within the expected `root` directory before reading, or use `path.relative` and `path.resolve` to ensure the resolved path starts with the root.",
+      "providers": [
+        "local"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Reliability",
+      "file": "tools/rules.mjs",
+      "line": 15,
+      "title": "Missing error handling for git command failures in bootstrap and revision checks",
+      "why": "The `git` function uses `execFileSync` with a timeout but does not check the `status` or `error` property of the result. If `git` fails (e.g., `--show-toplevel` fails because the directory is not a git repo, or `ls-files` fails due to a missing submodule), the function throws an error, but the caller in `run` (line 65) catches it and logs `INCOMPLETE`. However, if `git` hangs or returns a non-zero exit code that isn't an exception (e.g., if `windowsHide` causes a silent failure on some platforms), the script might proceed with stale or incorrect data. Specifically, `git(repo,",
+      "fix": "Add a timeout to the `git` command execution and handle the case where `git` returns a non-zero exit code (e.g., if the repo is not initialized or the path is invalid) before proceeding.",
+      "providers": [
+        "local"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Reliability",
+      "file": "tools/rules.mjs",
+      "line": 65,
+      "title": "Submodule validation may proceed with stale or missing data if gitlink is broken",
+      "why": "The `revision` function checks if the pinned SHA matches the actual HEAD of the submodule. If the submodule is missing or the gitlink is broken, `git(repo,",
+      "fix": "Add a check to ensure the `git` command returns a valid SHA and handle the case where the submodule is missing or the gitlink is broken.",
+      "providers": [
+        "local"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Reliability",
+      "file": "tools/lib/rule-catalog.mjs",
+      "line": 100,
+      "title": "Conditional rules with empty paths and tasks may be selected or rejected inconsistently",
+      "why": "The `loadCatalog` function validates that conditional rules have either `paths` or `tasks`. However, if a rule has both empty arrays (which is technically allowed by the schema but logically invalid), the `selectRules` function might select it based on `load: always` or reject it based on the `paths` check. The",
+      "fix": "Add a check to ensure the `paths` and `tasks` arrays are not empty for conditional rules, or handle the case where they are empty gracefully.",
+      "providers": [
+        "local"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Minor",
+      "category": "Ux",
+      "file": "tools/rules.mjs",
+      "line": 35,
+      "title": "Missing validation for --only flag usage with check command",
+      "why": "The `parseArgs` function checks if `--only` is used with `check` and throws an error. However, if the user passes `--only` with `check`, the error message is generic. A more specific message would help the user understand why the command failed.",
+      "fix": "Add a check to ensure the `--only` flag is used with `explain` or `read` commands, and provide a clear error message if it's used with `check`.",
+      "providers": [
+        "local"
+      ],
+      "role": "SecurityReliability",
+      "isGating": false
+    },
+    {
+      "severity": "Minor",
+      "category": "Architecture",
+      "file": "tools/lib/rule-catalog.mjs",
+      "line": 90,
+      "title": "Duplicate rule IDs between shared and local rules may cause silent overrides",
+      "why": "The `loadCatalog` function checks for duplicate IDs within the shared catalog and within the local catalog, but it does not check for duplicates between the two. If a local rule has the same ID as a shared rule, the local rule will overwrite the shared one, potentially leading to unexpected behavior.",
+      "fix": "Add a check to ensure the `id` field is unique across all rules, including local rules.",
+      "providers": [
+        "local"
+      ],
+      "role": "SecurityReliability",
+      "isGating": false
+    },
+    {
+      "severity": "Minor",
+      "category": "Reliability",
+      "file": "tools/rules.mjs",
+      "line": 45,
+      "title": "Missing validation for AGENTS.md and CLAUDE.md presence in check command",
+      "why": "The `validateInstructions` function checks for the presence of `AGENTS.md` and `CLAUDE.md`, but if they are missing, the `check` command might proceed with a partial set of instructions, leading to inconsistent behavior.",
+      "fix": "Add a check to ensure the `AGENTS.md` and `CLAUDE.md` files are present and valid before proceeding with the `check` command.",
+      "providers": [
+        "local"
+      ],
+      "role": "SecurityReliability",
+      "isGating": false
+    },
+    {
+      "severity": "Nit",
+      "category": "Performance",
+      "file": "tools/lib/rule-catalog.mjs",
+      "line": 100,
+      "title": "Large paths or tasks arrays may cause performance issues during rule selection",
+      "why": "The `selectRules` function iterates over all rules and checks if they match the given `paths` and `tasks`. If the arrays are very large, this could lead to performance issues, especially in large repositories with many rules.",
+      "fix": "Add a check to ensure the `paths` and `tasks` arrays are not too large, to prevent performance issues during rule selection.",
+      "providers": [
+        "local"
+      ],
+      "role": "SecurityReliability",
+      "isGating": false
+    },
+    {
+      "severity": "Major",
+      "category": "Ux",
+      "file": "tools/rules.mjs",
+      "line": 104,
+      "title": "Error output lacks command context, making it hard to distinguish which operation failed in a pipeline.",
+      "why": "When `rules.mjs` is run as part of a CI pipeline or a shell script (e.g., `npm run check`), the error message `rules: INCOMPLETE — ...` appears on stderr. If multiple tools run in parallel or sequentially, the user sees a generic 'rules' prefix without knowing if it was the `check`, `explain`, or `read` command that failed. This forces the user to grep logs or check exit codes to diagnose the specific failure mode, increasing cognitive load during debugging.",
+      "fix": "Replace `console.error` with a structured log or a dedicated error class that includes the command context, or ensure the error message is prefixed with the command name (e.g., `rules: check: INCOMPLETE — ...`).",
+      "providers": [
+        "local"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Performance",
+      "file": "tools/lib/rule-catalog.mjs",
+      "line": 23,
+      "title": "Loading a single rule file into memory without pre-validation causes OOM on large files before the size check.",
+      "why": "The `normalizedText` function reads the entire file content into a string (`fs.readFileSync`) before checking if it exceeds `LIMITS.file` (256 KiB). If a user accidentally places a 50 MB log file or binary dump in a rule directory, the code loads the whole 50 MB into memory, then throws an error. This is an N+1 memory spike where the cost is proportional to the file size, not the limit. A pre-check via `fs.statSync` would fail fast with minimal memory usage.",
+      "fix": "Replace `fs.readFileSync` with a streaming read or a buffered read that stops at the 256 KiB limit, or validate file size via `fs.statSync` before reading.",
+      "providers": [
+        "local"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Reliability",
+      "file": "tools/rules.mjs",
+      "line": 38,
+      "title": "Running `rules.mjs read` without `--task` arguments throws a generic error instead of a clear usage message.",
+      "why": "The `parseArgs` function defaults `tasks` to an empty array. If a user runs `node tools/rules.mjs read --repo .` without specifying `--task`, the code proceeds to `selectRules`, which throws `At least one --task is required`. However, the error message is generic and doesn't list the available tasks. In a CI context where a script might be called with variable arguments, this leads to a confusing failure where the user has to guess the required `--task` values. The error should explicitly list the valid tasks from `TASKS`.",
+      "fix": "Add a check to ensure `options.tasks` is not empty before calling `selectRules`, or handle the empty array case gracefully with a specific error.",
+      "providers": [
+        "local"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": true
+    },
+    {
+      "severity": "Minor",
+      "category": "Architecture",
+      "file": "tools/rules.mjs",
+      "line": 58,
+      "title": "The `selfHosted` logic in `validateInstructions` relies on a potentially stale or inconsistent state of the `sharedRoot` variable.",
+      "why": "The `sharedRoot` is calculated once at the top of the file using `fileURLToPath`. If the script is run from a different working directory or if the `sharedRoot` path changes (e.g., via symlinks), the comparison `fs.realpathSync(repo) === fs.realpathSync(sharedRoot)` might fail or succeed incorrectly. This could lead to the wrong validation path being taken (e.g., treating a consumer repo as self-hosted or vice versa), causing false positives for 'missing instruction source' or 'legacy .claude/rules' errors.",
+      "fix": "Pass the `selfHosted` flag explicitly to `validateInstructions` or derive it consistently from the `repo` path relative to `sharedRoot` before validation.",
+      "providers": [
+        "local"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": false
+    },
+    {
+      "severity": "Minor",
+      "category": "Ux",
+      "file": "tools/lib/rule-catalog.mjs",
+      "line": 120,
+      "title": "Dependency cycle error message is verbose and hard to parse for the specific rule causing the loop.",
+      "why": "When a cycle is detected, the error message `Rule dependency cycle: A -> B -> C -> A` is printed. While it lists the cycle, it doesn't explicitly state which rule *triggered* the failure in the context of the user's input (e.g., `--task`). If the user has many rules, finding the specific rule ID that caused the cycle requires parsing the list. A more direct error like `Cycle detected in rule 'common.a' (depends on 'common.b')` would be more actionable.",
+      "fix": "Include the specific rule ID in the error message when a dependency cycle is detected.",
+      "providers": [
+        "local"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": false
+    },
+    {
+      "severity": "Blocking",
+      "category": "Architecture",
+      "file": "tools/rules.mjs",
+      "line": 46,
+      "title": "Exact-match check on AGENTS.md prevents project-specific customization and forces local overrides into failure",
+      "why": "Line 46 asserts `agents.text !== bootstrap(...)`. Any consumer project that puts project description, additional repository directions, or environment notes into its root `AGENTS.md` triggers an error. Furthermore, lines 54-57 forbid any scoped `AGENTS.override.md`, `AGENTS.md`, or `CLAUDE.md` in parent/working directories. Consequently, downstream repositories cannot provide any agent entry instructions other than the exact 9-line template, breaking natural project-level instruction layering and forcing all repository instructions into `.agents/PROJECT.md` with no migration or coexistence seam.",
+      "fix": "Validate that `AGENTS.md` contains the required bootstrap loading directions (e.g. via prefix or structured inclusion check) instead of enforcing strict full-text identity.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "Architecture",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Architecture",
+      "file": "tools/lib/rule-catalog.mjs",
+      "line": 137,
+      "title": "Rule catalog resolution fails to expand transitive dependencies for 'always' loaded rules",
+      "why": "In `selectRules`, when `rule.load === 'always'` or `tasks` match, `add(rule, ...)` is called. But `add` invokes `rule.depends.forEach(id => add(byId.get(id), ...))` before setting `selected.set(rule.id, ...)` without passing reasons or tracking dependencies if order fluctuates. More critically, if an 'always' loaded rule depends on another conditional rule (or if a rule depends on an always rule), its dependencies are not categorized as core in `loadCatalog` if `selectRules` is run with only `['inspect']`, leading to budget and cycle check asymmetry across callers.",
+      "fix": "Ensure `add` performs topological ordering and explicit transitive dependency expansion regardless of whether the root rule was triggered by `always`, `task`, or `path`.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "Architecture",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Architecture",
+      "file": "tools/rules.mjs",
+      "line": 69,
+      "title": "Mounted conventions resolver enforces process-level realpath identity against sharedRoot, breaking external check runs",
+      "why": "Line 69 requires `fs.realpathSync(mounted) === fs.realpathSync(sharedRoot)`. When `tools/rules.mjs` is run from a global path, an orchestration tool, CI tooling, or another repository inspecting a target repo without having `tools/rules.mjs` physically located inside the target's `.agents/conventions`, the command unconditionally throws `Run this repository's own mounted resolver`. This couples execution to the physical directory where the script file resides and prevents cross-repository linting/validation.",
+      "fix": "Resolve `sharedRoot` dynamically from the target repository's `.agents/conventions` or allow `--conventions-root` CLI override rather than anchoring to the executed script's directory.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "Architecture",
+      "isGating": true
+    },
+    {
+      "severity": "Blocking",
+      "category": "Reliability",
+      "file": ".github/workflows/ci.yml",
+      "line": 31,
+      "title": "Missing package-lock.json causes npm ci to fail in CI and consumer setups",
+      "why": "The change introduces a new package.json declaring production dependencies (picomatch, yaml) and adds npm ci --ignore-scripts to ci.yml, sonarcloud.yml, and ENTRY.md without checking in package-lock.json. npm ci unconditionally fails with error ENOENT if package-lock.json is not present in the directory, failing CI builds and blocking all dependency installation.",
+      "fix": "Generate and commit package-lock.json locked to the specified dependency versions.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Blocking",
+      "category": "Reliability",
+      "file": "tools/lib/rule-catalog.mjs",
+      "line": 89,
+      "title": "Omission of typescript/doctrine.md metadata breaks rule catalog validation",
+      "why": "loadCatalog walks all four directories ('common', 'csharp', 'rust', 'typescript') and ruleFrom strictly requires id and load metadata in frontmatter. While metadata was added to the other 23 rule files in the diff, typescript/doctrine.md was omitted and retains its baseline frontmatter without id or load, causing any execution of rules.mjs check, explain, or read to throw an uncaught exception ('typescript/doctrine.md: invalid rule id').",
+      "fix": "Add YAML frontmatter containing id: \"typescript.doctrine\" and load: \"conditional\" with its paths pattern to typescript/doctrine.md.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Reliability",
+      "file": "tools/rules.mjs",
+      "line": 51,
+      "title": "Target path pointing to repository root causes an infinite loop in override detection",
+      "why": "When a user provides --file . or --file ./, targetPath returns \".\" or \"\". within(repo, file) resolves to repo itself, making dir = path.dirname(...) resolve to the repository's parent directory. The loop while(dir !== repo) walks up parent directories towards the filesystem root where path.dirname(root) returns root, never equals repo, and loops forever pegging CPU at 100%.",
+      "fix": "Disallow \".\" and empty strings in targetPath or stop the while loop when dir === repo or dir === path.dirname(dir).",
+      "providers": [
+        "gemini"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Minor",
+      "category": "Performance",
+      "file": "tools/lib/rule-catalog.mjs",
+      "line": 143,
+      "title": "Picomatch matcher function is recompiled on every rule and file during rule selection",
+      "why": "In selectRules(), for every rule in the catalog and every path pattern in rule.paths, patternMatcher(pattern) is called to compile a picomatch regex/closure inside the loop: 'for (const pattern of rule.paths) { const match = patternMatcher(pattern); normalized.filter(file => match(file))... }'. When selecting across dozens of rules or hundreds of candidate files/paths, recreating the matcher closures and regular expressions on every pass adds redundant CPU and allocation overhead on a command (rules.mjs explain/read) designed to be invoked repeatedly by agents.",
+      "fix": "Compile pattern matchers once during catalog initialization or cache matchers by pattern in a Map instead of calling patternMatcher(pattern) inside the inner loop over rules.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": false
+    },
+    {
+      "severity": "Minor",
+      "category": "Ux",
+      "file": "tools/rules.mjs",
+      "line": 6,
+      "title": "Missing npm dependencies result in raw Node module resolution crash rather than actionable error guidance",
+      "why": "ENTRY.md step 3 explicitly warns that if locked dependencies are missing, the user/agent must run npm ci --ignore-scripts. However, tools/rules.mjs top-level imports loadCatalog from ./lib/rule-catalog.mjs, which immediately imports external dependencies 'yaml' and 'picomatch'. When a user or agent invokes `node <resolver> check` in a fresh clone without node_modules, Node throws an unhandled MODULE_NOT_FOUND stack trace instead of the clean, structured error guidance promised in ENTRY.md.",
+      "fix": "Include a helpful error hint with the required installation command (e.g. \"Run 'npm ci --ignore-scripts' in <conventions-root>\") when imports of 'yaml' or 'picomatch' fail or when dependencies are missing before invoking git/rule-catalog.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": false
+    },
+    {
+      "severity": "Minor",
+      "category": "Ux",
+      "file": "tools/rules.mjs",
+      "line": 89,
+      "title": "--only flag validation accepts IDs not in selected scope but does not prevent misleading manifest calculation",
+      "why": "In tools/rules.mjs, when --only is provided to read/explain, selected is filtered into emitted, but if multiple --only options are given or when calculating sizes, the contract around reading single rules vs reporting total selected rules can cause confusion in agent parsers expecting strict 1:1 matching between emitted rules and returned payload metadata.",
+      "fix": "Use options.only.includes(rule.id) when computing rules and bytes for the output manifest/response rather than checking only after building the full payload.",
+      "providers": [
+        "gemini"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": false
+    },
+    {
+      "severity": "Major",
+      "category": "Architecture",
+      "file": ".agents/PROJECT.md",
+      "line": 4,
+      "title": "Required project documents are outside the resolver's instruction dependency graph",
+      "why": "If `research/architecture.md` is renamed or deleted, `rules check` still succeeds because it validates only AGENTS, CLAUDE, ENTRY, and PROJECT; an agent can then proceed while PROJECT's required implementation guidance is missing.",
+      "fix": "Declare required PROJECT dependencies in machine-readable metadata and have `check` validate their existence before reporting complete instruction loading.",
+      "providers": [
+        "codex"
+      ],
+      "role": "Architecture",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Architecture",
+      "file": "tools/lib/rule-catalog.mjs",
+      "line": 25,
+      "title": "The catalog cannot represent runtime-specific adapter rules",
+      "why": "A future Claude-only or Codex-only rule cannot be expressed: unknown `agent` metadata is rejected, while encoding it as an ordinary rule selects it for both runtimes, causing one agent to receive instructions for the other host.",
+      "fix": "Add an explicit agent/runtime dimension to rule metadata, CLI scope, and selection, or create a separately validated adapter catalog that the resolver includes per agent.",
+      "providers": [
+        "codex"
+      ],
+      "role": "Architecture",
+      "isGating": true
+    },
+    {
+      "severity": "Minor",
+      "category": "Architecture",
+      "file": "ENTRY.md",
+      "line": 20,
+      "title": "The resolver protocol is duplicated as hand-maintained prose and parser logic",
+      "why": "Changing a required flag or command sequence in `tools/rules.mjs` without updating ENTRY makes agents invoke an obsolete protocol and fail closed; changing ENTRY alone can make agents omit a check the resolver does not enforce.",
+      "fix": "Make one machine-readable resolver contract authoritative and generate or mechanically validate the ENTRY and bootstrap command text against it.",
+      "providers": [
+        "codex"
+      ],
+      "role": "Architecture",
+      "isGating": false
+    },
+    {
+      "severity": "Major",
+      "category": "Reliability",
+      "file": ".github/workflows/ci.yml",
+      "line": 31,
+      "title": "CI invokes npm ci without adding a package-lock.json",
+      "why": "On every fresh checkout, `npm ci --ignore-scripts` requires a committed lockfile; this diff adds package.json but no package-lock.json, so the Selftest job fails before running any tests or checks.",
+      "fix": "Commit the generated package-lock.json alongside package.json, or use `npm install --ignore-scripts` until a lockfile is committed.",
+      "providers": [
+        "codex"
+      ],
+      "role": "SecurityReliability",
+      "isGating": true
+    },
+    {
+      "severity": "Blocking",
+      "category": "Convention",
+      "file": ".github/workflows/ci.yml",
+      "line": 32,
+      "title": "CI runs npm ci without adding the required lockfile",
+      "why": "On every CI run, `npm ci --ignore-scripts` fails immediately because this change adds `package.json` but no `package-lock.json`; tests and checks never execute, so the new validation job cannot pass.",
+      "fix": "Commit the generated `package-lock.json` and keep it synchronized with `package.json`.",
+      "providers": [
+        "codex"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": true
+    },
+    {
+      "severity": "Major",
+      "category": "Performance",
+      "file": "tools/rules.mjs",
+      "line": 12,
+      "title": "Large repositories can make the resolver fail while checking git status",
+      "why": "`git status --porcelain --untracked-files=normal` captures all output synchronously with a 1 MiB buffer. A repository with roughly 20,000 untracked files can exceed that buffer, causing `rules check` to report instruction loading incomplete; even below the limit, the command prints no progress while the scan blocks.",
+      "fix": "Use a streaming/short-circuit dirty check that stops after the first status record, while retaining the required dirty-tree detection.",
+      "providers": [
+        "codex"
+      ],
+      "role": "UxDxPerformance",
+      "isGating": true
+    }
+  ],
+  "decisions": [
+    {
+      "finding": 0,
+      "action": "reject",
+      "reason": "The dependency is present and unconditional expansion is tested."
+    },
+    {
+      "finding": 1,
+      "action": "reject",
+      "reason": "Git supports worktree .git files; no .git directory assumption exists. --untracked-files=hidden is not a valid Git option."
+    },
+    {
+      "finding": 2,
+      "action": "accept",
+      "reason": "Include both conflicting source paths in duplicate-id diagnostics."
+    },
+    {
+      "finding": 3,
+      "action": "reject",
+      "reason": "run already resolves git rev-parse --show-toplevel before revision; nested CLI test passes."
+    },
+    {
+      "finding": 4,
+      "action": "reject",
+      "reason": "Missing entry is reported by source before revision. The proposed root check already exists."
+    },
+    {
+      "finding": 5,
+      "action": "accept",
+      "reason": "Improve source diagnostics together with finding 2."
+    },
+    {
+      "finding": 6,
+      "action": "reject",
+      "reason": "Metadata paths are globs, never file references; depends are ids. Walk rejects every symlink and CLI source containment rejects external .agents ancestry."
+    },
+    {
+      "finding": 7,
+      "action": "reject",
+      "reason": "execFileSync throws on nonzero and has timeout:10000; top-level catch reports INCOMPLETE."
+    },
+    {
+      "finding": 8,
+      "action": "reject",
+      "reason": "Missing gitlink is explicitly refused; git failures throw. Mounted entry is checked first."
+    },
+    {
+      "finding": 9,
+      "action": "reject",
+      "reason": "ruleFrom explicitly rejects conditional metadata with both empty arrays."
+    },
+    {
+      "finding": 10,
+      "action": "reject",
+      "reason": "parseArgs already rejects this with --only applies to read/explain."
+    },
+    {
+      "finding": 11,
+      "action": "reject",
+      "reason": "The duplicate map is built over [...shared,...local]; local ids additionally require local. namespace."
+    },
+    {
+      "finding": 12,
+      "action": "reject",
+      "reason": "validateInstructions calls source for both files before any selection; source throws when missing."
+    },
+    {
+      "finding": 13,
+      "action": "accept",
+      "reason": "Bound scope flags as well as catalog metadata."
+    },
+    {
+      "finding": 14,
+      "action": "accept",
+      "reason": "Include operation name in CLI errors."
+    },
+    {
+      "finding": 15,
+      "action": "reject",
+      "reason": "statSync(file).size is checked BEFORE readFileSync in normalizedText."
+    },
+    {
+      "finding": 16,
+      "action": "reject",
+      "reason": "The existing error includes Object.keys(TASKS).join and names every legal task."
+    },
+    {
+      "finding": 17,
+      "action": "reject",
+      "reason": "selfHosted is derived from real paths once and explicitly passed to validation already."
+    },
+    {
+      "finding": 18,
+      "action": "reject",
+      "reason": "Full dependency cycle lists every id and does not depend on selected task; catalog-wide validation is intentional."
+    },
+    {
+      "finding": 19,
+      "action": "reject",
+      "reason": "Exact bootstrap and explicit refusal of unmanaged overrides implement the reviewed contract. Project customization belongs in PROJECT/local rules; migration is S2-S4."
+    },
+    {
+      "finding": 20,
+      "action": "accept",
+      "reason": "Dependency expansion already works; isolate core-budget closure from inspect-only conditional dependencies and add regression coverage."
+    },
+    {
+      "finding": 21,
+      "action": "reject",
+      "reason": "Using the target pinned resolver is required to prevent version drift. Cross-repo orchestration invokes each target resolver with --repo."
+    },
+    {
+      "finding": 22,
+      "action": "reject",
+      "reason": "package-lock.json is committed in 8c5a418; reviewer diff excludes lockfiles. Fresh npm ci was run."
+    },
+    {
+      "finding": 23,
+      "action": "reject",
+      "reason": "typescript/doctrine.md has id and load in 8c5a418, verified by the catalog and body-preservation suite. It was omitted from the reviewer context, not from the commit."
+    },
+    {
+      "finding": 24,
+      "action": "accept",
+      "reason": "Reproduce root-target hang with a timeout test, reject directory-like target arguments and bound ancestor traversal."
+    },
+    {
+      "finding": 25,
+      "action": "reject",
+      "reason": "Matchers compile per pattern, not per candidate file; metadata is small and bounded. Persistent caching is explicitly excluded and no measured performance problem is shown."
+    },
+    {
+      "finding": 26,
+      "action": "accept",
+      "reason": "Use a dependency-load error boundary with the locked npm installation command."
+    },
+    {
+      "finding": 27,
+      "action": "reject",
+      "reason": "--only ids are validated against selected scope; read header names only emitted sources and remaining ids. explain intentionally reports the complete scope."
+    },
+    {
+      "finding": 28,
+      "action": "accept",
+      "reason": "Declare required PROJECT references as metadata and validate their existence."
+    },
+    {
+      "finding": 29,
+      "action": "reject",
+      "reason": "Runtime configuration is deliberately separate from common rule policy. No runtime-only rule was requested by S1; adding another condition here defeats the shared-source contract."
+    },
+    {
+      "finding": 30,
+      "action": "reject",
+      "reason": "ENTRY is user-facing CLI documentation, not a second parser. Real smoke exercises the described protocol. Generating documentation is not necessary for S1."
+    },
+    {
+      "finding": 31,
+      "action": "reject",
+      "reason": "Duplicate of 22: package-lock.json is committed and installed successfully; lockfiles are excluded from gate diff."
+    },
+    {
+      "finding": 32,
+      "action": "reject",
+      "reason": "Duplicate of 22: inspected committed lockfile, npm ci succeeded."
+    },
+    {
+      "finding": 33,
+      "action": "reject",
+      "reason": "Bounded failure is preferable to unbounded capture; consumer status runs only inside the small conventions mount. Source-tree mode on a huge unrelated checkout is not a supported target."
+    }
+  ]
+}

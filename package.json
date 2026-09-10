@@ -1,0 +1,15 @@
+{
+  "name": "dew-flow-conventions",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test tools/selftest.test.mjs tools/rules.test.mjs",
+    "check": "node tools/rules.mjs check --repo ."
+  },
+  "dependencies": {
+    "picomatch": "4.0.7",
+    "yaml": "2.9.0"
+  }
+}

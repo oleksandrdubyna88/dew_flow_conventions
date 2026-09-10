@@ -1,3 +1,8 @@
+---
+id: "common.measurement"
+load: "conditional"
+tasks: ["audit","test","benchmark"]
+---
 # Measurement — a number you did not set up is a number about something else
 
 > This family measures constantly: `RESULTS_*.md` in four repositories, prompt comparisons, model

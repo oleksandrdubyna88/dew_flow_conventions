@@ -1,3 +1,8 @@
+---
+id: "common.reliability"
+load: "conditional"
+tasks: ["implement","audit","test","deploy","benchmark"]
+---
 # Reliability — a process that must run 24/7 (MANDATORY)
 
 > Written from the 2026-08-16 four-repo audit, on the eve of the first long unattended runs. Every

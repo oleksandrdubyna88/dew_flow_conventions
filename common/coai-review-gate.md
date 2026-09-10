@@ -1,3 +1,8 @@
+---
+id: "common.coai-review-gate"
+load: "conditional"
+tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
+---
 <!-- coai-snippet v5 -->
 ## Multi-model review gate (ConnectOtherAIs)
 

@@ -1,9 +1,7 @@
 ---
-paths:
-  - "**/*.ts"
-  - "**/*.tsx"
-  - "**/*.mts"
-  - "**/*.cts"
+id: "typescript.doctrine"
+load: "conditional"
+paths: ["**/*.ts","**/*.tsx","**/*.mts","**/*.cts"]
 ---
 
 # TypeScript — the four traps that have actually cost us

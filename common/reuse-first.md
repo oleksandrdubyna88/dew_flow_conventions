@@ -1,3 +1,8 @@
+---
+id: "common.reuse-first"
+load: "conditional"
+tasks: ["plan","implement","docs","policy","test","pr","release","deploy","dependencies"]
+---
 # Reuse First — look before you build (MANDATORY)
 
 > Before writing anything new — a service, a helper, a script, a test fixture, a prompt, a UI panel —

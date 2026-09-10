@@ -1,3 +1,8 @@
+---
+id: "common.git-workflow"
+load: "conditional"
+tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
+---
 # Git Workflow
 
 > How a commit REACHES `main` — a pull request, the automated reviewer's comments verified and

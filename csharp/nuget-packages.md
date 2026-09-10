@@ -1,8 +1,8 @@
 ---
-paths:
-  - "**/*.csproj"
-  - "**/Directory.Packages.props"
-  - "**/Directory.Build.props"
+id: "csharp.nuget-packages"
+load: "conditional"
+paths: ["**/*.csproj","**/Directory.Packages.props","**/Directory.Build.props","**/NuGet.Config"]
+tasks: ["dependencies"]
 ---
 # NuGet packages — approval, freshness, licence
 

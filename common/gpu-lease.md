@@ -1,3 +1,8 @@
+---
+id: "common.gpu-lease"
+load: "conditional"
+tasks: ["gpu"]
+---
 # Take the card before you use it (MANDATORY for GPU work)
 
 > This machine has **one usable GPU**. Several things want it at once — an index pass embedding for twenty

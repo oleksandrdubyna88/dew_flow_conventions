@@ -1,7 +1,7 @@
 ---
-paths:
-  - "**/*.rs"
-  - "**/Cargo.toml"
+id: "rust.doctrine"
+load: "conditional"
+paths: ["**/*.rs","**/Cargo.toml"]
 ---
 # Rust doctrine — the family's code rules
 

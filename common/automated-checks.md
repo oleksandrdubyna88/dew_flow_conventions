@@ -1,3 +1,8 @@
+---
+id: "common.automated-checks"
+load: "conditional"
+tasks: ["audit","test","pr","release","policy"]
+---
 # Automated checks — what a reviewer, a scanner or a bot reports is work, down to zero (MANDATORY)
 
 > Extends [pull-requests.md](pull-requests.md), which governs how a change reaches `main`. This rule
