@@ -7,25 +7,28 @@
  * `settings/settings.json` and `settings/hooks/load-instructions.mjs` here.</p>
  *
  * <p><b>Why a checker rather than a sentence in the README.</b> This family already learned it
- * twice. `common/planning-docs.md` described plan promotion for as long as it existed and by the
+ * twice. `common/planning-docs.md` described plan promotion for as long as it existed, and by the
  * time anyone counted, twelve implemented plans sat unpromoted. `settings/settings.json` was
  * declared the reference and nothing ever compared a copy to it. A copied file with no comparison
- * is a file that drifts, and this one drifts SILENTLY: a session that never received the rules is
- * indistinguishable from a session that received them and chose badly.</p>
+ * drifts, and this one drifts SILENTLY: a session that never received the rules is indistinguishable
+ * from a session that received them and chose badly.</p>
  *
- * <p>Failure is by exit code, and every finding names the file and what to do. The settings check is
- * deliberately not byte-equality on the whole file — a repository may hold permissions of its own —
- * but the hook entry must match exactly, because that entry IS the mechanism.</p>
+ * <p>Every path derived from the argument goes through `within` — the same door every tool here uses
+ * since S8707, because an agent is the usual caller and a faulty argument must stop the tool rather
+ * than read something outside the repository.</p>
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { within } from './lib/paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REFERENCE = path.resolve(HERE, '..', 'settings');
 const HOOK = '.claude/hooks/load-instructions.mjs';
 const SETTINGS = '.claude/settings.json';
+const ADAPTER = 'CLAUDE.md';
+const LEGACY = '.claude/rules';
 
 /** Every `SessionStart` command a settings file declares, in order. */
 export function sessionStartCommands(settings) {
@@ -35,70 +38,97 @@ export function sessionStartCommands(settings) {
     .map((hook) => hook.command);
 }
 
-/** The findings for one repository — empty when its adapter is whole. */
-export function adapterFindings(repo, reference = REFERENCE) {
+/** One file's text with line endings normalised — a CRLF checkout is not drift. */
+function text(file) {
+  return fs.readFileSync(file, 'utf8').replaceAll('\r\n', '\n');
+}
+
+/** The settings file declares every SessionStart command the reference declares. */
+function settingsFindings(repo, wanted) {
+  const file = within(repo, SETTINGS, 'settings');
+  if (!fs.existsSync(file)) {
+    return [`${SETTINGS} is missing — copy settings/settings.json and keep your own permissions`];
+  }
+
+  let declared;
+  try {
+    declared = sessionStartCommands(JSON.parse(text(file)));
+  } catch (error) {
+    return [`${SETTINGS} does not parse: ${error.message}`];
+  }
+
+  return wanted
+    .filter((command) => !declared.includes(command))
+    .map((command) => `${SETTINGS} declares no SessionStart command \`${command}\` — `
+      + 'a Claude session there starts without this repository’s rules');
+}
+
+/** The hook is there, and byte-for-byte what this repository publishes. */
+function hookFindings(repo, reference) {
+  const file = within(repo, HOOK, 'hook');
+  if (!fs.existsSync(file)) {
+    return [`${HOOK} is missing — copy settings/hooks/load-instructions.mjs verbatim`];
+  }
+  if (text(file) !== reference) {
+    return [`${HOOK} has drifted from settings/hooks/load-instructions.mjs — `
+      + 'change the reference and re-copy, never the copy alone'];
+  }
+
+  return [];
+}
+
+/**
+ * The two doors `rule-cli.mjs` refuses.
+ *
+ * <p>Reported here as well because THIS is the tool somebody runs when they wonder why a session has
+ * no rules, and taking either door is the tempting wrong fix — it looks like it works, and it makes
+ * the resolver call the whole repository incomplete.</p>
+ */
+function refusedDoorFindings(repo) {
   const findings = [];
-  const referenceHook = fs.readFileSync(path.join(reference, 'hooks/load-instructions.mjs'), 'utf8');
-  const wanted = sessionStartCommands(
-    JSON.parse(fs.readFileSync(path.join(reference, 'settings.json'), 'utf8')),
-  );
-
-  const settingsPath = path.join(repo, SETTINGS);
-  if (!fs.existsSync(settingsPath)) {
-    findings.push(`${SETTINGS} is missing — copy settings/settings.json and keep your own permissions`);
-  } else {
-    let settings;
-    try {
-      settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-    } catch (error) {
-      findings.push(`${SETTINGS} does not parse: ${error.message}`);
-    }
-    if (settings !== undefined) {
-      const found = sessionStartCommands(settings);
-      for (const command of wanted) {
-        if (!found.includes(command)) {
-          findings.push(`${SETTINGS} declares no SessionStart command \`${command}\` — `
-            + 'a Claude session there starts without this repository’s rules');
-        }
-      }
-    }
-  }
-
-  const hookPath = path.join(repo, HOOK);
-  if (!fs.existsSync(hookPath)) {
-    findings.push(`${HOOK} is missing — copy settings/hooks/load-instructions.mjs verbatim`);
-  } else if (fs.readFileSync(hookPath, 'utf8').replace(/\r\n/g, '\n') !== referenceHook.replace(/\r\n/g, '\n')) {
-    findings.push(`${HOOK} has drifted from settings/hooks/load-instructions.mjs — `
-      + 'change the reference and re-copy, never the copy alone');
-  }
-
-  // The two doors the resolver refuses. Reported here as well because THIS is the tool somebody runs
-  // when they wonder why a session has no rules, and taking either door is the tempting wrong fix.
-  const legacy = path.join(repo, '.claude/rules');
+  const legacy = within(repo, LEGACY, 'legacy rules');
   if (fs.existsSync(legacy) && fs.readdirSync(legacy).length > 0) {
-    findings.push('.claude/rules is populated — the resolver refuses that as a second source; '
+    findings.push(`${LEGACY} is populated — the resolver refuses that as a second source; `
       + 'policy belongs in .agents/rules');
   }
-  const adapter = path.join(repo, 'CLAUDE.md');
-  if (fs.existsSync(adapter) && fs.readFileSync(adapter, 'utf8').trim() !== '@AGENTS.md') {
-    findings.push('CLAUDE.md is not exactly `@AGENTS.md` — the resolver refuses that; '
+  const adapter = within(repo, ADAPTER, 'adapter');
+  if (fs.existsSync(adapter) && text(adapter).trim() !== '@AGENTS.md') {
+    findings.push(`${ADAPTER} is not exactly \`@AGENTS.md\` — the resolver refuses that; `
       + 'the hook is how Claude loads instructions here');
   }
 
   return findings;
 }
 
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('adapter-check.mjs')) {
-  const repo = process.argv[2] ?? process.cwd();
+/** The findings for one repository — empty when its adapter is whole. */
+export function adapterFindings(repo, reference = REFERENCE) {
+  const root = path.resolve(repo);
+  const hook = text(path.join(reference, 'hooks/load-instructions.mjs'));
+  const wanted = sessionStartCommands(JSON.parse(text(path.join(reference, 'settings.json'))));
+
+  return [
+    ...settingsFindings(root, wanted),
+    ...hookFindings(root, hook),
+    ...refusedDoorFindings(root),
+  ];
+}
+
+function report(repo) {
   const findings = adapterFindings(path.resolve(repo));
   if (findings.length === 0) {
     process.stdout.write('adapter-check: OK — the Claude adapter is wired and matches the reference.\n');
-    process.exit(0);
+
+    return 0;
   }
   process.stdout.write(`adapter-check: ${findings.length} finding(s)\n\n`);
   for (const finding of findings) {
     process.stdout.write(`  ${finding}\n`);
   }
   process.stdout.write('\nThe reference lives in settings/ of the conventions repository.\n');
-  process.exit(1);
+
+  return 1;
+}
+
+if (process.argv[1]?.endsWith('adapter-check.mjs')) {
+  process.exit(report(process.argv[2] ?? process.cwd()));
 }
