@@ -18,7 +18,7 @@ fallback selector were rejected because they reintroduce stale state/duplication
 
 Two epics, four stories (each tested, documented and code-reviewed before the next):
 
-**S1 is merged; S2 tooling passed its code gate and awaits PR/CI.** S3–S4 rollout is not
+**S1 and S2 tooling are implemented (PR #16 and #17).** S3–S4 rollout is not
 claimed implemented. S1 acceptance: canonical bodies preserved, deterministic validated
 selection and source bootstrap work, existing tools remain green on Windows/WSL, new behavior
 is exercised through real CLI calls. Full live-agent/consumer rollout is acceptance of S2–S4.

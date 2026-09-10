@@ -2,6 +2,7 @@
 
 | Document | What exists |
 |---|---|
+| [PLAN_shared_rules_rollout_tooling.md](PLAN_shared_rules_rollout_tooling.md) | IMPLEMENTED: S2 migration, bounded native smoke, explicit failure evidence and reviewed deviations |
 | [architecture.md](architecture.md) | Shared rule delivery and its current boundaries |
 | [module_rules.md](module_rules.md) | Resolver schema, selection, dependencies and failure behavior |
 | [module_rule_migration.md](module_rule_migration.md) | Disposable migration, rollback and bounded native CLI evidence |

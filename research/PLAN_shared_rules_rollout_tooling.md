@@ -1,6 +1,6 @@
 # PLAN — migrate consumers to one shared instruction source
 
-> Status: **IN PROGRESS, 2026-09-10.** Scope: S2 of [shared rules](PLAN_shared_rules_claude_codex.md); S1 resolver is implemented, consumer rollout remains S3/S4.
+> Status: **IMPLEMENTED, 2026-09-10.** Scope: S2 of [shared rules](../todo/PLAN_shared_rules_claude_codex.md); shipped through PR #17. Consumer rollout remains S3/S4.
 
 Consumers currently keep their canonical project instructions in CLAUDE.md and mount the
 entire conventions repository under Claude's automatic rule tree. Both agents need one
@@ -78,4 +78,11 @@ Final code round on `5f683aa` versus source main `026b20e`: **proceed**, all thr
 architecture reviewers answered (not the earlier twelve-reviewer panel); all eight returned
 findings received decisions and the session reached Done. Accepted final fixes correlate
 source output with the actual resolver call, reject partial neutral layouts, and extract the
-shared Git runner. Tests now total 73. PR/CI publication remains pending; no consumer is published.
+shared Git runner. PR #17 follow-up fixes bind source evidence to the inspected repository,
+retain malformed-trace and supervisor failures, reject unsupported reference definitions and
+retain recovery instructions when journal creation fails. These five failures were reproduced
+before fixes. Final suite: 78 cases; Windows 77 pass plus one platform skip, WSL 78 pass.
+CI, CodeQL and SonarCloud pass; all eight CodeRabbit threads received reasoned replies and
+were resolved. Existing canonical policy bodies remain preserved except for the approved
+path substitutions; migration pins are promoted with their layouts in S3/S4. No consumer
+publication or complete native Codex acceptance is claimed by this tooling record.
