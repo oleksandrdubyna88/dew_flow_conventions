@@ -1,6 +1,7 @@
 ---
 id: "common.http-contracts"
 load: "conditional"
+depends: ["common.testing"]
 tasks: ["http","release","implement","audit"]
 paths: ["**/*.http"]
 ---

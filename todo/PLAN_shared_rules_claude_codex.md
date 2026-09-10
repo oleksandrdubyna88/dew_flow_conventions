@@ -62,6 +62,14 @@ Real self-host inspection: Claude completed and its source-read trace matched th
 hashes. Codex read canonical sources but hit its subscription usage limit before final completion;
 recorded as incomplete. This does not stop deterministic work or imply a successful Codex rollout.
 
+S1 code round 2 on `27f3150`: **proceed**, all 3 selected reviewers answered (architecture
+round; this was not the earlier 12-reviewer panel). Decisions recorded for all 11 returned
+entries, including prior-round entries carried forward. Accepted the new HTTP→testing
+dependency; other claims were either already fixed in 27f3150 or rejected with source evidence.
+The gate session is Done. HTTP selection was reproduced RED and fixed GREEN before the
+final S1 commit. WSL nested Claude smoke also completed successfully. S1 is complete;
+S2–S4 and complete Codex behavioral acceptance remain open.
+
 Цель: правило редактируется один раз и применяется обоими агентами. У каждого потребителя один закреплённый checkout conventions; тексты правил не копируются в отдельные версии для Claude и Codex. Различаются только способы подключения и настройки исполняющей среды.
 
 Этот план конкретизирует раздел 2 и часть разделов 3/5/6 [общего backlog](PLAN_product_improvements.md). Исправления F1–F4/F6–F9 из [аудита](REVIEW_product_audit_2026-09-09.md) остаются в общем backlog. Здесь — загрузка правил, F5, совместимость агентов и переход на новую структуру. Ни настройки агентов, ни submodules потребителей этим документом не изменены.

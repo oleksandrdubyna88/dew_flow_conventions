@@ -32,5 +32,13 @@ Windows read-only sandbox, but the turn ended with the subscription usage-limit 
 Its run is incomplete, not a behavioral pass. Temporary JSONL traces were bounded to 256 KiB
 per agent and 180 seconds by the probe. No installs or global configuration writes occurred.
 
+WSL nested-start probe also completed: Claude Code 2.1.197 (`claude-opus-4-8[1m]`)
+started in `tools/`, discovered the repository root and read the same five sources, 25,464
+bytes. Its trace was 195,035 bytes without truncation. It correctly reported working-tree
+mode and retained advisory/host-policy caveats. The external 180-second timeout owns cleanup.
+
+The HTTP-only selection regression failed before the dependency was declared and passed
+afterward. The complete suite now contains 55 cases (one Windows symlink privilege skip).
+
 Not yet covered: consumer migration scenarios, successful complete Codex behavior, compaction,
 fresh clone/rollback and the six-consumer rollout. These remain open in the plan.

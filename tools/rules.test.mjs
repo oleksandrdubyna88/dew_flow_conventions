@@ -132,6 +132,11 @@ test("central build props continue to select the NuGet policy",()=>{
   assert.ok(rules.some(rule=>rule.id==="csharp.nuget-packages"));
 });
 
+test("an HTTP-only scope still receives the testing contract it depends on",()=>{
+  const rules=selectRules(loadCatalog(sourceRoot),["http"],["api/example.http"]);
+  assert.ok(rules.some(rule=>rule.id==="common.testing"));
+});
+
 function cliFixture(t) {
   const {root}=fixture(t);
   for(const name of ["tools","node_modules","common","csharp","rust","typescript","AGENTS.md","CLAUDE.md","ENTRY.md",".agents","README.md","research"]) {
