@@ -7,7 +7,7 @@ try {
     const key=argv[i],value=argv[i+1];
     if(!value||value.startsWith("--"))throw new Error(`Missing value: ${key}`);
     if(key==="--file")options.files.push(value);
-    else if(["--repo","--agent","--cwd"].includes(key))options[key.slice(2)]=value;
+    else if(["--repo","--agent","--cwd","--cli"].includes(key))options[key.slice(2)]=value;
     else throw new Error(`Unknown option: ${key}`);
   }
   const result=await smoke(options);

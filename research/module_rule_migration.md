@@ -14,8 +14,13 @@ is retained with an incomplete report rather than reset or deleted.
 
 Unscoped local rules map to every known task, including inspect. Existing scoped frontmatter,
 untracked policy, old-mount host settings and conflicting neutral sources fail preflight.
-Operational rewrites are restricted to README/POST_DEPLOY and workflows; product code adapters
-are a separate reviewed consumer change. Markdown links are rebased and validated.
+Operational rewrites default to README/POST_DEPLOY and workflows. Repeated `--rewrite` can
+name tracked scripts under tools/scripts/deploy; host configuration remains protected.
+The bounded journal lists remaining legacy references and dirty source inputs relative to HEAD;
+the selected committed base is still the source of migrated content. Output must be outside
+both the consumer checkout and conventions checkout, including resolved ancestor aliases.
+Product code adapters are a separate reviewed consumer change. Markdown links are rebased
+and validated. An undeclared neutral directory fails the gate-snippet check.
 
 `tools/smoke-rules.mjs` runs an installed native CLI against a disposable worktree. It calls
 the mounted resolver to establish expected sources, asks the agent to discover its own
@@ -25,6 +30,18 @@ are separate evidence; the final answer still needs behavioral review. The lates
 per agent is stored atomically in Git metadata, with two fixed 32 KiB slots. Full model traces
 are captured only in memory, limited to 256 KiB. A lock prevents concurrent ownership of a slot.
 A quota failure is recorded without a retry or changing accounts.
+
+The installed mounted resolver takes precedence over an unrelated root ENTRY. Self-host
+fallback requires the exact source bootstrap. Native CLIs use PATH/default installed locations
+or explicit `--cli` executables/JavaScript entries, never shell wrappers. Claude auto-approval
+allows only this resolver's check/explain/read commands, not arbitrary Node programs. This is
+trusted-repository inspection, not a hostile-repository OS sandbox; inherited host permissions
+remain effective. Start/progress diagnostics go to stderr every 20 seconds during execution.
+
+The unchanged check hashes Git HEAD/index/status and instruction, selected rule, requested file
+and known host-setting content. It does not hash unrelated file bodies. Content is capped at
+512 paths, 1 MiB per file and 8 MiB total; symlink escapes, directories and excess sizes fail.
+Git commands have 30-second/4 MiB output bounds. The report names the measured scope explicitly.
 
 `tools/lib/proc.mjs` supplies bounded capture and cancellation. Smoke opts into containment:
 Linux uses a process group and Windows uses PowerShell 7 plus `process-job.ps1`, which creates

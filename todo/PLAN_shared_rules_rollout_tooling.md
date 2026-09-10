@@ -19,7 +19,8 @@ inputs and validates links/selected SHA before mutations. Partial failures repor
 worktree and base for recovery; no automatic hard reset is run against a caller checkout.
 Operational rewrite allowlist: root README/POST_DEPLOY, .github/workflows and explicit script
 paths. Host config references to the old mount and untracked/ignored policy copies are refused.
-Smoke uses disposable checkouts, restricted tools/sandbox, tree checks and explicit timeout
+Smoke uses disposable checkouts, restricted tool approval (Codex also requests its native read-only
+sandbox), bounded instruction/task-content snapshots plus Git state, and explicit timeout
 outcomes; it neither retries quota errors nor claims completed behavior from reads alone.
 
 Build order:
@@ -67,4 +68,10 @@ The process regression observes both process disappearance and elapsed time.
 
 The coai canary worktree has been prepared at `D:/rsd/.worktrees/shared-rules/coai` from the
 recorded migration journal base; product adapters and CI provisioning are still S3 work.
-The final code-gate review and native CLI evidence are in progress. No consumer is published.
+Code round 1: all 12 reviewers answered, verdict revise; all 38 findings received decisions.
+Accepted fixes cover source/output separation, explicit operational rewrites and residual reports,
+undeclared neutral directories, CLI discovery, resolver selection, bounded snapshots, narrower
+Claude approvals and progress reporting. See research/shared-rules-review-s2.json.
+The updated suite passes 71 cases in WSL and 70 plus one symlink skip on Windows. A second Claude
+smoke completed all seven reads with an untruncated answer; behavior remains scoped to that task.
+Final code-gate review is pending. No consumer is published.

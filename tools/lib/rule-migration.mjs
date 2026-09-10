@@ -69,7 +69,7 @@ function mountInfo(repo,base) {
   return {...mount,url:git(repo,"config","--blob",`${base}:.gitmodules`,"--get",`submodule.${mount.name}.url`),oldSha:git(repo,"rev-parse",`${base}:${OLD_MOUNT}`)};
 }
 
-export function migrationPlan({repo,conventions,sha,base="HEAD",output,branch}) {
+export function migrationPlan({repo,conventions,sha,base="HEAD",output,branch,rewrite=[]}) {
   const root=path.resolve(git(path.resolve(repo),"rev-parse","--show-toplevel"));
   const source=path.resolve(git(path.resolve(conventions),"rev-parse","--show-toplevel"));
   const baseSha=git(root,"rev-parse","--verify","--end-of-options",`${base}^{commit}`);
@@ -79,15 +79,23 @@ export function migrationPlan({repo,conventions,sha,base="HEAD",output,branch}) 
   while(!fs.existsSync(ancestor))ancestor=path.dirname(ancestor);
   const destination=path.join(fs.realpathSync(ancestor),path.relative(ancestor,requested));
   const comparable=value=>process.platform==="win32"?value.toLowerCase():value;
-  const realRoot=comparable(fs.realpathSync(root)), realDestination=comparable(destination);
-  if(realDestination===realRoot||realDestination.startsWith(realRoot+path.sep))throw new Error("Disposable output must be outside the source checkout");
+  const realDestination=comparable(destination);
+  for(const checkout of [root,source]) {
+    const realRoot=comparable(fs.realpathSync(checkout));
+    if(realDestination===realRoot||realDestination.startsWith(realRoot+path.sep))throw new Error("Disposable output must be outside both source checkouts");
+  }
   if(fs.existsSync(destination))throw new Error(`Output already exists; inspect or recover it before retry: ${destination}`);
   if(!branch || branch.startsWith("-"))throw new Error("An explicit new branch is required");
   git(root,"check-ref-format","--branch",branch);
   const files=git(root,"ls-tree","-rz","--name-only",baseSha).split("\0").filter(Boolean);
+  for(const file of rewrite) {
+    within(root,file);
+    if(!files.includes(file)||!/^(?:tools|scripts|deploy)\/.*\.(?:mjs|js|sh|ps1|cmd|bat|ya?ml)$/.test(file))throw new Error(`Explicit rewrite must name a tracked operational script under tools, scripts or deploy: ${file}`);
+  }
+  const rewritable=name=>operational(name)||rewrite.includes(name);
   if(files.some(file=>["AGENTS.md","AGENTS.override.md",".agents/PROJECT.md",NEW_MOUNT].includes(file)||file.startsWith(".agents/rules/")))throw new Error("Selected base already contains neutral instructions; reconcile instead of replacing them");
   const symlinks=git(root,"ls-tree","-rz",baseSha).split("\0").filter(line=>line.startsWith("120000 ")).map(line=>line.slice(line.indexOf("\t")+1));
-  if(symlinks.some(file=>["CLAUDE.md",".claude",".agents"].includes(file)||file.startsWith(".claude/")||operational(file)))throw new Error("Selected base contains symlinked migration inputs");
+  if(symlinks.some(file=>["CLAUDE.md",".claude",".agents"].includes(file)||file.startsWith(".claude/")||rewritable(file)))throw new Error("Selected base contains symlinked migration inputs");
   actualPolicies(root,files);
   const mount=mountInfo(root,baseSha);
   for(const file of ["ENTRY.md","tools/rules.mjs","package-lock.json"]) {
@@ -117,12 +125,21 @@ export function migrationPlan({repo,conventions,sha,base="HEAD",output,branch}) 
     const tasks=Object.keys(TASKS);
     patches.push({path:target,remove:file,text:`---\nid: ${JSON.stringify(id)}\nload: conditional\ntasks: ${JSON.stringify(tasks)}\n---\n${rewriteMount(rebaseLinks(text,file,target,validate))}`});
   }
-  for(const file of files.filter(operational)) {
+  for(const file of files.filter(rewritable)) {
     const before=blob(root,baseSha,file), after=rewriteMount(before);
     if(before!==after)patches.push({path:file,text:after});
   }
   const protectedFiles=files.filter(name=>/^(?:\.claude\/.*\.json|\.codex\/|\.vscode\/|\.gitignore$)/.test(name));
+  let references;
+  try {references=gitOutput(root,["grep","-I","-l","-z","-F",OLD_MOUNT,baseSha,"--"]);}
+  catch(error) {if(error.status!==1)throw error;references="";}
+  const changed=new Set(patches.flatMap(patch=>[patch.path,patch.remove].filter(Boolean)));
+  const remainingReferences=references.split("\0").filter(Boolean).map(name=>name.slice(baseSha.length+1))
+    .filter(name=>!changed.has(name)).map(file=>({file,kind:/^(research|todo)\//.test(file)?"historical or planned: inspect":"requires review"}));
+  const dirtyInputs=git(root,"diff","--name-only","-z","HEAD","--").split("\0").filter(name=>name&&
+    (changed.has(name)||rewritable(name)||name==="CLAUDE.md"||name.startsWith(".claude/rules/")));
   const journal={status:"dry-run",base:baseSha,newSha,branch,output:destination,oldMount:OLD_MOUNT,newMount:NEW_MOUNT,
+    remainingReferences,dirtyInputs,
     paths:patches.map(({path,remove,text})=>({path,remove,hash:sha256(text)}))};
   if(Buffer.byteLength(JSON.stringify(journal,null,2))>250*1024)throw new Error("Migration report exceeds 250 KiB; narrow the migration inputs");
   return {root,source,base:baseSha,newSha,output:destination,branch,mount,patches,protectedFiles,journal};

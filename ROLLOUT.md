@@ -33,8 +33,11 @@ Large reads require one `--only <id>` at a time, with the same scope. Check comp
 bodies and hashes. Actual SHA is compared with the staged gitlink; HEAD is reported separately.
 Commit only the reported paths after reviewing the diff and running the consumer's checks.
 
-The rewrite allowlist is root README/POST_DEPLOY and `.github/workflows`. Review product
-adapters separately; the tool does not rewrite source code or historical research. Unscoped
+The default rewrite allowlist is root README/POST_DEPLOY and `.github/workflows`. Add repeated
+`--rewrite scripts/check.ps1` for specific tracked operational scripts under tools/scripts/deploy.
+The report names remaining legacy references and dirty inputs; inspect those before approval.
+Output must be outside both source checkouts. Review product
+adapters separately; the tool does not rewrite product source code or historical research. Unscoped
 local rules receive every supported task, including inspection. Scoped frontmatter is refused
 until its applicability has an explicit mapping.
 
@@ -47,16 +50,28 @@ node tools/smoke-rules.mjs --repo <worktree> --agent claude --file src/Example.c
 node tools/smoke-rules.mjs --repo <worktree> --agent codex --cwd src --file src/Example.cs
 ```
 
+Use `--cli <installed-executable-or-js-entry>` for a nondefault CLI installation. Windows shell
+wrappers are refused; native executables and installed npm JavaScript entries are supported.
+Use native Git worktrees for each OS: Windows absolute paths in a worktree's `.git` file are
+not Linux paths. Create a separate Linux checkout/worktree for WSL; do not rewrite shared metadata.
+
 Windows containment requires PowerShell 7 with local scripts permitted by existing policy;
 the tool never changes execution policy. Linux uses a process group. Each cell has a
 180-second deadline and a 256 KiB output cap. The Windows supervisor owns a kill-on-close
 Job Object, so an exited direct child cannot strand its descendants.
 
 The harness checks full canonical bodies in successful tool outputs, CLI completion and
-unchanged checkout state. A final model claim alone is insufficient. Successful source reads
+unchanged Git HEAD/index/status plus instruction, selected rule, requested file and known host
+setting content. Other file bodies are not hashed. Snapshots refuse more than 512 files,
+1 MiB per source or 8 MiB total. A final model claim alone is insufficient. Successful source reads
 still require review of the recorded final answer for behavioral compliance. Quota, denied
 permissions, absent CLI and incomplete output are failures. No installs, login, account
 switching or automatic retries occur.
+
+Claude smoke is for trusted repositories: its auto-approved Bash commands are limited to
+the chosen resolver's check/explain/read operations, alongside read/search tools. This is not
+an OS sandbox and does not override inherited host permissions. Progress goes to stderr;
+stdout remains the final JSON evidence.
 
 Two fixed evidence slots per worktree live under Git metadata (`rules-smoke/latest-*.json`),
 at most 32 KiB each plus atomic-write temporary files. A new run replaces that agent's previous

@@ -65,6 +65,16 @@ WSL 66 passed. The real coai canary smoke completed with Claude (`claude-opus-5`
 seven selected canonical sources, and left checkout state unchanged. Evidence is in
 [shared-rules-smoke-s2.json](shared-rules-smoke-s2.json); its stored answer limitation is explicit.
 
+S2 review fixes were verified with 71 cases: Windows 70 passed plus the same symlink skip;
+WSL all 71 passed. Regression failures reproduced output nested in the conventions source,
+an unrelated root ENTRY shadowing the mounted resolver, and an undeclared neutral directory
+being reported as unadopted (the latter also fails when its production guard is removed).
+Snapshot tests detect changed inspected content and reject large inspected files while leaving
+unrelated large file bodies unread. The migration scenario checks explicit script rewrites,
+remaining-reference reports and dirty input disclosure. A second real Claude run completed
+with the narrower resolver-only Bash approvals, all seven sources, an untruncated final answer,
+and unchanged measured state. Its scope and manual assessment are in the evidence file.
+
 PR follow-up adds an in-process real-Git CLI protocol scenario, so coverage measures the
 actual implementation rather than fixture copies. A dot-segment regression first omitted
 `csharp.doctrine` for `src/./file.cs`; normalization restores the same selection as the

@@ -113,6 +113,10 @@ function walk(dir, mounts, found) {
 }
 
 const mounts = mountPaths();
+if (fs.existsSync(".agents/conventions") && !mounts.includes(".agents/conventions")) {
+  console.error("gate-snippet-check: .agents/conventions exists but is not a declared submodule. Reconcile the instruction source.");
+  process.exit(warnOnly ? 0 : 1);
+}
 const canonical = mounts.map((m) => `${m}/${CANONICAL.replaceAll("\\", "/")}`).find((p) => fs.existsSync(p));
 
 // A mount UNDER a rule tree is this family's rules submodule, whatever it is named. Distinguishing

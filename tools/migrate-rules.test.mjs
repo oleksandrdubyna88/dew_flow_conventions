@@ -49,6 +49,9 @@ test("the existing gate checker recognizes missing neutral mounts and relocated 
   fs.appendFileSync(path.join(root,".gitmodules"),'[submodule "old"]\n path = .claude/rules/shared\n url = https://example.invalid/conventions\n');
   assert.equal(check().code,1,"two declared rule mounts must not pass as one canonical source");
   assert.match(check().out,/multiple rule mounts/i);
+  fs.unlinkSync(path.join(root,".gitmodules"));
+  assert.equal(check().code,1,"an undeclared neutral directory must not pass as unadopted");
+  assert.match(check().out,/not a declared submodule/);
 });
 
 test("real Git migration leaves source work intact and prepares exactly one relocated submodule",t=>{
@@ -65,17 +68,21 @@ test("real Git migration leaves source work intact and prepares exactly one relo
   fs.mkdirSync(path.join(repo,".claude/rules/common/deep"),{recursive:true});
   fs.writeFileSync(path.join(repo,"research/architecture.md"),"# Architecture\n");
   fs.writeFileSync(path.join(repo,"README.md"),"# Product\n");
+  fs.mkdirSync(path.join(repo,"scripts"));
+  fs.writeFileSync(path.join(repo,"scripts/check.ps1"),"node .claude/rules/shared/tools/rules.mjs check\n");
+  fs.writeFileSync(path.join(repo,"scripts/later.sh"),"node .claude/rules/shared/tools/rules.mjs check\n");
   fs.writeFileSync(path.join(repo,"CLAUDE.md"),"Read [architecture](research/architecture.md).\n");
   fs.writeFileSync(path.join(repo,".claude/settings.json"),'{"permissions":{"defaultMode":"acceptEdits"}}\n');
   fs.writeFileSync(path.join(repo,".claude/rules/common/deep/local.md"),"# Project policy\nUse this project's error type.\n");
   git(repo,"-c","protocol.file.allow=always","submodule","add",conventions,".claude/rules/shared");
-  git(repo,"add","--","CLAUDE.md","README.md","research/architecture.md",".claude/settings.json",".claude/rules/common/deep/local.md",".gitmodules",".claude/rules/shared");
+  git(repo,"add","--","CLAUDE.md","README.md","research/architecture.md",".claude/settings.json",".claude/rules/common/deep/local.md",".gitmodules",".claude/rules/shared","scripts/check.ps1","scripts/later.sh");
   git(repo,"commit","-qm","fixture");
   const base=git(repo,"rev-parse","HEAD"),sha=git(conventions,"rev-parse","HEAD");
   fs.writeFileSync(path.join(repo,"README.md"),"User's unfinished work.\n");
-  const options={repo,conventions,sha,output,branch:"migrate-test"};
+  const options={repo,conventions,sha,output,branch:"migrate-test",rewrite:["scripts/check.ps1"]};
   assert.throws(()=>migrationPlan({...options,sha:"0000000000000000000000000000000000000000"}));
   assert.throws(()=>migrationPlan({...options,output:repo}),/outside/);
+  assert.throws(()=>migrationPlan({...options,output:path.join(conventions,"nested-output-test")}),/outside/);
   fs.writeFileSync(path.join(repo,".claude/rules/ignored.md"),"Unfinished policy");
   assert.throws(()=>migrationPlan(options),/Untracked or ignored policy/);
   fs.unlinkSync(path.join(repo,".claude/rules/ignored.md"));
@@ -83,6 +90,10 @@ test("real Git migration leaves source work intact and prepares exactly one relo
   assert.throws(()=>migrationPlan(options),/Existing instruction/);
   fs.unlinkSync(path.join(repo,"AGENTS.md"));
   const plan=migrationPlan(options);
+  assert.ok(plan.journal.dirtyInputs.includes("README.md"));
+  assert.ok(plan.journal.remainingReferences.some(item=>item.file==="scripts/later.sh"));
+  assert.ok(!plan.journal.remainingReferences.some(item=>item.file==="scripts/check.ps1"));
+  assert.throws(()=>migrationPlan({...options,rewrite:[".claude/settings.json"]}),/tracked operational script/);
   assert.equal(plan.journal.status,"dry-run");
   assert.equal(fs.existsSync(output),false);
   assert.equal(git(repo,"rev-parse","HEAD"),base);
@@ -94,6 +105,7 @@ test("real Git migration leaves source work intact and prepares exactly one relo
   assert.equal(git(path.join(output,".agents/conventions"),"rev-parse","HEAD"),sha);
   assert.match(fs.readFileSync(path.join(output,".agents/PROJECT.md"),"utf8"),/\.\.\/research\/architecture.md/);
   assert.equal(fs.readFileSync(path.join(output,"CLAUDE.md"),"utf8"),"@AGENTS.md\n");
+  assert.match(fs.readFileSync(path.join(output,"scripts/check.ps1"),"utf8"),/\.agents\/conventions/);
   // Locked packages are JS only; copy the already-installed exact dependencies for this offline fixture.
   fs.cpSync(path.join(conventions,"node_modules"),path.join(output,".agents/conventions/node_modules"),{recursive:true});
   const check=JSON.parse(execFileSync(process.execPath,[path.join(output,".agents/conventions/tools/rules.mjs"),"check","--repo",output],{encoding:"utf8",timeout:10000}));
