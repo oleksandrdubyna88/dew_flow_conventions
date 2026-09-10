@@ -1,3 +1,9 @@
+---
+id: "common.logging-serilog"
+load: "conditional"
+tasks: ["logging","implement","audit"]
+paths: ["**/Program.cs","**/main.rs"]
+---
 # Logging — Serilog, coloured to the console, and on disk per run (MANDATORY)
 
 > **One copy, consumed everywhere.** This rule lives in `dew_flow_conventions` and reaches every

@@ -1,0 +1,168 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnSync, execFileSync } from "node:child_process";
+import { loadCatalog, selectRules, sha256 } from "./lib/rule-catalog.mjs";
+
+function fixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rules Unicode пробел "));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const put = (name, metadata, body = "A complete rule.\n") => {
+    const file = path.join(root, name);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `---\n${metadata}\n---\n${body}`);
+  };
+  put("common/core.md", "id: common.core\nload: always");
+  return { root, put };
+}
+
+test("planned files select both languages before any diff exists", t => {
+  const {root,put} = fixture(t);
+  put("csharp/code.md", 'id: csharp.code\nload: conditional\npaths: ["**/*.cs"]');
+  put("typescript/code.md", 'id: typescript.code\nload: conditional\npaths: ["**/*.ts"]');
+  const selected = selectRules(loadCatalog(root), ["implement"], ["src/New.cs", "ui\\новый.ts"]);
+  assert.deepEqual(selected.map(r => r.id), ["common.core", "csharp.code", "typescript.code"]);
+});
+
+test("tasks OR paths select a rule and dependencies ignore their own conditions", t => {
+  const {root,put} = fixture(t);
+  put("common/a.md", 'id: common.a\nload: conditional\ntasks: ["release"]\npaths: ["**/*.http"]\ndepends: ["common.b"]');
+  put("common/b.md", 'id: common.b\nload: conditional\ntasks: ["gpu"]');
+  const catalog = loadCatalog(root);
+  for (const [tasks,files] of [[["release"],[]], [["audit"],["api/a.http"]]]) {
+    const ids = selectRules(catalog,tasks,files).map(r=>r.id);
+    assert.ok(ids.includes("common.a") && ids.includes("common.b"));
+    assert.ok(ids.indexOf("common.b") < ids.indexOf("common.a"));
+    assert.equal(new Set(ids).size, ids.length);
+  }
+});
+
+test("a nonmatching second path does not select an unrelated language", t => {
+  const {root,put}=fixture(t);
+  put("rust/code.md", 'id: rust.code\nload: conditional\npaths: ["**/*.rs"]');
+  assert.deepEqual(selectRules(loadCatalog(root),["inspect"],["src/a.cs","ui/b.ts"]).map(r=>r.id),["common.core"]);
+});
+
+test("invalid catalog fails even when its broken rule would not be selected", t => {
+  const {root,put} = fixture(t);
+  put("common/b.md", 'id: common.b\nload: conditional\ntasks: ["gpu"]\ndepends: ["missing.rule"]');
+  assert.throws(()=>loadCatalog(root), /missing.rule/);
+  put("common/b.md", 'id: common.b\nload: conditional\ntasks: ["gpu"]\ndepends: ["common.b"]');
+  assert.throws(()=>loadCatalog(root), /cycle/i);
+});
+
+test("duplicates, unknown keys, empty bodies and malformed metadata fail closed", t => {
+  const {root,put} = fixture(t);
+  for (const [meta,body,expected] of [
+    ["id: common.core\nload: always","body",/duplicate/i],
+    ["id: common.b\nload: always\nlaod: always","body",/laod/],
+    ["id: common.b\nload: always","",/empty/i],
+    ["id: common.b\nload: always\nload: conditional","body",/unique|duplicate/i],
+    ["id: common.b\nload: conditional\ntasks: [imlpement]","body",/imlpement/],
+  ]) {
+    put("common/b.md",meta,body);
+    assert.throws(()=>loadCatalog(root),expected);
+  }
+});
+
+test("docs and fixtures never become instructions but a rule directory cannot silently lose metadata", t => {
+  const {root,put} = fixture(t);
+  put("todo/plan.md", "id: malicious.rule\nload: always");
+  assert.equal(loadCatalog(root).length,1);
+  fs.writeFileSync(path.join(root,"common/core.md"),"# Missing declaration\n");
+  assert.throws(()=>loadCatalog(root), /metadata/i);
+});
+
+test("unknown tasks and escaped target paths fail instead of selecting only core", t => {
+  const catalog=loadCatalog(fixture(t).root);
+  assert.throws(()=>selectRules(catalog,["imlpement"],[]),/imlpement/);
+  assert.throws(()=>selectRules(catalog,["audit"],["../outside.cs"]),/relative|outside/i);
+  assert.throws(()=>selectRules(catalog,[],[]),/task/i);
+});
+
+test("hashes change on canonical edits without a persistent cache", t => {
+  const {root,put}=fixture(t);
+  const before=loadCatalog(root)[0].hash;
+  put("common/core.md","id: common.core\nload: always","Changed policy.\n");
+  assert.notEqual(loadCatalog(root)[0].hash,before);
+});
+
+test("symlink rule sources are refused instead of following external files", t => {
+  const {root}=fixture(t);
+  const target=path.join(root,"common","linked.md");
+  try { fs.symlinkSync(path.join(root,"common/core.md"),target); }
+  catch (error) { if(error.code === "EPERM") { t.skip("Windows symlink privilege unavailable; Linux runs this case"); return; } throw error; }
+  assert.throws(()=>loadCatalog(root),/symlink/i);
+});
+
+const sourceRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
+
+test("all original rule bodies and every inventoried section survive migration",()=>{
+  const inventory=JSON.parse(fs.readFileSync(path.join(sourceRoot,"research/shared-rules-migration-map.json"),"utf8"));
+  const catalog=loadCatalog(sourceRoot);
+  assert.equal(inventory.rules.length,24);
+  for(const original of inventory.rules) {
+    const actual=catalog.find(rule=>rule.id===original.id);
+    assert.ok(actual,original.id);
+    const body=actual.text.replace(/^---\n[\s\S]*?\n---\n/,"");
+    assert.deepEqual(body.split("\n").filter(line=>/^#{1,4} /.test(line)),original.sections);
+    // The inventory is evidence against the original commit, not a parallel applicability map.
+    assert.equal(sha256(body),original.originalBodySha256,original.id);
+  }
+});
+
+test("central build props continue to select the NuGet policy",()=>{
+  const rules=selectRules(loadCatalog(sourceRoot),["inspect"],["Directory.Build.props"]);
+  assert.ok(rules.some(rule=>rule.id==="csharp.nuget-packages"));
+});
+
+function cliFixture(t) {
+  const {root}=fixture(t);
+  for(const name of ["tools","node_modules","common","csharp","rust","typescript","AGENTS.md","CLAUDE.md","ENTRY.md",".agents"]) {
+    fs.cpSync(path.join(sourceRoot,name),path.join(root,name),{recursive:true});
+  }
+  execFileSync("git",["init","-q",root],{timeout:10000});
+  execFileSync("git",["-C",root,"-c","user.name=Rule test","-c","user.email=rules@example.invalid","-c","commit.gpgsign=false","commit","--allow-empty","-qm","fixture"],{timeout:10000});
+  const cli=(args,cwd=root)=>spawnSync(process.execPath,[path.join(root,"tools/rules.mjs"),...args],{cwd,encoding:"utf8",timeout:10000,maxBuffer:1024*1024});
+  return {root,cli};
+}
+
+test("real CLI loads from nested directories, bounds reads and reports missing/override policy",t=>{
+  const {root,cli}=cliFixture(t);
+  fs.mkdirSync(path.join(root,"src/два слова"),{recursive:true});
+  const args=["explain","--task","inspect","--file","src/New.cs","--file","ui/New.ts"];
+  const nested=cli(args,path.join(root,"src/два слова"));
+  assert.equal(nested.status,0,nested.stderr);
+  const manifest=JSON.parse(nested.stdout);
+  assert.ok(manifest.rules.some(rule=>rule.id==="csharp.doctrine"));
+  assert.ok(manifest.rules.some(rule=>rule.id==="typescript.doctrine"));
+  assert.ok(!manifest.rules.some(rule=>rule.id==="rust.doctrine"));
+  // Reintroduce the refuted callback in an isolated copy: this must change actual CLI behavior.
+  const catalogFile=path.join(root,"tools/lib/rule-catalog.mjs");
+  const correct=fs.readFileSync(catalogFile,"utf8");
+  const mutated=correct.replace("normalized.filter(file=>match(file))","normalized.filter(match)");
+  assert.notEqual(mutated,correct);
+  fs.writeFileSync(catalogFile,mutated);
+  assert.ok(JSON.parse(cli(args).stdout).rules.some(rule=>rule.id==="rust.doctrine"));
+  fs.writeFileSync(catalogFile,correct);
+  const large=cli(["read","--task","implement"]);
+  assert.equal(large.status,1);
+  assert.equal(large.stdout,"");
+  assert.match(large.stderr,/32 KiB/);
+  const single=cli(["read","--task","implement","--only","common.security"]);
+  assert.equal(single.status,0,single.stderr);
+  assert.match(single.stdout,/BEGIN RULE common.security/);
+  assert.match(single.stdout,/END RULE common.security/);
+  fs.writeFileSync(path.join(root,"src/AGENTS.override.md"),"Conflicting local rules\n");
+  const conflict=cli(args);
+  assert.equal(conflict.status,1);
+  assert.match(conflict.stderr,/AGENTS.override/);
+  fs.unlinkSync(path.join(root,"src/AGENTS.override.md"));
+  fs.unlinkSync(path.join(root,".agents/PROJECT.md"));
+  const missing=cli(["check"]);
+  assert.equal(missing.status,1);
+  assert.match(missing.stderr,/Missing instruction source.*PROJECT/);
+});

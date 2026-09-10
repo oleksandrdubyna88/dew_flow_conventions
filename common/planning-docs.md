@@ -1,3 +1,9 @@
+---
+id: "common.planning-docs"
+load: "conditional"
+tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
+paths: ["todo/**","research/**"]
+---
 # Planning Docs — `todo/` is open work, `research/` is documentation
 
 Two folders, two jobs. Never mix them.

@@ -1,3 +1,8 @@
+---
+id: "common.post-deploy-checks"
+load: "conditional"
+tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
+---
 # Post-deploy checks — the short list a green build cannot answer (MANDATORY)
 
 > Extends [development-workflow.md](development-workflow.md), which already records three ways a change

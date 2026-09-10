@@ -1,3 +1,7 @@
+---
+id: "common.security"
+load: "always"
+---
 # Security Guidelines
 
 ## Mandatory checks before ANY commit

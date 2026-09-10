@@ -1,3 +1,7 @@
+---
+id: "common.knowledge-base"
+load: "always"
+---
 # Knowledge base sync — `research/` tracks the system as it is (MANDATORY)
 
 The `research/` knowledge base uses the **`architecture.md` + `module_[name].md`** convention:

@@ -1,3 +1,9 @@
+---
+id: "common.http-contracts"
+load: "conditional"
+tasks: ["http","release","implement","audit"]
+paths: ["**/*.http"]
+---
 # HTTP contracts — an `.http` file per route group, run before every release (MANDATORY)
 
 > Extends [testing.md](testing.md), which governs what a test may claim. This rule covers the one tier

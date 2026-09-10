@@ -1,8 +1,7 @@
 ---
-paths:
-  - "**/*.cs"
-  - "**/*.razor"
-  - "**/*.csproj"
+id: "csharp.doctrine"
+load: "conditional"
+paths: ["**/*.cs","**/*.razor","**/*.csproj"]
 ---
 # C# doctrine — the family's code rules
 
