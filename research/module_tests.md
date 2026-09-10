@@ -105,3 +105,11 @@ State/PPid. This tests the same real process boundary without assuming synchrono
 See [kill(2)](https://man7.org/linux/man-pages/man2/kill.2.html): PID existence includes a
 terminated process awaiting wait. The CI outcome is recorded separately from that explanation.
 
+The real Git migration scenario also drives the complete smoke/report/lock cycle for both
+vendor event formats. Its explicitly labelled fixture CLI invokes the real mounted resolver
+and emits transport events; it does not call a model and is never native-agent evidence.
+It checks correlated reads, unchanged scope, persisted report identity, lock cleanup and
+active-owner refusal. This covers orchestration in ordinary CI while paid native runs remain
+separate. PR review refactoring split destination/source validation, patch construction,
+report ownership and event decoding without changing their contracts.
+

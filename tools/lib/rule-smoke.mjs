@@ -54,7 +54,7 @@ export function snapshot(repo,names) {
   const files=new Set([...names,".claude/settings.local.json",".codex/config.toml"]);
   if(files.size>512)throw new Error("Smoke snapshot exceeds 512 paths");
   let bytes=0;
-  const hashes=[...files].sort().map(name=>{
+  const hashes=[...files].sort((a,b)=>a<b?-1:a>b?1:0).map(name=>{
     const file=within(repo,name);
     if(!fs.existsSync(file))return [name,"absent"];
     const stat=fs.lstatSync(file);
@@ -77,6 +77,38 @@ export function snapshot(repo,names) {
     status:git(repo,"status","--porcelain","--untracked-files=normal"),hashes}));
 }
 
+function assertAvailableLock(report,lock) {
+  if(fs.existsSync(lock)) {
+    if(fs.lstatSync(lock).isSymbolicLink())throw new Error("Smoke lock cannot be a symlink");
+    const owner=JSON.parse(fs.readFileSync(lock,"utf8"));
+    if(!Number.isSafeInteger(owner.pid)||owner.pid<1)throw new Error("Unknown smoke lock; inspect before recovery");
+    let dead=false;
+    try{process.kill(owner.pid,0);}catch(error){if(error.code==="ESRCH")dead=true;else throw error;}
+    if(!dead)throw new Error(`Smoke already owned by process ${owner.pid}`);
+    // Never reap a lock with read-then-delete: another recovery can acquire it in between.
+    throw new Error(`Previous smoke owner ${owner.pid} is dead; run incomplete. Inspect ${report}, then recover its named .lock/.tmp files before retrying`);
+  }
+}
+
+function smokeReports(root,agent) {
+  const directory=git(root,"rev-parse","--path-format=absolute","--git-path","rules-smoke");
+  if(fs.existsSync(directory)&&fs.lstatSync(directory).isSymbolicLink())throw new Error("Smoke report directory cannot be a symlink");
+  fs.mkdirSync(directory,{recursive:true});
+  // Two fixed report slots; replacement is atomic, no growing trace/log directory or pruning job.
+  const report=path.join(directory,`latest-${agent}.json`);
+  const lock=report+".lock";
+  assertAvailableLock(report,lock);
+  if(fs.existsSync(report)&&fs.lstatSync(report).isSymbolicLink())throw new Error("Smoke report cannot be a symlink");
+  fs.writeFileSync(lock,JSON.stringify({pid:process.pid}),{flag:"wx"});
+  const save=value=>{
+    const text=JSON.stringify(value,null,2)+"\n";
+    if(Buffer.byteLength(text)>32768)throw new Error("Smoke evidence exceeds 32 KiB");
+    fs.writeFileSync(report+".tmp",text,{flag:"wx"});
+    fs.renameSync(report+".tmp",report);
+  };
+  return {report,lock,save};
+}
+
 export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
   if(!["claude","codex"].includes(agent))throw new Error("Agent must be claude or codex");
   const root=path.resolve(git(repo,"rev-parse","--show-toplevel"));
@@ -91,30 +123,7 @@ export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
   const prompt=`Read the repository instructions and explain the rules governing hypothetical new files ${scope.map(file=>JSON.stringify(file)).join(", ")}. This is read-only inspection, not implementation. Follow the repository loading procedure. Invoke node "${resolver.replaceAll("\\","/")}" as a single command per tool call, with --repo "${root.replaceAll("\\","/")}"; do not prefix cd or combine shell commands. Keep the final answer concise: selected rule ids/hashes and a concrete constraint from each applicable language. Do not delegate, call reviewers, edit files, inspect credentials, or read outside this repository.`;
   const cli=nativeCli(agent,working,prompt,resolver,explicitCli);
   const snapshotPaths=[...manifest.instructions.map(item=>item.path),...manifest.rules.map(item=>item.source),...scope];
-  const directory=git(root,"rev-parse","--path-format=absolute","--git-path","rules-smoke");
-  if(fs.existsSync(directory)&&fs.lstatSync(directory).isSymbolicLink())throw new Error("Smoke report directory cannot be a symlink");
-  fs.mkdirSync(directory,{recursive:true});
-  // Two fixed report slots; replacement is atomic, no growing trace/log directory or pruning job.
-  const report=path.join(directory,`latest-${agent}.json`);
-  const lock=report+".lock";
-  if(fs.existsSync(lock)) {
-    if(fs.lstatSync(lock).isSymbolicLink())throw new Error("Smoke lock cannot be a symlink");
-    const owner=JSON.parse(fs.readFileSync(lock,"utf8"));
-    if(!Number.isSafeInteger(owner.pid)||owner.pid<1)throw new Error("Unknown smoke lock; inspect before recovery");
-    let dead=false;
-    try{process.kill(owner.pid,0);}catch(error){if(error.code==="ESRCH")dead=true;else throw error;}
-    if(!dead)throw new Error(`Smoke already owned by process ${owner.pid}`);
-    // Never reap a lock with read-then-delete: another recovery can acquire it in between.
-    throw new Error(`Previous smoke owner ${owner.pid} is dead; run incomplete. Inspect ${report}, then recover its named .lock/.tmp files before retrying`);
-  }
-  if(fs.existsSync(report)&&fs.lstatSync(report).isSymbolicLink())throw new Error("Smoke report cannot be a symlink");
-  fs.writeFileSync(lock,JSON.stringify({pid:process.pid}),{flag:"wx"});
-  const save=value=>{
-    const text=JSON.stringify(value,null,2)+"\n";
-    if(Buffer.byteLength(text)>32768)throw new Error("Smoke evidence exceeds 32 KiB");
-    fs.writeFileSync(report+".tmp",text,{flag:"wx"});
-    fs.renameSync(report+".tmp",report);
-  };
+  const {report,lock,save}=smokeReports(root,agent);
   const initial={status:"incomplete: running",agent,platform:process.platform,started:new Date().toISOString(),pid:process.pid,
     version:manifest.version,scope,cwd,report,promptHash:sha256(prompt),
     unchangedScope:"Git HEAD/index/status plus instruction, selected rule, requested file and host-setting content; other file content is not hashed"};

@@ -52,7 +52,7 @@ function actualPolicies(repo,tracked) {
 }
 
 function mountInfo(repo,base) {
-  const lines=git(repo,"config","--blob",`${base}:.gitmodules`,"--get-regexp","^submodule\\..*\\.path$").split("\n");
+  const lines=git(repo,"config","--blob",`${base}:.gitmodules`,"--get-regexp",String.raw`^submodule\..*\.path$`).split("\n");
   const found=lines.map(line=>{
     const split=line.indexOf(" ");
     return {name:line.slice(10,split-5),path:line.slice(split+1).replaceAll("\\","/")};
@@ -64,41 +64,45 @@ function mountInfo(repo,base) {
   return {...mount,url:git(repo,"config","--blob",`${base}:.gitmodules`,"--get",`submodule.${mount.name}.url`),oldSha:git(repo,"rev-parse",`${base}:${OLD_MOUNT}`)};
 }
 
-export function migrationPlan({repo,conventions,sha,base="HEAD",output,branch,rewrite=[]}) {
-  const root=path.resolve(git(path.resolve(repo),"rev-parse","--show-toplevel"));
-  const source=path.resolve(git(path.resolve(conventions),"rev-parse","--show-toplevel"));
-  const baseSha=git(root,"rev-parse","--verify","--end-of-options",`${base}^{commit}`);
-  const newSha=git(source,"rev-parse","--verify","--end-of-options",`${sha}^{commit}`);
+function migrationDestination(output,checkouts) {
   const requested=path.resolve(output);
   let ancestor=requested;
   while(!fs.existsSync(ancestor))ancestor=path.dirname(ancestor);
   const destination=path.join(fs.realpathSync(ancestor),path.relative(ancestor,requested));
   const comparable=value=>process.platform==="win32"?value.toLowerCase():value;
   const realDestination=comparable(destination);
-  for(const checkout of [root,source]) {
+  for(const checkout of checkouts) {
     const realRoot=comparable(fs.realpathSync(checkout));
     if(realDestination===realRoot||realDestination.startsWith(realRoot+path.sep))throw new Error("Disposable output must be outside both source checkouts");
   }
   if(fs.existsSync(destination))throw new Error(`Output already exists; inspect or recover it before retry: ${destination}`);
-  if(!branch || branch.startsWith("-"))throw new Error("An explicit new branch is required");
-  git(root,"check-ref-format","--branch",branch);
-  const files=git(root,"ls-tree","-rz","--name-only",baseSha).split("\0").filter(Boolean);
-  for(const file of rewrite) {
-    within(root,file);
-    if(!files.includes(file)||!/^(?:tools|scripts|deploy)\/.*\.(?:mjs|js|sh|ps1|cmd|bat|ya?ml)$/.test(file))throw new Error(`Explicit rewrite must name a tracked operational script under tools, scripts or deploy: ${file}`);
-  }
-  const rewritable=name=>operational(name)||rewrite.includes(name);
-  if(files.some(file=>["AGENTS.md","AGENTS.override.md",".agents/PROJECT.md",NEW_MOUNT].includes(file)||file.startsWith(".agents/rules/")))throw new Error("Selected base already contains neutral instructions; reconcile instead of replacing them");
-  const symlinks=git(root,"ls-tree","-rz",baseSha).split("\0").filter(line=>line.startsWith("120000 ")).map(line=>line.slice(line.indexOf("\t")+1));
-  if(symlinks.some(file=>["CLAUDE.md",".claude",".agents"].includes(file)||file.startsWith(".claude/")||rewritable(file)))throw new Error("Selected base contains symlinked migration inputs");
-  actualPolicies(root,files);
-  const mount=mountInfo(root,baseSha);
+  return destination;
+}
+
+function validateSourceVersion(root,source,baseSha,newSha,files) {
   for(const file of ["ENTRY.md","tools/rules.mjs","package-lock.json"]) {
     if(!existsAt(source,newSha,file))throw new Error(`Selected conventions commit lacks ${file}`);
   }
   for(const file of files.filter(name=>/^\.(claude|codex|vscode)\//.test(name)&&!name.startsWith(".claude/rules/")&&/\.(json|toml)$/.test(name))) {
     if(blob(root,baseSha,file).includes(OLD_MOUNT))throw new Error(`Host configuration still references the legacy mount: ${file}; reconcile explicitly`);
   }
+}
+
+function validateInputs({root,source,baseSha,newSha,files,rewrite,rewritable}) {
+  for(const file of rewrite) {
+    within(root,file);
+    if(!files.includes(file)||!/^(?:tools|scripts|deploy)\/.*\.(?:mjs|js|sh|ps1|cmd|bat|ya?ml)$/.test(file))throw new Error(`Explicit rewrite must name a tracked operational script under tools, scripts or deploy: ${file}`);
+  }
+  if(files.some(file=>["AGENTS.md","AGENTS.override.md",".agents/PROJECT.md",NEW_MOUNT].includes(file)||file.startsWith(".agents/rules/")))throw new Error("Selected base already contains neutral instructions; reconcile instead of replacing them");
+  const symlinks=git(root,"ls-tree","-rz",baseSha).split("\0").filter(line=>line.startsWith("120000 ")).map(line=>line.slice(line.indexOf("\t")+1));
+  if(symlinks.some(file=>["CLAUDE.md",".claude",".agents"].includes(file)||file.startsWith(".claude/")||rewritable(file)))throw new Error("Selected base contains symlinked migration inputs");
+  actualPolicies(root,files);
+  const mount=mountInfo(root,baseSha);
+  validateSourceVersion(root,source,baseSha,newSha,files);
+  return mount;
+}
+
+function migrationPatches({root,source,baseSha,newSha,files,rewritable}) {
   const patches=[];
   const validate=(oldTarget,newTarget)=>{
     const shared=newTarget===NEW_MOUNT||newTarget.startsWith(NEW_MOUNT+"/");
@@ -108,8 +112,7 @@ export function migrationPlan({repo,conventions,sha,base="HEAD",output,branch,re
   const projectText=rewriteMount(rebaseLinks(blob(root,baseSha,"CLAUDE.md"),"CLAUDE.md",".agents/PROJECT.md",validate));
   if(projectText.startsWith("---\n"))throw new Error("Existing CLAUDE frontmatter needs explicit migration");
   const requires=["README.md","research/architecture.md"].filter(file=>files.includes(file));
-  patches.push({path:".agents/PROJECT.md",text:`---\nrequires: ${JSON.stringify(requires)}\n---\n${projectText}`});
-  patches.push({path:"CLAUDE.md",text:"@AGENTS.md\n"},{path:"AGENTS.md",text:bootstrap()});
+  patches.push({path:".agents/PROJECT.md",text:`---\nrequires: ${JSON.stringify(requires)}\n---\n${projectText}`},{path:"CLAUDE.md",text:"@AGENTS.md\n"},{path:"AGENTS.md",text:bootstrap()});
   for(const file of files.filter(name=>name.startsWith(".claude/rules/")&&name!==OLD_MOUNT)) {
     if(!file.endsWith(".md"))throw new Error(`Non-Markdown local rule requires reconciliation: ${file}`);
     const text=blob(root,baseSha,file);
@@ -124,10 +127,28 @@ export function migrationPlan({repo,conventions,sha,base="HEAD",output,branch,re
     const before=blob(root,baseSha,file), after=rewriteMount(before);
     if(before!==after)patches.push({path:file,text:after});
   }
+  return patches;
+}
+
+export function migrationPlan({repo,conventions,sha,base="HEAD",output,branch,rewrite=[]}) {
+  const root=path.resolve(git(path.resolve(repo),"rev-parse","--show-toplevel"));
+  const source=path.resolve(git(path.resolve(conventions),"rev-parse","--show-toplevel"));
+  const baseSha=git(root,"rev-parse","--verify","--end-of-options",`${base}^{commit}`);
+  const newSha=git(source,"rev-parse","--verify","--end-of-options",`${sha}^{commit}`);
+  const destination=migrationDestination(output,[root,source]);
+  if(!branch || branch.startsWith("-"))throw new Error("An explicit new branch is required");
+  git(root,"check-ref-format","--branch",branch);
+  const files=git(root,"ls-tree","-rz","--name-only",baseSha).split("\0").filter(Boolean);
+  const rewritable=name=>operational(name)||rewrite.includes(name);
+  const mount=validateInputs({root,source,baseSha,newSha,files,rewrite,rewritable});
+  const patches=migrationPatches({root,source,baseSha,newSha,files,rewritable});
   const protectedFiles=files.filter(name=>/^(?:\.claude\/.*\.json|\.codex\/|\.vscode\/|\.gitignore$)/.test(name));
   let references;
   try {references=gitOutput(root,["grep","-I","-l","-z","-F",OLD_MOUNT,baseSha,"--"]);}
-  catch(error) {if(error.status!==1)throw error;references="";}
+  catch(error) {
+    if(error.status!==1)throw error;
+    references="";
+  }
   const changed=new Set(patches.flatMap(patch=>[patch.path,patch.remove].filter(Boolean)));
   const remainingReferences=references.split("\0").filter(Boolean).map(name=>name.slice(baseSha.length+1))
     .filter(name=>!changed.has(name)).map(file=>({file,kind:/^(research|todo)\//.test(file)?"historical or planned: inspect":"requires review"}));

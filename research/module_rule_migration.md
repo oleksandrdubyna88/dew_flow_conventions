@@ -23,6 +23,10 @@ Product code adapters are a separate reviewed consumer change. Markdown links ar
 and validated. A neutral mount directory, PROJECT or local rule tree without a declared
 neutral mount fails the gate-snippet check. The conventions source itself is distinguished
 by the installed tool's root. Migration and smoke share the bounded runner in `tools/lib/git.mjs`.
+Preflight separates destination validation, source/version validation and patch construction.
+Smoke report/lock ownership and vendor trace decoding are separate functions so failure
+handling can be reviewed independently. Both Git callers retain the same operator-owned
+PATH trust boundary documented for the resolver; the scoped S4036 decision covers this helper too.
 
 `tools/smoke-rules.mjs` runs an installed native CLI against a disposable worktree. It calls
 the mounted resolver to establish expected sources, asks the agent to discover its own

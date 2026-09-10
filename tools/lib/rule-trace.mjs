@@ -33,38 +33,63 @@ export function resolverRead(command,{resolver,cwd},wrapped=false) {
   return comparable(path.resolve(cwd,args[1]))===comparable(path.resolve(resolver));
 }
 
-export function traceEvidence(agent,trace,expected,origin) {
-  const events=trace.split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line));
-  const outputs=[],commands=new Map(),models=new Set(),sourceCalls=[];
-  let completed=false,final="";
-  const capture=(command,text)=>{
+function sourceCollector(origin) {
+  const outputs=[],sourceCalls=[];
+  const capture=(command,text)=> {
     const accepted=!!origin&&resolverRead(command,origin);
     if(typeof command==="string"&&command.includes("rules.mjs")&&sourceCalls.length<8)sourceCalls.push({command:command.slice(0,512),accepted});
     if(accepted)outputs.push({text:text.replaceAll("\r\n","\n"),commandHash:sha256(command)});
   };
+  return {outputs,sourceCalls,capture};
+}
+
+function codexEvents(events,capture) {
+  let completed=false,final="";
   for(const event of events) {
-    if(agent==="codex") {
-      const item=event.item;
-      if(event.type==="item.completed"&&item?.type==="command_execution"&&item.exit_code===0)capture(item.command,item.aggregated_output??"");
-      if(event.type==="item.completed"&&item?.type==="agent_message")final=item.text??"";
-      if(event.type==="turn.completed")completed=true;
-      continue;
-    }
+    const item=event.item;
+    if(event.type==="item.completed"&&item?.type==="command_execution"&&item.exit_code===0)capture(item.command,item.aggregated_output??"");
+    if(event.type==="item.completed"&&item?.type==="agent_message")final=item.text??"";
+    if(event.type==="turn.completed")completed=true;
+  }
+  return {completed,final,models:[]};
+}
+
+function rememberCommands(message,commands) {
+  for(const block of message?.content??[]) {
+    if(block.type==="tool_use"&&block.name==="Bash")commands.set(block.id,block.input?.command);
+  }
+}
+
+function claudeResults(message,commands,capture) {
+  for(const block of message?.content??[]) {
+    if(block.type!=="tool_result"||block.is_error)continue;
+    const output=typeof block.content==="string"?block.content:(block.content??[]).filter(item=>item.type==="text").map(item=>item.text).join("\n");
+    capture(commands.get(block.tool_use_id),output);
+  }
+}
+
+function claudeEvents(events,capture) {
+  const commands=new Map(),models=new Set();
+  let completed=false,final="";
+  for(const event of events) {
     if(event.type==="assistant") {
       if(event.message?.model)models.add(event.message.model);
-      for(const block of event.message?.content??[])if(block.type==="tool_use"&&block.name==="Bash")commands.set(block.id,block.input?.command);
+      rememberCommands(event.message,commands);
     }
-    if(event.type==="user")for(const block of event.message?.content??[]) {
-      if(block.type!=="tool_result"||block.is_error)continue;
-      const output=typeof block.content==="string"?block.content:(block.content??[]).filter(item=>item.type==="text").map(item=>item.text).join("\n");
-      capture(commands.get(block.tool_use_id),output);
-    }
+    if(event.type==="user")claudeResults(event.message,commands,capture);
     if(event.type==="result") {completed=event.subtype==="success"&&!event.is_error;final=event.result??"";}
   }
+  return {completed,final,models:[...models]};
+}
+
+export function traceEvidence(agent,trace,expected,origin) {
+  const events=trace.split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line));
+  const {outputs,sourceCalls,capture}=sourceCollector(origin);
+  const {completed,final,models}=agent==="codex"?codexEvents(events,capture):claudeEvents(events,capture);
   const reads=expected.map(rule=>{
     const evidence=outputs.find(output=>output.text.includes(`BEGIN RULE ${rule.id} sha256:${rule.hash}\n${rule.text}\nEND RULE ${rule.id}`));
     return {id:rule.id,hash:rule.hash,complete:!!evidence,...(evidence?{sourceCommandHash:evidence.commandHash}:{})};
   });
-  return {completed,reads,sourceCalls,models:[...models],final:final.slice(0,12000),finalTruncated:final.length>12000,
+  return {completed,reads,sourceCalls,models,final:final.slice(0,12000),finalTruncated:final.length>12000,
     allSourcesRead:reads.length>0&&reads.every(rule=>rule.complete)};
 }

@@ -7,6 +7,7 @@ import {fileURLToPath} from "node:url";
 import {execFileSync,spawnSync} from "node:child_process";
 import {rebaseLinks,migrationPlan,applyMigration} from "./lib/rule-migration.mjs";
 import {git} from "./lib/git.mjs";
+import {smoke} from "./lib/rule-smoke.mjs";
 
 test("moved project links resolve to the same repository targets",()=>{
   const original='Read [design](research/architecture.md) and [gate](.claude/rules/shared/common/coai-review-gate.md). Keep [web](https://example.org/a) and [local](#here).';
@@ -58,7 +59,7 @@ test("the existing gate checker recognizes missing neutral mounts and relocated 
   assert.equal(check().code,1,"neutral instructions without a mount cannot pass as unadopted");
 });
 
-test("real Git migration leaves source work intact and prepares exactly one relocated submodule",t=>{
+test("real Git migration leaves source work intact and prepares exactly one relocated submodule",async t=>{
   const temp=fs.mkdtempSync(path.join(os.tmpdir(),"migration пробел "));
   const repo=path.join(temp,"source"),output=path.join(temp,"prepared");
   const conventions=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
@@ -117,6 +118,36 @@ test("real Git migration leaves source work intact and prepares exactly one relo
   assert.equal(check.version.staged,true);
   assert.ok(check.rules.some(rule=>rule.id==="local.common.deep.local"));
   const mounted=path.join(output,".agents/conventions");
+  // Exercise smoke orchestration without paid models. The fixture CLI runs the REAL resolver
+  // and emits a labelled transport fixture, never evidence of real model behavior.
+  const fixtureCli=path.join(temp,"transport-fixture.mjs");
+  fs.writeFileSync(fixtureCli,`
+    import {execFileSync} from 'node:child_process';
+    const root=${JSON.stringify(output)},resolver=${JSON.stringify(path.join(mounted,"tools/rules.mjs"))};
+    const out=execFileSync(process.execPath,[resolver,'read','--repo',root,'--task','inspect','--file','src/fixture.cs'],{encoding:'utf8'});
+    const command='node "'+resolver.replaceAll('\\\\','/')+'" read --repo "'+root+'" --task inspect --file src/fixture.cs';
+    const emit=value=>console.log(JSON.stringify(value));
+    if(process.argv.includes('--ephemeral')) {
+      emit({type:'item.completed',item:{type:'command_execution',command,exit_code:0,aggregated_output:out}});
+      emit({type:'item.completed',item:{type:'agent_message',text:'Transport fixture only, not a model answer.'}});
+      emit({type:'turn.completed'});
+    } else {
+      emit({type:'assistant',message:{model:'transport-fixture',content:[{type:'tool_use',id:'read',name:'Bash',input:{command}}]}});
+      emit({type:'user',message:{content:[{type:'tool_result',tool_use_id:'read',content:out}]}});
+      emit({type:'result',subtype:'success',result:'Transport fixture only, not a model answer.'});
+    }
+  `);
+  for(const agent of ["claude","codex"]) {
+    const observed=await smoke({repo:output,agent,files:["src/fixture.cs"],cli:fixtureCli});
+    assert.equal(observed.allSourcesRead,true,JSON.stringify(observed));
+    assert.equal(observed.completed,true);
+    assert.equal(observed.unchanged,true);
+    assert.deepEqual(JSON.parse(fs.readFileSync(observed.report,"utf8")),observed);
+    assert.equal(fs.existsSync(observed.report+".lock"),false);
+    fs.writeFileSync(observed.report+".lock",JSON.stringify({pid:process.pid}));
+    await assert.rejects(smoke({repo:output,agent,files:["src/fixture.cs"],cli:fixtureCli}),/already owned/);
+    fs.unlinkSync(observed.report+".lock");
+  }
   const cli=(args=["check"],cwd=output)=>spawnSync(process.execPath,[path.join(mounted,"tools/rules.mjs"),...args],{cwd,encoding:"utf8",timeout:10000});
   const scoped=cli(["explain","--task","inspect","--file","src/новый.cs"]);
   assert.equal(scoped.status,0,scoped.stderr);
