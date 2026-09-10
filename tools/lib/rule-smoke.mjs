@@ -49,12 +49,17 @@ function nativeCli(agent,repo,prompt,resolver,explicit) {
       "Bash(git rev-parse *)","Bash(pwd)","Glob","Grep","--",prompt]};
 }
 
+function codeUnitOrder(a,b) {
+  if(a===b)return 0;
+  return a<b?-1:1;
+}
+
 export function snapshot(repo,names) {
   // Git metadata plus bounded content of the inspected scope, not a whole-repository content audit.
   const files=new Set([...names,".claude/settings.local.json",".codex/config.toml"]);
   if(files.size>512)throw new Error("Smoke snapshot exceeds 512 paths");
   let bytes=0;
-  const hashes=[...files].sort((a,b)=>a<b?-1:a>b?1:0).map(name=>{
+  const hashes=[...files].sort(codeUnitOrder).map(name=>{
     const file=within(repo,name);
     if(!fs.existsSync(file))return [name,"absent"];
     const stat=fs.lstatSync(file);
