@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,10 +11,26 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const REFERENCE = path.join(ROOT, 'settings');
 
+/**
+ * A real repository, because the checker resolves a root the way the entry procedure does.
+ *
+ * <p>`git init` rather than a bare directory: a fixture that is not a repository would test a code
+ * path no consumer has.</p>
+ */
+function repository(t, prefix = 'adapter-') {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  execFileSync('git', ['-C', dir, 'init', '-q'], { timeout: 30_000, windowsHide: true });
+
+  // macOS puts temp dirs under a symlink, and git answers with the resolved path; the checker
+  // compares what git said against what it builds, so the fixture must use git's answer too.
+  return execFileSync('git', ['-C', dir, 'rev-parse', '--show-toplevel'],
+    { encoding: 'utf8', timeout: 30_000, windowsHide: true }).trim();
+}
+
 /** A repository with the adapter copied correctly, so each test can break exactly one thing. */
 function whole(t) {
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'adapter-'));
-  t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
+  const repo = repository(t);
   fs.mkdirSync(path.join(repo, '.claude/hooks'), { recursive: true });
   fs.copyFileSync(path.join(REFERENCE, 'settings.json'), path.join(repo, '.claude/settings.json'));
   fs.copyFileSync(
@@ -35,10 +52,7 @@ test('this repository hosts the adapter on itself, which is the only test the me
 });
 
 test('a missing hook and missing settings are both named, with what to do', (t) => {
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'adapter-bare-'));
-  t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
-
-  const findings = adapterFindings(repo);
+  const findings = adapterFindings(repository(t, 'adapter-bare-'));
 
   assert.equal(findings.length, 2);
   assert.match(findings.join('\n'), /\.claude\/settings\.json is missing/);
@@ -118,4 +132,13 @@ test('sessionStartCommands reads every entry and ignores what is not a command',
     }),
     ['one', 'two'],
   );
+});
+
+test('a directory that is not a repository is refused, not checked', (t) => {
+  // The checker builds every path from git's answer rather than from what a caller typed, so there
+  // is nothing sensible to report about a directory git does not know.
+  const loose = fs.mkdtempSync(path.join(os.tmpdir(), 'adapter-loose-'));
+  t.after(() => fs.rmSync(loose, { recursive: true, force: true }));
+
+  assert.throws(() => adapterFindings(loose), /is not inside a git repository/);
 });
