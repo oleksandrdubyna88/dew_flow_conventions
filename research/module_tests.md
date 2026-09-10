@@ -64,3 +64,13 @@ S2 development run, 2026-09-10: 66 cases, Windows 65 passed plus the explicit sy
 WSL 66 passed. The real coai canary smoke completed with Claude (`claude-opus-5`), read all
 seven selected canonical sources, and left checkout state unchanged. Evidence is in
 [shared-rules-smoke-s2.json](shared-rules-smoke-s2.json); its stored answer limitation is explicit.
+
+PR follow-up adds an in-process real-Git CLI protocol scenario, so coverage measures the
+actual implementation rather than fixture copies. A dot-segment regression first omitted
+`csharp.doctrine` for `src/./file.cs`; normalization restores the same selection as the
+canonical path. Repeated leading `./` and separators are covered too.
+The follow-up suite passed 56/57 on Windows (one symlink privilege skip) and 57/57
+in an isolated WSL/Linux checkout on 2026-09-10. A Windows-created worktree cannot be
+used directly by Linux Git because its `.git` file contains a Windows absolute path;
+the Linux run used the same source over a native Linux clone, without rewriting that file.
+

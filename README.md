@@ -29,13 +29,18 @@ Measured 2026-09-03: a session rooted in the frozen `ClaudeRag` checkout did a d
 that checkout happened to have no other session in it. That is luck, not method.
 
 So, **before the first commit in any `dew_flow_*` tree, read that repository's own rules** rather than
-assuming they are loaded:
+assuming they are loaded. For a migrated consumer, start with its `AGENTS.md` and
+the entry it names, then run:
 
 ```bash
 cat AGENTS.md .agents/PROJECT.md
 node .agents/conventions/tools/rules.mjs check --repo .
 node .agents/conventions/tools/rules.mjs explain --repo . --task git
 ```
+
+An unmigrated consumer still uses its committed `CLAUDE.md` and `.claude/rules/` tree.
+Read those until its migration lands; do not run neutral-layout commands there yet.
+In this conventions source checkout the equivalent resolver is `tools/rules.mjs`.
 
 The rules that govern are the ones belonging to **the repository you are committing to**, never the
 one the session was opened in. When they are not in your context, the fix is one `cat`, and the cost

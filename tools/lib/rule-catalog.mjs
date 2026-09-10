@@ -133,7 +133,7 @@ export function targetPath(value) {
   if (!normalized || normalized.includes("\0") || normalized.length>4096 || normalized.endsWith("/") || normalized.endsWith("/.") || normalized === "." || normalized.startsWith("/") || /^[A-Za-z]:/.test(normalized) || normalized.split("/").includes("..")) {
     throw new Error(`Target must name a root-relative file inside the repository: ${value}`);
   }
-  return normalized.replace(/^\.\//,"");
+  return path.posix.normalize(normalized);
 }
 
 export function selectRules(catalog,tasks,files) {
