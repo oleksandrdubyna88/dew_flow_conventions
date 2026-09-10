@@ -31,12 +31,18 @@ const SETTINGS = '.claude/settings.json';
 const ADAPTER = 'CLAUDE.md';
 const LEGACY = '.claude/rules';
 
-/** Every `SessionStart` command a settings file declares, in order. */
+/**
+ * Every `SessionStart` command a settings file declares, in order, as one comparable string.
+ *
+ * <p>Command AND arguments, because the reference is in exec form: `command` is `node` and the
+ * script is an argument. Comparing only `command` would call every settings file that runs node at
+ * session start a match, which is the opposite of what this checks.</p>
+ */
 export function sessionStartCommands(settings) {
   return (settings?.hooks?.SessionStart ?? [])
     .flatMap((entry) => entry?.hooks ?? [])
     .filter((hook) => hook?.type === 'command')
-    .map((hook) => hook.command);
+    .map((hook) => [hook.command, ...(hook.args ?? [])].join(' '));
 }
 
 /**

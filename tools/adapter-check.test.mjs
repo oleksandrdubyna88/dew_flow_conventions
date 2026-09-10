@@ -75,7 +75,11 @@ test('line endings are not drift', (t) => {
   // Windows checkouts of this family are normal; a CRLF copy is the same file.
   const repo = whole(t);
   const copy = path.join(repo, '.claude/hooks/load-instructions.mjs');
-  fs.writeFileSync(copy, fs.readFileSync(copy, 'utf8').replace(/\n/g, '\r\n'));
+  // Normalised BEFORE converting: this repository is itself checked out with CRLF on Windows, and
+  // the first version of this line turned every CR-LF into CR-CR-LF — real drift, which passed only
+  // where the file happened to have LF endings.
+  const asIs = fs.readFileSync(copy, 'utf8').replaceAll('\r\n', '\n');
+  fs.writeFileSync(copy, asIs.replaceAll('\n', '\r\n'));
 
   assert.deepEqual(adapterFindings(repo), []);
 });
