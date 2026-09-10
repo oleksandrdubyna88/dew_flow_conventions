@@ -98,6 +98,32 @@ A new repository joins with one `git submodule add` — see [ROLLOUT.md](ROLLOUT
 migration. Codex has a different schema; copying permissions into TOML does not produce equivalent
 controls. Do not overwrite user/global/managed settings.
 
+### The Claude host adapter is a hook, and that is not a preference
+
+`ENTRY.md` is one loading procedure for two hosts, and `tools/lib/rule-cli.mjs` enforces the single
+source: it refuses a `CLAUDE.md` that is anything but `@AGENTS.md`, and refuses a non-empty
+`.claude/rules`. Those two are precisely the doors Claude Code loads project instructions through
+**on its own** — no imports, no procedure, no cooperation from the model.
+
+Shutting them is what makes one source true. It also means a Claude session starts holding an
+instruction to go and read the rules rather than the rules. Measured in
+`dew_flow_connect_other_ais` right after its migration: **561 bytes**, where `CLAUDE.md` (3 971 B)
+and `.claude/rules/common/` (6 590 B) used to arrive by themselves. That is a change of kind rather
+than of size — enforcement moved from the host to the model's diligence, and step 8 of the entry
+requires the procedure again after every compaction.
+
+So the third door carries it. `settings/hooks/load-instructions.mjs` runs the **same resolver Codex
+is told to run, at the same pin**, with `read --task inspect` — what applies to every task — and
+`SessionStart` output becomes session context. It does not replace the procedure and says so in its
+own output: a session start cannot know which files the session will touch, so `explain`/`read` for
+the real task is still owed. Without the submodule it reports loading INCOMPLETE in the entry's own
+words and exits 0, because a hook that fails a fresh clone is a hook somebody deletes.
+
+Copy **both** files into a consumer — `settings/settings.json` → `.claude/settings.json` (keeping
+that repository's own permissions) and `settings/hooks/load-instructions.mjs` →
+`.claude/hooks/load-instructions.mjs`, verbatim. This repository runs the hook on itself, which is
+the only test of the mechanism that cannot pass while the mechanism is broken.
+
 ## `tools/` — the rules that check themselves
 
 A rule nothing enforces is a rule that decays quietly. `common/planning-docs.md` described how to promote
@@ -108,6 +134,7 @@ asking in writing to be moved and another had two promoted plans absent from its
 |---|---|---|
 | [`tools/plan-lifecycle.mjs`](tools/plan-lifecycle.mjs) | [`common/planning-docs.md`](common/planning-docs.md) | `node .agents/conventions/tools/plan-lifecycle.mjs` |
 | [`tools/pin-check.mjs`](tools/pin-check.mjs) | Editing discipline (pins at remote tips) | `node .agents/conventions/tools/pin-check.mjs` |
+| [`tools/adapter-check.mjs`](tools/adapter-check.mjs) | The Claude adapter is wired and matches `settings/` | `node .agents/conventions/tools/adapter-check.mjs` |
 | [`tools/http-coverage.mjs`](tools/http-coverage.mjs) | [`common/http-contracts.md`](common/http-contracts.md) — every route has a request | `node .agents/conventions/tools/http-coverage.mjs [--warn]` |
 | [`tools/http-run.mjs`](tools/http-run.mjs) | The same rule's other half — the suite actually runs, and its verdict is an exit code | `node .agents/conventions/tools/http-run.mjs [--tag prod] [--target <url>]` |
 | [`tools/post-deploy-check.mjs`](tools/post-deploy-check.mjs) | [`common/post-deploy-checks.md`](common/post-deploy-checks.md) — the file's shape in CI, its items against the live target | `node .agents/conventions/tools/post-deploy-check.mjs [--target <value>]` |
