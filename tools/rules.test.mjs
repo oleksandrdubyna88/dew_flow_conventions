@@ -134,6 +134,26 @@ test("central build props continue to select the NuGet policy",()=>{
   assert.ok(rules.some(rule=>rule.id==="csharp.nuget-packages"));
 });
 
+// The build-flags policy is scoped to SOLUTION files and the response file itself, and carries no
+// `tasks`. Both halves of that are budget decisions, measured rather than guessed:
+//
+//   * `tasks` would select it for every implement scope, TypeScript and Rust included — selection is
+//     paths OR tasks.
+//   * `**/*.cs` and `**/*.csproj` were in the first draft and pushed those scopes PAST the 32 KiB
+//     read budget (a `.cs` scope is 27 800 B before this rule and a `.csproj` scope 31 173 B, so the
+//     latter has 1 595 B of headroom for any new rule at all). The real-agent migration test caught
+//     it: the spawned session got INCOMPLETE and read nothing.
+//
+// Nothing is lost by the narrowing, because neither half of this rule depends on the text being in
+// context: `-m:N` is enforced by the PreToolUse guard whatever loaded, and the response file by
+// build-flags-check in CI.
+test("the build-flags policy selects on solutions and the response file, and nowhere else",()=>{
+  const catalog=loadCatalog(sourceRoot);
+  const selects=file=>selectRules(catalog,["implement"],[file]).some(rule=>rule.id==="csharp.dotnet-build");
+  for(const file of ["src/App.slnx","App.sln","Directory.Build.rsp"])assert.ok(selects(file),file);
+  for(const file of ["src/Thing.cs","src/Thing.csproj","src/thing.ts","src/main.rs"])assert.ok(!selects(file),file);
+});
+
 test("an HTTP-only scope still receives the testing contract it depends on",()=>{
   const rules=selectRules(loadCatalog(sourceRoot),["http"],["api/example.http"]);
   assert.ok(rules.some(rule=>rule.id==="common.testing"));
