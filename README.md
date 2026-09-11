@@ -119,10 +119,14 @@ own output: a session start cannot know which files the session will touch, so `
 the real task is still owed. Without the submodule it reports loading INCOMPLETE in the entry's own
 words and exits 0, because a hook that fails a fresh clone is a hook somebody deletes.
 
-Copy **both** files into a consumer — `settings/settings.json` → `.claude/settings.json` (keeping
-that repository's own permissions) and `settings/hooks/load-instructions.mjs` →
-`.claude/hooks/load-instructions.mjs`, verbatim. This repository runs the hook on itself, which is
-the only test of the mechanism that cannot pass while the mechanism is broken.
+Copy `settings/settings.json` → `.claude/settings.json` (keeping that repository's own permissions)
+and **every file under `settings/hooks/`** → `.claude/hooks/`, verbatim. There are two now:
+`load-instructions.mjs` is the rules door above, and `build-flags.mjs` refuses a `dotnet build` that
+does not bound its MSBuild worker pool ([`csharp/dotnet-build.md`](csharp/dotnet-build.md)) — the
+half of that rule no file in the repository can enforce. `tools/adapter-check.mjs` compares every
+one of them, because a copy nothing compares is a copy that quietly stops matching. This repository
+runs both hooks on itself, which is the only test of the mechanism that cannot pass while the
+mechanism is broken.
 
 ## `tools/` — the rules that check themselves
 
@@ -134,7 +138,7 @@ asking in writing to be moved and another had two promoted plans absent from its
 |---|---|---|
 | [`tools/plan-lifecycle.mjs`](tools/plan-lifecycle.mjs) | [`common/planning-docs.md`](common/planning-docs.md) | `node .agents/conventions/tools/plan-lifecycle.mjs` |
 | [`tools/pin-check.mjs`](tools/pin-check.mjs) | Editing discipline (pins at remote tips) | `node .agents/conventions/tools/pin-check.mjs` |
-| [`tools/adapter-check.mjs`](tools/adapter-check.mjs) | The Claude adapter is wired and matches `settings/` | `node .agents/conventions/tools/adapter-check.mjs` |
+| [`tools/adapter-check.mjs`](tools/adapter-check.mjs) | Every Claude adapter hook is wired and matches `settings/` | `node .agents/conventions/tools/adapter-check.mjs` |
 | [`tools/http-coverage.mjs`](tools/http-coverage.mjs) | [`common/http-contracts.md`](common/http-contracts.md) — every route has a request | `node .agents/conventions/tools/http-coverage.mjs [--warn]` |
 | [`tools/http-run.mjs`](tools/http-run.mjs) | The same rule's other half — the suite actually runs, and its verdict is an exit code | `node .agents/conventions/tools/http-run.mjs [--tag prod] [--target <url>]` |
 | [`tools/post-deploy-check.mjs`](tools/post-deploy-check.mjs) | [`common/post-deploy-checks.md`](common/post-deploy-checks.md) — the file's shape in CI, its items against the live target | `node .agents/conventions/tools/post-deploy-check.mjs [--target <value>]` |
