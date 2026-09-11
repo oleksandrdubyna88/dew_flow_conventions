@@ -125,9 +125,9 @@ also invokes a successful migration dry-run through the public CLI.
 
 ## The build-flags policy (`csharp/dotnet-build.md`)
 
-Four suites carry the rule, 27 cases, all through `npm test`; the suite is 115 cases with
-one Windows symlink-privilege skip. Ten of the 27 were written during the code round, one per
-finding, red before the fix.
+Four suites carry the rule, 32 cases, all through `npm test`; the suite is 120 cases with
+one Windows symlink-privilege skip. Fifteen of the 32 were written during the two code rounds, one
+per finding, each observed red before its fix.
 
 `tools/rules.test.mjs` gains one selection case: a `.slnx`, a `.sln` and `Directory.Build.rsp`
 select `csharp.dotnet-build`; a `.cs`, a `.csproj`, a `.ts` and a `.rs` do not. It was observed
@@ -136,7 +136,7 @@ than a setup error — and passing when it was restored. The rule carries no `ta
 selection is paths OR tasks, and the first draft did carry them, which delivered a rule about
 MSBuild to every TypeScript scope. That is what the negative half of the case pins.
 
-`tools/build-flags-check.test.mjs` (11 cases) drives the checker against real directories: no C#
+`tools/build-flags-check.test.mjs` (13 cases) drives the checker against real directories: no C#
 at all, a C# repository with no response file, the passing case, a response file with the wrong
 switch, one carrying an inert `-m:4`, a workflow that suppresses the file, comment and
 `/nodeReuse:false` spellings, and build output plus a vendored submodule not making a repository
@@ -146,7 +146,7 @@ case red, and the unmutated tool 0. The multi-line companion the structural-scan
 found a real hole rather than confirming one — a `--noAutoResponse` inside a `run: |` block was
 missed, because the pattern only allowed a single leading dash.
 
-`tools/build-flags-hook.test.mjs` (12 cases) covers the `PreToolUse` guard: bounded commands in
+`tools/build-flags-hook.test.mjs` (15 cases) covers the `PreToolUse` guard: bounded commands in
 five spellings pass, unbounded ones in five verbs are refused, `git commit -m "…" && dotnet build`
 is refused (the whole-command search for `-m` that a naive version would do is the trap), commands
 that open no pool are ignored, the stdin/stdout protocol is exercised end to end — a deny carries
@@ -198,3 +198,20 @@ to a COPY of the reference and asserts it is demanded of the consumer.
 `build-flags-check` accepted only a single leading dash where the guard accepts one or two, so an
 rsp carrying the inert `--maxcpucount:4` passed as clean and a correct `--nodeReuse:false` was
 reported as unswitched — two halves of one rule disagreeing about the syntax they both police.
+
+Round 2 found two more, and both were verified by running the predicate rather than by reading it.
+`cmd /c dotnet build src/App.slnx` was ALLOWED: the wrapper branch judged each remaining token on
+its own, and `dotnet` by itself is not a build — so was `sh -lc dotnet build x.slnx`, while the
+quoted `bash -c "dotnet build x"` was caught, which is what made the gap look like it was not there.
+The wrapper now skips only its own leading flags and rejoins the rest into one inner command line;
+the companion case asserts that `cmd /c dotnet build x -m:4` is still allowed, because the obvious
+fix — dropping every dashed token — would have thrown away the switch being looked for. And the
+suppression scan read only `.github/workflows`, so a consumer could keep a correct response file and
+discard it from `scripts/build.ps1` or an npm script; it now reads those too.
+
+The WSL half of the run: `tools/build-flags-check.test.mjs` and `tools/build-flags-hook.test.mjs`
+pass 24/24 under node 20 on Ubuntu, and the resolver's symlink case — the one Windows skips for lack
+of privilege — passes there. One case fails under WSL and is not a defect: `adapterFindings` on this
+checkout calls `git rev-parse --show-toplevel`, and a Windows-created worktree's `.git` file names
+`D:/rsd/...`, which Linux git cannot resolve. An ordinary checkout of the same repository resolves
+normally from WSL.

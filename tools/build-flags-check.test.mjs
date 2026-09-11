@@ -148,3 +148,31 @@ test('a response file that is not a file at all is a finding, not a crash', t =>
   assert.equal(findings.length, 1);
   assert.match(findings[0], /is not a file/);
 });
+
+test('the suppression scan reaches scripts and package scripts, not only workflows', t => {
+  // Round 2 finding: a consumer can keep a correct response file and then discard it from
+  // scripts/build.ps1 or an npm script, where the workflow-only scan never looked.
+  const viaScript = repository(t, {
+    'src/Thing/Thing.csproj': PROJECT,
+    'Directory.Build.rsp': '-nr:false\n',
+    'scripts/build.ps1': 'dotnet build src/App.slnx -c Release --noAutoResponse -m:24\n',
+  });
+  const scriptFindings = buildFlagsFindings(viaScript).findings;
+  assert.equal(scriptFindings.length, 1);
+  assert.ok(scriptFindings[0].includes('build.ps1'), scriptFindings[0]);
+
+  const viaPackage = repository(t, {
+    'src/Thing/Thing.csproj': PROJECT,
+    'Directory.Build.rsp': '-nr:false\n',
+    'package.json': '{"scripts":{"build":"dotnet build -noautorsp"}}\n',
+  });
+  assert.equal(buildFlagsFindings(viaPackage).findings.length, 1);
+
+  const clean = repository(t, {
+    'src/Thing/Thing.csproj': PROJECT,
+    'Directory.Build.rsp': '-nr:false\n',
+    'scripts/build.ps1': 'dotnet build src/App.slnx -c Release -m:4\n',
+    'package.json': '{"scripts":{"build":"dotnet build -m:4"}}\n',
+  });
+  assert.deepEqual(buildFlagsFindings(clean).findings, []);
+});
