@@ -7,7 +7,7 @@ paths: ["**/*.slnx","**/*.sln","**/Directory.Build.rsp"]
 
 > Measured 2026-09-11: 24 CPUs, 44 GB, SDK 10.0.112, **five autonomous Claude sessions building in
 > parallel**. That condition is the rule. Full record:
-> [PLAN_dotnet_build_node_reuse.md](../todo/PLAN_dotnet_build_node_reuse.md).
+> [PLAN_dotnet_build_node_reuse.md](../research/PLAN_dotnet_build_node_reuse.md).
 
 Left alone: **72 `MSBuild.dll /nodemode:1` processes holding 10 775 MB**, beside Postgres, Docker and
 a running e2e suite. Not an MSBuild bug, and not C# Dev Kit (which has its own `BuildHost`): a worker
@@ -54,8 +54,9 @@ beats the response file.
 
 `settings/hooks/build-flags.mjs`, wired as a `PreToolUse` hook, refuses such a command and names the
 flag to add. **Its reach is narrower than it sounds:** only a Claude Code session, in a repository
-that copied the adapter — and as of 2026-09-11 no consumer has. Codex, a human at a terminal and CI
-have this rule's word and nothing more. `tools/adapter-check.mjs` names a repository whose copy is
+that copied the adapter. As of 2026-09-11 exactly one has — `dew_flow_connect_other_ais`, the only
+migrated consumer — so in the other five, and for Codex, a human at a terminal and CI anywhere,
+this rule has its own word and nothing more. `tools/adapter-check.mjs` names a repository whose copy is
 missing, drifted or unwired, so "not copied yet" stays visible instead of becoming "quietly never".
 
 ## 3. CI overrides on the command line — never `-noautorsp` (MANDATORY)
