@@ -178,6 +178,20 @@ same commit. Also in the tail: extending the guard to `dotnet test` is deliberat
 — this family forbids that command in [common/testing.md](../common/testing.md), and enforcing
 another rule from this hook widens a review that should stay about one thing.
 
+### Recorded, not built — from the review rounds
+
+- **`adapter-check` compares in one direction only.** It demands every hook the reference declares;
+  it does not report a hook a consumer KEEPS after the reference drops one. The reference has never
+  dropped a hook, and the failure that would cause is a consumer still refusing unbounded builds
+  under a retired policy — inconvenient rather than unsafe, and visible in the refusal itself, which
+  names the rule. Worth doing when a hook is first retired, not before.
+- **Extending the guard to `dotnet test`.** One predicate away and tempting, but
+  [common/testing.md](../common/testing.md) forbids that command outright; enforcing another rule
+  from this hook widens a review that should stay about one thing.
+- **A repository-specific `-m:N`.** The refusal says "or the number this repository sets" and no
+  consumer sets one yet. When one does, the number belongs in that repository's own rule beside the
+  mount, and the message can read it from there.
+
 ### The pin cascade
 
 Per [README.md](../README.md) the rule-change author owns the rollout: bump the conventions pin in
