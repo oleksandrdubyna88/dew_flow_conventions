@@ -89,7 +89,7 @@ of skipping it is a commit that breaks a rule written precisely because breaking
 | `dew_flow_mcp` | .NET, public |
 | `dew_flow_sidecar_rust` | Rust — `csharp/` never matches; `rust/doctrine.md` is its doctrine |
 | `dew_flow_benchmark` | .NET |
-| `dew_flow_creds_for_devs` | TypeScript — a VS Code extension; `typescript/doctrine.md` is its doctrine, `csharp/` and `rust/` never match |
+| `dew_flow_creds_for_devs` | .NET + TypeScript — a VS Code extension over a C# broker, CLI and MCP server (one `.slnx`, seven projects), so `csharp/` and `typescript/` both match; `rust/` never does |
 | `dew_flow_connect_other_ais` | .NET + TypeScript — the ConnectOtherAIs review gate: a C# AOT MCP server and a VS Code extension, so `csharp/` and `typescript/` both match |
 
 A new repository joins with one `git submodule add` — see [ROLLOUT.md](ROLLOUT.md).
@@ -139,6 +139,7 @@ asking in writing to be moved and another had two promoted plans absent from its
 | [`tools/plan-lifecycle.mjs`](tools/plan-lifecycle.mjs) | [`common/planning-docs.md`](common/planning-docs.md) | `node .agents/conventions/tools/plan-lifecycle.mjs` |
 | [`tools/pin-check.mjs`](tools/pin-check.mjs) | Editing discipline (pins at remote tips) | `node .agents/conventions/tools/pin-check.mjs` |
 | [`tools/adapter-check.mjs`](tools/adapter-check.mjs) | Every Claude adapter hook is wired and matches `settings/` | `node .agents/conventions/tools/adapter-check.mjs` |
+| [`tools/build-flags-check.mjs`](tools/build-flags-check.mjs) | [`csharp/dotnet-build.md`](csharp/dotnet-build.md) — the root `Directory.Build.rsp` exists, says `-nr:false`, and no workflow suppresses it | `node .agents/conventions/tools/build-flags-check.mjs` |
 | [`tools/http-coverage.mjs`](tools/http-coverage.mjs) | [`common/http-contracts.md`](common/http-contracts.md) — every route has a request | `node .agents/conventions/tools/http-coverage.mjs [--warn]` |
 | [`tools/http-run.mjs`](tools/http-run.mjs) | The same rule's other half — the suite actually runs, and its verdict is an exit code | `node .agents/conventions/tools/http-run.mjs [--tag prod] [--target <url>]` |
 | [`tools/post-deploy-check.mjs`](tools/post-deploy-check.mjs) | [`common/post-deploy-checks.md`](common/post-deploy-checks.md) — the file's shape in CI, its items against the live target | `node .agents/conventions/tools/post-deploy-check.mjs [--target <value>]` |
