@@ -176,3 +176,29 @@ test('the suppression scan reaches scripts and package scripts, not only workflo
   });
   assert.deepEqual(buildFlagsFindings(clean).findings, []);
 });
+
+test('the suppression scan reaches nested and extensionless scripts', t => {
+  // CodeRabbit, PR #21: scripts/ was read one level deep through an extension allowlist, so
+  // scripts/ci/build.sh and an extensionless scripts/release both escaped it.
+  const nested = repository(t, {
+    'src/Thing/Thing.csproj': PROJECT,
+    'Directory.Build.rsp': '-nr:false',
+    'scripts/ci/build.sh': 'dotnet build src/App.slnx --noAutoResponse -m:24',
+  });
+  assert.equal(buildFlagsFindings(nested).findings.length, 1);
+
+  const extensionless = repository(t, {
+    'src/Thing/Thing.csproj': PROJECT,
+    'Directory.Build.rsp': '-nr:false',
+    'scripts/release': 'dotnet build -noautorsp',
+  });
+  assert.equal(buildFlagsFindings(extensionless).findings.length, 1);
+
+  const clean = repository(t, {
+    'src/Thing/Thing.csproj': PROJECT,
+    'Directory.Build.rsp': '-nr:false',
+    'scripts/ci/build.sh': 'dotnet build src/App.slnx -m:4',
+    'scripts/release': 'dotnet build -m:4',
+  });
+  assert.deepEqual(buildFlagsFindings(clean).findings, []);
+});

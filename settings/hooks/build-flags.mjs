@@ -33,6 +33,9 @@ const BUILD_VERBS = new Set(['build', 'msbuild', 'publish', 'pack', 'restore']);
 /** Shells and evaluators whose argument is itself a command line. */
 const WRAPPERS = new Set(['eval', 'sh', 'bash', 'zsh', 'dash', 'pwsh', 'powershell', 'cmd', 'command', 'time', 'nice']);
 
+/** `NAME=value` in front of a command — an environment assignment, never the executable. */
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+
 /** A max-cpu switch as a standalone token: `-m:4`, `--maxcpucount=8`, `/m:2`, or `-m` before a number. */
 const MAX_CPU = /^(-{1,2}|\/)(m|maxcpucount)(?:[:=](\d+))?$/i;
 
@@ -117,7 +120,10 @@ function bounded(parts) {
 
 /** The build this segment runs without bounding it, or an empty string. */
 function unboundedBuild(segment, depth = 0) {
-  const parts = tokens(segment).filter(part => part !== '&');
+  // `&` is PowerShell's call operator, and `VAR=value` in front of a command is ordinary shell —
+  // this family's own CLAUDE.md documents builds written exactly that way, and while the first token
+  // was taken as the executable, `CI=1 dotnet build App.slnx` was allowed. Found on PR #21.
+  const parts = tokens(segment).filter(part => part !== '&' && !ASSIGNMENT.test(part));
   if (parts.length === 0 || depth > 3) return '';
 
   const exe = executableName(parts[0]);

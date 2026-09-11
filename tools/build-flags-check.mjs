@@ -85,21 +85,35 @@ function responseSwitches(text) {
  */
 function commandBearingFiles(root) {
   const found = [];
-  const workflows = path.join(root, ".github", "workflows");
-  if (fs.existsSync(workflows)) {
-    for (const name of fs.readdirSync(workflows)) {
-      if (/\.ya?ml$/i.test(name)) found.push(path.join(".github", "workflows", name));
-    }
-  }
-  const scripts = path.join(root, "scripts");
-  if (fs.existsSync(scripts)) {
-    for (const name of fs.readdirSync(scripts)) {
-      if (/\.(sh|ps1|cmd|bat|psm1)$/i.test(name)) found.push(path.join("scripts", name));
-    }
-  }
+  // Both trees RECURSIVELY, and scripts/ without an extension allowlist: `scripts/ci/build.sh` and
+  // an extensionless `scripts/release` both escaped the first version (CodeRabbit, PR #21). Binary
+  // shapes are skipped by extension rather than text admitted by one — that is the safer direction,
+  // because a file type nobody thought of is then read rather than ignored.
+  walk(root, path.join(root, ".github", "workflows"), found);
+  walk(root, path.join(root, "scripts"), found);
   if (fs.existsSync(path.join(root, "package.json"))) found.push("package.json");
 
   return found;
+}
+
+const BINARY = /\.(png|jpe?g|gif|ico|pdf|zip|gz|7z|exe|dll|pdb|so|dylib|woff2?|ttf|mp4|wasm)$/i;
+
+/** Every readable file under `dir`, relative to `root`, skipping noise directories and binaries. */
+function walk(root, dir, found) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (!SKIP.has(entry.name)) walk(root, full, found);
+    } else if (!BINARY.test(entry.name)) {
+      found.push(path.relative(root, full));
+    }
+  }
 }
 
 /**
@@ -138,7 +152,13 @@ export function buildFlagsFindings(root) {
   }
 
   for (const file of commandBearingFiles(root)) {
-    if (NO_AUTO_RESPONSE.test(fs.readFileSync(path.join(root, file), "utf8"))) {
+    let text;
+    try {
+      text = fs.readFileSync(path.join(root, file), "utf8");
+    } catch {
+      continue; // A file this process cannot read cannot be judged, and is not a policy finding.
+    }
+    if (NO_AUTO_RESPONSE.test(text)) {
       findings.push(
         `${file} suppresses the response file, which discards -nr:false with it. Pass -m:N on the command line `
         + "instead — it already overrides the file.");
