@@ -141,3 +141,31 @@ test('the hook answers even when its stdin is never closed', async () => {
   assert.ok(out.endsWith('\n'), 'the decision must end with a newline');
 });
 
+
+test('a build behind a shell wrapper is still a build, with or without quotes', () => {
+  // Round 2 finding. `bash -c "dotnet build x"` was caught because the inner command is one quoted
+  // token; `cmd /c dotnet build x` was not, because the wrapper branch judged each remaining token
+  // on its own and `dotnet` alone is not a build.
+  for (const command of [
+    'cmd /c dotnet build src/App.slnx',
+    'cmd.exe /c dotnet build x.slnx',
+    'sh -lc dotnet build x.slnx',
+    'pwsh -NoProfile -Command dotnet build x.slnx',
+  ]) assert.equal(refused(command), true, command);
+});
+
+test("a wrapper does not swallow the inner command's own -m", () => {
+  // The obvious fix — drop every token starting with a dash before looking inside — would throw
+  // away the very switch being looked for, and refuse a correctly bounded build.
+  for (const command of [
+    'cmd /c dotnet build src/App.slnx -m:4',
+    'bash -c "dotnet build src/App.slnx -m:4"',
+    'sh -lc dotnet restore x.slnx -m 2',
+  ]) assert.equal(refused(command), false, command);
+});
+
+test('a command that is not a string is allowed, not a crash', () => {
+  for (const value of [123, { a: 1 }, null, undefined, []]) {
+    assert.equal(buildFlagsRefusal(value), '', String(value));
+  }
+});

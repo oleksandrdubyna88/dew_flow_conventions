@@ -122,10 +122,14 @@ function unboundedBuild(segment, depth = 0) {
 
   const exe = executableName(parts[0]);
   if (WRAPPERS.has(exe)) {
-    // `eval "dotnet build …"`, `bash -c "…"`: the command is in the argument, so look inside it.
-    const inner = parts.slice(1).filter(part => !part.startsWith('-') && part !== '/c' && part !== '/C');
+    // `bash -c "dotnet build …"`, `cmd /c dotnet build …`: the command is the argument. Skip only
+    // the wrapper's OWN leading flags — everything from the first non-flag token onward is one inner
+    // command line, rejoined. Judging those tokens separately was the round-2 gap (`dotnet` alone is
+    // not a build), and dropping every dashed token instead would throw away the inner `-m:4`.
+    const rest = parts.slice(1);
+    const start = rest.findIndex(part => !part.startsWith('-') && !/^\/[a-z]+$/i.test(part));
 
-    return inner.map(part => unboundedBuild(part, depth + 1)).find(Boolean) ?? '';
+    return start < 0 ? '' : unboundedBuild(rest.slice(start).join(' '), depth + 1);
   }
   const isBuild = exe === 'msbuild'
     || (exe === 'dotnet' && BUILD_VERBS.has((parts[1] ?? '').toLowerCase()));

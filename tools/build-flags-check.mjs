@@ -15,9 +15,9 @@
 //     1232 MB, exactly the control, because `dotnet build` injects its own `-maxcpucount` and the
 //     command line beats the response file. A file that carries `-m` is a file that lies about what
 //     it is doing, which is worse than not having one.
-//   * NO `-noautorsp` in a workflow. It suppresses the response file ENTIRELY, so a runner that
-//     reaches for it to widen a build silently discards `-nr:false` too — and it never needs to,
-//     because the command line already wins.
+//   * NO `-noautorsp` in a workflow, a script under scripts/, or package.json. It suppresses the
+//     response file ENTIRELY, so anything reaching for it to widen a build silently discards
+//     `-nr:false` too — and it never needs to, because the command line already wins.
 //
 // Run from a consumer repository root:  node .agents/conventions/tools/build-flags-check.mjs
 // A repository with no C# in it passes without an opinion.
@@ -75,12 +75,31 @@ function responseSwitches(text) {
     .flatMap(line => line.split(/\s+/));
 }
 
-function workflowFiles(root) {
-  const dir = path.join(root, ".github", "workflows");
-  if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir)
-    .filter(name => /\.ya?ml$/i.test(name))
-    .map(name => path.join(".github", "workflows", name));
+/**
+ * Every file that can carry a build command: workflows, the scripts folder, and package.json.
+ *
+ * <p>Workflows alone were the first version, and the round-2 review named what that misses — a
+ * consumer keeps a correct response file and then discards it from `scripts/build.ps1` or an npm
+ * script, where nothing looked. These three are where this family actually writes build commands;
+ * a command typed by hand is the guard's job, not this one's.</p>
+ */
+function commandBearingFiles(root) {
+  const found = [];
+  const workflows = path.join(root, ".github", "workflows");
+  if (fs.existsSync(workflows)) {
+    for (const name of fs.readdirSync(workflows)) {
+      if (/\.ya?ml$/i.test(name)) found.push(path.join(".github", "workflows", name));
+    }
+  }
+  const scripts = path.join(root, "scripts");
+  if (fs.existsSync(scripts)) {
+    for (const name of fs.readdirSync(scripts)) {
+      if (/\.(sh|ps1|cmd|bat|psm1)$/i.test(name)) found.push(path.join("scripts", name));
+    }
+  }
+  if (fs.existsSync(path.join(root, "package.json"))) found.push("package.json");
+
+  return found;
 }
 
 /**
@@ -118,7 +137,7 @@ export function buildFlagsFindings(root) {
     }
   }
 
-  for (const file of workflowFiles(root)) {
+  for (const file of commandBearingFiles(root)) {
     if (NO_AUTO_RESPONSE.test(fs.readFileSync(path.join(root, file), "utf8"))) {
       findings.push(
         `${file} suppresses the response file, which discards -nr:false with it. Pass -m:N on the command line `
