@@ -198,8 +198,8 @@ every consumer, doing the pinned-BY repositories (`dew_flow_rag_qln`) last.
 
 - `npm test` — the resolver's own suite, including the new-rule assertion.
 - `npm run check` — `rules.mjs check --repo .` resolves with the new file present.
-- `node tools/rules.mjs explain --repo . --task implement --file src/X.csproj` selects
-  `csharp.dotnet-build`, and the same command with a `.ts` file does not.
+- `node tools/rules.mjs explain --repo . --task implement --file src/App.slnx` selects
+  `csharp.dotnet-build`; a `.cs`, a `.csproj`, a `.ts` and a `.rs` do not.
 - `node tools/plan-lifecycle.mjs` — this plan is in `todo/`, has a status line, and `todo/README.md`
   matches the folder.
 - The behavioural claims in the rule are already measured; the rule's own numbers are not re-derived
@@ -207,7 +207,9 @@ every consumer, doing the pinned-BY repositories (`dew_flow_rag_qln`) last.
 
 ## Definition of Done
 
-- [ ] `csharp/dotnet-build.md` exists with valid frontmatter and is selected for `.csproj`/`.slnx`.
+- [ ] `csharp/dotnet-build.md` exists with valid frontmatter and is selected for `.slnx`, `.sln`
+      and `Directory.Build.rsp` — and for `.cs` and `.csproj` deliberately NOT, on the read-budget
+      measurement above.
 - [ ] `todo/README.md` lists this plan.
 - [ ] `npm test`, `npm run check` and `plan-lifecycle` are green.
 - [ ] The rule states what a file CAN enforce and what it cannot, with the measurement that shows it.

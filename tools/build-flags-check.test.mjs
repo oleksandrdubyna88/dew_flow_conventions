@@ -86,6 +86,40 @@ test('the workflow scan reads a multi-line run block, not only a one-line step',
   assert.match(findings[0], /suppresses the response file/);
 });
 
+test('the double-dash spellings are read, in both directions', t => {
+  // Found by the code round. The hook accepts `--maxcpucount:8` as a real switch and has a test
+  // saying so; this checker accepted only a single dash, so the two halves of one rule disagreed:
+  // an rsp carrying the inert `--maxcpucount:4` passed as clean, and one correctly saying
+  // `--nodereuse:false` was reported as not switching node reuse off at all.
+  const inert = repository(t, {
+    'src/Thing/Thing.csproj': PROJECT,
+    'Directory.Build.rsp': '-nr:false\n--maxcpucount:4\n',
+  });
+  const inertFindings = buildFlagsFindings(inert).findings;
+  assert.equal(inertFindings.length, 1);
+  assert.match(inertFindings[0], /measured to do nothing/);
+
+  const spelled = repository(t, {
+    'src/Thing/Thing.csproj': PROJECT,
+    'Directory.Build.rsp': '--nodeReuse:false\n',
+  });
+  assert.deepEqual(buildFlagsFindings(spelled).findings, []);
+});
+
+test('a directory the checker cannot read does not crash the run', t => {
+  // A repository with an unreadable subtree still has an answer about its response file, and a
+  // checker that throws EACCES is a red CI step that says nothing about the policy.
+  const root = repository(t, { 'src/Thing/Thing.csproj': PROJECT, 'Directory.Build.rsp': '-nr:false\n' });
+  const locked = path.join(root, 'src', 'locked');
+  fs.mkdirSync(locked);
+  try { fs.chmodSync(locked, 0o000); } catch { /* best effort; Windows ignores it */ }
+  try {
+    assert.deepEqual(buildFlagsFindings(root).findings, []);
+  } finally {
+    try { fs.chmodSync(locked, 0o700); } catch { /* ignore */ }
+  }
+});
+
 test('comments and spellings are read the way MSBuild reads them', t => {
   const root = repository(t, {
     'src/Thing/Thing.csproj': PROJECT,
@@ -105,4 +139,12 @@ test('build output and submodules do not make a repository a C# one', t => {
     'external/vendored/Lib.csproj': PROJECT,
   });
   assert.equal(buildFlagsFindings(root).isDotnet, false);
+});
+
+test('a response file that is not a file at all is a finding, not a crash', t => {
+  const root = repository(t, { 'src/Thing/Thing.csproj': PROJECT });
+  fs.mkdirSync(path.join(root, 'Directory.Build.rsp'));
+  const { findings } = buildFlagsFindings(root);
+  assert.equal(findings.length, 1);
+  assert.match(findings[0], /is not a file/);
 });

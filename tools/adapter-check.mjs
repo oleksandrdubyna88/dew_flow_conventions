@@ -30,31 +30,45 @@ const SETTINGS = '.claude/settings.json';
 const ADAPTER = 'CLAUDE.md';
 const LEGACY = '.claude/rules';
 
-/**
- * The hook events this adapter delivers, and the script files that back them.
- *
- * <p>A list rather than a constant because the adapter grew a second hook: `build-flags.mjs` refuses
- * a `dotnet build` that does not bound its MSBuild worker pool (`csharp/dotnet-build.md`). The
- * reason it is checked here is the reason the first one is — a copy nothing compares is a copy that
- * quietly stops matching, and a hook that has silently drifted enforces nothing while looking
- * present.</p>
- */
-const EVENTS = ['SessionStart', 'PreToolUse'];
-const HOOK_FILES = ['load-instructions.mjs', 'build-flags.mjs'];
 const hookPath = (file) => `.claude/hooks/${file}`;
 
 /**
- * Every command a settings file declares for one hook event, in order, as comparable strings.
+ * The hook scripts the reference publishes — derived, never listed here.
+ *
+ * <p>The adapter grew a second hook (`build-flags.mjs`, which refuses a `dotnet build` that does not
+ * bound its MSBuild worker pool) and a hard-coded inventory was the first version of this. The code
+ * round named the cost: a third hook added to `settings/hooks/` would be checked in no consumer
+ * until somebody remembered to edit this file, which is the failure this tool exists to prevent, one
+ * level up. Tests live beside their subject here, so `*.test.mjs` is not part of the adapter.</p>
+ */
+function referenceHookFiles(reference) {
+  return listIn(reference, 'hooks', 'reference hooks')
+    .filter((file) => file.endsWith('.mjs') && !file.endsWith('.test.mjs'))
+    .sort();
+}
+
+/**
+ * Every command a settings file declares for one hook event, with the matcher that decides whether
+ * it ever runs.
  *
  * <p>Command AND arguments, because the reference is in exec form: `command` is `node` and the
  * script is an argument. Comparing only `command` would call every settings file that runs node at
- * session start a match, which is the opposite of what this checks.</p>
+ * session start a match. <b>And matcher</b>, because the code round found the gap that leaves: a
+ * consumer that narrows `Bash|PowerShell` to `Bash` keeps the identical command while the guard
+ * stops running for PowerShell entirely, and the checker called that clean.</p>
  */
-export function hookCommands(settings, event) {
-  return (settings?.hooks?.[event] ?? [])
-    .flatMap((entry) => entry?.hooks ?? [])
+export function hookEntries(settings, event) {
+  return (settings?.hooks?.[event] ?? []).flatMap((entry) => (entry?.hooks ?? [])
     .filter((hook) => hook?.type === 'command')
-    .map((hook) => [hook.command, ...(hook.args ?? [])].join(' '));
+    .map((hook) => ({
+      matcher: entry?.matcher ?? '',
+      command: [hook.command, ...(hook.args ?? [])].join(' '),
+    })));
+}
+
+/** Just the command strings for one event. */
+export function hookCommands(settings, event) {
+  return hookEntries(settings, event).map((entry) => entry.command);
 }
 
 /** The `SessionStart` commands, kept as its own name because that event is the rules door. */
@@ -99,17 +113,28 @@ function settingsFindings(repo, wanted) {
     return [`${SETTINGS} does not parse: ${error.message}`];
   }
 
-  return wanted
-    .filter(({ event, command }) => !hookCommands(settings, event).includes(command))
-    .map(({ event, command }) => `${SETTINGS} declares no ${event} command \`${command}\` — `
-      + (event === 'SessionStart'
-        ? 'a Claude session there starts without this repository’s rules'
-        : 'that adapter is not wired, so what it enforces is not enforced there'));
+  return wanted.flatMap(({ event, matcher, command }) => {
+    const declared = hookEntries(settings, event);
+    const sameCommand = declared.filter((entry) => entry.command === command);
+    if (sameCommand.length === 0) {
+      return [`${SETTINGS} declares no ${event} command \`${command}\` — `
+        + (event === 'SessionStart'
+          ? 'a Claude session there starts without this repository’s rules'
+          : 'that adapter is not wired, so what it enforces is not enforced there')];
+    }
+    if (!sameCommand.some((entry) => entry.matcher === matcher)) {
+      return [`${SETTINGS} wires ${event} \`${command}\` with matcher `
+        + `\`${sameCommand[0].matcher}\`, not \`${matcher}\` — it then never runs for the tools the `
+        + 'reference covers, which is drift that looks like a copy'];
+    }
+
+    return [];
+  });
 }
 
 /** Every hook is there, and byte-for-byte what this repository publishes. */
-function hookFindings(repo, reference) {
-  return HOOK_FILES.flatMap((file) => {
+function hookFindings(repo, reference, files) {
+  return files.flatMap((file) => {
     const relative = hookPath(file);
     if (!existsIn(repo, relative, 'hook')) {
       return [`${relative} is missing — copy settings/hooks/${file} verbatim`];
@@ -163,18 +188,18 @@ function rootOf(directory) {
 /** The findings for one repository — empty when its adapter is whole. */
 export function adapterFindings(repo, reference = REFERENCE) {
   const root = rootOf(repo);
-  // The reference is this repository's own files, not anything a caller named.
-  const hooks = new Map(
-    HOOK_FILES.map((file) => [file, readIn(reference, `hooks/${file}`, 'reference hook')]),
-  );
+  // The reference is this repository's own files, not anything a caller named — and its inventory
+  // of hooks and events is READ from it, so a future adapter is checked the day it is added.
+  const files = referenceHookFiles(reference);
+  const hooks = new Map(files.map((file) => [file, readIn(reference, `hooks/${file}`, 'reference hook')]));
   const referenceSettings = JSON.parse(readIn(reference, 'settings.json', 'reference settings'));
-  const wanted = EVENTS.flatMap(
-    (event) => hookCommands(referenceSettings, event).map((command) => ({ event, command })),
+  const wanted = Object.keys(referenceSettings?.hooks ?? {}).flatMap(
+    (event) => hookEntries(referenceSettings, event).map((entry) => ({ event, ...entry })),
   );
 
   return [
     ...settingsFindings(root, wanted),
-    ...hookFindings(root, hooks),
+    ...hookFindings(root, hooks, files),
     ...refusedDoorFindings(root),
   ];
 }

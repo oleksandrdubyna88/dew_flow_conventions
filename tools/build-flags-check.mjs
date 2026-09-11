@@ -25,10 +25,14 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const SKIP = new Set([".git", "node_modules", "bin", "obj", "artifacts", "parity", ".vs", "packages"]);
+const SKIP = new Set([".git", "node_modules", "bin", "obj", "artifacts", "parity", ".vs", "packages", "dist", "coverage", ".next"]);
 const PROJECT = /\.(csproj|slnx|sln)$/i;
-const NODE_REUSE_OFF = /^[-/](nr|nodereuse):false$/i;
-const MAX_CPU = /^[-/](m|maxcpucount)(:|$)/i;
+// `-{1,2}|/` in both, and that is not cosmetic: the hook accepts `--maxcpucount:8` as a real switch
+// and has a test saying so. A checker that read only a single dash let an rsp carrying the inert
+// `--maxcpucount:4` pass as clean, and called a correct `--nodeReuse:false` file unswitched — two
+// halves of one rule disagreeing about the syntax they both police.
+const NODE_REUSE_OFF = /^(-{1,2}|\/)(nr|nodereuse):false$/i;
+const MAX_CPU = /^(-{1,2}|\/)(m|maxcpucount)(:|=|$)/i;
 // Every spelling dotnet accepts, and the reason the `-{1,2}` is not decoration: `--noAutoResponse`
 // is the form people write, and a single-dash pattern misses it while looking correct.
 const NO_AUTO_RESPONSE = /(^|[\s"'([{&|;])(-{1,2}|\/)no-?auto-?(rsp|response)\b/i;
@@ -41,7 +45,15 @@ const NO_AUTO_RESPONSE = /(^|[\s"'([{&|;])(-{1,2}|\/)no-?auto-?(rsp|response)\b/
  * with its own `.git` is a submodule and belongs to its own repository's check.</p>
  */
 function projectFiles(root, dir = root, found = []) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    // A subtree this process cannot read still leaves the response file answerable, and a checker
+    // that throws EACCES is a red CI step that says nothing about the policy.
+    return found;
+  }
+  for (const entry of entries) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       if (SKIP.has(entry.name)) continue;
@@ -86,6 +98,11 @@ export function buildFlagsFindings(root) {
     findings.push(
       `Directory.Build.rsp is missing from the repository root, and ${projects.length} C# project(s) build here `
       + `(${projects[0]}${projects.length > 1 ? ", …" : ""}). Create it with one line: -nr:false`);
+  } else if (!fs.statSync(rsp).isFile()) {
+    // A directory (or anything else) under that name reads as EISDIR and would crash the check —
+    // and it holds no switches, so the policy is as absent as if the file were missing.
+    findings.push("Directory.Build.rsp at the repository root is not a file. It must be a text file whose "
+      + "first line is -nr:false");
   } else {
     const switches = responseSwitches(fs.readFileSync(rsp, "utf8"));
     if (!switches.some(flag => NODE_REUSE_OFF.test(flag))) {

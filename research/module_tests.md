@@ -125,17 +125,18 @@ also invokes a successful migration dry-run through the public CLI.
 
 ## The build-flags policy (`csharp/dotnet-build.md`)
 
-Three suites arrived with the rule, 17 cases, all through `npm test`; the suite is 105 cases with
-one Windows symlink-privilege skip.
+Four suites carry the rule, 27 cases, all through `npm test`; the suite is 115 cases with
+one Windows symlink-privilege skip. Ten of the 27 were written during the code round, one per
+finding, red before the fix.
 
-`tools/rules.test.mjs` gains one selection case: a `.cs`, `.csproj`, `.slnx` and
-`Directory.Build.rsp` select `csharp.dotnet-build`, a `.ts` and a `.rs` do not. It was observed
+`tools/rules.test.mjs` gains one selection case: a `.slnx`, a `.sln` and `Directory.Build.rsp`
+select `csharp.dotnet-build`; a `.cs`, a `.csproj`, a `.ts` and a `.rs` do not. It was observed
 failing with the rule file moved aside — `AssertionError: src/Thing.cs`, the real symptom rather
 than a setup error — and passing when it was restored. The rule carries no `tasks` deliberately:
 selection is paths OR tasks, and the first draft did carry them, which delivered a rule about
 MSBuild to every TypeScript scope. That is what the negative half of the case pins.
 
-`tools/build-flags-check.test.mjs` (8 cases) drives the checker against real directories: no C#
+`tools/build-flags-check.test.mjs` (11 cases) drives the checker against real directories: no C#
 at all, a C# repository with no response file, the passing case, a response file with the wrong
 switch, one carrying an inert `-m:4`, a workflow that suppresses the file, comment and
 `/nodeReuse:false` spellings, and build output plus a vendored submodule not making a repository
@@ -145,7 +146,7 @@ case red, and the unmutated tool 0. The multi-line companion the structural-scan
 found a real hole rather than confirming one — a `--noAutoResponse` inside a `run: |` block was
 missed, because the pattern only allowed a single leading dash.
 
-`settings/hooks/build-flags.test.mjs` (6 cases) covers the `PreToolUse` guard: bounded commands in
+`tools/build-flags-hook.test.mjs` (12 cases) covers the `PreToolUse` guard: bounded commands in
 five spellings pass, unbounded ones in five verbs are refused, `git commit -m "…" && dotnet build`
 is refused (the whole-command search for `-m` that a naive version would do is the trap), commands
 that open no pool are ignored, the stdin/stdout protocol is exercised end to end — a deny carries
@@ -168,3 +169,32 @@ run-to-run; the rule states its conditions. One of them corrected the implementa
 written: `dotnet restore` with no flags peaked at 11 workers and retained all 11 on the same
 12-project solution a full build does, so the guard's exemption for it — on the true but irrelevant
 ground that restore does not compile — was removed.
+
+### What the code round changed, and the cases that hold it
+
+Twelve reviewers over three vendors read the branch, and four defects in the two guards survived
+verification. Each is now a case that was observed red first.
+
+The guard matched build verbs as SUBSTRINGS of the raw command. Both halves of that were wrong:
+`grep -n "dotnet build" README.md` was refused although it builds nothing, and
+`dotnet build "src/My -m 4.sln"` was allowed because the path contained something shaped like the
+switch. It now splits a command line quote-aware — on chains and on the openers of substitutions and
+subshells — tokenises each segment with quotes removed, and asks whether the EXECUTABLE token is
+`dotnet`/`msbuild` however it is spelled: `dotnet.exe`, an absolute path, a PowerShell `&` call. A
+max-cpu switch counts only as a token of its own, so `-m:4foo` is not one.
+
+The guard could HANG. `for await (… process.stdin)` ends at EOF, so a caller that writes the payload
+and holds the pipe open left the tool call pending for ever — the one failure mode its own comment
+promised it did not have. It now races the read against a 2-second deadline and answers anyway. The
+case writes a payload without closing stdin and fails if the process has not exited in 15 seconds;
+against the old code it took the full 15.
+
+`adapter-check` compared command and arguments but not the `matcher`, so a consumer narrowing
+`Bash|PowerShell` to `Bash` was certified clean while every PowerShell build ran unguarded. It also
+hard-coded which hooks and events exist, so a third adapter would have been checked nowhere until
+somebody edited the checker. Both inventories are now read from `settings/`, and a case adds a hook
+to a COPY of the reference and asserts it is demanded of the consumer.
+
+`build-flags-check` accepted only a single leading dash where the guard accepts one or two, so an
+rsp carrying the inert `--maxcpucount:4` passed as clean and a correct `--nodeReuse:false` was
+reported as unswitched — two halves of one rule disagreeing about the syntax they both police.
