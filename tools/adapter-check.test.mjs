@@ -125,6 +125,39 @@ test('the build-flags adapter is checked too, copy and wiring alike', (t) => {
   assert.match(wiringFindings[0], /declares no PreToolUse command/);
 });
 
+test('a narrowed matcher is drift, because the hook then never runs for the other tool', (t) => {
+  // Found by the code round: comparing only command and args certified a consumer clean while its
+  // PreToolUse matcher had been cut to `Bash`, so every PowerShell build ran unguarded.
+  const repo = whole(t);
+  const settingsPath = path.join(repo, '.claude/settings.json');
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  settings.hooks.PreToolUse[0].matcher = 'Bash';
+  fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
+
+  const findings = adapterFindings(repo);
+
+  assert.equal(findings.length, 1);
+  assert.match(findings[0], /matcher/);
+});
+
+test('a hook added to the reference is checked without editing this file', (t) => {
+  // The inventories are derived from settings/, not hard-coded: a third hook must be checked the day
+  // it is added, or the next rollout is silently optional.
+  const repo = whole(t);
+  const reference = fs.mkdtempSync(path.join(os.tmpdir(), 'adapter-ref-'));
+  t.after(() => fs.rmSync(reference, { recursive: true, force: true }));
+  fs.cpSync(REFERENCE, reference, { recursive: true });
+  fs.writeFileSync(path.join(reference, 'hooks/third.mjs'), '// a future adapter\n');
+  const settings = JSON.parse(fs.readFileSync(path.join(reference, 'settings.json'), 'utf8'));
+  settings.hooks.Stop = [{ hooks: [{ type: 'command', command: 'node', args: ['${CLAUDE_PROJECT_DIR}/.claude/hooks/third.mjs'] }] }];
+  fs.writeFileSync(path.join(reference, 'settings.json'), `${JSON.stringify(settings, null, 2)}\n`);
+
+  const findings = adapterFindings(repo, reference).join('\n');
+
+  assert.match(findings, /third\.mjs is missing/);
+  assert.match(findings, /declares no Stop command/);
+});
+
 test('the two doors the resolver refuses are reported here too, because this is where people look', (t) => {
   const repo = whole(t);
   fs.mkdirSync(path.join(repo, '.claude/rules'), { recursive: true });

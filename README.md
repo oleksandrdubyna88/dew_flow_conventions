@@ -138,7 +138,7 @@ asking in writing to be moved and another had two promoted plans absent from its
 |---|---|---|
 | [`tools/plan-lifecycle.mjs`](tools/plan-lifecycle.mjs) | [`common/planning-docs.md`](common/planning-docs.md) | `node .agents/conventions/tools/plan-lifecycle.mjs` |
 | [`tools/pin-check.mjs`](tools/pin-check.mjs) | Editing discipline (pins at remote tips) | `node .agents/conventions/tools/pin-check.mjs` |
-| [`tools/adapter-check.mjs`](tools/adapter-check.mjs) | Every Claude adapter hook is wired and matches `settings/` | `node .agents/conventions/tools/adapter-check.mjs` |
+| [`tools/adapter-check.mjs`](tools/adapter-check.mjs) | Every adapter hook `settings/` publishes is copied, wired on its own event and matcher, and byte-identical | `node .agents/conventions/tools/adapter-check.mjs` |
 | [`tools/build-flags-check.mjs`](tools/build-flags-check.mjs) | [`csharp/dotnet-build.md`](csharp/dotnet-build.md) — the root `Directory.Build.rsp` exists, says `-nr:false`, and no workflow suppresses it | `node .agents/conventions/tools/build-flags-check.mjs` |
 | [`tools/http-coverage.mjs`](tools/http-coverage.mjs) | [`common/http-contracts.md`](common/http-contracts.md) — every route has a request | `node .agents/conventions/tools/http-coverage.mjs [--warn]` |
 | [`tools/http-run.mjs`](tools/http-run.mjs) | The same rule's other half — the suite actually runs, and its verdict is an exit code | `node .agents/conventions/tools/http-run.mjs [--tag prod] [--target <url>]` |
