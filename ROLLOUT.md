@@ -93,7 +93,14 @@ the harness cannot prove absence of all external policy or external effects.
 - run: node .agents/conventions/tools/rules.mjs check --repo .
 - run: node .agents/conventions/tools/plan-lifecycle.mjs
 - run: node .agents/conventions/tools/gate-snippet-check.mjs
+- run: node .agents/conventions/tools/build-flags-check.mjs
 ```
+
+`build-flags-check` is safe to add everywhere: a repository with no C# in it passes without an
+opinion, so the Rust and TypeScript consumers need no exception. In a .NET consumer it goes in with
+that repository's root `Directory.Build.rsp` in the SAME commit, so the step is green the day it
+lands rather than red until somebody follows up — see
+[csharp/dotnet-build.md](csharp/dotnet-build.md).
 
 Keep existing HTTP/post-deploy and pin-freshness checks. Pin freshness compares committed
 pins with remote tips; during rollout an approved older pin is intentional and recorded
