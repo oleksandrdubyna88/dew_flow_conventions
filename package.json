@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "test": "node --test tools/selftest.test.mjs tools/rules.test.mjs tools/migrate-rules.test.mjs tools/proc.test.mjs tools/smoke-rules.test.mjs tools/adapter-check.test.mjs tools/build-flags-check.test.mjs tools/build-flags-hook.test.mjs",
-    "check": "node tools/rules.mjs check --repo ."
+    "test": "node --test",
+    "check": "node tools/rules.mjs check --repo .",
+    "test:coverage": "node --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/lcov.info"
   },
   "dependencies": {
     "picomatch": "4.0.7",

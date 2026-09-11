@@ -28,12 +28,14 @@ jobs:
         with:
           node-version: 22
       # The gate measures coverage of NEW code, so the scan needs a report rather than a promise.
-      # Node's own runner produces lcov; the selftest is the only test there is.
+      # Node's own runner produces lcov. The file list is DISCOVERED, not written down: this job used
+      # to carry its own copy of it, and a pull request that added two suites left them unmeasured
+      # while `npm test` ran them, which showed up only as a coverage gate failure.
       - name: Test with coverage
         run: |
           npm ci --ignore-scripts
           mkdir -p coverage
-          node --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/lcov.info tools/selftest.test.mjs tools/rules.test.mjs tools/migrate-rules.test.mjs tools/proc.test.mjs tools/smoke-rules.test.mjs tools/adapter-check.test.mjs
+          npm run test:coverage
       # Pinned to a SHA, and to v8: v4 and v5 carry an argument-injection advisory (GHSA, high),
       # which Dependabot raised on this repository's default branch on 2026-09-05. A tag is a moving
       # target and SonarCloud's own githubactions:S7637 says so; the comment is what makes the SHA
