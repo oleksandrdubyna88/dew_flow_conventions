@@ -41,10 +41,18 @@ const hookPath = (file) => `.claude/hooks/${file}`;
  * until somebody remembered to edit this file, which is the failure this tool exists to prevent, one
  * level up. Tests live beside their subject here, so `*.test.mjs` is not part of the adapter.</p>
  */
-function referenceHookFiles(reference) {
-  return listIn(reference, 'hooks', 'reference hooks')
-    .filter((file) => file.endsWith('.mjs') && !file.endsWith('.test.mjs'))
-    .sort();
+function referenceHookFiles(reference, relative = 'hooks', prefix = '') {
+  return listIn(reference, relative, 'reference hooks').flatMap((entry) => {
+    const next = `${relative}/${entry}`;
+    // Recursive, because a hook in a subdirectory would otherwise be published and checked nowhere
+    // (CodeRabbit, PR #21). The relative name is what a consumer copies, so `shared/third.mjs`
+    // stays `shared/third.mjs` under `.claude/hooks/`.
+    if (fs.statSync(within(reference, next, 'reference hooks')).isDirectory()) {
+      return referenceHookFiles(reference, next, `${prefix}${entry}/`);
+    }
+
+    return entry.endsWith('.mjs') && !entry.endsWith('.test.mjs') ? [`${prefix}${entry}`] : [];
+  }).sort();
 }
 
 /**

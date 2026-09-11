@@ -169,3 +169,17 @@ test('a command that is not a string is allowed, not a crash', () => {
     assert.equal(buildFlagsRefusal(value), '', String(value));
   }
 });
+
+test('an environment assignment in front of the command does not hide it', () => {
+  // CodeRabbit, PR #21. `VAR=value cmd` is ordinary shell, and this family's own CLAUDE.md documents
+  // builds written exactly that way, so the first token is often not the executable at all.
+  for (const command of [
+    'CI=1 dotnet build App.slnx',
+    'Agent__AiRuntime__Provider=Codex dotnet build src/App.slnx',
+    'DOTNET_CLI_TELEMETRY_OPTOUT=1 msbuild App.slnx',
+  ]) assert.equal(refused(command), true, command);
+  for (const command of [
+    'CI=1 dotnet build App.slnx -m:4',
+    'CI=1 npm test',
+  ]) assert.equal(refused(command), false, command);
+});

@@ -125,9 +125,9 @@ also invokes a successful migration dry-run through the public CLI.
 
 ## The build-flags policy (`csharp/dotnet-build.md`)
 
-Four suites carry the rule, 32 cases, all through `npm test`; the suite is 120 cases with
-one Windows symlink-privilege skip. Fifteen of the 32 were written during the two code rounds, one
-per finding, each observed red before its fix.
+Four suites carry the rule, 34 cases, all through `npm test`; the suite is 122 cases with
+one Windows symlink-privilege skip. Seventeen of the 34 were written during the two code rounds and
+the pull request's automated review, one per finding, each observed red before its fix.
 
 `tools/rules.test.mjs` gains one selection case: a `.slnx`, a `.sln` and `Directory.Build.rsp`
 select `csharp.dotnet-build`; a `.cs`, a `.csproj`, a `.ts` and a `.rs` do not. It was observed
@@ -136,7 +136,7 @@ than a setup error — and passing when it was restored. The rule carries no `ta
 selection is paths OR tasks, and the first draft did carry them, which delivered a rule about
 MSBuild to every TypeScript scope. That is what the negative half of the case pins.
 
-`tools/build-flags-check.test.mjs` (13 cases) drives the checker against real directories: no C#
+`tools/build-flags-check.test.mjs` (14 cases) drives the checker against real directories: no C#
 at all, a C# repository with no response file, the passing case, a response file with the wrong
 switch, one carrying an inert `-m:4`, a workflow that suppresses the file, comment and
 `/nodeReuse:false` spellings, and build output plus a vendored submodule not making a repository
@@ -146,7 +146,7 @@ case red, and the unmutated tool 0. The multi-line companion the structural-scan
 found a real hole rather than confirming one — a `--noAutoResponse` inside a `run: |` block was
 missed, because the pattern only allowed a single leading dash.
 
-`tools/build-flags-hook.test.mjs` (15 cases) covers the `PreToolUse` guard: bounded commands in
+`tools/build-flags-hook.test.mjs` (16 cases) covers the `PreToolUse` guard: bounded commands in
 five spellings pass, unbounded ones in five verbs are refused, `git commit -m "…" && dotnet build`
 is refused (the whole-command search for `-m` that a naive version would do is the trap), commands
 that open no pool are ignored, the stdin/stdout protocol is exercised end to end — a deny carries
@@ -215,3 +215,14 @@ of privilege — passes there. One case fails under WSL and is not a defect: `ad
 checkout calls `git rev-parse --show-toplevel`, and a Windows-created worktree's `.git` file names
 `D:/rsd/...`, which Linux git cannot resolve. An ordinary checkout of the same repository resolves
 normally from WSL.
+
+The pull request's automated reviewer found two more, and both reproduced against the code before
+anything was changed. `CI=1 dotnet build App.slnx` was ALLOWED, because the first token was taken as
+the executable and `CI=1` is not one — an environment assignment in front of a command is ordinary
+shell, and this family's own CLAUDE.md documents builds written exactly that way
+(`Agent__AiRuntime__Provider=Codex dotnet run ...`). And the suppression scan read `scripts/` one
+level deep through an extension allowlist, so `scripts/ci/build.sh` and an extensionless
+`scripts/release` both escaped it; it now walks both trees and skips binary shapes by extension
+rather than admitting text by one, so a file type nobody thought of is read rather than ignored.
+`referenceHookFiles` became recursive for the same class of reason: a hook in a subdirectory would
+have been published and checked nowhere.
