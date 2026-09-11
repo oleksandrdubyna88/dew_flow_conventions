@@ -26,23 +26,40 @@ import { within } from './lib/paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REFERENCE = path.resolve(HERE, '..', 'settings');
-const HOOK = '.claude/hooks/load-instructions.mjs';
 const SETTINGS = '.claude/settings.json';
 const ADAPTER = 'CLAUDE.md';
 const LEGACY = '.claude/rules';
 
 /**
- * Every `SessionStart` command a settings file declares, in order, as one comparable string.
+ * The hook events this adapter delivers, and the script files that back them.
+ *
+ * <p>A list rather than a constant because the adapter grew a second hook: `build-flags.mjs` refuses
+ * a `dotnet build` that does not bound its MSBuild worker pool (`csharp/dotnet-build.md`). The
+ * reason it is checked here is the reason the first one is — a copy nothing compares is a copy that
+ * quietly stops matching, and a hook that has silently drifted enforces nothing while looking
+ * present.</p>
+ */
+const EVENTS = ['SessionStart', 'PreToolUse'];
+const HOOK_FILES = ['load-instructions.mjs', 'build-flags.mjs'];
+const hookPath = (file) => `.claude/hooks/${file}`;
+
+/**
+ * Every command a settings file declares for one hook event, in order, as comparable strings.
  *
  * <p>Command AND arguments, because the reference is in exec form: `command` is `node` and the
  * script is an argument. Comparing only `command` would call every settings file that runs node at
  * session start a match, which is the opposite of what this checks.</p>
  */
-export function sessionStartCommands(settings) {
-  return (settings?.hooks?.SessionStart ?? [])
+export function hookCommands(settings, event) {
+  return (settings?.hooks?.[event] ?? [])
     .flatMap((entry) => entry?.hooks ?? [])
     .filter((hook) => hook?.type === 'command')
     .map((hook) => [hook.command, ...(hook.args ?? [])].join(' '));
+}
+
+/** The `SessionStart` commands, kept as its own name because that event is the rules door. */
+export function sessionStartCommands(settings) {
+  return hookCommands(settings, 'SessionStart');
 }
 
 /**
@@ -69,36 +86,41 @@ function listIn(root, relative, what) {
   return fs.existsSync(dir) ? fs.readdirSync(dir) : [];
 }
 
-/** The settings file declares every SessionStart command the reference declares. */
+/** The settings file declares every hook command the reference declares, for every event. */
 function settingsFindings(repo, wanted) {
   if (!existsIn(repo, SETTINGS, 'settings')) {
     return [`${SETTINGS} is missing — copy settings/settings.json and keep your own permissions`];
   }
 
-  let declared;
+  let settings;
   try {
-    declared = sessionStartCommands(JSON.parse(readIn(repo, SETTINGS, 'settings')));
+    settings = JSON.parse(readIn(repo, SETTINGS, 'settings'));
   } catch (error) {
     return [`${SETTINGS} does not parse: ${error.message}`];
   }
 
   return wanted
-    .filter((command) => !declared.includes(command))
-    .map((command) => `${SETTINGS} declares no SessionStart command \`${command}\` — `
-      + 'a Claude session there starts without this repository’s rules');
+    .filter(({ event, command }) => !hookCommands(settings, event).includes(command))
+    .map(({ event, command }) => `${SETTINGS} declares no ${event} command \`${command}\` — `
+      + (event === 'SessionStart'
+        ? 'a Claude session there starts without this repository’s rules'
+        : 'that adapter is not wired, so what it enforces is not enforced there'));
 }
 
-/** The hook is there, and byte-for-byte what this repository publishes. */
+/** Every hook is there, and byte-for-byte what this repository publishes. */
 function hookFindings(repo, reference) {
-  if (!existsIn(repo, HOOK, 'hook')) {
-    return [`${HOOK} is missing — copy settings/hooks/load-instructions.mjs verbatim`];
-  }
-  if (readIn(repo, HOOK, 'hook') !== reference) {
-    return [`${HOOK} has drifted from settings/hooks/load-instructions.mjs — `
-      + 'change the reference and re-copy, never the copy alone'];
-  }
+  return HOOK_FILES.flatMap((file) => {
+    const relative = hookPath(file);
+    if (!existsIn(repo, relative, 'hook')) {
+      return [`${relative} is missing — copy settings/hooks/${file} verbatim`];
+    }
+    if (readIn(repo, relative, 'hook') !== reference.get(file)) {
+      return [`${relative} has drifted from settings/hooks/${file} — `
+        + 'change the reference and re-copy, never the copy alone'];
+    }
 
-  return [];
+    return [];
+  });
 }
 
 /**
@@ -141,15 +163,18 @@ function rootOf(directory) {
 /** The findings for one repository — empty when its adapter is whole. */
 export function adapterFindings(repo, reference = REFERENCE) {
   const root = rootOf(repo);
-  // The reference is this repository's own file, not anything a caller named.
-  const hook = readIn(reference, 'hooks/load-instructions.mjs', 'reference hook');
-  const wanted = sessionStartCommands(
-    JSON.parse(readIn(reference, 'settings.json', 'reference settings')),
+  // The reference is this repository's own files, not anything a caller named.
+  const hooks = new Map(
+    HOOK_FILES.map((file) => [file, readIn(reference, `hooks/${file}`, 'reference hook')]),
+  );
+  const referenceSettings = JSON.parse(readIn(reference, 'settings.json', 'reference settings'));
+  const wanted = EVENTS.flatMap(
+    (event) => hookCommands(referenceSettings, event).map((command) => ({ event, command })),
   );
 
   return [
     ...settingsFindings(root, wanted),
-    ...hookFindings(root, hook),
+    ...hookFindings(root, hooks),
     ...refusedDoorFindings(root),
   ];
 }
