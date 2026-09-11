@@ -122,3 +122,49 @@ Git checkout hook made journal creation fail without recovery context. The tests
 explicit incomplete outcomes, target exit 125 remains distinct, and journal failure preserves
 the disposable worktree. CLI error handling runs in selftest; the existing real-Git scenario
 also invokes a successful migration dry-run through the public CLI.
+
+## The build-flags policy (`csharp/dotnet-build.md`)
+
+Three suites arrived with the rule, 17 cases, all through `npm test`; the suite is 105 cases with
+one Windows symlink-privilege skip.
+
+`tools/rules.test.mjs` gains one selection case: a `.cs`, `.csproj`, `.slnx` and
+`Directory.Build.rsp` select `csharp.dotnet-build`, a `.ts` and a `.rs` do not. It was observed
+failing with the rule file moved aside — `AssertionError: src/Thing.cs`, the real symptom rather
+than a setup error — and passing when it was restored. The rule carries no `tasks` deliberately:
+selection is paths OR tasks, and the first draft did carry them, which delivered a rule about
+MSBuild to every TypeScript scope. That is what the negative half of the case pins.
+
+`tools/build-flags-check.test.mjs` (8 cases) drives the checker against real directories: no C#
+at all, a C# repository with no response file, the passing case, a response file with the wrong
+switch, one carrying an inert `-m:4`, a workflow that suppresses the file, comment and
+`/nodeReuse:false` spellings, and build output plus a vendored submodule not making a repository
+a C# one. Its teeth were checked by mutation rather than by reading: disabling the `-m` detection,
+the `-noautorsp` detection and the missing-file branch in turn each turned exactly the matching
+case red, and the unmutated tool 0. The multi-line companion the structural-scan rule demands
+found a real hole rather than confirming one — a `--noAutoResponse` inside a `run: |` block was
+missed, because the pattern only allowed a single leading dash.
+
+`settings/hooks/build-flags.test.mjs` (6 cases) covers the `PreToolUse` guard: bounded commands in
+five spellings pass, unbounded ones in five verbs are refused, `git commit -m "…" && dotnet build`
+is refused (the whole-command search for `-m` that a naive version would do is the trap), commands
+that open no pool are ignored, the stdin/stdout protocol is exercised end to end — a deny carries
+`hookEventName`, `permissionDecision` and a reason naming `-m:4`, and an allowed command produces
+no output at all — and a malformed payload allows the command rather than blocking the session.
+The protocol case exists because the pure predicate can be right while the wiring emits the wrong
+shape, which denies nothing and says nothing.
+
+`tools/adapter-check.test.mjs` grows one case for the second hook, and two existing cases change
+count because a bare repository is now missing two hooks rather than one. The new case observes a
+drifted guard copy and an unwired `PreToolUse` entry as separate findings. The three failure modes
+were also run by hand against this repository — copy removed, copy edited, wiring deleted — each
+reported with the file and the event named, and OK restored afterwards.
+
+**What the tests do not cover, and why it is recorded here.** The measurements the rule cites
+(worker counts, peak and retained RAM, response-file discovery, which delivery of `-m` works) are
+not re-derived by any test: they are properties of MSBuild on a particular machine, and a test that
+asserted them would be asserting the SDK. They were measured with a negative control and reproduced
+run-to-run; the rule states its conditions. One of them corrected the implementation after it was
+written: `dotnet restore` with no flags peaked at 11 workers and retained all 11 on the same
+12-project solution a full build does, so the guard's exemption for it — on the true but irrelevant
+ground that restore does not compile — was removed.

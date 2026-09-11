@@ -33,10 +33,9 @@ function whole(t) {
   const repo = repository(t);
   fs.mkdirSync(path.join(repo, '.claude/hooks'), { recursive: true });
   fs.copyFileSync(path.join(REFERENCE, 'settings.json'), path.join(repo, '.claude/settings.json'));
-  fs.copyFileSync(
-    path.join(REFERENCE, 'hooks/load-instructions.mjs'),
-    path.join(repo, '.claude/hooks/load-instructions.mjs'),
-  );
+  for (const hook of ['load-instructions.mjs', 'build-flags.mjs']) {
+    fs.copyFileSync(path.join(REFERENCE, 'hooks', hook), path.join(repo, '.claude/hooks', hook));
+  }
   fs.writeFileSync(path.join(repo, 'CLAUDE.md'), '@AGENTS.md\n');
 
   return repo;
@@ -54,9 +53,10 @@ test('this repository hosts the adapter on itself, which is the only test the me
 test('a missing hook and missing settings are both named, with what to do', (t) => {
   const findings = adapterFindings(repository(t, 'adapter-bare-'));
 
-  assert.equal(findings.length, 2);
+  assert.equal(findings.length, 3);
   assert.match(findings.join('\n'), /\.claude\/settings\.json is missing/);
   assert.match(findings.join('\n'), /\.claude\/hooks\/load-instructions\.mjs is missing/);
+  assert.match(findings.join('\n'), /\.claude\/hooks\/build-flags\.mjs is missing/);
 });
 
 test('a hook copy that has drifted is caught — that is the whole reason this tool exists', (t) => {
@@ -94,9 +94,35 @@ test('settings without the SessionStart command are named, and other permissions
 
   const findings = adapterFindings(repo);
 
-  assert.equal(findings.length, 1);
-  assert.match(findings[0], /declares no SessionStart command/);
-  assert.match(findings[0], /starts without this repository’s rules/);
+  // Deleting `hooks` unwires BOTH adapters, and each is named on its own: the rules door and the
+  // build-flags refusal fail for different reasons and are fixed by different lines.
+  assert.equal(findings.length, 2);
+  assert.match(findings.join('\n'), /declares no SessionStart command/);
+  assert.match(findings.join('\n'), /starts without this repository’s rules/);
+  assert.match(findings.join('\n'), /declares no PreToolUse command/);
+  assert.match(findings.join('\n'), /what it enforces is not enforced there/);
+});
+
+test('the build-flags adapter is checked too, copy and wiring alike', (t) => {
+  // Added when the second hook arrived: a checker that only ever looked at the first one would have
+  // reported OK for a repository whose MSBuild worker pool was bounded by nothing.
+  const drifted = whole(t);
+  const copy = path.join(drifted, '.claude/hooks/build-flags.mjs');
+  fs.writeFileSync(copy, `${fs.readFileSync(copy, 'utf8')}\n// a local tweak\n`);
+  const driftFindings = adapterFindings(drifted);
+
+  assert.equal(driftFindings.length, 1);
+  assert.match(driftFindings[0], /build-flags\.mjs has drifted/);
+
+  const unwired = whole(t);
+  const settingsPath = path.join(unwired, '.claude/settings.json');
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  delete settings.hooks.PreToolUse;
+  fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
+  const wiringFindings = adapterFindings(unwired);
+
+  assert.equal(wiringFindings.length, 1);
+  assert.match(wiringFindings[0], /declares no PreToolUse command/);
 });
 
 test('the two doors the resolver refuses are reported here too, because this is where people look', (t) => {
