@@ -1,9 +1,14 @@
 # PLAN — bound the MSBuild node pool that agent builds leave behind
 
-> Status: **in progress, 2026-09-11** — the rule, its enforcing hook and the two checks are on
-> `feat/dotnet-build-node-reuse`; the five-consumer rollout and the pin cascade are still open.
-> Scope: `csharp/dotnet-build.md`, `settings/hooks/build-flags.mjs`, `tools/build-flags-check.mjs`,
-> `tools/adapter-check.mjs`, and a `Directory.Build.rsp` in every .NET consumer.
+> Status: **IMPLEMENTED, 2026-09-11.** The rule, the guard, both checks and the six-consumer
+> cascade all shipped. Deviations from the plan as written, each forced by a measurement taken
+> after it: the rule's `paths` are narrower (`.cs` and `.csproj` blew the 32 KiB read budget),
+> `-noautorsp` is FORBIDDEN rather than offered to CI (it discards `-nr:false` with the response
+> file), `dotnet restore` is NOT exempt (11 workers, all retained), and the guard reads tokens
+> rather than substrings (it refused `grep 'dotnet build'` and allowed `CI=1 dotnet build`).
+>
+> Open tail, recorded below rather than built: `adapter-check` compares in one direction only,
+> the guard does not police `dotnet test`, and no consumer sets its own `-m:N` yet.
 >
 > Related docs: [csharp/doctrine.md](../csharp/doctrine.md), [common/testing.md](../common/testing.md),
 > [common/measurement.md](../common/measurement.md), [README.md](../README.md).
@@ -154,7 +159,7 @@ leaves every scope under the ceiling. Nothing is lost, because neither half of t
 its text being in context: `-m:N` is enforced by the `PreToolUse` guard whatever was loaded, and the
 response file by `build-flags-check` in CI.
 
-**For [PLAN_product_improvements.md](PLAN_product_improvements.md), not for this branch:** a `.csproj`
+**For [PLAN_product_improvements.md](../todo/PLAN_product_improvements.md), not for this branch:** a `.csproj`
 scope has 1 595 B of headroom, so the next C#-project rule anyone writes cannot fit either. The
 constraint is the always-core plus `csharp.doctrine` plus `csharp.nuget-packages`, not this rule.
 
@@ -171,6 +176,17 @@ Measured baseline, 2026-09-11, `build-flags-check` run from each repository root
 | `dew_flow_connect_other_ais` | FAILED — no `Directory.Build.rsp` |
 | `dew_flow_sidecar_rust` | nothing to check — no C# |
 | `dew_flow_conventions` | nothing to check — no C# |
+
+**Outcome, the same day.** Six pull requests, each carrying the pin, the root `Directory.Build.rsp`
+and the CI step in one commit so the check was green on arrival: `dew_flow_mcp` #11,
+`dew_flow_benchmark` #10, `dew_flow_sidecar_rust` #10 (pin and step only — no C# there),
+`dew_flow_creds_for_devs` #69, `dew_flow_rag_qln` #10. `dew_flow_connect_other_ais` #202 was CLOSED,
+not merged: another session had already landed the same bump plus the `.claude/hooks/build-flags.mjs`
+copy and the `PreToolUse` wiring that `adapter-check` requires there — it is the only migrated
+consumer, and the only one that runs that check. `dew_flow_rag_qln` went last because bumping the
+rules pin in mcp and benchmark moved their tips and staled its two CODE pins; those were bumped in
+the same commit and the repository was built against them (`-m:4`, succeeded, zero workers left
+behind) rather than assumed.
 
 One two-line file each, in its own branch and pull request per repository, per
 [common/task-lifecycle.md](../common/task-lifecycle.md), with the CI step that runs the check in the
