@@ -97,16 +97,21 @@ order of preference:
    listens for is silent in the same way. So **push tags one at a time** — always where a workflow
    triggers on them — and for a release, verify each before pushing the next:
 
-   - **The success criterion is a NEW run whose head SHA is the tag's own commit** — not a non-empty
-     listing. A bare `gh run list` shows runs from other refs, and even `gh run list --branch <tag>` can
-     show the run from a previous push of that same tag. Match the commit, or you are reading somebody
-     else's evidence.
+   - **Record the existing run IDs BEFORE the push**, then accept only a run that is new against that
+     list. A head SHA alone does not identify a run: the same commit can be reached by a branch push,
+     and several workflows can run on it. The run you are waiting for is the one with an **unseen id**,
+     from the **release workflow**, on event **`push`**, for ref **`refs/tags/<tag>`**, whose head SHA
+     is the tag's commit. A bare `gh run list` — and even `gh run list --branch <tag>` — will happily
+     show you somebody else's evidence.
    - **Poll within a bounded window**, because event creation is not instant — and stop at the deadline
      with a stated failure rather than waiting forever, which is how a release procedure hangs.
-   - **Recovery, only after the deadline passes with no matching run:** if a run for that tag exists but
-     failed, re-run THAT run. Delete and re-push the tag only when no matching run exists at all —
-     deleting a tag whose event is merely delayed can publish the same release twice, from two different
-     commits, which is worse than the silence you were fixing.
+   - **The deadline does not prove the event will never fire, so recovery is not automatic.** If a run
+     for that tag exists but failed, re-run THAT run — that path is safe. Deleting and re-pushing the
+     tag is not: a delayed original event can still be delivered afterwards and publish the same release
+     a second time, from a different commit. So that move requires two things, and the absence of a run
+     at the deadline is neither of them — **the person's explicit go-ahead**, and a publish step that is
+     idempotent for a given tag (re-publishing is a no-op, or it fails closed). If the release job has
+     no such guard, that guard is the fix, not a faster re-push.
 2. **The repository deploys, and has a non-production environment** — dev, stage, test. Deploy there,
    verify the result against that environment, and read its logs before calling it done.
 3. **The repository deploys and has exactly ONE environment.** Then that environment is
@@ -135,5 +140,7 @@ order of preference:
 - [ ] After the merge: a release was cut, or a non-production environment was deployed and verified,
       or the single environment was put to the person as a question — and whichever it was is in the
       summary.
-- [ ] Where the outcome above was a release: each tag was pushed alone, and a run whose head SHA is
-      that tag's commit was observed to start — not assumed from a green `git push`.
+- [ ] Where the outcome above was a release: each tag was pushed alone, and the run observed was new
+      against the ids recorded before the push, from the release workflow, on event `push` for
+      `refs/tags/<tag>`, with the tag's commit as its head SHA — not assumed from a green `git push`.
+      A tag was deleted and re-pushed only with the person's go-ahead and an idempotent publish step.

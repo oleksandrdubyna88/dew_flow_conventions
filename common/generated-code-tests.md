@@ -87,8 +87,9 @@ code that is not, and there is nothing in the run to tell you which happened.
 - Never assert a generated program's correctness with a substring of its source.
 - Never match a pattern against a whole composite when a smaller slice can hold it.
 - Never run a generated artefact anywhere that has secrets, network, or writable state that matters.
-- Never reach for the parsed-form fallback because building the sandbox is inconvenient — only because
-  the artefact genuinely has no executable form, or nothing was meant to run it.
+- Never reach for the parsed-form fallback because building the sandbox is inconvenient. It is for an
+  artefact with no executable form, an artefact nothing was meant to run, or one whose required
+  execution limits genuinely cannot be enforced — and which of those it is goes in the test.
 - Never execute one without a deadline — an unbounded run does not fail, it hangs.
 - Never leave a fake untested, and never let one be more permissive than what it replaces.
 
