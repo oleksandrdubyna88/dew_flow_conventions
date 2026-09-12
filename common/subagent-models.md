@@ -24,11 +24,18 @@ tasks: ["plan","implement","audit","policy","test","docs","pr","release"]
 ## Pass it EXPLICITLY, every time
 
 A subagent's model can come from three places, and only one of them is yours: the agent definition's
-frontmatter, the session's configured default, and the argument you pass. **Plugin agents pin their
-own.** The `feature-dev` plugin's `code-architect`, `code-explorer` and `code-reviewer` all carry
-`model: sonnet` in their frontmatter, and that wins over the session default — which is how three
-architects split a feature on Sonnet while the operator believed they were on Opus, and only noticed
-because they asked.
+frontmatter, the session's configured default, and the argument you pass. **A plugin agent may pin
+its own, and it wins over the session default.**
+
+Measured 2026-09-12 in `connect_other_ais`: the `feature-dev` plugin's `code-architect`,
+`code-explorer` and `code-reviewer` each carried `model: sonnet` in their frontmatter, across all
+seventeen cached versions of the plugin. Three architects therefore split a feature on Sonnet while
+the operator believed they were on Opus, and it surfaced only because they asked which models were
+running — nothing in the transcript said.
+
+**That example is dated on purpose, and it is an example rather than the rule.** A plugin's
+frontmatter can change with any release, so do not rely on this list staying true: check the
+definition you are about to launch, or make the question moot by naming the model yourself.
 
 So: **name the model in the call**, whatever you believe the default to be. Passing it when it was
 already right costs nothing; omitting it when it was wrong costs a plan.
