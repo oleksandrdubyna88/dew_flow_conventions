@@ -1,14 +1,34 @@
 # PLAN — three rules from the 1.7.0 release of `dew_flow_creds_for_devs`
 
-> Status: **plan only, nothing implemented yet.** Scope: three rules from one release, plus one
-> paragraph on release tags.
+> Status: **IMPLEMENTED, 2026-09-12.** Scope: three rules from one release, plus one paragraph on
+> release tags. Shipped in pull request #24.
 >
 > Related docs: [common/reliability.md](../common/reliability.md),
 > [common/testing.md](../common/testing.md), [common/task-lifecycle.md](../common/task-lifecycle.md).
 
 > **Placement changed during implementation — see *Deviation* below.** The two big rules were planned as
 > new SECTIONS inside `reliability.md` and `testing.md`. Both of those files are frozen by the migration
-> evidence in `research/shared-rules-migration-map.json`, so they became two new rule files instead.
+> evidence in `shared-rules-migration-map.json`, so they became two new rule files instead:
+> [../common/platform-limits.md](../common/platform-limits.md) and
+> [../common/generated-code-tests.md](../common/generated-code-tests.md).
+>
+> **What else shipped differently from this text.** Two coai rounds and CodeRabbit moved four things the
+> plan had wrong or too loose, and each correction is worth more than the original wording:
+>
+> - The multibyte fixture example was arithmetically WRONG — 100 characters with four two-byte
+>   characters is 104 bytes and is not refused at a 107-byte limit. The rule now carries the actual
+>   probe, and DEFINES the refused fixture as the accepted character count carrying one multi-byte
+>   character, the only shape that can distinguish the two readings.
+> - `IsMacOS() ? 103 : 107` — the line this plan held up as the model — hands every future platform the
+>   Linux number unprobed. It now appears as the WRONG spelling, against an explicit per-platform map
+>   resolved where the adapter is constructed.
+> - "Hermetic" was an outcome with no mechanism; it is deny-by-default with a hard timeout, and the
+>   carve-out for shell commands was narrowed, because a shell command usually CAN be sandboxed and an
+>   argv assertion cannot see quoting, expansion or exit status.
+> - The tag rule's first draft could accept the wrong run, and its recovery could publish twice. A head
+>   SHA does not identify a run; the criterion is an unseen run id from the release workflow on event
+>   `push` for `refs/tags/<tag>`, and delete-and-re-push now requires the person's go-ahead plus an
+>   idempotent publish step.
 
 ## Where this comes from
 
