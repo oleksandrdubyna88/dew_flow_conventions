@@ -44,8 +44,8 @@ Four parts, each one a distinct failure observed in the same defect:
 1. **The kernel counts bytes, and the documented number is the FIELD, not the limit.** Every write-up
    of `sun_path` says "104 on macOS, 108 on Linux" and .NET's own exception message names those
    numbers; a probe says the longest ACCEPTED ASCII path is **107** on Linux (the NUL terminator), and
-   a 100-character path holding four two-byte characters is refused while a 107-character ASCII path is
-   not. Read the limit off a probe you ran. **The guard counts encoded bytes** —
+   the same CHARACTER count carrying one two-byte character — 108 bytes — is refused. Read the limit off
+   a probe you ran. **The guard counts encoded bytes** —
    `Encoding.UTF8.GetByteCount(path)` against the probed maximum, never `string.Length`, which passes a
    multibyte path the constructor then refuses. The probed maximum already accounts for the terminator,
    so it is not subtracted a second time.
@@ -55,11 +55,14 @@ Four parts, each one a distinct failure observed in the same defect:
    one input the guard existed for took the process down. Whatever a signature promises an answer for,
    it answers for every input it accepts.
 3. **The boundary is tested deliberately, and the fixture can tell the two readings apart.** Largest
-   accepted, first refused, and the user-facing message. An ASCII fixture passes identically under the
-   byte reading and the character reading, so it cannot fail when the code holds the wrong one.
-4. **One named thing owns the platform's answer** — `MaxSocketPathBytes` in the adapter that owns the
-   socket, not an `if` per call site. And every guard on that limit READS it: a constant no call site
-   consults is decoration, and the call site that kept its own literal is the one that will be wrong.
+   accepted, first refused, and the user-facing message — and the refused fixture is the ACCEPTED
+   character count carrying one multi-byte character, asserted to differ in byte count from character
+   count. An all-ASCII fixture passes identically under the byte reading and the character reading, so
+   it cannot fail when the code holds the wrong one.
+4. **One immutable constant is the source of truth** — in the adapter that owns the resource, reachable
+   by every guard, with every user-facing message naming the limit derived from it and no literal left
+   at a call site. Platforms are mapped EXPLICITLY and an unmeasured one fails closed:
+   `IsMacOS() ? 103 : 107` silently hands Windows or a BSD the Linux number with no probe behind it.
 
 Parts 1–3 restate, with the measurement attached, the three conclusions the operator drew from the
 incident on 2026-09-12 (platform-limit isolation, strict exception contracts, deliberate boundary
@@ -75,10 +78,12 @@ Three parts:
 1. **A string assertion cannot see meaning.** The generated script contained everything it was supposed
    to contain and was still wrong as a program. If the artefact is executable — a page script, a
    generated statement, a shell command, a config the product parses — the test runs it. About a
-   hundred lines of `node:vm` sandbox converted this class of bug from invisible to red. **Bounded:**
-   the execution is hermetic — no secrets, no network, no destructive filesystem access. Where that
-   cannot be arranged, and a generated shell command is the case that cannot, assert over the PARSED
-   form — the argv array, the AST, the parsed config — rather than over a run.
+   hundred lines of `node:vm` sandbox converted this class of bug from invisible to red. **Bounded, deny
+   by default:** cleared environment, an allowlist of globals, no network or child processes, an
+   isolated temporary directory, and a hard timeout with memory and output bounds — a generated
+   `while (true) {}` must fail the test, not hang the suite. Where those limits cannot be enforced, and
+   a generated shell command is the case that cannot, assert over the PARSED form — the argv array, the
+   AST, the parsed config — rather than over a run.
 2. **A pattern matched against a WHOLE composite passes on the wrong occurrence.**
    `assert.match(script, /refreshMix\(\)/)` matched the function's own definition, three hundred lines
    below the handler that was supposed to call it — green with the call deleted. Match the smallest
@@ -97,15 +102,18 @@ from a check to a whole leg.
 
 The rule is the matrix, not the tag: every platform a repository ships a binary for runs its tests on a
 pull request. Where a full matrix is genuinely too expensive, the split is by COMPONENT and is stated —
-here the three client components gained `macos-latest` and the server and vault did not, because they
-ship as Linux containers.
+the sanctioned narrowing is a written MAPPING from every shipped binary-and-platform pair to the
+components tested for it on a pull request — "too expensive" is not a reason, because nothing can check
+it. Here the three client components gained `macos-latest` and the server and vault did not, because
+they ship as Linux containers and no macOS binary of them exists to protect.
 
 Two traps, both met while fixing it:
 
 - **A path filter is a second thing to keep true.** Written from memory as `src/cli/**` against
   directories actually named `src_cli`, it matches nothing, the job never runs, and a job that never
-  ran looks exactly like a job that passed. Filter only when the cost is real; when you do, assert the
-  filter matches a file that exists.
+  ran looks exactly like a job that passed. And a filter naming one component's directory skips a change
+  to the SHARED code that component links, which is where a platform adapter lives. A filter must cover
+  every path that can affect the binary, or the job runs unfiltered.
 - **Read the price from the account you are actually on.** The 10× cost of a macOS minute is a fact
   about PRIVATE repositories. Public ones get the runners free, which turns careful path-filtering into
   complexity bought with nothing.
@@ -114,9 +122,12 @@ Two traps, both met while fixing it:
 
 One paragraph: pushing more than three tags in one `git push` creates no workflow events at all —
 silent, exit code 0. Four products were tagged in one push on 2026-09-12 and nothing ran. Push tags one
-at a time, and verify by the TAG's own ref — `gh run list --branch <tag>`, not a bare `gh run list`,
-which shows runs from other refs and from the previous tag and reads as success. Poll it, because event
-creation is not instant, and name the recovery: delete the tag and push it again, alone.
+at a time, and verify each before the next. The success criterion is a NEW run whose head SHA is that
+tag's own commit — not a non-empty listing, because even `gh run list --branch <tag>` can show the run
+from a previous push of the same tag. Poll within a bounded window and stop at the deadline with a
+stated failure. Recovery only after that: re-run an existing failed run, and delete-and-re-push only
+when no matching run exists at all, because deleting a tag whose event is merely delayed can publish
+the same release twice from two different commits.
 
 ## Build order
 
@@ -167,7 +178,8 @@ The conventions repository's own suite is what governs here:
 - `npm run check` — the resolver check over this repo.
 - Both must be run from the worktree, not the primary checkout.
 
-No new `id` is introduced, so no catalog registration and no consumer-side resolver change.
+Two new `id`s are introduced; the resolver discovers them from the folder, so no central catalog
+registration and no consumer-side resolver change is required.
 
 **What this suite does NOT prove, stated so nobody reads green as more than it is:** it validates
 structure, not prose. It cannot tell whether a number written in a rule is true. So the numbers in rule
