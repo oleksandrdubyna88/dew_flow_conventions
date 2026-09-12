@@ -27,6 +27,13 @@ A subagent's model can come from three places, and only one of them is yours: th
 frontmatter, the session's configured default, and the argument you pass. **A plugin agent may pin
 its own, and it wins over the session default.**
 
+**What this repository can and cannot say about that.** Nothing here resolves a model. `tools/rules.mjs`
+selects instruction SOURCES and `tools/lib/rule-trace.mjs` only records the `message.model` it
+observed; neither sets a precedence, and no contract in this repository does. The order above is
+OBSERVED behaviour of the host, measured once, on the date below — it is evidence, not a guarantee,
+and a host release may change it without telling anyone. That is the whole argument for the
+instruction this rule actually gives: pass the model explicitly, and the precedence stops mattering.
+
 Measured 2026-09-12 in `connect_other_ais`: the `feature-dev` plugin's `code-architect`,
 `code-explorer` and `code-reviewer` each carried `model: sonnet` in their frontmatter, across all
 seventeen cached versions of the plugin. Three architects therefore split a feature on Sonnet while
