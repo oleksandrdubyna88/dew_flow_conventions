@@ -86,15 +86,25 @@ order of preference:
    received three versions' worth of work. Compare the newest tag and the newest published release
    against the manifest before deciding what the next release contains.
 
-   **Then verify the tag actually STARTED something.** Pushing more than three tags in one `git push`
-   creates **no** workflow events at all — GitHub's own limit, silent, exit code 0, and `git push`
-   reports every tag as written because every tag WAS written. Measured 2026-09-12: four products
-   tagged in one push, zero runs, and the repository looked exactly as it does after a successful
-   release until somebody noticed nothing had published. **Push tags one at a time**, and check by the
-   tag's own ref — `gh run list --branch <tag>`, never a bare `gh run list`, which shows runs from other
-   refs and from the tag before this one and reads as success. Event creation is not instant, so poll it
-   rather than looking once. The recovery, when nothing appears, is the same move: delete the tag and
-   push it again, alone.
+   **Then verify the tag actually STARTED something.** A push of several tags at once can create **no**
+   workflow events at all — silently, with exit code 0, and with `git push` reporting every tag as
+   written, because every tag WAS written. Measured 2026-09-12: four products tagged in one push, zero
+   runs, and the repository looked exactly as it does after a successful release until somebody noticed
+   nothing had published. GitHub documents the threshold as more than three tags in one push; what was
+   measured here is the four-tag case and its silence.
+
+   So **push release tags one at a time**, and verify each before the next:
+
+   - **The success criterion is a NEW run whose head SHA is the tag's own commit** — not a non-empty
+     listing. A bare `gh run list` shows runs from other refs, and even `gh run list --branch <tag>` can
+     show the run from a previous push of that same tag. Match the commit, or you are reading somebody
+     else's evidence.
+   - **Poll within a bounded window**, because event creation is not instant — and stop at the deadline
+     with a stated failure rather than waiting forever, which is how a release procedure hangs.
+   - **Recovery, only after the deadline passes with no matching run:** if a run for that tag exists but
+     failed, re-run THAT run. Delete and re-push the tag only when no matching run exists at all —
+     deleting a tag whose event is merely delayed can publish the same release twice, from two different
+     commits, which is worse than the silence you were fixing.
 2. **The repository deploys, and has a non-production environment** — dev, stage, test. Deploy there,
    verify the result against that environment, and read its logs before calling it done.
 3. **The repository deploys and has exactly ONE environment.** Then that environment is
@@ -123,5 +133,5 @@ order of preference:
 - [ ] After the merge: a release was cut, or a non-production environment was deployed and verified,
       or the single environment was put to the person as a question — and whichever it was is in the
       summary.
-- [ ] A release tag was pushed alone and its own run was observed to start — not assumed from a green
-      `git push`.
+- [ ] Where the outcome above was a release: each tag was pushed alone, and a run whose head SHA is
+      that tag's commit was observed to start — not assumed from a green `git push`.
