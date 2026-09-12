@@ -10,6 +10,10 @@ tasks: ["implement","test","audit"]
 > TEXT of a program instead of its behaviour. It is a separate file only because `testing.md` is frozen
 > by the migration evidence in `research/shared-rules-migration-map.json` while the Claude/Codex
 > migration is open; it belongs inside that rule when the inventory retires.
+>
+> **This file is ADDITIVE and supersedes nothing.** The hazard of a second file is drift: an edit to
+> that frozen section is not finished until this file has been reconciled with it, and whoever retires
+> the inventory merges this back rather than leaving two descriptions of one policy in the resolver.
 
 Measured 2026-09-12 in `dew_flow_creds_for_devs`. The extension's webviews are page scripts assembled as
 template literals. Roughly four thousand tests asserted over the assembled string and every one was
@@ -42,9 +46,16 @@ the intention of whoever wrote the test:
   already passed `timeout: 5000`; the rule's first draft failed to say so, which is why this is written
   down.
 
-**Where those limits cannot be enforced, do not execute** — and a generated shell command is exactly the
-case where they cannot. Assert over the PARSED form instead: the argv array, the AST, the parsed config
-object. Parsed is still behaviour; a substring is not.
+**Where those limits cannot be enforced, do not execute.** Assert over the PARSED form instead: the argv
+array, the AST, the parsed config object. Parsed is still behaviour; a substring is not.
+
+But be honest about which case you are in, because the carve-out is narrower than it first looks. A
+generated **shell command** usually CAN be bounded — a container, or a subprocess with a cleared
+environment, a timeout and resource limits — and an argv or AST assertion cannot see the things that
+make shell dangerous in the first place: quoting, expansion, redirection, exit status. So a generated
+shell artefact is executed in a sandbox where one can be built, and the parsed-form route belongs to
+command-CONSTRUCTION helpers whose output is not meant to be run at all, and to artefacts with no
+executable form.
 
 ## 2. A pattern matched against a WHOLE composite passes on the wrong occurrence
 
@@ -76,6 +87,8 @@ code that is not, and there is nothing in the run to tell you which happened.
 - Never assert a generated program's correctness with a substring of its source.
 - Never match a pattern against a whole composite when a smaller slice can hold it.
 - Never run a generated artefact anywhere that has secrets, network, or writable state that matters.
+- Never reach for the parsed-form fallback because building the sandbox is inconvenient — only because
+  the artefact genuinely has no executable form, or nothing was meant to run it.
 - Never execute one without a deadline — an unbounded run does not fail, it hangs.
 - Never leave a fake untested, and never let one be more permissive than what it replaces.
 

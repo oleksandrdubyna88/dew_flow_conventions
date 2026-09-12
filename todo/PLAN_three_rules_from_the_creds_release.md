@@ -206,8 +206,16 @@ A conventions commit costs a pin bump in six consumers. The operator's standing 
 operator each time, not to this plan; the plan's obligation is to ASK and to record the answer rather
 than to cascade silently or to skip silently.
 
-**A candidate tool, deliberately not built here.** A reviewer asked for a checker that reads every
+**The answer taken for this change, as a stated assumption.** The operator's standing instruction from
+2026-09-12 was to bump `dew_flow_creds_for_devs` only and leave the other five. This change proceeds on
+that same answer rather than blocking on a fresh one: creds_for_devs is bumped, the other five consumers
+stay on their current pins and are listed as pending in the summary. If that is wrong, the fix is one
+cascade run and nothing here depends on the order.
+
+**Two candidate tools, deliberately not built here.** A reviewer asked for a checker that reads every
 consumer's `.github/workflows` and asserts a pull-request job per platform each repository ships a
-binary for — the same shape as `tools/pin-check.mjs` and `tools/scenario-check.mjs`. That is a tool and
-a plan of its own, not a rule, and building it inside a rules-text change would be the scope creep the
-gate is meant to catch. Recorded here so it is declined on the record rather than dropped.
+binary for — the same shape as `tools/pin-check.mjs` and `tools/scenario-check.mjs`. The code round
+asked for a second one: a check tying each extension file to the frozen section it will merge into, so
+the two cannot drift while the migration inventory stands. Both are tools and a plan of their own, not
+rules, and building either inside a rules-text change would be the scope creep the gate is meant to
+catch. Recorded here so they are declined on the record rather than dropped.

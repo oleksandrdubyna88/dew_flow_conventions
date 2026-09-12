@@ -93,7 +93,9 @@ order of preference:
    nothing had published. GitHub documents the threshold as more than three tags in one push; what was
    measured here is the four-tag case and its silence.
 
-   So **push release tags one at a time**, and verify each before the next:
+   The threshold is about TAGS IN A PUSH, not about release tags, so a bulk push of any tags a workflow
+   listens for is silent in the same way. So **push tags one at a time** — always where a workflow
+   triggers on them — and for a release, verify each before pushing the next:
 
    - **The success criterion is a NEW run whose head SHA is the tag's own commit** — not a non-empty
      listing. A bare `gh run list` shows runs from other refs, and even `gh run list --branch <tag>` can
