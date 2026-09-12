@@ -11,6 +11,12 @@ tasks: ["implement","audit","test","release","deploy"]
 > migration is open, so this material is a rule of its own; when that inventory retires, part 1 belongs
 > in `reliability.md` and part 2 in `testing.md`.
 >
+> **This file is ADDITIVE. Nothing in it supersedes or contradicts those sections** — it is the same
+> policy carried further. The hazard of a second file is drift, so the obligation is explicit: an edit
+> to either frozen section is not finished until this file has been reconciled with it, and whoever
+> retires the inventory merges these parts back rather than leaving two descriptions of one policy in
+> the resolver at once.
+>
 > Both halves come from one incident, measured 2026-09-12 in `dew_flow_creds_for_devs`: `creds` 0.1.6
 > failed **both** macOS legs of a four-product release on a unix socket path, after the other three
 > products had already published. Nothing here is hypothetical, and the existing rules would have
@@ -60,8 +66,14 @@ your machine is not.
    ```
 
    Windows, a BSD or anything added later takes the Linux value without anyone having run a probe there,
-   and the boundary tests go green against a limit nobody measured. Name each supported platform and
-   refuse an unmeasured one with a diagnosable error instead of guessing.
+   and the boundary tests go green against a limit nobody measured.
+
+   Write it as an explicit **target → probed value** mapping with no catch-all branch, and **resolve it
+   where the adapter is constructed**, not inside a property every guard touches. That placement is the
+   difference between a diagnosable refusal at one known point — "this platform has no probed socket
+   path limit" — and an exception surfacing from an arbitrary call site halfway through an operation.
+   It is also what lets a cross-compiled target carry its own constant instead of asking the running
+   machine what it is.
 
 ### Testing it — an all-ASCII fixture cannot fail
 
@@ -98,6 +110,11 @@ can be excused by asserting it. What is sanctioned is a **mapping, written down,
 binary-and-platform pair to the components tested for it on a pull request** — and a component may be
 left out of that mapping only if it cannot affect that binary, which is a claim about the dependency
 graph and is therefore checkable.
+
+**Write that mapping in the workflow file itself, beside the matrix it describes.** Prose kept anywhere
+else drifts the first time somebody adds a binary, renames a component or moves shared code: the job
+changes and the justification does not, and the rule still looks satisfied. In the same file, a reviewer
+reading the job reads why it covers what it covers, and the two are edited together or not at all.
 
 In the repository this came from, the mapping is: the three client components — the CLI, the MCP server,
 the broker client — run on `macos-latest` as well as Linux, because they are what touches the local
