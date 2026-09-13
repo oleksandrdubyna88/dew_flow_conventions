@@ -38,10 +38,15 @@ Everything the review-gate rule says about this being ADDITIONAL to your own rev
 3. `resolve` with a decision for EVERY finding — **and pass the same `document`**. A document review
    is its own session, keyed by the document rather than by the branch, so one branch holds as many
    of them as you like and `resolve` has to be told which. `status` takes it the same way.
-4. Fix what you accepted and run `review_document` again. Editing the document between rounds keeps
-   the session: identity is the path, or the name you gave raw text, never the content. A review
-   that has FINISHED is re-opened only with `newReview: true`, which starts a fresh review and
-   leaves the finished one on the record.
+4. Act on the VERDICT before you consider another round, exactly as you would at the other gates:
+   `revise` → fix what you accepted and call `review_document` again; `proceed`, `good_enough` or
+   `continue_anyway` → the document gate is done, and your summary says what you took and what you
+   declined; `call_human` → surface the open findings and stop, with `ask_human` to fetch the
+   person; `escalated` → apply the named step and run a fresh round. Running the review again is
+   never a way past a verdict that asked for something else.
+5. Editing the document between rounds keeps the session: identity is the path, or the name you gave
+   raw text, never the content. A review that has FINISHED is re-opened only with
+   `newReview: true`, which starts a fresh review and leaves the finished one on the record.
 
 **The reply carries one thing the other gates do not: `notes`** — each reviewer's prose about the
 whole document, one entry per reviewer. It gates nothing, and it is never merged: findings are
@@ -52,3 +57,16 @@ back, and it is what to pass on when somebody asked what a document says.
 Which reviewers run is the operator's choice, in the panel's Document stage: the product ships two —
 one that reads for whether the document does its job, one that writes the account — and a person can
 add their own, in their own language, with their own prompt.
+
+## Definition of Done
+
+- [ ] `open` was called for the repository the document lives in, before anything else.
+- [ ] The document was passed ONE way — `documentPath`, or `documentText` with a `documentName` —
+      and `purposeText` said what the document is for.
+- [ ] Every finding of every round got an `accept` or a reasoned `reject` through `resolve`, with
+      the same `document` passed back.
+- [ ] The verdict was acted on rather than re-run: fixes for `revise`, a person for `call_human`,
+      the named step for `escalated`.
+- [ ] The reviewers' `notes` were read and passed on — that is the account somebody asked for, and
+      it is the one thing a findings list does not contain.
+- [ ] The summary names the verdict, the reviewer count, and what was accepted and declined.
