@@ -31,6 +31,12 @@ is the only way the gate can record which model asked for a round, and the log's
 answering "what does the AI writing this code habitually miss" — a question that is about the model,
 not about the CLI it arrived through.
 
+*Checked 2026-09-13* against the `ModelContextProtocol` .NET SDK 2.2.0, which is what the gate's
+server runs: `initialize` carries `clientInfo { name, version }` and the protocol's own
+`Implementation` type has `Name`, `Title`, `Version`, `Description`, `Icons` and `WebsiteUrl` —
+no model, on the `2025-11-25` revision or the `2026-07-28` one. Re-check before assuming this is
+still true of a later revision; if a model field ever arrives, this rule is what retires.
+
 **Send it again on every `open`, including one that resumes a session you already opened.** That is
 the reason it is an argument rather than an environment variable: a variable is read once when your
 process starts, so a model switched mid-session — `/model`, an escalation, a fall-back — would leave
