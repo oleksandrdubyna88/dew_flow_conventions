@@ -68,10 +68,19 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   working* and needs its build run. A rules-pin bump never needs that; a code-pin bump always does.
   Do not treat them as the same chore because the same tool reports both.
 - The habit is now also a check: [`tools/pin-check.mjs`](tools/pin-check.mjs) runs in every
-  consumer's CI and fails while **any** submodule pin (this one, and `dew_flow_rag_qln`'s
-  `external/dew_flow_mcp` alike) is not at its remote's tip. The 2026-08-19 audit found three
+  consumer's CI and fails while **any** submodule pin is not at the tip of **the ref it tracks** —
+  `submodule.<name>.branch` in that consumer's `.gitmodules`. The 2026-08-19 audit found three
   consumers two commits behind — one missing `gpu-lease.md` entirely — which is why the pin has a
   check instead of an owner.
+- **Which ref a pin tracks is the whole difference between a check and a treadmill.** Until
+  2026-09-14 every pin was compared against `ls-remote <url> HEAD`, so the expected value was this
+  repository's LIVE tip resolved at CI run time — which made the check a function of somebody else's
+  merge rather than of the pull request being checked. Measured over 29 days: main moved **95 times**,
+  and each of those commits reddened every open pull request in six repositories at once; **317**
+  pin-touching commits went downstream, a *majority* of all commits on main in two consumers. The
+  shared rules now track `release`, which moves when a rule author promotes a reviewed commit. A
+  submodule that declares no `branch` is unaffected — git's own default for the unset key is the
+  remote HEAD, which is exactly what it was compared against before.
 - Repo-specific policy moves to `.agents/PROJECT.md` and `.agents/rules/`; runtime settings
   stay in their host configuration. Never copy a policy body into both hosts' trees.
 - **`main` is closed, here and in every consumer that protects it.** A change is a branch and a pull
@@ -137,7 +146,7 @@ asking in writing to be moved and another had two promoted plans absent from its
 | Tool | Enforces | Run |
 |---|---|---|
 | [`tools/plan-lifecycle.mjs`](tools/plan-lifecycle.mjs) | [`common/planning-docs.md`](common/planning-docs.md) | `node .agents/conventions/tools/plan-lifecycle.mjs` |
-| [`tools/pin-check.mjs`](tools/pin-check.mjs) | Editing discipline (pins at remote tips) | `node .agents/conventions/tools/pin-check.mjs` |
+| [`tools/pin-check.mjs`](tools/pin-check.mjs) | Editing discipline — every pin at the tip of the ref it tracks (`release` for the shared rules, its own default branch for a code pin) | `node .agents/conventions/tools/pin-check.mjs` |
 | [`tools/adapter-check.mjs`](tools/adapter-check.mjs) | Every adapter hook `settings/` publishes is copied, wired on its own event and matcher, and byte-identical | `node .agents/conventions/tools/adapter-check.mjs` |
 | [`tools/build-flags-check.mjs`](tools/build-flags-check.mjs) | [`csharp/dotnet-build.md`](csharp/dotnet-build.md) — the root `Directory.Build.rsp` exists, says `-nr:false`, and no workflow suppresses it | `node .agents/conventions/tools/build-flags-check.mjs` |
 | [`tools/http-coverage.mjs`](tools/http-coverage.mjs) | [`common/http-contracts.md`](common/http-contracts.md) — every route has a request | `node .agents/conventions/tools/http-coverage.mjs [--warn]` |
