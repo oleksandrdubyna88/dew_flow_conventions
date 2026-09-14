@@ -85,6 +85,25 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   declare the key would be judged by a version that cannot read it. A submodule that declares no
   `branch` is unaffected either way — git's own default for the unset key is the remote HEAD, which
   is what it was compared against before.
+- **How `release` moves.** Through the `promote-release` workflow and nothing else: it is
+  `workflow_dispatch` only, so a merge to main never touches the ref. It takes a full 40-character
+  sha and refuses it unless the commit is an ancestor of `main` **and** the `ci` run for that exact
+  sha finished with conclusion `success` — an absent run and one still in progress are both refusals,
+  because an unverified commit is what six repositories would then load. The judgement lives in
+  [`tools/promote-release.mjs`](tools/promote-release.mjs) rather than in the YAML precisely so those
+  refusals can be tested; twenty-seven cases drive it.
+
+  **Rollback is a forward release**, not a rewind: revert the content on `main` and promote the new
+  commit. There is no force input, and the push carries no `--force`, so git itself refuses a
+  non-fast-forward move. Moving `release` backwards would make every consumer's committed pin differ
+  from the tip at once — all six repositories red during the very incident the rollback exists to end
+  — and would break every cached clone's `git submodule update --remote`.
+
+  **Known gap, deliberately accepted (2026-09-14):** the ref has no server-side protection. Anyone
+  with push rights can move `release` by hand and skip every check above. The workflow is the
+  intended route, not an enforced one. Closing it needs a repository ruleset on `refs/heads/release`
+  (deny direct and force pushes, bypass for the Actions actor) — settings rather than a file, which
+  is why nothing in this tree can prove it.
 - Repo-specific policy moves to `.agents/PROJECT.md` and `.agents/rules/`; runtime settings
   stay in their host configuration. Never copy a policy body into both hosts' trees.
 - **`main` is closed, here and in every consumer that protects it.** A change is a branch and a pull
@@ -151,6 +170,7 @@ asking in writing to be moved and another had two promoted plans absent from its
 |---|---|---|
 | [`tools/plan-lifecycle.mjs`](tools/plan-lifecycle.mjs) | [`common/planning-docs.md`](common/planning-docs.md) | `node .agents/conventions/tools/plan-lifecycle.mjs` |
 | [`tools/pin-check.mjs`](tools/pin-check.mjs) | Editing discipline — every pin at the tip of the ref it tracks (`release` for the shared rules, its own default branch for a code pin) | `node .agents/conventions/tools/pin-check.mjs` |
+| [`tools/promote-release.mjs`](tools/promote-release.mjs) | The `release` ref moves only to a commit that is on `main` and whose `ci` run finished green — an absent or unfinished run is a refusal, never a pass | `node tools/promote-release.mjs <sha> [--dry-run]` (this repository only) |
 | [`tools/adapter-check.mjs`](tools/adapter-check.mjs) | Every adapter hook `settings/` publishes is copied, wired on its own event and matcher, and byte-identical | `node .agents/conventions/tools/adapter-check.mjs` |
 | [`tools/build-flags-check.mjs`](tools/build-flags-check.mjs) | [`csharp/dotnet-build.md`](csharp/dotnet-build.md) — the root `Directory.Build.rsp` exists, says `-nr:false`, and no workflow suppresses it | `node .agents/conventions/tools/build-flags-check.mjs` |
 | [`tools/http-coverage.mjs`](tools/http-coverage.mjs) | [`common/http-contracts.md`](common/http-contracts.md) — every route has a request | `node .agents/conventions/tools/http-coverage.mjs [--warn]` |
