@@ -518,3 +518,25 @@ plan calls correct); the bounds are already `--max-commits`/`--max-days`; every 
 lib/git.mjs's 30-second ceiling and a failed fetch is already UNDECIDED; and `fetch-depth: 0` is not
 what supplies the release object — `measure()` fetches both refs itself and then asks by SHA, which
 is why a fresh clone reading a 90-day-old release commit works at all.
+
+**What the code round added.** Twenty-four findings, nine accepted. Two are worth recording.
+
+`--max-days soon` became `NaN`, and every comparison with NaN is false — so a typo in a flag switched
+the alarm off while still exiting 0. A detector that reports health because its own argument was
+misspelt is worse than one that is missing, because it looks like it ran. Bounds are now validated as
+non-negative integers and a bad one is a usage error. Observed red first.
+
+And the age bound's CLAIM was wrong, which two reviewers caught from opposite directions. It said
+"publishing has stopped", but it measures the commit's date — so promoting a deliberately older
+reviewed commit would have read as a stall the moment it landed, which is the false alarm that gets a
+check disabled. The measurement is right and the sentence was not: it now says *what consumers load is
+N days old*, which is the thing that actually matters and the thing the number actually is.
+
+Fifteen were rejected, four of them on claims the repository disproves outright. The loudest was
+Blocking: that `actions/checkout@v7` and `actions/setup-node@v7` do not exist and every scheduled run
+would fail. Every workflow here already uses them and `gh run list` shows those runs concluding
+`success` — it is a knowledge-cutoff artefact, and had it been true this repository's CI would have
+been failing for months rather than gating a pull request. Three more asserted code that is already
+there: `--warn` IS checked before the failing return, the fetch DOES precede `merge-base`, and the
+ancestry comparison uses the SHAs read from the remote rather than local branch names, so a stale
+local pointer cannot participate.

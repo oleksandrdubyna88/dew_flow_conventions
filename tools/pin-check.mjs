@@ -132,7 +132,7 @@ for (const [name, entry] of declared) {
     cached = ""; // not set, which is the normal state and the one CI is always in.
   }
   if (cached !== "" && cached !== (entry.branch ?? "")) {
-    localOverrides.push({ path, name, cached, declared: entry.branch ?? "(none — the remote's default branch)" });
+    localOverrides.push({ path, name, cached, declared: entry.branch === undefined || entry.branch === "" ? "nothing, so this pin follows the remote's default branch" : `\`${entry.branch}\`` });
     continue;
   }
 
@@ -191,11 +191,12 @@ for (const f of notCommitted) {
 
 for (const f of localOverrides) {
   console.error(`pin-check: LOCAL OVERRIDE ${f.path}`);
-  console.error(`  This clone's .git/config says \`${f.cached}\`, and .gitmodules says \`${f.declared}\`.`);
+  console.error(`  This clone's .git/config says \`${f.cached}\`, and .gitmodules says ${f.declared}.`);
   console.error("  `git submodule update --remote` reads the local value FIRST, so a bump made here would");
   console.error("  follow the wrong ref while CI — a fresh clone holding only the committed config — follows");
   console.error("  the other, and calls the result STALE. `git submodule sync` copies the url, not the branch.");
-  console.error(`  fix:   git config --unset submodule.${f.name}.branch   (then the committed .gitmodules decides)`);
+  console.error(`  fix:   git config --unset submodule.${f.name}.branch`);
+  console.error("         — after which the committed .gitmodules decides, which is what CI already reads.");
 }
 
 for (const f of unresolved) {

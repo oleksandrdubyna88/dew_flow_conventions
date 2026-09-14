@@ -15,7 +15,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { EXIT, measure } from "./release-distance.mjs";
+import { EXIT, main, measure } from "./release-distance.mjs";
 
 const git = (cwd, ...args) =>
   execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", timeout: 20000, windowsHide: true }).trim();
@@ -98,7 +98,7 @@ test("a release too many commits behind main FAILS, and says why that is not a s
   s.publish(s.shas[0]);
   const verdict = s.measure({ maxCommits: 2 });
   assert.equal(verdict.code, EXIT.PAST, verdict.headline);
-  assert.match(verdict.headline, /release has stopped moving/);
+  assert.match(verdict.headline, /release is behind what this repository has agreed/);
   assert.match(verdict.lines.join("\n"), /5 commits ahead of release \(limit 2\)/);
   assert.match(verdict.lines.join("\n"), /every pin-check is green/);
 });
@@ -110,7 +110,7 @@ test("a release whose commit is old FAILS even when main has barely moved", (t) 
   s.publish(s.shas.at(-1));
   const verdict = s.measure({ maxDays: 30 });
   assert.equal(verdict.code, EXIT.PAST, verdict.headline);
-  assert.match(verdict.lines.join("\n"), /release points at is 90 days old \(limit 30\)/);
+  assert.match(verdict.lines.join("\n"), /what consumers load is 90 days old \(limit 30\)/);
   assert.equal(verdict.commits, 0, "distance alone would have called this healthy");
 });
 
@@ -120,7 +120,7 @@ test("no release yet is not a fault, and says so in those words", (t) => {
   const s = scene(t, { commits: 2 });
   const verdict = s.measure();
   assert.equal(verdict.code, EXIT.WITHIN, verdict.headline);
-  assert.match(verdict.headline, /release does not exist yet/);
+  assert.match(verdict.headline, /No release yet — not a fault/);
   assert.match(verdict.lines.join("\n"), /nothing has been published/i);
 });
 
@@ -157,4 +157,26 @@ test("a fetch that fails is UNDECIDED, not a measurement of stale refs", (t) => 
   });
   assert.equal(verdict.code, EXIT.UNDECIDED, verdict.headline);
   assert.match(verdict.headline, /fetch failed/);
+});
+
+test("a bound that is not a number is a usage error, not a disabled alarm", async (t) => {
+  // `Number("soon")` is NaN, and every comparison with NaN is false — so a typo in a flag would have
+  // turned the alarm off while still exiting 0. A detector that reports health because its own
+  // argument was misspelt is worse than one that is missing, because it looks like it ran.
+  const s = scene(t, { commits: 6, ageDays: 90 });
+  s.publish(s.shas[0]);
+  const said = [];
+  const code = await main(["--max-days", "soon"], (m) => said.push(m), (m) => said.push(m), s.raw);
+  assert.notEqual(code, EXIT.WITHIN, said.join("\n"));
+  assert.match(said.join("\n"), /--max-days/);
+  assert.match(said.join("\n"), /not a number/);
+});
+
+test("valid bounds passed as flags still decide the verdict", async (t) => {
+  const s = scene(t, { commits: 6 });
+  s.publish(s.shas[0]);
+  const said = [];
+  const code = await main(["--max-commits", "2"], (m) => said.push(m), (m) => said.push(m), s.raw);
+  assert.equal(code, EXIT.PAST, said.join("\n"));
+  assert.match(said.join("\n"), /5 commits ahead of release \(limit 2\)/);
 });

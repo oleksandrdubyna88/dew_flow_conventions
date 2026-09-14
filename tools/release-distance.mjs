@@ -17,7 +17,9 @@
 // It answers two questions, and FAILS rather than merely reporting, because a weekly summary nobody
 // reads is the same as no detector at all:
 //   - how many commits `main` is ahead of `release` — work written and not published;
-//   - how old the commit `release` points at is — publishing that has stopped.
+//   - how old what consumers LOAD is. Note the claim: not "publishing stopped" but "the published
+//     rules are this old", because promoting a deliberately older reviewed commit is legitimate and
+//     would otherwise read as a stall the moment it landed.
 //
 // Distance alone is not a fault: a quiet week is a quiet week, and a release that is behind by a
 // few documentation commits is a deliberate state, not drift. So the thresholds are generous and
@@ -85,7 +87,7 @@ export function measure(git, { maxCommits = MAX_COMMITS, maxDays = MAX_DAYS } = 
     // look identical from a consumer's side and only one of them is fine.
     return {
       code: EXIT.WITHIN,
-      headline: "release does not exist yet",
+      headline: "No release yet — not a fault",
       lines: [`${REMOTE} has no ${RELEASE_REF}. Nothing has been published, so nothing can be stale.`,
         "The first promotion creates it — see the promote-release workflow."],
       release, main, commits: 0, days: 0,
@@ -137,16 +139,17 @@ export function measure(git, { maxCommits = MAX_COMMITS, maxDays = MAX_DAYS } = 
   // reported by name so the reader knows which one they are looking at.
   const over = [
     commits > maxCommits ? `main is ${commits} commits ahead of release (limit ${maxCommits})` : "",
-    days > maxDays ? `the commit release points at is ${days} days old (limit ${maxDays})` : "",
+    days > maxDays ? `what consumers load is ${days} days old (limit ${maxDays})` : "",
   ].filter(Boolean);
 
   if (over.length === 0) {
-    return { code: EXIT.WITHIN, headline: `release is ${commits} commit(s) behind main, published ${days} day(s) ago`, lines: [], release, main, commits, days };
+    return { code: EXIT.WITHIN, headline: `release is ${commits} commit(s) behind main, published ${days === 0 ? "today" : `${days} day(s) ago`}`, lines: [], release, main, commits, days };
   }
   return {
     code: EXIT.PAST,
-    headline: "release has stopped moving",
+    headline: "release is behind what this repository has agreed",
     lines: [...over,
+      `release is ${release}; main is ${main}.`,
       "Every consumer pin equals its tracked tip, so every pin-check is green — and the rules the",
       "family reads are this far behind the ones it has written. That is the 2026-08-19 audit state",
       "with the alarm switched off, which is why this is a failure and not a summary.",
@@ -172,9 +175,22 @@ export async function main(argv, log = console.log, fail = console.error, git = 
     return EXIT.PAST;
   }
 
+  // Validated rather than coerced. `Number("soon")` is NaN, and every comparison with NaN is false —
+  // so a typo in a flag would have switched the alarm off while still exiting 0. A detector that
+  // reports health because its own argument was misspelt is worse than one that is missing, because
+  // it looks like it ran.
   const bounds = {};
-  if (parsed.values["max-commits"] !== undefined) bounds.maxCommits = Number(parsed.values["max-commits"]);
-  if (parsed.values["max-days"] !== undefined) bounds.maxDays = Number(parsed.values["max-days"]);
+  for (const [flag, key] of [["max-commits", "maxCommits"], ["max-days", "maxDays"]]) {
+    const given = parsed.values[flag];
+    if (given === undefined) continue;
+    const value = Number(given);
+    if (!Number.isInteger(value) || value < 0) {
+      fail(`release-distance: --${flag} was given "${given}", which is not a number of ${flag === "max-days" ? "days" : "commits"}.`);
+      fail("  A bound that does not parse would silently disable the alarm it names, so this stops instead.");
+      return EXIT.PAST;
+    }
+    bounds[key] = value;
+  }
 
   const verdict = measure(git, bounds);
   if (verdict.code === EXIT.WITHIN) {
