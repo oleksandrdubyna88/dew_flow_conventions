@@ -98,10 +98,43 @@ export function measure(git, { maxCommits = MAX_COMMITS, maxDays = MAX_DAYS } = 
     return { code: EXIT.UNDECIDED, headline: "fetch failed", lines: [firstLine(error.stderr) || firstLine(error.message)] };
   }
 
+  // Divergence first, because both metrics are meaningless without it. `rev-list release..main`
+  // counts only the commits main has that release lacks, so a release force-moved to an unrelated
+  // commit answers a SMALL number — and a recent force-move passes the age bound too. Both would
+  // report health while what consumers load is not on main's history at all. `promote-release`
+  // cannot produce this state, but the ref has no server-side protection (README records that as
+  // accepted), so a hand-push can.
+  let onMain = false;
+  try {
+    git("merge-base", "--is-ancestor", release, main);
+    onMain = true;
+  } catch (error) {
+    if (error.status !== 1) {
+      return { code: EXIT.UNDECIDED, headline: "ancestry could not be judged", lines: [firstLine(error.stderr) || firstLine(error.message)] };
+    }
+  }
+  if (!onMain) {
+    return {
+      code: EXIT.PAST,
+      headline: "release is not on main",
+      lines: [`release is ${release}, and main (${main}) does not reach it.`,
+        "So neither metric means anything: the distance counts only main-side commits, and the age is",
+        "the age of a commit that is not in this history. Something moved the ref outside the promotion",
+        "workflow — which the ref's missing protection permits, and which this is the only check for.",
+        "fix:   find out what moved it, then promote a reviewed commit on main through promote-release."],
+      release, main, commits: 0, days: 0,
+    };
+  }
+
   const commits = Number(git("rev-list", "--count", `${release}..${main}`));
   const committedAt = Number(git("show", "-s", "--format=%ct", release)) * 1000;
   const days = Math.floor((Date.now() - committedAt) / 86_400_000);
 
+  // Either bound failing is a failure, and the two mean different things. AGE says publishing has
+  // stopped. DISTANCE says work is being written and not published — a burst of merges with no
+  // promotion is an active repository, but forty commits of unpublished RULES is still drift: what
+  // the family reads and what it has agreed have come apart, and the consumers cannot tell. Both are
+  // reported by name so the reader knows which one they are looking at.
   const over = [
     commits > maxCommits ? `main is ${commits} commits ahead of release (limit ${maxCommits})` : "",
     days > maxDays ? `the commit release points at is ${days} days old (limit ${maxDays})` : "",

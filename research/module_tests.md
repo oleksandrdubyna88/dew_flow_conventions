@@ -490,3 +490,31 @@ Mutation-checked: removing the age bound turns exactly that case red and nothing
 there is nothing to be behind, and "not published yet" and "publishing has stopped" look identical
 from a consumer's side while only one of them is fine. An unreachable remote is UNDECIDED rather than
 a distance of zero, for the same reason it is everywhere else in these tools.
+
+**What the plan round added.** Twelve findings, six accepted.
+
+Two reviewers independently noticed that a `release` force-moved to an unrelated commit defeats both
+metrics at once: `rev-list release..main` counts only main-side commits and answers a SMALL number,
+and a recent force-move passes the age bound too — so the check reports health while what consumers
+load is not on main's history at all. `promote-release` cannot produce that state, but the ref has no
+server-side protection, so a hand-push can, and this is the only check that would ever look.
+Divergence is now judged FIRST, before either metric, and reported as *release is not on main*. The
+fixture needed an orphan branch; its first draft failed with `fatal: bad object`, because `publish`
+pushes from a clone that had never seen that commit — a fixture fault that looks nothing like the
+divergence under test.
+
+The other accepted one changed `pin-check` rather than this file. The `.git/config` trap was
+documented and nothing asserted it: `git submodule update --remote` reads `submodule.<name>.branch`
+from the LOCAL config first, and `git submodule sync` copies the url but not the branch — so a clone
+made before this rollout keeps following the default branch while CI, a fresh clone with only the
+committed config, follows `release`. A bump made on that machine lands at the wrong tip and CI calls
+it STALE, which reads like a bug in the rollout rather than one stale line on one developer's
+machine. `pin-check` now reports `LOCAL OVERRIDE` naming both values and the `--unset` that ends it,
+with a companion case proving a cached branch that AGREES does not fire.
+
+Six were rejected on evidence the code carries: the absent-`release` branch is taken before any
+metric and returns WITHIN by design (exit 3 would make a scheduled job red every week for a state the
+plan calls correct); the bounds are already `--max-commits`/`--max-days`; every git call is bounded by
+lib/git.mjs's 30-second ceiling and a failed fetch is already UNDECIDED; and `fetch-depth: 0` is not
+what supplies the release object — `measure()` fetches both refs itself and then asks by SHA, which
+is why a fresh clone reading a 90-day-old release commit works at all.
