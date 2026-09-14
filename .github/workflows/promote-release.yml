@@ -44,11 +44,27 @@ permissions:
 jobs:
   promote:
     runs-on: ubuntu-latest
+    # Every step here can hang on a network or registry failure, and the tool's own 30-second ceiling
+    # covers only its `gh` call. Without this the dispatch holds a runner indefinitely and produces no
+    # verdict at all, which reads like a gate still thinking rather than one that never answered.
+    timeout-minutes: 10
     steps:
+      - name: The gate that judges must be main's gate
+        # The checkout below takes whatever ref the dispatch selected, so without this a branch
+        # carrying an edited tools/promote-release.mjs could judge — and promote — a main commit
+        # under rules nobody reviewed. The gate is only a gate if it is the one on main.
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "promote-release: refusing to run from ${{ github.ref }}." >&2
+          echo "  Dispatch this workflow against main: the gate that judges a promotion must be the" >&2
+          echo "  reviewed one, not whatever a branch happens to carry." >&2
+          exit 1
+
       - uses: actions/checkout@v7
         with:
+          ref: refs/heads/main
           # The tool asks whether the sha is an ancestor of main and how far release is behind it;
-          # both are questions a shallow clone cannot answer.
+          # both are questions a shallow clone cannot answer, and it refuses one outright.
           fetch-depth: 0
 
       - uses: actions/setup-node@v7
@@ -61,7 +77,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: node tools/promote-release.mjs "${{ inputs.sha }}"
+          # The input reaches the tool as an ARGUMENT, never as text substituted into this script.
+          # `${{ inputs.sha }}` written inline is expanded by Actions before the shell parses the
+          # line, so a value like `$(curl …)` or `"; …; #` would run on the runner with the workflow
+          # token — before the tool's 40-hex check ever sees it. Through the environment there is no
+          # such expansion, and the quotes keep it one word.
+          SHA: ${{ inputs.sha }}
+        run: node tools/promote-release.mjs "$SHA"
 
       - name: Say what moved
         if: success()

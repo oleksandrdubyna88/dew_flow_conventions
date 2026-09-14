@@ -63,18 +63,41 @@ const MAIN_REF = "refs/heads/main";
 /** Pushed in full so the ref can only ever be a branch — the plan's contract, and pin-check's expectation. */
 export const RELEASE_REF = "refs/heads/release";
 
-/** The `name:` line of .github/workflows/ci.yml, and its path — a run counts if it matches either. */
+/**
+ * The `name:` line of .github/workflows/ci.yml, and its path — a run counts if it matches either, so
+ * renaming one alone does not silently make every run "absent".
+ */
 const CI_WORKFLOW = "ci";
 const CI_WORKFLOW_PATH = ".github/workflows/ci.yml";
+
+/**
+ * The file name the runs are asked for BY.
+ *
+ * Deliberately the workflow-scoped endpoint rather than `actions/runs?head_sha=`: the generic listing
+ * returns every workflow's runs for the sha and sets `total_count` across all of them, so on a busy
+ * commit a page of ci successes could sit beside a hundred unrelated runs and the count would say the
+ * answer was short when it was complete. Asking ci for its own runs makes the count mean what the
+ * judgement needs it to mean.
+ */
+const CI_WORKFLOW_FILE = "ci.yml";
 
 /** A commit id and nothing else. Either case, because both are hex; it is lower-cased before use. */
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 
-/** One sha has a handful of runs. If GitHub ever says it has more than this, the answer is refused
- *  as unreadable rather than judged on one page — see ciRunsFor. */
+/** A full page. One sha's ci runs almost never fill it; when they do, the pager below asks for more. */
 const RUNS_PER_PAGE = 100;
 
-/** The same ceiling lib/git.mjs puts on every git call — an API that accepts and then says nothing is not "slow". */
+/**
+ * A ceiling on paging, so a remote that keeps claiming more cannot spin here for ever. Ten pages is
+ * a thousand ci runs for ONE commit — past that the answer is not a listing, it is a symptom, and
+ * UNDECIDED is the honest verdict.
+ */
+const MAX_RUN_PAGES = 10;
+
+/**
+ * Thirty seconds, matching the ceiling lib/git.mjs puts on every git call. An API that accepts the
+ * connection and then says nothing is not "slow" — it is endless, and the gate must still answer.
+ */
 const GH_TIMEOUT_MS = 30_000;
 
 export const EXIT = Object.freeze({ PROMOTED: 0, REFUSED: 1, USAGE: 2, UNDECIDED: 3 });
@@ -143,16 +166,50 @@ export function ciRunsFor(answer, sha) {
   }
   if (!Array.isArray(parsed?.workflow_runs)) return { error: "the answer carries no workflow_runs list" };
 
-  // One page is asked for. If GitHub says there are more runs than it listed, the ones it did not
-  // list could include the failed twin this gate refuses on — and a page of successes would then
-  // read as a clean sha. An answer that might be missing the disqualifying run is no answer.
+  // `total_count` is how the pager knows whether it has seen everything, so an answer that does not
+  // carry a real count is unreadable rather than complete. Treating a missing or non-numeric count as
+  // "nothing more to fetch" would let a page of successes stand in for a listing whose later pages
+  // hold the failed run that disqualifies the sha.
   const total = Number(parsed.total_count);
-  if (Number.isFinite(total) && total > parsed.workflow_runs.length) {
-    return { error: `GitHub lists ${total} run(s) for this sha but returned ${parsed.workflow_runs.length}; a later page could hold a failed run` };
+  if (!Number.isInteger(total) || total < 0) {
+    return { error: `the answer's total_count is ${JSON.stringify(parsed.total_count)}, which is not a count of runs` };
   }
 
   const isCi = (r) => r.name === CI_WORKFLOW || r.path === CI_WORKFLOW_PATH;
-  return { runs: parsed.workflow_runs.filter((r) => isCi(r) && String(r.head_sha).toLowerCase() === sha) };
+  return {
+    runs: parsed.workflow_runs.filter((r) => isCi(r) && String(r.head_sha).toLowerCase() === sha),
+    total,
+    listed: parsed.workflow_runs.length,
+  };
+}
+
+/**
+ * Every `ci` run GitHub has for this sha, across as many pages as it takes — or the reason the
+ * listing could not be completed.
+ *
+ * Paging matters because the judgement is "EVERY run is green": a listing that stopped at one page
+ * could be missing exactly the failed run that should refuse the promotion, and a sha whose runs
+ * merely OUTNUMBER a page must still be promotable. A page that comes back empty ends the loop even
+ * if the count disagrees, so a remote that miscounts cannot spin here.
+ */
+export async function collectCiRuns(gh, repository, sha) {
+  const runs = [];
+  let seen = 0;
+  for (let page = 1; page <= MAX_RUN_PAGES; page += 1) {
+    const query = `repos/${repository}/actions/workflows/${CI_WORKFLOW_FILE}/runs?head_sha=${sha}&per_page=${RUNS_PER_PAGE}&page=${page}`;
+    let answer;
+    try {
+      answer = await gh("api", query);
+    } catch (error) {
+      return { error: `page ${page}: ${firstLine(error.message)}`, asked: true };
+    }
+    const parsed = ciRunsFor(answer, sha);
+    if (parsed.error !== undefined) return { error: parsed.error };
+    runs.push(...parsed.runs);
+    seen += parsed.listed;
+    if (parsed.listed === 0 || seen >= parsed.total) return { runs };
+  }
+  return { error: `more than ${MAX_RUN_PAGES} pages of ci runs for one commit; that is a symptom, not a listing` };
 }
 
 /**
@@ -303,19 +360,15 @@ export async function decide({ sha: named, git, gh, repository, say = () => {} }
   if (!local.ok) return local;
 
   say(`asking GitHub for \`${CI_WORKFLOW}\` runs of ${sha} in ${repository}`);
-  let answer;
-  try {
-    answer = await gh("api", `repos/${repository}/actions/runs?head_sha=${sha}&per_page=${RUNS_PER_PAGE}`);
-  } catch (error) {
-    return undecided("GITHUB NOT ASKED", firstLine(error.message),
-      "Without GitHub's answer there is no evidence either way, and no evidence is a refusal.",
-      "fix:   authenticate gh (GH_TOKEN in Actions), check the network, and run again.");
-  }
-  const listing = ciRunsFor(answer, sha);
+  const listing = await collectCiRuns(gh, repository, sha);
   if (listing.error !== undefined) {
-    return undecided("UNREADABLE ANSWER", `${listing.error}: ${firstLine(answer) || "(empty)"}`,
-      "An answer that cannot be read is not an answer of \"no runs\"; it is no answer.",
-      "fix:   run the gh api call by hand and look at what came back.");
+    return listing.asked === true
+      ? undecided("GITHUB NOT ASKED", listing.error,
+        "Without GitHub's answer there is no evidence either way, and no evidence is a refusal.",
+        "fix:   authenticate gh (GH_TOKEN in Actions), check the network, and run again.")
+      : undecided("UNREADABLE ANSWER", listing.error,
+        "An answer that cannot be read is not an answer of \"no runs\"; it is no answer.",
+        "fix:   run the gh api call by hand and look at what came back.");
   }
   const verdict = judgeRuns(listing.runs, sha, repository);
   if (!verdict.ok) return verdict;
@@ -324,11 +377,21 @@ export async function decide({ sha: named, git, gh, repository, say = () => {} }
   return { ok: true, sha, main: local.main, release: local.release, ahead, runs: verdict.urls };
 }
 
-function report(decision, fail) {
+/**
+ * Print a refusal.
+ *
+ * The closing line is conditional, and that is the whole point of `afterPush`. Before the push, "no
+ * ref was moved" is a fact this tool can state. After one, it is a claim it cannot make: the remote
+ * may have accepted the update and lost the response, in which case consumers can already see the
+ * new release and an operator told "nothing was pushed" goes off to repair a state that is correct.
+ */
+function report(decision, fail, afterPush = false) {
   const kind = decision.code === EXIT.REFUSED ? "REFUSED" : "UNDECIDED";
   fail(`promote-release: ${kind} — ${decision.headline}`);
   for (const line of decision.lines) fail(`  ${line}`);
-  fail("  Nothing was pushed; release is where it was.");
+  fail(afterPush
+    ? `  The push was attempted, so the state of ${RELEASE_REF} is what the lines above say and no more.`
+    : "  No push was attempted; release is where it was.");
   return decision.code;
 }
 
@@ -363,21 +426,26 @@ export async function promote({ sha, dryRun = false, git, gh, repository, log = 
     // already see it. Reporting that as "nothing was pushed" would send an operator to repair a
     // state that is correct. So ask the remote where release is before concluding anything.
     let landed = "";
+    let asked = true;
     try {
       landed = remoteTips(git).get(RELEASE_REF) ?? "";
     } catch {
-      landed = "";
+      asked = false; // the read-back ITSELF failed: nothing below may claim to know where release is.
     }
-    if (landed === decision.sha) {
+    if (asked && landed === decision.sha) {
       log(`promote-release: the push reported an error, but ${REMOTE}/release IS ${decision.sha} — it landed before the connection broke.`);
       log(`promote-release: PROMOTED — ${REMOTE}/release is ${decision.sha}. Consumers pick it up with \`git submodule update --remote\`.`);
       return EXIT.PROMOTED;
     }
     return report(undecided("PUSH REFUSED", firstLine(error.stderr) || firstLine(error.message),
-      `${REMOTE} did not accept the update, and release is still ${landed || "(no such ref)"}.`,
+      asked
+        ? `${REMOTE} did not accept the update, and release is still ${landed || "(no such ref)"}.`
+        : `${REMOTE} could not be asked where release is afterwards, so whether the update landed is UNKNOWN.`,
       "A ruleset that denies pushes to release from anything but the workflow refuses exactly like this —",
       "which is the point of the ruleset; run the promotion through the workflow.",
-      "fix:   read the line above; this tool never adds --force, so a non-fast-forward refusal means release has moved on."), fail);
+      asked
+        ? "fix:   read the line above; this tool never adds --force, so a non-fast-forward refusal means release has moved on."
+        : `fix:   git ls-remote ${REMOTE} ${RELEASE_REF} — and compare with ${decision.sha} before doing anything else.`), fail, true);
   }
 
   let now = "";
@@ -386,13 +454,13 @@ export async function promote({ sha, dryRun = false, git, gh, repository, log = 
   } catch (error) {
     return report(undecided("PUSH NOT CONFIRMED", firstLine(error.stderr) || firstLine(error.message),
       `the push returned, but ${REMOTE} could not be asked where release is now.`,
-      `fix:   git ls-remote ${REMOTE} ${RELEASE_REF} — and compare with ${decision.sha}.`), fail);
+      `fix:   git ls-remote ${REMOTE} ${RELEASE_REF} — and compare with ${decision.sha}.`), fail, true);
   }
   if (now !== decision.sha) {
     return report(undecided("PUSH NOT CONFIRMED",
       `the push returned, but ${REMOTE} reports release at ${now || "(no such ref)"} rather than ${decision.sha}.`,
       "Something else moved the ref in the same moment, or the remote lied; either way this run promoted nothing it can vouch for.",
-      `fix:   git ls-remote ${REMOTE} ${RELEASE_REF}, and run the promotion again once it is understood.`), fail);
+      `fix:   git ls-remote ${REMOTE} ${RELEASE_REF}, and run the promotion again once it is understood.`), fail, true);
   }
 
   log(`promote-release: PROMOTED — ${REMOTE}/release is ${decision.sha}. Consumers pick it up with \`git submodule update --remote\`.`);
@@ -414,7 +482,14 @@ function usage(reason, fail) {
  * be supplied by a hostile or inherited environment, so the process-level tests can answer as GitHub
  * without leaving a way to forge CI evidence in production.
  */
-export async function main(argv, env, log = console.log, fail = console.error, gh = ghLauncher(env)) {
+export async function main(
+  argv,
+  env,
+  log = console.log,
+  fail = console.error,
+  gh = ghLauncher(env),
+  git = (...args) => gitIn(process.cwd(), ...args),
+) {
   let parsed;
   try {
     parsed = parseArgs({ args: argv, options: { "dry-run": { type: "boolean", default: false } }, allowPositionals: true, strict: true });
@@ -424,7 +499,6 @@ export async function main(argv, env, log = console.log, fail = console.error, g
   if (parsed.positionals.length !== 1) {
     return usage(parsed.positionals.length === 0 ? "no sha was given." : `one sha, not ${parsed.positionals.length}: ${parsed.positionals.join(" ")}`, fail);
   }
-  const git = (...args) => gitIn(process.cwd(), ...args);
   return promote({
     sha: parsed.positionals[0],
     dryRun: parsed.values["dry-run"],

@@ -92,7 +92,12 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   sha finished with conclusion `success` — an absent run and one still in progress are both refusals,
   because an unverified commit is what six repositories would then load. The judgement lives in
   [`tools/promote-release.mjs`](tools/promote-release.mjs) rather than in the YAML precisely so those
-  refusals can be tested; twenty-seven cases drive it.
+  refusals can be tested; thirty cases drive it.
+
+  **Dispatch it against `main`, not against your branch.** The job refuses any other ref and checks
+  out `refs/heads/main` explicitly: the checkout would otherwise take whatever ref the dispatch
+  selected, so a branch carrying an edited `promote-release.mjs` could judge a main commit under
+  rules nobody reviewed. A gate is only a gate if it is the one on main.
 
   **Rollback is a forward release**, not a rewind: revert the content on `main` and promote the new
   commit. There is no force input, and the push carries no `--force`, so git itself refuses a

@@ -99,9 +99,18 @@ function checkout(root, url, ...cloneFlags) {
 const ENTRY = (tool) => [
   'import * as fs from "node:fs";',
   `import { main } from ${JSON.stringify(pathToFileURL(tool).href)};`,
+  'const calls = () => {',
+  '  try { return fs.readFileSync(process.env.FAKE_GH_LOG, "utf8").split("\\n").filter(Boolean).length; }',
+  '  catch { return 0; }',
+  '};',
   'const gh = async (...args) => {',
+  '  // The answer file is one spec, or a list of them to hand out in order — which is how the pager',
+  '  // can be given a full first page and a failing second one. Past the end, the last spec repeats.',
+  '  const nth = calls();',
   '  fs.appendFileSync(process.env.FAKE_GH_LOG, JSON.stringify(args) + "\\n");',
-  '  const answer = JSON.parse(fs.readFileSync(process.env.FAKE_GH_ANSWER, "utf8"));',
+  '  const written = JSON.parse(fs.readFileSync(process.env.FAKE_GH_ANSWER, "utf8"));',
+  '  const list = Array.isArray(written) ? written : [written];',
+  '  const answer = list[Math.min(nth, list.length - 1)];',
   '  if ((answer.exitCode ?? 0) !== 0) throw new Error(answer.stderr ?? `gh exited ${answer.exitCode}`);',
   '  return answer.stdout ?? "";',
   '};',
@@ -117,6 +126,8 @@ function fakeGitHub(root) {
   const github = {
     env: { FAKE_GH_ENTRY: entry, FAKE_GH_ANSWER: answerFile, FAKE_GH_LOG: logFile },
     answers(spec) { fs.writeFileSync(answerFile, JSON.stringify(spec)); },
+    /** Hand out one spec per call, in order; the last repeats once the list runs out. */
+    answersInOrder(specs) { fs.writeFileSync(answerFile, JSON.stringify(specs)); },
     lists(runs) { github.answers({ stdout: JSON.stringify({ total_count: runs.length, workflow_runs: runs }) }); },
     calls() {
       return fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) : [];
@@ -155,7 +166,10 @@ function scene(t) {
   return { root, rules, github, runner, env, promote: (args, extra = {}) => run(runner, args, { ...env, ...extra }) };
 }
 
-const runsQuery = (sha) => ["api", `repos/${SLUG}/actions/runs?head_sha=${sha}&per_page=100`];
+// The ci workflow is asked for ITS OWN runs, not the repository for all of them: the generic
+// listing counts every workflow against one sha, so a busy commit looked like a short answer.
+const runsQuery = (sha, page = 1) =>
+  ["api", `repos/${SLUG}/actions/workflows/ci.yml/runs?head_sha=${sha}&per_page=100&page=${page}`];
 
 // ── the shape of the argument ─────────────────────────────────────────────────────────────────────
 
@@ -167,7 +181,7 @@ test("a sha that is not a full 40-character hex is refused before anything is as
     assert.equal(code, EXIT.REFUSED, out);
     assert.match(out, /REFUSED — NOT A SHA/, out);
     assert.match(out, /not a full 40-character commit id/, out);
-    assert.match(out, /Nothing was pushed/, out);
+    assert.match(out, /No push was attempted/, out);
   }
   assert.deepEqual(s.github.calls(), [], "GitHub is never asked about something that is not a commit id");
   assert.equal(s.rules.releaseAt(), "");
@@ -403,7 +417,7 @@ test("an unreadable answer from GitHub is no answer, not an absence of runs", (t
   const { code, out } = s.promote([s.rules.first]);
   assert.equal(code, EXIT.UNDECIDED, out);
   assert.match(out, /UNDECIDED — UNREADABLE ANSWER/, out);
-  assert.match(out, /the answer is not JSON: <html>/, out);
+  assert.match(out, /the answer is not JSON/, out);
   assert.doesNotMatch(out, /NO CI RUN/, "garbage must not be read as an empty listing");
   assert.equal(s.rules.releaseAt(), "");
 });
@@ -517,27 +531,38 @@ test("importing the module moves nothing and sets no exit code", () => {
 
 // ── what the code round of 2026-09-14 added ──────────────────────────────────────────────────────
 
-test("an answer that lists fewer runs than it counts is UNDECIDED, never a clean sha", () => {
-  // One page is asked for. If GitHub says there are more runs than it returned, the ones it did not
-  // return could include the failed twin this gate refuses on — and a page of successes would read
-  // as clean. An answer that might be missing the disqualifying run is no answer.
+test("a total_count that is not a count makes the answer unreadable", () => {
+  // The pager uses total_count to know whether it has seen everything, so an answer without a real
+  // one is unreadable rather than complete. Treating a missing count as "nothing more to fetch"
+  // would let one page of successes stand in for a listing whose later pages hold the failed run.
   const sha = "a".repeat(40);
-  const truncated = JSON.stringify({ total_count: 140, workflow_runs: [ciRun(sha)] });
-  assert.deepEqual(ciRunsFor(truncated, sha),
-    { error: "GitHub lists 140 run(s) for this sha but returned 1; a later page could hold a failed run" });
+  const runs = [ciRun(sha)];
+  assert.match(ciRunsFor(JSON.stringify({ workflow_runs: runs }), sha).error, /total_count is undefined/);
+  assert.match(ciRunsFor(JSON.stringify({ total_count: "lots", workflow_runs: runs }), sha).error, /not a count of runs/);
+  assert.match(ciRunsFor(JSON.stringify({ total_count: -1, workflow_runs: runs }), sha).error, /not a count of runs/);
 
-  const exact = JSON.stringify({ total_count: 1, workflow_runs: [ciRun(sha)] });
-  assert.equal(ciRunsFor(exact, sha).error, undefined, "a complete page is readable");
-  assert.equal(ciRunsFor(exact, sha).runs.length, 1);
+  const good = ciRunsFor(JSON.stringify({ total_count: 1, workflow_runs: runs }), sha);
+  assert.equal(good.error, undefined);
+  assert.deepEqual([good.total, good.listed, good.runs.length], [1, 1, 1]);
 });
 
-test("a truncated listing refuses the promotion rather than passing it", (t) => {
+test("a failed ci run on the SECOND page still refuses the promotion", (t) => {
+  // The judgement is "every run is green", so a listing that stopped at one page could be missing
+  // exactly the run that disqualifies the sha. Here page one is a hundred successes and the failure
+  // is on page two \u— the sha must be refused, and both pages must actually be asked for.
   const s = scene(t);
-  s.github.answers({ stdout: JSON.stringify({ total_count: 200, workflow_runs: [ciRun(s.rules.second)] }) });
+  const green = Array.from({ length: 100 }, (_, i) => ciRun(s.rules.second, { id: 1000 + i }));
+  const answers = [
+    { stdout: JSON.stringify({ total_count: 101, workflow_runs: green }) },
+    { stdout: JSON.stringify({ total_count: 101, workflow_runs: [ciRun(s.rules.second, { id: 9999, conclusion: "failure" })] }) },
+  ];
+  s.github.answersInOrder(answers);
+
   const { code, out } = s.promote([s.rules.second]);
-  assert.equal(code, EXIT.UNDECIDED, out);
-  assert.match(out, /UNDECIDED — UNREADABLE ANSWER/, out);
-  assert.match(out, /a later page could hold a failed run/, out);
+  assert.equal(code, EXIT.REFUSED, out);
+  assert.match(out, /CI NOT GREEN/, out);
+  assert.deepEqual(s.github.calls(), [runsQuery(s.rules.second, 1), runsQuery(s.rules.second, 2)],
+    "both pages were asked for, in order");
   assert.equal(s.rules.releaseAt(), "", "nothing was pushed");
 });
 
