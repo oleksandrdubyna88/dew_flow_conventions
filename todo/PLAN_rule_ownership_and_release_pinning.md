@@ -260,8 +260,11 @@ stop the rollout.
   consumer names the ref. A `.gitmodules` pointing at a branch the remote does not have is not a stale
   pin, it is a broken checkout.
 
-**Wave 1 — the six consumers stop following main.** One line in `.gitmodules`, a committed pin bump,
-and the G1 checkout fix if G1 failed. Order: `creds_for_devs` (canary — docs-only CI),
+**Wave 1 — the six consumers stop following main.** G1 is **CLOSED** (measured, above) and G2 is the
+promotion run at the end of Wave 0, so each consumer's change is exactly one line in `.gitmodules`
+plus a committed pin bump — no checkout step is touched. The canary is still a canary: it is the
+first repository to prove the switch end to end in real CI, not the thing that closes G1.
+Order: `creds_for_devs` (canary — docs-only CI),
 `connect_other_ais` (the only migrated consumer, and the only one running `adapter-check`), `mcp`,
 `sidecar_rust`, `benchmark`, **`rag_qln` last** — its two code pins go stale when mcp's and
 benchmark's tips move, and a code-pin bump needs a build run.
@@ -311,7 +314,7 @@ promote this plan to `research/` with its deviations recorded.
 
 ## Test plan
 
-- `tools/pin-check.test.mjs` — 11 cases over real git repositories in a temp directory, including the
+- `tools/pin-check.test.mjs` — 18 cases over real git repositories in a temp directory, including the
   RED one (*a pin at the release tip passes while the default branch has moved on*, which fails against
   today's tool), the backward-compatibility case (*no branch key behaves exactly as before*), the
   `rag_qln` shape (*a rules pin on release and two code pins on their own defaults are judged

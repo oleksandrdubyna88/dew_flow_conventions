@@ -78,9 +78,13 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   merge rather than of the pull request being checked. Measured over 29 days: main moved **95 times**,
   and each of those commits reddened every open pull request in six repositories at once; **317**
   pin-touching commits went downstream, a *majority* of all commits on main in two consumers. The
-  shared rules now track `release`, which moves when a rule author promotes a reviewed commit. A
-  submodule that declares no `branch` is unaffected — git's own default for the unset key is the
-  remote HEAD, which is exactly what it was compared against before.
+  shared rules **will** track `release`, which moves when a rule author promotes a reviewed commit —
+  a consumer starts following it the moment its `.gitmodules` declares `branch = release`, and until
+  that lands it goes on following the remote's default branch as before. The tool is ready ahead of
+  the rollout on purpose: it must be in the pin a consumer moves TO, or the first repository to
+  declare the key would be judged by a version that cannot read it. A submodule that declares no
+  `branch` is unaffected either way — git's own default for the unset key is the remote HEAD, which
+  is what it was compared against before.
 - Repo-specific policy moves to `.agents/PROJECT.md` and `.agents/rules/`; runtime settings
   stay in their host configuration. Never copy a policy body into both hosts' trees.
 - **`main` is closed, here and in every consumer that protects it.** A change is a branch and a pull
