@@ -314,3 +314,49 @@ spelled `refs/heads/<branch>` in full precisely so a tag can never match it; `tr
 tree read both go through the bounded family launcher rather than an unbounded call; the submodule
 section NAME is already derived from the config key rather than from the path; and printing a branch
 name to stderr is not shell injection, because nothing here executes it.
+
+## The promotion gate (`tools/promote-release.mjs`)
+
+`tools/promote-release.test.mjs` — 27 cases. The gate decides which commit six repositories load as
+their policy, so the tests are about its REFUSALS: a gate that has only ever been exercised on its
+happy path is a gate nobody has watched close.
+
+The judgement (`decide`) is exported separately from the side effect (`promote`), and both take
+`git` and `gh` as functions, so every refusal is driven at process level against real Git
+repositories in a temp directory with a stand-in answering as GitHub. The stand-in is not a
+weakening: it still has to produce a completed, successful run for the exact sha.
+
+Refusals covered: a sha that is not 40 hex characters (five spellings, and GitHub is never asked);
+a commit `main` does not reach — settled locally before GitHub is asked; no `ci` run at all; a run
+that is `in_progress`, `queued` or `waiting`; a run that completed `failure`, `cancelled`,
+`timed_out` or `startup_failure`; a green run of a DIFFERENT workflow for the same sha; a green run
+for a different sha; two runs where one failed — not outvoted, because two answers about one commit
+is a question and the gate does not guess. An answer that cannot be parsed is `UNDECIDED`, never
+"no runs": no answer is not an answer of no.
+
+Movement: the happy path pushes exactly `refs/heads/release` and moves nothing else; an older sha is
+refused as not a forward move, with the revert-on-main rollback named; a commit beside `release`
+that neither reaches is refused; a sha already at `release` is a verified no-op, and is still
+refused if its run is now red — a hand-pushed unverified ref does not become legitimate by being
+there. `--dry-run` suppresses the push and never the judgement.
+
+Exit vocabulary is `0` promoted, `1` refused (the sha's own standing), `2` usage, `3` undecided
+(evidence could not be gathered, or the push did not land). Nothing is pushed on any non-zero exit.
+The split follows `http-run.mjs`: a workflow log reader needs to know whether the COMMIT or the
+RUNNER was the problem.
+
+**Teeth checked by mutation, not by reading.** Making an absent `ci` run acceptable turns exactly
+four cases red — the three process-level ones and the `judgeRuns` unit — and nothing else; the file
+was restored byte-identically afterwards and re-run. Fable's own rounds also observed: the ancestry
+check removed promoted an unmerged branch tip on its own green run; `--dry-run` made to push anyway
+left `release` on the remote; and with the forward-only check removed, **git itself** rejected the
+non-fast-forward push, so the ref still did not move — the second line of defence holds
+independently of the first, which is the point of carrying no `--force`.
+
+**Not covered, and why.** The 30-second `gh` ceiling and the real `gh` binary and auth path: a
+30-second hang per case is not a test worth having, and the ceiling belongs to `lib/proc.mjs`, which
+`proc.test.mjs` already covers. The server-side ruleset on `release` is repository settings rather
+than a file — and as of 2026-09-14 it is not configured at all, which the README records as an
+accepted gap rather than an oversight. `PUSH NOT CONFIRMED` (the remote reporting a different sha
+immediately after a successful push) is a race that could not be staged deterministically against a
+local bare remote.

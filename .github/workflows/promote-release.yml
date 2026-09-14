@@ -1,0 +1,73 @@
+name: promote-release
+
+# `release` is the ref six repositories load their policy from. It moves HERE, deliberately, and only
+# through this file: there is no `on: push` in it, so a merge to main never touches it. That gap
+# between "written" and "loaded" is the whole mechanism — main is where rules are WRITTEN, `release`
+# is what is LOADED, and closing the gap automatically would put us back where we started, with every
+# commit here reddening every open pull request in six repositories at once.
+#
+# The judgement lives in tools/promote-release.mjs rather than in this YAML, because a gate whose
+# refusals cannot be tested is a gate nobody has seen close. Twenty-seven cases drive it, including
+# every refusal: a sha that is not on main, a ci run that is absent, one still in progress, and one
+# that finished red.
+#
+# There is no rewind input. Rollback is a FORWARD release — revert the content on main and promote
+# the new commit. Moving `release` backwards would make every consumer's committed pin differ from
+# the tip at once, so all six repositories would go red during the incident the rollback exists to
+# end, and a non-fast-forward update would break every cached clone's `git submodule update --remote`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "The reviewed commit on main to publish (full 40-character sha)"
+        required: true
+      reason:
+        description: "What this release contains, in one line, for the run summary"
+        required: true
+
+# One promotion at a time. Two concurrent runs could each judge a different sha as a forward move
+# from the release they both read before either pushed.
+concurrency:
+  group: promote-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # to push refs/heads/release
+  actions: read     # to read this repository's ci runs
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The tool asks whether the sha is an ancestor of main and how far release is behind it;
+          # both are questions a shallow clone cannot answer.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - run: npm ci --ignore-scripts
+
+      - name: Promote
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node tools/promote-release.mjs "${{ inputs.sha }}"
+
+      - name: Say what moved
+        if: success()
+        env:
+          SHA: ${{ inputs.sha }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          {
+            echo "## release → \`$SHA\`"
+            echo
+            echo "$REASON"
+            echo
+            echo "Consumers pick this up on their next pin bump; nothing in a consumer changes until then."
+          } >> "$GITHUB_STEP_SUMMARY"
