@@ -24,8 +24,14 @@ jobs:
         with:
           node-version: 22
       # The tools that every consumer's CI runs (plan-lifecycle, pin-check, gate-snippet-check,
-      # http-coverage, post-deploy-check) test themselves against tools/fixtures. A tool that
-      # breaks here breaks every consumer's build on its next pin bump, so it is checked here first.
+      # http-coverage, post-deploy-check) test themselves here. A tool that breaks here breaks every
+      # consumer's build on its next pin bump, so it is checked here first.
+      #
+      # Most of them run against tools/fixtures — directories whose right answers are known.
+      # pin-check cannot: what it asserts is a statement about two repositories ("is this pin the tip
+      # of the ref it tracks"), and no directory of files can express a release branch that lags its
+      # own default branch, so tools/pin-check.test.mjs builds real Git repositories in a temp dir.
+      # Until 2026-09-14 this comment claimed a pin-check selftest that did not exist at all.
       - name: Selftest
         run: |
           npm ci --ignore-scripts

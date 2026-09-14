@@ -226,3 +226,46 @@ level deep through an extension allowlist, so `scripts/ci/build.sh` and an exten
 rather than admitting text by one, so a file type nobody thought of is read rather than ignored.
 `referenceHookFiles` became recursive for the same class of reason: a hook in a subdirectory would
 have been published and checked nowhere.
+
+## The pin ref (`tools/pin-check.mjs`)
+
+`tools/pin-check.test.mjs` is the first test this tool has ever had. Until 2026-09-14 the CI job's
+own comment said it "tests itself against tools/fixtures", and it did not: every change to the one
+file six repositories run in CI shipped on a green build that never executed it.
+
+Ten cases, and no checked-in fixtures, deliberately. What the tool asserts is a statement about two
+repositories — *is this pin the tip of the ref it tracks* — and no directory of files can express a
+release branch that lags its own default branch, so each case builds real Git repositories in a temp
+directory and runs the tool as a child process the way a consumer's CI step does. The gitlink is
+written with `update-index --cacheinfo` rather than `git submodule add`: the tool never reads the
+submodule's contents, so cloning one would test something it does not do, and Git ≥ 2.38 refuses
+local-path submodule clones without `protocol.file.allow`.
+
+The RED case is *a pin at the release tip passes while the default branch has moved on*. Against the
+unchanged tool it failed with `pin-check: STALE .agents/conventions` — the real symptom, a correctly
+published pin reported as drift, rather than a setup error. Seven of the ten failed before the change
+and all ten pass after it.
+
+Two of the ten guard things that were never checked. *The pin is read from the commit, not the index*
+walks the documented three-step sequence — staged at the wrong sha, index corrected, commit made —
+and asserts red, red, green; README states this and nothing tested it. *A `.gitmodules` path that is
+not a gitlink is a finding, not a crash* pins the `rev-parse HEAD:<path>` guard: before it, a
+half-added submodule threw a raw git stderr dump with a Node stack trace out of the script. `git mv`
+of a mount leaves exactly that shape behind.
+
+*A branch the remote does not have is NO SUCH REF, never a silent OK* is the subtlest. `ls-remote`
+answers exit 0 and an EMPTY body for a pattern matching nothing; read as a tip, that empty string
+would make every pin look stale against a blank sha, and read as a miss it is the one thing it can be.
+
+Two setup errors were caught by reading the failures rather than the counts, and both would have been
+false evidence. A Windows path written verbatim into `.gitmodules` is `fatal: bad config line` — a
+backslash is a config escape — so the first red run was failing for the wrong reason entirely. And an
+all-zero sha is refused by git as a gitlink (`cache entry has null sha1`), which failed the
+unreachable-remote case for a reason that had nothing to do with reachability.
+
+**What these tests do not cover.** Whether GitHub answers a fetch for a reachable sha that is not a
+ref tip. That was measured separately against a `file://` remote on git 2.55 — a lagging pin fetched
+with `--depth 1` succeeds, and the fetch line shows why: git asks for the gitlink sha itself, not the
+branch tip. A local clone silently ignores `--depth` ("--depth is ignored in local clones"), so the
+first run of that experiment was a false green until the remote was re-addressed as `file://`. The
+GitHub half is confirmed on the first consumer to switch, which is what the canary is for.
