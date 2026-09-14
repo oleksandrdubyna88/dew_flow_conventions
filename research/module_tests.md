@@ -408,3 +408,49 @@ against origin's freshly-read `main`, with a shallow checkout refused outright b
 the "strict multi-run check deadlocks a sha forever" worry does not hold, because re-running a
 workflow adds an ATTEMPT to the same run record and updates its conclusion rather than leaving a
 failed twin — which the `CI NOT GREEN` message already names as the escape.
+
+### The gate's second code round — and the hole it found in the workflow
+
+Twelve reviewers, twenty-five findings, fifteen accepted. The most serious was not in the tool at all
+but in the YAML written to drive it, and two vendors named it independently.
+
+**The workflow interpolated the dispatch input straight into a shell command** — `node
+tools/promote-release.mjs "${{ inputs.sha }}"`. Actions substitutes that text before the shell parses
+the line, so a dispatcher submitting `$(…)` or `"; …; #` runs arbitrary commands on the runner with
+the workflow token, long before the tool's 40-hex check ever sees the value. It now travels through
+the environment (`SHA: ${{ inputs.sha }}` then `"$SHA"`), where no such expansion happens. Written
+down because the gate was built precisely to stop unverified things reaching six repositories, and
+the first serious way in was the door it walked through itself.
+
+Two more in the same file. The checkout took whatever ref the dispatch selected, so a branch carrying
+an edited `promote-release.mjs` could have judged — and promoted — a main commit under rules nobody
+reviewed; the job now refuses to run from anything but `main` and checks out `refs/heads/main`
+explicitly. And the job had no `timeout-minutes`, so a stalled checkout or `npm ci` held a runner with
+no verdict and no failure, which reads like a gate still thinking rather than one that never answered.
+
+**The run listing is now paged, and asked of the `ci` workflow rather than the repository.** The
+first fix for truncation compared `total_count` with what came back — but the generic
+`actions/runs?head_sha=` endpoint returns EVERY workflow's runs for a sha and counts across all of
+them, so on a busy commit a complete page of ci successes sat beside a hundred unrelated runs and the
+count said the answer was short when it was not. That made a valid commit permanently unpromotable,
+which is a fail-closed bug rather than a safe one. `collectCiRuns` now asks
+`actions/workflows/ci.yml/runs` and pages until it has seen the count, bounded at ten pages. A
+`total_count` that is missing or not a non-negative integer is unreadable rather than "nothing more to
+fetch" — otherwise one page of successes could stand in for a listing whose later pages hold the run
+that disqualifies the sha. Mutation-checked: making the pager stop after page one turns the
+second-page case red.
+
+**A refusal no longer claims nothing was pushed when a push was attempted.** `report()` ended every
+message with "Nothing was pushed; release is where it was" — true before the push, a claim the tool
+cannot make after one, because the remote may have accepted the update and lost the response. It now
+takes an `afterPush` flag and says instead that the state is what the lines above say and no more.
+The push-error path also distinguishes a read-back that ANSWERED from one that itself failed: the
+second says whether the update landed is unknown, rather than reporting the ref as absent.
+
+Ten findings were rejected on evidence the code carries: the shallow-checkout refusal is the FIRST
+statement in `standing()`, before any fetch or ancestry question; `remoteTips` is bounded by
+lib/git.mjs's 30-second ceiling like every other call; a tag cannot reach the push because the input
+must be 40 hex AND `cat-file -t` must answer `commit`; the empty-slug case is checked before GitHub is
+asked; and re-verifying a sha already at `release` is the feature, not waste — it is the one case
+where the ref may have arrived without ever passing the gate, and so the one case that must not be
+skipped.
