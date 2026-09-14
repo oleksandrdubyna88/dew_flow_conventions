@@ -360,3 +360,51 @@ than a file — and as of 2026-09-14 it is not configured at all, which the READ
 accepted gap rather than an oversight. `PUSH NOT CONFIRMED` (the remote reporting a different sha
 immediately after a successful push) is a race that could not be staged deterministically against a
 local bare remote.
+
+### What the gate's code round changed
+
+Fifteen findings across three vendors; seven accepted. Three of them — from three independent
+reviewers — were the same one, and it was right.
+
+**The `gh` executable is no longer nameable by the environment.** `ghLauncher` honoured a
+`PROMOTE_RELEASE_GH` variable, which the process-level tests used to answer as GitHub. The argument
+for keeping it was that it weakens nothing a PATH entry could not. Three reviewers answered the same
+way: an inherited or injected variable on a self-hosted runner could point it at a shim that answers
+"green" for any sha, after which the gate uses real credentials to move the ref — and a custom
+variable is exactly the sort of thing a workflow context leaks where PATH is sanitised. The seam is
+gone from production entirely. `main` now takes `gh` as a parameter, and each case spawns a small
+entry script that imports `main` and hands it a double. That is still a real process with real argv
+parsing, real git and the real judgement — and a function parameter is not something an environment
+can set.
+
+**A truncated listing is UNDECIDED, not a clean sha.** One page of 100 runs was asked for and judged
+as if it were all of them. If GitHub reports more runs than it returned, the ones it did not return
+could hold the failed twin the gate refuses on, and a page of successes would read as clean.
+`ciRunsFor` now compares `total_count` against the list it was given and refuses to read a short
+answer.
+
+**`GITHUB_REPOSITORY` and origin must agree.** The variable decided whose `ci` runs vouched for a
+sha while the push always went to origin, so in a local clone it could be set to a fork whose green
+run then authorised a ref on this remote. A mismatch is now resolved in neither direction: it
+returns nothing and the `WHICH REPOSITORY` branch stops the run.
+
+**A push that errors is no longer assumed to have failed.** If the remote accepts the update and the
+connection drops before the response arrives, the ref HAS moved and consumers can already see it;
+reporting "nothing was pushed" sends an operator to repair a correct state. The catch path now asks
+the remote where release is before concluding, and reports PROMOTED when it is already at the target.
+
+That race itself **is not covered**, and it cannot be staged deterministically against a local bare
+remote. What is covered is the half that can be: a `pre-receive` hook that rejects the push, after
+which the refusal names where release actually is. Mutation-checked — removing that wording turns
+exactly that case red. The first draft of this test was a false positive: it put the remote at the
+target sha, which takes the "already there" early return and never reaches the push at all. It
+passed without ever having been red, which is worth recording as the failure it was.
+
+Eight findings were rejected on evidence the implementation already carries: the absent-`release`
+bootstrap is an explicit branch (`tips.get(RELEASE_REF) ?? ""`, the fetch and forward-move check both
+guarded); network and `gh` failures are already `UNDECIDED` rather than refusals; a tag cannot
+participate because both the query and the push spell `refs/heads/` in full; ancestry is judged
+against origin's freshly-read `main`, with a shallow checkout refused outright before that point; and
+the "strict multi-run check deadlocks a sha forever" worry does not hold, because re-running a
+workflow adds an ATTEMPT to the same run record and updates its conclusion rather than leaving a
+failed twin — which the `CI NOT GREEN` message already names as the escape.

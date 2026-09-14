@@ -12,11 +12,13 @@
  * So each case builds a bare remote with a `main`, a merged history, an unmerged `topic` and a `stray`
  * branch off an older commit, then clones it the way the workflow's checkout would.
  *
- * GitHub is a scripted double. The tool spawns `gh` through the PROMOTE_RELEASE_GH seam, which here
- * names a tiny Node script that answers from a JSON file the test wrote and records every argv it was
- * given — so the happy path can assert not only that release moved but that GitHub was asked about
- * EXACTLY that sha, and the refusals can assert that GitHub was never asked at all when ancestry
- * already settled it.
+ * GitHub is a scripted double, injected as a FUNCTION. Each case spawns a tiny entry script that
+ * imports the tool's own `main` — real argv parsing, real git, real judgement — and hands it a `gh`
+ * that answers from a JSON file the test wrote and records every argv it was given. So the happy path
+ * asserts not only that release moved but that GitHub was asked about EXACTLY that sha, and the
+ * refusals assert GitHub was never asked at all when ancestry already settled it. Production has no
+ * environment variable naming the `gh` executable: three reviewers called that a way to forge the
+ * very evidence this gate checks, and a function parameter is not something an environment can set.
  */
 
 import { test } from "node:test";
@@ -25,7 +27,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { EXIT, RELEASE_REF, ciRunsFor, judgeRuns, repositorySlug } from "./promote-release.mjs";
 
@@ -86,27 +88,34 @@ function checkout(root, url, ...cloneFlags) {
 }
 
 /**
- * The `gh` double. Answers from a JSON file — `{ stdout, stderr, exitCode }` — and appends every argv
- * it receives to a log, one JSON array per line. Written as lines rather than a template literal so
- * no backtick can end it early.
+ * The entry the tests spawn instead of the tool itself.
+ *
+ * It is a real process running real argv parsing, real git and the tool's own `main` — but it passes
+ * `gh` as a FUNCTION. That matters: the tool used to read an environment variable naming the `gh`
+ * executable, and three reviewers called it what it was, a way for an inherited or injected variable
+ * on a self-hosted runner to forge the CI evidence the gate exists to check. A function parameter
+ * cannot be set by an environment, so the seam the tests need does not exist in production at all.
  */
-const FAKE_GH = [
+const ENTRY = (tool) => [
   'import * as fs from "node:fs";',
-  'fs.appendFileSync(process.env.FAKE_GH_LOG, JSON.stringify(process.argv.slice(2)) + "\\n");',
-  'const answer = JSON.parse(fs.readFileSync(process.env.FAKE_GH_ANSWER, "utf8"));',
-  'process.stdout.write(answer.stdout ?? "");',
-  'process.stderr.write(answer.stderr ?? "");',
-  'process.exitCode = answer.exitCode ?? 0;',
+  `import { main } from ${JSON.stringify(pathToFileURL(tool).href)};`,
+  'const gh = async (...args) => {',
+  '  fs.appendFileSync(process.env.FAKE_GH_LOG, JSON.stringify(args) + "\\n");',
+  '  const answer = JSON.parse(fs.readFileSync(process.env.FAKE_GH_ANSWER, "utf8"));',
+  '  if ((answer.exitCode ?? 0) !== 0) throw new Error(answer.stderr ?? `gh exited ${answer.exitCode}`);',
+  '  return answer.stdout ?? "";',
+  '};',
+  'process.exitCode = await main(process.argv.slice(2), process.env, console.log, console.error, gh);',
   "",
 ].join("\n");
 
 function fakeGitHub(root) {
-  const exe = path.join(root, "fake-gh.mjs");
-  fs.writeFileSync(exe, FAKE_GH);
+  const entry = path.join(root, "entry.mjs");
+  fs.writeFileSync(entry, ENTRY(tool));
   const answerFile = path.join(root, "gh-answer.json");
   const logFile = path.join(root, "gh-calls.log");
   const github = {
-    env: { PROMOTE_RELEASE_GH: exe, FAKE_GH_ANSWER: answerFile, FAKE_GH_LOG: logFile },
+    env: { FAKE_GH_ENTRY: entry, FAKE_GH_ANSWER: answerFile, FAKE_GH_LOG: logFile },
     answers(spec) { fs.writeFileSync(answerFile, JSON.stringify(spec)); },
     lists(runs) { github.answers({ stdout: JSON.stringify({ total_count: runs.length, workflow_runs: runs }) }); },
     calls() {
@@ -132,7 +141,7 @@ const ciRun = (sha, overrides = {}) => ({
 
 /** Run the real tool in a checkout, the way the workflow's step runs it. */
 function run(cwd, args, env) {
-  const result = spawnSync(process.execPath, [tool, ...args], { cwd, encoding: "utf8", timeout: 60000, env });
+  const result = spawnSync(process.execPath, [env.FAKE_GH_ENTRY, ...args], { cwd, encoding: "utf8", timeout: 60000, env });
   return { code: result.status, out: `${result.stdout}${result.stderr}` };
 }
 
@@ -441,17 +450,31 @@ test("when it cannot tell which GitHub repository to ask, it stops rather than a
 
 // ── the parsers, as units ─────────────────────────────────────────────────────────────────────────
 
-test("repositorySlug reads Actions first, then origin's url in either spelling, and refuses to guess", () => {
+test("repositorySlug refuses when GITHUB_REPOSITORY names a repository origin does not", () => {
+  // The variable decides WHOSE ci runs vouch for the sha; the push always goes to origin. Letting
+  // them disagree lets a fork's or mirror's green run authorise a ref on this remote — so a mismatch
+  // is not resolved in either direction, it returns nothing and the caller's WHICH REPOSITORY branch
+  // stops the run.
   const origin = (url) => (...args) => {
     assert.deepEqual(args, ["remote", "get-url", "origin"]);
     return url;
   };
-  assert.equal(repositorySlug({ GITHUB_REPOSITORY: "acme/rules" }, origin("https://github.com/other/repo.git")), "acme/rules");
+  assert.equal(repositorySlug({ GITHUB_REPOSITORY: "acme/rules" }, origin("https://github.com/acme/rules.git")), "acme/rules",
+    "agreeing is the only way through");
+  assert.equal(repositorySlug({ GITHUB_REPOSITORY: "ACME/Rules" }, origin("https://github.com/acme/rules.git")), "ACME/Rules",
+    "GitHub owners and names are case-insensitive");
+  assert.equal(repositorySlug({ GITHUB_REPOSITORY: "attacker/fork" }, origin("https://github.com/acme/rules.git")), "",
+    "a fork's runs may not vouch for a sha pushed to this origin");
+
   assert.equal(repositorySlug({}, origin("https://github.com/acme/rules.git")), "acme/rules");
   assert.equal(repositorySlug({}, origin("https://github.com/acme/rules")), "acme/rules");
   assert.equal(repositorySlug({}, origin("git@github.com:acme/rules.git")), "acme/rules");
   assert.equal(repositorySlug({}, origin("ssh://git@github.com/acme/rules.git")), "acme/rules");
   assert.equal(repositorySlug({}, origin("D:/rsd/conventions.git")), "", "a local path names no GitHub repository");
+
+  // Origin unparseable as GitHub — a local bare remote, as every test here uses — leaves the variable
+  // as the only statement about which repository this is, and nothing to contradict it.
+  assert.equal(repositorySlug({ GITHUB_REPOSITORY: "acme/rules" }, origin("D:/rsd/conventions.git")), "acme/rules");
   assert.equal(repositorySlug({ GITHUB_REPOSITORY: "not a slug" }, origin("D:/rsd/conventions.git")), "");
   assert.equal(repositorySlug({}, () => { throw new Error("fatal: No such remote 'origin'"); }), "");
 });
@@ -490,4 +513,51 @@ test("importing the module moves nothing and sets no exit code", () => {
   // The entry guard: `node --test` loaded this file, which imported the tool. Had the tool run its
   // main on import it would have printed usage and left EXIT.USAGE in process.exitCode.
   assert.ok(process.exitCode === undefined || process.exitCode === 0, `process.exitCode is ${process.exitCode}`);
+});
+
+// ── what the code round of 2026-09-14 added ──────────────────────────────────────────────────────
+
+test("an answer that lists fewer runs than it counts is UNDECIDED, never a clean sha", () => {
+  // One page is asked for. If GitHub says there are more runs than it returned, the ones it did not
+  // return could include the failed twin this gate refuses on — and a page of successes would read
+  // as clean. An answer that might be missing the disqualifying run is no answer.
+  const sha = "a".repeat(40);
+  const truncated = JSON.stringify({ total_count: 140, workflow_runs: [ciRun(sha)] });
+  assert.deepEqual(ciRunsFor(truncated, sha),
+    { error: "GitHub lists 140 run(s) for this sha but returned 1; a later page could hold a failed run" });
+
+  const exact = JSON.stringify({ total_count: 1, workflow_runs: [ciRun(sha)] });
+  assert.equal(ciRunsFor(exact, sha).error, undefined, "a complete page is readable");
+  assert.equal(ciRunsFor(exact, sha).runs.length, 1);
+});
+
+test("a truncated listing refuses the promotion rather than passing it", (t) => {
+  const s = scene(t);
+  s.github.answers({ stdout: JSON.stringify({ total_count: 200, workflow_runs: [ciRun(s.rules.second)] }) });
+  const { code, out } = s.promote([s.rules.second]);
+  assert.equal(code, EXIT.UNDECIDED, out);
+  assert.match(out, /UNDECIDED — UNREADABLE ANSWER/, out);
+  assert.match(out, /a later page could hold a failed run/, out);
+  assert.equal(s.rules.releaseAt(), "", "nothing was pushed");
+});
+
+test("a refused push says where release actually is, instead of only that nothing moved", (t) => {
+  // The new read-back in the catch path. Its real purpose is the race where the remote ACCEPTED the
+  // update and the connection dropped before the answer arrived \u— reporting that as "nothing was
+  // pushed" sends an operator to repair a state that is already correct. That race cannot be staged
+  // deterministically against a local bare remote (see research/module_tests.md), so what is asserted
+  // here is the half that can be: after a push the remote genuinely refuses, the tool asks where
+  // release is and says so, rather than leaving the reader to guess.
+  const s = scene(t);
+  s.github.lists([ciRun(s.rules.second)]);
+  s.rules.release(s.rules.first);             // release exists, one commit behind \u— a forward move
+  const hook = path.join(s.rules.url, "hooks", "pre-receive");
+  fs.writeFileSync(hook, ["#!/bin/sh", "exit 1", ""].join("\n"));
+  fs.chmodSync(hook, 0o755);
+
+  const { code, out } = s.promote([s.rules.second]);
+  assert.equal(code, EXIT.UNDECIDED, out);
+  assert.match(out, /PUSH REFUSED/, out);
+  assert.match(out, new RegExp(`release is still ${s.rules.first}`), out);
+  assert.equal(s.rules.releaseAt(), s.rules.first, "the ref really did not move");
 });

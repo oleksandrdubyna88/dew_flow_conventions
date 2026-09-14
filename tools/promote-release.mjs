@@ -70,7 +70,8 @@ const CI_WORKFLOW_PATH = ".github/workflows/ci.yml";
 /** A commit id and nothing else. Either case, because both are hex; it is lower-cased before use. */
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 
-/** One sha has a handful of runs; a page this wide is never paginated and never truncated. */
+/** One sha has a handful of runs. If GitHub ever says it has more than this, the answer is refused
+ *  as unreadable rather than judged on one page — see ciRunsFor. */
 const RUNS_PER_PAGE = 100;
 
 /** The same ceiling lib/git.mjs puts on every git call — an API that accepts and then says nothing is not "slow". */
@@ -85,40 +86,46 @@ const undecided = (headline, ...lines) => ({ ok: false, code: EXIT.UNDECIDED, he
 /**
  * `owner/name` of the GitHub repository whose ci runs are asked for.
  *
- * GITHUB_REPOSITORY first, because Actions sets it and the runner's origin url may be a token-bearing
- * https form nobody should parse. Outside Actions, origin's url — https or ssh, with or without `.git`.
- * Empty when neither says: the caller refuses rather than asking the wrong repository.
+ * GITHUB_REPOSITORY and origin must AGREE. The variable decides whose ci runs vouch for the sha and
+ * the push always goes to origin, so a disagreement lets a fork authorise a ref here. Outside Actions,
+ * origin's url alone — https or ssh, with or without `.git`. Empty when neither says, or when they
+ * contradict each other: the caller refuses rather than asking the wrong repository.
  */
 export function repositorySlug(env, git) {
-  const fromActions = env.GITHUB_REPOSITORY ?? "";
-  if (/^[^\s/]+\/[^\s/]+$/.test(fromActions)) return fromActions;
-  let url;
+  let fromOrigin = "";
   try {
-    url = git("remote", "get-url", REMOTE);
+    const match = /github\.com[/:]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/.exec(git("remote", "get-url", REMOTE));
+    if (match !== null) fromOrigin = `${match[1]}/${match[2]}`;
   } catch {
-    return "";
+    fromOrigin = "";
   }
-  const match = /github\.com[/:]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/.exec(url);
-  return match === null ? "" : `${match[1]}/${match[2]}`;
+
+  const fromActions = env.GITHUB_REPOSITORY ?? "";
+  if (!/^[^\s/]+\/[^\s/]+$/.test(fromActions)) return fromOrigin;
+
+  // GITHUB_REPOSITORY decides WHOSE ci runs vouch for the sha, while the push always goes to origin.
+  // Letting them disagree means a fork's or mirror's green run can authorise a ref on this remote, so
+  // a mismatch is not resolved in either direction — it is refused by returning nothing, and the
+  // caller's WHICH REPOSITORY branch stops the run. Equal, or origin unparseable, is the only way
+  // through. Case-insensitive because GitHub owners and names are.
+  if (fromOrigin === "" || fromOrigin.toLowerCase() === fromActions.toLowerCase()) return fromActions;
+  return "";
 }
 
 /**
  * `gh` as a function: argv in, stdout out, a thrown Error for anything that is not exit 0.
  *
- * PROMOTE_RELEASE_GH names the executable (default `gh`); a `.mjs`/`.js` path runs under this Node.
- * That is the seam the tests use to answer as GitHub without a network. It weakens nothing a PATH
- * entry could not: the double still has to produce a completed, successful run for the exact sha.
+ * Always the `gh` on PATH. There is deliberately no environment variable naming the executable:
+ * three reviewers on 2026-09-14 called such a seam a way to forge the evidence this gate exists to
+ * check, and they were right — an inherited or injected variable on a self-hosted runner could point
+ * it at a shim that answers "green" for any sha, after which the gate uses real credentials to move
+ * the ref. Tests inject `gh` as a FUNCTION instead (`main` takes it), which no environment can set.
  * Launched through lib/proc.mjs — the family's launcher for everything that is not git — so the
  * ceiling kills the process tree rather than merely stopping the wait.
  */
 export function ghLauncher(env = process.env) {
-  const configured = env.PROMOTE_RELEASE_GH ?? "gh";
-  const underNode = /\.[cm]?js$/i.test(configured);
   return async (...args) => {
-    const result = await run(underNode ? process.execPath : configured, underNode ? [configured, ...args] : args, {
-      env,
-      timeoutMs: GH_TIMEOUT_MS,
-    });
+    const result = await run("gh", args, { env, timeoutMs: GH_TIMEOUT_MS });
     if (result.timedOut) throw new Error(`gh gave no answer within ${GH_TIMEOUT_MS} ms`);
     if (result.spawnFailed) throw new Error(`gh could not be started (${result.spawnError}) — is the GitHub CLI installed and on PATH?`);
     if (result.code !== 0) throw new Error(firstLine(result.err) || `gh exited ${result.code}`);
@@ -135,6 +142,15 @@ export function ciRunsFor(answer, sha) {
     return { error: "the answer is not JSON" };
   }
   if (!Array.isArray(parsed?.workflow_runs)) return { error: "the answer carries no workflow_runs list" };
+
+  // One page is asked for. If GitHub says there are more runs than it listed, the ones it did not
+  // list could include the failed twin this gate refuses on — and a page of successes would then
+  // read as a clean sha. An answer that might be missing the disqualifying run is no answer.
+  const total = Number(parsed.total_count);
+  if (Number.isFinite(total) && total > parsed.workflow_runs.length) {
+    return { error: `GitHub lists ${total} run(s) for this sha but returned ${parsed.workflow_runs.length}; a later page could hold a failed run` };
+  }
+
   const isCi = (r) => r.name === CI_WORKFLOW || r.path === CI_WORKFLOW_PATH;
   return { runs: parsed.workflow_runs.filter((r) => isCi(r) && String(r.head_sha).toLowerCase() === sha) };
 }
@@ -342,9 +358,25 @@ export async function promote({ sha, dryRun = false, git, gh, repository, log = 
   try {
     git("push", REMOTE, `${decision.sha}:${RELEASE_REF}`);
   } catch (error) {
+    // A push that errors has not necessarily failed: if the remote accepted the update and the
+    // connection dropped before the response arrived, the ref HAS moved and every consumer can
+    // already see it. Reporting that as "nothing was pushed" would send an operator to repair a
+    // state that is correct. So ask the remote where release is before concluding anything.
+    let landed = "";
+    try {
+      landed = remoteTips(git).get(RELEASE_REF) ?? "";
+    } catch {
+      landed = "";
+    }
+    if (landed === decision.sha) {
+      log(`promote-release: the push reported an error, but ${REMOTE}/release IS ${decision.sha} — it landed before the connection broke.`);
+      log(`promote-release: PROMOTED — ${REMOTE}/release is ${decision.sha}. Consumers pick it up with \`git submodule update --remote\`.`);
+      return EXIT.PROMOTED;
+    }
     return report(undecided("PUSH REFUSED", firstLine(error.stderr) || firstLine(error.message),
-      `${REMOTE} did not accept the update. A ruleset that denies pushes to release from anything but the workflow refuses`,
-      "exactly like this — which is the point of the ruleset; run the promotion through the workflow.",
+      `${REMOTE} did not accept the update, and release is still ${landed || "(no such ref)"}.`,
+      "A ruleset that denies pushes to release from anything but the workflow refuses exactly like this —",
+      "which is the point of the ruleset; run the promotion through the workflow.",
       "fix:   read the line above; this tool never adds --force, so a non-fast-forward refusal means release has moved on."), fail);
   }
 
@@ -375,8 +407,14 @@ function usage(reason, fail) {
   return EXIT.USAGE;
 }
 
-/** The command: argv → exit code. Real git in the current directory, real (or PROMOTE_RELEASE_GH) gh. */
-export async function main(argv, env, log = console.log, fail = console.error) {
+/**
+ * The command: argv → exit code. Real git in the current directory, and the `gh` on PATH.
+ *
+ * `gh` is a parameter rather than something an environment variable can redirect: a function cannot
+ * be supplied by a hostile or inherited environment, so the process-level tests can answer as GitHub
+ * without leaving a way to forge CI evidence in production.
+ */
+export async function main(argv, env, log = console.log, fail = console.error, gh = ghLauncher(env)) {
   let parsed;
   try {
     parsed = parseArgs({ args: argv, options: { "dry-run": { type: "boolean", default: false } }, allowPositionals: true, strict: true });
@@ -391,7 +429,7 @@ export async function main(argv, env, log = console.log, fail = console.error) {
     sha: parsed.positionals[0],
     dryRun: parsed.values["dry-run"],
     git,
-    gh: ghLauncher(env),
+    gh,
     repository: repositorySlug(env, git),
     log,
     fail,

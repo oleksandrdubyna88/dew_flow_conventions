@@ -1,10 +1,15 @@
 name: promote-release
 
-# `release` is the ref six repositories load their policy from. It moves HERE, deliberately, and only
-# through this file: there is no `on: push` in it, so a merge to main never touches it. That gap
-# between "written" and "loaded" is the whole mechanism — main is where rules are WRITTEN, `release`
-# is what is LOADED, and closing the gap automatically would put us back where we started, with every
-# commit here reddening every open pull request in six repositories at once.
+# `release` is the ref six repositories load their policy from. This file is the SUPPORTED way to move
+# it — not, as of 2026-09-14, the only possible way: the ref has no server-side protection, so anyone
+# with push rights can move it by hand and skip every check below. That gap is recorded in the README
+# as an accepted risk rather than left to be discovered; closing it needs a repository ruleset on
+# refs/heads/release, which is settings rather than a file.
+#
+# What this file DOES guarantee is that a merge to main never moves the ref: there is no `on: push`
+# here, only workflow_dispatch. That gap between "written" and "loaded" is the whole mechanism — main
+# is where rules are WRITTEN, `release` is what is LOADED — and closing it automatically would put us
+# back where we started, with every commit here reddening every open pull request in six repositories.
 #
 # The judgement lives in tools/promote-release.mjs rather than in this YAML, because a gate whose
 # refusals cannot be tested is a gate nobody has seen close. Twenty-seven cases drive it, including

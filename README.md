@@ -85,7 +85,8 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   declare the key would be judged by a version that cannot read it. A submodule that declares no
   `branch` is unaffected either way — git's own default for the unset key is the remote HEAD, which
   is what it was compared against before.
-- **How `release` moves.** Through the `promote-release` workflow and nothing else: it is
+- **How `release` moves.** Through the `promote-release` workflow — the supported path, and while the
+  ref is unprotected not the only possible one (see the gap below). It is
   `workflow_dispatch` only, so a merge to main never touches the ref. It takes a full 40-character
   sha and refuses it unless the commit is an ancestor of `main` **and** the `ci` run for that exact
   sha finished with conclusion `success` — an absent run and one still in progress are both refusals,
