@@ -238,11 +238,24 @@ stop the rollout.
   FETCH_HEAD`. Modern git asks the server for **the exact commit the gitlink names**, not for the
   branch tip, so a lagging pin is not a shallow-fetch problem at all.
 
-  Residual risk, stated rather than waved away: the experiment used a `file://` remote, which allows a
-  reachable-sha fetch by default. GitHub allows it too, but that half is not measured here. It is
-  confirmed for real on the `creds_for_devs` canary — which is what the canary is for — and if the
-  canary fails, every consumer's checkout step changes in the same pull request as its `.gitmodules`
-  line, never after it.
+  **Confirmed against the real remote the same day, so no residual risk remains.** A scratch consumer
+  pinned **12 commits behind** `origin/main`, with the real `https://github.com/…/dew_flow_conventions.git`
+  url, fetched with `git submodule update --init --depth 1`: it succeeded, and the fetch line again
+  names the sha rather than a branch — `* branch 103842e8… -> FETCH_HEAD`. GitHub serves a reachable
+  sha to a shallow submodule fetch.
+
+  **Consequence for Wave 1: none of the 14 shallow-fetch sites needs to change.** The switch is one
+  `.gitmodules` line plus a committed pin bump per consumer, and nothing else.
+
+  For the record, the sites that would have been touched had this failed —
+  `creds_for_devs` `ci-server.yml:79`, `docs.yml:33`, `rsd-server-deploy.yml:103`;
+  `connect_other_ais` `ci.yml:27,151`, `release.yml:378`, `sonarcloud.yml:35`;
+  `mcp` `ci.yml:34,70`; `sidecar_rust` `ci.yml:72,112`; `benchmark` `ci.yml:53,94`;
+  `rag_qln` `ci.yml:125` (plus `submodules: recursive` at `:16,53`).
+
+  One scheduling fact found while mapping them: `connect_other_ais` runs `pin-check` as a **release
+  gate** (`release.yml:392`), not only on pull requests. A stale pin there blocks a tag, so its
+  switch must not be left half-finished.
 - **G2 · `release` exists.** `git ls-remote <url> refs/heads/release` must return a sha before any
   consumer names the ref. A `.gitmodules` pointing at a branch the remote does not have is not a stale
   pin, it is a broken checkout.
