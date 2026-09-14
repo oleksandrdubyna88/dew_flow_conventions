@@ -330,3 +330,34 @@ test("each remote is named before it is probed, so a slow one does not look like
   const { out } = run(repo);
   assert.match(out, /mount → release/);
 });
+
+test("a cached branch in .git/config that disagrees with .gitmodules is a finding", t => {
+  // The trap `git submodule update --remote` sets for every existing clone: it reads
+  // `submodule.<name>.branch` from .git/config FIRST, and `git submodule sync` copies the url but
+  // NOT the branch. So a clone made before the release rollout goes on following the default branch
+  // while CI — a fresh clone, holding only the committed config — names `release`. The bump then
+  // lands at the wrong tip and CI calls it STALE, which looks like a bug in the rollout rather than
+  // a stale line in one developer's .git/config. Documented is not enough; this says it out loud.
+  const root = workspace(t);
+  const rules = remote(root, "conventions");
+  const repo = consumer(root, "app", [{ path: "mount", url: rules.url, branch: "release", pin: rules.release }]);
+  assert.equal(run(repo).code, 0, "committed config alone is consistent");
+
+  git(repo, "config", "submodule.mount.branch", "main");
+  const { code, out } = run(repo);
+  assert.equal(code, 1, out);
+  assert.match(out, /LOCAL OVERRIDE mount/);
+  assert.match(out, /\.git\/config says `main`.*\.gitmodules says `release`/s);
+  assert.match(out, /git config --unset submodule\.mount\.branch/);
+});
+
+test("a cached branch that AGREES with .gitmodules is not a finding", t => {
+  // The check must not fire on a clone that is simply configured, which is the normal state after
+  // `git submodule add -b release`.
+  const root = workspace(t);
+  const rules = remote(root, "conventions");
+  const repo = consumer(root, "app", [{ path: "mount", url: rules.url, branch: "release", pin: rules.release }]);
+  git(repo, "config", "submodule.mount.branch", "release");
+  const { code, out } = run(repo);
+  assert.equal(code, 0, out);
+});

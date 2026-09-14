@@ -50,10 +50,26 @@ function scene(t, { commits = 3, ageDays = 0 } = {}) {
   }
   git(work, "push", "-q", "origin", "main");
 
+  // An unrelated history, for the divergence case: a commit that shares no ancestor with main.
+  const orphanDir = path.join(root, "orphan");
+  execFileSync("git", ["clone", "-q", url, orphanDir], { timeout: 20000 });
+  git(orphanDir, "checkout", "-q", "--orphan", "elsewhere");
+  execFileSync("git", ["-C", orphanDir,
+    "-c", "user.name=Distance test", "-c", "user.email=d@example.invalid", "-c", "commit.gpgsign=false",
+    "commit", "-q", "--allow-empty", "-m", "unrelated",
+  ], { timeout: 20000 });
+  const orphan = git(orphanDir, "rev-parse", "HEAD");
+  git(orphanDir, "push", "-q", "origin", "elsewhere");
+  // `publish` pushes from `work`, which has never seen that object — without this the push fails
+  // with "bad object", a fixture fault that looks nothing like the divergence being tested.
+  git(work, "fetch", "-q", "origin", "elsewhere");
+
   const clone = path.join(root, "runner");
   execFileSync("git", ["clone", "-q", url, clone], { timeout: 20000 });
   return {
     shas,
+    orphan,
+    raw: (...args) => git(clone, ...args),
     publish: (sha) => git(work, "push", "-q", "-f", "origin", `${sha}:refs/heads/release`),
     measure: (bounds) => measure((...args) => git(clone, ...args), bounds),
   };
@@ -114,4 +130,31 @@ test("a remote that cannot be reached is UNDECIDED, not a distance of zero", (t)
   execFileSync("git", ["init", "-q", "--initial-branch=main", clone], { timeout: 20000 });
   const verdict = measure((...args) => git(clone, ...args));
   assert.equal(verdict.code, EXIT.UNDECIDED, verdict.headline);
+});
+
+test("a release that is not an ancestor of main is divergence, not a small distance", (t) => {
+  // The ref has no server-side protection (README records that as accepted), so it CAN be moved by
+  // hand to something unrelated. `rev-list release..main` then counts only main-side commits and can
+  // answer a small number, and a recently force-moved ref passes the age bound too — so both metrics
+  // report health while what consumers load is not on main's history at all.
+  const s = scene(t, { commits: 3 });
+  s.publish(s.orphan);
+  const verdict = s.measure();
+  assert.equal(verdict.code, EXIT.PAST, verdict.headline);
+  assert.match(verdict.headline, /release is not on main/);
+  assert.match(verdict.lines.join("\n"), /neither metric means anything/);
+});
+
+test("a fetch that fails is UNDECIDED, not a measurement of stale refs", (t) => {
+  // The refs resolve, so the absent-release branch is not taken; the fetch is what breaks. Without
+  // this the tool could go on to measure whatever the clone happened to have, and report a distance
+  // computed from refs nobody refreshed.
+  const s = scene(t, { commits: 2 });
+  s.publish(s.shas[0]);
+  const verdict = measure((...args) => {
+    if (args[0] === "fetch") throw Object.assign(new Error("fatal: unable to access"), { stderr: "fatal: unable to access" });
+    return s.raw(...args);
+  });
+  assert.equal(verdict.code, EXIT.UNDECIDED, verdict.headline);
+  assert.match(verdict.headline, /fetch failed/);
 });

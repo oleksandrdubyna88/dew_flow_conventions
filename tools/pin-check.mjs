@@ -85,6 +85,7 @@ function resolveRef(branch) {
 const stale = [];
 const notCommitted = [];
 const unresolved = [];
+const localOverrides = [];
 const checked = [];
 
 for (const [name, entry] of declared) {
@@ -117,6 +118,23 @@ for (const [name, entry] of declared) {
     continue;
   }
   const pinned = treeEntry[3];
+
+  // The trap every existing clone has: `git submodule update --remote` reads
+  // `submodule.<name>.branch` from .git/config FIRST, and `git submodule sync` copies the url but
+  // NOT the branch. A clone made before the release rollout therefore goes on following the default
+  // branch while CI — a fresh clone, holding only the committed config — follows `release`. The bump
+  // lands at the wrong tip and CI calls it STALE, which reads like a bug in the rollout rather than
+  // one stale line on one machine. It costs a config read to say so instead.
+  let cached = "";
+  try {
+    cached = git("config", "--local", "--get", `submodule.${name}.branch`);
+  } catch {
+    cached = ""; // not set, which is the normal state and the one CI is always in.
+  }
+  if (cached !== "" && cached !== (entry.branch ?? "")) {
+    localOverrides.push({ path, name, cached, declared: entry.branch ?? "(none — the remote's default branch)" });
+    continue;
+  }
 
   const resolved = resolveRef(entry.branch ?? "");
   if (resolved.error !== undefined) {
@@ -158,7 +176,7 @@ for (const [name, entry] of declared) {
   if (pinned !== remote) stale.push({ path, url, pinned, remote, label: resolved.label });
 }
 
-if (stale.length === 0 && notCommitted.length === 0 && unresolved.length === 0) {
+if (stale.length === 0 && notCommitted.length === 0 && unresolved.length === 0 && localOverrides.length === 0) {
   const at = checked.map(c => `${c.path} → ${c.label}`).join(", ");
   console.log(`pin-check: OK — ${checked.length} pin(s) at the tip of the ref each tracks (${at}).`);
   process.exit(0);
@@ -169,6 +187,15 @@ for (const f of notCommitted) {
   console.error(`  ${f.path} ${f.problem}.`);
   console.error("  The defect is local: nothing about a remote branch is involved.");
   console.error(`  fix:   ${f.cure}`);
+}
+
+for (const f of localOverrides) {
+  console.error(`pin-check: LOCAL OVERRIDE ${f.path}`);
+  console.error(`  This clone's .git/config says \`${f.cached}\`, and .gitmodules says \`${f.declared}\`.`);
+  console.error("  `git submodule update --remote` reads the local value FIRST, so a bump made here would");
+  console.error("  follow the wrong ref while CI — a fresh clone holding only the committed config — follows");
+  console.error("  the other, and calls the result STALE. `git submodule sync` copies the url, not the branch.");
+  console.error(`  fix:   git config --unset submodule.${f.name}.branch   (then the committed .gitmodules decides)`);
 }
 
 for (const f of unresolved) {
@@ -190,6 +217,7 @@ const counts = [
   stale.length > 0 ? `${stale.length} stale` : "",
   notCommitted.length > 0 ? `${notCommitted.length} not committed` : "",
   unresolved.length > 0 ? `${unresolved.length} unresolvable` : "",
+  localOverrides.length > 0 ? `${localOverrides.length} locally overridden` : "",
 ].filter(Boolean).join(", ");
 
 console.error(

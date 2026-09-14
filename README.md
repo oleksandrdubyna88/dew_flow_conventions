@@ -119,6 +119,16 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   bounds: 40 commits of distance, or a release commit 30 days old. Generous on purpose — a check that
   fires on an ordinary quiet week is a check people disable. The age bound is the one that matters:
   distance alone calls a repository healthy when nothing is being written *and* nothing published.
+  It also refuses to measure at all when `release` is **not an ancestor of main** — a ref force-moved
+  to something unrelated answers a small distance and a young age, so both metrics would report health
+  while what consumers load is not on main's history. `promote-release` cannot produce that state; an
+  unprotected ref and a hand-push can, and this is the only check that would ever look.
+
+  **One trap on an existing clone, and `pin-check` now names it.** `git submodule update --remote`
+  reads `submodule.<name>.branch` from `.git/config` **first**, and `git submodule sync` copies the
+  url but not the branch — so a clone made before this rollout keeps following the default branch
+  while CI follows `release`, and the bump lands at the wrong tip. `pin-check` reports
+  `LOCAL OVERRIDE` with both values and the `git config --unset` that ends it.
 
   **Known gap, deliberately accepted (2026-09-14):** the ref has no server-side protection. Anyone
   with push rights can move `release` by hand and skip every check above. The workflow is the
