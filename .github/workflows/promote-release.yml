@@ -12,7 +12,7 @@ name: promote-release
 # back where we started, with every commit here reddening every open pull request in six repositories.
 #
 # The judgement lives in tools/promote-release.mjs rather than in this YAML, because a gate whose
-# refusals cannot be tested is a gate nobody has seen close. Twenty-seven cases drive it, including
+# refusals cannot be tested is a gate nobody has seen close. Thirty cases drive it, including
 # every refusal: a sha that is not on main, a ci run that is absent, one still in progress, and one
 # that finished red.
 #
@@ -54,8 +54,15 @@ jobs:
         # carrying an edited tools/promote-release.mjs could judge — and promote — a main commit
         # under rules nobody reviewed. The gate is only a gate if it is the one on main.
         if: github.ref != 'refs/heads/main'
+        env:
+          # Through the environment for the same reason the sha is, below: an expression written
+          # inline is expanded by Actions before the shell parses the line. A ref is far less
+          # controllable than a dispatch input, and anyone who can dispatch already has write access
+          # — but this step exists to refuse an unexpected ref, and refusing it by evaluating it
+          # would be a poor way to do that.
+          DISPATCH_REF: ${{ github.ref }}
         run: |
-          echo "promote-release: refusing to run from ${{ github.ref }}." >&2
+          echo "promote-release: refusing to run from $DISPATCH_REF." >&2
           echo "  Dispatch this workflow against main: the gate that judges a promotion must be the" >&2
           echo "  reviewed one, not whatever a branch happens to carry." >&2
           exit 1

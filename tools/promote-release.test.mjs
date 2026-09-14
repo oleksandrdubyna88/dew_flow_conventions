@@ -541,6 +541,18 @@ test("a total_count that is not a count makes the answer unreadable", () => {
   assert.match(ciRunsFor(JSON.stringify({ total_count: "lots", workflow_runs: runs }), sha).error, /not a count of runs/);
   assert.match(ciRunsFor(JSON.stringify({ total_count: -1, workflow_runs: runs }), sha).error, /not a count of runs/);
 
+  // The values that COERCE to a number, which is why the count is type-checked rather than passed
+  // through `Number()`. Each of these becomes 0, and a total of 0 tells the pager it has seen
+  // everything after one page — so a malformed answer would end the listing while looking complete,
+  // which is exactly the shape the paging exists to refuse.
+  for (const total of [null, false, [], ""]) {
+    const answer = JSON.stringify({ total_count: total, workflow_runs: runs });
+    assert.match(ciRunsFor(answer, sha).error ?? "", /not a count of runs/,
+      `total_count ${JSON.stringify(total)} coerces to 0 and must not be read as a count`);
+  }
+  // A numeric STRING is the near miss: it looks right and is not.
+  assert.match(ciRunsFor(JSON.stringify({ total_count: "1", workflow_runs: runs }), sha).error ?? "", /not a count of runs/);
+
   const good = ciRunsFor(JSON.stringify({ total_count: 1, workflow_runs: runs }), sha);
   assert.equal(good.error, undefined);
   assert.deepEqual([good.total, good.listed, good.runs.length], [1, 1, 1]);

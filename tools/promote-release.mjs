@@ -170,8 +170,12 @@ export function ciRunsFor(answer, sha) {
   // carry a real count is unreadable rather than complete. Treating a missing or non-numeric count as
   // "nothing more to fetch" would let a page of successes stand in for a listing whose later pages
   // hold the failed run that disqualifies the sha.
-  const total = Number(parsed.total_count);
-  if (!Number.isInteger(total) || total < 0) {
+  // Type-checked rather than coerced: `Number(null)`, `Number(false)`, `Number([])` and `Number("")`
+  // are all 0, and a total of 0 tells the pager it has seen everything after one page. A malformed
+  // answer would then end the listing while looking complete — the exact shape paging exists to
+  // refuse. A numeric string is the near miss, and is refused too.
+  const total = parsed.total_count;
+  if (typeof total !== "number" || !Number.isSafeInteger(total) || total < 0) {
     return { error: `the answer's total_count is ${JSON.stringify(parsed.total_count)}, which is not a count of runs` };
   }
 
