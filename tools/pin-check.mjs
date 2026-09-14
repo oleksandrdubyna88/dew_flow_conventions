@@ -18,8 +18,11 @@
 // older version was indistinguishable from drift, which is why README's own "consumers retain their
 // approved pins" policy could not be implemented.
 //
-// Checks the COMMITTED pin (`git rev-parse HEAD:<path>`), not the working tree, so a locally updated
-// but uncommitted submodule still fails — the pin is what a clone gets.
+// Checks the COMMITTED pin, not the working tree, so a locally updated but uncommitted submodule
+// still fails — the pin is what a clone gets. It is read from `ls-tree` rather than `rev-parse`
+// because only the tree entry's MODE says whether a path is a gitlink at all: `rev-parse HEAD:<path>`
+// succeeds for any committed object and hands back a TREE id for a directory, which then compares
+// unequal to a remote commit and reads as a stale pin whose suggested cure cannot work.
 //
 // Run from a consumer repo root:  node .agents/conventions/tools/pin-check.mjs
 // A remote that cannot be reached is a WARNING, not a failure — offline local runs stay usable;
@@ -27,66 +30,101 @@
 
 import { git as gitIn } from "./lib/git.mjs";
 
-// The family's one process launcher rather than a second one here: it bounds the call at 30 s, which
-// matters for the one call in this file that can hang forever — a remote that accepts the connection
-// and then says nothing is not "unreachable", it is endless.
+// The family's one process launcher rather than a second one here: it bounds every call at 30 s,
+// which matters for the one call in this file that can hang forever — a remote that accepts the
+// connection and then says nothing is not "unreachable", it is endless.
 const git = (...args) => gitIn(".", ...args);
 
-let pathLines;
+let configLines;
 try {
-  pathLines = git("config", "-f", ".gitmodules", "--get-regexp", String.raw`^submodule\..*\.path$`);
+  configLines = git("config", "-f", ".gitmodules", "--get-regexp", String.raw`^submodule\.`);
 } catch {
   console.log("pin-check: no .gitmodules in this repository — nothing to check.");
   process.exit(0);
 }
 
+// One read of the whole file instead of three `--get` subprocesses per submodule. `--get-regexp`
+// prints `key value`, and a value may contain spaces, so only the FIRST space is a separator.
+const declared = new Map();
+for (const line of configLines.split("\n").filter(Boolean)) {
+  const space = line.indexOf(" ");
+  const key = space === -1 ? line : line.slice(0, space);
+  const value = space === -1 ? "" : line.slice(space + 1);
+  const match = /^submodule\.(.+)\.(path|url|branch)$/.exec(key);
+  if (match === null) continue;
+  const [, name, field] = match;
+  if (!declared.has(name)) declared.set(name, {});
+  declared.get(name)[field] = value;
+}
+
 /**
- * The ref a pin is MEANT to follow — "" for the remote's default branch.
+ * The ref a pin follows, resolved to something `ls-remote` can match.
  *
- * Unset is not a special case invented here: git's own default for the key is the remote HEAD, so a
- * submodule that declares nothing is compared against exactly what it was compared against before
- * this key existed.
+ * Three shapes are legal in git and all three appear in the wild: a plain branch name, a fully
+ * qualified `refs/heads/...`, and `.` — git's shorthand for "the branch this superproject is on".
+ * Prepending refs/heads/ blindly turns the last two into `refs/heads/refs/heads/release` and
+ * `refs/heads/.`, neither of which matches anything, so a supported configuration was reported as a
+ * configuration error.
  */
-const trackedBranch = name => {
-  try {
-    return git("config", "-f", ".gitmodules", "--get", `submodule.${name}.branch`);
-  } catch {
-    return ""; // `git config --get` exits 1 for a key that is not there.
-  }
-};
+function resolveRef(branch) {
+  if (branch === "") return { ref: "HEAD", label: "the default branch" };
+  if (branch.startsWith("refs/")) return { ref: branch, label: branch.replace(/^refs\/heads\//, "") };
+  if (branch !== ".") return { ref: `refs/heads/${branch}`, label: branch };
 
-const describe = branch => (branch === "" ? "the default branch" : branch);
+  const head = git("rev-parse", "--abbrev-ref", "HEAD");
+  if (head === "HEAD") return { error: "`branch = .` follows this superproject's current branch, and HEAD is detached." };
+  return { ref: `refs/heads/${head}`, label: head };
+}
 
-const failures = [];
-const missing = [];
+const stale = [];
+const notCommitted = [];
+const unresolved = [];
 const checked = [];
 
-for (const line of pathLines.split("\n").filter(Boolean)) {
-  const firstSpace = line.indexOf(" ");
-  const key = line.slice(0, firstSpace);
-  const path = line.slice(firstSpace + 1);
-  const name = key.slice("submodule.".length, -".path".length);
-  const url = git("config", "-f", ".gitmodules", "--get", `submodule.${name}.url`);
+for (const [name, entry] of declared) {
+  const path = entry.path;
+  if (path === undefined || path === "") continue; // a section with no path declares no submodule.
 
-  let pinned;
+  if (entry.url === undefined || entry.url === "") {
+    notCommitted.push({ path, problem: "is declared in .gitmodules with no url, so there is nothing to compare it against", cure: `add a url to the [submodule "${name}"] section, or delete the section` });
+    continue;
+  }
+  const url = entry.url;
+
+  // `ls-tree` rather than `rev-parse`: only the mode tells a gitlink (160000) from a directory or a
+  // file committed at the same path.
+  let listing;
   try {
-    pinned = git("rev-parse", `HEAD:${path}`);
+    listing = git("ls-tree", "HEAD", "--", path);
   } catch {
-    // Declared in .gitmodules but not a gitlink in the commit: a half-added submodule, or a typo in
-    // `path`. Named rather than thrown — a raw git stderr dump is not something a reader can act on,
-    // and `git mv` of a mount leaves exactly this shape behind.
-    missing.push({ path, url, branch: "", reason: "declared in .gitmodules but not committed as a submodule at that path" });
+    listing = "";
+  }
+  const treeEntry = /^(\d+) (\w+) ([0-9a-f]+)/.exec(listing);
+  if (treeEntry === null || treeEntry[1] !== "160000") {
+    notCommitted.push({
+      path,
+      problem: treeEntry === null
+        ? "is declared in .gitmodules but nothing is committed at that path"
+        : `is committed as a ${treeEntry[2]}, not as a submodule — a gitlink has mode 160000`,
+      cure: `git add ${path} && commit, or remove the [submodule "${name}"] section`,
+    });
+    continue;
+  }
+  const pinned = treeEntry[3];
+
+  const resolved = resolveRef(entry.branch ?? "");
+  if (resolved.error !== undefined) {
+    unresolved.push({ path, url, message: resolved.error, cure: "name a branch explicitly, or check out a branch in this repository" });
     continue;
   }
 
-  const branch = trackedBranch(name);
-  // A named branch is asked for in FULL: a bare `release` would also match refs/tags/release, and a
-  // tag is not something `git submodule update --remote` can ever move a pin to.
-  const ref = branch === "" ? "HEAD" : `refs/heads/${branch}`;
+  // Say which remote is about to be probed BEFORE probing it: each call can spend the launcher's
+  // 30-second bound, and a CI log that prints nothing until the end reads as a hang.
+  console.log(`pin-check: ${path} → ${resolved.label} (${url})`);
 
   let answer;
   try {
-    answer = git("ls-remote", url, ref);
+    answer = git("ls-remote", url, resolved.ref);
   } catch (error) {
     console.log(`pin-check: WARN cannot reach ${url} — skipping ${path} (${error.message.split("\n")[0]}).`);
     continue;
@@ -97,43 +135,60 @@ for (const line of pathLines.split("\n").filter(Boolean)) {
   // thing it can be — a name that is not there.
   const remote = answer.split(/\s+/)[0];
   if (remote === undefined || remote === "") {
-    missing.push({ path, url, branch, reason: "" });
+    unresolved.push({
+      path,
+      url,
+      message: entry.branch === undefined || entry.branch === ""
+        ? `${url} advertises no default branch — it may be an empty repository.`
+        : `.gitmodules asks this pin to follow \`${entry.branch}\`, and ${url} has no ${resolved.ref}.`,
+      cure: entry.branch === undefined || entry.branch === ""
+        ? "push a first commit to that remote"
+        : `create or push \`${resolved.label}\` in ${url}, or correct the branch name in .gitmodules`,
+    });
     continue;
   }
 
-  checked.push({ path, ref: describe(branch) });
-  if (pinned !== remote) failures.push({ path, url, pinned, remote, ref: describe(branch) });
+  checked.push({ path, label: resolved.label });
+  if (pinned !== remote) stale.push({ path, url, pinned, remote, label: resolved.label });
 }
 
-if (failures.length === 0 && missing.length === 0) {
-  const at = checked.map(c => `${c.path} → ${c.ref}`).join(", ");
+if (stale.length === 0 && notCommitted.length === 0 && unresolved.length === 0) {
+  const at = checked.map(c => `${c.path} → ${c.label}`).join(", ");
   console.log(`pin-check: OK — ${checked.length} pin(s) at the tip of the ref each tracks (${at}).`);
   process.exit(0);
 }
 
-for (const m of missing) {
-  console.error(`pin-check: NO SUCH REF ${m.path}`);
-  if (m.reason !== "") {
-    console.error(`  ${m.reason}  (${m.url})`);
-    continue;
-  }
-  console.error(`  .gitmodules asks this pin to follow \`${m.branch}\`, and ${m.url} has no refs/heads/${m.branch}.`);
-  console.error("  A branch that is not there cannot be lagged behind, so this is a configuration error");
-  console.error("  rather than a stale pin: either the release ref was never cut, or the name is misspelt here.");
-  console.error(`  fix:   cut \`${m.branch}\` in the rules repository through its promote-release workflow, or drop`);
-  console.error(`         \`branch = ${m.branch}\` from .gitmodules to follow the default branch as before.`);
+for (const f of notCommitted) {
+  console.error(`pin-check: NOT COMMITTED ${f.path}`);
+  console.error(`  ${f.path} ${f.problem}.`);
+  console.error("  The defect is local: nothing about a remote branch is involved.");
+  console.error(`  fix:   ${f.cure}`);
 }
 
-for (const f of failures) {
+for (const f of unresolved) {
+  console.error(`pin-check: NO SUCH REF ${f.path}`);
+  console.error(`  ${f.message}`);
+  console.error("  A ref that is not there cannot be lagged behind, so this is a configuration error");
+  console.error("  rather than a stale pin.");
+  console.error(`  fix:   ${f.cure}`);
+}
+
+for (const f of stale) {
   console.error(`pin-check: STALE ${f.path}`);
   console.error(`  pinned ${f.pinned}`);
-  console.error(`  ${f.ref}  ${f.remote}  (${f.url})`);
+  console.error(`  ${f.label}  ${f.remote}  (${f.url})`);
   console.error(`  fix:   git submodule update --remote ${f.path} && git add ${f.path} && commit`);
 }
 
+const counts = [
+  stale.length > 0 ? `${stale.length} stale` : "",
+  notCommitted.length > 0 ? `${notCommitted.length} not committed` : "",
+  unresolved.length > 0 ? `${unresolved.length} unresolvable` : "",
+].filter(Boolean).join(", ");
+
 console.error(
-  `pin-check: ${failures.length} stale, ${missing.length} unresolvable pin(s). A consumer follows the ` +
-    "ref its .gitmodules names — `release` for the shared rules, which moves when a rule author " +
-    "promotes a reviewed commit and never when main does. See the conventions README, Editing discipline.",
+  `pin-check: ${counts}. A consumer follows the ref its .gitmodules names — \`release\` for the ` +
+    "shared rules, which moves when a rule author promotes a reviewed commit and never when main " +
+    "does. See the conventions README, Editing discipline.",
 );
 process.exit(1);

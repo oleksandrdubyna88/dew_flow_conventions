@@ -201,9 +201,11 @@ test("the pin is read from the commit, not the index", t => {
   assert.equal(run(repo).code, 0, "and only the commit makes it green");
 });
 
-test("a .gitmodules path that is not a gitlink is a finding, not a crash", t => {
-  // A half-added submodule, or a typo in `path`. Named, rather than thrown: a raw git stderr dump
-  // is not something a reader can act on, and `git mv` of a mount leaves exactly this shape behind.
+test("a .gitmodules path that is not a gitlink is NOT COMMITTED, not a missing ref and not a crash", t => {
+  // A half-added submodule, or a typo in `path`. Three things it must not be: a crash (before the
+  // guard, a raw git stderr dump with a Node stack trace came out of the script); a NO SUCH REF,
+  // which sends the reader to look at a remote branch when the defect is entirely local; or a line
+  // with no cure on it. `git mv` of a mount leaves exactly this shape behind.
   const root = workspace(t);
   const rules = remote(root, "conventions");
   const repo = consumer(root, "app", [{ path: "mount", url: rules.url, branch: "release", pin: rules.release }]);
@@ -214,6 +216,99 @@ test("a .gitmodules path that is not a gitlink is a finding, not a crash", t => 
     "commit", "-q", "-m", "declare a mount that was never added");
   const { code, out } = run(repo);
   assert.equal(code, 1, out);
-  assert.match(out, /NO SUCH REF ghost/);
-  assert.match(out, /not committed as a submodule at that path/);
+  assert.match(out, /NOT COMMITTED ghost/);
+  assert.doesNotMatch(out, /NO SUCH REF ghost/);
+  assert.match(out, /git add ghost/);
+});
+
+test("a path committed as a directory is NOT COMMITTED, rather than compared as if it were a pin", t => {
+  // The sharp one. `rev-parse HEAD:<path>` SUCCEEDS for any committed object — it returns a tree id
+  // for a directory and a blob id for a file — so a submodule that was replaced by vendored files
+  // resolved to a tree sha, which was then compared against a remote COMMIT sha and reported STALE.
+  // The advice on that line, `git submodule update --remote`, cannot work on a directory. Only the
+  // entry's MODE distinguishes the two, so the pin is read from ls-tree and used only at 160000.
+  const root = workspace(t);
+  const rules = remote(root, "conventions");
+  const repo = consumer(root, "app", [{ path: "mount", url: rules.url, branch: "release", pin: rules.release }]);
+  fs.mkdirSync(path.join(repo, "vendored"));
+  fs.writeFileSync(path.join(repo, "vendored", "file.txt"), "not a submodule\n");
+  fs.appendFileSync(path.join(repo, ".gitmodules"),
+    `[submodule "vendored"]\n\tpath = vendored\n\turl = ${rules.url}\n`);
+  git(repo, "add", ".gitmodules", "vendored");
+  git(repo, "-c", "user.name=Pin test", "-c", "user.email=pin@example.invalid", "-c", "commit.gpgsign=false",
+    "commit", "-q", "-m", "a directory where a submodule was declared");
+  const { code, out } = run(repo);
+  assert.equal(code, 1, out);
+  assert.match(out, /NOT COMMITTED vendored/);
+  assert.doesNotMatch(out, /STALE vendored/);
+});
+
+test("branch = . follows the superproject's own current branch", t => {
+  // Git's documented shorthand: `.` means "the branch this superproject is on". Prepending
+  // refs/heads/ to it builds `refs/heads/.`, which matches nothing, so the pin was reported as an
+  // unresolvable configuration error on a configuration git supports.
+  const root = workspace(t);
+  const rules = remote(root, "conventions");
+  git(path.join(root, "conventions-work"), "push", "-q", "origin", `${rules.tip}:refs/heads/main`);
+  const repo = consumer(root, "app", [{ path: "mount", url: rules.url, branch: ".", pin: rules.tip }]);
+  const { code, out } = run(repo);
+  assert.equal(code, 0, out);
+  assert.match(out, /mount → main/);
+});
+
+test("a branch already spelled as a full ref is not prefixed twice", t => {
+  // `branch = refs/heads/release` is legal; prefixing it again builds refs/heads/refs/heads/release.
+  const root = workspace(t);
+  const rules = remote(root, "conventions");
+  const repo = consumer(root, "app", [{ path: "mount", url: rules.url, branch: "refs/heads/release", pin: rules.release }]);
+  const { code, out } = run(repo);
+  assert.equal(code, 0, out);
+});
+
+test("a hierarchical branch name is accepted, because git accepts it", t => {
+  // Not `release/stable`: this helper's remote already has `release`, and a ref cannot be both a
+  // file and a directory, so git refuses the push — a fixture collision, never the tool's opinion.
+  const root = workspace(t);
+  const rules = remote(root, "conventions");
+  git(path.join(root, "conventions-work"), "push", "-q", "origin", `${rules.release}:refs/heads/stable/v1`);
+  const repo = consumer(root, "app", [{ path: "mount", url: rules.url, branch: "stable/v1", pin: rules.release }]);
+  const { code, out } = run(repo);
+  assert.equal(code, 0, out);
+  assert.match(out, /mount → stable\/v1/);
+});
+
+test("a submodule declared with no url is a finding, not an uncaught throw", t => {
+  const root = workspace(t);
+  const rules = remote(root, "conventions");
+  const repo = consumer(root, "app", [{ path: "mount", url: rules.url, branch: "release", pin: rules.release }]);
+  fs.appendFileSync(path.join(repo, ".gitmodules"), `[submodule "urlless"]\n\tpath = urlless\n`);
+  git(repo, "update-index", "--add", "--cacheinfo", `160000,${rules.release},urlless`);
+  git(repo, "add", ".gitmodules");
+  git(repo, "-c", "user.name=Pin test", "-c", "user.email=pin@example.invalid", "-c", "commit.gpgsign=false",
+    "commit", "-q", "-m", "a submodule with no url");
+  const { code, out } = run(repo);
+  assert.equal(code, 1, out);
+  assert.match(out, /urlless/);
+  assert.doesNotMatch(out, /at file:/, "a stack trace is not a finding");
+});
+
+test("a missing ref on a code pin does not send the reader to the rules repository's workflow", t => {
+  // The remediation used to name promote-release for EVERY missing ref. For a code submodule
+  // tracking its own `stable`, that is the wrong repository and the wrong cure.
+  const root = workspace(t);
+  const lib = remote(root, "library");
+  const repo = consumer(root, "app", [{ path: "external/library", url: lib.url, branch: "stable", pin: lib.tip }]);
+  const { code, out } = run(repo);
+  assert.equal(code, 1, out);
+  assert.match(out, /NO SUCH REF external\/library/);
+  assert.match(out, /has no refs\/heads\/stable/);
+  assert.doesNotMatch(out, /promote-release/, "that workflow belongs to the rules repository, not to this remote");
+});
+
+test("each remote is named before it is probed, so a slow one does not look like a hang", t => {
+  const root = workspace(t);
+  const rules = remote(root, "conventions");
+  const repo = consumer(root, "app", [{ path: "mount", url: rules.url, branch: "release", pin: rules.release }]);
+  const { out } = run(repo);
+  assert.match(out, /mount → release/);
 });

@@ -269,3 +269,48 @@ with `--depth 1` succeeds, and the fetch line shows why: git asks for the gitlin
 branch tip. A local clone silently ignores `--depth` ("--depth is ignored in local clones"), so the
 first run of that experiment was a false green until the remote was re-addressed as `file://`. The
 GitHub half is confirmed on the first consumer to switch, which is what the canary is for.
+
+### What the code round changed, and the cases that hold it
+
+Twelve reviewers over three vendors read the branch; the gate returned `proceed` and 13 of 28
+findings were accepted. Seven more cases now exist, each observed red first.
+
+The sharpest was a defect the story had introduced while fixing another. `rev-parse HEAD:<path>`
+does not throw for a path that is not a submodule — it SUCCEEDS for any committed object, handing
+back a tree id for a directory and a blob id for a file. A submodule replaced by vendored files
+therefore resolved to a tree sha, was compared against a remote COMMIT sha, and reported `STALE
+vendored` with the advice `git submodule update --remote vendored`, which cannot work on a
+directory. Only the tree entry's MODE separates the two, so the pin is now read from `ls-tree` and
+used only at `160000`. Mutation-checked: removing the mode comparison turns that one case red and
+nothing else.
+
+`branch = .` is git's documented shorthand for "the branch this superproject is on", and
+`branch = refs/heads/release` is a legal fully-qualified spelling. Prepending `refs/heads/` blindly
+built `refs/heads/.` and `refs/heads/refs/heads/release`, so two configurations git supports were
+reported as unresolvable. `resolveRef` now handles all three shapes, and a detached HEAD under
+`branch = .` is named as the configuration error it is rather than matched against nothing.
+
+A declared path that is not a gitlink used to be labelled `NO SUCH REF`, which sends the reader to
+investigate a remote branch when the defect is entirely local, and the summary counted it among
+"unresolvable refs". It is now `NOT COMMITTED`, with `git add <path> && commit` as the cure, and the
+three failure kinds are counted separately. A missing ref on a CODE pin no longer advises the rules
+repository's promote-release workflow — the wrong repository and the wrong cure; the message names
+the submodule's own url.
+
+Two smaller ones: a `[submodule]` section with no url threw an uncaught error out of the script, and
+an empty `ls-remote` answer for an unborn remote HEAD produced a message about dropping a
+`branch = ` key that was never there. Each remote is also named on stdout before it is probed, so a
+call spending the 30-second launcher bound does not read as a hang.
+
+Four `--get` subprocesses per submodule became one `--get-regexp` read of the whole file.
+
+Two more setup errors were caught by reading failures rather than counts. A hierarchical branch
+fixture used `release/stable` on a remote that already had `release`, and git refuses that push — a
+ref cannot be both a file and a directory. And the unreachable-remote case pinned an all-zero sha,
+which git rejects outright as a gitlink. Neither was the tool's opinion about anything.
+
+Fifteen findings were rejected with reasons, four of them on premises the code disproves: the ref is
+spelled `refs/heads/<branch>` in full precisely so a tag can never match it; `trackedBranch` and the
+tree read both go through the bounded family launcher rather than an unbounded call; the submodule
+section NAME is already derived from the config key rather than from the path; and printing a branch
+name to stderr is not shell injection, because nothing here executes it.
