@@ -317,7 +317,7 @@ name to stderr is not shell injection, because nothing here executes it.
 
 ## The promotion gate (`tools/promote-release.mjs`)
 
-`tools/promote-release.test.mjs` — 27 cases. The gate decides which commit six repositories load as
+`tools/promote-release.test.mjs` — 30 cases. The gate decides which commit six repositories load as
 their policy, so the tests are about its REFUSALS: a gate that has only ever been exercised on its
 happy path is a gate nobody has watched close.
 
@@ -454,3 +454,19 @@ must be 40 hex AND `cat-file -t` must answer `commit`; the empty-slug case is ch
 asked; and re-verifying a sha already at `release` is the feature, not waste — it is the one case
 where the ref may have arrived without ever passing the gate, and so the one case that must not be
 skipped.
+
+**What the automated reviewer added.** Four findings on the pull request, all taken.
+
+The sharpest was a coercion: `Number(parsed.total_count)`. `Number(null)`, `Number(false)`,
+`Number([])` and `Number("")` are all **0** — and a total of 0 tells the pager it has seen everything
+after one page, so a malformed answer would have ended the listing while looking complete. That is
+precisely the shape paging exists to refuse. The count is now type-checked (`typeof === "number"`,
+safe integer, non-negative), and the case list includes the numeric STRING, which is the near miss
+that looks right and is not. Observed red first: *total_count null coerces to 0 and must not be read
+as a count*.
+
+It also found the SAME injection class in the guard step added to fix the first one:
+`echo "… ${{ github.ref }}" >&2`. A ref is far less controllable than a dispatch input and anyone who
+can dispatch already has write access — but a step whose whole job is to refuse an unexpected ref is
+a poor place to evaluate it. Through the environment now, like the sha. Recorded because it is the
+instructive part: the fix for a template-expansion hole introduced another one three lines away.

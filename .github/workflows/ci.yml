@@ -25,7 +25,12 @@ jobs:
           node-version: 22
       # The tools that every consumer's CI runs (plan-lifecycle, pin-check, gate-snippet-check,
       # http-coverage, post-deploy-check) test themselves here. A tool that breaks here breaks every
-      # consumer's build on its next pin bump, so it is checked here first.
+      # consumer's build on its next pin bump, so it is checked here first. promote-release runs only
+      # HERE rather than in a consumer, and is tested here for a different reason: it decides what
+      # every consumer loads, so it is the one tool whose failure would not be caught downstream at all.
+      #
+      # `npm test` is bare `node --test`, which discovers tools/*.test.mjs on its own — a new tool's
+      # tests are picked up by existing here, not by being added to a list.
       #
       # Most of them run against tools/fixtures — directories whose right answers are known.
       # pin-check cannot: what it asserts is a statement about two repositories ("is this pin the tip
