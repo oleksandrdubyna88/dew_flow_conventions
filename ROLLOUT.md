@@ -6,8 +6,13 @@ in `.agents/PROJECT.md` and `.agents/rules`, and uses the root adapters describe
 
 ## Migrate an existing consumer
 
-Choose a reviewed conventions commit reachable from the remote before publishing a consumer
-pin. Run from a conventions checkout with `npm ci --ignore-scripts` completed:
+The reviewed commit is the one `release` points at — that is what promotion means:
+
+```text
+git ls-remote https://github.com/oleksandrdubyna88/dew_flow_conventions.git refs/heads/release
+```
+
+Run from a conventions checkout with `npm ci --ignore-scripts` completed:
 
 ```text
 node tools/migrate-rules.mjs --repo <consumer> --conventions <source> --sha <approved-sha> --base origin/main --output <new-worktree> --branch feat/shared-rules
@@ -102,9 +107,11 @@ that repository's root `Directory.Build.rsp` in the SAME commit, so the step is 
 lands rather than red until somebody follows up — see
 [csharp/dotnet-build.md](csharp/dotnet-build.md).
 
-Keep existing HTTP/post-deploy and pin-freshness checks. Pin freshness compares committed
-pins with remote tips; during rollout an approved older pin is intentional and recorded
-explicitly. Do not silently update code dependencies to make a rules migration pass.
+Keep existing HTTP/post-deploy and pin-freshness checks. Pin freshness compares each committed
+pin with the tip of **the ref it tracks**: the shared rules track `release` (declare it as
+`branch = release` under that submodule's section in `.gitmodules`), and a code pin tracks its own
+default branch. An older pin is no longer "intentional but unrecorded" — it is a pin behind
+`release`, and it is red. Do not silently update code dependencies to make a rules migration pass.
 A fresh clone needs the same initialization/install before either agent loads rules.
 The public conventions URL must remain accessible to consumers.
 
@@ -123,7 +130,12 @@ adapters and paths together. In a disposable clone, deinitialize the neutral sub
 check out the recorded base, then initialize `.claude/rules/shared`; the integration test
 performs this with a real Git submodule. Never use destructive recovery in a shared checkout.
 
-For later updates fetch the reviewed commit into the mount, check out that exact SHA, run
-checks, stage the gitlink and open a bump PR. Never use remote HEAD as a missing-instruction
-fallback. Migrate the canary first; update pinned repositories before their consumers,
+For later updates run `git submodule update --remote <mount>`, run the checks, stage the gitlink
+and open a bump pull request. `--remote` goes to `release` because `.gitmodules` says so. Never use
+remote HEAD as a missing-instruction fallback.
+
+One trap on an existing clone: `git submodule update --remote` reads `submodule.<name>.branch` from
+**`.git/config` first**, and `git submodule sync` copies the url but NOT the branch. A clone made
+before this rollout therefore keeps following the default branch while CI names `release`. Fix it
+once per clone with `git config submodule.<name>.branch release`, or re-init the submodule. Migrate the canary first; update pinned repositories before their consumers,
 and build whenever a code pin changes.

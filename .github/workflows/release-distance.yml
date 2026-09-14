@@ -1,0 +1,40 @@
+name: release-distance
+
+# The compensating detector for the release ref, and it is not optional.
+#
+# Freezing `release` fixed a loud failure: before it, one commit here reddened every open pull
+# request in six repositories, and 317 pin-touching commits went downstream in a month. But the cure
+# has a silent failure of its own. Once every consumer pins `release` and `release` stops moving,
+# every pin equals its tracked tip and every pin-check is green — while the rules the family reads
+# get older every week. That is the 2026-08-19 audit state recreated by design, with the alarm off.
+#
+# common/reliability.md rules on exactly this shape: an unbounded wait is legal only as a documented
+# pair — the reason AND a detector that can tell "slow but alive" from "wedged". This is the detector,
+# and it FAILS rather than summarising, because a weekly report nobody reads is not one.
+
+on:
+  schedule:
+    # Monday morning UTC. A week is the right grain: shorter nags about ordinary quiet, longer lets a
+    # month of not publishing pass unnoticed.
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  distance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The age of the release commit is read from the object itself, which a shallow clone that
+          # stops at main's tip would not have.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - run: node tools/release-distance.mjs

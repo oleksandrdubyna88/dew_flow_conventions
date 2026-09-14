@@ -51,10 +51,16 @@ of skipping it is a commit that breaks a rule written precisely because breaking
 - Shared rules are edited **here and only here**. A consumer repository never carries its own copy of a
   shared rule — if a repo needs different behaviour, that difference is a named repo-local rule beside
   the mount, extending this one, never a divergent copy.
-- **The rule-change author owns the six-consumer rollout.** Review the source change, choose its
-  approved commit, then update each consumer through a migration/bump PR with validation and
-  rollback recorded. Urgent fixes use the same explicit pin update. During staged rollout,
-  old consumers retain their approved pins; do not move them to remote HEAD before verification.
+- **The rule-change author owns the six-consumer rollout.** Review the source change, then **promote
+  it**: `release` is the approved pin, and moving it is what publishes a rule. A commit on `main`
+  reaches nobody until then. Each consumer is updated through a bump pull request with validation and
+  rollback recorded; urgent fixes use the same explicit pin update.
+
+  This paragraph used to end *"during staged rollout, old consumers retain their approved pins; do not
+  move them to remote HEAD before verification"* — a policy `pin-check` could not implement, because
+  it knew only the remote's live tip and had no concept of an approved pin. The check won and the
+  policy was decoration. Now there is nothing to reconcile: a consumer that has not been bumped yet is
+  simply behind `release`, and there is no other pin it could be at.
 - **`pin-check` reads the pin from HEAD, not from the index.** After
   `git submodule update --remote` + `git add`, it still reports STALE — the pin it compares is the one
   in the last commit. Only the commit makes it green. Do not read that first STALE as a second failure
@@ -104,6 +110,15 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   non-fast-forward move. Moving `release` backwards would make every consumer's committed pin differ
   from the tip at once — all six repositories red during the very incident the rollback exists to end
   — and would break every cached clone's `git submodule update --remote`.
+
+  **And `release` is watched, because freezing it creates a silent failure of its own.** Once every
+  consumer pins it and it stops moving, every pin equals its tracked tip and every `pin-check` is
+  green — while the rules the family reads get older every week. That is the 2026-08-19 audit state
+  recreated by design, with the alarm switched off.
+  [`tools/release-distance.mjs`](tools/release-distance.mjs) runs weekly and **fails** past its
+  bounds: 40 commits of distance, or a release commit 30 days old. Generous on purpose — a check that
+  fires on an ordinary quiet week is a check people disable. The age bound is the one that matters:
+  distance alone calls a repository healthy when nothing is being written *and* nothing published.
 
   **Known gap, deliberately accepted (2026-09-14):** the ref has no server-side protection. Anyone
   with push rights can move `release` by hand and skip every check above. The workflow is the
@@ -177,6 +192,7 @@ asking in writing to be moved and another had two promoted plans absent from its
 | [`tools/plan-lifecycle.mjs`](tools/plan-lifecycle.mjs) | [`common/planning-docs.md`](common/planning-docs.md) | `node .agents/conventions/tools/plan-lifecycle.mjs` |
 | [`tools/pin-check.mjs`](tools/pin-check.mjs) | Editing discipline — every pin at the tip of the ref it tracks (`release` for the shared rules, its own default branch for a code pin) | `node .agents/conventions/tools/pin-check.mjs` |
 | [`tools/promote-release.mjs`](tools/promote-release.mjs) | The `release` ref moves only to a commit that is on `main` and whose `ci` run finished green — an absent or unfinished run is a refusal, never a pass | `node tools/promote-release.mjs <sha> [--dry-run]` (this repository only) |
+| [`tools/release-distance.mjs`](tools/release-distance.mjs) | The compensating detector: `release` is still being moved, and has not quietly stopped while every pin-check stays green | `node tools/release-distance.mjs [--warn]` (this repository only, weekly) |
 | [`tools/adapter-check.mjs`](tools/adapter-check.mjs) | Every adapter hook `settings/` publishes is copied, wired on its own event and matcher, and byte-identical | `node .agents/conventions/tools/adapter-check.mjs` |
 | [`tools/build-flags-check.mjs`](tools/build-flags-check.mjs) | [`csharp/dotnet-build.md`](csharp/dotnet-build.md) — the root `Directory.Build.rsp` exists, says `-nr:false`, and no workflow suppresses it | `node .agents/conventions/tools/build-flags-check.mjs` |
 | [`tools/http-coverage.mjs`](tools/http-coverage.mjs) | [`common/http-contracts.md`](common/http-contracts.md) — every route has a request | `node .agents/conventions/tools/http-coverage.mjs [--warn]` |

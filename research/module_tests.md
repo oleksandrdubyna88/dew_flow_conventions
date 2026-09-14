@@ -470,3 +470,23 @@ It also found the SAME injection class in the guard step added to fix the first 
 can dispatch already has write access — but a step whose whole job is to refuse an unexpected ref is
 a poor place to evaluate it. Through the environment now, like the sha. Recorded because it is the
 instructive part: the fix for a template-expansion hole introduced another one three lines away.
+
+## The distance watch (`tools/release-distance.mjs`)
+
+Six cases. The check exists because the mechanism it watches creates the failure it looks for:
+freezing `release` removed a loud problem and introduced a quiet one, where every pin equals its
+tracked tip, every `pin-check` is green, and the rules the family reads get older every week.
+
+Two of the cases are the ones that decide whether it is worth having. *An ordinary quiet week does
+not fire* — a release a few commits behind, published recently, is a deliberate state, and a check
+that fires on it is one people switch off. And *a release whose commit is old FAILS even when main
+has barely moved*, which distance alone would call healthy: nothing written and nothing published is
+the actual stall, and it is the only case where the repository looks calm and is not. That case needs
+a commit with a backdated committer date, which is the one thing no fixture directory could express.
+
+Mutation-checked: removing the age bound turns exactly that case red and nothing else.
+
+*No release yet* is deliberately NOT a fault, and says so in those words — before the first promotion
+there is nothing to be behind, and "not published yet" and "publishing has stopped" look identical
+from a consumer's side while only one of them is fine. An unreachable remote is UNDECIDED rather than
+a distance of zero, for the same reason it is everywhere else in these tools.
