@@ -35,11 +35,17 @@ import { git as gitIn } from "./lib/git.mjs";
 // connection and then says nothing is not "unreachable", it is endless.
 const git = (...args) => gitIn(".", ...args);
 
+// Read the configuration from HEAD, not from the working tree — the same commit the gitlink below
+// comes from. Mixing the two let an UNCOMMITTED `branch` edit decide which ref was compared while
+// the committed pin was used, so a local run could go green for `release` while CI, a fresh clone
+// holding the committed config, checked a different ref and disagreed. It is the tool's own
+// principle applied to the file that describes the pin: the pin is what a clone gets, and so is
+// the configuration that says what it follows.
 let configLines;
 try {
-  configLines = git("config", "-f", ".gitmodules", "--get-regexp", String.raw`^submodule\.`);
+  configLines = git("config", "--blob=HEAD:.gitmodules", "--get-regexp", String.raw`^submodule\.`);
 } catch {
-  console.log("pin-check: no .gitmodules in this repository — nothing to check.");
+  console.log("pin-check: no committed .gitmodules in this repository — nothing to check.");
   process.exit(0);
 }
 

@@ -183,7 +183,7 @@ test("a repository with no .gitmodules has nothing to check, and says so", t => 
   execFileSync("git", ["init", "-q", "--initial-branch=main", repo], { timeout: 20000 });
   const { code, out } = run(repo);
   assert.equal(code, 0, out);
-  assert.match(out, /no \.gitmodules/);
+  assert.match(out, /no committed \.gitmodules/);
 });
 
 test("the pin is read from the commit, not the index", t => {
@@ -303,6 +303,24 @@ test("a missing ref on a code pin does not send the reader to the rules reposito
   assert.match(out, /NO SUCH REF external\/library/);
   assert.match(out, /has no refs\/heads\/stable/);
   assert.doesNotMatch(out, /promote-release/, "that workflow belongs to the rules repository, not to this remote");
+});
+
+test("an uncommitted .gitmodules edit does not change the verdict", t => {
+  // Both halves of the comparison must come from the same commit. The gitlink is read from HEAD
+  // because "the pin is what a clone gets"; reading `.gitmodules` from the WORKING TREE alongside it
+  // meant an uncommitted `branch` edit silently changed which ref was compared, so a local run could
+  // go green for `release` while CI — a fresh clone, holding the committed config — checked HEAD and
+  // disagreed. The same argument as the pin itself, applied to the configuration that describes it.
+  const root = workspace(t);
+  const rules = remote(root, "conventions");
+  const repo = consumer(root, "app", [{ path: "mount", url: rules.url, branch: "release", pin: rules.release }]);
+  assert.equal(run(repo).code, 0, "committed state tracks release, and the pin is at its tip");
+
+  fs.writeFileSync(path.join(repo, ".gitmodules"),
+    `[submodule "mount"]\n\tpath = mount\n\turl = ${rules.url}\n\tbranch = main\n`);
+  const { code, out } = run(repo);
+  assert.equal(code, 0, out);
+  assert.match(out, /mount → release/, "the committed config decides, not the dirty working tree");
 });
 
 test("each remote is named before it is probed, so a slow one does not look like a hang", t => {
