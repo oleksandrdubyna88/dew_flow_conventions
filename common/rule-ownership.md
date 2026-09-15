@@ -2,7 +2,7 @@
 id: "common.rule-ownership"
 load: "conditional"
 tasks: ["policy","docs"]
-paths: ["common/*.md","csharp/*.md","rust/*.md","typescript/*.md",".agents/rules/**"]
+paths: ["common/*.md","csharp/*.md","rust/*.md","typescript/*.md"]
 ---
 # A shared rule names no product (MANDATORY)
 
@@ -68,6 +68,11 @@ EXTEND a shared rule — say which one it narrows, and narrow it. It may never r
 carrying its own copy of a shared rule is what [`gate-snippet-check.mjs`](../tools/gate-snippet-check.mjs)
 fails the build over, because a copy is a thing that drifts while looking identical.
 
+**This rule governs the shared corpus only.** Its `paths` deliberately do not match
+`.agents/rules/**`: a rule saying "name no product" has no business loading while somebody edits a
+repository's own local rules, where naming the product is the whole job. It would be read as an
+instruction to strip exactly the context those files exist to hold.
+
 ### The one hard constraint
 
 **A shared rule may never `depends:` on a `local.*` id.** The dependency runs the wrong way: a shared
@@ -100,6 +105,16 @@ difference between a decision and an allowlist somebody grew. Three kinds qualif
 
 A name that merely *would be inconvenient* to generalise is not one of these. Write the shape, and
 leave the example in the repository that owns it.
+
+<!-- owns: the sidecar — the sentence below has to show the definite form to explain the difference -->
+
+**What the check actually looks for** is in one place, so nobody has to guess: the patterns at the top
+of [`tools/ownership-check.mjs`](../tools/ownership-check.mjs) — a `dew_flow_*` repository name, an
+`mcp__*__*` tool name, a handful of product words, and a short list of ambiguous nouns (`sidecar`,
+`benchmark`, `daemon`, `extension`, `panel`, `broker`, `vault`, `crate`, `gate`) matched **only**
+behind `the`, `its` or `our`. The determiner is the signal: measured over this corpus, the definite
+form is nearly always a product reference and the indefinite form is always generic, which is why
+*"a sidecar process"* is legal prose and *"the sidecar"* is a finding.
 
 ## Never
 
