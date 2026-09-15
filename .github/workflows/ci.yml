@@ -39,14 +39,16 @@ jobs:
       # Until 2026-09-14 this comment claimed a pin-check selftest that did not exist at all.
 
       # A shared rule names no product (common/rule-ownership.md). It needs no npm install, which is
-      # why it runs before the step that does. --warn while the backfill runs:
-      # 129 references across 26 of 32 rules on the day this landed, and a check that goes red on the
-      # day it lands teaches people to switch it off. But a bare --warn would let a NEW reference merge
-      # unnoticed for as long as the backfill takes, which is the one thing this rule promises cannot
-      # happen — so it is a RATCHET: the backlog is allowed, nothing may be added to it, and the number
-      # comes down as the cleanup lands until --max 0 is the armed state.
+      # why it runs before the step that does. The backfill is real — 129 references across 26 of 32
+      # rules on the day this landed — and a check that goes red on the day it lands teaches people to
+      # switch it off. But a bare --warn would let a NEW reference merge unnoticed for as long as the
+      # backfill takes, which is the one thing this rule promises cannot happen. So it is a RATCHET,
+      # and its budget is PER FILE (tools/ownership-baseline.json): one repo-wide total lets a branch
+      # spend headroom another branch won, so cleaning ten references in one rule silently pays for
+      # two new ones in another. Counts come down as the cleanup lands; deleting the baseline file is
+      # the armed state, at which point any finding at all fails.
       - name: Ownership
-        run: node tools/ownership-check.mjs --max 129
+        run: node tools/ownership-check.mjs
 
       - name: Selftest
         run: |

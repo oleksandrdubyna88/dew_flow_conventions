@@ -126,22 +126,42 @@ const sourceRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..")
 // hash changing is a red suite, and a deliberate change is a two-line diff beside the prose. The
 // original record is still asserted to be PRESENT and well formed, because the thing it protects is
 // somebody quietly deleting the evidence rather than somebody editing a rule.
-test("every rule's live body matches its recorded hash, and the migration evidence is intact",()=>{
+test("the migration evidence for the original 24 is intact",()=>{
+  // Provenance, and nothing else. These hashes are what the bodies were at migration; they are never
+  // compared against a live file, because comparing them for ever is what made those 24 rules
+  // uneditable — every improvement had to become a NEW rule file, and 24 migrated rules are 32 today.
+  // What this protects is somebody deleting the record, not somebody editing a rule.
   const inventory=JSON.parse(fs.readFileSync(path.join(sourceRoot,"research/shared-rules-migration-map.json"),"utf8"));
   const catalog=loadCatalog(sourceRoot);
   assert.equal(inventory.rules.length,24);
   for(const original of inventory.rules) {
-    const actual=catalog.find(rule=>rule.id===original.id);
-    assert.ok(actual,original.id);
-    const body=actual.text.replace(/^---\n[\s\S]*?\n---\n/,"");
-
+    assert.ok(catalog.find(rule=>rule.id===original.id),`${original.id}: a migrated rule may not vanish`);
     assert.match(original.originalBodySha256,/^[0-9a-f]{64}$/,`${original.id}: migration evidence must survive`);
     assert.ok(Array.isArray(original.sections)&&original.sections.length>0,`${original.id}: original sections must survive`);
+    assert.equal(original.currentBodySha256,undefined,`${original.id}: change control belongs in rule-bodies.json, not in the migration record`);
+  }
+});
 
-    assert.equal(sha256(body),original.currentBodySha256,
-      `${original.id}: the body changed without its currentBodySha256 — update the map in the same commit`);
-    assert.deepEqual(body.split("\n").filter(line=>/^#{1,4} /.test(line)),original.currentSections,
-      `${original.id}: headings changed without currentSections`);
+test("EVERY rule's live body matches research/rule-bodies.json",()=>{
+  // Change control, covering the whole catalog rather than the 24 that happened to be migrated.
+  // Keyed on the migration map, eight post-migration rules — including this story's own
+  // common/rule-ownership.md — were protected by nothing, so an unreviewed edit to them passed clean.
+  // That is the drift this mechanism exists to notice, in the files most likely to carry it.
+  const manifest=JSON.parse(fs.readFileSync(path.join(sourceRoot,"research/rule-bodies.json"),"utf8"));
+  const catalog=loadCatalog(sourceRoot);
+  const recorded=new Map(manifest.rules.map(entry=>[entry.id,entry]));
+
+  assert.equal(recorded.size,catalog.length,
+    "a rule was added or removed without research/rule-bodies.json — add its entry in the same commit");
+
+  for(const rule of catalog) {
+    const entry=recorded.get(rule.id);
+    assert.ok(entry,`${rule.id}: no entry in rule-bodies.json — a new rule records its body in the same commit`);
+    const body=rule.text.replace(/^---\n[\s\S]*?\n---\n/,"");
+    assert.equal(sha256(body),entry.bodySha256,
+      `${rule.id}: the body changed without its bodySha256 — update research/rule-bodies.json in the same commit`);
+    assert.deepEqual(body.split("\n").filter(line=>/^#{1,4} /.test(line)),entry.sections,
+      `${rule.id}: headings changed without their recorded sections`);
   }
 });
 

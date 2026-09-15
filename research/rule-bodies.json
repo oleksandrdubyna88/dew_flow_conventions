@@ -1,11 +1,10 @@
 {
-  "baseline": "5d6984ebaa9efd3bae48e25f91f8a1bb3872b54f",
+  "note": "Current body hash and headings for EVERY shared rule. Moved in the SAME commit as any edit; rules.test.mjs fails when a body changes and this does not. Provenance for the original 24 migrated rules lives in shared-rules-migration-map.json and is never compared against a live file.",
   "rules": [
     {
-      "source": "common/automated-checks.md",
       "id": "common.automated-checks",
-      "originalBodySha256": "dce1be161056391d54b2bde2c52aa04d2f1a99a3cc52b12ee584c9eefd5fac82",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/automated-checks.md",
+      "bodySha256": "cf2a152631ed411a98c98386240897c81961840f686d313af58238d47d5923d6",
       "sections": [
         "# Automated checks — what a reviewer, a scanner or a bot reports is work, down to zero (MANDATORY)",
         "## The rule",
@@ -16,19 +15,37 @@
       ]
     },
     {
-      "source": "common/coai-review-gate.md",
+      "id": "common.coai-caller-model",
+      "source": "common/coai-caller-model.md",
+      "bodySha256": "5f2ccbe5b8da1fb42c9ea245cce062ffff12ff0f50aefee64cdf7c09bf3c62d8",
+      "sections": [
+        "## Say which model you are when you open the gate",
+        "### Why you have to be asked",
+        "### If you genuinely do not know it",
+        "### Definition of Done"
+      ]
+    },
+    {
+      "id": "common.coai-document-gate",
+      "source": "common/coai-document-gate.md",
+      "bodySha256": "a2358c524c9f12940f1068d4fdb5b93858eb55bbcb60adc771ec5a64d8a6606b",
+      "sections": [
+        "## Reviewing a DOCUMENT rather than a change",
+        "## Definition of Done"
+      ]
+    },
+    {
       "id": "common.coai-review-gate",
-      "originalBodySha256": "f5f8ccc3894772971ec9d8dc29671c62aaaccab15bdd03d1bdc0282d33d66049",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/coai-review-gate.md",
+      "bodySha256": "f5f8ccc3894772971ec9d8dc29671c62aaaccab15bdd03d1bdc0282d33d66049",
       "sections": [
         "## Multi-model review gate (ConnectOtherAIs)"
       ]
     },
     {
-      "source": "common/coding-style.md",
       "id": "common.coding-style",
-      "originalBodySha256": "0acf32d9ea193e42085d75b522d01f283e5e7120379c55b8f6cda2bafcf1dcb0",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/coding-style.md",
+      "bodySha256": "0acf32d9ea193e42085d75b522d01f283e5e7120379c55b8f6cda2bafcf1dcb0",
       "sections": [
         "# Coding Style",
         "## Immutability (CRITICAL)",
@@ -41,10 +58,9 @@
       ]
     },
     {
-      "source": "common/development-workflow.md",
       "id": "common.development-workflow",
-      "originalBodySha256": "ba11ae1c42d9c468878e21105550950cfa0cd5de97b18a6b79560ae8df54aae9",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/development-workflow.md",
+      "bodySha256": "ba11ae1c42d9c468878e21105550950cfa0cd5de97b18a6b79560ae8df54aae9",
       "sections": [
         "# Development Workflow",
         "## Verify the ARTEFACT, not the source (MANDATORY)",
@@ -57,20 +73,32 @@
       ]
     },
     {
-      "source": "common/durable-status.md",
       "id": "common.durable-status",
-      "originalBodySha256": "18c8b393564afded9f0540e900a8b8bf26e60b29279f5a025b44fbf55dd94102",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/durable-status.md",
+      "bodySha256": "18c8b393564afded9f0540e900a8b8bf26e60b29279f5a025b44fbf55dd94102",
       "sections": [
         "# Durable status for status-changing actions (MANDATORY)",
         "## Rules"
       ]
     },
     {
-      "source": "common/git-workflow.md",
+      "id": "common.generated-code-tests",
+      "source": "common/generated-code-tests.md",
+      "bodySha256": "52a2819506c79383a3e03e432c395f2074f79a9d1d702fb702c88deac9030be4",
+      "sections": [
+        "# Code you GENERATE is executed by the test, never string-matched (MANDATORY)",
+        "## 1. If the artefact is executable, the test EXECUTES it",
+        "### Bounded, because \"execute the artefact\" is not safe advice everywhere",
+        "## 2. A pattern matched against a WHOLE composite passes on the wrong occurrence",
+        "## 3. The harness is code under test, and a permissive fake turns a suite green",
+        "## Never",
+        "## Definition of Done"
+      ]
+    },
+    {
       "id": "common.git-workflow",
-      "originalBodySha256": "b8ba57882e790ff80803149256db479db03d59ff7c616a5887fe03647c37ea0a",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/git-workflow.md",
+      "bodySha256": "eeaba02bb654752861fccfcd881dab2a8f482e90f449f5a30ec4ccbb385b5b2c",
       "sections": [
         "# Git Workflow",
         "## Commit your OWN work, and only after it is verified (MANDATORY)",
@@ -95,10 +123,9 @@
       ]
     },
     {
-      "source": "common/gpu-lease.md",
       "id": "common.gpu-lease",
-      "originalBodySha256": "7b39a43bd8e75abd31dafc6b52ffbf3c3769c8391345635684a50a75c7e54369",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/gpu-lease.md",
+      "bodySha256": "7b39a43bd8e75abd31dafc6b52ffbf3c3769c8391345635684a50a75c7e54369",
       "sections": [
         "# Take the card before you use it (MANDATORY for GPU work)",
         "## The rule",
@@ -110,10 +137,9 @@
       ]
     },
     {
-      "source": "common/http-contracts.md",
       "id": "common.http-contracts",
-      "originalBodySha256": "ece6705a3428029c557bfc713f1c8d9c31410164ba01380755f2d460af8ad29e",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/http-contracts.md",
+      "bodySha256": "9f92e96733a5a75630a1b81d5572d92d148f3a792fa318b45a5f6170241d04bb",
       "sections": [
         "# HTTP contracts — an `.http` file per route group, run before every release (MANDATORY)",
         "## Where the files live",
@@ -134,20 +160,18 @@
       ]
     },
     {
-      "source": "common/knowledge-base.md",
       "id": "common.knowledge-base",
-      "originalBodySha256": "057ce9ce911bbdfccea5891d693c6a8721bc9cb9aca00a1d9f21fc1db956cd52",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/knowledge-base.md",
+      "bodySha256": "057ce9ce911bbdfccea5891d693c6a8721bc9cb9aca00a1d9f21fc1db956cd52",
       "sections": [
         "# Knowledge base sync — `research/` tracks the system as it is (MANDATORY)",
         "## Shortening a rule drops the caveat — and its absence reads as permission"
       ]
     },
     {
-      "source": "common/logging-serilog.md",
       "id": "common.logging-serilog",
-      "originalBodySha256": "7cf9569794a811e1ac7163aa64d42cadde87599d3cd5885e80dd4aab192d9638",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/logging-serilog.md",
+      "bodySha256": "760c9b1b1b5d68d136f7ebf907f4157fb84ddb5d3c25f37f24cb5ee122c9574c",
       "sections": [
         "# Logging — Serilog, coloured to the console, and on disk per run (MANDATORY)",
         "## The rule",
@@ -166,10 +190,9 @@
       ]
     },
     {
-      "source": "common/measurement.md",
       "id": "common.measurement",
-      "originalBodySha256": "39e5c0d559c1cce66964acd900df436d90e5f67ec131c535af6742b49f83335f",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/measurement.md",
+      "bodySha256": "39e5c0d559c1cce66964acd900df436d90e5f67ec131c535af6742b49f83335f",
       "sections": [
         "# Measurement — a number you did not set up is a number about something else",
         "## 1. Pin everything you are NOT varying, then prove the arm actually differed (MANDATORY)",
@@ -183,10 +206,9 @@
       ]
     },
     {
-      "source": "common/planning-docs.md",
       "id": "common.planning-docs",
-      "originalBodySha256": "2eecad1b68dec7085cb8d7e904eb77de383aa927c6eb60a71797aceb3b46c427",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/planning-docs.md",
+      "bodySha256": "0b8be29ee452ad6e437ce4b710756edeb8d8fdf0487952c8ecd990658e7aed1b",
       "sections": [
         "# Planning Docs — `todo/` is open work, `research/` is documentation",
         "## Creating a plan",
@@ -203,10 +225,23 @@
       ]
     },
     {
-      "source": "common/post-deploy-checks.md",
+      "id": "common.platform-limits",
+      "source": "common/platform-limits.md",
+      "bodySha256": "4f0a48cf856f2cbd2c48eed6035e66eaf5a94b9e78040d162b3baed132dce395",
+      "sections": [
+        "# Platforms — the limits they impose, and the proof you ship for them (MANDATORY)",
+        "## 1. A platform limit is the KERNEL's number, in the KERNEL's unit — and one adapter owns it",
+        "### Testing it — an all-ASCII fixture cannot fail",
+        "## 2. A platform that is only BUILT during a release is an untested platform",
+        "### The only sanctioned narrowing is a written mapping",
+        "## Never",
+        "## Definition of Done"
+      ]
+    },
+    {
       "id": "common.post-deploy-checks",
-      "originalBodySha256": "a9b89927e0887b507adff3ee9cb7ad16d7ad86d90932d818e1b2e2e7aea62e71",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/post-deploy-checks.md",
+      "bodySha256": "d582d264da8f74292491ca9728e1b185a05a56c1562dadcc4640d2b4668f4006",
       "sections": [
         "# Post-deploy checks — the short list a green build cannot answer (MANDATORY)",
         "## Why a test cannot answer this",
@@ -223,10 +258,9 @@
       ]
     },
     {
-      "source": "common/pull-requests.md",
       "id": "common.pull-requests",
-      "originalBodySha256": "e95808f04e99f14dd50f912bd7dfcc4b7079e1498c5a2e06ea61fb3a0115bf86",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/pull-requests.md",
+      "bodySha256": "16e397c604916a990aafa186bf5170cb66a7464ac97082d046036b7a50ba67c5",
       "sections": [
         "# Pull requests — `main` is closed; the reviewer's comments are work (MANDATORY)",
         "## The rule",
@@ -238,10 +272,9 @@
       ]
     },
     {
-      "source": "common/reliability.md",
       "id": "common.reliability",
-      "originalBodySha256": "b7744935fd5904ba9099253344d374ce67ebd0b2caea38be56f73a4cb3820e2e",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/reliability.md",
+      "bodySha256": "b7744935fd5904ba9099253344d374ce67ebd0b2caea38be56f73a4cb3820e2e",
       "sections": [
         "# Reliability — a process that must run 24/7 (MANDATORY)",
         "## Every wait has a ceiling",
@@ -260,10 +293,9 @@
       ]
     },
     {
-      "source": "common/reuse-first.md",
       "id": "common.reuse-first",
-      "originalBodySha256": "27c62e437ee2fbae94d1cc8823ce3808c38288c6f67cbc36d28c86cc7b372634",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/reuse-first.md",
+      "bodySha256": "27c62e437ee2fbae94d1cc8823ce3808c38288c6f67cbc36d28c86cc7b372634",
       "sections": [
         "# Reuse First — look before you build (MANDATORY)",
         "## The three questions, in order",
@@ -277,10 +309,24 @@
       ]
     },
     {
-      "source": "common/scenario-tests.md",
+      "id": "common.rule-ownership",
+      "source": "common/rule-ownership.md",
+      "bodySha256": "08bca1cf5df049c1a6b48c37ca5627308edf3b6263d2aa2ce6adc9f5d0b3738d",
+      "sections": [
+        "# A shared rule names no product (MANDATORY)",
+        "## The test, and it takes one second",
+        "## Evidence keeps its story and loses its address",
+        "## Where product-specific material goes instead",
+        "### The one hard constraint",
+        "## When the product name IS the instruction",
+        "## Never",
+        "## Definition of Done"
+      ]
+    },
+    {
       "id": "common.scenario-tests",
-      "originalBodySha256": "31fee268e7b0f1bb16bd22edc11706f81dfd43fc936daa8173574eca36ee7ce5",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/scenario-tests.md",
+      "bodySha256": "31fee268e7b0f1bb16bd22edc11706f81dfd43fc936daa8173574eca36ee7ce5",
       "sections": [
         "# Scenario tests — every repository has a harness of its own, and every flow is in it (MANDATORY)",
         "## Why this is mandatory",
@@ -292,10 +338,9 @@
       ]
     },
     {
-      "source": "common/security.md",
       "id": "common.security",
-      "originalBodySha256": "3033200d93eb53553fc481f2d81ddda1bfc987b5ff2c28f205ba17132c21a431",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/security.md",
+      "bodySha256": "3033200d93eb53553fc481f2d81ddda1bfc987b5ff2c28f205ba17132c21a431",
       "sections": [
         "# Security Guidelines",
         "## Mandatory checks before ANY commit",
@@ -311,10 +356,37 @@
       ]
     },
     {
-      "source": "common/testing.md",
+      "id": "common.subagent-models",
+      "source": "common/subagent-models.md",
+      "bodySha256": "c27c12426e323ac9bcf7d8a7a05abb435d8cbdf5cb6f364b5ef595bc96d53815",
+      "sections": [
+        "# Which model a subagent runs on (MANDATORY)",
+        "## The rule",
+        "## Pass it EXPLICITLY, every time",
+        "## Why not Fable everywhere",
+        "## Never",
+        "## Definition of Done"
+      ]
+    },
+    {
+      "id": "common.task-lifecycle",
+      "source": "common/task-lifecycle.md",
+      "bodySha256": "48d94a4c162f00157e46e16364a1db3b0cd6b1cb65ea82af19cacdce7857364a",
+      "sections": [
+        "# A task is a worktree, a branch, a pull request, and a release",
+        "## 1. One task, one worktree, one branch (MANDATORY)",
+        "### Why, and it is not tidiness",
+        "### Finishing",
+        "## 2. The pull request is yours until it is merged (MANDATORY)",
+        "## 3. After the merge, ship it (MANDATORY)",
+        "## Never",
+        "## Definition of Done"
+      ]
+    },
+    {
       "id": "common.testing",
-      "originalBodySha256": "3db8d673c0a7793b85622493a861a926e04c937712454acbb4c74a56f8a483fb",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/testing.md",
+      "bodySha256": "3db8d673c0a7793b85622493a861a926e04c937712454acbb4c74a56f8a483fb",
       "sections": [
         "# Testing",
         "## Running tests — executables only, never `dotnet test` (MANDATORY)",
@@ -340,10 +412,9 @@
       ]
     },
     {
-      "source": "common/utc-timestamps.md",
       "id": "common.utc-timestamps",
-      "originalBodySha256": "c305216f455e9b04336cf1373fdf89a41985fc88ad38f7a5b65515cf3de1921c",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "common/utc-timestamps.md",
+      "bodySha256": "c305216f455e9b04336cf1373fdf89a41985fc88ad38f7a5b65515cf3de1921c",
       "sections": [
         "# UTC in the database, local time only on the frontend (MANDATORY)",
         "## The rule",
@@ -354,10 +425,9 @@
       ]
     },
     {
-      "source": "csharp/doctrine.md",
       "id": "csharp.doctrine",
-      "originalBodySha256": "a8e22cc8563b1f817f2fb8919b8a72bf74985f6e5da4230d5648164c31a4caf2",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "csharp/doctrine.md",
+      "bodySha256": "a8e22cc8563b1f817f2fb8919b8a72bf74985f6e5da4230d5648164c31a4caf2",
       "sections": [
         "# C# doctrine — the family's code rules",
         "## 1. Language & runtime",
@@ -371,10 +441,24 @@
       ]
     },
     {
-      "source": "csharp/nuget-packages.md",
+      "id": "csharp.dotnet-build",
+      "source": "csharp/dotnet-build.md",
+      "bodySha256": "177b642fdb96f5f596ec19134c0abb80288186a00aa723efeda3ed82fc6a9d5e",
+      "sections": [
+        "# `dotnet build` — bound the worker pool, because several sessions build at once",
+        "## 1. Every .NET repository carries `Directory.Build.rsp` at its root (MANDATORY)",
+        "## 2. Every MSBuild-driven command carries `-m:N` (MANDATORY)",
+        "### What enforces it, and where it does not reach",
+        "## 3. CI overrides on the command line — never `-noautorsp` (MANDATORY)",
+        "## 4. Know the floor",
+        "## Never",
+        "## Definition of Done"
+      ]
+    },
+    {
       "id": "csharp.nuget-packages",
-      "originalBodySha256": "96e982e08345f28163064afe01485a9831688a5a47b87738fd4e0c7a7dd2d0fb",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "csharp/nuget-packages.md",
+      "bodySha256": "96e982e08345f28163064afe01485a9831688a5a47b87738fd4e0c7a7dd2d0fb",
       "sections": [
         "# NuGet packages — approval, freshness, licence",
         "## Before adding any package",
@@ -385,10 +469,9 @@
       ]
     },
     {
-      "source": "rust/doctrine.md",
       "id": "rust.doctrine",
-      "originalBodySha256": "f0d8374d20cc167e6c25fcbfcea364b63fdf723fe47d9fa17ab09ff091b3bf7a",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "rust/doctrine.md",
+      "bodySha256": "f0d8374d20cc167e6c25fcbfcea364b63fdf723fe47d9fa17ab09ff091b3bf7a",
       "sections": [
         "# Rust doctrine — the family's code rules",
         "## 1. Toolchain & flavors",
@@ -403,10 +486,9 @@
       ]
     },
     {
-      "source": "typescript/doctrine.md",
       "id": "typescript.doctrine",
-      "originalBodySha256": "3251c5a5fb7ded69a4076513bb5b2322a05a823b7b956654c6dca8737b7364a0",
-      "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
+      "source": "typescript/doctrine.md",
+      "bodySha256": "3251c5a5fb7ded69a4076513bb5b2322a05a823b7b956654c6dca8737b7364a0",
       "sections": [
         "# TypeScript — the four traps that have actually cost us",
         "## 1. Never interpolate into a `<script>` element with `JSON.stringify` (MANDATORY)",

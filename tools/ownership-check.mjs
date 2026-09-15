@@ -14,7 +14,7 @@
 // The detector is a PATTERN, not a list of the six repositories. A list would pass the seventh
 // repository to join the family, which is the one nobody would think to add.
 //
-// Run from this repository's root:  node tools/ownership-check.mjs [--warn]
+// Run from this repository's root:  node tools/ownership-check.mjs [--warn] [--baseline <path>]
 // Exit: 0 clean, or --warn.  1 findings, a malformed marker, a downward dependency, or nothing scanned.
 
 import * as fs from "node:fs";
@@ -80,18 +80,24 @@ export const isReason = (reason) =>
 const WARN = process.argv.includes("--warn");
 
 /**
- * The ratchet. `--max N` allows N existing findings and fails on the N+1th.
+ * The ratchet, PER FILE.
  *
  * `--warn` alone would let a NEW product reference merge unnoticed for as long as the backfill takes,
- * which defeats the one thing this rule promises — that the drift cannot recur. The baseline is what
- * the corpus already carries; anything above it arrived after the rule existed. As the cleanup lands
- * the number comes down, and `--max 0` is the armed state.
+ * which defeats the one thing this rule promises — that the drift cannot recur.
  *
- * A malformed marker and a downward dependency are never forgiven by a baseline: those are defects in
- * the mechanism rather than a backlog of names.
+ * A single repository-wide number would not fix it either, and that was the first attempt: if one
+ * author removes ten references from one rule while another adds two to a different rule, the total
+ * still falls and the additions merge unseen. Worse, every cleanup pull request would have to edit
+ * the CI workflow to lower the number, so concurrent cleanups conflict on the one line they all
+ * touch. A reduction in one file must never buy capacity in another.
+ *
+ * So the baseline is a map of file -> count. A file over its recorded count fails; a file under it is
+ * the cleanup working; a file with findings and NO entry is new drift. The armed state is deleting
+ * the baseline file, at which point any finding at all fails.
  */
-const maxIndex = process.argv.indexOf("--max");
-const MAX = maxIndex === -1 ? undefined : Number(process.argv[maxIndex + 1]);
+const BASELINE_DEFAULT = "tools/ownership-baseline.json";
+const baselineIndex = process.argv.indexOf("--baseline");
+const BASELINE_PATH = baselineIndex === -1 ? undefined : process.argv[baselineIndex + 1];
 
 /**
  * Text with fenced code blocks removed.
@@ -165,15 +171,26 @@ export function rulesIn(root) {
  * findingsIn and markersIn without the whole corpus being scanned on import.
  */
 export function main() {
-  if (maxIndex !== -1 && (!Number.isInteger(MAX) || MAX < 0)) {
-    // Number("soon") is NaN and every comparison with it is false, so a typo would disable the
-    // ratchet while still exiting 0 — the trap release-distance had, in the same shape.
-    console.error(`ownership-check: --max was given "${process.argv[maxIndex + 1]}", which is not a number of findings.`);
-    console.error("  A baseline that does not parse would switch the ratchet off and still look green.");
+  const root = process.cwd();
+
+  // The baseline is read before anything is scanned, so an unreadable or malformed one stops the run
+  // rather than silently allowing everything: a ratchet that cannot be loaded must not look like a
+  // ratchet that found nothing.
+  let baseline;
+  const baselineFile = path.join(root, BASELINE_PATH ?? BASELINE_DEFAULT);
+  if (fs.existsSync(baselineFile)) {
+    try {
+      baseline = JSON.parse(fs.readFileSync(baselineFile, "utf8")).files;
+      if (baseline === null || typeof baseline !== "object") throw new Error("no `files` map");
+    } catch (error) {
+      console.error(`ownership-check: ${BASELINE_PATH ?? BASELINE_DEFAULT} could not be read as a baseline (${error.message}).`);
+      console.error("  A baseline that does not parse would switch the ratchet off and still look green.");
+      return 1;
+    }
+  } else if (BASELINE_PATH !== undefined) {
+    console.error(`ownership-check: no baseline at ${BASELINE_PATH}.`);
     return 1;
   }
-
-  const root = process.cwd();
   const files = rulesIn(root);
 
   if (files.length === 0) {
@@ -241,15 +258,34 @@ export function main() {
     return 0;
   }
 
-  if (MAX !== undefined && !mechanismBroken) {
-    if (findings.length <= MAX) {
-      console.log(`ownership-check: within the baseline — ${findings.length} of an allowed ${MAX}. Reported, not failed.`);
+  if (baseline !== undefined && !mechanismBroken) {
+    const perFile = new Map();
+    for (const f of findings) perFile.set(f.file, (perFile.get(f.file) ?? 0) + 1);
+
+    const over = [];
+    for (const [file, count] of perFile) {
+      const allowed = baseline[file.replaceAll("\\", "/")] ?? 0;
+      if (count > allowed) over.push({ file, count, allowed });
+    }
+
+    if (over.length === 0) {
+      const total = findings.length;
+      const budget = Object.values(baseline).reduce((n, v) => n + v, 0);
+      console.log(`ownership-check: within the baseline — ${total} finding(s) against ${budget} recorded, none over its file's count.`);
+      if (total < budget) console.log("  Under the baseline: lower the counts in the baseline file so the ground that was won is held.");
       return 0;
     }
+
     console.error("");
-    console.error(`ownership-check: ${findings.length} finding(s), ${findings.length - MAX} more than the allowed ${MAX}.`);
-    console.error("  That difference is a reference that was not there before — the backlog is allowed while it");
-    console.error("  is being worked off, but nothing may be ADDED to it. Anonymise the new one, or declare it.");
+    for (const o of over) {
+      console.error(`ownership-check: OVER BASELINE ${o.file} — ${o.count} finding(s), ${o.allowed} recorded.`);
+    }
+    console.error("  The count for that file GREW. Usually that is an undeclared product reference somebody");
+    console.error("  added; it can also be an existing one duplicated by a reword or a split sentence. Either");
+    console.error("  way `git diff` against the base branch shows which line, and the cure is the same:");
+    console.error("  anonymise it, declare it with an `owns:` marker, or move it to the repository that owns it.");
+    console.error("  The backlog is allowed while it is worked off. Nothing may be ADDED to it — and a file");
+    console.error("  getting cleaner never buys room for another file to get worse.");
     return 1;
   }
   return 1;
