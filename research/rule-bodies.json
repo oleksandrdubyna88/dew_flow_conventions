@@ -17,7 +17,7 @@
     {
       "id": "common.coai-caller-model",
       "source": "common/coai-caller-model.md",
-      "bodySha256": "0b3d1c2aa263cfa2a68390a7a84d962958d8bc647f15a7b7fcf47a8aa680cbe8",
+      "bodySha256": "53b7975da6ec172387c158dcde94ccc47046b8be6f734aeb6501bae23f2bcd0d",
       "sections": [
         "## Say which model you are when you open the review gate",
         "### Why you have to be asked",
@@ -28,7 +28,7 @@
     {
       "id": "common.coai-document-gate",
       "source": "common/coai-document-gate.md",
-      "bodySha256": "f34f0ea88db35e06ca80167126d03539ff2abf8a744c92a2e26300f2ce38e5da",
+      "bodySha256": "9242891b2ed8e84a19de8bdcfe1d6013f0542db2930a5e1c230e1a26022a6244",
       "sections": [
         "## Reviewing a DOCUMENT rather than a change",
         "## Definition of Done"
@@ -37,7 +37,7 @@
     {
       "id": "common.coai-review-gate",
       "source": "common/coai-review-gate.md",
-      "bodySha256": "4c97d46dc85da76fccfb77e2a3d32fde1f6652a2de00f69993f37d75a680e6c8",
+      "bodySha256": "82ecf5ec12bdb24ee9e38e49390ba5618d34cd6f22e09e3e90fbd0bbd70c5722",
       "sections": [
         "## Multi-model review gate (ConnectOtherAIs)"
       ]
