@@ -588,10 +588,13 @@ worklist, and it is why the CI step carries `--warn`.
 which made them uneditable: every improvement had to become a NEW rule file, and the corpus grew
 instead of being corrected. That is visible in the numbers — 24 migrated rules, 32 today.
 
-The inventory now carries two records per rule. `originalBodySha256`/`sections` are the migration
-evidence, asserted only to be PRESENT and well formed, because what they protect is somebody deleting
-the record rather than somebody editing a rule. `currentBodySha256`/`currentSections` are compared
-against the live body and move in the SAME commit as any edit.
+The two records now live in two files, and the code round is the reason. Keying the live hash off
+the migration map covered the 24 rules that were migrated — which left the other eight, including the
+rule that defines this whole policy, protected by nothing at all, and getting quieter as the corpus
+grows. So `research/shared-rules-migration-map.json` went back to being migration EVIDENCE only
+(`originalBodySha256`/`sections`, asserted to be present and well formed, because what they protect is
+somebody deleting the record), and `research/rule-bodies.json` carries `bodySha256` for **all 32**
+rules, compared against the live body and moved in the SAME commit as any edit.
 
 So the freeze changed from *no edit ever* to *no accidental edit*. Observed red before it was relied
 on: appending one sentence to a rule without touching the map fails with
@@ -603,19 +606,33 @@ accepted, and two of them were holes in what this story promises rather than pol
 
 **The ratchet.** A bare `--warn` exits 0 whatever it finds, so a pull request adding a NEW product
 reference would have merged unnoticed for as long as the backfill takes — which defeats the single
-guarantee the rule makes, that the drift cannot recur. `--max N` allows N existing findings and fails
-on the N+1th, naming the difference as "a reference that was not there before". The backlog is
-allowed while it is worked off; nothing may be added to it; `--max 0` is the armed state. A malformed
-marker and a downward dependency are never forgiven by a baseline, because those are defects in the
-mechanism rather than a backlog of names — asserted by a case that passes `--max 99` and still fails.
+guarantee the rule makes, that the drift cannot recur. The backlog is allowed while it is worked off;
+nothing may be added to it; deleting the baseline file is the armed state, at which point any finding
+at all fails.
+
+**The budget is PER FILE, and that is not a refinement.** The first version allowed a repo-wide total.
+The code round named what that buys: one branch cleans ten references out of one rule and, without
+ever touching a second rule, pays for two new ones somebody adds on a different branch — both branches
+are under the total, both are green, and the reference that the rule exists to stop merges. So
+`tools/ownership-baseline.json` records a count per file, a file over its own count fails, and the
+case that proves it is *cleaning one file never buys room for another to get worse*. A file with
+findings and no entry at all is new drift by definition. A baseline that cannot be READ stops the run
+rather than allowing everything, because a manifest that does not parse would switch the ratchet off
+and still look green.
+
+A malformed marker and a downward dependency are never forgiven by a baseline, because those are
+defects in the mechanism rather than a backlog of names — asserted by a case whose baseline allows
+far more findings than the fixture has, and which still fails.
 
 **The rule was loading in the wrong repository.** Its `paths` matched `.agents/rules/**`, so an agent
 editing a CONSUMER's own local rules would have been handed a rule saying "name no product" — exactly
 inverting what those files exist to hold. Scoped to the shared corpus only, with the reason written
 into the rule so it is not re-added.
 
-A `--max` that does not parse is a usage error rather than a silently disabled ratchet: `Number("soon")`
-is NaN and every comparison with it is false, which is the same trap `release-distance` had.
+An explicitly named `--baseline` that is not there is a usage error rather than a silently disabled
+ratchet — the missing DEFAULT means armed, but a path somebody typed and misspelled must not read as
+"nothing to forgive". The scalar version had the same shape of trap for the same reason
+`release-distance` did: `Number("soon")` is NaN and every comparison with it is false.
 
 Marker reasons are now checked for shape as well as length — three words, and a placeholder list.
 That fix was itself a lesson: the first attempt wrote a literal `0x08` byte where `\b` belonged, so
@@ -631,3 +648,12 @@ observed red; the fence/inline-span distinction is tested in both directions; th
 the new rule present, which disproves the claim that asserting the original hashes breaks newly
 authored rules; and `downwardDependencies()` implements the `depends:` constraint the last finding
 asked for, with a fixture and a case.
+
+**What the code round added.** Seventeen findings across seven reviewers (codex was at capacity for
+all four of its slots); seven accepted. Two were the structural ones above — the per-file budget and the
+manifest split — and both were holes in the guarantee rather than polish. A third was quieter and worth
+recording: this check and the resolver each carry their own hardcoded list of rule directories, so a
+fifth directory would be distributed to consumers by `loadCatalog` and skipped entirely here. There is
+now a case that builds a probe file in every directory the resolver declares and fails unless the scan
+finds all of them. It read the directory back out of a path with `[\/]`, which matches only a forward
+slash while the tool returns the platform separator — green on CI, red on the machine it was written on.

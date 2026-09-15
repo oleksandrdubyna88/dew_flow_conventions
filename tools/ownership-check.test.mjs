@@ -33,6 +33,22 @@ function run(cwd, ...args) {
   return { code: result.status, out: `${result.stdout}${result.stderr}` };
 }
 
+/**
+ * A repository with one leaky rule and, optionally, a baseline recording what it already carries.
+ * `undefined` writes no baseline at all, which is the armed state.
+ */
+function baselineScene(t, files) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ownership-baseline-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, "common"), { recursive: true });
+  fs.mkdirSync(path.join(root, "tools"), { recursive: true });
+  fs.writeFileSync(path.join(root, "common", "x.md"), ["# One", "", "Measured in dew_flow_rag_qln today.", ""].join("\n"));
+  if (files !== undefined) {
+    fs.writeFileSync(path.join(root, "tools", "ownership-baseline.json"), JSON.stringify({ files }, null, 2));
+  }
+  return root;
+}
+
 test("an anonymised, dated rule passes", () => {
   const { code, out } = run(fixture("clean"));
   assert.equal(code, 0, out);
@@ -154,37 +170,66 @@ test("a marker shown inside a code fence is documentation, not a declaration", (
   assert.equal(findingsIn(fenced, "common/x.md").length, 1, "a name in an example is still a name");
 });
 
-test("--max is a ratchet: at or under the baseline passes, over it fails", () => {
-  // `--warn` alone would let a NEW product reference merge unnoticed for as long as the backfill
-  // takes — which defeats the one thing this story promises, that the drift cannot recur. The
-  // baseline is the number of findings the corpus already has; anything above it is new.
-  const under = run(fixture("leaky"), "--max", "1");
-  assert.equal(under.code, 0, under.out);
-  assert.match(under.out, /dew_flow_rag_qln/, "the finding is still reported, not hidden");
-  assert.match(under.out, /1 of an allowed 1/);
-
-  const over = run(fixture("leaky"), "--max", "0");
-  assert.equal(over.code, 1, over.out);
-  assert.match(over.out, /1 finding\(s\), 1 more than the allowed 0/);
-  assert.match(over.out, /a reference that was not there before/i);
-});
-
-test("--max still fails on a malformed marker or a downward dependency, whatever the count", () => {
-  // The ratchet is about the BACKLOG of product names. A marker with no reason and a shared rule
-  // depending on a local id are defects in the mechanism itself, and no baseline forgives them.
-  const marker = run(fixture("marked-bare"), "--max", "99");
-  assert.equal(marker.code, 1, marker.out);
-  const depends = run(fixture("depends"), "--max", "99");
-  assert.equal(depends.code, 1, depends.out);
-});
-
-test("--max rejects a baseline that is not a number, rather than ignoring it", () => {
-  // `Number("soon")` is NaN and every comparison with it is false, so a typo would silently disable
-  // the ratchet while still exiting 0 — the same trap release-distance had.
-  const { code, out } = run(fixture("clean"), "--max", "soon");
+test("a file over its recorded count fails, naming the file and both numbers", (t) => {
+  const root = baselineScene(t, { "common/x.md": 0 });
+  const { code, out } = run(root);
   assert.equal(code, 1, out);
-  assert.match(out, /--max/);
-  assert.match(out, /not a number/);
+  assert.match(out, /OVER BASELINE common.x\.md — 1 finding\(s\), 0 recorded/);
+  assert.match(out, /Nothing may be ADDED to it/);
+});
+
+test("a file at its recorded count passes, and the finding is still printed", (t) => {
+  const root = baselineScene(t, { "common/x.md": 1 });
+  const { code, out } = run(root);
+  assert.equal(code, 0, out);
+  assert.match(out, /dew_flow_rag_qln/, "reported, not hidden");
+  assert.match(out, /within the baseline/);
+});
+
+test("cleaning one file never buys room for another to get worse", (t) => {
+  // The defect a single repository-wide number has, and the reason the baseline is per FILE: one
+  // author removes ten references from one rule while another adds two to a different rule, the
+  // total still falls, and the additions merge unseen.
+  const root = baselineScene(t, { "common/x.md": 5, "common/y.md": 0 });
+  fs.writeFileSync(path.join(root, "common", "y.md"), "# Two\n\nMeasured in dew_flow_mcp today.\n");
+  const { code, out } = run(root);
+  assert.equal(code, 1, out);
+  assert.match(out, /OVER BASELINE common.y\.md/);
+  assert.doesNotMatch(out, /OVER BASELINE common.x\.md/, "the file that got cleaner is not the problem");
+});
+
+test("a file with findings and no entry at all is new drift", (t) => {
+  const root = baselineScene(t, { "common/other.md": 3 });
+  const { code, out } = run(root);
+  assert.equal(code, 1, out);
+  assert.match(out, /OVER BASELINE common.x\.md — 1 finding\(s\), 0 recorded/);
+});
+
+test("with no baseline file at all, any finding fails — that is the armed state", (t) => {
+  const root = baselineScene(t, undefined);
+  const { code, out } = run(root);
+  assert.equal(code, 1, out);
+  assert.match(out, /dew_flow_rag_qln/);
+});
+
+test("a baseline that cannot be read stops the run rather than allowing everything", (t) => {
+  // A ratchet that failed to load must not look like a ratchet that found nothing.
+  const root = baselineScene(t, { "common/x.md": 1 });
+  fs.writeFileSync(path.join(root, "tools", "ownership-baseline.json"), "{ this is not json");
+  const { code, out } = run(root);
+  assert.equal(code, 1, out);
+  assert.match(out, /could not be read as a baseline/);
+  assert.match(out, /switch the ratchet off and still look green/);
+});
+
+test("a baseline still fails on a malformed marker, whatever the counts say", (t) => {
+  // The ratchet is about the BACKLOG of names. A marker with no reason is a defect in the mechanism,
+  // and no baseline forgives it.
+  const root = baselineScene(t, { "common/x.md": 99 });
+  fs.writeFileSync(path.join(root, "common", "x.md"), "<!-- owns: coai -->\n# One\n\nCall `mcp__coai__open`.\n");
+  const { code, out } = run(root);
+  assert.equal(code, 1, out);
+  assert.match(out, /MARKER/);
 });
 
 test("a reason that is the shape of a reason rather than one is refused", () => {
@@ -194,5 +239,26 @@ test("a reason that is the shape of a reason rather than one is refused", () => 
   assert.equal(declared("the MCP tool names a session must type").tokens.length, 1);
   for (const placeholder of ["needed", "see above", "required for now", "TBD", "because", "it is needed here"]) {
     assert.equal(declared(placeholder).malformed.length, 1, `"${placeholder}" is not a reason`);
+  }
+});
+
+test("the directories this scans are the directories the resolver loads", async () => {
+  // Two hardcoded lists that must agree: if a fifth rule directory is ever added, loadCatalog would
+  // distribute those rules to consumers while this check skipped them entirely.
+  const { rulesIn: scanned } = await import("./ownership-check.mjs");
+  const catalogSource = fs.readFileSync(path.join(here, "lib", "rule-catalog.mjs"), "utf8");
+  const declared = /const DIRECTORIES = \[([^\]]*)\]/.exec(catalogSource)[1]
+    .split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ownership-dirs-"));
+  try {
+    for (const dir of declared) {
+      fs.mkdirSync(path.join(root, dir), { recursive: true });
+      fs.writeFileSync(path.join(root, dir, "probe.md"), "# probe\n");
+    }
+    const seen = scanned(root).map((f) => path.dirname(f)).sort();
+    assert.deepEqual(seen, [...declared].sort(),
+      "ownership-check and rule-catalog must walk the same directories");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
   }
 });

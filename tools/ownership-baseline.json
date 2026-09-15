@@ -1,0 +1,31 @@
+{
+  "note": "Per-file count of product references this corpus already carries, so the backlog can be worked off without new ones slipping in. A file over its count fails; under it, lower the number here in the same commit. Deleting this file is the armed state. See common/rule-ownership.md.",
+  "files": {
+    "common/automated-checks.md": 5,
+    "common/coai-caller-model.md": 10,
+    "common/coai-document-gate.md": 9,
+    "common/coai-review-gate.md": 13,
+    "common/development-workflow.md": 4,
+    "common/durable-status.md": 1,
+    "common/generated-code-tests.md": 2,
+    "common/git-workflow.md": 1,
+    "common/gpu-lease.md": 5,
+    "common/http-contracts.md": 5,
+    "common/logging-serilog.md": 5,
+    "common/measurement.md": 2,
+    "common/planning-docs.md": 1,
+    "common/platform-limits.md": 3,
+    "common/post-deploy-checks.md": 2,
+    "common/pull-requests.md": 15,
+    "common/reliability.md": 29,
+    "common/reuse-first.md": 2,
+    "common/scenario-tests.md": 3,
+    "common/security.md": 1,
+    "common/subagent-models.md": 1,
+    "common/testing.md": 4,
+    "csharp/doctrine.md": 1,
+    "csharp/dotnet-build.md": 1,
+    "rust/doctrine.md": 2,
+    "typescript/doctrine.md": 2
+  }
+}
