@@ -165,7 +165,7 @@ holding the whole document hostage.
 
 - **A change that crosses a repository boundary is named in both repos' plans** — a plan that exists on
   only one side of a boundary is a plan the other side will contradict.
-- **Cross-repository citations are paths, not links** — `dew_flow_mcp · research/architecture.md:12` —
+- **Cross-repository citations are paths, not links** — `<other-repo> · research/architecture.md:12` —
   because a relative link that resolves only on one machine is worse than a citation that names its
   source. Findings that matter are **carried over** into the citing repo rather than linked, so nothing
   depends on a checkout that may not exist.

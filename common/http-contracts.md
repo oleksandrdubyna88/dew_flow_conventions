@@ -67,7 +67,7 @@ this"* and *"nobody thought about it"* — indistinguishable in a file that simp
 
 ```
 # @uncovered GET /api/rag/projects/{id}/index-state — it resolves a collection through the vector
-#            store, and the daemon deliberately refuses to guess one.
+#            store, and the server deliberately refuses to guess one.
 ```
 
 `http-coverage.mjs` then counts that route as **declared** rather than missing. This is what makes an
@@ -111,8 +111,8 @@ thing. Everything else runs against a stack you started yourself, where breaking
 ## Not every API is an HTTP API
 
 A tool surface served over stdio — an MCP server — has no requests to send, and gets no `.http` files.
-Its contract is the tool schema; it already has a detector (`--print-surface`) and its own rules for
-what counts as a breaking change, in `dew_flow_mcp`'s `VERSIONING.md`. Forcing this rule onto it would
+Its contract is the tool schema; a repository that serves one has its own detector (`--print-surface`)
+and its own `VERSIONING.md` saying what counts as a breaking change. Forcing this rule onto it would
 produce an empty folder and a checkbox nobody can ever tick.
 
 One repository can be both. HTTP routes get `http/`; the tool surface gets its fingerprint.
@@ -159,7 +159,7 @@ node .agents/conventions/tools/http-run.mjs --tag prod --target https://live.exa
 `--all` is passed for you and is not optional: without it httpyac can drop into an interactive region
 picker and hang a headless run forever. `--name` is silently ignored whenever `--all` is present, which
 is why `--tag` materialises a filtered tree rather than naming requests (both measured in the
-`ClaudeRag` spike).
+spike that preceded this rule).
 
 ### What the coverage check does NOT claim
 
@@ -168,8 +168,9 @@ written in anything else, and it cannot see one whose paths are computed rather 
 `http.createServer` with hand-rolled path parsing is invisible to it, whatever the verdict says.
 
 So *"26 of 26 covered"* is a statement about the surfaces the scanner can enumerate, never about every
-HTTP surface in a repository. Measured here: `dew_flow_creds_for_devs` serves TWO — the vault server
-in C#, and a broker inside its VS Code extension that a CLI and an MCP client talk to over loopback.
+HTTP surface in a repository. Measured here: one repository serves TWO — a credential
+store's server in C#, and a broker inside its VS Code extension that a CLI and an MCP client talk to
+over loopback.
 The armed check covers the first and is structurally blind to the second, which is covered instead by
 65 tests that start the real server and fetch it over real HTTP.
 

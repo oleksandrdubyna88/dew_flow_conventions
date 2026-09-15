@@ -290,6 +290,32 @@ test("a marker licences its own token and not every token containing it", (t) =>
   assert.match(out, /dew_flow_rag_qln/, "the declaration of another token does not cover this one");
 });
 
+test("a rule with Windows line endings is read like any other", () => {
+  // Found by the suite going red on a corpus nobody had edited. `core.autocrlf` rewrites these files
+  // on checkout, and the frontmatter pattern anchors on `\n` — so on a Windows working copy the
+  // downward-dependency half read NOTHING and reported `OK, no undeclared product references`. The
+  // same fixture passes on CI, where the checkout is LF, which is how it stayed invisible: a green
+  // check that never ran. All three parsers fold the line endings now.
+  const win = (text) => text.replaceAll("\n", "\r\n");
+  const rule = [
+    '---',
+    'id: "common.x"',
+    'load: "conditional"',
+    'tasks: ["policy"]',
+    'depends: ["local.thing"]',
+    '---',
+    '# X',
+    '',
+    'Measured in dew_flow_mcp today.',
+    '',
+  ].join("\n");
+
+  assert.deepEqual(downwardDependencies(win(rule)), ["local.thing"], "the dependency is still seen");
+  assert.equal(findingsIn(win(rule), "common/x.md").length, 1, "and so is the product reference");
+  assert.deepEqual(markersIn(win('<!-- owns: coai — a tool name a session must type -->\n# X\n')).tokens,
+    ["coai"], "and the marker still declares");
+});
+
 test("a downward dependency is caught however the sequence is written", () => {
   // The resolver parses frontmatter with a real YAML parser, so all three of these are legal and
   // mean the same thing. This tool has no YAML dependency on purpose — it runs before `npm ci` —

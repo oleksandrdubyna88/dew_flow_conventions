@@ -21,8 +21,8 @@ Both cases are already recorded in [testing.md](testing.md); this rule is what f
   capital letter, so the `env` verb had never worked from any client. There was a generated contract file
   and a test on each side asserting its own tables matched that file. Both green. Nothing had ever sent the
   request, and the first end-to-end run found it in seconds.
-- **A whole measurement series silently degraded.** The retrieval engine began emitting a new funnel stage;
-  the benchmark's contract refused a funnel it did not know, so every white-box measurement fell back to
+- **A whole measurement series silently degraded.** A retrieval engine began emitting a new funnel stage;
+  a measuring harness's contract refused a funnel it did not know, so every white-box measurement fell back to
   black-box for days. The live check that would have caught it on the day **already existed** — nobody had
   run it against a live counterpart.
 
@@ -34,10 +34,10 @@ is not enough: it has to be named, catalogued and run.
 1. **Every repository has a scenario harness.** Two legitimate homes, and the choice is about who is
    measured, not about size:
    - **Inside the repository** — a suite beside the unit tests (`tests/<Product>.Scenarios`, a `#[test]`
-     module driving the binary, a `src/test/` suite launching the extension host) that starts the product
+     module driving the binary, a `src/test/` suite launching an editor's extension host) that starts the product
      and uses it.
    - **A repository of its own** — the shape to take when the harness measures the product from *outside*
-     and must be able to measure other things too. `dew_flow_benchmark` is this family's example: it drives
+     and must be able to measure other things too. This family has one: it drives
      a retrieval engine over the engine's real surface, it is a git repository in its own right, and the
      product pins it as a submodule, so a product commit names the harness commit that exercised it. That
      pin is the point — a separate repository without one leaves two moving trees and no way to say which

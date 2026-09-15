@@ -704,3 +704,30 @@ quality gate failed on the first of them.
   guarantee out of the pattern, and can get it out of a loop that takes each line once. The comment in
   the code says which of those two things is true, because a note claiming a denial of service was
   fixed here would be a claim the measurement does not support.
+
+## Recording a body, and the bug that found itself (`tools/rule-bodies.mjs`)
+
+The freeze had one half. `rules.test.mjs` fails when a rule's body changes and `research/rule-bodies.json`
+does not, and the story that introduced it updated the manifest with an uncommitted scratch script — a
+procedure executable by its author and by nobody else. A plan reviewer called that Blocking, and was
+right: the alternative on offer was re-deriving sha256 over a body-after-frontmatter by hand, for 21
+files.
+
+`node tools/rule-bodies.mjs` verifies and names every drifted rule; `--update <id>…` records the ones you
+NAME. Seven cases, and the one that matters is *`--update` records the ids it was given, and only those*:
+two bodies are edited, one id is passed, and the other must still be drift afterwards. An `--all` flag
+would make the command that records a deliberate edit identical to the command that blesses an accidental
+one, which is the only property the freeze has. Proved red by breaking exactly that line — (`ids` taken
+from the manifest instead of from argv) — three cases went red, including the two that assert a bad id
+and a missing id write nothing.
+
+It also cross-checks the pass: asked to verify after the anonymisation, it named **21 drifted rules**, which
+is exactly the 21 files the pass was supposed to touch.
+
+**And then the suite went red on a corpus nobody had edited.** `a shared rule depending on a local id is
+refused` failed because `core.autocrlf` had rewritten the fixtures on checkout: the frontmatter pattern
+anchors on `\n`, so on a CRLF working copy `downwardDependencies` matched nothing and the tool reported
+`OK — no undeclared product references` for a rule that declares one. The same fixture passes on CI,
+where the checkout is LF, which is how it stayed invisible — a green check that never ran, on the machine
+somebody is actually editing on. All three parsers fold line endings now, the same way the resolver does,
+and the case asserts all three on CRLF input.

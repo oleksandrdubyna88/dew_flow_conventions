@@ -54,8 +54,8 @@ beats the response file.
 
 `settings/hooks/build-flags.mjs`, wired as a `PreToolUse` hook, refuses such a command and names the
 flag to add. **Its reach is narrower than it sounds:** only a Claude Code session, in a repository
-that copied the adapter. As of 2026-09-11 exactly one has — `dew_flow_connect_other_ais`, the only
-migrated consumer — so in the other five, and for Codex, a human at a terminal and CI anywhere,
+that copied the adapter. As of 2026-09-11 exactly one consumer has — the one that has migrated to
+`.agents/` — so everywhere else, and for Codex, a human at a terminal and CI anywhere,
 this rule has its own word and nothing more. `tools/adapter-check.mjs` names a repository whose copy is
 missing, drifted or unwired, so "not copied yet" stays visible instead of becoming "quietly never".
 

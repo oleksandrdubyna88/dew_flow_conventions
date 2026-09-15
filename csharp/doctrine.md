@@ -53,7 +53,7 @@ those suites build happens to send the field.
 So:
 
 1. **Normalise where the value is READ, not at one call site.** A guard at the endpoint moves the
-   dereference rather than removing it — `dew_flow_creds_for_devs` had the same field read by
+   dereference rather than removing it — one repository here had the same field read by
    `IsValid()`, by `PayloadBytes()` and by the stored entity. One property (`Kind =>
    string.IsNullOrWhiteSpace(EntityKind) ? "credential" : EntityKind`) fixes all three.
 2. **Treat it as a CLASS, not an instance.** `common/security.md` — *a measure applied at SOME of its

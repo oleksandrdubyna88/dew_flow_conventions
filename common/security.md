@@ -27,8 +27,8 @@ timeout kills the entire process tree** (`Process.Kill(entireProcessTree: true)`
 cancel/timeout path, before the launcher returns). This family clones and checks out repositories at
 operator-supplied urls, so an unescaped shell string is an injection surface, not a style issue; and
 a timeout that merely stops *waiting* leaves an orphan holding locks and handles — see
-[reliability.md](reliability.md). Reference implementation:
-`dew_flow_benchmark · src/Bench.Infrastructure/Process/ProcessRunner.cs`.
+[reliability.md](reliability.md). The shape that works is a single shared process launcher — one
+type every caller goes through, so the escaping and the kill path are written once.
 
 ## A measure applied at SOME of its sites is the defect this family keeps writing (MANDATORY)
 

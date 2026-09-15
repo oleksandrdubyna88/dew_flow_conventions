@@ -4,7 +4,7 @@
     {
       "id": "common.automated-checks",
       "source": "common/automated-checks.md",
-      "bodySha256": "cf2a152631ed411a98c98386240897c81961840f686d313af58238d47d5923d6",
+      "bodySha256": "ef861ad645ae7ca39da5a6daca3e7ac382227cea9d4963b92ca16c7d78ba9915",
       "sections": [
         "# Automated checks — what a reviewer, a scanner or a bot reports is work, down to zero (MANDATORY)",
         "## The rule",
@@ -60,7 +60,7 @@
     {
       "id": "common.development-workflow",
       "source": "common/development-workflow.md",
-      "bodySha256": "ba11ae1c42d9c468878e21105550950cfa0cd5de97b18a6b79560ae8df54aae9",
+      "bodySha256": "0899bba1225a98b56648992ab7496f107b0e90ff0db2cdc17b7ab5f96d224445",
       "sections": [
         "# Development Workflow",
         "## Verify the ARTEFACT, not the source (MANDATORY)",
@@ -75,7 +75,7 @@
     {
       "id": "common.durable-status",
       "source": "common/durable-status.md",
-      "bodySha256": "18c8b393564afded9f0540e900a8b8bf26e60b29279f5a025b44fbf55dd94102",
+      "bodySha256": "ed2d7d72351142db129bb3c89d3689e0e6b6f027aa9d103654299a2d036794ad",
       "sections": [
         "# Durable status for status-changing actions (MANDATORY)",
         "## Rules"
@@ -84,7 +84,7 @@
     {
       "id": "common.generated-code-tests",
       "source": "common/generated-code-tests.md",
-      "bodySha256": "52a2819506c79383a3e03e432c395f2074f79a9d1d702fb702c88deac9030be4",
+      "bodySha256": "2b3ae1a3e445d8485a86cc000a1d76ca251acf1014901117b400f6f5d28ce279",
       "sections": [
         "# Code you GENERATE is executed by the test, never string-matched (MANDATORY)",
         "## 1. If the artefact is executable, the test EXECUTES it",
@@ -98,7 +98,7 @@
     {
       "id": "common.git-workflow",
       "source": "common/git-workflow.md",
-      "bodySha256": "eeaba02bb654752861fccfcd881dab2a8f482e90f449f5a30ec4ccbb385b5b2c",
+      "bodySha256": "e845886b95a4b94146ee6cf562232f8a6ee5a46a62a2af703442466f4a8c18e0",
       "sections": [
         "# Git Workflow",
         "## Commit your OWN work, and only after it is verified (MANDATORY)",
@@ -139,7 +139,7 @@
     {
       "id": "common.http-contracts",
       "source": "common/http-contracts.md",
-      "bodySha256": "9f92e96733a5a75630a1b81d5572d92d148f3a792fa318b45a5f6170241d04bb",
+      "bodySha256": "8f5dc95ead17fb582d371d8ba5cfc329b62b8415b7a8f201fe190ad03e26fd80",
       "sections": [
         "# HTTP contracts — an `.http` file per route group, run before every release (MANDATORY)",
         "## Where the files live",
@@ -147,7 +147,7 @@
         "### Only what can reasonably be provoked over the wire",
         "# @uncovered 503 — reached only when the store is down; not provokable from a request",
         "# @uncovered GET /api/rag/projects/{id}/index-state — it resolves a collection through the vector",
-        "#            store, and the daemon deliberately refuses to guess one.",
+        "#            store, and the server deliberately refuses to guess one.",
         "### `# @prod` — the tag that means \"safe against something live\"",
         "# @name vault_get_returns_the_callers_blob",
         "# @prod",
@@ -171,7 +171,7 @@
     {
       "id": "common.logging-serilog",
       "source": "common/logging-serilog.md",
-      "bodySha256": "760c9b1b1b5d68d136f7ebf907f4157fb84ddb5d3c25f37f24cb5ee122c9574c",
+      "bodySha256": "578bcc14fa681d5c4913b2e23c1268bc39316fd67bc187f38448b5c1a11c505c",
       "sections": [
         "# Logging — Serilog, coloured to the console, and on disk per run (MANDATORY)",
         "## The rule",
@@ -192,7 +192,7 @@
     {
       "id": "common.measurement",
       "source": "common/measurement.md",
-      "bodySha256": "39e5c0d559c1cce66964acd900df436d90e5f67ec131c535af6742b49f83335f",
+      "bodySha256": "33748211363de1d1ec96fe1aecd72ef2ace81a9d47e77d907f9012ccb9c08089",
       "sections": [
         "# Measurement — a number you did not set up is a number about something else",
         "## 1. Pin everything you are NOT varying, then prove the arm actually differed (MANDATORY)",
@@ -208,7 +208,7 @@
     {
       "id": "common.planning-docs",
       "source": "common/planning-docs.md",
-      "bodySha256": "0b8be29ee452ad6e437ce4b710756edeb8d8fdf0487952c8ecd990658e7aed1b",
+      "bodySha256": "ce44a145f7e3e584039c314634797145cd20416493a94e08f34654155e0f1a20",
       "sections": [
         "# Planning Docs — `todo/` is open work, `research/` is documentation",
         "## Creating a plan",
@@ -227,7 +227,7 @@
     {
       "id": "common.platform-limits",
       "source": "common/platform-limits.md",
-      "bodySha256": "4f0a48cf856f2cbd2c48eed6035e66eaf5a94b9e78040d162b3baed132dce395",
+      "bodySha256": "9cef63d08dbfc15853a12baa571bf31b1e10de8f6148bd82a1eaf3fbac3622e0",
       "sections": [
         "# Platforms — the limits they impose, and the proof you ship for them (MANDATORY)",
         "## 1. A platform limit is the KERNEL's number, in the KERNEL's unit — and one adapter owns it",
@@ -241,7 +241,7 @@
     {
       "id": "common.post-deploy-checks",
       "source": "common/post-deploy-checks.md",
-      "bodySha256": "d582d264da8f74292491ca9728e1b185a05a56c1562dadcc4640d2b4668f4006",
+      "bodySha256": "922ff69a2681324adcf7bb0a300618121de1b1b2df8a216fbbd4e4b48544046e",
       "sections": [
         "# Post-deploy checks — the short list a green build cannot answer (MANDATORY)",
         "## Why a test cannot answer this",
@@ -260,7 +260,7 @@
     {
       "id": "common.pull-requests",
       "source": "common/pull-requests.md",
-      "bodySha256": "16e397c604916a990aafa186bf5170cb66a7464ac97082d046036b7a50ba67c5",
+      "bodySha256": "4df75f97bedf6ed9922a68ed989da15f1c75d1dd123aae3f9915ae962b8d18af",
       "sections": [
         "# Pull requests — `main` is closed; the reviewer's comments are work (MANDATORY)",
         "## The rule",
@@ -295,7 +295,7 @@
     {
       "id": "common.reuse-first",
       "source": "common/reuse-first.md",
-      "bodySha256": "27c62e437ee2fbae94d1cc8823ce3808c38288c6f67cbc36d28c86cc7b372634",
+      "bodySha256": "faa2296b8e5e6289e1bcafdca139dbb79bf5a8d16f94cdca5da2a7d26be4a5bc",
       "sections": [
         "# Reuse First — look before you build (MANDATORY)",
         "## The three questions, in order",
@@ -326,7 +326,7 @@
     {
       "id": "common.scenario-tests",
       "source": "common/scenario-tests.md",
-      "bodySha256": "31fee268e7b0f1bb16bd22edc11706f81dfd43fc936daa8173574eca36ee7ce5",
+      "bodySha256": "8b6fce1262af76dc96052826a513cf93a91d26e7b8847fc6b79aad206e7e8977",
       "sections": [
         "# Scenario tests — every repository has a harness of its own, and every flow is in it (MANDATORY)",
         "## Why this is mandatory",
@@ -340,7 +340,7 @@
     {
       "id": "common.security",
       "source": "common/security.md",
-      "bodySha256": "3033200d93eb53553fc481f2d81ddda1bfc987b5ff2c28f205ba17132c21a431",
+      "bodySha256": "3c584be355f936b4225d9d5d0f49dd356db96a65ab94beb000e8cbca39c8b1f0",
       "sections": [
         "# Security Guidelines",
         "## Mandatory checks before ANY commit",
@@ -358,7 +358,7 @@
     {
       "id": "common.subagent-models",
       "source": "common/subagent-models.md",
-      "bodySha256": "c27c12426e323ac9bcf7d8a7a05abb435d8cbdf5cb6f364b5ef595bc96d53815",
+      "bodySha256": "1b029d1e49bd4b11e4ee356bb47bac511da40ed68e2c2b75abd93538664338fb",
       "sections": [
         "# Which model a subagent runs on (MANDATORY)",
         "## The rule",
@@ -386,7 +386,7 @@
     {
       "id": "common.testing",
       "source": "common/testing.md",
-      "bodySha256": "3db8d673c0a7793b85622493a861a926e04c937712454acbb4c74a56f8a483fb",
+      "bodySha256": "f09c745c01ba8964f7f92d87c4f51dcbf2ae61f83b7e81bae00b513f5e502738",
       "sections": [
         "# Testing",
         "## Running tests — executables only, never `dotnet test` (MANDATORY)",
@@ -427,7 +427,7 @@
     {
       "id": "csharp.doctrine",
       "source": "csharp/doctrine.md",
-      "bodySha256": "a8e22cc8563b1f817f2fb8919b8a72bf74985f6e5da4230d5648164c31a4caf2",
+      "bodySha256": "d424d45885a6814f110365e8e2519506efdc94e14b8e20c3af1b8ef481a868d1",
       "sections": [
         "# C# doctrine — the family's code rules",
         "## 1. Language & runtime",
@@ -443,7 +443,7 @@
     {
       "id": "csharp.dotnet-build",
       "source": "csharp/dotnet-build.md",
-      "bodySha256": "177b642fdb96f5f596ec19134c0abb80288186a00aa723efeda3ed82fc6a9d5e",
+      "bodySha256": "c9dd2558427c5c018f7963599386caea24fd991405e45c737332e54762f5a1f5",
       "sections": [
         "# `dotnet build` — bound the worker pool, because several sessions build at once",
         "## 1. Every .NET repository carries `Directory.Build.rsp` at its root (MANDATORY)",
@@ -471,7 +471,7 @@
     {
       "id": "rust.doctrine",
       "source": "rust/doctrine.md",
-      "bodySha256": "f0d8374d20cc167e6c25fcbfcea364b63fdf723fe47d9fa17ab09ff091b3bf7a",
+      "bodySha256": "55da0d1916c8b9e1cf808d00eecd0bde74e601f4a56988cc368dec7f6380e9e8",
       "sections": [
         "# Rust doctrine — the family's code rules",
         "## 1. Toolchain & flavors",
@@ -488,7 +488,7 @@
     {
       "id": "typescript.doctrine",
       "source": "typescript/doctrine.md",
-      "bodySha256": "3251c5a5fb7ded69a4076513bb5b2322a05a823b7b956654c6dca8737b7364a0",
+      "bodySha256": "839db403405380ae81cac74cc430e1fb11e3488302504d60b932a64e9846d531",
       "sections": [
         "# TypeScript — the four traps that have actually cost us",
         "## 1. Never interpolate into a `<script>` element with `JSON.stringify` (MANDATORY)",

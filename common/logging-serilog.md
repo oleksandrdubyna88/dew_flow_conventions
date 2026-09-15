@@ -6,8 +6,8 @@ paths: ["**/Program.cs","**/main.rs"]
 ---
 # Logging — Serilog, coloured to the console, and on disk per run (MANDATORY)
 
-> **One copy, consumed everywhere.** This rule lives in `dew_flow_conventions` and reaches every
-> `dew_flow_*` repository through the `.agents/conventions` submodule. The per-repo mirror copies and
+> **One copy, consumed everywhere.** This rule lives in the conventions repository and reaches every
+> consumer through the conventions submodule. The per-repo mirror copies and
 > their checklist are gone — this file is the only one to edit, and an edit is followed by a pin bump in
 > every consumer in the same task.
 
@@ -115,10 +115,9 @@ handler chatter drowns the application's own story at Information.
 
 ### A CLI verb that builds a service container is a host
 
-The 2026-08-16 audit found the family's benchmark CLI registering `.AddLogging()` with zero
-providers plus a `NullLoggerFactory` in its live `run`/`judge` path
-(`dew_flow_benchmark · hosts/Cli/RunCommand.cs:204`) — while the repo's correct `AddDewFlowLogging`
-sat unused one project over. Every `LogWarning` about crash-recovery and failed metrics went
+The 2026-08-16 audit found a measuring harness's CLI registering `.AddLogging()` with zero
+providers plus a `NullLoggerFactory` in its live run path — while that repository's correct
+`AddDewFlowLogging` sat unused one project over. Every `LogWarning` about crash-recovery and failed metrics went
 nowhere, in the code path whose whole diagnosability budget this rule exists to protect. So: any
 code path that builds a `ServiceCollection`/host — a CLI verb included — wires the same two sinks
 as every other host. Code that *looks* instrumented and says nothing is worse than no logging,
@@ -172,19 +171,19 @@ builder.AddDewFlowLogging("daemon");
 
 ## Rust
 
-The sidecar has no Serilog; it has `tracing`, and the CONTRACT is what is shared, not the library:
+A Rust host has no Serilog; it has `tracing`, and the CONTRACT is what is shared, not the library:
 
 - an stdout layer **with** ANSI (`.with_ansi(true)`),
 - a file layer **without** ANSI, at the same `logs/{day}/{app}-{time}-{pid}.log` path,
 - the same midnight segment for a run that outlives the day,
 - level from `RUST_LOG`, defaulting to the same floor,
 - the same **retention owner**: prune day folders at startup, same 14-day default, best effort, logged.
-  Configuration is the crate's own — an env var (`SIDECAR_LOG_RETENTION_DAYS`) rather than a
-  `Serilog:RetentionDays` key — because the CONTRACT is the window and the owner, not the mechanism.
+  Configuration is Rust-side — an env var rather than a `Serilog:RetentionDays` key — because the
+  CONTRACT is the window and the owner, not the mechanism.
 
-The sidecar is the process this matters most for and was the last to get it: the orchestrator starts it
-once and it serves until the machine does not, so it is the host least likely to ever be restarted by
-anything but a reboot.
+A long-lived sidecar process is what this matters most for, and it was the last to get it: an
+orchestrator starts it once and it serves until the machine does not, so it is the host least likely
+to ever be restarted by anything but a reboot.
 
 ## Never
 

@@ -109,7 +109,7 @@ So the artefact you roll back to has to exist already:
 4. **The rollback is one command, written down where somebody will find it at two in the morning** —
    the repository's own release section, not a comment inside a workflow file.
 
-**Measured 2026-09-03 in `dew_flow_creds_for_devs`**, which had the first half right and the second
+**Measured 2026-09-03 in one repository here**, which had the first half right and the second
 half wrong. `deploy/update.sh --rollback` pulls a version-tagged image from the registry and never
 builds — correct, and the shape to copy. But it remembered exactly one previous image
 (`echo "$PREVIOUS" >"$STATE_FILE"`, overwriting), and a rollback did not record where it rolled back
@@ -118,9 +118,9 @@ releases in a row and the tool had nothing left to offer, on a host somebody dep
 same day the rule was written — the state file is now a trail of three that `--rollback` pops from,
 and a plain refresh cannot bury the real previous by pushing a duplicate of the current image.
 
-The extension half of the same repository is the pattern that works: every release attaches its
-`.vsix` to a GitHub release, so every version ever shipped is one download away and a rollback is
-installing a file rather than building one.
+A VS Code extension shipped from the same repository is the pattern that works: every release
+attaches its `.vsix` to a GitHub release, so every version ever shipped is one download away and a
+rollback is installing a file rather than building one.
 
 ## Self-hosted means somebody has to delete things — and it must be a script (MANDATORY)
 
@@ -153,7 +153,7 @@ maintained beside it, and the two cannot drift apart.
 5. **Prune AFTER the new thing is proven, never before.** A prune that runs before the health check
    deletes the artefact the rollback is about to need.
 
-**Measured 2026-09-03 in `dew_flow_creds_for_devs`'s `deploy/`, where two of three writers were
+**Measured 2026-09-03 in one repository's `deploy/` here, where two of three writers were
 already bounded and the third was not.** Container logs are capped (`max-size: 10m`, `max-file: 5` on
 every service). Backups are pruned by `backup-once.sh` — and it already carries rule 4 in as many
 words: *"NEVER let retention empty the destination. A clock skew, a paused server, or a destination
@@ -169,7 +169,7 @@ The rule above is about an artefact that was not rebuilt. This one is about an a
 built, published, and **never deployed** — and about the half of the system that then keeps running
 last week's code while your half assumes today's.
 
-Measured 2026-08-26. A vault server gained three features; the extension gained the client half of
+Measured 2026-08-26. A server gained three features; its client half gained the calls for
 them. Source committed, CI green, the container image built and published from that very commit.
 The running server was still on a build from the day before, because deployment is a separate
 manual dispatch that nobody had triggered. Everything reported success. Nothing had shipped.

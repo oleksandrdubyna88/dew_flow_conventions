@@ -17,7 +17,7 @@ tasks: ["implement","audit","test","release","deploy"]
 > retires the inventory merges these parts back rather than leaving two descriptions of one policy in
 > the resolver at once.
 >
-> Both halves come from one incident, measured 2026-09-12 in `dew_flow_creds_for_devs`: `creds` 0.1.6
+> Both halves come from one incident, measured 2026-09-12 in one repository here: a CLI at 0.1.6
 > failed **both** macOS legs of a four-product release on a unix socket path, after the other three
 > products had already published. Nothing here is hypothetical, and the existing rules would have
 > stopped none of it.
@@ -116,10 +116,10 @@ else drifts the first time somebody adds a binary, renames a component or moves 
 changes and the justification does not, and the rule still looks satisfied. In the same file, a reviewer
 reading the job reads why it covers what it covers, and the two are edited together or not at all.
 
-In the repository this came from, the mapping is: the three client components — the CLI, the MCP server,
-the broker client — run on `macos-latest` as well as Linux, because they are what touches the local
-operating system; the server and the vault run on Linux alone, because they ship as Linux containers and
-no macOS binary of them exists to protect.
+In the repository this came from, the mapping is: the three client components — a CLI, an MCP server
+and a broker client — run on `macos-latest` as well as Linux, because they are what touches the local
+operating system; the server and its credential store run on Linux alone, because they ship as Linux
+containers and no macOS binary of them exists to protect.
 
 Two traps, both met while fixing it:
 
