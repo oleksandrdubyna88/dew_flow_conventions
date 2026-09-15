@@ -42,17 +42,18 @@ and is not committed. Say in the summary what was added and what the runner prin
 > Previously titled "cross-repository". The trigger is not the repository boundary — it is that the
 > same names are written down twice. A second implementation inside one repository fails identically,
 > and reading this rule as being about repositories is how it was walked past on 2026-08-26: a new
-> .NET CLI in the same repo as the TypeScript broker, with a generated contract file and a test on
+> .NET CLI in the same repo as a TypeScript broker, with a generated contract file and a test on
 > each side asserting its own tables matched that file. Both green. Neither asserted that the binary
-> could reach the broker at all, and `/v1/use/exportEnv` had been unreachable in every released
+> could reach that broker at all, and `/v1/use/exportEnv` had been unreachable in every released
 > build — the route grammar rejected a capital letter, so the `env` verb had never worked from any
 > client. The first end-to-end run found it in seconds.
 
 Two repositories that agree on a wire or file format each hold a copy of the names. Two suites can be green
 while the contract is broken, because **each compares its own list against itself**.
 
-This is not hypothetical. The retrieval engine began emitting a `collapse` stage; the benchmark's contract
-defined seven names and refuses a funnel naming an eighth, so **every** white-box measurement silently
+This is not hypothetical. A retrieval engine began emitting a `collapse` stage; a measuring
+harness's contract defined seven names and refuses a funnel naming an eighth, so **every** white-box
+measurement silently
 degraded to black-box — days after the two lists had been reconciled by hand. Both suites stayed green
 throughout. The check on the emitting side compared a hand-typed array of seven names to seven literals; an
 added constant could not fail it.
@@ -65,8 +66,8 @@ So, for every contract that crosses a repository:
 2. **One live check compares the two sides for real**, against a running counterpart, and **fails on
    degradation** rather than accepting it. A consumer that falls back to a lesser mode "with a reason" is
    doing the right thing at run time and the wrong thing in a test.
-3. **Run that check.** The benchmark's live test already asserted exactly this and would have caught the
-   break on the day — nobody had run it against a live engine.
+3. **Run that check.** That harness's live test already asserted exactly this and would have caught the
+   break on the day — nobody had run it against a live counterpart.
 4. **Reconciling by hand is what failed.** Do not propose it as the fix.
 
 ## A fixture the code REJECTS proves nothing — and it proves it in green (MANDATORY)
@@ -345,10 +346,10 @@ A test name states what must be true — `First_position_is_balanced_across_the_
 not `Bug123Test`.
 
 Where a guard exists because a specific plausible approach was **measured and refuted**, reproduce that
-approach inside the test so the defect is visible in the suite rather than only in a commit message
-(`dew_flow_benchmark`'s `MatrixOrderTests.The_naive_per_repeat_rotation_would_deal_two_to_one_and_that_is_the_point`
-is the reference shape). A future reader who thinks the guard is over-engineering meets the reason
-immediately.
+approach inside the test so the defect is visible in the suite rather than only in a commit message.
+The shape to copy is a test NAMED for the refuted approach —
+`The_naive_per_repeat_rotation_would_deal_two_to_one_and_that_is_the_point` — so a future reader who
+thinks the guard is over-engineering meets the reason immediately.
 
 ## Architecture is a test, not a review comment
 

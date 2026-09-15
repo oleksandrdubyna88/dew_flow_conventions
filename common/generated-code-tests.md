@@ -15,7 +15,7 @@ tasks: ["implement","test","audit"]
 > that frozen section is not finished until this file has been reconciled with it, and whoever retires
 > the inventory merges this back rather than leaving two descriptions of one policy in the resolver.
 
-Measured 2026-09-12 in `dew_flow_creds_for_devs`. The extension's webviews are page scripts assembled as
+Measured 2026-09-12 in one repository here. A VS Code extension's webviews are page scripts assembled as
 template literals. Roughly four thousand tests asserted over the assembled string and every one was
 green — while a user-visible bug had shipped: one of three worked examples was painted without the CSS
 class every colour rule in the stylesheet is scoped under. No substring assertion can see that, because

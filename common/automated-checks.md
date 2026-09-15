@@ -23,8 +23,9 @@ tasks: ["audit","test","pr","release","policy"]
    answered where it was made — the thread, the issue's *resolve as false positive / won't fix* with a
    reason, the alert's dismissal with a reason — and that reason names the code or the rule.
 3. **When the fix would break the product, stop and ask.** If honouring a report would break this
-   family's logic — the trust boundary in the vault, the Native AOT constraint on the gate, the
-   run-tests-as-executables rule, a measured decision recorded in `research/` — or would leave the
+   family's logic — a credential store's trust boundary, a Native AOT constraint on a server that
+   ships as one binary, the run-tests-as-executables rule, a measured decision recorded in
+   `research/` — or would leave the
    application inoperable, the item is NOT fixed to make a number go down. It is put to the person,
    with the report, the code and the rule side by side, and the outcome is one of two things: the code
    changes because the person agreed, or **the rule changes** so that the report stops being raised —
@@ -70,7 +71,8 @@ the one forbidden move; it turns the machinery into decoration.
 
 ## Mirrors
 
-A shared rule, mounted through the `.agents/conventions` submodule. Repositories where these tools are
-on today: `dew_flow_connect_other_ais`, `dew_flow_conventions`, `dew_flow_creds_for_devs` (CodeRabbit,
-SonarCloud, GitHub security checks); every `dew_flow_*` repository (Dependabot alerts and automated
-security fixes, secret scanning where GitHub allows it).
+A shared rule, mounted through the conventions submodule, and it applies **wherever the behaviour it
+describes is true**: in every repository that has an automated reviewer, a static scanner or a
+security alert feed, for the tools that repository actually has. Which repositories mount this rule
+at all is listed in one place, [README.md](../README.md) — a list of which tools are on where would
+be a second inventory, maintained here, going stale the first time somebody enables one.

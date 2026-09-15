@@ -25,9 +25,8 @@ const page = `<script>var rows = ${JSON.stringify(rows)};</script>`;
 is a break-out the moment any value in `rows` contains `</script>`. The rest of the page's own
 program is then parsed as markup, and whatever followed the closing tag runs.
 
-**Use the repository's own escaper** — in `dew_flow_creds_for_devs` it is `jsonForScript` in
-`webviewHtml.ts`, which also closes `<!--`. Never a hand-rolled `.replace()` at the call site:
-that is how the second instance happened.
+**Use the repository's own escaper** — one function, named for the job, that also closes `<!--`.
+Never a hand-rolled `.replace()` at the call site: that is how the second instance happened.
 
 **Three instances, three different people, one of them shipped.** `webauthnPrf.ts` escaped by
 hand; `entityFormScript.ts` did not; `depPickerScript.ts` reintroduced it in new code written
@@ -59,8 +58,8 @@ const css = `
 ```
 
 Write the identifier plainly, or use single quotes. **A test that parses the generated page for
-every variant is the guard** — in the extension it is `webviewHtml.test.ts`, and it is what caught
-this the second time it happened.
+every variant is the guard** — a suite beside the escaper, and it is what caught this the second
+time it happened.
 
 ## 3. An `as` cast is a promise to maintain a shape by hand — and it comes due silently
 

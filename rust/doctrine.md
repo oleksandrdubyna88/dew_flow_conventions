@@ -5,8 +5,8 @@ paths: ["**/*.rs","**/Cargo.toml"]
 ---
 # Rust doctrine — the family's code rules
 
-The Rust mirror of [../csharp/doctrine.md](../csharp/doctrine.md). Written down from what
-`dew_flow_sidecar_rust` already practices; every rule below has a named precedent in that crate.
+The Rust mirror of [../csharp/doctrine.md](../csharp/doctrine.md). Written down from what the
+family's Rust crate already practices; every rule below has a precedent there.
 Where the two doctrines state the same idea, the idea is the rule and the language is the accent.
 
 ## 1. Toolchain & flavors
@@ -67,7 +67,7 @@ is .NET-specific).
 
 Comments state constraints, invariants and measured incidents — never restate the line below. A
 dependency pin, a deliberate non-default, a refused alternative each get the reason written where
-the decision sits (the crate's `Cargo.toml` is the reference: every pin explains itself).
+the decision sits: a `Cargo.toml` where every pin explains itself is the shape to copy.
 
 ## 9. Logging and numbers
 

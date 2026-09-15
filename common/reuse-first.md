@@ -63,15 +63,15 @@ Measured 2026-09-02/03 in one repository, in one day, by that product's own revi
 | the decision | right at | wrong at |
 |---|---|---|
 | refuse a request with no finding schema instead of sending `{}` | the callee, where it had just been fixed | the CALLER, which kept its own copy of the fallback |
-| normalise an endpoint to `/v1` | the panel's probe | the review launch — so the model list looked healthy and every round 404'd |
+| normalise an endpoint to `/v1` | a UI's probe | the launch path — so the model list looked healthy and every round 404'd |
 | the list of runtime names this build knows | the type, and the parser | a third place, the auth arm, which answered `0 reviewer(s)` while `providers` said healthy |
 
 Three of the nine defects that campaign found, and the pattern held for the two before it: a
 duplicate-reviewer-key crash from one runtime list in two places, and a surface-name check in three
 copies where adding a surface updated two.
 
-**And a review FINDING is a report of a shape, not of a site.** Measured 2026-09-03 in
-`dew_flow_creds_for_devs`. A code round found that a payment value could be copied for the entry a
+**And a review FINDING is a report of a shape, not of a site.** Measured 2026-09-03 in one
+repository here. A code round found that a payment value could be copied for the entry a
 REUSED viewer panel had just replaced, and quoted the file it had been reading. The fix landed there
 and was reported as done. The same shape — an `await` between reading the current entry and acting on
 it — sat on four more paths, routed eleven lines earlier and returning *before* that guard; one was

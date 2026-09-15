@@ -34,7 +34,7 @@ OBSERVED behaviour of the host, measured once, on the date below — it is evide
 and a host release may change it without telling anyone. That is the whole argument for the
 instruction this rule actually gives: pass the model explicitly, and the precedence stops mattering.
 
-Measured 2026-09-12 in `connect_other_ais`: the `feature-dev` plugin's `code-architect`,
+Measured 2026-09-12 in one repository here: the `feature-dev` plugin's `code-architect`,
 `code-explorer` and `code-reviewer` each carried `model: sonnet` in their frontmatter, across all
 seventeen cached versions of the plugin. Three architects therefore split a feature on Sonnet while
 the operator believed they were on Opus, and it surfaced only because they asked which models were

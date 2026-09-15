@@ -127,9 +127,20 @@ const BASELINE_PATH_MISSING = baselineIndex !== -1 && BASELINE_PATH === undefine
 const outsideFences = (text) =>
   text.replace(/^```[\s\S]*?^```/gm, "").replace(/`[^`\n]*`/g, "");
 
+/**
+ * Line endings folded, because every pattern here anchors on `\n`.
+ *
+ * `core.autocrlf` rewrites this corpus on checkout, so the same file is LF on CI and CRLF on a
+ * Windows working copy. The frontmatter pattern `^---\n` then matches nothing, and the
+ * downward-dependency half of this check reported `OK, no undeclared product references` for a rule
+ * that declared one — silently, and only on the machine somebody was actually editing it on. The
+ * resolver folds the same way, for the same reason.
+ */
+const folded = (text) => text.replaceAll("\r\n", "\n");
+
 /** Every `owns:` token declared in one file, and the markers that failed to declare anything. */
 export function markersIn(raw) {
-  const text = outsideFences(raw);
+  const text = outsideFences(folded(raw));
   const tokens = [];
   const malformed = [];
   for (const match of text.matchAll(MARKER)) {
@@ -146,8 +157,8 @@ export function markersIn(raw) {
 }
 
 /** Product references in one file, as `{ file, line, kind, token }`, markers already stripped. */
-export function findingsIn(text, file) {
-  const withoutMarkers = text.replace(MARKER, "");
+export function findingsIn(raw, file) {
+  const withoutMarkers = folded(raw).replace(MARKER, "");
   const lines = withoutMarkers.split("\n");
   const found = [];
   for (const [index, line] of lines.entries()) {
@@ -169,8 +180,8 @@ export function findingsIn(text, file) {
  * so it reads all three by hand. A reader of only the quoted flow form would pass two spellings of
  * the dependency that stops rule loading everywhere it is missing.
  */
-export function downwardDependencies(text) {
-  const frontmatter = /^---\n([\s\S]*?)\n---\n/.exec(text);
+export function downwardDependencies(raw) {
+  const frontmatter = /^---\n([\s\S]*?)\n---\n/.exec(folded(raw));
   if (frontmatter === null) return [];
 
   const flow = /^depends:[ \t]*\[([^\]]*)\]/m.exec(frontmatter[1]);

@@ -312,7 +312,7 @@ So:
 not agreement — a clean auto-merge can produce a document that is syntactically fine and semantically
 wrong. Nothing downstream complains, because the files this bites are the ones no test reads.
 
-Measured 2026-09-03 in `dew_flow_creds_for_devs`. Merging `main` into a release branch auto-merged
+Measured 2026-09-03 in one repository here. Merging `main` into a release branch auto-merged
 `CHANGELOG.md` with no conflict and put the other branch's version section **above the file's own
 preamble**, keeping that branch's heading style — unbracketed, where every other heading in the file
 is `## [x]`. The release workflow slices notes from `'## [' + version + ']'` to the next `'

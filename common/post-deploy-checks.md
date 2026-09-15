@@ -70,7 +70,7 @@ Last verified: 2026-09-03 · https://vault.example.com · 0.2.4
 
 | # | What a person loses if this is broken | Check | Auto |
 |---|---|---|---|
-| 1 | Nobody can sign in — the extension shows an empty Team with no error | `curl -fsS $TARGET/api/health` | auto |
+| 1 | Nobody can sign in — the client shows an empty list with no error | `curl -fsS $TARGET/api/health` | auto |
 | 2 | Everyone is on last week's build without knowing | `curl -fsS $TARGET/api/health \| jq -e '.version=="0.2.4"'` | auto |
 | 3 | … | … | manual |
 ```
@@ -125,7 +125,7 @@ accumulated in `todo/` under a rule that described exactly how to move them.
 Every item that **can** be a command **is** one, runnable against the live target: `curl`, a
 `# @prod`-tagged request from [http-contracts.md](http-contracts.md), a CLI invocation, a marketplace
 version query, an `unzip -p … | grep` for a symbol only the new build has. Items that genuinely need a
-person — open the editor, run the command, look at the panel — are marked `manual` and stay a handful.
+person — open the editor, run the command, read a screen — are marked `manual` and stay a handful.
 
 Where the repository already has HTTP requests, **the check reuses them** instead of restating them in
 curl: the prod-safe subset is exactly the `# @prod` tag, and the runner sends those. One artefact, two

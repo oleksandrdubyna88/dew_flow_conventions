@@ -27,7 +27,7 @@ because it dies on reload. The source of truth is **persisted server-side** and 
 4. **Never get stuck.** On failure, revert out of the in-flight status with the reason shown. Add a
    **startup sweep** that ends rows orphaned by a crash — and make it **ownership-checked**: a row is
    swept only when its recorded owner host/pid is actually dead, never merely because the host
-   restarted. (The reference implementation is `dew_flow_rag_qln`'s index passes: a distinct
+   restarted. (The shape that works, from a .NET indexing worker here: a distinct
    `Interrupted` terminal state for swept rows, owner columns on the row, progress counters that only
    grow so the UI never flickers backward.)
 5. **Long work is visible** in the operator's UI for its duration — a process nobody can see is a

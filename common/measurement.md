@@ -25,7 +25,7 @@ about a different question than the one in the heading. The fix was one pinned v
 
 So, before reading any result:
 
-- **Pin it in the harness, not in your head.** "I set that in the panel earlier" is not a pin.
+- **Pin it in the harness, not in your head.** "I set that in the UI earlier" is not a pin.
 - **Read back what was actually sent** — the composed prompt, the request body, the env block — for at
   least one cell per arm. An arm that did not differ produces a beautiful table of one condition
   measured twice.
@@ -93,7 +93,7 @@ you meant. When a reviewer — a model, a colleague, CI — makes a claim about 
 
 ## 6. A results document names its subject by sha, and its harness by path
 
-Six months on, "the local model was faster" is unusable and `2b7d3ab, coai-matrix.mjs, 2026-09-02` is
+Six months on, "the local model was faster" is unusable and `2b7d3ab, review-matrix.mjs, 2026-09-02` is
 reproducible. Name: the commit or input under test, the harness that ran it, the date, the pinned
 variables, and the machine when the machine matters (a GPU measurement is about that card).
 

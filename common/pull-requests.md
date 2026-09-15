@@ -16,27 +16,28 @@ tasks: ["git","pr","release"]
    **rebase** (linear history; each commit keeps the message it was written with) or by **squash** when
    a branch is a trail of fix-ups nobody should read. Merge commits are off.
 2. **The diff goes through the review gate BEFORE the pull request is opened.** Where the repository
-   has the `coai` gate ([coai-review-gate.md](coai-review-gate.md)), the change is not ready for a
-   pull request until `review_code` has run over its diff and every finding has been resolved —
-   accepted and fixed, or rejected with a reason. The gate is not a nicer code review; it is other
-   vendors' models reading the change without your context, and it is the one reader that has not
-   already agreed with you.
+   has a multi-vendor review gate ([coai-review-gate.md](coai-review-gate.md) is the one this family
+   runs), the change is not ready for a pull request until its code round has run over the diff and
+   every finding has been resolved — accepted and fixed, or rejected with a reason. A review gate is
+   not a nicer code review; it is other vendors' models reading the change without your context, and
+   it is the one reader that has not already agreed with you.
 
-   **The order is: plan → gate → implement → gate → pull request.** Opening the pull request first
-   and running the gate "later" is the same mistake as writing the test after the fix: by then the
-   diff is a thing you are defending rather than a thing you are checking. Measured here on
+   **The order is: plan → review → implement → review → pull request.** Opening the pull request
+   first and running that review "later" is the same mistake as writing the test after the fix: by then
+   the diff is a thing you are defending rather than a thing you are checking. Measured here on
    2026-09-05, and it is why this clause exists: an agent landed more than twenty pull requests in
    one session, every one of them through CI and an automated reviewer, and not one of them through
-   the gate that repository ships.
+   the review gate that repository ships.
 
-   A change with no diff to review — a documentation-only edit, a version bump, a workflow the gate
-   cannot run against — says so in the pull request description instead. "Not applicable" written
+   A change with no diff to review — a documentation-only edit, a version bump, a workflow a review
+   gate cannot run against — says so in the pull request description instead. "Not applicable" written
    down is a decision; silence is an omission.
 
 3. **A pull request is not done when it is opened.** After opening it, come back **about five minutes
    later** and read what arrived: the CI checks, and — where the repository has an automated reviewer
-   (CodeRabbit on `dew_flow_connect_other_ais`, `dew_flow_conventions`, `dew_flow_creds_for_devs`) —
-   its summary and every inline comment.
+   configured — its summary and every inline comment. Whether one is configured is a fact about that
+   repository's checks, visible on the pull request itself; a list of which repositories have one
+   would be an inventory maintained here and stale the first time somebody enabled another.
 4. **Verify a reviewer's comment before acting on it.** An automated reviewer is a colleague who has
    not run the code. For each comment, first establish whether it is **accurate** (does the code do
    what the comment says?) and **right** (does this repository's rule agree — `CLAUDE.md`,
@@ -112,8 +113,8 @@ gh pr merge --rebase --delete-branch        # or --squash for a fix-up trail
 
 ## Definition of Done
 
-- [ ] The diff went through the `coai` gate before the pull request was opened, and every finding was
-      resolved — or the description says why the gate does not apply to this change.
+- [ ] The diff went through the review gate before the pull request was opened, and every finding was
+      resolved — or the description says why a review gate does not apply to this change.
 - [ ] The change reached `main` through a pull request merged by rebase or squash.
 - [ ] Opening it left no more than three pull requests open on that repository — or the person agreed to
       the seventh, and the description says why.
@@ -126,6 +127,8 @@ gh pr merge --rebase --delete-branch        # or --squash for a fix-up trail
 
 ## Mirrors
 
-This is a shared rule; consumers mount it through the `.agents/conventions` submodule. Repositories
-with an automated reviewer today: `dew_flow_connect_other_ais`, `dew_flow_conventions`,
-`dew_flow_creds_for_devs`. Adding one to another repository is a one-line change to the list above.
+A shared rule, mounted through the conventions submodule, and it applies **wherever the behaviour it
+describes is true**: every clause about an automated reviewer applies in the repositories that have
+one, and says nothing in the ones that do not. Which repositories mount this rule at all is listed in
+one place, [README.md](../README.md). Enabling a reviewer somewhere new needs no edit here — which is
+the point, because an edit here is a commit in six repositories.
