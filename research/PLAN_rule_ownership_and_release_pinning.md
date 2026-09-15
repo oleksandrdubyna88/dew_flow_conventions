@@ -1,11 +1,51 @@
 # PLAN — a shared rule names no product, and a consumer follows a release
 
-> Status: **plan only, nothing implemented yet.** Scope: this repository's 27 rule bodies, its
-> `tools/pin-check.mjs` and frozen-evidence test, and one `.gitmodules` line plus one CI step in each
-> of the six consumers.
+> Status: **IMPLEMENTED, 2026-09-15**, except section 5 — *The two product manuals go home* — which
+> is extracted into [todo/PLAN_product_manuals_go_home.md](../todo/PLAN_product_manuals_go_home.md)
+> because its precondition is not met yet. Scope as built: this repository's 32 rule bodies, four new
+> tools, and one `.gitmodules` line plus one pin in each of the six consumers.
 >
 > Related docs: [README.md](../README.md), [ENTRY.md](../ENTRY.md), [ROLLOUT.md](../ROLLOUT.md),
-> [research/module_rules.md](../research/module_rules.md), [research/module_tests.md](../research/module_tests.md).
+> [module_rules.md](module_rules.md), [module_tests.md](module_tests.md).
+
+## What shipped, and where it differed from this plan
+
+Five stories, each through the review gate twice and merged on green:
+
+| | shipped |
+|---|---|
+| `release` as a ref a person moves | `tools/promote-release.mjs` (fail-closed: on main, `ci` green, forward only, no rewind input), the `workflow_dispatch` promotion, `tools/release-distance.mjs` as the compensating watch |
+| `pin-check` reads the ref its `.gitmodules` names | and reads the pin from `ls-tree`, because only the MODE distinguishes a gitlink; `rev-parse HEAD:<path>` resolved a directory to a tree sha and reported it as STALE with an impossible cure |
+| `common/rule-ownership.md` + `tools/ownership-check.mjs` | with a per-file ratchet, then armed |
+| the cleanup | 129 references, not the 53 this plan estimated |
+| the audit ledger | NOT in this plan: `research/reliability-audit-2026-08-16.json`, with `tools/audit-ledger.test.mjs` |
+| `tools/rule-bodies.mjs` | NOT in this plan: the freeze had no committed way to RECORD a body |
+| `tools/lib/rule-body.mjs` | NOT in this plan: three implementations of "what a rule's body is" had grown |
+
+**The count was wrong by a factor of two and a half.** This plan said 53 references in 19 files; the
+detector found **129 across 26 of 32 rules**. The estimate came from a hand count of repository names
+and missed two whole categories: `mcp__*__*` tool names (invisible to a word-bounded search, because
+`_` is a word character) and definite product nouns behind `the`/`its`/`our`.
+
+**The ratchet was not in this plan and became the mechanism the cleanup rode on.** A check that goes
+red on the day it lands teaches people to switch it off, so it landed allowing the backlog per FILE
+and refusing anything new. The budget being per file rather than repository-wide is what stops one
+branch spending the headroom another won; that it is a floor as well as a ceiling is what stops the
+ground won being quietly given back. Both came from review rounds.
+
+**Anonymisation alone would have failed the objection this policy has to face** — *anonymise in place,
+and a year later nobody can check the claim.* Hence the ledger: the story stays in the rule, the
+address is kept outside the corpus where nothing loads it as policy, and a test asserts the two stay
+in step in both directions.
+
+## The open tail
+
+Section 5 is the one part not built. It is not an oversight: its precondition is written into this
+plan, and half of it has now shipped on the product's side — the gate's server instructions and its
+`resolve` tool description now carry the COMMANDS block, reject-in-round-one and the enforced stop
+after `call_human`. What remains is the live-session verification, which needs an INSTALLED build, and
+then the reduction of the shared copies. It lives in
+[todo/PLAN_product_manuals_go_home.md](../todo/PLAN_product_manuals_go_home.md).
 
 ## The symptom, in the operator's words
 
