@@ -866,9 +866,22 @@ environment variable names, and the family's brand tokens. What it found:
 | `AddDewFlowLogging`, `<Repo>.ServiceDefaults`, `logs/{yyyy-MM-dd}/…` (`logging-serilog.md`) | stays — the family's own brand, which the rule names as its third declared kind: a contract every repository implements |
 | `SIDECAR_LOG_RETENTION_DAYS` | already generalised in S2.2 to "an env var rather than a `Serilog:RetentionDays` key" |
 
-Nothing else. No shared rule now carries a paragraph that is true of one product only, so the move half
-of the instruction has nothing left to move out of this repository. That claim is checkable against the
-list above rather than asserted.
+Nothing else of that KIND — no shared rule carries an address or an internal detail that the detector
+cannot see. That claim is checkable against the list above rather than asserted.
+
+**It is not the same as saying nothing is left to move, and the difference matters.** This audit asked
+whether a paragraph describes one product's internals while naming nothing. The plan asks something
+larger of two files (`todo/PLAN_rule_ownership_and_release_pinning.md` § 5, *The two product manuals go
+home*): `coai-review-gate.md` and `gpu-lease.md` are to be **split by body** — the obligation stays
+shared and vendor-neutral, while the PROTOCOL half (tool names, arguments, verdict words; the wrapper's
+flags, endpoint and discovery file) goes to the repository that serves it and already reaches a session
+through the product's own surfaces.
+
+That split is deliberately NOT done here, and its precondition is written into the plan: three things
+must ship on the product's shipping surfaces first — the COMMANDS block, the reject-in-round-one
+convergence argument, and the enforced stop after `call_human` — and be verified in a live session
+before the shared copy is reduced. The declarations this story adds are what those names need while
+they are still here; several of them leave with the protocol when that story runs.
 
 ### The residual a marker leaves, written down rather than discovered
 
