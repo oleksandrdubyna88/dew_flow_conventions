@@ -3,7 +3,7 @@ id: "common.coai-document-gate"
 load: "conditional"
 tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
 ---
-<!-- coai-document v1 -->
+<!-- coai-document v2 -->
 ## Reviewing a DOCUMENT rather than a change
 
 <!-- owns: coai — the MCP server this stage belongs to, named in its tool prefix -->

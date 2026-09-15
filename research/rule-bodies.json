@@ -17,7 +17,7 @@
     {
       "id": "common.coai-caller-model",
       "source": "common/coai-caller-model.md",
-      "bodySha256": "53b7975da6ec172387c158dcde94ccc47046b8be6f734aeb6501bae23f2bcd0d",
+      "bodySha256": "deeaf21c3353f496624c8fdf8f1e2292979bd94ef2f8d90a00d3c122fbdcb3cd",
       "sections": [
         "## Say which model you are when you open the review gate",
         "### Why you have to be asked",
@@ -28,7 +28,7 @@
     {
       "id": "common.coai-document-gate",
       "source": "common/coai-document-gate.md",
-      "bodySha256": "9242891b2ed8e84a19de8bdcfe1d6013f0542db2930a5e1c230e1a26022a6244",
+      "bodySha256": "e1c052e2844ad4fbda19168c544177680fe0c6bacd1477e928bc025a0c68a352",
       "sections": [
         "## Reviewing a DOCUMENT rather than a change",
         "## Definition of Done"
