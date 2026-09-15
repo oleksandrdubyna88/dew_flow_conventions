@@ -44,13 +44,26 @@ usual in two places:
    will open a pull request naming the new version, which is what makes this maintainable rather than
    a thing that rots. Check `.github/dependabot.yml` here and in each consumer.
 4. A check, because a rule nothing enforces decays quietly: a small `tools/action-pins-check.mjs` that
-   fails on any `uses:` with a non-sha ref, excluding local (`./`) and reusable-workflow references.
-   `--warn` first, per this repository's habit.
+   fails on any `uses:` with a non-sha ref. `--warn` first, per this repository's habit.
+
+   **Only a LOCAL `./` reference is excluded**, because it resolves inside the repository being
+   checked out and has no upstream to move. A **remote reusable workflow is not excluded**:
+   `owner/repo/.github/workflows/x.yml@main` is exactly the mutable pointer this task exists to
+   remove, and it runs with the calling workflow's permissions. It is pinned like anything else —
+   `owner/repo/.github/workflows/x.yml@<sha>  # v2.1.0`.
+
+   **`docker://` is pinned to a digest, not excluded**: `docker://alpine:3.19` is a mutable tag with
+   the same failure mode, so the check requires `docker://<image>@sha256:<digest>`. If a case appears
+   where that is genuinely impractical, it is an explicit allowlist entry with a reason, never a
+   silent hole in the pattern.
 
 ## Build order
 
-1. `tools/action-pins-check.mjs` + `tools/action-pins-check.test.mjs`, fixtures for: a tag, a sha, a
-   sha with a version comment, a local `./` reference, a `docker://` reference. Land with `--warn`.
+1. `tools/action-pins-check.mjs` + `tools/action-pins-check.test.mjs`, with a fixture per shape and
+   its expected verdict stated: a tag (REFUSED), a sha (passes), a sha with a version comment
+   (passes), a local `./` reference (skipped), a remote reusable workflow on a branch (REFUSED), the
+   same pinned to a sha (passes), `docker://image:tag` (REFUSED) and `docker://image@sha256:...`
+   (passes). Land with `--warn`.
 2. Pin this repository's five workflows; drop `--warn` here.
 3. Dependabot configuration, verified by watching it open one bump.
 4. Roll the check into the consumers' CI, `--warn` first, in the usual order with `rag_qln` last.
@@ -59,8 +72,11 @@ usual in two places:
 
 The check's teeth are the point: a fixture with a tagged action must go red, and mutation-checking it
 (accepting any ref) must turn exactly that fixture red and nothing else. Cover the shapes that must
-NOT fire — `./.github/actions/thing`, a reusable workflow `owner/repo/.github/workflows/x.yml@sha`,
-and a sha that already carries a comment.
+NOT fire — `./.github/actions/thing`, a reusable workflow already pinned as
+`owner/repo/.github/workflows/x.yml@<sha>`, and a sha that already carries a version comment — and,
+just as important, the near misses that MUST fire: the same reusable workflow on `@main`, and a
+`docker://` image on a tag. A check whose exclusions are wider than its rule is a check that passes
+the things it was written for.
 
 ## Risks
 
@@ -74,7 +90,8 @@ and a sha that already carries a comment.
 
 ## Definition of Done
 
-- [ ] No `uses:` anywhere in the family names a tag or a branch.
+- [ ] No `uses:` anywhere in the family names a tag or a branch — including remote reusable workflows
+      and `docker://` images, which are pinned by sha and digest respectively.
 - [ ] Every pin carries its version as a trailing comment.
 - [ ] `tools/action-pins-check.mjs` runs without `--warn` here and in all six consumers.
 - [ ] The policy for choosing and bumping a pin is written in `common/automated-checks.md`.

@@ -67,6 +67,13 @@ mutations already performed and recorded in `research/module_tests.md`:
 files in place and crashes leaves a broken repository), runs `node --test`, collects the failing test
 names, and diffs against `expect`.
 
+**It runs the UNMUTATED copy first and requires an empty failure set.** Without that baseline the whole
+comparison is unsound: a suite that is already red for an unrelated reason can have a failing name that
+happens to match what a mutation was expected to produce, and the harness then accepts a mutation for
+a reason that has nothing to do with the mutation. A non-empty baseline aborts before any mutation is
+applied and says which cases were already failing — that is a finding about the suite, not a reason to
+carry on and interpret noise.
+
 ## Build order
 
 1. `tools/mutate.mjs` + its own test, over a two-file fixture with a known-toothless test, so the
@@ -92,6 +99,7 @@ names, and diffs against `expect`.
 ## Definition of Done
 
 - [ ] `npm run mutate` exists, and fails when a recorded mutation reddens the wrong set of cases.
+- [ ] It runs the unmutated copy first and aborts on a non-empty baseline, naming what was already red.
 - [ ] Its own test proves it catches a deliberately toothless test.
 - [ ] Every mutation already recorded in prose is in `tools/mutants.json`.
 - [ ] A syntax-breaking mutation is reported as an error, never as a pass.
