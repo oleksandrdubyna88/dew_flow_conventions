@@ -136,6 +136,11 @@ form is nearly always a product reference and the indefinite form is always gene
   wherever it is true.
 - Never add a product-specific paragraph "because it is a good example".
 - Never make a shared rule `depends:` on a `local.*` id.
+- Never anonymise a name a session must TYPE. Measured 2026-09-15: applying this rule took
+  `review_code` out of the pull-request rule and left a review gate described rather than named,
+  and within the day other sessions stopped running one before opening a pull request. The
+  one-second test has a second half for exactly this — if the sentence stops being EXECUTABLE, the
+  anonymisation is wrong, and the name is a declaration rather than an address.
 - Never add an `owns:` marker to avoid a rewrite. It is for a name that cannot be generalised, not for
   one you did not feel like generalising.
 
