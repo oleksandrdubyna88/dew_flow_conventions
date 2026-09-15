@@ -2,6 +2,7 @@
 
 | Document | What exists |
 |---|---|
+| [PLAN_rule_ownership_and_release_pinning.md](PLAN_rule_ownership_and_release_pinning.md) | IMPLEMENTED 2026-09-15 — a shared rule names no product and a consumer follows a `release` ref: the governance rule, its armed check, 129 references anonymised or declared, the audit ledger, and the pin mechanism that stops one commit here reddening six repositories. Its section 5 is extracted to `todo/PLAN_product_manuals_go_home.md` |
 | [PLAN_shared_rules_rollout_tooling.md](PLAN_shared_rules_rollout_tooling.md) | IMPLEMENTED: S2 migration, bounded native smoke, explicit failure evidence and reviewed deviations |
 | [PLAN_dotnet_build_node_reuse.md](PLAN_dotnet_build_node_reuse.md) | IMPLEMENTED: the MSBuild worker pool bounded — the rule, the PreToolUse guard, both checks, and the six-consumer rollout |
 | [architecture.md](architecture.md) | Shared rule delivery and its current boundaries |
