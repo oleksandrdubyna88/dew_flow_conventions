@@ -3,6 +3,9 @@ id: "common.coai-review-gate"
 load: "conditional"
 tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
 ---
+<!-- coai-snippet v5 -->
+## Multi-model review gate (ConnectOtherAIs)
+
 <!-- A token is matched EXACTLY, so `coai` does not cover `mcp__coai__open`: every tool name below
      is its own decision, spelled in full, and visible as its own line in the diff. -->
 <!-- owns: coai — the MCP server's own name, and the prefix of every tool below -->
@@ -14,8 +17,6 @@ tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy",
 <!-- owns: mcp__coai__resolve — a tool name a session types; there is no generic spelling of it -->
 <!-- owns: mcp__coai__status — a tool name a session types; there is no generic spelling of it -->
 <!-- owns: mcp__coai__ask_human — a tool name a session types; there is no generic spelling of it -->
-<!-- coai-snippet v5 -->
-## Multi-model review gate (ConnectOtherAIs)
 
 This repository is reviewed by OTHER vendors' models before and after implementation, through the
 `coai` MCP server.

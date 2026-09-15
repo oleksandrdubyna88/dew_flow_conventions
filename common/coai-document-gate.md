@@ -3,11 +3,12 @@ id: "common.coai-document-gate"
 load: "conditional"
 tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
 ---
+<!-- coai-document v1 -->
+## Reviewing a DOCUMENT rather than a change
+
 <!-- owns: coai — the MCP server this stage belongs to, named in its tool prefix -->
 <!-- owns: ConnectOtherAIs — the product that serves the document stage, as its panel names it -->
 <!-- owns: mcp__coai__review_document — a tool name a session types; there is no generic spelling of it -->
-<!-- coai-document v1 -->
-## Reviewing a DOCUMENT rather than a change
 
 > **This extends [coai-review-gate.md](coai-review-gate.md), and it is a separate file because that
 > one is frozen.** `tools/rules.test.mjs` hashes all 24 migrated rule bodies against baseline
