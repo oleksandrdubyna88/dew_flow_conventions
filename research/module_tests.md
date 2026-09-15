@@ -791,3 +791,36 @@ is refused with the two shapes this CLI has. And the test helper that replaced a
 on the OPENING `---`, so every edited fixture lost its frontmatter entirely and the freeze was being
 exercised against a file shape that cannot exist. There is now a case asserting that metadata is not
 part of what gets hashed.
+
+## The audit ledger (`tools/audit-ledger.test.mjs`)
+
+`common/reliability.md` was 29 of the 68 references left in the corpus, and the only rule BUILT out of
+citations: written from a four-repository audit on 2026-08-16, with a header instructing the reader to
+cite `repo · path:line` for every finding. Anonymising the body and leaving that header would have
+produced a rule whose own instructions restore what the rewrite removed.
+
+A plan reviewer raised the objection this whole policy has to answer, as Blocking: anonymise in place,
+and a year later nobody can check the claim. `research/reliability-audit-2026-08-16.json` is the answer
+— 23 findings, each with the address it had, the evidence, what it cost, the date, and the sentence
+that replaced it — and it sits OUTSIDE the rule corpus on purpose: nothing loads it as policy, so nobody
+edits it when a product is renamed, which is the property being protected.
+
+Five cases keep it honest, and both directions were observed red before they were relied on: rewording
+a finding without touching the ledger, and putting a repository name back into the rule. The second
+half is checked with `findingsIn` — the same detector the whole corpus is checked with — so the two
+cannot disagree about what a product reference is.
+
+**What the code round added.** The linkage check required `now` to appear; it now requires it to appear
+**exactly once**, because a sentence reused under a second requirement would otherwise let one
+finding's address and cost describe a claim it was never about. It also accepted an empty `now`, which
+matches every rule ever written. And the identity check tested for duplicate ids but not for absence,
+so deleting an entry left the suite green while the evidence for one finding was gone — in the file
+whose only job is that it survives. The id set is now asserted to be exactly R-01 to R-23, in order.
+
+Both sides are whitespace-collapsed before comparison. The entries carry the line breaks they were
+copied with, which matches today and would stop matching the first time somebody reflowed a paragraph
+around a sentence that is still there. A reviewer predicted that failure was already happening; it was
+not — the suite was green — but the fragility was real and is gone.
+
+The test then caught three of this story's own edits: making three sentences imperative moved them out
+from under their ledger entries, and the suite said so before the commit.

@@ -5,7 +5,10 @@
   "findings": [
     {
       "id": "R-01",
-      "was": ["dew_flow_rag_qln · src/Rag.Infrastructure/RagInfrastructureExtensions.cs:152", "dew_flow_sidecar_rust · src/main.rs:1470"],
+      "was": [
+        "dew_flow_rag_qln · src/Rag.Infrastructure/RagInfrastructureExtensions.cs:152",
+        "dew_flow_sidecar_rust · src/main.rs:1470"
+      ],
       "evidence": "An infinite HTTP timeout from the indexing host into the inference sidecar, composed with the sidecar's engine mutex: one wedged inference blocks every pass forever, and /health cannot tell.",
       "cost": "every pass blocked, indefinitely, with no signal",
       "date": "2026-08-16",
@@ -13,7 +16,9 @@
     },
     {
       "id": "R-02",
-      "was": ["dew_flow_sidecar_rust · src/main.rs:1127"],
+      "was": [
+        "dew_flow_sidecar_rust · src/main.rs:1127"
+      ],
       "evidence": "A blocking lock taken directly on an async worker thread, in /unload — the recovery tool itself could starve the server that needed recovering.",
       "cost": "the recovery path could deadlock the thing it recovers",
       "date": "2026-08-16",
@@ -21,15 +26,19 @@
     },
     {
       "id": "R-03",
-      "was": ["dew_flow_benchmark · src/Bench.Infrastructure/Process/ProcessRunner.cs"],
+      "was": [
+        "dew_flow_benchmark · src/Bench.Infrastructure/Process/ProcessRunner.cs"
+      ],
       "evidence": "The reference process launcher: a linked token, a tree-kill, and a typed outcome.",
       "cost": "reference implementation, not a violation",
       "date": "2026-08-16",
-      "now": "one shared launcher with a linked\ntoken, a tree-kill and a typed outcome"
+      "now": "Use ONE shared launcher, with a linked token, a tree-kill and a typed outcome."
     },
     {
       "id": "R-04",
-      "was": ["dew_flow_rag_qln · src/Rag.Infrastructure/Processes/ProcessRunner.cs:61"],
+      "was": [
+        "dew_flow_rag_qln · src/Rag.Infrastructure/Processes/ProcessRunner.cs:61"
+      ],
       "evidence": "A second process launcher whose WaitForExitAsync threw on timeout while the child lived on, on a probe that runs every five minutes forever.",
       "cost": "an orphan process every five minutes, holding locks and handles",
       "date": "2026-08-16",
@@ -37,7 +46,9 @@
     },
     {
       "id": "R-05",
-      "was": ["dew_flow_rag_qln · src/Rag.Application/Indexing/IndexPassWorker.cs:53"],
+      "was": [
+        "dew_flow_rag_qln · src/Rag.Application/Indexing/IndexPassWorker.cs:53"
+      ],
       "evidence": "CreateAsyncScope()/GetRequiredService<T>() resolved ABOVE the try, so a resolution failure escaped ExecuteAsync and the .NET default (BackgroundServiceExceptionBehavior.StopHost) stopped the whole host.",
       "cost": "the whole host stops, from one failed service resolution",
       "date": "2026-08-16",
@@ -45,7 +56,9 @@
     },
     {
       "id": "R-06",
-      "was": ["dew_flow_mcp · src/Mcp.Telemetry/SpoolUsageSink.cs:59"],
+      "was": [
+        "dew_flow_mcp · src/Mcp.Telemetry/SpoolUsageSink.cs:59"
+      ],
       "evidence": "A detached drain loop catching two exception types; everything else killed it silently for the life of the process while the host looked healthy.",
       "cost": "the writer dies with no line in the log, for the life of the process",
       "date": "2026-08-16",
@@ -53,7 +66,9 @@
     },
     {
       "id": "R-07",
-      "was": ["dew_flow_benchmark · hosts/Cli/RunCommand.cs:142"],
+      "was": [
+        "dew_flow_benchmark · hosts/Cli/RunCommand.cs:142"
+      ],
       "evidence": "A loop exiting on Reason.Contains(\"no pending cell\") — a message substring — and a lost claim race retrying in a zero-delay spin.",
       "cost": "a renamed message ends the campaign; a lost race burns a core",
       "date": "2026-08-16",
@@ -61,7 +76,9 @@
     },
     {
       "id": "R-08",
-      "was": ["dew_flow_benchmark · hosts/Cli/RunCommand.cs:133"],
+      "was": [
+        "dew_flow_benchmark · hosts/Cli/RunCommand.cs:133"
+      ],
       "evidence": "No per-unit try/catch in the drain loop: one transient NpgsqlException killed the process and every pending cell.",
       "cost": "leg 3,001 fails and takes the remaining 7,000 with it",
       "date": "2026-08-16",
@@ -69,7 +86,9 @@
     },
     {
       "id": "R-09",
-      "was": ["dew_flow_benchmark · PostgresRunStore.SweepAsync"],
+      "was": [
+        "dew_flow_benchmark · PostgresRunStore.SweepAsync"
+      ],
       "evidence": "A crash-recovery sweep fully implemented, fully tested, and called by nothing — unreachable outside its own tests, so a killed run's claimed cells were stranded forever.",
       "cost": "every killed run strands its claimed cells, permanently",
       "date": "2026-08-16",
@@ -77,15 +96,19 @@
     },
     {
       "id": "R-10",
-      "was": ["dew_flow_rag_qln · IndexPassWorker"],
+      "was": [
+        "dew_flow_rag_qln · IndexPassWorker"
+      ],
       "evidence": "The reference: an ownership-checked sweep run as the first thing in ExecuteAsync.",
       "cost": "reference implementation, not a violation",
       "date": "2026-08-16",
-      "now": "a worker that runs its ownership-checked sweep as the first\n  thing in `ExecuteAsync`"
+      "now": "Run the ownership-checked sweep as the first thing in `ExecuteAsync`."
     },
     {
       "id": "R-11",
-      "was": ["dew_flow_rag_qln"],
+      "was": [
+        "dew_flow_rag_qln"
+      ],
       "evidence": "A 4-second sidecar probe timing out escaped a `when (ex is not OperationCanceledException)` filter, escaped the endpoint, and Kestrel answered 500 — six times in one day, on the operator's status page. The same repository held twelve copies of that filter.",
       "cost": "six 500s in one day; twelve copies of the same trap",
       "date": "2026-08-16",
@@ -93,7 +116,9 @@
     },
     {
       "id": "R-12",
-      "was": ["dew_flow_benchmark · src/Bench.Infrastructure/Models/OpenAiCompatibleRuntime.cs:73"],
+      "was": [
+        "dew_flow_benchmark · src/Bench.Infrastructure/Models/OpenAiCompatibleRuntime.cs:73"
+      ],
       "evidence": "The reference filter: catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) — filtering on the token's state rather than the exception's type.",
       "cost": "reference implementation, not a violation",
       "date": "2026-08-16",
@@ -101,7 +126,9 @@
     },
     {
       "id": "R-13",
-      "was": ["dew_flow_benchmark"],
+      "was": [
+        "dew_flow_benchmark"
+      ],
       "evidence": "Zero signal handling in a CLI: every orchestrator stop had the same effect as a crash.",
       "cost": "a planned stop strands the run exactly as a crash does",
       "date": "2026-08-16",
@@ -109,7 +136,9 @@
     },
     {
       "id": "R-14",
-      "was": ["dew_flow_creds_for_devs"],
+      "was": [
+        "dew_flow_creds_for_devs"
+      ],
       "evidence": "A plan coordinating two VS Code windows through a lease key in shared globalState, with write-then-read-back to settle a tie. Three vendors returned the same Blocking finding independently: the store's update is asynchronous and a foreign write arrives with no ordering against a local read, so both windows read empty, both write, and each re-reads its own value.",
       "cost": "two holders enter; the plan itself said the store has no CAS one paragraph above",
       "date": "2026-09-03",
@@ -117,7 +146,10 @@
     },
     {
       "id": "R-15",
-      "was": ["dew_flow_rag_qln · SpeedWindow", "dew_flow_sidecar_rust · RungCache"],
+      "was": [
+        "dew_flow_rag_qln · SpeedWindow",
+        "dew_flow_sidecar_rust · RungCache"
+      ],
       "evidence": "The references for bounded memory: a capped ring buffer for a rolling window, an LRU for a cache.",
       "cost": "reference implementations, not violations",
       "date": "2026-08-16",
@@ -125,7 +157,10 @@
     },
     {
       "id": "R-16",
-      "was": ["dew_flow_benchmark · LiveTrace._byLeg", "dew_flow_benchmark · GitCheckoutProvider._locks"],
+      "was": [
+        "dew_flow_benchmark · LiveTrace._byLeg",
+        "dew_flow_benchmark · GitCheckoutProvider._locks"
+      ],
       "evidence": "Two dictionaries that GetOrAdd forever and remove never — a per-leg trace and a checkout lock table. Both latent on the audit date; live the day a long-running worker lands.",
       "cost": "unbounded growth, latent",
       "date": "2026-08-16",
@@ -133,15 +168,19 @@
     },
     {
       "id": "R-17",
-      "was": ["dew_flow_rag_qln · SizeHistoryStore"],
+      "was": [
+        "dew_flow_rag_qln · SizeHistoryStore"
+      ],
       "evidence": "The reference retention policy: a 7-day raw window with an hourly rollup.",
       "cost": "reference implementation, not a violation",
       "date": "2026-08-16",
-      "now": "a 7-day raw window with an hourly rollup"
+      "now": "a 7-day raw window with an hourly rollup is the shape to copy"
     },
     {
       "id": "R-18",
-      "was": ["dew_flow_rag_qln · index_passes"],
+      "was": [
+        "dew_flow_rag_qln · index_passes"
+      ],
       "evidence": "An append-only table with one row per index pass and no retention: deleted never.",
       "cost": "unbounded table growth",
       "date": "2026-08-16",
@@ -149,7 +188,9 @@
     },
     {
       "id": "R-19",
-      "was": ["dew_flow_rag_qln · PlatformExtensions.cs:12"],
+      "was": [
+        "dew_flow_rag_qln · PlatformExtensions.cs:12"
+      ],
       "evidence": "EnableRetryOnFailure not enabled: a one-second Postgres blip failed a whole indexing pass.",
       "cost": "a one-second blip costs a whole pass",
       "date": "2026-08-16",
@@ -157,7 +198,9 @@
     },
     {
       "id": "R-20",
-      "was": ["dew_flow_benchmark · OpenAiCompatibleRuntime"],
+      "was": [
+        "dew_flow_benchmark · OpenAiCompatibleRuntime"
+      ],
       "evidence": "A model runtime with a 10-minute default wall timeout and no consecutive-failure circuit breaker, so a dead endpoint burned the wall per leg for every remaining leg.",
       "cost": "10 minutes per leg, for every remaining leg, against a dead endpoint",
       "date": "2026-08-16",
@@ -165,7 +208,9 @@
     },
     {
       "id": "R-21",
-      "was": ["dew_flow_mcp · McpApiEndpoints.cs:12"],
+      "was": [
+        "dew_flow_mcp · McpApiEndpoints.cs:12"
+      ],
       "evidence": "/health returning \"ok\" unconditionally, so an orchestrator could not see the dead spool writer behind it.",
       "cost": "a dead writer behind a healthy probe",
       "date": "2026-08-16",
@@ -173,7 +218,9 @@
     },
     {
       "id": "R-22",
-      "was": ["dew_flow_sidecar_rust · src/main.rs:1042"],
+      "was": [
+        "dew_flow_sidecar_rust · src/main.rs:1042"
+      ],
       "evidence": "The first /health call SHA-256-hashed every provider library beside the executable — blocking work on the probe path.",
       "cost": "gigabytes hashed inline on a liveness probe",
       "date": "2026-08-16",
@@ -181,7 +228,9 @@
     },
     {
       "id": "R-23",
-      "was": ["dew_flow_mcp · SandboxedFileReader.cs:41"],
+      "was": [
+        "dew_flow_mcp · SandboxedFileReader.cs:41"
+      ],
       "evidence": "startLine + lineCount overflowed int into an unhandled exception any client could trigger with one call.",
       "cost": "an unhandled exception from one client call",
       "date": "2026-08-16",

@@ -26,13 +26,36 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ledger = JSON.parse(fs.readFileSync(path.join(root, "research/reliability-audit-2026-08-16.json"), "utf8"));
 const rule = folded(fs.readFileSync(path.join(root, ledger.rule), "utf8"));
 
-test("every ledger entry points at a sentence that is actually in the rule", () => {
+/**
+ * Whitespace collapsed, so a re-wrap of the prose is not a false report of drift.
+ *
+ * The entries carry the line breaks they were copied with, which matches today and would stop
+ * matching the first time somebody reflowed a paragraph around a sentence that is still there.
+ */
+const flat = (text) => text.replace(/\s+/g, " ").trim();
+const flatRule = flat(rule);
+
+test("every ledger entry points at a sentence that is actually in the rule, exactly once", () => {
   // The half that rots first. An editor who rewords a finding without touching the ledger leaves a
   // record that describes a rule which no longer exists, and nothing would say so.
+  //
+  // Once, not at least once: a sentence that turns up under a second requirement would otherwise let
+  // one finding's address and cost describe a claim it was never about.
   for (const finding of ledger.findings) {
-    assert.ok(rule.includes(finding.now),
-      `${finding.id}: its "now" text is not in ${ledger.rule} — reword the ledger in the same commit`);
+    assert.ok(typeof finding.now === "string" && finding.now.trim().length > 0,
+      `${finding.id}: an empty "now" matches every rule ever written`);
+    const occurrences = flatRule.split(flat(finding.now)).length - 1;
+    assert.equal(occurrences, 1,
+      `${finding.id}: its "now" text appears ${occurrences} time(s) in ${ledger.rule} — it must appear exactly once`);
   }
+});
+
+test("the audit is whole: every finding it recorded is still in the ledger", () => {
+  // Duplicate ids were checked and absence was not, so deleting an entry left the suite green while
+  // the evidence for one finding was gone — in the file whose only job is that it survives.
+  const expected = Array.from({ length: 23 }, (_, index) => `R-${String(index + 1).padStart(2, "0")}`);
+  assert.deepEqual(ledger.findings.map((finding) => finding.id), expected,
+    "the ledger holds R-01 to R-23, in order — a finding is not removed or renumbered");
 });
 
 test("every entry keeps what makes the evidence checkable", () => {
@@ -45,7 +68,7 @@ test("every entry keeps what makes the evidence checkable", () => {
     assert.ok(Array.isArray(finding.was) && finding.was.length > 0,
       `${finding.id}: the address it had is the whole point of this file`);
     for (const address of finding.was) {
-      assert.match(address, /^dew_flow_[a-z_]+( · .+)?$/,
+      assert.match(address, /^dew_flow_[a-z0-9_]+( · .+)?$/,
         `${finding.id}: an address names the repository it was in`);
     }
     assert.ok(finding.evidence.split(" ").length >= 8, `${finding.id}: evidence, not a label`);
