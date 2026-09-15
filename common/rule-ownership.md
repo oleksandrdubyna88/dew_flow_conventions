@@ -146,5 +146,6 @@ form is nearly always a product reference and the indefinite form is always gene
 - [ ] Anything that failed the test moved to the owning repository, in the same task.
 - [ ] No shared rule `depends:` on a `local.*` id.
 - [ ] Every surviving product name carries an `<!-- owns: … — why -->` marker in its own file.
-- [ ] `node tools/ownership-check.mjs` passes. It is ARMED — there is no allowance and no backlog,
-      so a single undeclared name fails the build.
+- [ ] `node tools/ownership-check.mjs` passes, and there is no `tools/ownership-baseline.json`.
+      That absence IS the armed state: no allowance, no backlog, and one undeclared name fails the
+      build. A checklist that only said the command passes would be satisfied by both states.

@@ -3,6 +3,8 @@ id: "common.coai-review-gate"
 load: "conditional"
 tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
 ---
+<!-- A token is matched EXACTLY, so `coai` does not cover `mcp__coai__open`: every tool name below
+     is its own decision, spelled in full, and visible as its own line in the diff. -->
 <!-- owns: coai — the MCP server's own name, and the prefix of every tool below -->
 <!-- owns: ConnectOtherAIs — the product that serves this gate; a session reads its panel by that name -->
 <!-- owns: mcp__coai__providers — a tool name a session types; there is no generic spelling of it -->

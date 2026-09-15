@@ -869,3 +869,23 @@ environment variable names, and the family's brand tokens. What it found:
 Nothing else. No shared rule now carries a paragraph that is true of one product only, so the move half
 of the instruction has nothing left to move out of this repository. That claim is checkable against the
 list above rather than asserted.
+
+### The residual a marker leaves, written down rather than discovered
+
+A marker licenses its token in the FILE that carries it — that is the mechanism's documented shape, and
+it is what stops one declaration anywhere from licensing a name everywhere. It also means the `coai`
+marker in `pull-requests.md`, which exists only because that rule links `coai-review-gate.md`, would
+cover a product-specific `coai` sentence somebody adds to the same file later.
+
+A reviewer raised it and it is real. Occurrence-scoped declarations would close it and cost more than
+they are worth: a marker beside every mention, in a policy file six repositories load. So the residual
+stands, with the two things that cost nothing — the marker's reason says what it is for and what it
+is not ("only the file name this rule links to; no product sentence belongs in here"), and it is
+recorded here so the next person meets it as a known limit.
+
+**A correction to the record.** In the previous story's round I rejected a citation of
+`.agents/PROJECT.md` on the ground that the file does not exist here. It does — twenty lines, added
+in 026b20e. The rejection's conclusion survives on the correct ground: its sentence "do not fold the
+unrelated product-audit backlog into a rule-delivery change" names
+`todo/REVIEW_product_audit_2026-09-09.md`, findings about the PRODUCTS, and not an audit of this
+repository's own corpus.
