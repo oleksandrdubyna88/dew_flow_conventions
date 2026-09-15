@@ -37,7 +37,7 @@
     {
       "id": "common.coai-review-gate",
       "source": "common/coai-review-gate.md",
-      "bodySha256": "234f2c9ab05574374c0c0f198a1c56328e9ea4423f939cd41efbcd180c27e514",
+      "bodySha256": "4c97d46dc85da76fccfb77e2a3d32fde1f6652a2de00f69993f37d75a680e6c8",
       "sections": [
         "## Multi-model review gate (ConnectOtherAIs)"
       ]
@@ -251,7 +251,7 @@
     {
       "id": "common.pull-requests",
       "source": "common/pull-requests.md",
-      "bodySha256": "5a22740c449054bd1333f16c1ca128b2cb8f01f00d957e2ea0c28eabd947b4f0",
+      "bodySha256": "989bfe18c8c1856c08933795303c73cb1de723681060e9ff4e8de73597d66379",
       "sections": [
         "# Pull requests — `main` is closed; the reviewer's comments are work (MANDATORY)",
         "## The rule",
@@ -301,7 +301,7 @@
     {
       "id": "common.rule-ownership",
       "source": "common/rule-ownership.md",
-      "bodySha256": "e09bf0921c01725a3696628a4f16a9c2f72c56774e14751cb7115cacb3c2bcb8",
+      "bodySha256": "069c403719d48d2daa6bd06dd7a53443d7db426f67ffd020611a30ab1bda4e37",
       "sections": [
         "# A shared rule names no product (MANDATORY)",
         "## The test, and it takes one second",
