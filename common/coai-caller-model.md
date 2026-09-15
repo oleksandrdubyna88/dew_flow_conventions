@@ -3,7 +3,7 @@ id: "common.coai-caller-model"
 load: "conditional"
 tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
 ---
-<!-- coai-caller v1 -->
+<!-- coai-caller v2 -->
 ## Say which model you are when you open the review gate
 
 <!-- owns: coai — the MCP server whose handshake this rule is about, named in its tool prefix -->
