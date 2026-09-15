@@ -264,7 +264,7 @@
     {
       "id": "common.reliability",
       "source": "common/reliability.md",
-      "bodySha256": "b7744935fd5904ba9099253344d374ce67ebd0b2caea38be56f73a4cb3820e2e",
+      "bodySha256": "54bba3f56e04fd1223659824be8db8e49419d021b5aab875903ba9f97ed8b852",
       "sections": [
         "# Reliability — a process that must run 24/7 (MANDATORY)",
         "## Every wait has a ceiling",
