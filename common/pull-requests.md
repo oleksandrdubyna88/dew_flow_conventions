@@ -17,15 +17,16 @@ tasks: ["git","pr","release"]
    **rebase** (linear history; each commit keeps the message it was written with) or by **squash** when
    a branch is a trail of fix-ups nobody should read. Merge commits are off.
 2. **The diff goes through the review gate BEFORE the pull request is opened.** Where the repository
-   has a multi-vendor review gate ([coai-review-gate.md](coai-review-gate.md) is the one this family
-   runs), the change is not ready for a pull request until its code round has run over the diff and
-   every finding has been resolved — accepted and fixed, or rejected with a reason. A review gate is
-   not a nicer code review; it is other vendors' models reading the change without your context, and
-   it is the one reader that has not already agreed with you.
+   has a multi-vendor review gate — this family runs the `coai` one
+   ([coai-review-gate.md](coai-review-gate.md)) — the change is not ready for a pull request until
+   `review_code` has run over its diff and every finding has been resolved: accepted and fixed, or
+   rejected with a reason. A review gate is not a nicer code review; it is other vendors' models
+   reading the change without your context, and it is the one reader that has not already agreed
+   with you.
 
-   **The order is: plan → review → implement → review → pull request.** Opening the pull request
-   first and running that review "later" is the same mistake as writing the test after the fix: by then
-   the diff is a thing you are defending rather than a thing you are checking. Measured here on
+   **The order is: plan → gate → implement → gate → pull request.** Opening the pull request
+   first and running a gate round "later" is the same mistake as writing the test after the fix: by
+   then the diff is a thing you are defending rather than a thing you are checking. Measured here on
    2026-09-05, and it is why this clause exists: an agent landed more than twenty pull requests in
    one session, every one of them through CI and an automated reviewer, and not one of them through
    the review gate that repository ships.
@@ -114,8 +115,8 @@ gh pr merge --rebase --delete-branch        # or --squash for a fix-up trail
 
 ## Definition of Done
 
-- [ ] The diff went through the review gate before the pull request was opened, and every finding was
-      resolved — or the description says why a review gate does not apply to this change.
+- [ ] The diff went through the `coai` gate — `review_code` over the diff — before the pull request
+      was opened, and every finding was resolved, or the description says why it does not apply.
 - [ ] The change reached `main` through a pull request merged by rebase or squash.
 - [ ] Opening it left no more than three pull requests open on that repository — or the person agreed to
       the seventh, and the description says why.

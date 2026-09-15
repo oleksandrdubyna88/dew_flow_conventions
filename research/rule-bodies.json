@@ -251,7 +251,7 @@
     {
       "id": "common.pull-requests",
       "source": "common/pull-requests.md",
-      "bodySha256": "989bfe18c8c1856c08933795303c73cb1de723681060e9ff4e8de73597d66379",
+      "bodySha256": "56ba23ae399c3ecbdf4b2bacbf4a73ce3a37b120f632f3e6eee06e60a83c4931",
       "sections": [
         "# Pull requests — `main` is closed; the reviewer's comments are work (MANDATORY)",
         "## The rule",
@@ -301,7 +301,7 @@
     {
       "id": "common.rule-ownership",
       "source": "common/rule-ownership.md",
-      "bodySha256": "069c403719d48d2daa6bd06dd7a53443d7db426f67ffd020611a30ab1bda4e37",
+      "bodySha256": "03047d098739062cb8de4faa7210329e0d037b5ea1b1796e6d37728828c72277",
       "sections": [
         "# A shared rule names no product (MANDATORY)",
         "## The test, and it takes one second",
