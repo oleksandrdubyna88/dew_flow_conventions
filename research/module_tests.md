@@ -540,3 +540,60 @@ been failing for months rather than gating a pull request. Three more asserted c
 there: `--warn` IS checked before the failing return, the fetch DOES precede `merge-base`, and the
 ancestry comparison uses the SHAs read from the remote rather than local branch names, so a stale
 local pointer cannot participate.
+
+## Rule ownership (`tools/ownership-check.mjs`)
+
+Fourteen cases behind the rule that says a shared rule names no product. Three of them are controls
+rather than findings, and the controls are what decide whether this check survives contact with the
+corpus.
+
+`benchmark` is a legal value in the task vocabulary, so a detector matching the bare word would refuse
+a perfectly legal frontmatter — and a check that goes red on a legal file is one somebody switches off
+within the week. The fix is the determiner: measured over the corpus before the check existed, the
+definite form ("the sidecar has no Serilog") appears 24 times and is nearly always a product
+reference, while the indefinite form ("a sidecar process") appears 6 times and is always generic. So
+*`the sidecar` fires and `a sidecar process` does not* is a case, with the negative half asserted.
+
+The third is *a repository no list has heard of is still caught*. The detector is the PATTERN
+`dew_flow_[a-z0-9_]+`, not the six names: a list would pass the seventh repository to join, which is
+exactly the one nobody would remember to add.
+
+**Two defects the tests found in the tool, both of which had hidden themselves.**
+
+Importing the module ran the whole scan — there was no entry guard, so the first test run scanned the
+real corpus and exited before asserting anything. It now returns an exit code from `main()` and the
+guard runs it only as a command, the same shape `post-deploy-check.mjs` uses.
+
+And `\bcoai\b` does **not** match inside `mcp__coai__open`, because `_` is a word character. So MCP
+tool names — the densest product reference in this corpus — were invisible. That gap hid itself twice
+over: the tool called the file clean, and a fixture written to prove the `owns:` marker worked passed
+*because nothing had been detected to declare*. A green test for a mechanism that never ran. The
+detector now has a shape-based `mcp__<product>__<tool>` pattern, and the marker fixture means what it
+says.
+
+**A marker inside a code fence or an inline span is documentation, not a declaration.** Also not
+hypothetical: the rule that documents the `owns:` syntax was reported as carrying a malformed marker,
+by the check it defines. Marker parsing skips fenced and inline code; findings do not, because a
+product name in an example is still a product name.
+
+Scanning zero rule files is a failure with its own sentence, not a pass — run from the wrong
+directory, this check would otherwise report a clean bill of health for a corpus it never opened.
+
+**The corpus on the day it landed: 129 product references across 26 of 32 shared rules.** That is the
+worklist, and it is why the CI step carries `--warn`.
+
+## The frozen bodies became a recorded freeze
+
+`rules.test.mjs` compared every one of the 24 migrated bodies against `originalBodySha256` for ever,
+which made them uneditable: every improvement had to become a NEW rule file, and the corpus grew
+instead of being corrected. That is visible in the numbers — 24 migrated rules, 32 today.
+
+The inventory now carries two records per rule. `originalBodySha256`/`sections` are the migration
+evidence, asserted only to be PRESENT and well formed, because what they protect is somebody deleting
+the record rather than somebody editing a rule. `currentBodySha256`/`currentSections` are compared
+against the live body and move in the SAME commit as any edit.
+
+So the freeze changed from *no edit ever* to *no accidental edit*. Observed red before it was relied
+on: appending one sentence to a rule without touching the map fails with
+`common.durable-status: the body changed without its currentBodySha256 — update the map in the same
+commit`.
