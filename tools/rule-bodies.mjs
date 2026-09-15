@@ -142,7 +142,18 @@ export function main(argv, root = path.resolve(here, "..")) {
     return 1;
   }
   const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
-  const updateAt = argv.indexOf("--update");
+
+  // Two shapes, and nothing else. `--update` must come FIRST when it comes at all: searching the
+  // whole argv for it meant `--all` on its own quietly became a verification run that printed OK on a
+  // clean corpus — which a caller who believed in `--all` would read as "recorded" — and
+  // `--typo --update <id>` updated the manifest with the typo ignored.
+  if (argv.length > 0 && argv[0] !== "--update") {
+    console.error(`rule-bodies: ${argv[0]} is not how this is run.`);
+    console.error("  node tools/rule-bodies.mjs                       verify every recorded rule");
+    console.error("  node tools/rule-bodies.mjs --update <id> [<id>…] record those rules' bodies");
+    return 1;
+  }
+  const updateAt = argv.length === 0 ? -1 : 0;
 
   if (updateAt === -1) {
     const drift = drifted(root, manifest);
