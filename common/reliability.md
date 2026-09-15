@@ -5,13 +5,18 @@ tasks: ["implement","audit","test","deploy","benchmark"]
 ---
 # Reliability — a process that must run 24/7 (MANDATORY)
 
-> Written from the 2026-08-16 four-repo audit, on the eve of the first long unattended runs. Every
-> rule below names the audit finding that made it; none is hypothetical. The mission they serve:
-> **no hangs, no leaks, no silent deaths — and every failure diagnosable from the log after the
-> fact.** Citations are `repo · path:line` per [planning-docs.md](planning-docs.md) — **as of the
-> audit date**: they are the evidence that made the rule, not live pointers, and most named
-> violations are since fixed (each repo's `research/PLAN_reliability_tail.md` tracks its closures).
-> Do not "correct" a citation to today's line numbers; the rule text is the durable part.
+> Written from a four-repository audit on **2026-08-16**, on the eve of the first long unattended
+> runs. Every rule below names the finding that made it; none is hypothetical. The mission they
+> serve: **no hangs, no leaks, no silent deaths — and every failure diagnosable from the log after
+> the fact.**
+>
+> **Evidence names the KIND of host and the date, never a repository, a path or a line**
+> ([rule-ownership.md](rule-ownership.md)). What a finding is worth is what happened, what it cost and
+> when — and those survive a rename, a split and an archive, which an address does not. The addresses
+> as they stood on the audit date are kept out of the corpus, in this repository's
+> [`research/reliability-audit-2026-08-16.json`](../research/reliability-audit-2026-08-16.json), so a
+> reader who wants to check a claim can, and nobody has to edit a shared rule when a product moves.
+> Most of the violations below are since fixed; the rule text is the durable part.
 
 ## Every wait has a ceiling
 
@@ -21,22 +26,20 @@ tasks: ["implement","audit","test","deploy","benchmark"]
 - An **infinite timeout is legal only as a documented pair**: the reason (a cold GPU compile is
   minutes of *correct* slowness) AND a compensating detector that can tell "slow but alive" from
   "wedged" — a progress heartbeat, a staleness watchdog, an activity stamp something actually
-  checks. Audit: the daemon's infinite sidecar HTTP timeout composes with the sidecar's engine
-  mutex into "one wedged inference blocks every pass forever, and `/health` cannot tell"
-  (`dew_flow_rag_qln · src/Rag.Infrastructure/RagInfrastructureExtensions.cs:152`,
-  `dew_flow_sidecar_rust · src/main.rs:1470`).
+  checks. Audit, 2026-08-16: an indexing host's infinite HTTP timeout into a local inference worker
+  composes with that worker's engine mutex into "one wedged inference blocks every pass forever, and
+  `/health` cannot tell" — two components, each defensible alone.
 - A blocking lock is never taken directly on an async worker thread — `try_lock` or move to the
-  blocking pool (`dew_flow_sidecar_rust · src/main.rs:1127` — `/unload`, the recovery tool itself,
-  could starve the server that needed recovering).
+  blocking pool. Audit, in a Rust host: the `/unload` endpoint, the recovery tool itself, could
+  starve the server that needed recovering.
 
 ## A timed-out child process is a killed child process
 
 [security.md](security.md) already requires exe + argv + timeout. The timeout must also **kill the
 entire process tree** — a timeout that merely stops *waiting* promotes the child to an orphan that
-holds locks, handles and memory forever. Reference implementation:
-`dew_flow_benchmark · src/Bench.Infrastructure/Process/ProcessRunner.cs` (linked token, tree-kill,
-typed outcome). Violation: `dew_flow_rag_qln · src/Rag.Infrastructure/Processes/ProcessRunner.cs:61`
-— `WaitForExitAsync` throws on timeout and the child lives on, on a probe that runs every five
+holds locks, handles and memory forever. The shape that works is one shared launcher with a linked
+token, a tree-kill and a typed outcome. Audit, 2026-08-16: a second launcher in a .NET host let
+`WaitForExitAsync` throw on timeout while the child lived on — on a probe that runs every five
 minutes forever.
 
 ## Background work neither dies silently nor takes the host with it
@@ -44,24 +47,25 @@ minutes forever.
 - **Everything** a worker iteration does lives inside its `try` — including `CreateAsyncScope()` and
   `GetRequiredService<T>()`. A resolution failure outside the `try` escapes `ExecuteAsync`, and the
   .NET default (`BackgroundServiceExceptionBehavior.StopHost`) then stops the **whole host**
-  (`dew_flow_rag_qln · src/Rag.Application/Indexing/IndexPassWorker.cs:53`). Decide the behaviour
-  per host, explicitly.
+  Decide the behaviour
+  per host, explicitly. Audit, 2026-08-16: in a .NET indexing worker, the scope resolution sat above
+  the `try`.
 - **No unobserved fire-and-forget.** A `Task.Run` whose fault nobody awaits is a worker that dies
-  with no line in the log while the process looks healthy (`dew_flow_mcp ·
-  src/Mcp.Telemetry/SpoolUsageSink.cs:59` — two caught exception types, everything else kills the
-  drain loop silently for the life of the process). Every detached task ends in a catch-all that
+  with no line in the log while the process looks healthy. Audit, in a telemetry sink: two caught
+  exception types, and everything else killed the drain loop silently for the life of the process.
+  Every detached task ends in a catch-all that
   logs; hosts also register `TaskScheduler.UnobservedTaskException` as the net under the net.
 - **Loop exits are decided on typed outcomes, never message substrings**; retry loops have backoff
-  and a bound (`dew_flow_benchmark · hosts/Cli/RunCommand.cs:142` — exit by
-  `Reason.Contains("no pending cell")`, and a lost claim race retries in a zero-delay spin).
+  and a bound. Audit, in a measuring harness's CLI: the loop exited by
+  `Reason.Contains("no pending cell")`, and a lost claim race retried in a zero-delay spin.
 - **One failed unit is recorded and skipped; it never kills the campaign.** The drain loop wraps
   each unit in its own `try/catch`: a transient `NpgsqlException` on leg 3,001 must fail *that leg*,
-  not the remaining 7,000 (`dew_flow_benchmark · hosts/Cli/RunCommand.cs:133`).
+  not the remaining 7,000. Audit: that guard was missing in the same harness's drain loop.
 - **A crash-recovery sweep exists AND is invoked at every owning host's startup.** The audit's most
   instructive find: a sweep fully implemented, fully tested, and called by nothing
-  (`dew_flow_benchmark · PostgresRunStore.SweepAsync` — unreachable outside tests, so a killed run's
-  claimed cells are stranded forever). Reference: `dew_flow_rag_qln · IndexPassWorker` runs its
-  ownership-checked sweep first thing in `ExecuteAsync`.
+  — a store's sweep method, unreachable outside its own tests, so a killed run's claimed cells were
+  stranded forever. The shape that works: a worker that runs its ownership-checked sweep as the first
+  thing in `ExecuteAsync`.
 
 ## Where `try/catch` lives — the three boundaries
 
@@ -71,17 +75,15 @@ missing habit — the code around it caught exceptions elsewhere. So the placeme
 1. **Per independent unit.** A loop over independent units — queue items, benchmark legs, requests,
    timer ticks — wraps **each unit** in its own `try/catch` that records the failure *on that unit*
    and continues. The loop's job is the campaign; one unit is never allowed to end it
-   (`dew_flow_benchmark · hosts/Cli/RunCommand.cs:133` — no per-leg guard, one `NpgsqlException`
-   kills the process and every pending cell).
+   (audit: no per-leg guard, so one `NpgsqlException` killed the process and every pending cell).
 2. **The whole unit body, setup included.** `CreateAsyncScope()`, `GetRequiredService<T>()`,
    opening the connection — that *is* the unit. Setup outside the `try` is the same crash through a
-   side door (`dew_flow_rag_qln · IndexPassWorker.cs:53` — resolution above the `try`, and the
-   escape stops the whole host).
+   side door (audit: resolution above the `try`, and the escape stopped the whole host).
 3. **A catch-all at the outermost edge of every detached execution.** `ExecuteAsync`, a `Task.Run`
    body, an event handler, a thread main: the last frame before "nobody above me" ends in
    `catch (Exception ex)` that logs. A **list of anticipated types is not a guard** — it is a bet
-   that the fourth type never comes (`dew_flow_mcp · SpoolUsageSink.cs` caught two types; the third
-   killed the writer silently for the life of the process).
+   that the fourth type never comes (audit: a telemetry sink caught two types; the third killed the
+   writer silently for the life of the process).
 
 And the counter-rule, unchanged from [../csharp/doctrine.md](../csharp/doctrine.md) §5: **everywhere
 else, don't catch.** Expected failures travel as `Outcome` values; an unexpected exception flies to
@@ -95,8 +97,8 @@ compliance. Catch a *specific* type only where this layer genuinely handles *tha
   production path is a decision — write the reason beside it.
 - Every host, **CLIs included**, wires Ctrl+C / SIGTERM into its root token
   (`PosixSignalRegistration` / `Console.CancelKeyPress`), so a planned stop produces a resumable
-  state instead of a stranded one (`dew_flow_benchmark` — zero signal handling; every orchestrator
-  stop has the same effect as a crash).
+  state instead of a stranded one. Audit, in a measuring harness: zero signal handling, so every
+  orchestrator stop had the same effect as a crash.
 
 ### A timeout is not a cancellation — and .NET spells them the same
 
@@ -109,9 +111,9 @@ The two facts are opposite in meaning and identical in type:
 
 So `catch (Exception ex) when (ex is not OperationCanceledException)` — which reads as "handle
 everything except the caller giving up" — **excludes our own timeout**, the one case the catch exists
-for. Found live on 2026-08-16 in `dew_flow_rag_qln`: a 4-second sidecar probe timing out escaped the
+for. Found live on 2026-08-16 in one .NET host here: a 4-second probe timing out escaped the
 handler, escaped the endpoint, and Kestrel answered **500** — six times in one day, on the operator's
-Runtime page, which is the one place to look when something is slow. The same repository held
+own status page, which is the one place to look when something is slow. The same repository held
 **twelve** copies of that filter. It is a language trap, not a lapse.
 
 **Filter on the token's state, never on the exception's type:**
@@ -120,7 +122,7 @@ Runtime page, which is the one place to look when something is slow. The same re
 catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
 ```
 
-(`dew_flow_benchmark · src/Bench.Infrastructure/Models/OpenAiCompatibleRuntime.cs:73` — the reference.)
+(A model runtime's HTTP client here is the reference shape.)
 
 The same trap has a second face on the throwing side: a launcher whose timeout surfaced as
 `OperationCanceledException` made every caller read "we overran" as "the host is shutting down", so a
@@ -134,7 +136,7 @@ A lock is not a data structure you write; it is one atomic operation you borrow,
 you cannot name the operation — the one call that either succeeds or fails and cannot half-happen —
 then what you are building is advisory coordination, and it must say so where a caller reads it.
 
-Measured 2026-09-03 in `dew_flow_creds_for_devs`. A plan proposed coordinating two VS Code windows
+Measured 2026-09-03 in one repository here. A plan proposed coordinating two editor windows
 through a lease key in the shared `globalState`, with a write-then-read-back to settle a tie: take it,
 re-read it, proceed only if it is still ours. Its review round returned **three Blocking findings from
 three vendors independently**, all the same — the store's `update` is asynchronous and a foreign write
@@ -159,33 +161,34 @@ What to do instead:
 ## Everything that grows has an owner
 
 - **In memory:** every cache, dictionary or list that grows with traffic is bounded or evicted.
-  Reference: `dew_flow_rag_qln · SpeedWindow` (capped ring), `dew_flow_sidecar_rust · RungCache`
-  (LRU). Violations: `dew_flow_benchmark · LiveTrace._byLeg` and `GitCheckoutProvider._locks` —
-  `GetOrAdd` forever, remove never (both latent today, live the day a long-running worker lands).
-- **In the database:** an append-only table names its retention/rollup policy. Reference:
-  `dew_flow_rag_qln · SizeHistoryStore` (7-day raw, hourly rollup). Violation: `index_passes` —
-  one row per pass, deleted never.
+  The shapes that work: a capped ring buffer for a rolling window, an LRU for a cache. Audit,
+  2026-08-16: two dictionaries in a measuring harness — a per-leg trace and a checkout lock table —
+  did `GetOrAdd` forever and removed never (both latent that day, live the day a long-running worker
+  lands).
+- **In the database:** an append-only table names its retention/rollup policy. The shape that works:
+  a 7-day raw window with an hourly rollup. Audit, 2026-08-16: a table with one row per index pass,
+  deleted never.
 - **On disk:** every directory a host writes — `logs/`, spools, artifacts — has a named retention
   owner. The rule lives in [logging-serilog.md](logging-serilog.md) § Retention.
 
 ## Transient faults are the weather, not an event
 
 - Database access enables the provider's retry strategy (`EnableRetryOnFailure` for Npgsql/EF) or
-  records why not. Today a one-second Postgres blip fails a whole pass
-  (`dew_flow_rag_qln · PlatformExtensions.cs:12`).
+  records why not. Audit, 2026-08-16: with it off, a one-second Postgres blip failed a whole indexing
+  pass.
 - The loop that calls a flaky dependency carries a consecutive-failure circuit breaker: an endpoint
   that is *down* must fail the campaign in minutes, not burn the default wall-timeout per leg for
-  every remaining leg (`dew_flow_benchmark · OpenAiCompatibleRuntime` — 10-minute default wall,
-  no breaker).
+  every remaining leg. Audit, 2026-08-16: a model runtime with a 10-minute default wall and no
+  breaker.
 
 ## Health endpoints tell the truth and never block
 
 - `/health` computes from live internal state — workers alive, queue depth, last-success time —
-  never a constant (`dew_flow_mcp · McpApiEndpoints.cs:12` returns `"ok"` unconditionally, so an
-  orchestrator cannot see the dead spool writer behind it).
+  never a constant. Audit, 2026-08-16: an endpoint returning `"ok"` unconditionally, so an
+  orchestrator could not see the dead spool writer behind it.
 - `/health` does zero blocking work inline: no locks that can queue behind a build, no first-call
-  hashing of gigabytes on the probe path (`dew_flow_sidecar_rust · src/main.rs:1042` — first
-  `/health` SHA-256-hashes every provider DLL beside the exe).
+  hashing of gigabytes on the probe path. Audit, 2026-08-16: in a Rust host, the first `/health`
+  call SHA-256-hashed every provider library beside the executable.
 
 ## Paid work is written down as it is earned
 
@@ -217,8 +220,8 @@ loop is resumable or it is not finished.
 ## Boundary numbers are clamped
 
 Every numeric field a client sends is range-validated before arithmetic, and window math is
-`checked` or done in `long` (`dew_flow_mcp · SandboxedFileReader.cs:41` — `startLine + lineCount`
-overflows `int` into an unhandled exception any client can trigger with one call).
+`checked` or done in `long`. Audit, 2026-08-16: a sandboxed file reader added `startLine + lineCount`
+and overflowed `int` into an unhandled exception any client could trigger with one call.
 
 **A model's answer is a client's input.** A number that came out of an LLM has been through no
 validation at all, and it will be wrong in the way that hurts: a reviewer citing line 500 of a
