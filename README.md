@@ -84,13 +84,19 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   merge rather than of the pull request being checked. Measured over 29 days: main moved **95 times**,
   and each of those commits reddened every open pull request in six repositories at once; **317**
   pin-touching commits went downstream, a *majority* of all commits on main in two consumers. The
-  shared rules **will** track `release`, which moves when a rule author promotes a reviewed commit —
-  a consumer starts following it the moment its `.gitmodules` declares `branch = release`, and until
-  that lands it goes on following the remote's default branch as before. The tool is ready ahead of
-  the rollout on purpose: it must be in the pin a consumer moves TO, or the first repository to
-  declare the key would be judged by a version that cannot read it. A submodule that declares no
-  `branch` is unaffected either way — git's own default for the unset key is the remote HEAD, which
-  is what it was compared against before.
+  shared rules track `release`, which moves when a rule author promotes a reviewed commit. **All six
+  consumers follow it as of 2026-09-15**, so a commit on this repository's main now reddens nothing
+  anywhere until somebody promotes it. A submodule that declares no `branch` is unaffected either way
+  — git's own default for the unset key is the remote HEAD, which is what it was compared against
+  before, and `dew_flow_rag_qln`'s two code pins go on using it.
+
+  That last repository is where the behaviour was worth proving, because it mixes both kinds of pin
+  and its CI now prints them judged separately in one run:
+
+  ```
+  pin-check: OK — 3 pin(s) at the tip of the ref each tracks (external/dew_flow_mcp → the default
+  branch, .claude/rules/shared → release, external/dew_flow_benchmark → the default branch).
+  ```
 - **How `release` moves.** Through the `promote-release` workflow — the supported path, and while the
   ref is unprotected not the only possible one (see the gap below). It is
   `workflow_dispatch` only, so a merge to main never touches the ref. It takes a full 40-character
