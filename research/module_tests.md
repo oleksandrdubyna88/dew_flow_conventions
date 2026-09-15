@@ -824,3 +824,48 @@ not — the suite was green — but the fragility was real and is gone.
 
 The test then caught three of this story's own edits: making three sentences imperative moved them out
 from under their ledger entries, and the suite said so before the commit.
+
+## Armed (S2.4)
+
+`tools/ownership-baseline.json` is gone. The check landed as a ratchet over **129 references across 26
+of 32 rules** and the allowance was deleted with the last story of the backfill, so from that commit a
+single undeclared product name in any shared rule fails the build.
+
+**The 39 that were left were never citations.** They are the rule's own declared categories, and each
+one is now a marker with a reason in the file that uses it: nine in `coai-review-gate.md` (the server's
+name, the product's name, and each of the seven MCP tool names), two in `coai-caller-model.md`, three in
+`coai-document-gate.md`, one in `gpu-lease.md` (the single host that serves the lease, because the
+machine has one card) and one in `pull-requests.md` (the file name it links to). Ten other references
+were not declarations at all but definite nouns wearing a product's name — `the gate`, `the panel`,
+`the daemon`, `the sidecar` — and those were rewritten.
+
+Because the token is matched EXACTLY, `coai` does not cover `mcp__coai__open`: each tool name is its own
+decision and its own line in the diff. A reviewer asked whether the link `[coai-review-gate.md](...)`
+would even be covered by a `coai` marker, since the detector might report the token as
+`coai-review-gate`; it does not — `-` is not a word character, so the finding is `coai` and the marker
+covers it. Verified by running it rather than by reading the regex.
+
+**Verified at the CI boundary**, which is where the promise actually lives: the Ownership step is
+`run: node tools/ownership-check.mjs` at the repository root, with no `--warn` and no `--baseline`. And
+the armed state was demonstrated, not assumed: a scratch corpus holding one undeclared reference and no
+baseline file exits **1**.
+
+### The Epic 3 audit
+
+The original instruction had two halves — clean the shared rules, and MOVE what belongs to a product
+into that product's repository. The detector answers the first half. The second needs a reading, because
+a paragraph can describe one product's internals while naming nothing, and every automated check stays
+green.
+
+Scanned across all 32 rules: concrete filesystem paths, `localhost`/loopback addresses, port numbers,
+environment variable names, and the family's brand tokens. What it found:
+
+| found | verdict |
+|---|---|
+| `%LOCALAPPDATA%/dew-flow/daemon.json` (`gpu-lease.md`) | stays — the discovery path of the one lease server, inside the declared shared-service category |
+| `AddDewFlowLogging`, `<Repo>.ServiceDefaults`, `logs/{yyyy-MM-dd}/…` (`logging-serilog.md`) | stays — the family's own brand, which the rule names as its third declared kind: a contract every repository implements |
+| `SIDECAR_LOG_RETENTION_DAYS` | already generalised in S2.2 to "an env var rather than a `Serilog:RetentionDays` key" |
+
+Nothing else. No shared rule now carries a paragraph that is true of one product only, so the move half
+of the instruction has nothing left to move out of this repository. That claim is checkable against the
+list above rather than asserted.

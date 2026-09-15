@@ -3,12 +3,15 @@ id: "common.coai-document-gate"
 load: "conditional"
 tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
 ---
+<!-- owns: coai — the MCP server this stage belongs to, named in its tool prefix -->
+<!-- owns: ConnectOtherAIs — the product that serves the document stage, as its panel names it -->
+<!-- owns: mcp__coai__review_document — a tool name a session types; there is no generic spelling of it -->
 <!-- coai-document v1 -->
 ## Reviewing a DOCUMENT rather than a change
 
 > **This extends [coai-review-gate.md](coai-review-gate.md), and it is a separate file because that
 > one is frozen.** `tools/rules.test.mjs` hashes all 24 migrated rule bodies against baseline
-> `5d6984eb` as evidence that nothing was lost when the rules moved, so adding a section to the gate
+> `5d6984eb` as evidence that nothing was lost when the rules moved, so adding a section to that
 > rule turns the suite red. The house precedent — `common/task-lifecycle.md`,
 > `common/subagent-models.md` — is a new file that says where it belongs once the inventory retires.
 > **Where this belongs then: as a final section of `coai-review-gate.md`, after step 6.**
@@ -54,7 +57,7 @@ deduplicated because two vendors agreeing is stronger evidence of one defect, wh
 separate accounts of one document is the whole reason to read them. That is where a summary comes
 back, and it is what to pass on when somebody asked what a document says.
 
-Which reviewers run is the operator's choice, in the panel's Document stage: the product ships two —
+Which reviewers run is the operator's choice, in the Document stage of its UI: the product ships two —
 one that reads for whether the document does its job, one that writes the account — and a person can
 add their own, in their own language, with their own prompt.
 

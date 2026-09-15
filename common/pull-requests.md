@@ -3,6 +3,7 @@ id: "common.pull-requests"
 load: "conditional"
 tasks: ["git","pr","release"]
 ---
+<!-- owns: coai — the file name this rule links to, which carries the gate's own name -->
 # Pull requests — `main` is closed; the reviewer's comments are work (MANDATORY)
 
 > Extends [git-workflow.md](git-workflow.md), which governs the COMMIT. This rule governs how a commit
