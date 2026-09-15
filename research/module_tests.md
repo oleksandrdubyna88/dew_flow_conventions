@@ -657,3 +657,30 @@ fifth directory would be distributed to consumers by `loadCatalog` and skipped e
 now a case that builds a probe file in every directory the resolver declares and fails unless the scan
 finds all of them. It read the directory back out of a path with `[\/]`, which matches only a forward
 slash while the tool returns the platform separator — green on CI, red on the machine it was written on.
+
+**What the automated reviewer added.** Six comments, four of them real, and three were the same kind of
+defect as the per-file budget: a check that answers a slightly different question than the one it was
+asked, and says nothing about the difference.
+
+- **The baseline was a ceiling only.** A file recorded at 5 and carrying 3 passed with an advisory. That
+  leaves two slots a reference can be added back into later, under the old number, with nothing to say
+  a word — the hole the per-file split closed, one level down. The recorded count is now a floor as
+  well: a file that got cleaner fails until its number comes down in the same commit, naming the number
+  to write, and a file cleaned to zero has its entry removed rather than left standing.
+- **`owns:` matched by substring.** `<!-- owns: e — … -->` is a perfectly well-formed marker, and `e`
+  sits inside every `dew_flow_*` name there is — one character would have licensed the corpus. The token
+  is compared exactly now, which also means `coai` no longer covers `mcp__coai__open`: a tool name is a
+  different name and gets its own decision. Both fixtures that relied on the substring behaviour were
+  passing for that reason and now declare the token they actually use.
+- **`depends:` was read in one of three legal spellings.** The resolver parses frontmatter with a real
+  YAML parser, so `["local.x"]`, `[local.x]` and a block sequence all mean the same thing; this tool has
+  no YAML dependency on purpose, because that is what lets it run before `npm ci` and be the first check.
+  It reads all three by hand now.
+- **`--baseline` as the last argument** read as no flag at all and checked the default file instead — the
+  same shape as `--max-days soon` becoming NaN. It is a usage error with its own sentence.
+
+The two rejected were the automated reviewer's standing advice to bump consumer pins in the same pull
+request (pins follow the `release` ref, which moves through `promote-release.mjs` once, after the
+programme lands — a cascade per pull request is the churn this work exists to remove), and a re-report
+of the empty-directory fixture, already fixed one commit earlier by building the repository in a temp
+dir instead.

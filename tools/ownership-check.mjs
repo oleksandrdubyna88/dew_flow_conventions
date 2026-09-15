@@ -98,6 +98,12 @@ const WARN = process.argv.includes("--warn");
 const BASELINE_DEFAULT = "tools/ownership-baseline.json";
 const baselineIndex = process.argv.indexOf("--baseline");
 const BASELINE_PATH = baselineIndex === -1 ? undefined : process.argv[baselineIndex + 1];
+/**
+ * `--baseline` as the LAST argument reads as no flag at all, and the run would then check the
+ * default baseline while its author believed it was checking another one — a silent answer to a
+ * different question. The same shape as `--max-days soon` becoming NaN in `release-distance`.
+ */
+const BASELINE_PATH_MISSING = baselineIndex !== -1 && BASELINE_PATH === undefined;
 
 /**
  * Text with fenced code blocks removed.
@@ -144,13 +150,33 @@ export function findingsIn(text, file) {
   return found;
 }
 
-/** `depends:` entries that point at a repo-local rule — the direction that cannot resolve. */
+/**
+ * `depends:` entries that point at a repo-local rule — the direction that cannot resolve.
+ *
+ * The resolver parses frontmatter with a real YAML parser, so `["local.x"]`, `[local.x]` and a
+ * block sequence of `- local.x` are three legal spellings of one thing. This tool has no YAML
+ * dependency on purpose — it runs before `npm ci`, which is what lets it be the FIRST check —
+ * so it reads all three by hand. A reader of only the quoted flow form would pass two spellings of
+ * the dependency that stops rule loading everywhere it is missing.
+ */
 export function downwardDependencies(text) {
   const frontmatter = /^---\n([\s\S]*?)\n---\n/.exec(text);
   if (frontmatter === null) return [];
-  const depends = /depends:\s*\[([^\]]*)\]/.exec(frontmatter[1]);
-  if (depends === null) return [];
-  return [...depends[1].matchAll(/["']([^"']+)["']/g)].map((m) => m[1]).filter((id) => id.startsWith("local."));
+
+  const flow = /^depends:[ \t]*\[([^\]]*)\]/m.exec(frontmatter[1]);
+  const items = [];
+  if (flow !== null) {
+    items.push(...flow[1].split(",").map((item) => item.trim()));
+  } else {
+    // A block sequence: `depends:` on its own line, then indented `- item` lines until the next key.
+    const block = /^depends:[ \t]*(?:#[^\n]*)?\n((?:[ \t]+-[^\n]*\n?)+)/m.exec(frontmatter[1]);
+    if (block === null) return [];
+    items.push(...[...block[1].matchAll(/^[ \t]+-[ \t]*([^\n]*)$/gm)].map((m) => m[1].trim()));
+  }
+
+  return items
+    .map((item) => item.replace(/^["']|["']$/g, "").trim())
+    .filter((id) => id.startsWith("local."));
 }
 
 export function rulesIn(root) {
@@ -172,6 +198,12 @@ export function rulesIn(root) {
  */
 export function main() {
   const root = process.cwd();
+
+  if (BASELINE_PATH_MISSING) {
+    console.error("ownership-check: --baseline needs a path after it.");
+    console.error(`  Without one this would have checked ${BASELINE_DEFAULT} and said nothing about it.`);
+    return 1;
+  }
 
   // The baseline is read before anything is scanned, so an unreadable or malformed one stops the run
   // rather than silently allowing everything: a ratchet that cannot be loaded must not look like a
@@ -214,9 +246,14 @@ export function main() {
 
     // A marker grants its token in the file that carries it, and nowhere else — otherwise one
     // declaration would licence the name across the corpus, which is an allowlist with extra steps.
-    const declared = markers.tokens.map((t) => t.toLowerCase());
+    //
+    // The comparison is EXACT, on the normalised token. It was `includes` first, which made a short
+    // declaration an allowlist for the corpus: `<!-- owns: e — … -->` is a perfectly well-formed
+    // marker, and `e` sits inside every `dew_flow_*` name there is.
+    const normalise = (token) => token.toLowerCase().replace(/\s+/g, " ").trim();
+    const declared = new Set(markers.tokens.map(normalise));
     for (const finding of findingsIn(text, file)) {
-      if (declared.some((token) => finding.token.toLowerCase().includes(token))) continue;
+      if (declared.has(normalise(finding.token))) continue;
       findings.push(finding);
     }
   }
@@ -259,27 +296,45 @@ export function main() {
   }
 
   if (baseline !== undefined && !mechanismBroken) {
+    // The recorded count is a floor as well as a ceiling. Allowing a file to sit UNDER its number
+    // leaves room a reference can be added back into later, under the old count, with nothing to
+    // say a word — the same hole the per-file split closed, one level down. So a cleanup is not
+    // finished until the baseline says so, in the same commit, which is also what makes the number
+    // a record of the corpus rather than a budget somebody remembers to spend.
     const perFile = new Map();
-    for (const f of findings) perFile.set(f.file, (perFile.get(f.file) ?? 0) + 1);
-
-    const over = [];
-    for (const [file, count] of perFile) {
-      const allowed = baseline[file.replaceAll("\\", "/")] ?? 0;
-      if (count > allowed) over.push({ file, count, allowed });
+    for (const f of findings) {
+      const key = f.file.replaceAll("\\", "/");
+      perFile.set(key, (perFile.get(key) ?? 0) + 1);
     }
 
-    if (over.length === 0) {
-      const total = findings.length;
-      const budget = Object.values(baseline).reduce((n, v) => n + v, 0);
-      console.log(`ownership-check: within the baseline — ${total} finding(s) against ${budget} recorded, none over its file's count.`);
-      if (total < budget) console.log("  Under the baseline: lower the counts in the baseline file so the ground that was won is held.");
+    const over = [];
+    const below = [];
+    for (const file of new Set([...perFile.keys(), ...Object.keys(baseline)])) {
+      const count = perFile.get(file) ?? 0;
+      const allowed = baseline[file] ?? 0;
+      if (count > allowed) over.push({ file, count, allowed });
+      else if (count < allowed) below.push({ file, count, allowed });
+    }
+
+    if (over.length === 0 && below.length === 0) {
+      console.log(`ownership-check: at the baseline — ${findings.length} finding(s), every file at its recorded count.`);
       return 0;
     }
 
     console.error("");
+    for (const b of below) {
+      const cure = b.count === 0 ? "remove its entry" : `lower it to ${b.count}`;
+      console.error(`ownership-check: BELOW BASELINE ${b.file} — ${b.count} finding(s), ${b.allowed} recorded — ${cure}.`);
+    }
+    if (below.length > 0) {
+      console.error("  That file got cleaner, which is the work. It is not finished until the baseline moves");
+      console.error("  with it: a number left above what the file carries is room a later reference can be");
+      console.error("  added back into without this check saying anything at all.");
+    }
     for (const o of over) {
       console.error(`ownership-check: OVER BASELINE ${o.file} — ${o.count} finding(s), ${o.allowed} recorded.`);
     }
+    if (over.length === 0) return 1;
     console.error("  The count for that file GREW. Usually that is an undeclared product reference somebody");
     console.error("  added; it can also be an existing one duplicated by a reword or a split sentence. Either");
     console.error("  way `git diff` against the base branch shows which line, and the cure is the same:");

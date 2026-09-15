@@ -45,8 +45,10 @@ jobs:
       # backfill takes, which is the one thing this rule promises cannot happen. So it is a RATCHET,
       # and its budget is PER FILE (tools/ownership-baseline.json): one repo-wide total lets a branch
       # spend headroom another branch won, so cleaning ten references in one rule silently pays for
-      # two new ones in another. Counts come down as the cleanup lands; deleting the baseline file is
-      # the armed state, at which point any finding at all fails.
+      # two new ones in another. The count is a floor as well as a ceiling: a file that got cleaner
+      # fails until its number comes down in the same commit, because a number left above what the
+      # file carries is room a reference can be added back into silently. Deleting the baseline file
+      # is the armed state, at which point any finding at all fails.
       - name: Ownership
         run: node tools/ownership-check.mjs
 

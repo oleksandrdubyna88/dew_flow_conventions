@@ -93,7 +93,17 @@ are allowed, and they are **declared** — in the file that needs them, with the
 ```
 
 One marker per token. **A marker without a reason is refused**, because the reason is the whole
-difference between a decision and an allowlist somebody grew. Three kinds qualify:
+difference between a decision and an allowlist somebody grew.
+
+<!-- owns: coai — the containment example needs the real pair; an invented one would not show it -->
+<!-- owns: mcp__coai__open — the other half of that pair, and a tool name has no generic spelling -->
+
+The token is matched **exactly**. `coai` does not cover `mcp__coai__open`: a tool name is a different
+name and gets its own decision, so a file using six tools carries six markers and every one of them is
+visible in the diff. Substring matching was the first version of this, and it made a perfectly
+well-formed `<!-- owns: e — … -->` a licence for every `dew_flow_*` name there is.
+
+Three kinds qualify:
 
 <!-- owns: mcp__coai__review_plan — the example has to be a real tool name to mean anything -->
 1. **A tool surface every repository calls.** `mcp__coai__review_plan` is a name a session must type;

@@ -311,7 +311,7 @@
     {
       "id": "common.rule-ownership",
       "source": "common/rule-ownership.md",
-      "bodySha256": "08bca1cf5df049c1a6b48c37ca5627308edf3b6263d2aa2ce6adc9f5d0b3738d",
+      "bodySha256": "cf50285c2a643bf331fb439c1d7534bc180cb5efac735e9d44e09827a4679930",
       "sections": [
         "# A shared rule names no product (MANDATORY)",
         "## The test, and it takes one second",

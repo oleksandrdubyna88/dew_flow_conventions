@@ -22,7 +22,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { findingsIn, markersIn } from "./ownership-check.mjs";
+import { downwardDependencies, findingsIn, markersIn } from "./ownership-check.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const tool = path.join(here, "ownership-check.mjs");
@@ -135,12 +135,13 @@ test("--warn reports every finding in full and still exits 0", () => {
 
 test("a marker grants its token only in the file that carries it", () => {
   // Otherwise one declaration anywhere would licence the name everywhere, which is an allowlist with
-  // extra steps.
+  // extra steps. The token is matched exactly, so the marker names the tool rather than the product:
+  // `coai` and `mcp__coai__open` are two names, and each one is declared where it is used.
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ownership-"));
   try {
     fs.mkdirSync(path.join(root, "common"), { recursive: true });
     fs.writeFileSync(path.join(root, "common", "declared.md"),
-      "<!-- owns: coai — the MCP tool names a session must type -->\n# One\n\nCall `mcp__coai__open`.\n");
+      "<!-- owns: mcp__coai__open — a tool name a session must type -->\n# One\n\nCall `mcp__coai__open`.\n");
     fs.writeFileSync(path.join(root, "common", "undeclared.md"), "# Two\n\nCall `mcp__coai__open`.\n");
     const { code, out } = run(root);
     assert.equal(code, 1, out);
@@ -195,7 +196,7 @@ test("a file at its recorded count passes, and the finding is still printed", (t
   const { code, out } = run(root);
   assert.equal(code, 0, out);
   assert.match(out, /dew_flow_rag_qln/, "reported, not hidden");
-  assert.match(out, /within the baseline/);
+  assert.match(out, /at the baseline/);
 });
 
 test("cleaning one file never buys room for another to get worse", (t) => {
@@ -242,6 +243,72 @@ test("a baseline still fails on a malformed marker, whatever the counts say", (t
   const { code, out } = run(root);
   assert.equal(code, 1, out);
   assert.match(out, /MARKER/);
+});
+
+test("--baseline with no path after it is a usage error, not a quiet fall back to the default", (t) => {
+  // `--baseline` as the last argument reads `argv[i + 1]` as undefined, which is indistinguishable
+  // from the flag being absent: the run would check the DEFAULT baseline while its author believed
+  // it was checking another one. The same shape of trap `release-distance` had with `Number("soon")`.
+  const root = baselineScene(t, { "common/x.md": 1 });
+  const { code, out } = run(root, "--baseline");
+  assert.equal(code, 1, out);
+  assert.match(out, /--baseline needs a path/);
+});
+
+test("a file that got cleaner fails until its recorded count comes down with it", (t) => {
+  // The ground that was won has to be held in the SAME commit. A number left above what the file
+  // carries is room a reference can be added back into, under the old count, with nothing to say so
+  // — which is the hole this ratchet exists to close, one level down.
+  const root = baselineScene(t, { "common/x.md": 3 });
+  const { code, out } = run(root);
+  assert.equal(code, 1, out);
+  assert.match(out, /BELOW BASELINE common.x\.md — 1 finding\(s\), 3 recorded/);
+  assert.match(out, /lower it to 1/);
+});
+
+test("a file cleaned to zero loses its entry rather than keeping its old number", (t) => {
+  const root = baselineScene(t, { "common/x.md": 1, "common/gone.md": 4 });
+  const { code, out } = run(root);
+  assert.equal(code, 1, out);
+  assert.match(out, /BELOW BASELINE common.gone\.md — 0 finding\(s\), 4 recorded/);
+  assert.match(out, /remove its entry/);
+});
+
+test("a marker licences its own token and not every token containing it", (t) => {
+  // Substring matching made a one-character declaration an allowlist for the corpus: "e" is inside
+  // every `dew_flow_*` name there is, and the marker carrying it is perfectly well formed.
+  const root = baselineScene(t, undefined);
+  fs.writeFileSync(path.join(root, "common", "x.md"), [
+    "<!-- owns: e — a token short enough to sit inside every repository name -->",
+    "# One",
+    "",
+    "Measured in dew_flow_rag_qln today.",
+    "",
+  ].join("\n"));
+  const { code, out } = run(root);
+  assert.equal(code, 1, out);
+  assert.match(out, /dew_flow_rag_qln/, "the declaration of another token does not cover this one");
+});
+
+test("a downward dependency is caught however the sequence is written", () => {
+  // The resolver parses frontmatter with a real YAML parser, so all three of these are legal and
+  // mean the same thing. This tool has no YAML dependency on purpose — it runs before `npm ci` —
+  // and a reader of only the quoted flow form would pass two of the three legal spellings.
+  const frontmatter = (depends) => `---\nid: "common.x"\nload: "conditional"\ntasks: ["policy"]\n${depends}\n---\n# X\n`;
+  const spellings = [
+    'depends: ["local.thing"]',
+    "depends: [local.thing]",
+    "depends:\n  - local.thing",
+    "depends:\n  - 'local.thing'",
+  ];
+  for (const spelling of spellings) {
+    assert.deepEqual(downwardDependencies(frontmatter(spelling)), ["local.thing"], spelling);
+  }
+
+  // And a shared dependency is not a finding, in any spelling.
+  for (const spelling of ['depends: ["common.other"]', "depends:\n  - common.other"]) {
+    assert.deepEqual(downwardDependencies(frontmatter(spelling)), [], spelling);
+  }
 });
 
 test("a reason that is the shape of a reason rather than one is refused", () => {
