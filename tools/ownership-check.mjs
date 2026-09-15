@@ -56,8 +56,19 @@ const MCP_TOOL = /\bmcp__[a-z0-9]+__[a-z0-9_]+\b/gi;
  */
 const DEFINITE = /\b(?:the|its|our)\s+(sidecar|benchmark|daemon|extension|panel|broker|vault|crate|gate)\b/gi;
 
-/** `<!-- owns: <token> — <reason> -->`. The reason is what makes it a decision and not an allowlist. */
-const MARKER = /<!--\s*owns:\s*([^\s—-][^—\n]*?)\s*(?:—|--)\s*([^>]*?)\s*-->/gi;
+/**
+ * `<!-- owns: <token> — <reason> -->`. The reason is what makes it a decision and not an allowlist.
+ *
+ * The pattern captures the whole comment body and the SPLIT happens in JavaScript. Spelling the two
+ * halves as one regex meant a lazy run of "anything but an em dash" immediately before an alternation
+ * that can match a hyphen — super-linear backtracking, reported by the scanner, and it needed a
+ * second pattern beside it for the separator-less shape. One capture reads the same and cannot
+ * backtrack: `[^>]` never crosses the `>` that ends the comment.
+ */
+const MARKER = /<!--\s*owns:([^>]*)-->/gi;
+
+/** Where a marker's token ends and its reason begins: an em dash, or two hyphens. */
+const SEPARATOR = /—|--/;
 
 /**
  * A reason has to say something. Ten characters and three words stop "ok", "needed" and "see above";
@@ -122,22 +133,21 @@ export function markersIn(raw) {
   const tokens = [];
   const malformed = [];
   for (const match of text.matchAll(MARKER)) {
-    const token = match[1].trim();
-    const reason = (match[2] ?? "").trim();
-    if (!isReason(reason)) malformed.push({ token, reason });
-    else tokens.push(token);
-  }
-  // A marker with no separator at all never matches above, so catch the bare shape separately.
-  for (const match of text.matchAll(/<!--\s*owns:\s*([^\s—>-][^>\n]*?)\s*-->/gi)) {
     const body = match[1].trim();
-    if (!/—|--/.test(body)) malformed.push({ token: body, reason: "" });
+    const at = body.search(SEPARATOR);
+    const token = (at === -1 ? body : body.slice(0, at)).trim();
+    const reason = at === -1 ? "" : body.slice(at).replace(SEPARATOR, "").trim();
+    // A separator-less marker declares nothing and lands here as a reason of "", which is the same
+    // verdict by the same route rather than a second pattern that has to be kept in step.
+    if (token === "" || !isReason(reason)) malformed.push({ token, reason });
+    else tokens.push(token);
   }
   return { tokens, malformed };
 }
 
 /** Product references in one file, as `{ file, line, kind, token }`, markers already stripped. */
 export function findingsIn(text, file) {
-  const withoutMarkers = text.replace(MARKER, "").replace(/<!--\s*owns:[^>]*-->/gi, "");
+  const withoutMarkers = text.replace(MARKER, "");
   const lines = withoutMarkers.split("\n");
   const found = [];
   for (const [index, line] of lines.entries()) {
@@ -169,9 +179,21 @@ export function downwardDependencies(text) {
     items.push(...flow[1].split(",").map((item) => item.trim()));
   } else {
     // A block sequence: `depends:` on its own line, then indented `- item` lines until the next key.
-    const block = /^depends:[ \t]*(?:#[^\n]*)?\n((?:[ \t]+-[^\n]*\n?)+)/m.exec(frontmatter[1]);
-    if (block === null) return [];
-    items.push(...[...block[1].matchAll(/^[ \t]+-[ \t]*([^\n]*)$/gm)].map((m) => m[1].trim()));
+    //
+    // Read line by line rather than as `(?:[ \t]+-[^\n]*\n?)+`, which the scanner reported as
+    // exponential backtracking. Measured before replacing it: it is not — that group can match one
+    // line many ways, but nothing follows it, so the engine takes the first way and never retries;
+    // 22 `- item` runs on one line matched in under a millisecond. What the report was right about
+    // is that the pattern cannot be read for the guarantee, and the loop below can: it takes each
+    // line once.
+    const lines = frontmatter[1].split("\n");
+    const start = lines.findIndex((line) => /^depends:[ \t]*(?:#[^\n]*)?$/.test(line));
+    if (start === -1) return [];
+    for (const line of lines.slice(start + 1)) {
+      const item = /^[ \t]+-[ \t]*(.*)$/.exec(line);
+      if (item === null) break;
+      items.push(item[1].trim());
+    }
   }
 
   return items
@@ -192,48 +214,39 @@ export function rulesIn(root) {
 }
 
 /**
- * The scan. Returns an exit code rather than calling process.exit, so importing this module for its
- * parsers runs nothing — the same guard post-deploy-check uses, and the reason the tests can exercise
- * findingsIn and markersIn without the whole corpus being scanned on import.
+ * The baseline, or the reason there is none.
+ *
+ * Read before anything is scanned, so an unreadable or malformed one stops the run rather than
+ * silently allowing everything: a ratchet that cannot be LOADED must not look like a ratchet that
+ * found nothing. `{ failed: true }` means the run is over; `{ baseline: undefined }` means there is
+ * no baseline file, which is the armed state.
  */
-export function main() {
-  const root = process.cwd();
+function loadBaseline(root) {
+  const named = BASELINE_PATH ?? BASELINE_DEFAULT;
+  const file = path.join(root, named);
 
-  if (BASELINE_PATH_MISSING) {
-    console.error("ownership-check: --baseline needs a path after it.");
-    console.error(`  Without one this would have checked ${BASELINE_DEFAULT} and said nothing about it.`);
-    return 1;
-  }
-
-  // The baseline is read before anything is scanned, so an unreadable or malformed one stops the run
-  // rather than silently allowing everything: a ratchet that cannot be loaded must not look like a
-  // ratchet that found nothing.
-  let baseline;
-  const baselineFile = path.join(root, BASELINE_PATH ?? BASELINE_DEFAULT);
-  if (fs.existsSync(baselineFile)) {
-    try {
-      baseline = JSON.parse(fs.readFileSync(baselineFile, "utf8")).files;
-      if (baseline === null || typeof baseline !== "object") throw new Error("no `files` map");
-    } catch (error) {
-      console.error(`ownership-check: ${BASELINE_PATH ?? BASELINE_DEFAULT} could not be read as a baseline (${error.message}).`);
-      console.error("  A baseline that does not parse would switch the ratchet off and still look green.");
-      return 1;
-    }
-  } else if (BASELINE_PATH !== undefined) {
+  if (!fs.existsSync(file)) {
+    if (BASELINE_PATH === undefined) return { baseline: undefined };
     console.error(`ownership-check: no baseline at ${BASELINE_PATH}.`);
-    return 1;
-  }
-  const files = rulesIn(root);
-
-  if (files.length === 0) {
-    // Zero findings because nothing was read looks exactly like zero findings because everything was
-    // clean. Say which one this is.
-    console.error("ownership-check: scanned no rule files under common/, csharp/, rust/, typescript/.");
-    console.error("  Run it from the conventions repository root; from anywhere else it would report a");
-    console.error("  clean bill of health for a corpus it never opened.");
-    return 1;
+    return { failed: true };
   }
 
+  try {
+    const baseline = JSON.parse(fs.readFileSync(file, "utf8")).files;
+    if (baseline === null || typeof baseline !== "object") throw new Error("no `files` map");
+    return { baseline };
+  } catch (error) {
+    console.error(`ownership-check: ${named} could not be read as a baseline (${error.message}).`);
+    console.error("  A baseline that does not parse would switch the ratchet off and still look green.");
+    return { failed: true };
+  }
+}
+
+/** Normalised for comparison: a marker and a finding are the same name however they were typed. */
+const normalise = (token) => token.toLowerCase().replace(/\s+/g, " ").trim();
+
+/** Every file's findings, malformed markers and downward dependencies, in one pass over the corpus. */
+function scanCorpus(root, files) {
   const findings = [];
   const malformed = [];
   const downward = [];
@@ -247,10 +260,9 @@ export function main() {
     // A marker grants its token in the file that carries it, and nowhere else — otherwise one
     // declaration would licence the name across the corpus, which is an allowlist with extra steps.
     //
-    // The comparison is EXACT, on the normalised token. It was `includes` first, which made a short
-    // declaration an allowlist for the corpus: `<!-- owns: e — … -->` is a perfectly well-formed
-    // marker, and `e` sits inside every `dew_flow_*` name there is.
-    const normalise = (token) => token.toLowerCase().replace(/\s+/g, " ").trim();
+    // The comparison is EXACT. It was `includes` first, which made a short declaration an allowlist
+    // for the corpus: `<!-- owns: e — … -->` is a perfectly well-formed marker, and `e` sits inside
+    // every `dew_flow_*` name there is.
     const declared = new Set(markers.tokens.map(normalise));
     for (const finding of findingsIn(text, file)) {
       if (declared.has(normalise(finding.token))) continue;
@@ -258,11 +270,11 @@ export function main() {
     }
   }
 
-  if (findings.length === 0 && malformed.length === 0 && downward.length === 0) {
-    console.log(`ownership-check: OK — ${files.length} shared rule(s), no undeclared product references.`);
-    return 0;
-  }
+  return { findings, malformed, downward };
+}
 
+/** Everything that was found, printed in full whatever the baseline goes on to decide. */
+function report({ findings, malformed, downward }, fileCount) {
   for (const f of findings) {
     console.error(`ownership-check: ${f.kind} ${f.file}:${f.line} — "${f.token}"`);
   }
@@ -276,75 +288,123 @@ export function main() {
     console.error("  repositories that happen to have it and fail everywhere else, stopping rule loading.");
   }
 
-  if (findings.length > 0) {
-    console.error("");
-    console.error(`ownership-check: ${findings.length} product reference(s) in ${new Set(findings.map((f) => f.file)).size} of ${files.length} shared rules.`);
-    console.error("  Apply the one-second test (common/rule-ownership.md): would another repository still");
-    console.error("  need that sentence if the named one did not exist? If yes, anonymise the citation and");
-    console.error("  keep its date. If no, move it to the repository that owns it. A name that IS the");
-    console.error("  instruction declares itself in the same file:");
-    console.error("      <!-- owns: <token> — why a generic form would be unusable -->");
+  if (findings.length === 0) return;
+  const inFiles = new Set(findings.map((f) => f.file)).size;
+  console.error("");
+  console.error(`ownership-check: ${findings.length} product reference(s) in ${inFiles} of ${fileCount} shared rules.`);
+  console.error("  Apply the one-second test (common/rule-ownership.md): would another repository still");
+  console.error("  need that sentence if the named one did not exist? If yes, anonymise the citation and");
+  console.error("  keep its date. If no, move it to the repository that owns it. A name that IS the");
+  console.error("  instruction declares itself in the same file:");
+  console.error("      <!-- owns: <token> — why a generic form would be unusable -->");
+}
+
+/** Each file's findings against its recorded count, as `{ over, below }`. */
+function compareToBaseline(findings, baseline) {
+  const perFile = new Map();
+  for (const f of findings) {
+    const key = f.file.replaceAll("\\", "/");
+    perFile.set(key, (perFile.get(key) ?? 0) + 1);
   }
 
-  // A marker with no reason and a shared rule depending on a local id are defects in the mechanism,
-  // not a backlog of names — no baseline forgives them, and --warn is the only thing that can.
-  const mechanismBroken = malformed.length > 0 || downward.length > 0;
+  const over = [];
+  const below = [];
+  for (const file of new Set([...perFile.keys(), ...Object.keys(baseline)])) {
+    const count = perFile.get(file) ?? 0;
+    const allowed = baseline[file] ?? 0;
+    if (count > allowed) over.push({ file, count, allowed });
+    else if (count < allowed) below.push({ file, count, allowed });
+  }
+  return { over, below };
+}
+
+/**
+ * The ratchet's verdict.
+ *
+ * The recorded count is a floor as well as a ceiling. A file allowed to sit UNDER its number leaves
+ * room a reference can be added back into later, under the old count, with nothing to say a word —
+ * the same hole the per-file split closed, one level down. So a cleanup is not finished until the
+ * baseline says so, in the same commit, which is what makes the number a record of the corpus rather
+ * than a budget somebody remembers to spend.
+ */
+function judgeBaseline(findings, baseline) {
+  const { over, below } = compareToBaseline(findings, baseline);
+
+  if (over.length === 0 && below.length === 0) {
+    console.log(`ownership-check: at the baseline — ${findings.length} finding(s), every file at its recorded count.`);
+    return 0;
+  }
+
+  console.error("");
+  for (const b of below) {
+    const cure = b.count === 0 ? "remove its entry" : `lower it to ${b.count}`;
+    console.error(`ownership-check: BELOW BASELINE ${b.file} — ${b.count} finding(s), ${b.allowed} recorded — ${cure}.`);
+  }
+  if (below.length > 0) {
+    console.error("  That file got cleaner, which is the work. It is not finished until the baseline moves");
+    console.error("  with it: a number left above what the file carries is room a later reference can be");
+    console.error("  added back into without this check saying anything at all.");
+  }
+  for (const o of over) {
+    console.error(`ownership-check: OVER BASELINE ${o.file} — ${o.count} finding(s), ${o.allowed} recorded.`);
+  }
+  if (over.length === 0) return 1;
+
+  console.error("  The count for that file GREW. Usually that is an undeclared product reference somebody");
+  console.error("  added; it can also be an existing one duplicated by a reword or a split sentence. Either");
+  console.error("  way `git diff` against the base branch shows which line, and the cure is the same:");
+  console.error("  anonymise it, declare it with an `owns:` marker, or move it to the repository that owns it.");
+  console.error("  The backlog is allowed while it is worked off. Nothing may be ADDED to it — and a file");
+  console.error("  getting cleaner never buys room for another file to get worse.");
+  return 1;
+}
+
+/**
+ * The scan. Returns an exit code rather than calling process.exit, so importing this module for its
+ * parsers runs nothing — the same guard post-deploy-check uses, and the reason the tests can exercise
+ * findingsIn and markersIn without the whole corpus being scanned on import.
+ */
+export function main() {
+  const root = process.cwd();
+
+  if (BASELINE_PATH_MISSING) {
+    console.error("ownership-check: --baseline needs a path after it.");
+    console.error(`  Without one this would have checked ${BASELINE_DEFAULT} and said nothing about it.`);
+    return 1;
+  }
+
+  const loaded = loadBaseline(root);
+  if (loaded.failed) return 1;
+
+  const files = rulesIn(root);
+  if (files.length === 0) {
+    // Zero findings because nothing was read looks exactly like zero findings because everything was
+    // clean. Say which one this is.
+    console.error("ownership-check: scanned no rule files under common/, csharp/, rust/, typescript/.");
+    console.error("  Run it from the conventions repository root; from anywhere else it would report a");
+    console.error("  clean bill of health for a corpus it never opened.");
+    return 1;
+  }
+
+  const scan = scanCorpus(root, files);
+  if (scan.findings.length === 0 && scan.malformed.length === 0 && scan.downward.length === 0) {
+    console.log(`ownership-check: OK — ${files.length} shared rule(s), no undeclared product references.`);
+    return 0;
+  }
+
+  report(scan, files.length);
 
   if (WARN) {
     console.log("ownership-check: --warn — reported, not failed.");
     return 0;
   }
 
-  if (baseline !== undefined && !mechanismBroken) {
-    // The recorded count is a floor as well as a ceiling. Allowing a file to sit UNDER its number
-    // leaves room a reference can be added back into later, under the old count, with nothing to
-    // say a word — the same hole the per-file split closed, one level down. So a cleanup is not
-    // finished until the baseline says so, in the same commit, which is also what makes the number
-    // a record of the corpus rather than a budget somebody remembers to spend.
-    const perFile = new Map();
-    for (const f of findings) {
-      const key = f.file.replaceAll("\\", "/");
-      perFile.set(key, (perFile.get(key) ?? 0) + 1);
-    }
+  // A marker with no reason and a shared rule depending on a local id are defects in the MECHANISM,
+  // not a backlog of names — no baseline forgives them, and --warn is the only thing that can.
+  const mechanismBroken = scan.malformed.length > 0 || scan.downward.length > 0;
+  if (loaded.baseline === undefined || mechanismBroken) return 1;
 
-    const over = [];
-    const below = [];
-    for (const file of new Set([...perFile.keys(), ...Object.keys(baseline)])) {
-      const count = perFile.get(file) ?? 0;
-      const allowed = baseline[file] ?? 0;
-      if (count > allowed) over.push({ file, count, allowed });
-      else if (count < allowed) below.push({ file, count, allowed });
-    }
-
-    if (over.length === 0 && below.length === 0) {
-      console.log(`ownership-check: at the baseline — ${findings.length} finding(s), every file at its recorded count.`);
-      return 0;
-    }
-
-    console.error("");
-    for (const b of below) {
-      const cure = b.count === 0 ? "remove its entry" : `lower it to ${b.count}`;
-      console.error(`ownership-check: BELOW BASELINE ${b.file} — ${b.count} finding(s), ${b.allowed} recorded — ${cure}.`);
-    }
-    if (below.length > 0) {
-      console.error("  That file got cleaner, which is the work. It is not finished until the baseline moves");
-      console.error("  with it: a number left above what the file carries is room a later reference can be");
-      console.error("  added back into without this check saying anything at all.");
-    }
-    for (const o of over) {
-      console.error(`ownership-check: OVER BASELINE ${o.file} — ${o.count} finding(s), ${o.allowed} recorded.`);
-    }
-    if (over.length === 0) return 1;
-    console.error("  The count for that file GREW. Usually that is an undeclared product reference somebody");
-    console.error("  added; it can also be an existing one duplicated by a reword or a split sentence. Either");
-    console.error("  way `git diff` against the base branch shows which line, and the cure is the same:");
-    console.error("  anonymise it, declare it with an `owns:` marker, or move it to the repository that owns it.");
-    console.error("  The backlog is allowed while it is worked off. Nothing may be ADDED to it — and a file");
-    console.error("  getting cleaner never buys room for another file to get worse.");
-    return 1;
-  }
-  return 1;
-
+  return judgeBaseline(scan.findings, loaded.baseline);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
