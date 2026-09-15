@@ -59,10 +59,39 @@ const DEFINITE = /\b(?:the|its|our)\s+(sidecar|benchmark|daemon|extension|panel|
 /** `<!-- owns: <token> — <reason> -->`. The reason is what makes it a decision and not an allowlist. */
 const MARKER = /<!--\s*owns:\s*([^\s—-][^—\n]*?)\s*(?:—|--)\s*([^>]*?)\s*-->/gi;
 
-/** A reason has to say something. Ten characters is enough to stop "ok" and "see above". */
+/**
+ * A reason has to say something. Ten characters and three words stop "ok", "needed" and "see above";
+ * a placeholder list stops the next few that occurred to a reviewer.
+ *
+ * No check can judge whether a justification is HONEST — that is what review is for, and the marker
+ * is deliberately visible in the diff so a reviewer sees it. What this can do is refuse the shapes
+ * that are obviously not a reason at all.
+ */
 const MIN_REASON = 10;
+const MIN_REASON_WORDS = 3;
+const PLACEHOLDER = /^(see above|see below|needed|required|necessary|obvious|todo|tbd|n\/?a|because|why|reason|it is needed)\b/i;
+
+/** Whether a marker's reason is a reason, rather than the shape of one. */
+export const isReason = (reason) =>
+  reason.length >= MIN_REASON
+  && reason.split(/\s+/).filter(Boolean).length >= MIN_REASON_WORDS
+  && !PLACEHOLDER.test(reason);
 
 const WARN = process.argv.includes("--warn");
+
+/**
+ * The ratchet. `--max N` allows N existing findings and fails on the N+1th.
+ *
+ * `--warn` alone would let a NEW product reference merge unnoticed for as long as the backfill takes,
+ * which defeats the one thing this rule promises — that the drift cannot recur. The baseline is what
+ * the corpus already carries; anything above it arrived after the rule existed. As the cleanup lands
+ * the number comes down, and `--max 0` is the armed state.
+ *
+ * A malformed marker and a downward dependency are never forgiven by a baseline: those are defects in
+ * the mechanism rather than a backlog of names.
+ */
+const maxIndex = process.argv.indexOf("--max");
+const MAX = maxIndex === -1 ? undefined : Number(process.argv[maxIndex + 1]);
 
 /**
  * Text with fenced code blocks removed.
@@ -83,7 +112,7 @@ export function markersIn(raw) {
   for (const match of text.matchAll(MARKER)) {
     const token = match[1].trim();
     const reason = (match[2] ?? "").trim();
-    if (reason.length < MIN_REASON) malformed.push({ token, reason });
+    if (!isReason(reason)) malformed.push({ token, reason });
     else tokens.push(token);
   }
   // A marker with no separator at all never matches above, so catch the bare shape separately.
@@ -136,6 +165,14 @@ export function rulesIn(root) {
  * findingsIn and markersIn without the whole corpus being scanned on import.
  */
 export function main() {
+  if (maxIndex !== -1 && (!Number.isInteger(MAX) || MAX < 0)) {
+    // Number("soon") is NaN and every comparison with it is false, so a typo would disable the
+    // ratchet while still exiting 0 — the trap release-distance had, in the same shape.
+    console.error(`ownership-check: --max was given "${process.argv[maxIndex + 1]}", which is not a number of findings.`);
+    console.error("  A baseline that does not parse would switch the ratchet off and still look green.");
+    return 1;
+  }
+
   const root = process.cwd();
   const files = rulesIn(root);
 
@@ -195,9 +232,25 @@ export function main() {
     console.error("      <!-- owns: <token> — why a generic form would be unusable -->");
   }
 
+  // A marker with no reason and a shared rule depending on a local id are defects in the mechanism,
+  // not a backlog of names — no baseline forgives them, and --warn is the only thing that can.
+  const mechanismBroken = malformed.length > 0 || downward.length > 0;
+
   if (WARN) {
     console.log("ownership-check: --warn — reported, not failed.");
     return 0;
+  }
+
+  if (MAX !== undefined && !mechanismBroken) {
+    if (findings.length <= MAX) {
+      console.log(`ownership-check: within the baseline — ${findings.length} of an allowed ${MAX}. Reported, not failed.`);
+      return 0;
+    }
+    console.error("");
+    console.error(`ownership-check: ${findings.length} finding(s), ${findings.length - MAX} more than the allowed ${MAX}.`);
+    console.error("  That difference is a reference that was not there before — the backlog is allowed while it");
+    console.error("  is being worked off, but nothing may be ADDED to it. Anonymise the new one, or declare it.");
+    return 1;
   }
   return 1;
 

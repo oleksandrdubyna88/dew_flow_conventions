@@ -597,3 +597,37 @@ So the freeze changed from *no edit ever* to *no accidental edit*. Observed red 
 on: appending one sentence to a rule without touching the map fails with
 `common.durable-status: the body changed without its currentBodySha256 — update the map in the same
 commit`.
+
+**What the plan round added.** Ten findings across two reviewers (the third was at capacity); four
+accepted, and two of them were holes in what this story promises rather than polish.
+
+**The ratchet.** A bare `--warn` exits 0 whatever it finds, so a pull request adding a NEW product
+reference would have merged unnoticed for as long as the backfill takes — which defeats the single
+guarantee the rule makes, that the drift cannot recur. `--max N` allows N existing findings and fails
+on the N+1th, naming the difference as "a reference that was not there before". The backlog is
+allowed while it is worked off; nothing may be added to it; `--max 0` is the armed state. A malformed
+marker and a downward dependency are never forgiven by a baseline, because those are defects in the
+mechanism rather than a backlog of names — asserted by a case that passes `--max 99` and still fails.
+
+**The rule was loading in the wrong repository.** Its `paths` matched `.agents/rules/**`, so an agent
+editing a CONSUMER's own local rules would have been handed a rule saying "name no product" — exactly
+inverting what those files exist to hold. Scoped to the shared corpus only, with the reason written
+into the rule so it is not re-added.
+
+A `--max` that does not parse is a usage error rather than a silently disabled ratchet: `Number("soon")`
+is NaN and every comparison with it is false, which is the same trap `release-distance` had.
+
+Marker reasons are now checked for shape as well as length — three words, and a placeholder list.
+That fix was itself a lesson: the first attempt wrote a literal `0x08` byte where `\b` belonged, so
+the placeholder list matched nothing and `"required for now"` passed as a justification. It took three
+attempts to repair, because the mangling recurs every time a backslash goes through a heredoc. No
+check can judge whether a justification is HONEST — the marker is visible in the diff for that — but
+it can refuse the shapes that are not reasons at all.
+
+Six were rejected on evidence: the 16 KiB core cap is already enforced with its own message (and is
+the reason this rule is `conditional`); `load: conditional` is a selection mechanism and resolves no
+repository at runtime; the unrecorded-edit case is exactly what the two-hash freeze detects and was
+observed red; the fence/inline-span distinction is tested in both directions; the suite is green WITH
+the new rule present, which disproves the claim that asserting the original hashes breaks newly
+authored rules; and `downwardDependencies()` implements the `depends:` constraint the last finding
+asked for, with a fixture and a case.

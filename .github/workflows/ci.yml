@@ -41,9 +41,12 @@ jobs:
       # A shared rule names no product (common/rule-ownership.md). It needs no npm install, which is
       # why it runs before the step that does. --warn while the backfill runs:
       # 129 references across 26 of 32 rules on the day this landed, and a check that goes red on the
-      # day it lands teaches people to switch it off. The flag comes off when the cleanup is done.
+      # day it lands teaches people to switch it off. But a bare --warn would let a NEW reference merge
+      # unnoticed for as long as the backfill takes, which is the one thing this rule promises cannot
+      # happen — so it is a RATCHET: the backlog is allowed, nothing may be added to it, and the number
+      # comes down as the cleanup lands until --max 0 is the armed state.
       - name: Ownership
-        run: node tools/ownership-check.mjs --warn
+        run: node tools/ownership-check.mjs --max 129
 
       - name: Selftest
         run: |

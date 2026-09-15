@@ -153,3 +153,46 @@ test("a marker shown inside a code fence is documentation, not a declaration", (
   const fenced = "# Rule\n\n```\nMeasured in dew_flow_mcp.\n```\n";
   assert.equal(findingsIn(fenced, "common/x.md").length, 1, "a name in an example is still a name");
 });
+
+test("--max is a ratchet: at or under the baseline passes, over it fails", () => {
+  // `--warn` alone would let a NEW product reference merge unnoticed for as long as the backfill
+  // takes — which defeats the one thing this story promises, that the drift cannot recur. The
+  // baseline is the number of findings the corpus already has; anything above it is new.
+  const under = run(fixture("leaky"), "--max", "1");
+  assert.equal(under.code, 0, under.out);
+  assert.match(under.out, /dew_flow_rag_qln/, "the finding is still reported, not hidden");
+  assert.match(under.out, /1 of an allowed 1/);
+
+  const over = run(fixture("leaky"), "--max", "0");
+  assert.equal(over.code, 1, over.out);
+  assert.match(over.out, /1 finding\(s\), 1 more than the allowed 0/);
+  assert.match(over.out, /a reference that was not there before/i);
+});
+
+test("--max still fails on a malformed marker or a downward dependency, whatever the count", () => {
+  // The ratchet is about the BACKLOG of product names. A marker with no reason and a shared rule
+  // depending on a local id are defects in the mechanism itself, and no baseline forgives them.
+  const marker = run(fixture("marked-bare"), "--max", "99");
+  assert.equal(marker.code, 1, marker.out);
+  const depends = run(fixture("depends"), "--max", "99");
+  assert.equal(depends.code, 1, depends.out);
+});
+
+test("--max rejects a baseline that is not a number, rather than ignoring it", () => {
+  // `Number("soon")` is NaN and every comparison with it is false, so a typo would silently disable
+  // the ratchet while still exiting 0 — the same trap release-distance had.
+  const { code, out } = run(fixture("clean"), "--max", "soon");
+  assert.equal(code, 1, out);
+  assert.match(out, /--max/);
+  assert.match(out, /not a number/);
+});
+
+test("a reason that is the shape of a reason rather than one is refused", () => {
+  // No check can judge whether a justification is honest — that is what review is for, and the marker
+  // is deliberately visible in the diff. What this refuses is the shapes that are not reasons at all.
+  const declared = (reason) => markersIn(`<!-- owns: coai — ${reason} -->`);
+  assert.equal(declared("the MCP tool names a session must type").tokens.length, 1);
+  for (const placeholder of ["needed", "see above", "required for now", "TBD", "because", "it is needed here"]) {
+    assert.equal(declared(placeholder).malformed.length, 1, `"${placeholder}" is not a reason`);
+  }
+});
