@@ -114,13 +114,14 @@ test("symlink rule sources are refused instead of following external files", t =
 
 const sourceRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
 
-// The inventory carries TWO records per rule, and they answer different questions.
+// TWO records per rule, in two files, answering two different questions.
 //
-//   originalBodySha256 / sections  — what the body was at migration. Immutable evidence that nothing
-//     was lost in the move, and never compared against the live file again: comparing it forever is
-//     what made these 24 rules uneditable, so that every improvement had to become a NEW file and the
-//     corpus grew instead of being corrected.
-//   currentBodySha256 / currentSections — what the body is NOW. Moved in the SAME commit as any edit.
+//   shared-rules-migration-map.json: originalBodySha256 / sections — what the body was at migration.
+//     Immutable evidence that nothing was lost in the move, and never compared against the live file
+//     again: comparing it forever is what made those 24 rules uneditable, so that every improvement
+//     had to become a NEW file and the corpus grew instead of being corrected.
+//   rule-bodies.json: bodySha256 / sections — what the body is NOW, for ALL 32 rules rather than the
+//     24 that happened to be migrated. Moved in the SAME commit as any edit.
 //
 // So the freeze changed from "no edit ever" to "no ACCIDENTAL edit": a body that changes without its
 // hash changing is a red suite, and a deliberate change is a two-line diff beside the prose. The
