@@ -30,6 +30,12 @@ const fixture = (name) => path.join(here, "fixtures", "ownership", name);
 
 function run(cwd, ...args) {
   const result = spawnSync(process.execPath, [tool, ...args], { cwd, encoding: "utf8", timeout: 30000 });
+  // A spawn that never happened reports status `null`, which an equality assertion renders as
+  // `null !== 1` and sends the reader after the tool's exit code rather than after the missing
+  // directory. Say which it was.
+  if (result.error !== undefined) {
+    throw new Error(`the tool could not be run in ${cwd}: ${result.error.message}`);
+  }
   return { code: result.status, out: `${result.stdout}${result.stderr}` };
 }
 
@@ -106,10 +112,16 @@ test("a shared rule depending on a local id is refused", () => {
   assert.match(out, /never depends on a repo-local one/);
 });
 
-test("scanning no rule files at all is a failure, not a pass", () => {
+test("scanning no rule files at all is a failure, not a pass", (t) => {
   // Zero findings because nothing was read looks identical to zero findings because everything was
   // clean. Run from the wrong directory, this check must say so rather than congratulate itself.
-  const { code, out } = run(fixture("empty"));
+  //
+  // The repository is built here rather than committed, because an empty directory is the one thing
+  // git cannot carry: `tools/fixtures/ownership/empty/` existed on the machine that wrote it and
+  // nowhere else. It passed locally and failed on CI with `null !== 1` — the tool was never spawned.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ownership-empty-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const { code, out } = run(root);
   assert.equal(code, 1, out);
   assert.match(out, /scanned no rule files/);
 });
