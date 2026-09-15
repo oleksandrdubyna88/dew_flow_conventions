@@ -13,44 +13,126 @@
 // This is NOT an update-everything button. It recomputes the ids you NAME, so the command is a
 // statement about what you changed, and a rule you edited by accident is still a red suite rather
 // than a silently blessed diff. `--all` does not exist, and adding it would remove the only property
-// the freeze has.
+// the freeze has — so the word is REFUSED rather than ignored, because a flag that is silently
+// dropped reports success for a job it did not do.
+//
+// What a body IS lives in lib/rule-body.mjs, which the resolver and the ownership check read through
+// as well. Two reviewers found the reason independently: a private copy of that extraction hashes
+// bytes that are not what consumers load, and the freeze then blesses or refuses a policy change on
+// the wrong evidence.
 //
 // Run:    node tools/rule-bodies.mjs                       verify, and name every drifted rule
 //         node tools/rule-bodies.mjs --update <id> [<id>…] record those rules' bodies as they are now
-// Exit:   0 in step, or updated.  1 drift, an unknown id, or a rule with no entry.
+// Exit:   0 in step, or updated.  1 drift, an unknown id, an unrecorded rule, or a failed write.
 
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
+import { bodyOf as bodyFrom, sectionsOf } from "./lib/rule-body.mjs";
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const MANIFEST = "research/rule-bodies.json";
 
+/** The four directories the resolver walks. A file outside them is not a rule. */
+const RULE_DIRECTORIES = ["common", "csharp", "rust", "typescript"];
+
 /** The same text the resolver reads: CRLF folded, frontmatter removed. Hash what a consumer loads. */
 export function bodyOf(root, source) {
-  const text = fs.readFileSync(path.join(root, source), "utf8").replaceAll("\r\n", "\n");
-  return text.replace(/^---\n[\s\S]*?\n---\n/, "");
+  return bodyFrom(fs.readFileSync(path.join(root, source), "utf8"));
 }
 
 export function recordFor(root, entry) {
   const body = bodyOf(root, entry.source);
   return {
     bodySha256: createHash("sha256").update(body).digest("hex"),
-    sections: body.split("\n").filter((line) => /^#{1,4} /.test(line)),
+    sections: sectionsOf(body),
   };
 }
 
-/** Which recorded rules no longer match their file, as `{ id, hash, sections }` flags. */
+/** Every rule file on disk, as repository-relative paths with forward slashes. */
+export function rulesOnDisk(root) {
+  const found = [];
+  for (const directory of RULE_DIRECTORIES) {
+    const full = path.join(root, directory);
+    if (!fs.existsSync(full)) continue;
+    for (const name of fs.readdirSync(full).sort()) {
+      if (name.endsWith(".md")) found.push(`${directory}/${name}`);
+    }
+  }
+  return found;
+}
+
+/**
+ * Everything out of step, as `{ id, hash, sections, missing, unrecorded }`.
+ *
+ * It walks the DISK as well as the manifest. Reading only the manifest meant a new rule file entered
+ * policy distribution with no freeze over it while this tool reported OK, and a deleted or renamed
+ * source came back as a bare ENOENT instead of a sentence naming the rule that lost its file.
+ */
 export function drifted(root, manifest) {
   const out = [];
+  const recorded = new Set();
+
   for (const entry of manifest.rules) {
+    recorded.add(entry.source);
+    if (!fs.existsSync(path.join(root, entry.source))) {
+      out.push({ id: entry.id, missing: true });
+      continue;
+    }
     const now = recordFor(root, entry);
     const hash = now.bodySha256 !== entry.bodySha256;
     const sections = JSON.stringify(now.sections) !== JSON.stringify(entry.sections);
     if (hash || sections) out.push({ id: entry.id, hash, sections });
   }
+
+  for (const source of rulesOnDisk(root)) {
+    if (recorded.has(source)) continue;
+    const declared = /^id:\s*"?([^"\n]+)"?/m.exec(fs.readFileSync(path.join(root, source), "utf8"));
+    out.push({ id: declared === null ? source : declared[1].trim(), source, unrecorded: true });
+  }
+
   return out;
+}
+
+/** Replace the manifest with no window in which it is half-written. */
+function writeManifest(file, manifest) {
+  const temporary = `${file}.tmp`;
+  try {
+    fs.writeFileSync(temporary, `${JSON.stringify(manifest, null, 2)}\n`);
+    fs.renameSync(temporary, file);
+    return true;
+  } catch (error) {
+    try { fs.rmSync(temporary, { force: true }); } catch { /* the failure below is the one to report */ }
+    console.error(`rule-bodies: ${MANIFEST} could not be written (${error.message}).`);
+    console.error("  Nothing was changed. This file is the freeze's only record, so a half-written one");
+    console.error("  would fail every rule at once and could be committed by accident.");
+    return false;
+  }
+}
+
+function report(drift) {
+  for (const d of drift) {
+    if (d.missing) {
+      console.error(`rule-bodies: MISSING ${d.id} — its recorded source is not on disk.`);
+    } else if (d.unrecorded) {
+      console.error(`rule-bodies: UNRECORDED ${d.id} (${d.source}) — a rule with no entry in ${MANIFEST}.`);
+    } else {
+      const what = [d.hash ? "body" : "", d.sections ? "headings" : ""].filter(Boolean).join(" and ");
+      console.error(`rule-bodies: DRIFT ${d.id} — its ${what} changed without the record moving.`);
+    }
+  }
+
+  const editable = drift.filter((d) => !d.missing && !d.unrecorded).map((d) => d.id);
+  if (editable.length > 0) {
+    console.error(`  If the edit was deliberate: node tools/rule-bodies.mjs --update ${editable.join(" ")}`);
+    console.error("  If it was not, the diff against the base branch is the answer to what happened.");
+  }
+  if (drift.some((d) => d.unrecorded || d.missing)) {
+    console.error(`  A rule that was added, renamed or removed changes ${MANIFEST} by hand, once —`);
+    console.error("  because a tool that did it for you would let a rule join or leave policy unnoticed.");
+  }
 }
 
 export function main(argv, root = path.resolve(here, "..")) {
@@ -68,20 +150,20 @@ export function main(argv, root = path.resolve(here, "..")) {
       console.log(`rule-bodies: OK — ${manifest.rules.length} rule(s) match their recorded body.`);
       return 0;
     }
-    for (const d of drift) {
-      const what = [d.hash ? "body" : "", d.sections ? "headings" : ""].filter(Boolean).join(" and ");
-      console.error(`rule-bodies: DRIFT ${d.id} — its ${what} changed without the record moving.`);
-    }
-    console.error(`  If the edit was deliberate: node tools/rule-bodies.mjs --update ${drift.map((d) => d.id).join(" ")}`);
-    console.error("  If it was not, the diff against the base branch is the answer to what happened.");
+    report(drift);
     return 1;
   }
 
-  const ids = argv.slice(updateAt + 1).filter((argument) => !argument.startsWith("--"));
+  const ids = argv.slice(updateAt + 1);
+  const flag = ids.find((argument) => argument.startsWith("--"));
+  if (flag !== undefined) {
+    console.error(`rule-bodies: ${flag} is not an option here.`);
+    console.error("  Naming what you changed is the point, so there is no --all: a button that recorded");
+    console.error("  every body would bless the edit you did not notice making. Nothing was changed.");
+    return 1;
+  }
   if (ids.length === 0) {
     console.error("rule-bodies: --update needs at least one rule id.");
-    console.error("  Naming what you changed is the point: there is no --all, because a button that");
-    console.error("  records every body would bless the edit you did not notice making.");
     return 1;
   }
 
@@ -94,6 +176,11 @@ export function main(argv, root = path.resolve(here, "..")) {
       failed = true;
       continue;
     }
+    if (!fs.existsSync(path.join(root, entry.source))) {
+      console.error(`rule-bodies: ${id} has no file at ${entry.source}.`);
+      failed = true;
+      continue;
+    }
     const before = entry.bodySha256;
     Object.assign(entry, recordFor(root, entry));
     const moved = before === entry.bodySha256 ? "unchanged" : `${before.slice(0, 12)} → ${entry.bodySha256.slice(0, 12)}`;
@@ -101,7 +188,7 @@ export function main(argv, root = path.resolve(here, "..")) {
   }
   if (failed) return 1;
 
-  fs.writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`);
+  if (!writeManifest(manifestFile, manifest)) return 1;
   console.log(`rule-bodies: ${MANIFEST} written. The diff beside the prose is what a reviewer reads.`);
   return 0;
 }

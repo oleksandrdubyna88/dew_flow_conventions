@@ -4,6 +4,8 @@ import { createHash } from "node:crypto";
 import { parseDocument } from "yaml";
 import picomatch from "picomatch";
 
+import { folded } from "./rule-body.mjs";
+
 export const TASKS = Object.freeze({
   inspect: "Read or explain the product without changing it",
   audit: "Review correctness, security, or performance",
@@ -42,7 +44,7 @@ export function projectRequirements(text) {
 export function normalizedText(file) {
   if (fs.lstatSync(file).isSymbolicLink()) throw new Error(`Symlink instruction source: ${file}`);
   if (fs.statSync(file).size > LIMITS.file) throw new Error(`Instruction exceeds ${LIMITS.file} bytes: ${file}`);
-  return fs.readFileSync(file, "utf8").replaceAll("\r\n", "\n");
+  return folded(fs.readFileSync(file, "utf8"));
 }
 
 function walk(directory) {

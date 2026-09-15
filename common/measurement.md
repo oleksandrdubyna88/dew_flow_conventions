@@ -93,7 +93,7 @@ you meant. When a reviewer — a model, a colleague, CI — makes a claim about 
 
 ## 6. A results document names its subject by sha, and its harness by path
 
-Six months on, "the local model was faster" is unusable and `2b7d3ab, review-matrix.mjs, 2026-09-02` is
+Six months on, "the local model was faster" is unusable and `2b7d3ab, <harness>.mjs, 2026-09-02` is
 reproducible. Name: the commit or input under test, the harness that ran it, the date, the pinned
 variables, and the machine when the machine matters (a GPU measurement is about that card).
 
