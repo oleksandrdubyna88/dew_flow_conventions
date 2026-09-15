@@ -731,3 +731,49 @@ anchors on `\n`, so on a CRLF working copy `downwardDependencies` matched nothin
 where the checkout is LF, which is how it stayed invisible — a green check that never ran, on the machine
 somebody is actually editing on. All three parsers fold line endings now, the same way the resolver does,
 and the case asserts all three on CRLF input.
+
+### What the code round added
+
+Twelve reviewers, 28 findings, ten accepted. Two of them were found independently by two vendors, which
+is usually the signal worth reading first.
+
+**Three implementations of “what a rule's body is”.** The resolver folded CRLF and stripped frontmatter;
+the ownership check anchored on `\n` and folded nothing; the body freeze folded and stripped in its own
+copy of the same two expressions. The consequence both reviewers named: if the resolver ever normalises
+differently, the freeze hashes bytes that are not what six repositories load, and then it blesses or
+refuses a policy change on the wrong evidence. `tools/lib/rule-body.mjs` now holds `folded`, `bodyOf`,
+`outsideFences` and `sectionsOf`, and the resolver, the ownership check, the freeze tool and
+`rules.test.mjs` all read through it. It is dependency-free because the ownership check runs before
+`npm ci`, which is what lets it be the first step in the job.
+
+**`# @name` inside a code fence was a heading.** Verified against the real manifest before accepting:
+`common.http-contracts` recorded `# @name vault_get_returns_the_callers_blob` and `# @prod`, and
+`common.git-workflow` recorded two shell comments. So editing a comment in an `.http` sample reported
+that the rule's HEADINGS had changed. `sectionsOf` strips fences, and because both the tool and the
+test use it, they cannot disagree about what a heading is. Twelve rules had their recorded outline
+corrected; no body hash moved.
+
+**`--update common.one --all`** dropped the flag, recorded one rule, exited 0 and said the manifest was
+written. For a tool whose whole argument is that there is no `--all`, silently accepting the word and
+doing something else is the worst available answer. Any `--` argument after `--update` is now refused by
+name, and nothing is written.
+
+**`drifted()` walked the manifest, not the disk.** A NEW rule file therefore entered policy distribution
+with no freeze over it while the tool reported OK, and a deleted or renamed source came back as a bare
+ENOENT. It walks both now: an unrecorded rule and a missing source are each reported as what they are,
+and neither offers `--update` as the cure — a rule that joins or leaves policy is a manifest edit somebody
+makes on purpose.
+
+**The manifest was truncated before it was rewritten.** It is written to a temporary file beside itself
+and renamed over, so a killed process, a full disk or a read-only checkout leaves the old record intact
+and says which file could not be written. The case makes the write fail portably by putting a directory
+where the temporary file has to go — the first attempt made the MANIFEST a directory, which broke the
+read instead and proved nothing.
+
+Eighteen were rejected. Six were one claim repeated: that “in one repository here” is an invented term —
+it is the worked example in `common/rule-ownership.md`'s own anonymisation table, and “here” is the scope
+that keeps the claim honest. Two asked for the product names to be restored. One asserted that
+`markersIn` folds too late; it folds at `ownership-check.mjs:143`, before the fences are stripped. Two
+asked for a `--dry-run` whose output is what `git diff research/rule-bodies.json` already shows, on a
+tracked file, for a command that prints every id it touched with both hashes. One asked for a lock file
+against two people running `--update` in the same directory in the same second.

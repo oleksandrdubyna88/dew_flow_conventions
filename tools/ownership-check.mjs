@@ -21,6 +21,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { folded, outsideFences } from "./lib/rule-body.mjs";
+
 /** The four directories loadCatalog walks. Anything outside them is not a rule. */
 const RULE_DIRECTORIES = ["common", "csharp", "rust", "typescript"];
 
@@ -116,27 +118,10 @@ const BASELINE_PATH = baselineIndex === -1 ? undefined : process.argv[baselineIn
  */
 const BASELINE_PATH_MISSING = baselineIndex !== -1 && BASELINE_PATH === undefined;
 
-/**
- * Text with fenced code blocks removed.
- *
- * Used for MARKERS only, never for findings. A marker is an instruction to this tool, and one inside
- * a fence OR an inline code span is being SHOWN rather than GIVEN. Not hypothetical: the rule that
- * documents this syntax was reported as carrying a malformed marker, by the check it defines. A
- * product NAME in a fence is still a product name, so findings keep reading them.
- */
-const outsideFences = (text) =>
-  text.replace(/^```[\s\S]*?^```/gm, "").replace(/`[^`\n]*`/g, "");
-
-/**
- * Line endings folded, because every pattern here anchors on `\n`.
- *
- * `core.autocrlf` rewrites this corpus on checkout, so the same file is LF on CI and CRLF on a
- * Windows working copy. The frontmatter pattern `^---\n` then matches nothing, and the
- * downward-dependency half of this check reported `OK, no undeclared product references` for a rule
- * that declared one — silently, and only on the machine somebody was actually editing it on. The
- * resolver folds the same way, for the same reason.
- */
-const folded = (text) => text.replaceAll("\r\n", "\n");
+// Fenced and inline code is stripped for MARKERS only, never for findings: a marker inside a fence is
+// being SHOWN rather than GIVEN — the rule that documents this syntax was reported as carrying a
+// malformed marker, by the check it defines — while a product NAME in an example is still a product
+// name. Both live in lib/rule-body.mjs, so the resolver and the freeze read a file the same way.
 
 /** Every `owns:` token declared in one file, and the markers that failed to declare anything. */
 export function markersIn(raw) {

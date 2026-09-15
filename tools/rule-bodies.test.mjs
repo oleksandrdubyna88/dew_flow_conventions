@@ -112,3 +112,68 @@ test("a missing manifest stops the run rather than starting one", (t) => {
   fs.rmSync(path.join(root, "research", "rule-bodies.json"));
   assert.equal(main([], root), 1);
 });
+
+test("an unsupported flag after --update is refused, not quietly dropped", (t) => {
+  // `--update common.one --all` used to drop the flag, record one rule, exit 0 and report that the
+  // manifest was written — so a caller who believed --all existed would be told their edit was
+  // recorded while another rule stayed drifted. A tool whose whole argument is that there is no
+  // --all must not accept the word and do something else.
+  const root = scene(t);
+  edit(root, "one", "# One\n\nA sentence, rewritten.\n");
+  edit(root, "two", "# Two\n\nAnother sentence, rewritten.\n");
+
+  const code = main(["--update", "common.one", "--all"], root);
+  assert.equal(code, 1);
+  assert.deepEqual(drifted(root, manifestOf(root)).map((d) => d.id), ["common.one", "common.two"],
+    "a refused run records nothing at all");
+});
+
+test("a rule file with no manifest entry is unrecorded drift, not a clean bill of health", (t) => {
+  // drifted() walked the manifest, so a NEW rule entered policy distribution with no freeze over it
+  // and this tool said OK. It walks the rule directories now.
+  const root = scene(t);
+  fs.writeFileSync(path.join(root, "common", "three.md"),
+    '---\nid: "common.three"\nload: "conditional"\ntasks: ["policy"]\n---\n# Three\n\nNew.\n');
+  const code = main([], root);
+  assert.equal(code, 1);
+  assert.deepEqual(drifted(root, manifestOf(root)).map((d) => d.id), ["common.three"]);
+});
+
+test("a recorded rule whose file is gone is reported, not an ENOENT stack trace", (t) => {
+  const root = scene(t);
+  fs.rmSync(path.join(root, "common", "two.md"));
+  const drift = drifted(root, manifestOf(root));
+  assert.deepEqual(drift.map((d) => d.id), ["common.two"]);
+  assert.equal(drift[0].missing, true, "the reason is that its source is gone");
+  assert.equal(main([], root), 1);
+});
+
+test("a `#` comment inside a code fence is not a heading", (t) => {
+  // Measured in the real manifest before this was fixed: common.http-contracts recorded
+  // `# @name vault_get_returns_the_callers_blob` and `# @prod` as headings, and common.git-workflow
+  // recorded two shell comments. Editing a comment in a code sample then reported that the rule's
+  // HEADINGS had changed, which couples the outline to the contents of an example.
+  const root = scene(t);
+  edit(root, "one", "# One\n\n```sh\n# not a heading, a comment\n```\n\n## Really a heading\n");
+  assert.equal(main(["--update", "common.one"], root), 0);
+  assert.deepEqual(manifestOf(root).rules[0].sections, ["# One", "## Really a heading"]);
+});
+
+test("a manifest that cannot be written says so, and leaves the old one intact", (t) => {
+  // The manifest is the freeze's only record, so a truncate-then-write that is interrupted leaves
+  // partial JSON that fails every rule at once and can be committed by accident. It writes a
+  // temporary file beside the manifest and renames it over, so a failed write changes nothing.
+  //
+  // A DIRECTORY at the temporary path is the portable way to make that write fail on every platform
+  // this runs on, while the manifest itself still reads normally — which is the case under test.
+  const root = scene(t);
+  edit(root, "one", "# One\n\nA sentence, rewritten.\n");
+  const manifest = path.join(root, "research", "rule-bodies.json");
+  const before = fs.readFileSync(manifest, "utf8");
+  fs.mkdirSync(`${manifest}.tmp`);
+
+  assert.equal(main(["--update", "common.one"], root), 1);
+  assert.equal(fs.readFileSync(manifest, "utf8"), before, "the old record survived the failure");
+  assert.deepEqual(drifted(root, manifestOf(root)).map((d) => d.id), ["common.one"],
+    "and the corpus is still drifted, so nothing was quietly blessed");
+});

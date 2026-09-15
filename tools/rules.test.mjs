@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync, execFileSync } from "node:child_process";
 import { loadCatalog, selectRules, sha256 } from "./lib/rule-catalog.mjs";
 import {run} from "./lib/rule-cli.mjs";
+import {bodyOf, sectionsOf} from "./lib/rule-body.mjs";
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "rules Unicode пробел "));
@@ -158,10 +159,12 @@ test("EVERY rule's live body matches research/rule-bodies.json",()=>{
   for(const rule of catalog) {
     const entry=recorded.get(rule.id);
     assert.ok(entry,`${rule.id}: no entry in rule-bodies.json — a new rule records its body in the same commit`);
-    const body=rule.text.replace(/^---\n[\s\S]*?\n---\n/,"");
+    // The same definition the resolver and tools/rule-bodies.mjs use, so this compares the FILE
+    // against the record rather than two implementations of "what a body is" against each other.
+    const body=bodyOf(rule.text);
     assert.equal(sha256(body),entry.bodySha256,
       `${rule.id}: the body changed without its bodySha256 — update research/rule-bodies.json in the same commit`);
-    assert.deepEqual(body.split("\n").filter(line=>/^#{1,4} /.test(line)),entry.sections,
+    assert.deepEqual(sectionsOf(body),entry.sections,
       `${rule.id}: headings changed without their recorded sections`);
   }
 });
