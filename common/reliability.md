@@ -16,7 +16,9 @@ tasks: ["implement","audit","test","deploy","benchmark"]
 > as they stood on the audit date are kept out of the corpus, in this repository's
 > [`research/reliability-audit-2026-08-16.json`](../research/reliability-audit-2026-08-16.json), so a
 > reader who wants to check a claim can, and nobody has to edit a shared rule when a product moves.
-> Most of the violations below are since fixed; the rule text is the durable part.
+> That file is the only place those addresses are kept, and it is a HISTORICAL RECORD rather than a
+> policy input: nothing loads it, and its line numbers are what they were on the audit date. Most of
+> the violations below are since fixed; the rule text is the durable part.
 
 ## Every wait has a ceiling
 
@@ -37,8 +39,8 @@ tasks: ["implement","audit","test","deploy","benchmark"]
 
 [security.md](security.md) already requires exe + argv + timeout. The timeout must also **kill the
 entire process tree** — a timeout that merely stops *waiting* promotes the child to an orphan that
-holds locks, handles and memory forever. The shape that works is one shared launcher with a linked
-token, a tree-kill and a typed outcome. Audit, 2026-08-16: a second launcher in a .NET host let
+holds locks, handles and memory forever. Use ONE shared launcher, with a linked token, a tree-kill
+and a typed outcome. Audit, 2026-08-16: a second launcher in a .NET host let
 `WaitForExitAsync` throw on timeout while the child lived on — on a probe that runs every five
 minutes forever.
 
@@ -64,8 +66,7 @@ minutes forever.
 - **A crash-recovery sweep exists AND is invoked at every owning host's startup.** The audit's most
   instructive find: a sweep fully implemented, fully tested, and called by nothing
   — a store's sweep method, unreachable outside its own tests, so a killed run's claimed cells were
-  stranded forever. The shape that works: a worker that runs its ownership-checked sweep as the first
-  thing in `ExecuteAsync`.
+  stranded forever. Run the ownership-checked sweep as the first thing in `ExecuteAsync`.
 
 ## Where `try/catch` lives — the three boundaries
 
@@ -165,8 +166,8 @@ What to do instead:
   2026-08-16: two dictionaries in a measuring harness — a per-leg trace and a checkout lock table —
   did `GetOrAdd` forever and removed never (both latent that day, live the day a long-running worker
   lands).
-- **In the database:** an append-only table names its retention/rollup policy. The shape that works:
-  a 7-day raw window with an hourly rollup. Audit, 2026-08-16: a table with one row per index pass,
+- **In the database:** an append-only table names its retention/rollup policy — a 7-day raw window
+  with an hourly rollup is the shape to copy. Audit, 2026-08-16: a table with one row per index pass,
   deleted never.
 - **On disk:** every directory a host writes — `logs/`, spools, artifacts — has a named retention
   owner. The rule lives in [logging-serilog.md](logging-serilog.md) § Retention.
