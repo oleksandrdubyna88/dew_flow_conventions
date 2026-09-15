@@ -37,6 +37,14 @@ jobs:
       # of the ref it tracks"), and no directory of files can express a release branch that lags its
       # own default branch, so tools/pin-check.test.mjs builds real Git repositories in a temp dir.
       # Until 2026-09-14 this comment claimed a pin-check selftest that did not exist at all.
+
+      # A shared rule names no product (common/rule-ownership.md). It needs no npm install, which is
+      # why it runs before the step that does. --warn while the backfill runs:
+      # 129 references across 26 of 32 rules on the day this landed, and a check that goes red on the
+      # day it lands teaches people to switch it off. The flag comes off when the cleanup is done.
+      - name: Ownership
+        run: node tools/ownership-check.mjs --warn
+
       - name: Selftest
         run: |
           npm ci --ignore-scripts

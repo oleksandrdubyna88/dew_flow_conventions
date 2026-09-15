@@ -114,7 +114,19 @@ test("symlink rule sources are refused instead of following external files", t =
 
 const sourceRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
 
-test("all original rule bodies and every inventoried section survive migration",()=>{
+// The inventory carries TWO records per rule, and they answer different questions.
+//
+//   originalBodySha256 / sections  — what the body was at migration. Immutable evidence that nothing
+//     was lost in the move, and never compared against the live file again: comparing it forever is
+//     what made these 24 rules uneditable, so that every improvement had to become a NEW file and the
+//     corpus grew instead of being corrected.
+//   currentBodySha256 / currentSections — what the body is NOW. Moved in the SAME commit as any edit.
+//
+// So the freeze changed from "no edit ever" to "no ACCIDENTAL edit": a body that changes without its
+// hash changing is a red suite, and a deliberate change is a two-line diff beside the prose. The
+// original record is still asserted to be PRESENT and well formed, because the thing it protects is
+// somebody quietly deleting the evidence rather than somebody editing a rule.
+test("every rule's live body matches its recorded hash, and the migration evidence is intact",()=>{
   const inventory=JSON.parse(fs.readFileSync(path.join(sourceRoot,"research/shared-rules-migration-map.json"),"utf8"));
   const catalog=loadCatalog(sourceRoot);
   assert.equal(inventory.rules.length,24);
@@ -122,10 +134,14 @@ test("all original rule bodies and every inventoried section survive migration",
     const actual=catalog.find(rule=>rule.id===original.id);
     assert.ok(actual,original.id);
     const body=actual.text.replace(/^---\n[\s\S]*?\n---\n/,"");
-    assert.deepEqual(body.split("\n").filter(line=>/^#{1,4} /.test(line)),original.sections);
-    // The inventory is evidence against the original commit, not a parallel applicability map.
-    // Reverse the explicit S2 path migration before comparing immutable baseline evidence.
-    assert.equal(sha256(body.replaceAll(".agents/conventions",".claude/rules/shared")),original.originalBodySha256,original.id);
+
+    assert.match(original.originalBodySha256,/^[0-9a-f]{64}$/,`${original.id}: migration evidence must survive`);
+    assert.ok(Array.isArray(original.sections)&&original.sections.length>0,`${original.id}: original sections must survive`);
+
+    assert.equal(sha256(body),original.currentBodySha256,
+      `${original.id}: the body changed without its currentBodySha256 — update the map in the same commit`);
+    assert.deepEqual(body.split("\n").filter(line=>/^#{1,4} /.test(line)),original.currentSections,
+      `${original.id}: headings changed without currentSections`);
   }
 });
 

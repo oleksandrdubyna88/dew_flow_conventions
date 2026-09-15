@@ -13,6 +13,15 @@
         "## Never",
         "## Definition of Done",
         "## Mirrors"
+      ],
+      "currentBodySha256": "cf2a152631ed411a98c98386240897c81961840f686d313af58238d47d5923d6",
+      "currentSections": [
+        "# Automated checks — what a reviewer, a scanner or a bot reports is work, down to zero (MANDATORY)",
+        "## The rule",
+        "## For an agent working autonomously",
+        "## Never",
+        "## Definition of Done",
+        "## Mirrors"
       ]
     },
     {
@@ -22,6 +31,10 @@
       "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
       "sections": [
         "## Multi-model review gate (ConnectOtherAIs)"
+      ],
+      "currentBodySha256": "f5f8ccc3894772971ec9d8dc29671c62aaaccab15bdd03d1bdc0282d33d66049",
+      "currentSections": [
+        "## Multi-model review gate (ConnectOtherAIs)"
       ]
     },
     {
@@ -30,6 +43,17 @@
       "originalBodySha256": "0acf32d9ea193e42085d75b522d01f283e5e7120379c55b8f6cda2bafcf1dcb0",
       "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
       "sections": [
+        "# Coding Style",
+        "## Immutability (CRITICAL)",
+        "## File organization",
+        "## Error handling",
+        "## Input validation",
+        "## User-facing text is English",
+        "## Absent is not zero, and asked-for is not reported",
+        "## Code quality checklist"
+      ],
+      "currentBodySha256": "0acf32d9ea193e42085d75b522d01f283e5e7120379c55b8f6cda2bafcf1dcb0",
+      "currentSections": [
         "# Coding Style",
         "## Immutability (CRITICAL)",
         "## File organization",
@@ -54,6 +78,17 @@
         "## The other side ships on its own clock (MANDATORY)",
         "### Two obligations, and the second is the one people skip",
         "### Ask it as one question"
+      ],
+      "currentBodySha256": "ba11ae1c42d9c468878e21105550950cfa0cd5de97b18a6b79560ae8df54aae9",
+      "currentSections": [
+        "# Development Workflow",
+        "## Verify the ARTEFACT, not the source (MANDATORY)",
+        "## A release that shipped SOME of its platforms is worse than one that failed (MANDATORY)",
+        "## A rollback must not BUILD, and it must reach further back than one (MANDATORY)",
+        "## Self-hosted means somebody has to delete things — and it must be a script (MANDATORY)",
+        "## The other side ships on its own clock (MANDATORY)",
+        "### Two obligations, and the second is the one people skip",
+        "### Ask it as one question"
       ]
     },
     {
@@ -64,6 +99,11 @@
       "sections": [
         "# Durable status for status-changing actions (MANDATORY)",
         "## Rules"
+      ],
+      "currentBodySha256": "18c8b393564afded9f0540e900a8b8bf26e60b29279f5a025b44fbf55dd94102",
+      "currentSections": [
+        "# Durable status for status-changing actions (MANDATORY)",
+        "## Rules"
       ]
     },
     {
@@ -72,6 +112,29 @@
       "originalBodySha256": "b8ba57882e790ff80803149256db479db03d59ff7c616a5887fe03647c37ea0a",
       "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
       "sections": [
+        "# Git Workflow",
+        "## Commit your OWN work, and only after it is verified (MANDATORY)",
+        "### 1. Commit only what your task touched",
+        "### 2. Never commit work you have not seen working",
+        "### 3. In a shared tree, \"it builds here\" is not \"this commit builds\"",
+        "### 4. On a file someone else is also editing, committing it WHOLE is always wrong",
+        "# re-apply ONLY your hunks to the scratch copy",
+        "# keep only hunks whose added lines match identifiers YOU added; drop every other hunk",
+        "### 5. Check the staged diff's SIZE, not only its deletions",
+        "### 6. Verify the STAGED tree, not the working tree",
+        "### 7. `git status` answers WHAT and `git log` cannot answer WHO — never name an owner",
+        "### 8. `git mv` stages the ORIGINAL content — your edit to the moved file is still unstaged",
+        "### 9. \"It is green\" is a claim about a COMMIT, never about now",
+        "### 10. When you HAVE swept someone's work: do not revert it",
+        "### 11. After a merge, re-read the files TOOLING parses",
+        "## ['`,",
+        "### When verification is BLOCKED — ask, do not guess",
+        "## Commit message format",
+        "## One version string, one build — even for a build only you installed",
+        "## Pull request workflow"
+      ],
+      "currentBodySha256": "eeaba02bb654752861fccfcd881dab2a8f482e90f449f5a30ec4ccbb385b5b2c",
+      "currentSections": [
         "# Git Workflow",
         "## Commit your OWN work, and only after it is verified (MANDATORY)",
         "### 1. Commit only what your task touched",
@@ -107,6 +170,16 @@
         "## Never",
         "## Definition of Done",
         "## Where it lives"
+      ],
+      "currentBodySha256": "7b39a43bd8e75abd31dafc6b52ffbf3c3769c8391345635684a50a75c7e54369",
+      "currentSections": [
+        "# Take the card before you use it (MANDATORY for GPU work)",
+        "## The rule",
+        "## What counts as GPU work",
+        "## Waiting is the point",
+        "## Never",
+        "## Definition of Done",
+        "## Where it lives"
       ]
     },
     {
@@ -115,6 +188,25 @@
       "originalBodySha256": "ece6705a3428029c557bfc713f1c8d9c31410164ba01380755f2d460af8ad29e",
       "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
       "sections": [
+        "# HTTP contracts — an `.http` file per route group, run before every release (MANDATORY)",
+        "## Where the files live",
+        "## What every endpoint gets",
+        "### Only what can reasonably be provoked over the wire",
+        "# @uncovered 503 — reached only when the store is down; not provokable from a request",
+        "# @uncovered GET /api/rag/projects/{id}/index-state — it resolves a collection through the vector",
+        "#            store, and the daemon deliberately refuses to guess one.",
+        "### `# @prod` — the tag that means \"safe against something live\"",
+        "# @name vault_get_returns_the_callers_blob",
+        "# @prod",
+        "## The trigger — forward first, backfill second",
+        "## Not every API is an HTTP API",
+        "## Running them",
+        "### What the coverage check does NOT claim",
+        "## Never",
+        "## Definition of Done"
+      ],
+      "currentBodySha256": "9f92e96733a5a75630a1b81d5572d92d148f3a792fa318b45a5f6170241d04bb",
+      "currentSections": [
         "# HTTP contracts — an `.http` file per route group, run before every release (MANDATORY)",
         "## Where the files live",
         "## What every endpoint gets",
@@ -141,6 +233,11 @@
       "sections": [
         "# Knowledge base sync — `research/` tracks the system as it is (MANDATORY)",
         "## Shortening a rule drops the caveat — and its absence reads as permission"
+      ],
+      "currentBodySha256": "057ce9ce911bbdfccea5891d693c6a8721bc9cb9aca00a1d9f21fc1db956cd52",
+      "currentSections": [
+        "# Knowledge base sync — `research/` tracks the system as it is (MANDATORY)",
+        "## Shortening a rule drops the caveat — and its absence reads as permission"
       ]
     },
     {
@@ -149,6 +246,23 @@
       "originalBodySha256": "7cf9569794a811e1ac7163aa64d42cadde87599d3cd5885e80dd4aab192d9638",
       "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
       "sections": [
+        "# Logging — Serilog, coloured to the console, and on disk per run (MANDATORY)",
+        "## The rule",
+        "### Path shape",
+        "### Colour: Serilog's console theme does NOT work here — measured",
+        "### stdio hosts write console logs to STDERR",
+        "### What every line carries",
+        "### Levels come from configuration, never from call sites",
+        "### A CLI verb that builds a service container is a host",
+        "### Retention — `logs/` must not grow forever",
+        "### Failures during startup must still be logged",
+        "## The shape (C#)",
+        "## Rust",
+        "## Never",
+        "## Definition of Done"
+      ],
+      "currentBodySha256": "760c9b1b1b5d68d136f7ebf907f4157fb84ddb5d3c25f37f24cb5ee122c9574c",
+      "currentSections": [
         "# Logging — Serilog, coloured to the console, and on disk per run (MANDATORY)",
         "## The rule",
         "### Path shape",
@@ -180,6 +294,18 @@
         "## 6. A results document names its subject by sha, and its harness by path",
         "## Never",
         "## Definition of Done"
+      ],
+      "currentBodySha256": "39e5c0d559c1cce66964acd900df436d90e5f67ec131c535af6742b49f83335f",
+      "currentSections": [
+        "# Measurement — a number you did not set up is a number about something else",
+        "## 1. Pin everything you are NOT varying, then prove the arm actually differed (MANDATORY)",
+        "## 2. Validate an automatic metric against a hand-read sample BEFORE reporting its numbers (MANDATORY)",
+        "## 3. A conclusion may not be wider than the conditions measured (MANDATORY)",
+        "## 4. Record the prediction BEFORE the run, and report observed-against-predicted (MANDATORY)",
+        "## 5. A claim about code is settled by opening the file, never by remembering it (MANDATORY)",
+        "## 6. A results document names its subject by sha, and its harness by path",
+        "## Never",
+        "## Definition of Done"
       ]
     },
     {
@@ -188,6 +314,21 @@
       "originalBodySha256": "2eecad1b68dec7085cb8d7e904eb77de383aa927c6eb60a71797aceb3b46c427",
       "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
       "sections": [
+        "# Planning Docs — `todo/` is open work, `research/` is documentation",
+        "## Creating a plan",
+        "# PLAN — <what this achieves>",
+        "### A plan that creates something that GROWS names its budget — before the first write",
+        "## Promoting a finished plan",
+        "### The `git mv` goes LAST, not first",
+        "### The three link cases, because \"both directions\" hides one",
+        "## Partially implemented plans",
+        "## Across repositories",
+        "## Never",
+        "## Definition of Done",
+        "## A boundary between two plans is named on BOTH sides (MANDATORY)"
+      ],
+      "currentBodySha256": "0b8be29ee452ad6e437ce4b710756edeb8d8fdf0487952c8ecd990658e7aed1b",
+      "currentSections": [
         "# Planning Docs — `todo/` is open work, `research/` is documentation",
         "## Creating a plan",
         "# PLAN — <what this achieves>",
@@ -220,6 +361,21 @@
         "### Two traps in the commands themselves, both measured",
         "## Never",
         "## Definition of Done"
+      ],
+      "currentBodySha256": "d582d264da8f74292491ca9728e1b185a05a56c1562dadcc4640d2b4668f4006",
+      "currentSections": [
+        "# Post-deploy checks — the short list a green build cannot answer (MANDATORY)",
+        "## Why a test cannot answer this",
+        "## What \"prod\" is, per repository — and nobody is exempt",
+        "## The file",
+        "# Post-deploy checks — <repository>",
+        "## Two conditions, and an item needs both (MANDATORY)",
+        "## Twelve items, and how the thirteenth gets in",
+        "## The trigger — after every task and every bug",
+        "## Automation is the point, not a bonus",
+        "### Two traps in the commands themselves, both measured",
+        "## Never",
+        "## Definition of Done"
       ]
     },
     {
@@ -235,6 +391,16 @@
         "## Never",
         "## Definition of Done",
         "## Mirrors"
+      ],
+      "currentBodySha256": "16e397c604916a990aafa186bf5170cb66a7464ac97082d046036b7a50ba67c5",
+      "currentSections": [
+        "# Pull requests — `main` is closed; the reviewer's comments are work (MANDATORY)",
+        "## The rule",
+        "## For an agent working autonomously",
+        "# fix or reply per thread, then:",
+        "## Never",
+        "## Definition of Done",
+        "## Mirrors"
       ]
     },
     {
@@ -243,6 +409,23 @@
       "originalBodySha256": "b7744935fd5904ba9099253344d374ce67ebd0b2caea38be56f73a4cb3820e2e",
       "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
       "sections": [
+        "# Reliability — a process that must run 24/7 (MANDATORY)",
+        "## Every wait has a ceiling",
+        "## A timed-out child process is a killed child process",
+        "## Background work neither dies silently nor takes the host with it",
+        "## Where `try/catch` lives — the three boundaries",
+        "## Cancellation is real, shutdown is planned",
+        "### A timeout is not a cancellation — and .NET spells them the same",
+        "## Before designing a lock, name the atomic operation it rests on",
+        "## Everything that grows has an owner",
+        "## Transient faults are the weather, not an event",
+        "## Health endpoints tell the truth and never block",
+        "## Paid work is written down as it is earned",
+        "## Boundary numbers are clamped",
+        "## Definition of Done"
+      ],
+      "currentBodySha256": "b7744935fd5904ba9099253344d374ce67ebd0b2caea38be56f73a4cb3820e2e",
+      "currentSections": [
         "# Reliability — a process that must run 24/7 (MANDATORY)",
         "## Every wait has a ceiling",
         "## A timed-out child process is a killed child process",
@@ -274,6 +457,18 @@
         "### What to do instead",
         "## Never",
         "## Definition of Done"
+      ],
+      "currentBodySha256": "27c62e437ee2fbae94d1cc8823ce3808c38288c6f67cbc36d28c86cc7b372634",
+      "currentSections": [
+        "# Reuse First — look before you build (MANDATORY)",
+        "## The three questions, in order",
+        "### 1. Can it be reused as it is?",
+        "### 2. If it cannot be reused as it is — can it be MADE reusable?",
+        "### 3. What is the STYLE of the neighbouring code?",
+        "## A decision applied at SOME of its sites — and it is usually not a security measure (MANDATORY)",
+        "### What to do instead",
+        "## Never",
+        "## Definition of Done"
       ]
     },
     {
@@ -289,6 +484,16 @@
         "## Adoption",
         "## Never",
         "## Definition of Done"
+      ],
+      "currentBodySha256": "31fee268e7b0f1bb16bd22edc11706f81dfd43fc936daa8173574eca36ee7ce5",
+      "currentSections": [
+        "# Scenario tests — every repository has a harness of its own, and every flow is in it (MANDATORY)",
+        "## Why this is mandatory",
+        "## The rule",
+        "## What this does not replace",
+        "## Adoption",
+        "## Never",
+        "## Definition of Done"
       ]
     },
     {
@@ -297,6 +502,20 @@
       "originalBodySha256": "3033200d93eb53553fc481f2d81ddda1bfc987b5ff2c28f205ba17132c21a431",
       "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
       "sections": [
+        "# Security Guidelines",
+        "## Mandatory checks before ANY commit",
+        "## Secret management",
+        "## External processes",
+        "## A measure applied at SOME of its sites is the defect this family keeps writing (MANDATORY)",
+        "### What to do instead",
+        "### Safe by construction, not safe by content",
+        "## A measure you have not OBSERVED working is a comment (MANDATORY)",
+        "### The two mistakes, separately",
+        "### What to do instead",
+        "## Security response protocol"
+      ],
+      "currentBodySha256": "3033200d93eb53553fc481f2d81ddda1bfc987b5ff2c28f205ba17132c21a431",
+      "currentSections": [
         "# Security Guidelines",
         "## Mandatory checks before ANY commit",
         "## Secret management",
@@ -337,6 +556,30 @@
         "## Architecture is a test, not a review comment",
         "## Scope",
         "## Definition of Done"
+      ],
+      "currentBodySha256": "3db8d673c0a7793b85622493a861a926e04c937712454acbb4c74a56f8a483fb",
+      "currentSections": [
+        "# Testing",
+        "## Running tests — executables only, never `dotnet test` (MANDATORY)",
+        "## Every feature ships with tests, in the same task",
+        "## A green suite is not evidence about a contract with TWO IMPLEMENTATIONS (MANDATORY)",
+        "## A fixture the code REJECTS proves nothing — and it proves it in green (MANDATORY)",
+        "## Asserting that you SENT a protective option is not testing that it protects",
+        "## A test that repeats a list the code also holds will not notice the third entry",
+        "## A structural test that matches nothing passes forever",
+        "## A test can only inspect what is PRESENT",
+        "## A test must leave a shared store as it found it",
+        "## Passes alone, fails in the suite — that is a SHARED-STATE defect, never a flake (MANDATORY)",
+        "## A green suite proves only the BINARIES you ran — check they are the ones you built",
+        "## A green suite proves only the configuration you ran",
+        "## A test that reads the clock expires, and it expires green",
+        "## A check that only runs during a release has never run",
+        "## Starting is not working — a delivery check must USE the capability",
+        "## Every bug fix starts with a RED test (MANDATORY)",
+        "## Name the guarantee, and give a refuted approach a shape",
+        "## Architecture is a test, not a review comment",
+        "## Scope",
+        "## Definition of Done"
       ]
     },
     {
@@ -345,6 +588,15 @@
       "originalBodySha256": "c305216f455e9b04336cf1373fdf89a41985fc88ad38f7a5b65515cf3de1921c",
       "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
       "sections": [
+        "# UTC in the database, local time only on the frontend (MANDATORY)",
+        "## The rule",
+        "## Detecting the damage",
+        "## Rust",
+        "## Never",
+        "## Definition of Done"
+      ],
+      "currentBodySha256": "c305216f455e9b04336cf1373fdf89a41985fc88ad38f7a5b65515cf3de1921c",
+      "currentSections": [
         "# UTC in the database, local time only on the frontend (MANDATORY)",
         "## The rule",
         "## Detecting the damage",
@@ -368,6 +620,18 @@
         "## 5. Expected failures are values, not exceptions",
         "## 6. Pure functions, small methods",
         "## 7. Immutability in contracts"
+      ],
+      "currentBodySha256": "a8e22cc8563b1f817f2fb8919b8a72bf74985f6e5da4230d5648164c31a4caf2",
+      "currentSections": [
+        "# C# doctrine — the family's code rules",
+        "## 1. Language & runtime",
+        "## 2. Records for data, classes for services",
+        "## 3. No primitive obsession",
+        "## 4. No null in business logic",
+        "### 4a. A DTO field the client omitted is NULL, whatever its initializer says (MANDATORY)",
+        "## 5. Expected failures are values, not exceptions",
+        "## 6. Pure functions, small methods",
+        "## 7. Immutability in contracts"
       ]
     },
     {
@@ -376,6 +640,15 @@
       "originalBodySha256": "96e982e08345f28163064afe01485a9831688a5a47b87738fd4e0c7a7dd2d0fb",
       "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
       "sections": [
+        "# NuGet packages — approval, freshness, licence",
+        "## Before adding any package",
+        "## Licence before version (MANDATORY)",
+        "## Bumping",
+        "## Prefer nothing",
+        "## Definition of Done"
+      ],
+      "currentBodySha256": "96e982e08345f28163064afe01485a9831688a5a47b87738fd4e0c7a7dd2d0fb",
+      "currentSections": [
         "# NuGet packages — approval, freshness, licence",
         "## Before adding any package",
         "## Licence before version (MANDATORY)",
@@ -400,6 +673,19 @@
         "## 7. Layout and tests",
         "## 8. Comments carry the why",
         "## 9. Logging and numbers"
+      ],
+      "currentBodySha256": "f0d8374d20cc167e6c25fcbfcea364b63fdf723fe47d9fa17ab09ff091b3bf7a",
+      "currentSections": [
+        "# Rust doctrine — the family's code rules",
+        "## 1. Toolchain & flavors",
+        "## 2. Expected failures are values",
+        "## 3. `unwrap`/`expect` — the invariant is written beside it",
+        "## 4. The reactor never blocks",
+        "## 5. Locks refuse, recover, and log",
+        "## 6. RAII for invariants that span phases",
+        "## 7. Layout and tests",
+        "## 8. Comments carry the why",
+        "## 9. Logging and numbers"
       ]
     },
     {
@@ -408,6 +694,15 @@
       "originalBodySha256": "3251c5a5fb7ded69a4076513bb5b2322a05a823b7b956654c6dca8737b7364a0",
       "disposition": "Entire original body preserved; applicability is declared only in source frontmatter.",
       "sections": [
+        "# TypeScript — the four traps that have actually cost us",
+        "## 1. Never interpolate into a `<script>` element with `JSON.stringify` (MANDATORY)",
+        "## 2. A backtick inside a template literal ends it — including inside a comment",
+        "## 3. An `as` cast is a promise to maintain a shape by hand — and it comes due silently",
+        "## 4. `tsc` emits despite errors — so a green suite can be green against stale output",
+        "## Definition of Done"
+      ],
+      "currentBodySha256": "3251c5a5fb7ded69a4076513bb5b2322a05a823b7b956654c6dca8737b7364a0",
+      "currentSections": [
         "# TypeScript — the four traps that have actually cost us",
         "## 1. Never interpolate into a `<script>` element with `JSON.stringify` (MANDATORY)",
         "## 2. A backtick inside a template literal ends it — including inside a comment",
