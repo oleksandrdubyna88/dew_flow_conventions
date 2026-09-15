@@ -684,3 +684,23 @@ request (pins follow the `release` ref, which moves through `promote-release.mjs
 programme lands — a cascade per pull request is the churn this work exists to remove), and a re-report
 of the empty-directory fixture, already fixed one commit earlier by building the repository in a temp
 dir instead.
+
+**What the static scanner added, and what it got wrong.** Five issues, all in this one file, and the
+quality gate failed on the first of them.
+
+- **Cognitive complexity 49 against a limit of 15** in `main()`, which was fair: it read the baseline,
+  walked the corpus, printed every kind of finding and judged the ratchet in one function. It is four
+  named ones now — `loadBaseline`, `scanCorpus`, `report`, `judgeBaseline` — and the tests did not change,
+  which is the only evidence a refactor can offer.
+- **Two regexes reported as super-linear.** The marker pattern spelled both halves of
+  `<!-- owns: token — reason -->` as one expression, which put a lazy run of *anything but an em dash*
+  immediately before an alternation that can match a hyphen, and needed a SECOND pattern beside it for
+  the separator-less shape. One capture of the comment body, split in JavaScript, reads the same, cannot
+  backtrack (`[^>]` never crosses the `>` that ends a comment) and collapses the two passes into one.
+- **The `depends:` block sequence reported as exponential backtracking — measured, and it was not.**
+  `(?:[ \t]+-[^\n]*\n?)+` can match one line many ways, but nothing follows the group, so the engine
+  takes the first way and never retries: 22 `- item` runs on a single line matched in under a
+  millisecond. The report was still worth acting on for the other reason — a reader cannot get that
+  guarantee out of the pattern, and can get it out of a loop that takes each line once. The comment in
+  the code says which of those two things is true, because a note claiming a denial of service was
+  fixed here would be a claim the measurement does not support.
