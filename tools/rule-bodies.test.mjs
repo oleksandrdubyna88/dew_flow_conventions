@@ -43,10 +43,19 @@ function scene(t) {
 }
 
 const manifestOf = (root) => JSON.parse(fs.readFileSync(path.join(root, "research", "rule-bodies.json"), "utf8"));
+/**
+ * Replace a rule's BODY, keeping its frontmatter.
+ *
+ * The first version anchored on the opening `---` and replaced everything after it, so every edited
+ * fixture lost its frontmatter entirely — and the freeze was then exercised against a file shape that
+ * cannot exist, which would not notice `id`, `load` or `tasks` leaking into the hash.
+ */
 const edit = (root, name, body) => {
   const file = path.join(root, "common", `${name}.md`);
   const text = fs.readFileSync(file, "utf8");
-  fs.writeFileSync(file, text.replace(/(---\n)([\s\S]*)$/, (_, marker) => `${marker}${body}`));
+  const frontmatter = /^---\n[\s\S]*?\n---\n/.exec(text);
+  assert.ok(frontmatter, `${name}.md has no frontmatter to keep`);
+  fs.writeFileSync(file, `${frontmatter[0]}${body}`);
 };
 
 test("a corpus in step reports OK and writes nothing", (t) => {
@@ -176,4 +185,54 @@ test("a manifest that cannot be written says so, and leaves the old one intact",
   assert.equal(fs.readFileSync(manifest, "utf8"), before, "the old record survived the failure");
   assert.deepEqual(drifted(root, manifestOf(root)).map((d) => d.id), ["common.one"],
     "and the corpus is still drifted, so nothing was quietly blessed");
+});
+
+test("a heading keeps the words inside its backticks", (t) => {
+  // Stripping fences from the heading scan also stripped INLINE code, content and all, so
+  // '### 7. `git status` answers WHAT' was recorded as '### 7.  answers WHAT'. Measured in the real
+  // manifest: six headings across five rules lost the names they were about. A fence is a block that
+  // is being shown; an inline span inside a heading is part of the heading.
+  const root = scene(t);
+  edit(root, "one", [
+    "# One with `code` in it",
+    "",
+    "```sh",
+    "# not a heading, a comment",
+    "```",
+    "",
+    "## 7. `git status` answers WHAT",
+    "",
+  ].join("\n"));
+
+  assert.equal(main(["--update", "common.one"], root), 0);
+  assert.deepEqual(manifestOf(root).rules[0].sections,
+    ["# One with `code` in it", "## 7. `git status` answers WHAT"]);
+});
+
+test("the frontmatter is not part of the body that is hashed", (t) => {
+  // What consumers load is the body; the resolver strips frontmatter before handing it over. If the
+  // hash covered `id` or `tasks`, a metadata change would read as a rule edit and a rule edit could
+  // be hidden by a compensating metadata change.
+  const root = scene(t);
+  const file = path.join(root, "common", "one.md");
+  const before = manifestOf(root).rules[0].bodySha256;
+  fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace('tasks: ["policy"]', 'tasks: ["policy","docs"]'));
+  assert.deepEqual(drifted(root, manifestOf(root)), [], "metadata moved, the body did not");
+  assert.equal(manifestOf(root).rules[0].bodySha256, before);
+});
+
+test("an argument this CLI does not have is refused, whatever it looks like", (t) => {
+  // `--all` alone found no `--update`, fell through to verification and printed OK on a clean corpus
+  // — which a caller who believed in `--all` would read as "recorded". And `--typo --update <id>`
+  // updated the manifest with the typo ignored.
+  const root = scene(t);
+  edit(root, "one", "# One\n\nA sentence, rewritten.\n");
+
+  assert.equal(main(["--all"], root), 1, "a flag that does not exist is not a verification run");
+  assert.equal(main(["--typo", "--update", "common.one"], root), 1, "and it is not ignored either");
+  assert.deepEqual(drifted(root, manifestOf(root)).map((d) => d.id), ["common.one"], "nothing recorded");
+
+  // The two supported shapes still work.
+  assert.equal(main([], root), 1, "no arguments: verify, and this corpus is drifted");
+  assert.equal(main(["--update", "common.one"], root), 0);
 });

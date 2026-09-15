@@ -777,3 +777,17 @@ that keeps the claim honest. Two asked for the product names to be restored. One
 asked for a `--dry-run` whose output is what `git diff research/rule-bodies.json` already shows, on a
 tracked file, for a command that prints every id it touched with both hashes. One asked for a lock file
 against two people running `--update` in the same directory in the same second.
+
+**And the automated reviewer caught what the twelve reviewers did not.** Stripping fences from the
+heading scan also stripped INLINE code, content and all, so the heading "### 7. `git status` answers WHAT" was
+recorded as "### 7.  answers WHAT" — six headings across five rules lost the names they were about,
+visible in the manifest diff and nowhere else. A fenced BLOCK is something being shown; an inline span
+inside a heading is part of the heading, and those are two functions now.
+
+It also found that `--all` on its own fell through to a verification run and printed OK on a clean
+corpus, which a caller who believed in `--all` would read as "recorded", and that `--typo --update <id>`
+updated the manifest with the typo ignored: `--update` must now be the FIRST argument, and anything else
+is refused with the two shapes this CLI has. And the test helper that replaced a fixture's body anchored
+on the OPENING `---`, so every edited fixture lost its frontmatter entirely and the freeze was being
+exercised against a file shape that cannot exist. There is now a case asserting that metadata is not
+part of what gets hashed.

@@ -108,8 +108,8 @@
         "### 4. On a file someone else is also editing, committing it WHOLE is always wrong",
         "### 5. Check the staged diff's SIZE, not only its deletions",
         "### 6. Verify the STAGED tree, not the working tree",
-        "### 7.  answers WHAT and  cannot answer WHO — never name an owner",
-        "### 8.  stages the ORIGINAL content — your edit to the moved file is still unstaged",
+        "### 7. `git status` answers WHAT and `git log` cannot answer WHO — never name an owner",
+        "### 8. `git mv` stages the ORIGINAL content — your edit to the moved file is still unstaged",
         "### 9. \"It is green\" is a claim about a COMMIT, never about now",
         "### 10. When you HAVE swept someone's work: do not revert it",
         "### 11. After a merge, re-read the files TOOLING parses",
@@ -139,11 +139,11 @@
       "source": "common/http-contracts.md",
       "bodySha256": "8f5dc95ead17fb582d371d8ba5cfc329b62b8415b7a8f201fe190ad03e26fd80",
       "sections": [
-        "# HTTP contracts — an  file per route group, run before every release (MANDATORY)",
+        "# HTTP contracts — an `.http` file per route group, run before every release (MANDATORY)",
         "## Where the files live",
         "## What every endpoint gets",
         "### Only what can reasonably be provoked over the wire",
-        "###  — the tag that means \"safe against something live\"",
+        "### `# @prod` — the tag that means \"safe against something live\"",
         "## The trigger — forward first, backfill second",
         "## Not every API is an HTTP API",
         "## Running them",
@@ -157,7 +157,7 @@
       "source": "common/knowledge-base.md",
       "bodySha256": "057ce9ce911bbdfccea5891d693c6a8721bc9cb9aca00a1d9f21fc1db956cd52",
       "sections": [
-        "# Knowledge base sync —  tracks the system as it is (MANDATORY)",
+        "# Knowledge base sync — `research/` tracks the system as it is (MANDATORY)",
         "## Shortening a rule drops the caveat — and its absence reads as permission"
       ]
     },
@@ -174,7 +174,7 @@
         "### What every line carries",
         "### Levels come from configuration, never from call sites",
         "### A CLI verb that builds a service container is a host",
-        "### Retention —  must not grow forever",
+        "### Retention — `logs/` must not grow forever",
         "### Failures during startup must still be logged",
         "## The shape (C#)",
         "## Rust",
@@ -203,11 +203,11 @@
       "source": "common/planning-docs.md",
       "bodySha256": "ce44a145f7e3e584039c314634797145cd20416493a94e08f34654155e0f1a20",
       "sections": [
-        "# Planning Docs —  is open work,  is documentation",
+        "# Planning Docs — `todo/` is open work, `research/` is documentation",
         "## Creating a plan",
         "### A plan that creates something that GROWS names its budget — before the first write",
         "## Promoting a finished plan",
-        "### The  goes LAST, not first",
+        "### The `git mv` goes LAST, not first",
         "### The three link cases, because \"both directions\" hides one",
         "## Partially implemented plans",
         "## Across repositories",
@@ -253,7 +253,7 @@
       "source": "common/pull-requests.md",
       "bodySha256": "4df75f97bedf6ed9922a68ed989da15f1c75d1dd123aae3f9915ae962b8d18af",
       "sections": [
-        "# Pull requests —  is closed; the reviewer's comments are work (MANDATORY)",
+        "# Pull requests — `main` is closed; the reviewer's comments are work (MANDATORY)",
         "## The rule",
         "## For an agent working autonomously",
         "## Never",
@@ -270,7 +270,7 @@
         "## Every wait has a ceiling",
         "## A timed-out child process is a killed child process",
         "## Background work neither dies silently nor takes the host with it",
-        "## Where  lives — the three boundaries",
+        "## Where `try/catch` lives — the three boundaries",
         "## Cancellation is real, shutdown is planned",
         "### A timeout is not a cancellation — and .NET spells them the same",
         "## Before designing a lock, name the atomic operation it rests on",
@@ -379,7 +379,7 @@
       "bodySha256": "f09c745c01ba8964f7f92d87c4f51dcbf2ae61f83b7e81bae00b513f5e502738",
       "sections": [
         "# Testing",
-        "## Running tests — executables only, never  (MANDATORY)",
+        "## Running tests — executables only, never `dotnet test` (MANDATORY)",
         "## Every feature ships with tests, in the same task",
         "## A green suite is not evidence about a contract with TWO IMPLEMENTATIONS (MANDATORY)",
         "## A fixture the code REJECTS proves nothing — and it proves it in green (MANDATORY)",
@@ -435,11 +435,11 @@
       "source": "csharp/dotnet-build.md",
       "bodySha256": "c9dd2558427c5c018f7963599386caea24fd991405e45c737332e54762f5a1f5",
       "sections": [
-        "#  — bound the worker pool, because several sessions build at once",
-        "## 1. Every .NET repository carries  at its root (MANDATORY)",
-        "## 2. Every MSBuild-driven command carries  (MANDATORY)",
+        "# `dotnet build` — bound the worker pool, because several sessions build at once",
+        "## 1. Every .NET repository carries `Directory.Build.rsp` at its root (MANDATORY)",
+        "## 2. Every MSBuild-driven command carries `-m:N` (MANDATORY)",
         "### What enforces it, and where it does not reach",
-        "## 3. CI overrides on the command line — never  (MANDATORY)",
+        "## 3. CI overrides on the command line — never `-noautorsp` (MANDATORY)",
         "## 4. Know the floor",
         "## Never",
         "## Definition of Done"
@@ -466,7 +466,7 @@
         "# Rust doctrine — the family's code rules",
         "## 1. Toolchain & flavors",
         "## 2. Expected failures are values",
-        "## 3. / — the invariant is written beside it",
+        "## 3. `unwrap`/`expect` — the invariant is written beside it",
         "## 4. The reactor never blocks",
         "## 5. Locks refuse, recover, and log",
         "## 6. RAII for invariants that span phases",
@@ -481,10 +481,10 @@
       "bodySha256": "6e74f803ba385f184be20cc276d59e17d07ebfc6bc414196ed887d71407fc680",
       "sections": [
         "# TypeScript — the four traps that have actually cost us",
-        "## 1. Never interpolate into a  element with  (MANDATORY)",
+        "## 1. Never interpolate into a `<script>` element with `JSON.stringify` (MANDATORY)",
         "## 2. A backtick inside a template literal ends it — including inside a comment",
-        "## 3. An  cast is a promise to maintain a shape by hand — and it comes due silently",
-        "## 4.  emits despite errors — so a green suite can be green against stale output",
+        "## 3. An `as` cast is a promise to maintain a shape by hand — and it comes due silently",
+        "## 4. `tsc` emits despite errors — so a green suite can be green against stale output",
         "## Definition of Done"
       ]
     }

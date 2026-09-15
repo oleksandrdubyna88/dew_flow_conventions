@@ -25,24 +25,33 @@ export function bodyOf(text) {
   return folded(text).replace(/^---\n[\s\S]*?\n---\n/, "");
 }
 
+/** Text with fenced code BLOCKS removed. What is left includes inline spans, backticks and all. */
+export function outsideFencedBlocks(text) {
+  return folded(text).replace(/^```[\s\S]*?^```/gm, "");
+}
+
 /**
- * Text with fenced code blocks and inline code spans removed.
+ * Text with fenced code blocks AND inline code spans removed.
  *
- * Used where something inside a fence is being SHOWN rather than GIVEN: a marker in an example is
- * documentation, and a `#` comment in a shell sample is not a heading. Findings are the exception and
- * read the whole text, because a product name in an example is still a product name.
+ * Used for markers, where something inside backticks is being SHOWN rather than GIVEN: the rule that
+ * documents the `owns:` syntax was reported as carrying a malformed marker, by the check it defines.
+ * Findings are the exception and read the whole text, because a product name in an example is still a
+ * product name.
  */
 export function outsideFences(text) {
-  return folded(text).replace(/^```[\s\S]*?^```/gm, "").replace(/`[^`\n]*`/g, "");
+  return outsideFencedBlocks(text).replace(/`[^`\n]*`/g, "");
 }
 
 /**
  * A body's markdown headings, in order.
  *
- * Fences are stripped first. Without that, `# @name vault_get_returns_the_callers_blob` inside an
- * `.http` sample is recorded as a heading — measured: four such lines across two rules — and editing
- * a comment in a code sample reports that the rule's HEADINGS changed.
+ * Fenced BLOCKS are stripped and inline spans are not, and the difference is the whole of it. Without
+ * the first, `# @name vault_get_returns_the_callers_blob` inside an `.http` sample is recorded as a
+ * heading — measured: four such lines across two rules. With the second, a heading loses the words it
+ * is about: '### 7. `git status` answers WHAT' was recorded as '### 7.  answers WHAT', six times
+ * across five rules, which an automated reviewer caught by reading the manifest diff. A fence is a
+ * block being shown; an inline span inside a heading is part of the heading.
  */
 export function sectionsOf(body) {
-  return outsideFences(body).split("\n").filter((line) => /^#{1,4} /.test(line));
+  return outsideFencedBlocks(body).split("\n").filter((line) => /^#{1,4} /.test(line));
 }
