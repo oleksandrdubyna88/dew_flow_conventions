@@ -3,6 +3,15 @@ id: "common.coai-review-gate"
 load: "conditional"
 tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
 ---
+<!-- owns: coai — the MCP server's own name, and the prefix of every tool below -->
+<!-- owns: ConnectOtherAIs — the product that serves this gate; a session reads its panel by that name -->
+<!-- owns: mcp__coai__providers — a tool name a session types; there is no generic spelling of it -->
+<!-- owns: mcp__coai__open — a tool name a session types; there is no generic spelling of it -->
+<!-- owns: mcp__coai__review_plan — a tool name a session types; there is no generic spelling of it -->
+<!-- owns: mcp__coai__review_code — a tool name a session types; there is no generic spelling of it -->
+<!-- owns: mcp__coai__resolve — a tool name a session types; there is no generic spelling of it -->
+<!-- owns: mcp__coai__status — a tool name a session types; there is no generic spelling of it -->
+<!-- owns: mcp__coai__ask_human — a tool name a session types; there is no generic spelling of it -->
 <!-- coai-snippet v5 -->
 ## Multi-model review gate (ConnectOtherAIs)
 
@@ -71,7 +80,7 @@ has reached `proceed`.**
    **The server will not take another round until a person answers, and this is enforced.** After
    `call_human`, `review_plan` and `review_code` REFUSE — running the review again is not one
    of your options, and neither is resolving your way past it: recording decisions no longer
-   reopens the gate. Call `ask_human`. Their answer decides: *keep going* and *stop and act on the
+   reopens it. Call `ask_human`. Their answer decides: *keep going* and *stop and act on the
    findings* each grant a fresh set of rounds, *stop and talk to me* advances nothing, and if they
    would rather ship with the findings open they say so and you pass
    `humanDecision: "proceed"` to `resolve`.

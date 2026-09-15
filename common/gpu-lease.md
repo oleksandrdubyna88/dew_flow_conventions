@@ -3,6 +3,7 @@ id: "common.gpu-lease"
 load: "conditional"
 tasks: ["gpu"]
 ---
+<!-- owns: dew_flow_rag_qln — the one host that serves the lease, because the machine has one card -->
 # Take the card before you use it (MANDATORY for GPU work)
 
 > This machine has **one usable GPU**. Several things want it at once — an index pass embedding for twenty
@@ -30,14 +31,14 @@ success, on a non-zero exit, and on Ctrl-C. **That is why it exists.** An agent 
 release is an agent that eventually will not, and a lease nobody releases is a card nothing may touch until
 a sweep notices.
 
-It also sends its own pid, which puts you on the **liveness** path: if your process dies the daemon proves
+It also sends its own pid, which puts you on the **liveness** path: if your process dies the server proves
 it and hands the card back at once. A claimant that cannot supply a pid gets a two-minute TTL instead and
 must keep renewing it.
 
 ## What counts as GPU work
 
 Anything that embeds, reranks, or runs a local model: an index pass, a benchmark leg, an Ollama call, a
-`llama.cpp` run, a script that calls the sidecar. **Tokenising does not** — it is CPU on the sidecar, and
+`llama.cpp` run, a script that calls a local inference worker. **Tokenising does not** — it is CPU-side, and
 gating it would serialise the one stage with no reason to wait.
 
 ## Waiting is the point

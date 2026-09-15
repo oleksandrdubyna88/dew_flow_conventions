@@ -17,9 +17,9 @@
     {
       "id": "common.coai-caller-model",
       "source": "common/coai-caller-model.md",
-      "bodySha256": "5f2ccbe5b8da1fb42c9ea245cce062ffff12ff0f50aefee64cdf7c09bf3c62d8",
+      "bodySha256": "0b3d1c2aa263cfa2a68390a7a84d962958d8bc647f15a7b7fcf47a8aa680cbe8",
       "sections": [
-        "## Say which model you are when you open the gate",
+        "## Say which model you are when you open the review gate",
         "### Why you have to be asked",
         "### If you genuinely do not know it",
         "### Definition of Done"
@@ -28,7 +28,7 @@
     {
       "id": "common.coai-document-gate",
       "source": "common/coai-document-gate.md",
-      "bodySha256": "a2358c524c9f12940f1068d4fdb5b93858eb55bbcb60adc771ec5a64d8a6606b",
+      "bodySha256": "f34f0ea88db35e06ca80167126d03539ff2abf8a744c92a2e26300f2ce38e5da",
       "sections": [
         "## Reviewing a DOCUMENT rather than a change",
         "## Definition of Done"
@@ -37,7 +37,7 @@
     {
       "id": "common.coai-review-gate",
       "source": "common/coai-review-gate.md",
-      "bodySha256": "f5f8ccc3894772971ec9d8dc29671c62aaaccab15bdd03d1bdc0282d33d66049",
+      "bodySha256": "234f2c9ab05574374c0c0f198a1c56328e9ea4423f939cd41efbcd180c27e514",
       "sections": [
         "## Multi-model review gate (ConnectOtherAIs)"
       ]
@@ -123,7 +123,7 @@
     {
       "id": "common.gpu-lease",
       "source": "common/gpu-lease.md",
-      "bodySha256": "7b39a43bd8e75abd31dafc6b52ffbf3c3769c8391345635684a50a75c7e54369",
+      "bodySha256": "bce83fd6a83184a62a1fa875177c075ec037490cf961551e58d7fa93842ccc9f",
       "sections": [
         "# Take the card before you use it (MANDATORY for GPU work)",
         "## The rule",
@@ -251,7 +251,7 @@
     {
       "id": "common.pull-requests",
       "source": "common/pull-requests.md",
-      "bodySha256": "4df75f97bedf6ed9922a68ed989da15f1c75d1dd123aae3f9915ae962b8d18af",
+      "bodySha256": "5a22740c449054bd1333f16c1ca128b2cb8f01f00d957e2ea0c28eabd947b4f0",
       "sections": [
         "# Pull requests — `main` is closed; the reviewer's comments are work (MANDATORY)",
         "## The rule",
@@ -301,7 +301,7 @@
     {
       "id": "common.rule-ownership",
       "source": "common/rule-ownership.md",
-      "bodySha256": "cf50285c2a643bf331fb439c1d7534bc180cb5efac735e9d44e09827a4679930",
+      "bodySha256": "e09bf0921c01725a3696628a4f16a9c2f72c56774e14751cb7115cacb3c2bcb8",
       "sections": [
         "# A shared rule names no product (MANDATORY)",
         "## The test, and it takes one second",

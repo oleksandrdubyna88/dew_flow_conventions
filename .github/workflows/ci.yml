@@ -39,16 +39,15 @@ jobs:
       # Until 2026-09-14 this comment claimed a pin-check selftest that did not exist at all.
 
       # A shared rule names no product (common/rule-ownership.md). It needs no npm install, which is
-      # why it runs before the step that does. The backfill is real — 129 references across 26 of 32
-      # rules on the day this landed — and a check that goes red on the day it lands teaches people to
-      # switch it off. But a bare --warn would let a NEW reference merge unnoticed for as long as the
-      # backfill takes, which is the one thing this rule promises cannot happen. So it is a RATCHET,
-      # and its budget is PER FILE (tools/ownership-baseline.json): one repo-wide total lets a branch
-      # spend headroom another branch won, so cleaning ten references in one rule silently pays for
-      # two new ones in another. The count is a floor as well as a ceiling: a file that got cleaner
-      # fails until its number comes down in the same commit, because a number left above what the
-      # file carries is room a reference can be added back into silently. Deleting the baseline file
-      # is the armed state, at which point any finding at all fails.
+      # why it runs before the step that does — and being first is the point: this is the check the
+      # whole programme exists to arm.
+      #
+      # ARMED. There is no baseline file any more. It landed as a ratchet over 129 references across
+      # 26 of 32 rules, because a check that goes red on the day it lands teaches people to switch it
+      # off; the backlog was worked off in four stories and the allowance was deleted with the last
+      # one. From here any undeclared product reference in any shared rule fails, and the cure is in
+      # the tool's own output: anonymise the citation and keep its date, declare the name with an
+      # `owns:` marker and a reason, or move it to the repository that owns it.
       - name: Ownership
         run: node tools/ownership-check.mjs
 

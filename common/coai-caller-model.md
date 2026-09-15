@@ -3,8 +3,10 @@ id: "common.coai-caller-model"
 load: "conditional"
 tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
 ---
+<!-- owns: coai — the MCP server whose handshake this rule is about, named in its tool prefix -->
+<!-- owns: mcp__coai__open — the tool that carries the declaration; the argument is on that call and no other -->
 <!-- coai-caller v1 -->
-## Say which model you are when you open the gate
+## Say which model you are when you open the review gate
 
 > **This extends [coai-review-gate.md](coai-review-gate.md), and it is a separate file because that
 > one is frozen.** `tools/rules.test.mjs` hashes all 24 migrated rule bodies against baseline
@@ -27,11 +29,11 @@ family name, and not the name of the product you are running inside.
 
 The MCP handshake already tells the server which CLIENT is calling: `claude-code`, `codex`,
 `gemini-cli`, with its version. **No field anywhere in the MCP protocol carries a model.** So this
-is the only way the gate can record which model asked for a round, and the log's whole purpose is
+is the only way a review gate can record which model asked for a round, and the log's whole purpose is
 answering "what does the AI writing this code habitually miss" — a question that is about the model,
 not about the CLI it arrived through.
 
-*Checked 2026-09-13* against the `ModelContextProtocol` .NET SDK 2.2.0, which is what the gate's
+*Checked 2026-09-13* against the `ModelContextProtocol` .NET SDK 2.2.0, which is what this gate's
 server runs: `initialize` carries `clientInfo { name, version }` and the protocol's own
 `Implementation` type has `Name`, `Title`, `Version`, `Description`, `Icons` and `WebsiteUrl` —
 no model, on the `2025-11-25` revision or the `2026-07-28` one. Re-check before assuming this is
