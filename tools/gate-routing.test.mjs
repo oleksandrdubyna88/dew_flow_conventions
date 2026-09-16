@@ -42,7 +42,19 @@ const ROUTING = [
     "the gate a plan actually goes to, spelled the way a session has to type it"],
   [/mcp__coai__review_code/,
     "what that gate unlocks — the cost of using the wrong one is that this stays shut"],
+  // The prose is hard-wrapped at about a hundred columns, so any phrase long enough to be worth
+  // pinning can straddle a line break. These two allow one — asserting the exact spacing INSIDE a
+  // sentence would fail on a reflow that changed nothing, which is a test that cries about layout.
+  [/`mcp__coai__review_plan`[^`]*unlocks\s[^`]*`mcp__coai__review_code`/,
+    "the DIRECTION between the two gates — reverse it and all the names above still appear, which is "
+    + "the one thing a list of names cannot see (raised on the code round)"],
+  [/it belongs here, at\s+`mcp__coai__review_document`/,
+    "this gate named in the paragraph rather than left as 'here' — a reader who lands on this "
+    + "sentence alone has to be able to type it"],
 ];
+
+/** The sentence the paragraph has to sit against. Placement is the fix, not only the words. */
+const LIST_ENDS = "a requirements list — rather than a diff.";
 
 function documentGate() {
   return bodyOf(fs.readFileSync(path.join(root, SOURCE), "utf8"));
@@ -64,7 +76,9 @@ test("every one of those phrases comes from that paragraph and nowhere else", ()
   const body = documentGate();
   const opens = body.indexOf(OPENS);
 
-  assert.notEqual(opens, -1, `${SOURCE}: the paragraph must open with ${JSON.stringify(OPENS)}`);
+  // Wherever it sits — this locates the paragraph, it does not require it at any position.
+  assert.notEqual(opens, -1,
+    `${SOURCE}: no paragraph beginning ${JSON.stringify(OPENS)} was found anywhere in the body`);
 
   const ends = body.indexOf("\n\n", opens);
   const without = body.slice(0, opens) + (ends === -1 ? "" : body.slice(ends));
@@ -74,4 +88,17 @@ test("every one of those phrases comes from that paragraph and nowhere else", ()
       `${phrase} survives the paragraph being removed, so the case above would stay green without it `
       + `— and ${why} would then be unguarded`);
   }
+});
+
+test("the counter-example sits against the list that causes the mistake, with nothing between", () => {
+  // Placement IS the fix here: the reason a plan goes to the wrong gate is that it matches a list of
+  // concrete nouns, and a correction three paragraphs down is read after the match has been made.
+  // The words alone were pinned above; moving the paragraph while keeping them would leave those
+  // cases green and the symptom exactly where it was. (Raised on the code round.)
+  const body = documentGate();
+  const before = body.slice(0, body.indexOf(OPENS)).trimEnd();
+
+  assert.ok(before.endsWith(LIST_ENDS),
+    `${SOURCE}: the paragraph must come directly after ${JSON.stringify(LIST_ENDS)} — nothing may sit `
+    + `between the list and its correction. It currently follows: ${JSON.stringify(before.slice(-90))}`);
 });
