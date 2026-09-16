@@ -28,7 +28,7 @@
     {
       "id": "common.coai-document-gate",
       "source": "common/coai-document-gate.md",
-      "bodySha256": "e1c052e2844ad4fbda19168c544177680fe0c6bacd1477e928bc025a0c68a352",
+      "bodySha256": "11eff2ec9e1f60566f63c314348f9cb72a174773881e2ccf39c7bbafe86c5b60",
       "sections": [
         "## Reviewing a DOCUMENT rather than a change",
         "## Definition of Done"

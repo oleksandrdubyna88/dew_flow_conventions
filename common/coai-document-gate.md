@@ -3,7 +3,7 @@ id: "common.coai-document-gate"
 load: "conditional"
 tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
 ---
-<!-- coai-document v2 -->
+<!-- coai-document v3 -->
 ## Reviewing a DOCUMENT rather than a change
 
 <!-- owns: coai — the MCP server this stage belongs to, named in its tool prefix -->
@@ -21,6 +21,18 @@ tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy",
 one next door: no plan round before it and no code round after it, because the document IS the work.
 Reach for it when what you are producing or checking is a document — a specification, a policy, a
 proposal, a brief, a requirements list — rather than a diff.
+
+**A PLAN is not one of these, and that is the mistake this paragraph exists to stop.** A plan is a
+proposal and a requirements list, so it matches the words above twice — which is exactly why the
+words above are not the test. The test is what exists when the task is FINISHED. If the answer is a
+DIFF — source, configuration, a schema, a migration, a generated asset, anything this repository
+carries afterwards — then the document in your hand is a plan for that diff, and it goes to
+`mcp__coai__review_plan`, which is the only gate that unlocks `mcp__coai__review_code`. If the
+deliverable is the text itself and nothing will be built from it, it belongs here. Sending a plan
+here is not a near miss: it costs a full round of every enabled provider's reviewers and leaves the
+code gate exactly as shut as it was, because a document round is keyed by the document while the
+code gate asks about the branch — and the refusal you eventually meet says nothing about the gate
+you used by mistake.
 
 Everything the review-gate rule says about this being ADDITIONAL to your own review, about the
 `commands` a round may carry, and about `call_human` applies here unchanged.

@@ -902,3 +902,32 @@ in 026b20e. The rejection's conclusion survives on the correct ground: its sente
 unrelated product-audit backlog into a rule-delivery change" names
 `todo/REVIEW_product_audit_2026-09-09.md`, findings about the PRODUCTS, and not an audit of this
 repository's own corpus.
+
+## What a hash cannot say (`tools/gate-routing.test.mjs`)
+
+The body freeze answers one question — *did anybody review this edit?* — and it answers it well:
+`rules.test.mjs` goes red when a body changes and `research/rule-bodies.json` does not, so an
+unrecorded edit is a failed suite rather than a silent policy change. What it cannot answer is
+whether the body still SAYS the thing it exists to say. Record a new hash beside any replacement
+text and the suite is green.
+
+A gate reviewer named that gap on 2026-09-16, on the story that taught `coai-document-gate.md` to
+tell its own gate apart from the plan gate: an editor could rewrite that paragraph, run
+`rule-bodies.mjs --update`, pass everything here, and leave an agent holding a plan calling
+`review_document` exactly as often as before. The finding was accepted, and this file is the answer.
+
+Two cases, and the second is the point. The first asserts four phrases the rule has to keep — the
+counter-example, the discriminator (*what exists when the task is FINISHED*), and both tool names
+spelled the way a session types them. The second splices the paragraph out of the body and requires
+every one of those phrases to disappear with it, because a content assertion whose words also occur
+elsewhere in the file stays green when the paragraph is deleted — which is the shape this repository
+has already been caught by once, and is why `canonical-markers.test.mjs` carries its own negative
+companion. Ask what the assertion would SEE if the behaviour were removed.
+
+The RED was observed before the paragraph existed and named the real symptom:
+`common/coai-document-gate.md no longer carries /A PLAN is not one of these/`, and, from the second
+case, `the paragraph must open with "**A PLAN is not one of these"`. After the edit both pass, the
+marker check still passes, and `rules.test.mjs` fails with
+`common.coai-document-gate: the body changed without its bodySha256` until the manifest is recorded —
+which is the ordering the story's build order requires so that the freeze's own RED is observed
+rather than skipped.
