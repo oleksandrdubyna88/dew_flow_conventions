@@ -9,6 +9,8 @@ tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy",
 <!-- owns: coai — the MCP server this stage belongs to, named in its tool prefix -->
 <!-- owns: ConnectOtherAIs — the product that serves the document stage, as its panel names it -->
 <!-- owns: mcp__coai__review_document — a tool name a session types; there is no generic spelling of it -->
+<!-- owns: mcp__coai__review_plan — the gate this one is confused WITH; naming it is the whole correction -->
+<!-- owns: mcp__coai__review_code — what that other gate unlocks, and the cost of arriving here instead -->
 
 > **This extends [coai-review-gate.md](coai-review-gate.md), and it is a separate file because that
 > one is frozen.** `tools/rules.test.mjs` hashes all 24 migrated rule bodies against baseline
@@ -29,11 +31,10 @@ DIFF — source, configuration, a schema, a migration, a generated asset, anythi
 carries afterwards — then the document in your hand is a plan for that diff, and it goes to
 `mcp__coai__review_plan`, which is the only gate that unlocks `mcp__coai__review_code`. If the
 deliverable is the text itself and nothing will be built from it, it belongs here, at
-`mcp__coai__review_document`. Sending a plan
-here is not a near miss: it costs a full round of every enabled provider's reviewers and leaves the
-code gate exactly as shut as it was, because a document round is keyed by the document while the
-code gate asks about the branch — and the refusal you eventually meet says nothing about the gate
-you used by mistake.
+`mcp__coai__review_document`. Sending a plan here is not a near miss: it costs a full round of every
+enabled provider's reviewers and leaves the code gate exactly as shut as it was, because a document
+round is keyed by the document while the code gate asks about the branch — and the refusal you
+eventually meet says nothing about which gate you used by mistake.
 
 Everything the review-gate rule says about this being ADDITIONAL to your own review, about the
 `commands` a round may carry, and about `call_human` applies here unchanged.
