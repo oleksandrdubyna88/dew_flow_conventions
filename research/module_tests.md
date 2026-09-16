@@ -931,3 +931,16 @@ marker check still passes, and `rules.test.mjs` fails with
 `common.coai-document-gate: the body changed without its bodySha256` until the manifest is recorded —
 which is the ordering the story's build order requires so that the freeze's own RED is observed
 rather than skipped.
+
+The code round added three assertions and one of them is the reason the other two are not enough.
+Naming both tools is a list of names, and a list of names cannot see a REVERSAL: swap the sentence to
+say `review_code` unlocks `review_plan` and every name assertion still matches. So the direction is
+pinned as a phrase, and proved by swapping it — both names present, the case red. Placement is pinned
+the same way: the whole fix here is that the correction sits against the list that causes the
+mistake, so a paragraph slid between the two turns the case red with *nothing may sit between the
+list and its correction*. Both were satisfied the moment they were written, which is exactly when an
+assertion has to be broken on purpose before it is believed.
+
+Two of the phrases allow a line break inside them. The prose is hard-wrapped at about a hundred
+columns, so a phrase worth pinning can straddle one — the first draft of the tool-name assertion went
+red on a reflow that changed no words, which is a test complaining about layout.

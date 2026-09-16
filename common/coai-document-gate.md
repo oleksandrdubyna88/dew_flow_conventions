@@ -28,7 +28,8 @@ words above are not the test. The test is what exists when the task is FINISHED.
 DIFF — source, configuration, a schema, a migration, a generated asset, anything this repository
 carries afterwards — then the document in your hand is a plan for that diff, and it goes to
 `mcp__coai__review_plan`, which is the only gate that unlocks `mcp__coai__review_code`. If the
-deliverable is the text itself and nothing will be built from it, it belongs here. Sending a plan
+deliverable is the text itself and nothing will be built from it, it belongs here, at
+`mcp__coai__review_document`. Sending a plan
 here is not a near miss: it costs a full round of every enabled provider's reviewers and leaves the
 code gate exactly as shut as it was, because a document round is keyed by the document while the
 code gate asks about the branch — and the refusal you eventually meet says nothing about the gate
