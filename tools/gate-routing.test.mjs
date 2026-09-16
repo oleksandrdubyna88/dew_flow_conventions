@@ -38,10 +38,13 @@ const ROUTING = [
     "the counter-example — the example list above it matches a plan twice, which is what sends plans to the wrong gate"],
   [/what exists when the task is FINISHED/,
     "the discriminator, which is the only form of this test a reader can apply without judgement"],
-  [/mcp__coai__review_plan/,
-    "the gate a plan actually goes to, spelled the way a session has to type it"],
-  [/mcp__coai__review_code/,
-    "what that gate unlocks — the cost of using the wrong one is that this stays shut"],
+  // A BARE `mcp__coai__review_plan` was pinned here and is not any more, and the reason is worth
+  // keeping: the file's `owns:` declarations name both tools, legitimately and by the ownership
+  // check's own contract, so a bare name is no longer paragraph-local — delete the paragraph and a
+  // bare-name case stays green on the declaration alone. Nothing is lost, because the directional
+  // phrase below requires both names, their order AND the verb between them, which is strictly more
+  // than either bare case asserted. The uniqueness case is what caught this.
+  //
   // The prose is hard-wrapped at about a hundred columns, so any phrase long enough to be worth
   // pinning can straddle a line break. These two allow one — asserting the exact spacing INSIDE a
   // sentence would fail on a reflow that changed nothing, which is a test that cries about layout.

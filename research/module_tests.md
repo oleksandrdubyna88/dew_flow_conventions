@@ -944,3 +944,20 @@ assertion has to be broken on purpose before it is believed.
 Two of the phrases allow a line break inside them. The prose is hard-wrapped at about a hundred
 columns, so a phrase worth pinning can straddle one — the first draft of the tool-name assertion went
 red on a reflow that changed no words, which is a test complaining about layout.
+
+**What CI caught that twelve reviewers and the author did not.** The paragraph introduced two tool
+names into a SHARED rule, and `tools/ownership-check.mjs` refused them: tokens are matched exactly,
+so the file's existing declaration of one tool name says nothing about the other two. The check also
+named `the gate` — an ambiguous noun behind a definite article — which the sentence did not need and
+now reads as *which gate you used by mistake*. It was missed locally for a plain reason worth writing
+down: `npm test` does not run the family checks. CI runs `ownership-check`, `plan-lifecycle`,
+`pin-check` and `adapter-check` as separate steps, so a green `npm test` is not a green pull request.
+Run all five before pushing.
+
+Fixing it turned the uniqueness case red, which is the case doing its job. Declaring
+`mcp__coai__review_plan` and `mcp__coai__review_code` in `owns:` comments put both names in the body
+OUTSIDE the paragraph, so a bare-name assertion would have survived the paragraph being deleted. The
+two bare-name entries were removed rather than exempted: the directional phrase requires both names,
+their order and the verb between them, which is strictly more than either bare case asserted. An
+assertion that a stronger one subsumes is not a loss; an assertion the uniqueness case has to be
+taught to ignore is a hole with a comment over it.
