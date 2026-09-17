@@ -73,14 +73,14 @@ jobs:
       # pushes. This job does: `tools/promote-release.mjs` ends in a `git push` of
       # `<sha>:refs/heads/release`, and that push authenticates through git's own config. Turn this
       # off and promotion fails with an authentication error rather than a useful one.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: refs/heads/main
           # The tool asks whether the sha is an ancestor of main and how far release is behind it;
           # both are questions a shallow clone cannot answer, and it refuses one outright.
           fetch-depth: 0
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
 
