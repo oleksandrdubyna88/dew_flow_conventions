@@ -169,6 +169,17 @@ export function branchesOf(file) {
   if (!named || typeof named !== 'object' || Array.isArray(named) || Object.keys(named).length === 0) {
     throw new Error('`branches` must be an object mapping branch names to protection bodies, naming at least one');
   }
+  // THE MIXED FORM, refused — and it is the worse of the two silent losses, because unlike a `null`
+  // body it reads as a perfectly sensible file. Measured: `{ enforce_admins: true, allow_deletions:
+  // false, branches: { main: {…} } }` came back as ONE target whose body is the branch's alone, and
+  // both root opinions were dropped without a word — never compared, never sent by `--apply`.
+  // Anything that is not `branches` or a `$` note is therefore refused here, including a MISSPELLED
+  // field: `enforce_admin` at the root is exactly the case a "only real fields count" rule would
+  // wave through. (CodeRabbit, creds_for_devs #118.)
+  const stray = Object.keys(file).filter((key) => key !== 'branches' && !key.startsWith('$'));
+  if (stray.length > 0) {
+    throw new Error(`a file with \`branches\` must put every protection field inside a branch body — found ${stray.join(', ')} at the root, which would be silently ignored`);
+  }
   // EVERY body is validated here, before any branch is checked or applied — one bad entry refuses
   // the whole file rather than leaving a run half-applied across branches.
   return Object.entries(named).map(([branch, body]) => ({ branch, body: checked(`\`branches.${branch}\``, body) }));
@@ -576,6 +587,27 @@ function branchCases() {
       name: 'a file with no `branches` key and no protection field is refused the same way',
       ok: refused({ $note: 'only prose' }).includes('the file'),
       detail: refused({ $note: 'only prose' }) || 'it returned instead of throwing',
+    },
+    // The MIXED form: a root opinion beside `branches` used to be dropped without a word.
+    {
+      name: 'a protection field at the ROOT beside `branches` is refused, never silently dropped',
+      ok: refused({ enforce_admins: true, branches: { main: { lock_branch: false } } })
+        .includes('enforce_admins'),
+      detail: refused({ enforce_admins: true, branches: { main: { lock_branch: false } } })
+        || 'it returned instead of throwing — the root opinion was lost',
+    },
+    {
+      name: 'a MISSPELLED field at the root is refused too, which "only real fields count" would not catch',
+      ok: refused({ enforce_admin: true, branches: { main: { lock_branch: false } } })
+        .includes('enforce_admin'),
+      detail: refused({ enforce_admin: true, branches: { main: { lock_branch: false } } })
+        || 'it returned instead of throwing',
+    },
+    {
+      name: '`$` notes at the root are NOT stray — they are how this file carries its prose',
+      ok: shape({ $note: 'why', $decided: ['…'], branches: { main: { lock_branch: false } } })
+        === JSON.stringify([['main', { lock_branch: false }]]),
+      detail: shape({ $note: 'why', $decided: ['…'], branches: { main: { lock_branch: false } } }),
     },
   ];
 }
