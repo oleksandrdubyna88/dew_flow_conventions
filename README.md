@@ -144,17 +144,28 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   were the failures that hurt all six consumers at once — a backwards move makes every pinned sha
   differ from the tip during the incident the rollback exists to end.
 
-  **Still open, deliberately accepted (2026-09-14, narrowed 2026-09-18):** anyone with push rights
-  can still move `release` FORWARD by hand and skip every check above. The workflow remains the
-  intended route, not an enforced one. Branch protection cannot say *only this workflow may update
-  this ref* on a personal repository — `restrictions` is organisation-only. Closing it needs a
-  repository ruleset on `refs/heads/release` whose only bypass actor is the Actions app: settings of
-  a different kind, which is why nothing in this tree can prove it.
+  **The ref also requires `tools · selftest` and `workflows · actionlint`** — the two contexts
+  `ci.yml` actually reports on a push to `main`. Required checks apply to a **direct push**, not only
+  to a merge, so a commit hand-pushed here without ever running CI is refused by GitHub itself. This
+  cannot break a legitimate promotion: `tools/promote-release.mjs` already refuses a sha whose `ci`
+  run is absent, unfinished or red, so every sha GitHub would reject is one the gate refuses anyway.
 
-  Deliberately **no required checks and no reviews** on `release`. The promotion is a direct push of
-  a sha already on main and already green, and `tools/promote-release.mjs` refuses one that is not —
-  requiring the checks again would duplicate a gate with thirty cases behind it, and requiring a pull
-  request would break the push outright.
+  **Still open, deliberately accepted (2026-09-14, narrowed twice on 2026-09-18):** someone with push
+  rights can open a pull request, let CI go green on its head sha, never merge it, and push **that**
+  sha here. The residual exposure is therefore *content that passed CI but was never reviewed or
+  merged* — narrower than arbitrary content, and not nothing. The workflow remains the intended
+  route, not an enforced one. Branch protection cannot say *only this workflow may update this ref*
+  on a personal repository — `restrictions` is organisation-only. Closing it needs a repository
+  ruleset on `refs/heads/release` whose only bypass actor is the Actions app: settings of a different
+  kind, which is why nothing in this tree can prove it.
+
+  > The earlier version of this paragraph said the open half was "a forward move", and that was too
+  > kind to it. **Forward constrains ancestry, not content**: a single-parent child of the current
+  > tip carrying anything at all is a forward move and need never have been on `main`. The required
+  > checks above are what actually narrowed it.
+
+  Deliberately **no reviews** on `release`: the promotion is a direct push, and a pull-request
+  requirement would break it outright.
 - Repo-specific policy moves to `.agents/PROJECT.md` and `.agents/rules/`; runtime settings
   stay in their host configuration. Never copy a policy body into both hosts' trees.
 - **`main` is closed, here and in every consumer that protects it.** A change is a branch and a pull

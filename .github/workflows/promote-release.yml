@@ -2,16 +2,22 @@ name: promote-release
 
 # `release` is the ref six repositories load their policy from. This file is the SUPPORTED way to move
 # it — not, as of 2026-09-14, the only possible way: anyone with push rights can move it by hand and
-# skip every check below. Since 2026-09-18 the ref carries branch protection (stated in
-# .github/branch-protection.json), so it can no longer be REWOUND, deleted or given a non-linear
-# history, and an admin is not exempt — but a forward move by hand is still possible, because branch
-# protection cannot say "only this workflow may update this ref" on a personal repository. Closing
-# that needs a ruleset on refs/heads/release whose only bypass actor is the Actions app. The README
+# skip the checks below. Since 2026-09-18 the ref carries branch protection (stated in
+# .github/branch-protection.json): it can no longer be REWOUND, deleted or given a non-linear
+# history, an admin is not exempt, and `tools · selftest` + `workflows · actionlint` are REQUIRED —
+# required checks apply to a direct push, so a commit hand-pushed here without ever running ci is
+# refused by GitHub itself. That cannot block a legitimate promotion, because the gate below already
+# refuses a sha whose ci run is absent, unfinished or red: every sha GitHub would reject is one this
+# tool rejects anyway.
+#
+# WHAT IS STILL OPEN: someone with push rights can open a pull request, let ci go green on its head
+# sha, never merge it, and push THAT sha here — content that passed ci but was never reviewed. Branch
+# protection cannot say "only this workflow may update this ref" on a personal repository; closing it
+# needs a ruleset on refs/heads/release whose only bypass actor is the Actions app. The README
 # records both halves rather than leaving either to be discovered.
 #
-# The protection is deliberately WITHOUT required checks and WITHOUT reviews: the promotion below is a
-# direct push of a sha that this gate has already proven is on main and green, and a pull-request
-# requirement on this ref would break that push outright.
+# The protection is deliberately WITHOUT reviews: the promotion below is a direct push, and a
+# pull-request requirement on this ref would break it outright.
 #
 # What this file DOES guarantee is that a merge to main never moves the ref: there is no `on: push`
 # here, only workflow_dispatch. That gap between "written" and "loaded" is the whole mechanism — main
