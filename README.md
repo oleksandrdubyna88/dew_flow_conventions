@@ -136,11 +136,25 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   while CI follows `release`, and the bump lands at the wrong tip. `pin-check` reports
   `LOCAL OVERRIDE` with both values and the `git config --unset` that ends it.
 
-  **Known gap, deliberately accepted (2026-09-14):** the ref has no server-side protection. Anyone
-  with push rights can move `release` by hand and skip every check above. The workflow is the
-  intended route, not an enforced one. Closing it needs a repository ruleset on `refs/heads/release`
-  (deny direct and force pushes, bypass for the Actions actor) — settings rather than a file, which
-  is why nothing in this tree can prove it.
+  **Half of that gap is closed since 2026-09-18, and the half that is left is a different shape.**
+  `refs/heads/release` now carries branch protection, stated in
+  [`.github/branch-protection.json`](.github/branch-protection.json) and checked by
+  `node .github/scripts/branch-protection.mjs`, which reads every branch that file names: the ref
+  **cannot be rewound, deleted, or given a non-linear history, and an admin is not exempt.** Those
+  were the failures that hurt all six consumers at once — a backwards move makes every pinned sha
+  differ from the tip during the incident the rollback exists to end.
+
+  **Still open, deliberately accepted (2026-09-14, narrowed 2026-09-18):** anyone with push rights
+  can still move `release` FORWARD by hand and skip every check above. The workflow remains the
+  intended route, not an enforced one. Branch protection cannot say *only this workflow may update
+  this ref* on a personal repository — `restrictions` is organisation-only. Closing it needs a
+  repository ruleset on `refs/heads/release` whose only bypass actor is the Actions app: settings of
+  a different kind, which is why nothing in this tree can prove it.
+
+  Deliberately **no required checks and no reviews** on `release`. The promotion is a direct push of
+  a sha already on main and already green, and `tools/promote-release.mjs` refuses one that is not —
+  requiring the checks again would duplicate a gate with thirty cases behind it, and requiring a pull
+  request would break the push outright.
 - Repo-specific policy moves to `.agents/PROJECT.md` and `.agents/rules/`; runtime settings
   stay in their host configuration. Never copy a policy body into both hosts' trees.
 - **`main` is closed, here and in every consumer that protects it.** A change is a branch and a pull
