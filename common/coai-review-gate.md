@@ -67,7 +67,7 @@ has reached `proceed`.**
 
    **A code round resolved at `proceed` CLOSES the session.** For a checkpoint, a final round, or a
    retry after a crash, commit and call `review_code` with `again: true` — refused, saying why,
-   when nothing new is committed, findings await `resolve`, or a person is asked.
+   when nothing new is committed, findings await `resolve`, or `call_human` awaits a person.
 
    **A code round is never given a bare diff.** `planText` is the SCOPE — what this change was
    supposed to achieve — and the server refuses a code round without one. A reviewer holding only a
