@@ -60,9 +60,14 @@ has reached `proceed`.**
    is about the same document.
 4. Verdict `revise` → fix the accepted findings, run `review_plan` again. Verdict `proceed`
    → implement.
-5. **When the branch is written**, call `review_code` with the same `planText` and the
-   `baseRef` you branched from. Three independent reviewers per vendor read the diff. Same
-   `resolve` duty, same loop.
+5. **When the branch is written and COMMITTED**, call `review_code` with the same `planText` and
+   the `baseRef` you branched from. Three independent reviewers per vendor read the diff. Same
+   `resolve` duty, same loop. Only committed changes are reviewed; an empty diff is refused, never
+   passed.
+
+   **A code round resolved at `proceed` CLOSES the session.** For a checkpoint, a final round, or a
+   retry after a crash, commit and call `review_code` with `again: true` — refused, saying why,
+   when nothing new is committed, findings await `resolve`, or a person is asked.
 
    **A code round is never given a bare diff.** `planText` is the SCOPE — what this change was
    supposed to achieve — and the server refuses a code round without one. A reviewer holding only a
