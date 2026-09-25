@@ -62,7 +62,8 @@ they are recognisable from inside the task:
    `epics` — so make that call as written. Nothing is wrong when this one fires; that is the point of
    it. Close each with `mcp__coai__close_consult` and an outcome once you have verified the advice: a
    cadence consultation counts only when it has one, and in `require` the group's code round is
-   refused until it does. It spends none of the budget for being stuck.
+   refused until it does — unless no consultant can be had, when the server stands the refusal down
+   and says so in the round. It spends none of the budget for being stuck.
 
 The fifth and the seventh are not moments of being stuck, and they belong here anyway. The seventh
 is an order you carry out. The fifth is a judgement: a finding you are about to let rewrite the work leaves you exactly where the third one does — two defensible shapes and nothing in
