@@ -985,3 +985,10 @@ What changed here, and what checks it:
   resolves to nothing.
 - **`rule-bodies.json`** gained the new entry by hand, as a new rule must, and both hashes were
   recorded with `--update` naming the two ids.
+
+**What this repository can and cannot prove about it.** The consumer's generator was run against the new
+file on 2026-09-25 as a dry run — its own `ruleBody` with its own consultant marker — and accepted it,
+frontmatter stripped, body starting at the v3 marker; a test here cannot do that, because this repository
+may not depend on a consumer, which is why the marker regex is copied. And none of these checks says an
+agent OBEYS trigger 7 — no loader output is evidence of behaviour. That is proved in the consumer, by a
+bounded live run of a split plan under `require` once the consumer builds its snippet from this file.
