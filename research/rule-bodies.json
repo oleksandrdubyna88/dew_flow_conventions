@@ -28,7 +28,7 @@
     {
       "id": "common.coai-consultant",
       "source": "common/coai-consultant.md",
-      "bodySha256": "8d56121805da29523672266a60d98c183e57a76df9b8f1ff61d067337b645c29",
+      "bodySha256": "bff2091c586adb4d2f0e81e144d50ebc06abdee1fa7e37fa59a27f2680ff9508",
       "sections": [
         "## When you are stuck, ask another vendor (ConnectOtherAIs)"
       ]
