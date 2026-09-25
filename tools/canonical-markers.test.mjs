@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Three rules are consumed by a build, not only read by a session.
+ * Four rules are consumed by a build, not only read by a session.
  *
  * `prepare-gate.mjs` in the product that serves the review gate generates its shipped prompt text
  * from these files, and it requires each body to START with a canonical marker line immediately
@@ -34,6 +34,8 @@ const CANONICAL = {
   "common/coai-review-gate.md": /^<!-- coai-snippet v\d+ -->\n## Multi-model review gate \(ConnectOtherAIs\)/,
   "common/coai-document-gate.md": /^<!-- coai-document v\d+ -->\n## Reviewing a DOCUMENT/,
   "common/coai-caller-model.md": /^<!-- coai-caller v\d+ -->\n## Say which model you are/,
+  // The consultant half of the same snippet, since it moved here from the product (2026-09-25).
+  "common/coai-consultant.md": /^<!-- coai-consultant v\d+ -->\n## When you are stuck, ask another vendor/,
 };
 
 test("every generated rule still begins with the line its consumer generates from", () => {
