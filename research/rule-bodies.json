@@ -28,7 +28,7 @@
     {
       "id": "common.coai-consultant",
       "source": "common/coai-consultant.md",
-      "bodySha256": "bff2091c586adb4d2f0e81e144d50ebc06abdee1fa7e37fa59a27f2680ff9508",
+      "bodySha256": "0b5dea791e302f94426d001034bd298706254cb02e43e556a8a1f26a8fa6cb77",
       "sections": [
         "## When you are stuck, ask another vendor (ConnectOtherAIs)"
       ]
@@ -45,7 +45,7 @@
     {
       "id": "common.coai-review-gate",
       "source": "common/coai-review-gate.md",
-      "bodySha256": "5179fe58053e8f3db98793490e1c37b3d1b8145686a444ab7e0598db69e7f8b1",
+      "bodySha256": "a175a71801af806473591c7b54698b91c6a8cf520022c259427c6b6b86d334ea",
       "sections": [
         "## Multi-model review gate (ConnectOtherAIs)"
       ]
