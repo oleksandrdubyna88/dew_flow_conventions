@@ -105,3 +105,7 @@ has reached `proceed`.**
 
 Report the verdicts and the reviewer counts in your summary. A round that ran with four of six
 reviewers says so — pass that on rather than implying a full panel agreed.
+
+The same server also lets you ASK another vendor's model — when you are stuck, when a finding changes
+your mind about the work, and when a reply orders a consultation on a cadence. The consultant rule
+beside this one says when, and what to send.

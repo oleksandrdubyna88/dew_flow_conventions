@@ -961,3 +961,27 @@ two bare-name entries were removed rather than exempted: the directional phrase 
 their order and the verb between them, which is strictly more than either bare case asserted. An
 assertion that a stronger one subsumes is not a loss; an assertion the uniqueness case has to be
 taught to ignore is a hole with a comment over it.
+
+## The consultant half moved here (`common/coai-consultant.md`, 2026-09-25)
+
+Until today the consultant half of the pasted snippet was the product's own file, on the operator's ruling
+of 2026-09-13 that a rule about one tool of one product is not shared. The ruling was reversed on
+2026-09-25: the review server gates every repository in the family, so a rule about when to call its
+consultant is as shared as the gate rule itself. The body moved as it was — six triggers and the three
+rules about the answer — with one addition that is the reason for the move: **trigger 7, the cadence**,
+which tells a session to make the consultation a review reply orders, with the `kind`, `plan` and
+`epics` the order writes out, and to close it with an outcome.
+
+What changed here, and what checks it:
+
+- **A fourth build-consumed rule.** `canonical-markers.test.mjs` pins
+  `<!-- coai-consultant vN -->` followed by its heading; its RED was observed with an `owns:` line moved
+  above the marker (`common/coai-consultant.md: its body must START with the canonical marker…`).
+- **Four `owns:` markers**, one per token — the server, the product, and the two tool names the rule
+  makes a session type (`consult`, `close_consult`). Two phrasings the ownership check would have
+  refused were rewritten rather than declared: *the gate above* and *in the panel*.
+- **A three-sentence pointer at the end of `coai-review-gate.md`**, naming the consultant rule in words
+  rather than by a link: that body is pasted into a consumer's instruction file, where a relative link
+  resolves to nothing.
+- **`rule-bodies.json`** gained the new entry by hand, as a new rule must, and both hashes were
+  recorded with `--update` naming the two ids.
