@@ -52,8 +52,9 @@ they are recognisable from inside the task:
    block; neither of you is taking orders from it.
 6. **The person asks for it** — "consult", "ask the consultant", or the `/mcp__coai__consult`
    prompt this server offers. That one needs no judgement from you.
-7. **A review reply orders one — the cadence.** When the operator has switched the consultation
-   cadence on, a plan split into epics owes one consultation per group of epics (three by default),
+7. **A review reply orders one — the cadence.** This one is not yours to judge: the review server
+   writes the order into its reply only when the operator has switched the consultation cadence on and
+   the plan is split into epics, so no order in the reply means nothing to do. A plan split into epics owes one consultation per group of epics (three by default),
    taken before that group's first code round: is this group right, where is it weak, what did it
    forget. From five epics you are also asked which epics and stories carry the most risk, and each one
    you name gets a consultation of its own. The order arrives in the reply under
