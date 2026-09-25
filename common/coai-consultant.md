@@ -109,3 +109,13 @@ the problem statement is the same bytes twice, and you pay for both.
 A consultation is bounded and it is not free: turns per consultation, consultations per session, and
 an idle close, all set by the person in the ConnectOtherAIs settings. When the budget is spent, the thing to do is talk
 to the person — which was always the other answer to being stuck.
+
+### Definition of Done
+
+- [ ] When one of the seven triggers fired, `mcp__coai__consult` was called — or the reason it could not
+      be (switched off, the budget spent, the turn failed) was said, and what was in doubt was verified
+      another way or put to the person.
+- [ ] Every consultation you opened was closed with `mcp__coai__close_consult` and an outcome —
+      `solved`, `not_solved` or `abandoned` — once its advice was verified or dropped.
+- [ ] No line of the work changed on the consultant's word alone: each piece of advice acted on was
+      checked by a test, a run or a read of the code it named.
