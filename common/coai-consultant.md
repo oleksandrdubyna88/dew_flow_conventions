@@ -3,7 +3,7 @@ id: "common.coai-consultant"
 load: "conditional"
 tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
 ---
-<!-- coai-consultant v3 -->
+<!-- coai-consultant v4 -->
 ## When you are stuck, ask another vendor (ConnectOtherAIs)
 
 <!-- owns: coai — the MCP server's own name, and the prefix of every tool below -->

@@ -1005,8 +1005,11 @@ failure, a `blocking` finding or the person's request; never a third).
 What checks it, and what deliberately does not:
 
 - **`rule-bodies.json`** gained the entry by hand, as a new rule must, and its hash was recorded with
-  `--update common.coai-feature-gate`. The same commit moved `common.coai-consultant`, whose trigger 7
-  now says a cadence consultation counts only after `close_consult` records an outcome.
+  `--update common.coai-feature-gate`. The same pull request moved `common.coai-consultant`, whose
+  trigger 7 now says a cadence consultation counts only after `close_consult` records an outcome — and
+  whose marker rose to `<!-- coai-consultant v4 -->` with the consumer's own version moving 3 → 4, so a
+  pasted copy of v3 learns it is stale. `canonical-markers.test.mjs` leaves the version free, so it
+  needed no change.
 - **Three `owns:` markers**, one per token: the server's name and the two tool names the rule makes a
   session type (`review_feature`, `consult`).
 - **It is not in `canonical-markers.test.mjs`.** It carries a `<!-- coai-feature v1 -->` marker in the

@@ -28,7 +28,7 @@
     {
       "id": "common.coai-consultant",
       "source": "common/coai-consultant.md",
-      "bodySha256": "a765484bc1e0b7213c20821785eac00fc9fb69e15c9c647acacaaa499d975b81",
+      "bodySha256": "6114aedf73c0bd499f00ed1113255aa2a0b5237cfbbf40b85a7064e9b1d86f44",
       "sections": [
         "## When you are stuck, ask another vendor (ConnectOtherAIs)",
         "### Definition of Done"
