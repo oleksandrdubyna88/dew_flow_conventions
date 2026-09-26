@@ -4,15 +4,16 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 
-import { resolved } from '../.github/scripts/branch-protection.mjs';
+import { resolved } from '../.github/scripts/lib/resolved.mjs';
 
 /**
  * The resolver is the family's ONE way for a script in `.github/scripts/` to find `git` or `gh`.
  *
- * <p>Exported on 2026-09-26: `dew_flow_connect_other_ais` gave two new release scripts
- * (`release-anchors.mjs`, `docs-only-title.mjs`) this function instead of a second copy of it —
- * SonarCloud's S4036 fires on a bare name handed to the spawner — and its copy of this file took the
- * `export`. This copy keeps pace, so the two do not drift.</p>
+ * <p>A module of its own, `.github/scripts/lib/resolved.mjs`, since 2026-09-26. It lived inside
+ * `branch-protection.mjs`; `dew_flow_connect_other_ais` then gave two release scripts
+ * (`release-anchors.mjs`, `docs-only-title.mjs`) this function rather than a second copy of it —
+ * SonarCloud's S4036 fires on a bare name handed to the spawner — and a PATH resolver imported from a
+ * branch-protection script coupled two unrelated things. Both repositories hold the same module.</p>
  */
 
 test('the resolver is importable, and finds a program on PATH by its absolute path', () => {
