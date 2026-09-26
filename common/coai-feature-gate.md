@@ -56,13 +56,14 @@ reviewed and were consulted on the code. Credential-shaped files are never sent 
 - `revise` → `resolve` every finding as at the other stages: accept, or reject with a reason, in THIS
   round. Fix what you accepted and commit it — as new pull requests when the epics are merged. Then:
   - **a second round runs ONLY when round 1 had a reviewer failure, a `blocking` finding came back, or
-    the person asks for one** — call again with `again: true` over the new commits;
+    the person asks for one** — call again with `again: true` over the new commits (a retry after a
+    reviewer failure needs none, and asks only the reviewers that failed);
   - otherwise there is no second round: the resolved findings and their fixes close the review.
 
   At most two rounds, ever.
 - `call_human` → stop the SHIPPING, not the task: surface the open findings and call `ask_human` with
-  `feature`. It is also what comes back when every ticked reviewer failed, because an outage must not
-  wave a feature through.
+  `feature`. It is also what comes back when the second round still fails or still carries a
+  `blocking` finding — an outage that outlasts the retry must not wave a feature through.
 - `skipped` → nobody is ticked for features, the stage is switched off, or the plan is too small. It
   never blocks; tell the person the feature review did not run, and why.
 

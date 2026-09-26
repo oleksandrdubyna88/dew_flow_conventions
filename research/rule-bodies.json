@@ -46,7 +46,7 @@
     {
       "id": "common.coai-feature-gate",
       "source": "common/coai-feature-gate.md",
-      "bodySha256": "5ed30c59bd1550eea2116f675b8567233e4a26f998bd6d6d38e644a61a9901e5",
+      "bodySha256": "537a1a0795e5f006b3f6fdfad4186bfdd46b304dd3be5200d50f3b5afbff2975",
       "sections": [
         "## Reviewing a WHOLE feature before it ships",
         "### When",
