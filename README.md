@@ -106,6 +106,15 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   [`tools/promote-release.mjs`](tools/promote-release.mjs) rather than in the YAML precisely so those
   refusals can be tested; thirty cases drive it.
 
+  **The dispatch takes a required `reason` input beside the sha** — one line saying what the release
+  contains, for the run summary:
+
+  ```bash
+  gh workflow run promote-release.yml --ref main -f sha=<40-character sha> -f reason="…"
+  ```
+
+  Without `-f reason="…"` the dispatch answers **422** and nothing runs.
+
   **Dispatch it against `main`, not against your branch.** The job refuses any other ref and checks
   out `refs/heads/main` explicitly: the checkout would otherwise take whatever ref the dispatch
   selected, so a branch carrying an edited `promote-release.mjs` could judge a main commit under
