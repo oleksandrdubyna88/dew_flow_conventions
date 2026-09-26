@@ -992,3 +992,25 @@ frontmatter stripped, body starting at the v3 marker; a test here cannot do that
 may not depend on a consumer, which is why the marker regex is copied. And none of these checks says an
 agent OBEYS trigger 7 — no loader output is evidence of behaviour. That is proved in the consumer, by a
 bounded live run of a split plan under `require` once the consumer builds its snippet from this file.
+
+## The feature gate (`common/coai-feature-gate.md`, 2026-09-26)
+
+The review server gained a fourth stage — one review of a whole plan of three or more epics before its
+release — and the rule for calling it lives here for the reason the consultant rule moved here: the
+server gates every repository in the family. It is short on purpose. The tool's own description carries
+the parameters and their limits; the rule carries when to call it, what to pass, what each verdict asks
+of the caller, and the operator's round cap of 2026-09-26 (a second round only after a reviewer
+failure, a `blocking` finding or the person's request; never a third).
+
+What checks it, and what deliberately does not:
+
+- **`rule-bodies.json`** gained the entry by hand, as a new rule must, and its hash was recorded with
+  `--update common.coai-feature-gate`. The same commit moved `common.coai-consultant`, whose trigger 7
+  now says a cadence consultation counts only after `close_consult` records an outcome.
+- **Three `owns:` markers**, one per token: the server's name and the two tool names the rule makes a
+  session type (`review_feature`, `consult`).
+- **It is not in `canonical-markers.test.mjs`.** It carries a `<!-- coai-feature v1 -->` marker in the
+  shape of the other four so a consumer can generate from it later, but no consumer's build reads it
+  yet, and that test asserts a contract with a build.
+- **Nothing counts whether the review ran** (operator, 2026-09-26). No checker, no CI step: this
+  repository holds guidance, never enforcement, and the rule says so in its own text.

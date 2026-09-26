@@ -60,9 +60,9 @@ they are recognisable from inside the task:
    you name gets a consultation of its own. The order arrives in the reply under
    `CONSULT ON A CADENCE.` with the call written out — `kind` (`cadence` or `risk`), `plan` and
    `epics` — so make that call as written. Nothing is wrong when this one fires; that is the point of
-   it. Close each with `mcp__coai__close_consult` and an outcome once you have verified the advice: a
-   cadence consultation counts only when it has one, and in `require` the group's code round is
-   refused until it does — unless no consultant can be had, when the server stands the refusal down
+   it. Close each with `mcp__coai__close_consult` and an outcome once you have verified the advice.
+   A cadence consultation counts only after `close_consult` records `solved`, `not_solved` or
+   `abandoned`. In `require` the group's code round is refused until it does — unless no consultant can be had, when the server stands the refusal down
    and says so in the round. It spends none of the budget for being stuck.
 
 The fifth and the seventh are not moments of being stuck, and they belong here anyway. The seventh
