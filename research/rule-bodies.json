@@ -107,7 +107,7 @@
     {
       "id": "common.git-workflow",
       "source": "common/git-workflow.md",
-      "bodySha256": "e845886b95a4b94146ee6cf562232f8a6ee5a46a62a2af703442466f4a8c18e0",
+      "bodySha256": "98305377f465e2c61731af0e80cf36ed355bab409a1c1219f7d034b987548861",
       "sections": [
         "# Git Workflow",
         "## Commit your OWN work, and only after it is verified (MANDATORY)",

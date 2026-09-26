@@ -363,7 +363,7 @@ The body says what was **observed**, not what was intended: the suite's own numb
 and any deviation from the plan the work followed. A message that reads as verified when it was not is
 worse than no message, because the next reader stops looking.
 
-Note: attribution is disabled globally via `~/.claude/settings.json` — no generated-with trailers.
+Note: a `Co-Authored-By:` trailer naming the model that co-wrote a commit is allowed — it is what Claude Code adds by default, and main's history already carries it; a "Generated with …" line is not, in a commit message — it belongs in a pull-request body.
 
 ## One version string, one build — even for a build only you installed
 
