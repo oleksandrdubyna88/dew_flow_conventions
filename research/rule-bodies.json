@@ -28,7 +28,7 @@
     {
       "id": "common.coai-consultant",
       "source": "common/coai-consultant.md",
-      "bodySha256": "9049c3398c01276c55cdbfab2c901db64e8b506d43ef7d378da823748882c869",
+      "bodySha256": "6114aedf73c0bd499f00ed1113255aa2a0b5237cfbbf40b85a7064e9b1d86f44",
       "sections": [
         "## When you are stuck, ask another vendor (ConnectOtherAIs)",
         "### Definition of Done"
@@ -41,6 +41,19 @@
       "sections": [
         "## Reviewing a DOCUMENT rather than a change",
         "## Definition of Done"
+      ]
+    },
+    {
+      "id": "common.coai-feature-gate",
+      "source": "common/coai-feature-gate.md",
+      "bodySha256": "5ed30c59bd1550eea2116f675b8567233e4a26f998bd6d6d38e644a61a9901e5",
+      "sections": [
+        "## Reviewing a WHOLE feature before it ships",
+        "### When",
+        "### What to pass",
+        "### What each verdict means",
+        "### Nothing checks that you ran it",
+        "### Definition of Done"
       ]
     },
     {
