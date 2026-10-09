@@ -28,7 +28,7 @@
     {
       "id": "common.coai-consultant",
       "source": "common/coai-consultant.md",
-      "bodySha256": "9049c3398c01276c55cdbfab2c901db64e8b506d43ef7d378da823748882c869",
+      "bodySha256": "6a7c4a8a8a59aaf3456148334213112cbe1ea48b78fc2629d5ebfd39b0adde14",
       "sections": [
         "## When you are stuck, ask another vendor (ConnectOtherAIs)",
         "### Definition of Done"
@@ -41,6 +41,27 @@
       "sections": [
         "## Reviewing a DOCUMENT rather than a change",
         "## Definition of Done"
+      ]
+    },
+    {
+      "id": "common.coai-feature-gate",
+      "source": "common/coai-feature-gate.md",
+      "bodySha256": "cbf1c0deec3a5b99fea4ca93acb8d2c0d7fb3a422613774bb14bd26813bf4f4e",
+      "sections": [
+        "## Reviewing the whole FEATURE before release (ConnectOtherAIs)",
+        "### Definition of Done"
+      ]
+    },
+    {
+      "id": "common.coai-question-consultant",
+      "source": "common/coai-question-consultant.md",
+      "bodySha256": "369af5c4661daad28cdc34c7ecb2bab7cc9626d2e80edac08f8f7d5b357cf48a",
+      "sections": [
+        "## Before you ask the person, ask the consultants (ConnectOtherAIs)",
+        "### How",
+        "### What it does not change",
+        "### When no consultant can be had",
+        "### Definition of Done"
       ]
     },
     {
