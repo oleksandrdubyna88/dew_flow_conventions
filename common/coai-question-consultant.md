@@ -84,11 +84,13 @@ do you ask the person in this conversation directly.
 
 ### Definition of Done
 
-- [ ] Every question meant for the person went through `mcp__coai__ask_consultants` first — or why it
-      could not (switched off, none available, quota spent, failed, the tool absent) was said, and the
-      list was cut down to the person's questions anyway.
+- [ ] Every question meant for the person, other than those under *What it does not change*, went
+      through `mcp__coai__ask_consultants` first — or why it could not (switched off, none available,
+      quota spent, failed, the tool absent) was said, and the list was cut down to the person's
+      questions anyway.
 - [ ] Advice was verified before it was acted on, and what was settled that way is in the summary.
 - [ ] Each question that reached the person carried what the consultants answered and your
       recommendation.
-- [ ] `mcp__coai__ask_human` received the `consultId`; the review gate's own question and a production
-      risk took their own paths.
+- [ ] `mcp__coai__ask_human` received the `consultId` when the consultants answered; when none could be
+      had it was called without one, and only with the `coai` tools absent was the person asked in this
+      conversation directly. The review gate's own question and a production risk took their own paths.

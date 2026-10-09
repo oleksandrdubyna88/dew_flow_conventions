@@ -110,7 +110,8 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   contains, for the run summary:
 
   ```bash
-  gh workflow run promote-release.yml --ref main -f sha=<40-character sha> -f reason="…"
+  SHA=…   # the full 40-character sha of the verified main commit
+  gh workflow run promote-release.yml --ref main -f "sha=$SHA" -f reason="…"
   ```
 
   Without `-f reason="…"` the dispatch answers **422** and nothing runs.
