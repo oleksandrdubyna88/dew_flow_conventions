@@ -1007,8 +1007,8 @@ shared material.
   *the gate switched off*, *lets the gate find*) were rewritten rather than declared.
 - **`common/coai-question-consultant.md`** (`coai-question` v1) is new: before ANY question reaches the
   person, `ask_consultants` has it — a higher bar than the server's phase rule, which lets planning
-  questions and the first two batches through. The person gets the remainder and four kinds always
-  (unsettled answers, actions outside the working copy, changes to their machine, pure preferences),
+  questions and the first two batches through. The person gets what the answers did not settle and
+  three kinds always (actions outside the working copy, changes to their machine, pure preferences),
   with the consultants' answers beside each question. It names the server's mechanics (`consultId`,
   `ask_in_conversation`, `productionRisk`) without contradicting them.
 - **`canonical-markers.test.mjs`** now pins both: each body must START with its marker and heading,

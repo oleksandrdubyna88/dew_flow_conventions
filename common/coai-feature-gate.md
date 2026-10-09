@@ -48,15 +48,17 @@ checks you are where you think you are, so one naming any other commit is refuse
 - `callerModel` — your own model id, as the caller rule asks of `open`.
 
 **What the verdicts mean.** One round is the budget. A second runs only on one of three grounds — a
-reviewer failure, a `blocking` finding, or the person asking for it — and never a third, whoever asks.
+reviewer failure, a `blocking` finding, or the person asking for it — and no request of yours adds a
+third.
 
 - `skipped` does NOT block the release. Nobody could review it — no vendor ticked for features, the
   stage switched off, or a plan under three epics. Tell the person the feature review did not run, and
   the reason the reply gives, then carry on.
 - `proceed` or `good_enough` — resolve every finding; the review closes on resolve, and no second round
-  follows. On `good_enough` the findings gate but none is blocking: apply the ones that are true and
-  useful as NEW pull requests, never by rewriting merged epics, and reject the rest with reasons. Your
-  summary says what you took and what you declined. `continue_anyway` closes it the same way.
+  is owed — one runs later only if the person asks for it (below). On `good_enough` the findings gate
+  but none is blocking: apply the ones that are true and useful as NEW pull requests, never by
+  rewriting merged epics, and reject the rest with reasons. Your summary says what you took and what
+  you declined.
 - `revise` comes back only with a ground for the second round, and the reply names which:
   - **a `blocking` finding** — resolve every finding, land the accepted fixes as NEW pull requests, then
     call `mcp__coai__review_feature` again with `again: true` from the checkout once it holds them: its
@@ -65,7 +67,8 @@ reviewer failure, a `blocking` finding, or the person asking for it — and neve
     needs no new commits and asks only the reviewers that failed.
 - **The person's request** is the third ground, and only theirs: after the first round, ask with
   `mcp__coai__ask_human` and `feature`. Your own `again: true` is refused over the same base until they
-  answer.
+  answer; once they say to keep going, call `mcp__coai__review_feature` again with `again: true` — it
+  needs no new commit.
 - `call_human` stops the release. It is also what a second round that still carries a `blocking`
   finding, or fails again, comes back with. Surface the open findings and call `mcp__coai__ask_human`;
   only the person's answer moves it on.

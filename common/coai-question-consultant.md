@@ -40,9 +40,9 @@ planning questions the server would let through included.
 3. **The answers are advice, never orders.** Verify each one against the code, a run or the documents
    before acting on it; *a consultant said so* is not a verification. Where the answers agree and check
    out, the question is settled: act on it, and say in your summary what was asked and what you took.
-4. **The person gets the remainder** — and these four kinds always, whatever the consultants said:
-   - what the answers did not settle: they disagree, they could not check it, or your verification
-     refuted them;
+4. **The person gets the remainder** — what the answers did not settle (they disagree, they could not
+   check it, or your verification refuted them) — and these three kinds always, whatever the
+   consultants said:
    - an action that reaches outside this working copy on someone's behalf — an issue or a pull request
      in another owner's repository, a publication, a release, anything public;
    - a change to the person's own machine, installations, accounts or settings;
@@ -50,7 +50,7 @@ planning questions the server would let through included.
 5. **Show the person what the consultants said.** Each question that reaches them carries the answers,
    a line each — which model, what it advised — and your own recommendation, so they can overrule any
    of it. A bare question asks them to redo work that was already done.
-6. **Then the door.** Call `mcp__coai__ask_human` with the `consultId` the consultants' reply gave you
+6. **Then the door, for what still goes to the person.** Call `mcp__coai__ask_human` with the `consultId` the consultants' reply gave you
    — it is accepted once, from this session, for 30 minutes — and with `document` or `feature` when the
    question belongs to one of those reviews. For your own question it answers `ask_in_conversation`:
    ask the person in this conversation, with your own question tool.
@@ -73,8 +73,14 @@ planning questions the server would let through included.
 
 The reply says so — `off`, `none_available`, `quota_spent`, `failed` — or the tool is not there at all.
 Say it in one line, then do the consultants' job yourself: settle from the code, the documents and a
-run whatever can be settled that way, and put to the person only the four kinds above. A missing
+run whatever can be settled that way, and put to the person only what is left and the three kinds
+above. A missing
 consultant is never a reason to hand the person the whole list.
+
+The door is still `mcp__coai__ask_human`, called without a `consultId` — with `document` or `feature`
+when the question belongs to one of those reviews. When no consultant can be had the server stands its
+requirement down and says so in the reply's `note`. Only when the `coai` tools themselves are absent
+do you ask the person in this conversation directly.
 
 ### Definition of Done
 
