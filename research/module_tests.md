@@ -992,3 +992,32 @@ frontmatter stripped, body starting at the v3 marker; a test here cannot do that
 may not depend on a consumer, which is why the marker regex is copied. And none of these checks says an
 agent OBEYS trigger 7 — no loader output is evidence of behaviour. That is proved in the consumer, by a
 bounded live run of a split plan under `require` once the consumer builds its snippet from this file.
+
+## The feature and question halves (`coai-feature-gate.md`, `coai-question-consultant.md`, 2026-10-09)
+
+Two more halves of the pasted snippet live here now, for the reason the consultant half moved: the
+review server gates every repository in the family, so a rule about when to call one of its tools is
+shared material.
+
+- **`common/coai-feature-gate.md`** is the product's own `featureRule.md` (v2) moved here and raised to
+  **v3**. The move was not verbatim, and on purpose: v2 still told a caller that `revise` meant "call
+  again", while the server already ran the one-round budget — a second round only for a reviewer
+  failure, a `blocking` finding or the person's request, never a third, `good_enough` closing on
+  resolve. v3 says what the server does. Three phrasings the ownership check refuses (*the gate's*,
+  *the gate switched off*, *lets the gate find*) were rewritten rather than declared.
+- **`common/coai-question-consultant.md`** (`coai-question` v1) is new: before ANY question reaches the
+  person, `ask_consultants` has it — a higher bar than the server's phase rule, which lets planning
+  questions and the first two batches through. The person gets the remainder and four kinds always
+  (unsettled answers, actions outside the working copy, changes to their machine, pure preferences),
+  with the consultants' answers beside each question. It names the server's mechanics (`consultId`,
+  `ask_in_conversation`, `productionRisk`) without contradicting them.
+- **`canonical-markers.test.mjs`** now pins both: each body must START with its marker and heading,
+  because the consumer's generator refuses anything else. The marker versions stay free.
+- **`common/coai-consultant.md`, trigger 7** — "a cadence consultation counts only after
+  `close_consult` records `solved`, `not_solved` or `abandoned`" — rides along, its marker raised to v4
+  (operator-approved 2026-09-26).
+- **`rule-bodies.json`** gained the two entries by hand and all three hashes were recorded with
+  `--update` naming exactly those ids.
+
+None of this says an agent OBEYS the question rule; that is behaviour, observed in a session, not in a
+loader.
