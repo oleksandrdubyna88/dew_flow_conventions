@@ -101,7 +101,25 @@ export function launchPlan(command, args, env = process.env, cwd = process.cwd()
   return [env.ComSpec || "cmd.exe", ["/d", "/s", "/c", `"${line}"`], { windowsVerbatimArguments: true }];
 }
 
-const FORWARDED = ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"];
+/**
+ * Which signals the wrapper passes on, and which it only survives, so it is still there to report
+ * the child's exit code.
+ *
+ * - Off a terminal on POSIX, the child gets a process group of its own, and every signal goes to
+ *   that whole group. So `wrapper → npm → test workers` ends together, even when the middle
+ *   process does not pass signals on.
+ * - On a terminal, the child stays in the foreground group. A background group would be stopped
+ *   the moment it read the TTY. The terminal already sends SIGINT and SIGHUP to that whole group,
+ *   so forwarding them would deliver each one twice and could cut the child's own cleanup short.
+ *   Only SIGTERM, which a terminal never sends, is passed on.
+ * - On Windows, a console's Ctrl+C and Ctrl+Break already reach every attached process. A hard
+ *   TerminateProcess cannot be forwarded at all, which is why the rule names `taskkill /T`.
+ */
+export function signalPlan(platform, isTTY) {
+  if (platform === "win32") return { ownGroup: false, forward: [], absorb: ["SIGINT", "SIGBREAK"] };
+  if (isTTY) return { ownGroup: false, forward: ["SIGTERM"], absorb: ["SIGINT", "SIGHUP"] };
+  return { ownGroup: true, forward: ["SIGINT", "SIGTERM", "SIGHUP"], absorb: [] };
+}
 
 function main(argv) {
   const [command, ...args] = argv;
@@ -116,24 +134,20 @@ function main(argv) {
     process.stderr.write(`low-priority: command not found: ${command}\n`);
     process.exit(127);
   }
-  // Terminating the wrapper must not orphan anything it started. Off a terminal the child gets a
-  // process group of its own, and a signal is passed to the whole group — so `wrapper → npm → test
-  // workers` ends together even when the middle process does not pass signals on. On a terminal the
-  // child stays in the foreground group (a background group would be stopped the moment it read the
-  // TTY), where Ctrl+C reaches every process anyway, and a signal is passed to the child. On Windows
-  // a console's Ctrl+C / Ctrl+Break already reaches every attached process, so the wrapper only has
-  // to stay alive until the child has finished.
-  const ownGroup = process.platform !== "win32" && !process.stdin.isTTY;
-  const child = spawn(file, fileArgs, { stdio: "inherit", detached: ownGroup, ...extra });
+  // Terminating the wrapper must not orphan anything it started; see signalPlan.
+  const plan = signalPlan(process.platform, Boolean(process.stdin.isTTY));
+  const child = spawn(file, fileArgs, { stdio: "inherit", detached: plan.ownGroup, ...extra });
 
-  const handlers = FORWARDED.map(signal => {
-    const handler = () => {
-      if (process.platform === "win32") return;
-      try { if (ownGroup) process.kill(-child.pid, signal); else child.kill(signal); } catch { /* gone */ }
-    };
+  const forward = signal => () => {
+    try { if (plan.ownGroup) process.kill(-child.pid, signal); else child.kill(signal); } catch { /* gone */ }
+  };
+  const handlers = [
+    ...plan.forward.map(signal => [signal, forward(signal)]),
+    ...plan.absorb.map(signal => [signal, () => { /* the child got it too; wait for its exit */ }]),
+  ];
+  for (const [signal, handler] of handlers) {
     try { process.on(signal, handler); } catch { /* signal unsupported on this platform */ }
-    return [signal, handler];
-  });
+  }
 
   child.on("error", error => {
     process.stderr.write(`low-priority: ${command}: ${error.message}\n`);

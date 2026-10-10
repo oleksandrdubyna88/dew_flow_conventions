@@ -76,6 +76,7 @@ there:
   `tools/lower-priority-preload.test.mjs` pins all four cases.
 - `--import` reaches every worker `node --test` starts, and lowering twice is harmless.
 - The preload holds no priority logic; the one implementation stays in the tool.
+- A change to the template ships to every copy in the same rollout that bumps the pin.
 
 **Measured, on one core:**
 
@@ -123,8 +124,12 @@ Never raise the script's priority, or a test's deadline, to make a saturated mac
     takes no `--disable-build-servers`.
 
 **Ending a lowered run.** Ctrl+C reaches the whole tree. A background run is ended through the pid
-you started: `taskkill /T /PID <pid>` on Windows, a signal to that pid elsewhere (the tool forwards
-it). Never by image name.
+you started, and never by image name:
+
+- **Windows:** `taskkill /T /PID <pid>`.
+- **Elsewhere:** `SIGTERM` to that pid. The tool forwards it to the child's whole process group.
+- **`SIGKILL`** cannot be forwarded. After a `kill -9` of the wrapper, end the child's group
+  yourself: `kill -- -<child pid>`.
 
 ## 3. CI is exempt
 

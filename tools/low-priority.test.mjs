@@ -147,3 +147,14 @@ test("the exported lowerOwnPriority lowers the calling process and reports the l
   assert.equal(actual, Math.max(os.getPriority(0), lowered));
   assert.equal(reported, actual);
 });
+
+test("signals: on a terminal Ctrl+C is not delivered twice; off it the whole group is signalled", async () => {
+  const {signalPlan} = await import(new URL("./low-priority.mjs", import.meta.url).href);
+  // A terminal already sends SIGINT/SIGHUP to the whole foreground group, child included, so
+  // forwarding them again would interrupt the child's own cleanup with a second signal.
+  assert.deepEqual(signalPlan("linux", true), {ownGroup: false, forward: ["SIGTERM"], absorb: ["SIGINT", "SIGHUP"]});
+  assert.deepEqual(signalPlan("linux", false), {ownGroup: true, forward: ["SIGINT", "SIGTERM", "SIGHUP"], absorb: []});
+  assert.deepEqual(signalPlan("darwin", false), {ownGroup: true, forward: ["SIGINT", "SIGTERM", "SIGHUP"], absorb: []});
+  assert.deepEqual(signalPlan("win32", true), {ownGroup: false, forward: [], absorb: ["SIGINT", "SIGBREAK"]});
+  assert.deepEqual(signalPlan("win32", false), {ownGroup: false, forward: [], absorb: ["SIGINT", "SIGBREAK"]});
+});
