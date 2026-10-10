@@ -192,6 +192,19 @@
       ]
     },
     {
+      "id": "common.local-cpu-budget",
+      "source": "common/local-cpu-budget.md",
+      "bodySha256": "62a6fd708dd633ca6ec7f8232811385d2cd73cbf7a5db0acd0cb2114c67efbfb",
+      "sections": [
+        "# Local test and build runs — at most 8 workers, at lowered CPU priority (MANDATORY)",
+        "## 1. At most 8 workers per local run (MANDATORY)",
+        "## 2. At lowered CPU priority (MANDATORY)",
+        "## 3. CI is exempt",
+        "## Never",
+        "## Definition of Done"
+      ]
+    },
+    {
       "id": "common.logging-serilog",
       "source": "common/logging-serilog.md",
       "bodySha256": "578bcc14fa681d5c4913b2e23c1268bc39316fd67bc187f38448b5c1a11c505c",

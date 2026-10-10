@@ -1021,3 +1021,26 @@ shared material.
 
 None of this says an agent OBEYS the question rule; that is behaviour, observed in a session, not in a
 loader.
+
+## Local CPU budget and the priority wrapper (`tools/low-priority.mjs`, 2026-10-10)
+
+`common/local-cpu-budget.md` caps local test and build runs at 8 workers and runs them lowered;
+`tools/low-priority.mjs` is how a command is lowered with its exit code, output and signals intact.
+The evidence is [2026-10-10_windows_cpu_priority.md](2026-10-10_windows_cpu_priority.md).
+
+`tools/low-priority.test.mjs` drives real processes, never a mock of `os.setPriority`:
+
+- exit code 37 comes back as 37; stdout (20 000 bytes) and stderr arrive separately and complete;
+- a child AND a grandchild report the lowered priority through `os.getPriority` — the inheritance
+  the whole method rests on;
+- with `CI=true` both keep the caller's priority; a caller already at Idle is not raised (Windows);
+- a missing command exits 127 naming it; no command prints the usage and exits 2;
+- Windows: a `.cmd` shim on `PATH` receives `two words`, `with"quote`, `a&b` and `100%` intact —
+  with one round of caret escaping `with"quote` ended the quoted region inside the shim and `&b` ran
+  as a command, which is why every batch file gets two;
+- POSIX: `SIGTERM` to the wrapper ends the child as well (no orphan) — skipped on Windows, where a
+  hard kill of the wrapper alone cannot be forwarded and the rule names `taskkill /T`;
+- the exported `lowerOwnPriority()` lowers its caller and returns the level it reached.
+
+Break-it, product code only, 2026-10-10: commenting out the `os.setPriority` call reddens the
+inheritance case and the export case; removing the second escaping round reddens the shim case.
