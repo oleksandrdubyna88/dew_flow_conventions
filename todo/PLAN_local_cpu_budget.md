@@ -81,14 +81,21 @@ In short:
 - Under `CI` it lowers nothing: CI is not throttled, per the owner.
 - Its exit code is the child's. A signal that ends the child is re-raised. A missing command exits
   127 and says why.
-- Terminating the wrapper does not orphan the child (plan round 1). `SIGINT`, `SIGTERM` and
-  `SIGHUP` (plus `SIGBREAK` on Windows) are forwarded to the child, and the wrapper waits for it.
+- Terminating the wrapper does not orphan the child (plan round 1), and not its children either
+  (the cadence consultation). Off a terminal on POSIX the child gets its own process group, and
+  `SIGINT`/`SIGTERM`/`SIGHUP` go to that whole group. On a terminal they go to the child, which
+  stays in the foreground group, where Ctrl+C reaches everything anyway. The wrapper waits for the
+  child either way.
 - A hard `TerminateProcess` of the wrapper alone cannot be forwarded on Windows without a Job
   Object. The rule names `taskkill /T /PID <pid>`, which ends the whole tree.
 - On Windows it resolves `.cmd`/`.bat` shims (`npm`, `npx`, `vitest`) through `PATHEXT` and runs
   them via `cmd.exe` with quoted arguments. An `.exe` runs directly, and `node` is `process.execPath`.
 - It exports `lowerOwnPriority()` for a node runner script that spawns its own workers.
 - It has no dependencies, so a consumer needs no `npm ci` inside the mount.
+- The preload is `tools/templates/lower-priority-preload.mjs`, copied verbatim with one `MOUNT`
+  line edited. `tools/lower-priority-preload.test.mjs` pins its contract (the cadence
+  consultation): mount present → lowered; absent under CI → silent; absent locally → one notice;
+  present but broken, or without the export → the run fails.
 - **Where CI does not check the mount out** (several consumers here; every corporate consumer: their CI never initialises it), a package.json script preloads a 10-line repository-local module with `node --import`. That module imports `lowerOwnPriority()` and treats a missing mount as CI. This is the delivery for a script; a copy of the tool is not, and the rule says so.
 
 **Why a node tool and not a pwsh one:**
@@ -198,7 +205,12 @@ Its own conventions, read 2026-10-10 from a fresh clone:
   - A missing command exits 127 with a message.
   - No command prints the usage and exits 2.
   - Windows only: a `.cmd` shim on `PATH` gets an argument containing a space intact.
-  - POSIX only: a `SIGTERM` to the wrapper ends the child as well (no orphan).
+  - POSIX only: a `SIGTERM` to the wrapper ends the child and its child as well (no orphan).
+  - The Windows shim case's arguments also carry `%PATH%`, `!PATH!`, an empty string, a trailing
+    backslash, `^`, `()`, `|` and `<>`. These are the matrix the consultant ran against
+    npm.cmd, npx.cmd and a `.bin` shim.
+- `tools/lower-priority-preload.test.mjs`: the four preload cases above. Break-it: a catch-all
+  around the import reddens both "broken" cases.
 - Break-it (product code only): drop the `setPriority` call, and the inheritance case goes red. Pass
   `shell: true` without the quoting, and the space case goes red.
 - Here: `npm test`, `npm run check`, `node tools/rule-bodies.mjs` and

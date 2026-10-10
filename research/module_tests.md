@@ -1038,9 +1038,21 @@ The evidence is [2026-10-10_windows_cpu_priority.md](2026-10-10_windows_cpu_prio
 - Windows: a `.cmd` shim on `PATH` receives `two words`, `with"quote`, `a&b` and `100%` intact —
   with one round of caret escaping `with"quote` ended the quoted region inside the shim and `&b` ran
   as a command, which is why every batch file gets two;
-- POSIX: `SIGTERM` to the wrapper ends the child as well (no orphan) — skipped on Windows, where a
+- POSIX: `SIGTERM` to the wrapper ends the child AND the child's own child (no orphan; the child gets its own process group off a terminal) — skipped on Windows, where a
   hard kill of the wrapper alone cannot be forwarded and the rule names `taskkill /T`;
 - the exported `lowerOwnPriority()` lowers its caller and returns the level it reached.
+
+`tools/lower-priority-preload.test.mjs` pins the preload a consumer copies
+(`tools/templates/lower-priority-preload.mjs`, one `MOUNT` line edited) through `node --import` in a
+throwaway consumer:
+
+- mount present: lowered, and silent;
+- absent under `CI`: unlowered, and silent;
+- absent locally: unlowered, with exactly ONE notice even though a child also preloads;
+- present but a syntax error, or without the export: the run fails.
+
+Only the intended absence may fall back. Break-it: wrapping the import in a catch-all reddened
+exactly the two "broken" cases.
 
 Break-it, product code only, 2026-10-10: commenting out the `os.setPriority` call reddens the
 inheritance case and the export case; removing the second escaping round reddens the shim case.

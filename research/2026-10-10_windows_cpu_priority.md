@@ -173,8 +173,10 @@ migrations, a resolver run bounded at 10 s.
 
 - The failing files passed alone, both normal and lowered, between those runs.
 - On a machine that other work saturates, a starved test misses a wall-clock deadline that a
-  Normal-priority process would have met. The rule therefore says: such a failure is re-run alone
-  at normal priority before it is debugged. Never "fix" it by raising the priority or the deadline.
+  Normal-priority process would have met. That is the hypothesis, not a proof: no normal-priority
+  run was made under the same saturation. So the rule says to re-run the failing file at BOTH
+  priorities under the same load before debugging it. Never "fix" it by raising the priority or
+  the deadline.
 
 ## Conclusions
 

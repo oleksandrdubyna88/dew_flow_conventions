@@ -61,18 +61,21 @@ a priority, and it has no dependencies.
 `lowerOwnPriority()` before it spawns them, so it needs no wrapper.
 
 **A package.json script that CI also runs** cannot name a file inside the mount when CI does not
-check the mount out. So it preloads a small repository-local module, and that module imports
-`lowerOwnPriority()` from the mount:
+check the mount out. So it preloads `scripts/lower-priority.mjs`, a verbatim copy of
+[`tools/templates/lower-priority-preload.mjs`](../tools/templates/lower-priority-preload.mjs). Its
+one `MOUNT` line is edited to the repository's mount path, and it imports `lowerOwnPriority()` from
+there:
 
 ```json
 "test": "node --import ./scripts/lower-priority.mjs --test --test-concurrency=8"
 "test": "node --import ./scripts/lower-priority.mjs ./node_modules/vitest/vitest.mjs run"
 ```
 
-- When the mount is missing, the module treats that as CI: it lowers nothing and prints one notice
-  when `CI` is not set.
+- **Only an absent mount falls back.** That is CI's normal state: nothing is lowered, and one notice
+  is printed when `CI` is not set. A mount that is present but broken fails the run.
+  `tools/lower-priority-preload.test.mjs` pins all four cases.
 - `--import` reaches every worker `node --test` starts, and lowering twice is harmless.
-- The module holds no logic of its own. The one implementation stays in the tool.
+- The preload holds no priority logic; the one implementation stays in the tool.
 
 **Measured, on one core:**
 
@@ -93,14 +96,19 @@ check the mount out. So it preloads a small repository-local module, and that mo
 Wall time was the same in every arm. When other work already saturates the machine, the lowered
 suite finishes later — that is the point: the cost lands on the batch job, not on the person.
 
-**A deadline that fires in a lowered run on a saturated machine is evidence about the machine.**
+**A deadline that fires in a lowered run on a saturated machine may be starvation, not a defect.**
 Measured the same day, on one suite of 249 tests with 5–30 s wall-clock deadlines:
 
 - 7 deadline failures in a lowered run while other sessions kept the CPU at 100 %;
 - 0 failures in both a lowered and a normal run at 64–76 % load, an hour later.
 
-So re-run the failing file alone at normal priority before debugging it. Never raise the script's
-priority, or a test's deadline, to make a saturated machine look green.
+So diagnose before you debug:
+
+- Re-run the failing file at BOTH priorities under the same load.
+- A failure that also appears at normal priority is a defect.
+- One that appears only lowered, and only on a saturated machine, is the machine.
+
+Never raise the script's priority, or a test's deadline, to make a saturated machine look green.
 
 **Shell-native equivalents**, when the tool is out of reach:
 

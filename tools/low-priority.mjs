@@ -76,8 +76,9 @@ const CMD_META = /([()\][%!^"`<>&|;, *?])/g;
  * Quote one argument for `cmd.exe /d /s /c "…"` running a batch file: the C runtime's quoting
  * first (backslashes before a quote doubled, the quote escaped), then every cmd metacharacter
  * caret-escaped — the quotes included, so cmd never enters a quoted state in which `%` would still
- * expand. A shim re-parses its `%*`, so an argument gets a second round. This is the algorithm
- * cross-spawn uses, for the same reason.
+ * expand. A shim re-parses its `%*`, so an argument gets a second round. This is cross-spawn's
+ * algorithm, applied more widely: cross-spawn doubles only for node_modules/.bin shims, this file
+ * doubles for every batch file (see launchPlan).
  */
 export function quoteForCmd(arg, doubleEscape = false) {
   let text = String(arg).replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, "$1$1");
@@ -115,13 +116,21 @@ function main(argv) {
     process.stderr.write(`low-priority: command not found: ${command}\n`);
     process.exit(127);
   }
-  const child = spawn(file, fileArgs, { stdio: "inherit", ...extra });
+  // Terminating the wrapper must not orphan anything it started. Off a terminal the child gets a
+  // process group of its own, and a signal is passed to the whole group — so `wrapper → npm → test
+  // workers` ends together even when the middle process does not pass signals on. On a terminal the
+  // child stays in the foreground group (a background group would be stopped the moment it read the
+  // TTY), where Ctrl+C reaches every process anyway, and a signal is passed to the child. On Windows
+  // a console's Ctrl+C / Ctrl+Break already reaches every attached process, so the wrapper only has
+  // to stay alive until the child has finished.
+  const ownGroup = process.platform !== "win32" && !process.stdin.isTTY;
+  const child = spawn(file, fileArgs, { stdio: "inherit", detached: ownGroup, ...extra });
 
-  // Terminating the wrapper must not orphan the child. On Windows a console's Ctrl+C / Ctrl+Break
-  // already reaches every process attached to it, so the wrapper only has to stay alive until the
-  // child has finished; elsewhere the signal is passed on.
   const handlers = FORWARDED.map(signal => {
-    const handler = () => { if (process.platform !== "win32") { try { child.kill(signal); } catch { /* gone */ } } };
+    const handler = () => {
+      if (process.platform === "win32") return;
+      try { if (ownGroup) process.kill(-child.pid, signal); else child.kill(signal); } catch { /* gone */ }
+    };
     try { process.on(signal, handler); } catch { /* signal unsupported on this platform */ }
     return [signal, handler];
   });

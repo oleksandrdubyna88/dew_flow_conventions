@@ -101,7 +101,9 @@ test("a .cmd shim found on PATH receives its arguments intact, spaces and quotes
     fs.writeFileSync(path.join(dir, "argv.js"), `require('node:fs').writeFileSync(${JSON.stringify(argsFile)},JSON.stringify(process.argv.slice(2)));process.exitCode=5;`);
     // The shape npm writes for its own shims: forward every argument to node.
     fs.writeFileSync(path.join(dir, "shimprobe.cmd"), `@"${process.execPath}" "%~dp0argv.js" %*\r\n`);
-    const args = ["two words", "plain", "with\"quote", "a&b", "100%"];
+    // The matrix a consultant ran against npm.cmd, npx.cmd and a node_modules/.bin shim on
+    // 2026-10-10, kept as the regression set: nothing here may be expanded, split or dropped.
+    const args = ["two words", "plain", "with\"quote", "a&b", "100%", "%PATH%", "!PATH!", "", "trail\\", "a^b", "(x)", "x|y", "<in>"];
     const result = wrap(["shimprobe", ...args], {env: {PATH: `${dir}${path.delimiter}${process.env.PATH}`}});
     assert.equal(result.status, 5, result.stderr);
     assert.deepEqual(JSON.parse(fs.readFileSync(argsFile, "utf8")), args);
@@ -110,23 +112,30 @@ test("a .cmd shim found on PATH receives its arguments intact, spaces and quotes
   }
 });
 
-test("terminating the wrapper ends the child too — no orphan keeps the CPU", async (t) => {
+test("terminating the wrapper ends the child AND its child — no orphan keeps the CPU", async (t) => {
   if (windows) { t.skip("a POSIX signal case; on Windows the tree is ended with taskkill /T"); return; }
-  const wrapper = spawn(process.execPath, [tool, "node", "-e", "console.log(process.pid);setInterval(()=>{},1000)"], {env: env(), stdio: ["ignore", "pipe", "pipe"]});
-  const childPid = await new Promise((resolve, reject) => {
-    wrapper.stdout.once("data", chunk => resolve(Number(String(chunk).trim())));
+  // wrapper → child → grandchild, the shape of `wrapper → npm → test workers`. The child does not
+  // pass signals on, which is exactly the middle process the group kill exists for.
+  const script = "const {spawn}=require('node:child_process');"
+    + "const g=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});"
+    + "console.log(process.pid+' '+g.pid);setInterval(()=>{},1000);";
+  const wrapper = spawn(process.execPath, [tool, "node", "-e", script], {env: env(), stdio: ["ignore", "pipe", "pipe"]});
+  const pids = await new Promise((resolve, reject) => {
+    wrapper.stdout.once("data", chunk => resolve(String(chunk).trim().split(/\s+/).map(Number)));
     wrapper.once("exit", code => reject(new Error(`wrapper exited early with ${code}`)));
   });
-  assert.ok(childPid > 0);
+  assert.equal(pids.length, 2, String(pids));
   const exited = new Promise(resolve => wrapper.once("exit", (code, signal) => resolve({code, signal})));
   wrapper.kill("SIGTERM");
   const outcome = await exited;
   assert.ok(outcome.signal === "SIGTERM" || outcome.code === 143, JSON.stringify(outcome));
-  const deadline = performance.now() + 5000;
-  for (;;) {
-    try { process.kill(childPid, 0); } catch (error) { if (error.code === "ESRCH") return; throw error; }
-    if (performance.now() > deadline) assert.fail(`child ${childPid} outlived its wrapper`);
-    await delay(25);
+  for (const pid of pids) {
+    const deadline = performance.now() + 5000;
+    for (;;) {
+      try { process.kill(pid, 0); } catch (error) { if (error.code === "ESRCH") break; throw error; }
+      if (performance.now() > deadline) assert.fail(`process ${pid} outlived its wrapper`);
+      await delay(25);
+    }
   }
 });
 
