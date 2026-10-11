@@ -223,10 +223,10 @@ Git Bash, `--disable-build-servers`.
 
 | Consumer | Bare bump | Adoption | Notes |
 |---|---|---|---|
-| SSO | #93 | #92 | vitest `maxWorkers` = min(8, CPUs - 1); no pipeline runs its tests |
+| SSO | #93 | #92 | vitest `maxWorkers` = max(1, min(8, CPUs - 1)); no pipeline runs its tests |
 | loc-sim | #18 | #19 | rebase-only repository, so the adoption was folded into one commit; #17 was closed as superseded |
 | project-tools | #444 | #445 | jest `maxWorkers: 1` kept and pinned; CodeRabbit's "keep the pin old" was declined with `shared-rules-pin.md`; no ClickUp id (the check only warns) |
-| orchestrator | #299 | #300 | controll keeps `fileParallelism: false`; the sandbox worker gets a runner computing min(8, CPUs - 1) |
+| orchestrator | #299 | #300 | controll keeps `fileParallelism: false`; the sandbox worker gets a runner computing max(1, min(8, CPUs - 1)) |
 | scoreMeter | #175 | #176 | six xUnit projects with a CI-conditioned copy; the ui runner |
 | access-server | #303 | #304 | three preload copies; Playwright `workers: 1` kept |
 | alert-center | #168 | #169 | the inline jest config moved to `jest.config.js` |
