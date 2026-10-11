@@ -31,7 +31,7 @@ off CI where it cannot.
 | `node --test` | `--test-concurrency=N` with `N = max(1, min(8, os.availableParallelism() - 1))`, computed in the runner script that spawns `node --test`; a literal 8 only in a script CI never runs |
 | vitest | `maxWorkers: Math.max(1, Math.min(8, availableParallelism() - 1))` in its config |
 | jest | `maxWorkers: Math.max(1, Math.min(8, os.availableParallelism() - 1))` in a JS config |
-| Playwright | `workers: Math.max(1, Math.min(8, os.availableParallelism() - 1))` in its config |
+| Playwright | `workers: Math.max(1, Math.min(8, Math.floor(os.availableParallelism() / 2)))` in its config — ITS default is half the logical CPUs, so `CPUs - 1` would raise it |
 | pytest-xdist | `-n 8` in the documented local command, never `-n auto`, and never in an `addopts` CI also reads |
 | xUnit v3 (MTP executable) | `"maxParallelThreads": 8` in the project's `xunit.runner.json`, **plus** `<Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" Condition="'$(CI)' != 'true'" />`. Measured on xunit.v3 4.0.1: a file that is not copied to the output is never read, and the runner stays at one thread per CPU. The condition keeps CI at its own count: GitHub Actions sets `CI=true` exactly. A CI that sets another value needs its own condition. |
 | cargo | `-j 8` and `-- --test-threads=8` in the documented local commands. A `.cargo/config.toml` (`[build] jobs`, `[env] RUST_TEST_THREADS`) caps correctly (measured: 20 at once, then 8), but it also applies to CI and raises a small runner. |

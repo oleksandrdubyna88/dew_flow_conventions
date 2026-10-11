@@ -14,7 +14,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
-import { lowerOwnPriority } from "./low-priority.mjs";
+import { exitCodeFor, lowerOwnPriority } from "./low-priority.mjs";
 
 /** The family cap. */
 export const CAP = 8;
@@ -24,14 +24,22 @@ export function testConcurrency(threads = availableParallelism()) {
   return Math.max(1, Math.min(CAP, threads - 1));
 }
 
-function main(extra) {
-  lowerOwnPriority();
-  const result = spawnSync(process.execPath, ["--test", `--test-concurrency=${testConcurrency()}`, ...extra], { stdio: "inherit" });
+/** The argument list of the one `node --test` this runner starts. */
+export function testArgs(extra = [], threads = availableParallelism()) {
+  return ["--test", `--test-concurrency=${testConcurrency(threads)}`, ...extra];
+}
+
+/**
+ * Run the suite and return the exit code to leave with: the child's own, or 128 + the signal's number when a
+ * signal ended it, never a plain 1 that a caller could not tell from a failing test. `spawn` is a seam for tests.
+ */
+export function runTests(extra = [], spawn = spawnSync) {
+  const result = spawn(process.execPath, testArgs(extra), { stdio: "inherit" });
   if (result.error) {
     process.stderr.write(`run-tests: ${result.error.message}\n`);
-    process.exit(1);
+    return 1;
   }
-  process.exit(result.status ?? 1);
+  return exitCodeFor(result.status, result.signal);
 }
 
 const invokedDirectly = (() => {
@@ -42,4 +50,7 @@ const invokedDirectly = (() => {
   }
 })();
 
-if (invokedDirectly) main(process.argv.slice(2));
+if (invokedDirectly) {
+  lowerOwnPriority();
+  process.exit(runTests(process.argv.slice(2)));
+}

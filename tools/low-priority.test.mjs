@@ -231,3 +231,16 @@ test("npm test and test:coverage go through the runner, so the cap and the lower
   assert.equal(pkg.scripts.test, "node tools/run-tests.mjs");
   assert.match(pkg.scripts["test:coverage"], /^node tools\/run-tests\.mjs --experimental-test-coverage /);
 });
+
+test("the runner leaves with the suite's exit code, and a signal never reads as a plain 1", async () => {
+  const {runTests, testArgs} = await import(new URL("./run-tests.mjs", import.meta.url).href);
+  const calls = [];
+  const fake = result => (file, args) => { calls.push([file, args]); return result; };
+  assert.equal(runTests(["--x"], fake({status: 0, signal: null})), 0);
+  assert.equal(runTests([], fake({status: 3, signal: null})), 3);
+  assert.equal(runTests([], fake({status: null, signal: "SIGTERM"})), 128 + os.constants.signals.SIGTERM);
+  assert.equal(runTests([], fake({error: new Error("spawn failed")})), 1);
+  assert.equal(calls[0][0], process.execPath);
+  assert.deepEqual(calls[0][1], testArgs(["--x"]));
+  assert.deepEqual(testArgs(["--x"], 4), ["--test", "--test-concurrency=3", "--x"]);
+});
