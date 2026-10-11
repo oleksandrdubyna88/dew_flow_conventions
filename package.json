@@ -7,9 +7,9 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node tools/low-priority.mjs node --test --test-concurrency=8",
+    "test": "node tools/run-tests.mjs",
     "check": "node tools/rules.mjs check --repo .",
-    "test:coverage": "node tools/low-priority.mjs node --test --test-concurrency=8 --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/lcov.info"
+    "test:coverage": "node tools/run-tests.mjs --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/lcov.info"
   },
   "dependencies": {
     "picomatch": "4.0.7",

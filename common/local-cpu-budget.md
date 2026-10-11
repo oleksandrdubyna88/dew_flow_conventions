@@ -21,15 +21,20 @@ paths: ["**/package.json","**/vitest.config.*","**/jest.config.*","**/playwright
 Every local test or build run sets its worker count explicitly, at **8 or fewer**. A runner's
 default is "one worker per CPU", so leaving it unset is how one session takes the whole machine.
 
+**Every one of these switches is an EXACT number, not a ceiling.** A bare 8 RAISES a machine with
+fewer threads: measured 2026-10-11 by one consumer, a 4-vCPU CI runner went from 3–4 workers to 8. So
+the cap is written as `min(8, the runner's own default)` wherever the value can be computed, and kept
+off CI where it cannot.
+
 | Runner | Where the cap goes |
 |---|---|
-| `node --test` | `--test-concurrency=8` on the command line, including inside a runner script that spawns `node --test` |
-| vitest | `maxWorkers: 8` in its config, or `--maxWorkers=8` |
-| jest | `--maxWorkers=8` |
-| Playwright | `workers: 8` in its config |
-| pytest-xdist | `-n 8`, never `-n auto` |
-| xUnit v3 (MTP executable) | `"maxParallelThreads": 8` in the project's `xunit.runner.json`, or `--max-threads 8` |
-| cargo | `.cargo/config.toml`: `[build] jobs = 8` and `[env] RUST_TEST_THREADS = "8"` |
+| `node --test` | `--test-concurrency=N` with `N = max(1, min(8, os.availableParallelism() - 1))`, computed in the runner script that spawns `node --test`; a literal 8 only in a script CI never runs |
+| vitest | `maxWorkers: Math.max(1, Math.min(8, availableParallelism() - 1))` in its config |
+| jest | `maxWorkers: Math.max(1, Math.min(8, os.availableParallelism() - 1))` in a JS config |
+| Playwright | `workers: Math.max(1, Math.min(8, Math.floor(os.availableParallelism() / 2)))` in its config — ITS default is half the logical CPUs, so `CPUs - 1` would raise it |
+| pytest-xdist | `-n 8` in the documented local command, never `-n auto`, and never in an `addopts` CI also reads |
+| xUnit v3 (MTP executable) | `"maxParallelThreads": 8` in the project's `xunit.runner.json`, **plus** `<Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" Condition="'$(CI)' != 'true'" />`. Measured on xunit.v3 4.0.1: a file that is not copied to the output is never read, and the runner stays at one thread per CPU. The condition keeps CI at its own count: GitHub Actions sets `CI=true` exactly. A CI that sets another value needs its own condition. |
+| cargo | `-j 8` and `-- --test-threads=8` in the documented local commands. A `.cargo/config.toml` (`[build] jobs`, `[env] RUST_TEST_THREADS`) caps correctly (measured: 20 at once, then 8), but it also applies to CI and raises a small runner. |
 | MSBuild / `dotnet build` | `-m:4`, per [dotnet-build.md](../csharp/dotnet-build.md). Stricter than 8, and this rule never raises it. |
 
 - **The cap is per RUN, not per project.** Run test executables one after another. A script that
@@ -37,7 +42,8 @@ default is "one worker per CPU", so leaving it unset is how one session takes th
 - **8 is a ceiling, not a target.** A suite that is correct at 8 is correct at 4, and a suite that
   needs more than 8 to pass has a timing dependency that is a defect of its own.
 - **A test that pins the runner's arguments pins this too.** Where a repository asserts its own
-  `test` script or its runner's spawn arguments, the cap belongs in that assertion.
+  `test` script or its runner's spawn arguments, the cap belongs in that assertion — for xUnit,
+  the Content item with its copy metadata, not only the JSON value.
 
 ## 2. At lowered CPU priority (MANDATORY)
 
@@ -57,8 +63,9 @@ node <conventions>/tools/low-priority.mjs npm run build
 priority. The command's exit code, stdout, stderr and signals come back unchanged. It never raises
 a priority, and it has no dependencies.
 
-**A node runner script that spawns its own workers** calls the tool's exported
-`lowerOwnPriority()` before it spawns them, so it needs no wrapper.
+**A node runner script that spawns its own workers** lowers itself before it spawns them, with
+`await import('./lower-priority.mjs')` — the same preload copy as below, imported rather than
+preloaded — so it needs no wrapper.
 
 **A package.json script that CI also runs** cannot name a file inside the mount when CI does not
 check the mount out. So it preloads `scripts/lower-priority.mjs`, a verbatim copy of
@@ -67,9 +74,14 @@ one `MOUNT` line is edited to the repository's mount path, and it imports `lower
 there:
 
 ```json
-"test": "node --import ./scripts/lower-priority.mjs --test --test-concurrency=8"
 "test": "node --import ./scripts/lower-priority.mjs ./node_modules/vitest/vitest.mjs run"
+"test": "node scripts/run-tests.mjs"
 ```
+
+The vitest cap lives in its config (§1). A bare `node --test` cannot compute `min(8, …)` on its
+command line, so it moves into a runner script that does. A literal `--test-concurrency=8` in a
+script CI also runs raises a small runner. Keep it only if that raise was measured and found
+harmless: one consumer measured 6 m 39 s against 6 m 52 s on its CI.
 
 - **Only an absent mount falls back.** Absent means the folder is missing or empty: an
   uninitialised submodule leaves an empty folder, and that is CI's normal state. Nothing is lowered
@@ -119,9 +131,14 @@ Never raise the script's priority, or a test's deadline, to make a saturated mac
   The shell lowers itself and then starts the command, so the command inherits. Resolve `pwsh`
   from PATH: the Store build of PowerShell 7 lives under `%LOCALAPPDATA%\Microsoft\WindowsApps`,
   not `%ProgramFiles%\PowerShell\7`. Use `powershell` (5.1) only where pwsh 7 is absent.
-- **Linux / WSL**: `nice -n 19 <command>`.
-  - `dotnet build`, `publish`, `pack` and `run` add `--disable-build-servers`. Otherwise
-    long-lived build servers started at nice 0 do the compiling.
+- **Linux / WSL**: `nice -n 19 <command>`. **Not Git Bash on Windows:** its `nice` maps onto
+  Windows priority classes, and `nice -n 19` there is the Idle class, which the never-list forbids
+  (measured 2026-10-11: `nice -n 19` → 19, `nice -n 10` → BelowNormal). On Windows use the tool, or
+  `nice -n 10` in a script that must stay in bash.
+- **Every OS:** a lowered `dotnet build`, `publish`, `pack` or `run` adds `--disable-build-servers`.
+  Otherwise a long-lived build server started earlier at normal priority does the compiling for
+  the lowered build. Measured on Linux with nice 0 servers (2026-10-09), and on Windows by one
+  consumer, where a Normal-priority VBCSCompiler compiled for the lowered builds (2026-10-11).
   - An MTP test project is built first, then its test executable runs under `nice`. `dotnet test`
     takes no `--disable-build-servers`.
 
@@ -138,7 +155,9 @@ you started, and never by image name:
 A CI runner is a dedicated machine with nobody at it.
 
 - The tool lowers nothing when `CI` is set.
-- A cap of 8 is a no-op on a runner with 8 or fewer cores.
+- **A cap must not RAISE a runner.** It is not a no-op on a small machine — the switches are exact
+  values (§1). Write `min(8, default)`, condition the xUnit copy on `CI`, and keep cargo's caps in
+  the local commands.
 - Never add throttling to a CI job unless that runner itself needs it, and then say why in the
   workflow.
 
@@ -152,6 +171,8 @@ A CI runner is a dedicated machine with nobody at it.
 - Never lower a process after it has started its workers. The ones already running keep their
   priority. Lower first, then spawn.
 - Never run several test executables in parallel and count only one of them against the cap.
+- Never write a bare 8 where CI runs it. Measured: it RAISES a 4-vCPU runner.
+- Never cap xUnit with a JSON file that is not copied to the output. Measured: it is never read.
 
 ## Definition of Done
 

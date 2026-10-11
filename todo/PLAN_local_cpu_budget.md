@@ -137,6 +137,31 @@ another, and a script that starts several at once counts every one of them again
 follows README *Editing discipline*: rag_qln goes last, and its code pins are bumped in the same
 pull request with its build run.
 
+**Rollout record, as of 2026-10-11.**
+
+- **Two PRs per consumer, not one.** Promoting `release` turned every consumer's required pin check red
+  at once, which blocked other sessions' open PRs. So each consumer got a bare pin bump first, merged
+  within the hour, and the adoption second.
+- **Deviations from the table above, all measured on the way:**
+  - The cap is `min(8, CPUs - 1)` for node and vitest. The xUnit copy is conditioned on `CI`.
+  - cargo's caps went into the documented commands, not `.cargo/config.toml`.
+  - Runner scripts lower themselves with `await import('./lower-priority.mjs')`.
+  - The research record's M4 has the reasons.
+
+| Repository | Bare bump | Adoption | Notes |
+|---|---|---|---|
+| connect_other_ais | #753 merged | #757 | PROJECT.md is in the reviewer prompt's 80 000-character rule corpus, so its edit is net -27 characters |
+| creds_for_devs | #217 merged | #219 merged | done by another session; root `xunit.runner.json` linked into every test project via Directory.Build.props; the runner banner went from [24 threads] to [8 threads] |
+| wsl_care | #97 merged | open | the bump was done by that repository's own session |
+| mcp | #44 merged | #45 merged | nine probe classes observe the peak (9 of 9 red when the copy is missing) |
+| benchmark | #74 merged | #75 | the same probe |
+| sidecar_rust | #52 merged | #53 merged | cargo caps in CLAUDE.md/README, pinned by `tests/local_cpu_budget.rs` |
+| rag_qln | #55 merged (with both code pins) | open | vitest, WSL scripts under `nice -n 19`, Rag.Tests; code pins follow the mcp/benchmark merges |
+
+The rule corrections (the xUnit copy, the CI raise, Git Bash's `nice`, build servers on every OS)
+are promoted as one more `release` move after the last adoption merges, followed by one more bare
+bump wave.
+
 ### 3. The corporate rules repository and its consumers
 
 Verified read-only on 2026-10-10 with `gh` (an account with org access) by reading every
