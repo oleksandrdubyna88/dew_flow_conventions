@@ -9,7 +9,7 @@
 ## The question
 
 The test runners leave one session taking the whole machine; the symptom is in
-[the plan](../todo/PLAN_local_cpu_budget.md). Capping the worker count is half the answer. The other
+[the plan](PLAN_local_cpu_budget.md). Capping the worker count is half the answer. The other
 half is a way to run those workers BELOW interactive work. That way must:
 
 1. really lower the priority of the whole process tree: children and grandchildren too, not only

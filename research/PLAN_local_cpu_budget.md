@@ -1,11 +1,22 @@
 # PLAN — local test and build runs take at most 8 workers, at lowered CPU priority
 
-> Status: **plan only, nothing implemented yet (2026-10-10).** Scope: a new shared rule and a
-> priority wrapper tool here, the pin bump plus the local test scripts in every consumer, and the
-> same rule in the corporate shared-rules repository and its consumers.
+> Status: **IMPLEMENTED, 2026-10-11.** Scope: a new shared rule and a priority wrapper tool here, the
+> pin bump plus the local test scripts in every consumer, and the same rule in the corporate
+> shared-rules repository and its consumers. Deviations (details in the rollout records of sections 2
+> and 3):
+> - Every cap is `min(8, the runner's own default)` where it can be computed, not a bare 8, because the
+>   switches are exact and a bare 8 raised a 4-vCPU runner. The xUnit copy is conditioned on `CI`.
+>   This shipped as #60 and a second `release` move.
+> - Git Bash uses `nice -n 10`, because 19 is the Idle class there.
+> - `--disable-build-servers` is needed on every OS.
+> - cargo's caps live in the documented commands, not in `.cargo/config.toml`.
+> - Every consumer got a bare pin-bump PR first and the adoption second, in both organisations.
+>
+> Open tail: creds_for_devs' WSL harnesses still run their inner `dotnet build` unlowered. That
+> repository owns the item, and it waits for its own WSL-bridge branch.
 >
 > Related docs: [csharp/dotnet-build.md](../csharp/dotnet-build.md),
-> [PLAN_dotnet_build_node_reuse.md](../research/PLAN_dotnet_build_node_reuse.md),
+> [PLAN_dotnet_build_node_reuse.md](PLAN_dotnet_build_node_reuse.md),
 > [common/measurement.md](../common/measurement.md), [README.md](../README.md).
 
 ## The symptom, measured
@@ -24,7 +35,7 @@ at `-m:4`. Test runners and the other build tools have no cap.
 
 ## What the measurements decide
 
-The full record is [2026-10-10_windows_cpu_priority.md](../research/2026-10-10_windows_cpu_priority.md).
+The full record is [2026-10-10_windows_cpu_priority.md](2026-10-10_windows_cpu_priority.md).
 In short:
 
 - **Lowering priority works on Windows, and children inherit it.** A process that sets itself to
@@ -148,19 +159,20 @@ pull request with its build run.
   - Runner scripts lower themselves with `await import('./lower-priority.mjs')`.
   - The research record's M4 has the reasons.
 
-| Repository | Bare bump | Adoption | Notes |
-|---|---|---|---|
-| connect_other_ais | #753 merged | #757 | PROJECT.md is in the reviewer prompt's 80 000-character rule corpus, so its edit is net -27 characters |
-| creds_for_devs | #217 merged | #219 merged | done by another session; root `xunit.runner.json` linked into every test project via Directory.Build.props; the runner banner went from [24 threads] to [8 threads] |
-| wsl_care | #97 merged | open | the bump was done by that repository's own session |
-| mcp | #44 merged | #45 merged | nine probe classes observe the peak (9 of 9 red when the copy is missing) |
-| benchmark | #74 merged | #75 | the same probe |
-| sidecar_rust | #52 merged | #53 merged | cargo caps in CLAUDE.md/README, pinned by `tests/local_cpu_budget.rs` |
-| rag_qln | #55 merged (with both code pins) | open | vitest, WSL scripts under `nice -n 19`, Rag.Tests; code pins follow the mcp/benchmark merges |
+| Repository | Bare bump (791b25e) | Adoption | Second bump (03428e2) | Notes |
+|---|---|---|---|---|
+| connect_other_ais | #753 | #757 | #763 | PROJECT.md is in the reviewer prompt's 80 000-character rule corpus, so its edit is net -27 characters; a later review asked to wrap its build line too, and that was declined for the same budget (the wrapped line is in ARCHITECTURE.md) |
+| creds_for_devs | #217 | #219 | #222 | root `xunit.runner.json` linked into every test project via Directory.Build.props; the runner banner went from [24 threads] to [8 threads]. #225 brought it to the corrected rule: a runner script computes `min(8, CPUs - 1)` instead of an exact 8, and the xUnit copy is skipped under `CI` |
+| wsl_care | #97 | #102 | #110 | the first bump was done by that repository's own session |
+| mcp | #44 | #45 | #47 | nine probe classes observe the peak (9 of 9 red when the copy is missing) |
+| benchmark | #74 | #75 | #76 | the same probe |
+| sidecar_rust | #52 | #53 | #55 | cargo caps in CLAUDE.md/README, pinned by `tests/local_cpu_budget.rs` |
+| rag_qln | #55 (with both code pins) | #56 | #59 (with both code pins) | vitest, WSL scripts under `nice -n 19`, Rag.Tests; code pins follow the mcp/benchmark merges |
 
-The rule corrections (the xUnit copy, the CI raise, Git Bash's `nice`, build servers on every OS)
-are promoted as one more `release` move after the last adoption merges, followed by one more bare
-bump wave.
+All of these are merged. The rule corrections (the xUnit copy, the CI raise, Git Bash's `nice`, build
+servers on every OS) were merged as #60 and promoted as the second `release` move (03428e2) after the
+last adoption merged, followed by the second bare bump wave in the last column. The template and the
+tool did not change in #60, so no consumer's verbatim preload copy had to follow.
 
 ### 3. The corporate rules repository and its consumers
 
@@ -205,6 +217,36 @@ Its own conventions, read 2026-10-10 from a fresh clone:
   script files only.
 - Each consumer's own CLAUDE.md wins in that repository.
 
+**Rollout record, as of 2026-10-11.** The corporate rule merged as its #32 (pin `1a08122`). It already
+carried the corrections: caps `min(8, default)`, the xUnit copy conditioned on `CI`, `nice -n 10` under
+Git Bash, `--disable-build-servers`.
+
+| Consumer | Bare bump | Adoption | Notes |
+|---|---|---|---|
+| SSO | #93 | #92 | vitest `maxWorkers` = max(1, min(8, CPUs - 1)); no pipeline runs its tests |
+| loc-sim | #18 | #19 | rebase-only repository, so the adoption was folded into one commit; #17 was closed as superseded |
+| project-tools | #444 | #445 | jest `maxWorkers: 1` kept and pinned; CodeRabbit's "keep the pin old" was declined with `shared-rules-pin.md`; no ClickUp id (the check only warns) |
+| orchestrator | #299 | #300 | controll keeps `fileParallelism: false`; the sandbox worker gets a runner computing max(1, min(8, CPUs - 1)) |
+| scoreMeter | #175 | #176 | six xUnit projects with a CI-conditioned copy; the ui runner |
+| access-server | #303 | #304 | three preload copies; Playwright `workers: 1` kept |
+| alert-center | #168 | #169 | the inline jest config moved to `jest.config.js` |
+| llm-jira-estimates | #59 | #60 | four xUnit projects; documented commands lowered |
+| email-service | #204 | #205 | make's test targets under `nice -n 19` guarded by CI; PHPUnit lowered in its container |
+| knowledge_base | #57 | #58 | ui-template, the VS Code extension runner, `run-api-tests.sh` |
+
+Deviations from the plan above:
+
+- **Two PRs per consumer, not one.** The consumers' own `shared-rules-pin.md` says that a pin bump is its
+  own commit, ahead of the task. The squash merges here would have mixed it in, so each consumer got a
+  bare bump PR first.
+- **The deploy-on-push repositories** (scoreMeter, llm-jira-estimates, orchestrator) waited for the
+  owner's decision. Their bumps squashed with `[skip ci]` as usual. Their adoptions deployed, and each
+  deploy run was watched.
+- **Clones:** the first batch of fresh clones was lost when WSL restarted. The work moved to
+  `/tmp/orgmeter-concurrency-20261011T124253Z/`.
+- **The review gate** could not open a checkout inside WSL `/tmp`, so independent read-only reviewers stood
+  in. They found nothing gating.
+
 ## Build order
 
 1. This plan, then the gate's plan round on it.
@@ -245,11 +287,11 @@ Its own conventions, read 2026-10-10 from a fresh clone:
 
 ## Definition of Done
 
-- [ ] `common/local-cpu-budget.md` exists, recorded in `rule-bodies.json`, naming no product.
-- [ ] `tools/low-priority.mjs` and its tests are merged. The Windows and Linux CI legs are green.
-- [ ] The measurement record is in `research/`, dated, with numbers and method.
-- [ ] `release` is promoted to the merge sha.
-- [ ] Every dew_flow consumer is merged with its pin at that sha and its own scripts capped.
-- [ ] The corporate rule is merged, and each of its consumers has a merged (or, where its rules
+- [x] `common/local-cpu-budget.md` exists, recorded in `rule-bodies.json`, naming no product.
+- [x] `tools/low-priority.mjs` and its tests are merged. The Windows and Linux CI legs are green.
+- [x] The measurement record is in `research/`, dated, with numbers and method.
+- [x] `release` is promoted to the merge sha.
+- [x] Every dew_flow consumer is merged with its pin at that sha and its own scripts capped.
+- [x] The corporate rule is merged, and each of its consumers has a merged (or, where its rules
       forbid self-merge, an opened) PR.
-- [ ] This plan is promoted to `research/` with `IMPLEMENTED <date>` and its deviations.
+- [x] This plan is promoted to `research/` with `IMPLEMENTED <date>` and its deviations.
