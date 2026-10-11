@@ -86,10 +86,21 @@ export function quoteForCmd(arg, doubleEscape = false) {
   return doubleEscape ? text.replace(CMD_META, "^$1") : text;
 }
 
+/**
+ * The exit code that tells a caller what happened to the child: its own code, or — for a child
+ * ended by a signal this process cannot re-raise (Windows has no POSIX signals) — the shell
+ * convention 128 + the signal's number, so `kill` never reads as an ordinary `exit(1)`.
+ */
+export function exitCodeFor(code, signal) {
+  if (code !== null && code !== undefined) return code;
+  if (signal) return 128 + (os.constants.signals[signal] ?? 0);
+  return 1;
+}
+
 /** What to actually start: [file, args, extra spawn options]. */
-export function launchPlan(command, args, env = process.env, cwd = process.cwd()) {
+export function launchPlan(command, args, env = process.env, cwd = process.cwd(), platform = process.platform) {
   if (command === "node") return [process.execPath, args, {}];
-  if (process.platform !== "win32") return [command, args, {}];
+  if (platform !== "win32") return [command, args, {}];
   const found = resolveWindowsCommand(command, env, cwd);
   if (!found) return ["", args, {}];
   if (!/\.(cmd|bat)$/i.test(found)) return [found, args, {}];
@@ -134,7 +145,9 @@ function main(argv) {
     process.stderr.write(`low-priority: command not found: ${command}\n`);
     process.exit(127);
   }
-  // Terminating the wrapper must not orphan anything it started; see signalPlan.
+  // Terminating the wrapper must not orphan anything it started. Off a terminal on POSIX, signals
+  // go to the child's own process group. On a terminal, Ctrl+C and SIGHUP reach the foreground
+  // group straight from the terminal, so only SIGTERM is forwarded. See signalPlan.
   const plan = signalPlan(process.platform, Boolean(process.stdin.isTTY));
   const child = spawn(file, fileArgs, { stdio: "inherit", detached: plan.ownGroup, ...extra });
 
@@ -157,9 +170,11 @@ function main(argv) {
     for (const [name, handler] of handlers) process.off(name, handler);
     if (signal && process.platform !== "win32") {
       process.kill(process.pid, signal);
+      // The default action ends this process at once; if anything kept it alive, still say "signal".
+      setTimeout(() => process.exit(exitCodeFor(code, signal)), 200).unref();
       return;
     }
-    process.exit(code ?? 1);
+    process.exit(exitCodeFor(code, signal));
   });
 }
 

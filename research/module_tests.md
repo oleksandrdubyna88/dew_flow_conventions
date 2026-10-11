@@ -1039,6 +1039,8 @@ The evidence is [2026-10-10_windows_cpu_priority.md](2026-10-10_windows_cpu_prio
   with one round of caret escaping `with"quote` ended the quoted region inside the shim and `&b` ran
   as a command, which is why every batch file gets two;
 - POSIX: `SIGTERM` to the wrapper ends the child AND the child's own child (no orphan; the child gets its own process group off a terminal);
+- `exitCodeFor()`: a child ended by a signal the wrapper cannot re-raise exits 128 + the signal's
+  number, never a plain 1 (CodeRabbit, PR #59);
 - `signalPlan()`: on a terminal only `SIGTERM` is forwarded (the terminal already sends SIGINT/SIGHUP to the whole foreground group, so forwarding would deliver them twice), off a terminal all three go to the child's group, on Windows none — break-it: forwarding SIGINT on a terminal reddens it — skipped on Windows, where a
   hard kill of the wrapper alone cannot be forwarded and the rule names `taskkill /T`;
 - the exported `lowerOwnPriority()` lowers its caller and returns the level it reached.
@@ -1049,6 +1051,8 @@ throwaway consumer:
 
 - mount present: lowered, and silent;
 - absent under `CI`: unlowered, and silent;
+- an EMPTY mount folder (an uninitialised submodule) counts as absent; a mount with content but no
+  tool is a stale checkout and fails the run (CodeRabbit, PR #59);
 - absent locally: unlowered, with exactly ONE notice even though a child also preloads;
 - present but a syntax error, or without the export: the run fails.
 

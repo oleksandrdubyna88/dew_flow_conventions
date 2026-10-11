@@ -71,9 +71,11 @@ there:
 "test": "node --import ./scripts/lower-priority.mjs ./node_modules/vitest/vitest.mjs run"
 ```
 
-- **Only an absent mount falls back.** That is CI's normal state: nothing is lowered, and one notice
-  is printed when `CI` is not set. A mount that is present but broken fails the run.
-  `tools/lower-priority-preload.test.mjs` pins all four cases.
+- **Only an absent mount falls back.** Absent means the folder is missing or empty: an
+  uninitialised submodule leaves an empty folder, and that is CI's normal state. Nothing is lowered
+  then, and one notice is printed when `CI` is not set.
+- **Every other case fails the run.** A mount with content but no tool is a stale checkout, and a
+  tool that does not load is broken. `tools/lower-priority-preload.test.mjs` pins every case.
 - `--import` reaches every worker `node --test` starts, and lowering twice is harmless.
 - The preload holds no priority logic; the one implementation stays in the tool.
 - A change to the template ships to every copy in the same rollout that bumps the pin.

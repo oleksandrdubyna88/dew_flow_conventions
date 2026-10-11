@@ -14,7 +14,12 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const template = fs.readFileSync(path.join(here, "templates", "lower-priority-preload.mjs"), "utf8");
 const tool = fs.readFileSync(path.join(here, "low-priority.mjs"), "utf8");
 const lowered = process.platform === "win32" ? os.constants.priority.PRIORITY_BELOW_NORMAL : 19;
-const MOUNT_LINE = /^const MOUNT = new URL\("[^"]+", import\.meta\.url\);$/m;
+const MOUNT_LINE = /^const MOUNT = new URL\("[^"]+", import\.meta\.url\);(?=\r?$)/m;
+
+/** An uninitialised submodule: the folder exists and is empty. */
+const EMPTY = Symbol("empty mount folder");
+/** A checkout of the mount from before the tool existed: content, no tool. */
+const STALE = Symbol("stale mount");
 
 function consumer(t, mount) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "low-priority-preload-"));
@@ -22,8 +27,12 @@ function consumer(t, mount) {
   fs.mkdirSync(path.join(root, "scripts"));
   assert.match(template, MOUNT_LINE, "the template must keep exactly one MOUNT line for consumers to edit");
   fs.writeFileSync(path.join(root, "scripts", "lower-priority.mjs"),
-    template.replace(MOUNT_LINE, 'const MOUNT = new URL("../mount/tools/low-priority.mjs", import.meta.url);'));
-  if (mount !== undefined) {
+    template.replace(MOUNT_LINE, 'const MOUNT = new URL("../mount/", import.meta.url);'));
+  if (mount === EMPTY) fs.mkdirSync(path.join(root, "mount"));
+  else if (mount === STALE) {
+    fs.mkdirSync(path.join(root, "mount", "common"), {recursive: true});
+    fs.writeFileSync(path.join(root, "mount", "README.md"), "a checkout from before the tool existed\n");
+  } else if (mount !== undefined) {
     fs.mkdirSync(path.join(root, "mount", "tools"), {recursive: true});
     fs.writeFileSync(path.join(root, "mount", "tools", "low-priority.mjs"), mount);
   }
@@ -62,6 +71,19 @@ test("mount absent locally: the run goes on unlowered and says so ONCE, not once
   assert.deepEqual(seen(result.stdout), {self: os.getPriority(0), child: os.getPriority(0)});
   assert.equal(result.stderr.match(/NOT lowered/g)?.length, 1, result.stderr);
   assert.match(result.stderr, /submodule update --init/);
+});
+
+test("an uninitialised submodule — an EMPTY mount folder — is absent too", t => {
+  const result = run(consumer(t, EMPTY), {CI: "true"});
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(seen(result.stdout), {self: os.getPriority(0), child: os.getPriority(0)});
+  assert.equal(result.stderr, "");
+});
+
+test("a mount with content but no tool is stale, and the run fails instead of falling back", t => {
+  const result = run(consumer(t, STALE));
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /stale/);
 });
 
 test("mount present but broken: the run fails instead of quietly running unlowered", t => {

@@ -4,16 +4,22 @@
 //
 //   node --import ./scripts/lower-priority.mjs --test --test-concurrency=8
 //
-// A mount that is absent is CI's normal state (CI checks no submodule out, and CI is exempt), so it
-// lowers nothing — locally it says so once. Anything else, a mount that is present but broken
-// included, fails the run loudly: only the intended absence falls back.
-import { existsSync } from "node:fs";
+// An ABSENT mount is CI's normal state: CI checks no submodule out, and CI is exempt. Absent means
+// the mount folder is missing or empty — an uninitialised submodule leaves an empty folder. Then
+// nothing is lowered, and locally the preload says so once. Anything else fails the run loudly:
+// a mount that has content but no tool is a stale checkout, and a tool that does not load is broken.
+import { existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const MOUNT = new URL("../.agents/conventions/tools/low-priority.mjs", import.meta.url);
+const MOUNT = new URL("../.agents/conventions/", import.meta.url);
 
-if (existsSync(MOUNT)) {
-  (await import(MOUNT.href)).lowerOwnPriority();
+const tool = new URL("tools/low-priority.mjs", MOUNT);
+const mountIsAbsent = () => !existsSync(MOUNT) || readdirSync(MOUNT).length === 0;
+
+if (existsSync(tool)) {
+  (await import(tool.href)).lowerOwnPriority();
+} else if (!mountIsAbsent()) {
+  throw new Error(`low-priority: ${fileURLToPath(MOUNT)} has content but no tools/low-priority.mjs — the submodule is stale (git submodule update)`);
 } else if (!process.env.CI && !process.env.LOW_PRIORITY_PRELOAD_NOTICE) {
   process.env.LOW_PRIORITY_PRELOAD_NOTICE = "1";
   process.stderr.write(`low-priority: ${fileURLToPath(MOUNT)} is absent (git submodule update --init) — this run is NOT lowered\n`);

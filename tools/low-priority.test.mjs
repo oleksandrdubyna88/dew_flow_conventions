@@ -158,3 +158,60 @@ test("signals: on a terminal Ctrl+C is not delivered twice; off it the whole gro
   assert.deepEqual(signalPlan("win32", true), {ownGroup: false, forward: [], absorb: ["SIGINT", "SIGBREAK"]});
   assert.deepEqual(signalPlan("win32", false), {ownGroup: false, forward: [], absorb: ["SIGINT", "SIGBREAK"]});
 });
+
+test("a child ended by a signal that cannot be re-raised still reads as a signal, never as exit 1", async () => {
+  const {exitCodeFor} = await import(new URL("./low-priority.mjs", import.meta.url).href);
+  assert.equal(exitCodeFor(37, null), 37);
+  assert.equal(exitCodeFor(0, null), 0);
+  // The shell convention, 128 + the signal number, so a caller can tell `kill` from `exit(1)`.
+  assert.equal(exitCodeFor(null, "SIGTERM"), 128 + os.constants.signals.SIGTERM);
+  assert.equal(exitCodeFor(null, "SIGKILL"), 128 + os.constants.signals.SIGKILL);
+  assert.equal(exitCodeFor(null, null), 1);
+});
+
+// The Windows launch decisions are pure, so they are checked on every platform — CI runs Linux, and
+// the real-process shim case above only runs where cmd.exe exists.
+test("launch plan: node is this node, a POSIX command runs as given", async () => {
+  const {launchPlan} = await import(new URL("./low-priority.mjs", import.meta.url).href);
+  assert.deepEqual(launchPlan("node", ["-v"]), [process.execPath, ["-v"], {}]);
+  assert.deepEqual(launchPlan("npm", ["test"], {}, "/", "linux"), ["npm", ["test"], {}]);
+});
+
+test("launch plan on Windows: PATHEXT finds the shim, cmd.exe runs it, an .exe runs directly", async (t) => {
+  const {launchPlan, resolveWindowsCommand} = await import(new URL("./low-priority.mjs", import.meta.url).href);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "low-priority-plan-"));
+  t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
+  fs.writeFileSync(path.join(dir, "probe.cmd"), "");
+  fs.writeFileSync(path.join(dir, "tool.exe"), "");
+  const env = {PATH: dir, PATHEXT: ".EXE;.CMD", ComSpec: "C:\\Windows\\System32\\cmd.exe"};
+
+  assert.equal(resolveWindowsCommand("probe", env, dir), path.join(dir, "probe.cmd"));
+  assert.equal(resolveWindowsCommand("tool", env, dir), path.join(dir, "tool.exe"));
+  assert.equal(resolveWindowsCommand("./probe", {PATHEXT: ".CMD"}, dir), path.join(dir, "probe.cmd"));
+  assert.equal(resolveWindowsCommand("absent", env, dir), "");
+
+  assert.deepEqual(launchPlan("tool", ["x"], env, dir, "win32"), [path.join(dir, "tool.exe"), ["x"], {}]);
+  assert.deepEqual(launchPlan("absent", [], env, dir, "win32"), ["", [], {}]);
+  const [file, args, extra] = launchPlan("probe", ["a b", "x&y"], env, dir, "win32");
+  assert.equal(file, env.ComSpec);
+  assert.deepEqual(args.slice(0, 3), ["/d", "/s", "/c"]);
+  assert.deepEqual(extra, {windowsVerbatimArguments: true});
+  // The batch path is escaped once, every argument twice (a shim re-parses %*).
+  assert.ok(args[3].includes('^^^"a^^^ b^^^"'), args[3]);
+  assert.ok(args[3].includes('^^^"x^^^&y^^^"'), args[3]);
+});
+
+test("quoting for cmd: CRT rules first, then every metacharacter caret-escaped", async () => {
+  const {quoteForCmd} = await import(new URL("./low-priority.mjs", import.meta.url).href);
+  assert.equal(quoteForCmd("plain"), '^"plain^"');
+  assert.equal(quoteForCmd('a"b'), '^"a\\^"b^"');
+  assert.equal(quoteForCmd("trail\\"), '^"trail\\\\^"');
+  assert.equal(quoteForCmd("100%"), '^"100^%^"');
+  assert.equal(quoteForCmd("x", true), '^^^"x^^^"');
+});
+
+test("CI is any value but an explicit false", async () => {
+  const {isCi} = await import(new URL("./low-priority.mjs", import.meta.url).href);
+  for (const value of ["true", "1", "yes", "TRUE"]) assert.equal(isCi({CI: value}), true, value);
+  for (const value of [undefined, "", "false", "0", " FALSE "]) assert.equal(isCi({CI: value}), false, String(value));
+});
