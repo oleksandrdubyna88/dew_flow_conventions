@@ -178,6 +178,23 @@ migrations, a resolver run bounded at 10 s.
   priorities under the same load before debugging it. Never "fix" it by raising the priority or
   the deadline.
 
+## M4 — what the rollout measured (2026-10-11)
+
+The first consumers to adopt the rule turned up five facts the first version of the rule got wrong or left out.
+
+| # | Fact | Measured how |
+|---|---|---|
+| 1 | **An xUnit `xunit.runner.json` that is not copied to the output is never read.** | A probe of 30 sleeping test classes recording their peak concurrency, xunit.v3 4.0.1: no file 24; file beside the project 24; copied by `<Content … CopyToOutputDirectory="PreserveNewest" />` 8. A command-line `--max-threads 16` overrode it (16). Another consumer saw the runner's own banner go from `[24 threads]` to `[8 threads]`. |
+| 2 | **Every cap switch is an exact value, so a bare 8 RAISES a small CI runner.** | Another consumer measured a 4-vCPU runner going from 3–4 workers to 8 (6 m 39 s against 6 m 52 s, harmless there). This repository's own `tools · selftest` went from 13 s to 21 s after its `npm test` gained a literal `--test-concurrency=8` (single runs). |
+| 3 | **cargo caps correctly through `.cargo/config.toml`, but CI would inherit it.** | A 20-test probe crate: 20 at once by default, 8 with `[env] RUST_TEST_THREADS = "8"`. |
+| 4 | **Git Bash's `nice -n 19` on Windows is the Idle class.** | `nice -n 19 node -e …os.getPriority(0)` printed 19 (Idle); `nice -n 10` printed 10 (BelowNormal). |
+| 5 | **A Normal-priority build server compiles for a lowered Windows build.** | Reported by another consumer: VBCSCompiler started earlier at Normal priority did the compiling. This is the Windows twin of the Linux record's nice-0 build servers. |
+
+What changed as a result: the rule writes the cap as `min(8, default)` where it can be computed, conditions the
+xUnit copy on `CI`, keeps cargo's caps in the local commands, names `nice -n 10` for Git Bash, and asks for
+`--disable-build-servers` on every OS. This repository's `npm test` moved to `tools/run-tests.mjs`, which computes
+the cap.
+
 ## Conclusions
 
 1. **Lower yourself, then spawn.** It is the only Windows method measured to lower the whole tree

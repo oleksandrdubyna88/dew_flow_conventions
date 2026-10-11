@@ -215,3 +215,19 @@ test("CI is any value but an explicit false", async () => {
   for (const value of ["true", "1", "yes", "TRUE"]) assert.equal(isCi({CI: value}), true, value);
   for (const value of [undefined, "", "false", "0", " FALSE "]) assert.equal(isCi({CI: value}), false, String(value));
 });
+
+test("this repository's own runner caps node --test at min(8, CPUs - 1) — never a raise on a small machine", async () => {
+  const {testConcurrency, CAP} = await import(new URL("./run-tests.mjs", import.meta.url).href);
+  assert.equal(CAP, 8);
+  // A 4-vCPU CI runner keeps node's own default of 3; a 24-thread workstation is capped at 8; one thread still gets 1.
+  assert.equal(testConcurrency(4), 3);
+  assert.equal(testConcurrency(24), 8);
+  assert.equal(testConcurrency(9), 8);
+  assert.equal(testConcurrency(1), 1);
+});
+
+test("npm test and test:coverage go through the runner, so the cap and the lowering cannot be skipped", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(here, "..", "package.json"), "utf8"));
+  assert.equal(pkg.scripts.test, "node tools/run-tests.mjs");
+  assert.match(pkg.scripts["test:coverage"], /^node tools\/run-tests\.mjs --experimental-test-coverage /);
+});

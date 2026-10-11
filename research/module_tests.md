@@ -1061,3 +1061,8 @@ exactly the two "broken" cases.
 
 Break-it, product code only, 2026-10-10: commenting out the `os.setPriority` call reddens the
 inheritance case and the export case; removing the second escaping round reddens the shim case.
+
+`tools/run-tests.mjs` (2026-10-11) is this repository's own `npm test`: `lowerOwnPriority()`, then `node --test
+--test-concurrency=min(8, CPUs - 1)`. A literal 8 had taken the 4-vCPU CI runner from 3 workers to 8. Its case in
+`low-priority.test.mjs` asserts `testConcurrency()` for 4, 9, 24 and 1 threads, and asserts that `test` and
+`test:coverage` go through it. Break-it: returning a bare `CAP` reddens the first.

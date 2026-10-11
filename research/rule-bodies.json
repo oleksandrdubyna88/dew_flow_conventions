@@ -194,7 +194,7 @@
     {
       "id": "common.local-cpu-budget",
       "source": "common/local-cpu-budget.md",
-      "bodySha256": "2ac72ab8f592d498ef75f8c75d732e39fa45901de8252ff8c3eb95f57c16a9ae",
+      "bodySha256": "b71aeec77941463f1e13fa3cc96271007ea310098b4ec18df1acac7f333c2d1d",
       "sections": [
         "# Local test and build runs — at most 8 workers, at lowered CPU priority (MANDATORY)",
         "## 1. At most 8 workers per local run (MANDATORY)",
