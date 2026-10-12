@@ -57,9 +57,10 @@ architects and reviewers must be passed `model: "opus"` or they silently run on 
 decision and nothing else; `common/subagent-models.md` keeps the judges' side and the detail, declares
 `depends: ["common.subagent-scouts"]`, and never restates the decision — two summaries of one rule drift.
 
-The size target is **≤ 850 B for the whole file**, frontmatter included, so the tightest single-read scope measured
-(`.csproj`, 867 B free) still fits. The draft below measures **634 B** as a whole file (2026-10-12), leaving ~230 B
-in that scope. E1 measures the final text again; if the text cannot say what it must in 850 B, stop and bring the
+The size target is **≤ 700 B for the whole file**, frontmatter included. The tightest single-read scope measured
+(`.csproj`) has 867 B free; at 850 B it would keep 17 B, which is no margin at all (checked by an in-memory selection,
+2026-10-12). The draft below measures **634 B** as a whole file, leaving ~230 B in that scope. E1 measures the final
+text again; if the text cannot say what it must in 700 B, stop and bring the
 numbers to the operator rather than letting one scope fall over the limit.
 
 ### 3.1 Draft — `common/subagent-scouts.md`
@@ -99,6 +100,13 @@ The final file links `subagent-models.md` from its last sentence; the draft name
 - **Measured** — one dated paragraph: the conditions, the per-team-size verdicts, time and cost in one line each, and a
   link to `research/RESULTS_scout_models.md`. It says the Explore clause is measured or
   extrapolated, as the calibration found.
+- **Measured on one model, watched afterwards.** The measured paragraph names the exact `resolvedModel` ids the
+  calibration ran (for example `claude-sonnet-5-5`). An alias moves without notice, and a session cannot see it move:
+  the Agent result a caller receives carries the text and an agent id, not the model (observed in this session,
+  2026-10-12). So detection is not left to sessions. The benchmark's Scouts section runs a scheduled alias check — one
+  tiny cell, weekly — and when the id behind `sonnet` or `opus` differs from the recorded one, the check fails loudly
+  and the switch is **suspended** by the procedure in §3.4 until a recalibration on the new id passes the same
+  pre-registered test.
 - **Never**: never put a judge on Sonnet because it happens to be read-only; never fan out copies of one brief to reach
   the count; never let a scout's summary stand in for the file it names; never use Fable for a scout.
 - **DoD**: scouts on Sonnet at ⌈1.5·N⌉ with distinct focus areas; judges on Opus or Fable, named explicitly; the caller
@@ -111,38 +119,72 @@ No new rule. `subagent-models.md` gets one dated sentence — *Sonnet scouts at 
 adopted* — with the link to `research/RESULTS_scout_models.md`, so the proposal is not re-made blind. The draft above
 stays in this plan as the record of what was proposed.
 
+### 3.4 Suspension — when the measured model is no longer the one behind the alias
+
+The benchmark's weekly alias check (`dew_flow_benchmark · todo/PLAN_scout_model_calibration.md` §3.14) fails when the id
+behind `sonnet` or `opus` differs from the ids this rule records. That failure is acted on by this procedure — owned
+here, because a conventions commit alone reaches no consumer:
+
+1. Edit `common/subagent-scouts.md` so its decision reads *scouts run on Opus at N — suspended <date>: the alias now
+   resolves to <new id>, which was not measured*; keep its size budget.
+2. Flip the behaviour smoke's expectation (three scouts on Opus) and keep the other guards; `rule-bodies.mjs --update`.
+3. PR, merge, `promote-release`, the pin bump in every consumer — the E2 path.
+4. The suspension lifts only when a recalibration on the new id passes the same pre-registered test; the lift is the
+   same four steps in reverse, with the new ids recorded.
+
 ## 4. Build order — two epics; the gate once per epic
 
-**E0 — wait for the verdict.** Nothing here starts before the benchmark plan's RESULTS is merged.
+**Precondition — the verdict.** Nothing here starts before the benchmark plan's RESULTS is merged. On SWITCH, a second
+precondition: the benchmark's weekly alias check (§3.4) exists and has run green once — a switch with no watch on its
+model is not shipped.
 
-**E1 — the rule (one PR).**
+**E1 — the rule (one PR, branch `docs/scout-subagents-on-sonnet`).**
 
-1. `research/RESULTS_scout_models.md` here: a short record of the verdict, its conditions and its limits, citing the
-   benchmark's results by path; its `research/README.md` row.
-2. On SWITCH: write `common/subagent-scouts.md`, measure it (≤ 850 B), edit `subagent-models.md` per §3.2. On no switch:
-   §3.3 only.
-3. `node tools/rule-bodies.mjs --update common.subagent-models` (and the new rule's entry, added by hand per
-   `tools/rule-bodies.mjs:133`).
-4. Tests in `tools/rules.test.mjs`:
-   - *the scout rule is selected for every task* — a loop over `TASKS`;
-   - *every single-file inspect scope that fits today still fits* — no file, `.cs`, `.razor`, `.ts`, `.csproj` each
-     ≤ 32 768 B, so the next rule that breaks a scope fails by name instead of inside the migration test;
-   - **break-it**: pad the scout rule by 1 KB in a fixture catalog and watch the `.csproj` case go red; restore.
-5. `npm test`, `npm run check`, `node tools/rule-bodies.mjs`, `node tools/ownership-check.mjs`,
-   `node tools/plan-lifecycle.mjs` — all green; then one real `smoke-rules` run on a `.cs` scope showing
-   `allSourcesRead: true` with `common.subagent-scouts` selected.
+- **S1.1 — the record and the text.** `research/RESULTS_scout_models.md` here: a short record of the verdict, its
+  conditions and its limits, citing the benchmark's results by path, and its `research/README.md` row — in either case.
+  - *On SWITCH:* `common/subagent-scouts.md`, measured again (≤ 700 B), and `subagent-models.md` per §3.2, the measured
+    model ids included.
+  - *On no switch:* §3.3 only — no new rule.
 
-**E2 — rollout.** PR → CI green → automatic review comments read and acted on → merge →
-`promote-release` dispatched against `main` with the merged sha → the pin bumped in every consumer in the README's
-order, the one whose own pins depend on the others LAST, each consumer's `pin-check` green → in one consumer, the
-session-start hook's output shows `common.subagent-scouts`. Then promote this plan with its deviations.
+  Then `node tools/rule-bodies.mjs --update common.subagent-models`, and on SWITCH the new rule's entry added by hand
+  (`tools/rule-bodies.mjs:133`). Done when `node tools/rule-bodies.mjs` and `node tools/ownership-check.mjs` are clean.
+- **S1.2 — the guards.**
+  - *On SWITCH*, in `tools/rules.test.mjs`: *the scout rule is selected for every task* (a loop over `TASKS`); *every
+    single-file inspect scope that fits today still fits* — no file, `.cs`, `.razor`, `.ts`, `.csproj`, each ≤ 32 768 B,
+    so the next rule that breaks a scope fails by name instead of inside the migration test; the **break-it** — pad the
+    scout rule by 1 KB in a fixture catalog, watch the `.csproj` case go red, restore.
+  - *On SWITCH*, the **behaviour smoke** — loading is not obedience. `tools/lib/rule-smoke.mjs` cannot give this
+    evidence as it is: it offers the session no Agent tool (`:47-49`) and its prompt forbids delegation (`:128`). So it
+    is widened with a behaviour mode (reuse-first: one launcher, one trace reader), and `tools/lib/rule-trace.mjs`'s
+    `claudeEvents` learns to group events by `parent_tool_use_id`. The fixture is a frozen task whose text fixes the
+    baseline — *"an Opus team for this would be three scouts and one reviewer"* — so the expectation is known before
+    launch: **five** scouts with `model: "sonnet"` and distinct prompts, **one** reviewer with `model: "opus"`, every
+    child's `resolvedModel` matching, and a `Read` by the caller of at least one file a scout named before its
+    conclusion. A session's self-declared N proves only consistency, which is why the fixture states N. The observed
+    calls are recorded in `research/RESULTS_scout_models.md`; a miss is a defect in the rule text, fixed and re-run,
+    never a weakened check.
+  - *On no switch*, one guard: the catalog contains no `common.subagent-scouts`, and `subagent-models.md` carries the
+    dated not-adopted sentence.
+  - Either way: `npm test`, `npm run check` and `node tools/plan-lifecycle.mjs` green; on SWITCH also one real
+    `smoke-rules` run on a `.cs` scope showing `allSourcesRead: true` with `common.subagent-scouts` selected.
+
+The epic's code round reviews the rule text, the rule-body records and the tests together.
+
+**E2 — rollout.**
+
+- **S2.1 — release.** PR → CI green → automatic review comments read and acted on → merge → `promote-release`
+  dispatched against `main` with the merged sha.
+- **S2.2 — the consumers.** The pin bumped in every consumer in the README's order, the one whose own pins depend on
+  the others LAST, each consumer's `pin-check` green; on SWITCH, in one consumer, the session-start hook's output shows
+  `common.subagent-scouts`. Then this plan promoted with its deviations, the suspension procedure (§3.4) included in the
+  promoted record.
 
 Outside the repository, the same day: the assistant's own memory note about subagent models is rewritten to match
 (it currently says Sonnet is never intended for investigation work).
 
 ## 5. Test plan
 
-The four checks in E1 step 4, the full `npm test`, and the real smoke run in step 5. No test asserts on this rule's text
+The checks in S1.1 and S1.2, the full `npm test`, and the real smoke run. No test asserts on this rule's text
 today (`smoke-rules.test.mjs` uses invented rules); the body-hash freeze in `tools/rules.test.mjs:147-170` moves only
 through `rule-bodies.mjs --update`.
 
@@ -157,10 +199,16 @@ through `rule-bodies.mjs --update`.
 ## 7. Definition of Done
 
 - [ ] The benchmark's verdict is merged, and this plan followed the half of §4 it chose.
-- [ ] On SWITCH: `common/subagent-scouts.md` ≤ 850 B, the only statement of the decision; `subagent-models.md` depends
+- [ ] On SWITCH: `common/subagent-scouts.md` ≤ 700 B, the only statement of the decision; `subagent-models.md` depends
       on it, carries the scout/judge table, the split rule, the explicit-model rule for both sides, the measured
       paragraph, Never and DoD.
 - [ ] `research/RESULTS_scout_models.md` and its README row exist in either case.
-- [ ] The new tests exist, the break-it went red and back, and every check in E1 step 5 is green.
+- [ ] The guards for the branch taken exist (SWITCH or no switch), the break-it went red and back, and every check in
+      S1.1 and S1.2 is green.
+- [ ] On SWITCH: the behaviour smoke, on a fixture that states N = 3, showed five scouts on Sonnet with distinct
+      prompts, the reviewer on Opus, every `resolvedModel` matching, and the caller reading a named file; its calls are
+      recorded.
+- [ ] On SWITCH: the measured model ids are in the rule; the benchmark's alias check existed and ran green before the
+      release; the suspension procedure (§3.4) is in the promoted record.
 - [ ] Released, every consumer's pin bumped and green, the session-start hook verified in one consumer.
 - [ ] This plan promoted to `research/` with its deviations; `todo/README.md` updated.
