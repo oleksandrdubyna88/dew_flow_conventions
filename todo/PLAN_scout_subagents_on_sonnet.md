@@ -59,7 +59,8 @@ decision and nothing else; `common/subagent-models.md` keeps the judges' side an
 
 The size target is **≤ 700 B for the whole file**, frontmatter included. The tightest single-read scope measured
 (`.csproj`) has 867 B free; at 850 B it would keep 17 B, which is no margin at all (checked by an in-memory selection,
-2026-10-12). The draft below measures **634 B** as a whole file, leaving ~230 B in that scope. E1 measures the final
+2026-10-12). The draft below measures **683 B** as a whole file with LF endings and **694 B** with CRLF (a Windows
+checkout counts the working-tree bytes), leaving ~170 B in that scope. E1 measures the final
 text again; if the text cannot say what it must in 700 B, stop and bring the
 numbers to the operator rather than letting one scope fall over the limit.
 
@@ -75,15 +76,20 @@ tasks: ["inspect","audit","plan","implement","docs","policy","test","git","pr","
 
 A scout is a subagent whose assigned output is facts and file lists — an explorer, Explore, a lookup. Where N would run
 on Opus, launch ⌈1.5·N⌉ (1→2, 2→3, 3→5) with `model: "sonnet"`, each on its own focus written before launch. Anything
-that judges, designs, plans, verifies or writes is not a scout — see subagent-models.md.
+that judges, designs, plans, verifies or writes is not a scout: name `model: "opus"` for it, Fable where
+subagent-models.md says so.
 ```
 
-The final file links `subagent-models.md` from its last sentence; the draft names it as text.
+The final file links `subagent-models.md` from its last sentence; the draft names it as text. It names the judges'
+model itself because `subagent-models.md` is not selected for `inspect` — a session that only has this rule must still
+know that a judge runs on Opus.
 
 ### 3.2 Changes to `common/subagent-models.md`
 
 - Frontmatter: add `"benchmark"` to `tasks`; add `depends: ["common.subagent-scouts"]`.
-- Opening: *"Every subagent that decides runs on Opus"*; "exploration" leaves the Opus list.
+- Opening: *"Every subagent that decides runs on Opus"*; "exploration" leaves the Opus list, with one link to
+  `subagent-scouts.md` for what a scout runs on and how many — **the scout's model and count are stated there and
+  nowhere else**; this file never repeats them.
 - A section **Scout or judge — the assigned output decides**, as a table: explorer / Explore / lookup → scout; a
   reviewer, even a read-only one → judge; "verify this finding" → judge; a general-purpose agent asked to research AND
   propose → judge, or split it (a Sonnet scout gathers, the caller proposes); a scout in a security, cryptography or
@@ -91,10 +97,9 @@ The final file links `subagent-models.md` from its last sentence; the draft name
   *In doubt, it is a judge.*
 - **How to split the extra scouts**: focus areas are written down before launch, distinct, never copies — two scouts
   with one brief are one scout paid twice.
-- **Name the model on both sides**: `model: "sonnet"` for a scout even where its frontmatter already says so (a release
-  can change it); `model: "opus"` for every judge — in the feature-dev workflow that means Phase 4 architects and Phase 6
-  reviewers, whose frontmatter says `sonnet`. The alias resolves to the newest model; what actually ran is the child's
-  `resolvedModel`, not the argument.
+- **Name the judge's model**: `model: "opus"` for every judge — in the feature-dev workflow that means Phase 4
+  architects and Phase 6 reviewers, whose frontmatter says `sonnet`. The alias resolves to the newest model; what
+  actually ran is the child's `resolvedModel`, not the argument.
 - **The caller reads what the scouts name**: a scout's list is a lead; a conclusion rests on a file only once the caller
   opened it (`common/measurement.md` § 5). "Nothing found" means nothing was found by that search.
 - **Measured** — one dated paragraph: the conditions, the per-team-size verdicts, time and cost in one line each, and a
@@ -109,9 +114,9 @@ The final file links `subagent-models.md` from its last sentence; the draft name
   pre-registered test.
 - **Never**: never put a judge on Sonnet because it happens to be read-only; never fan out copies of one brief to reach
   the count; never let a scout's summary stand in for the file it names; never use Fable for a scout.
-- **DoD**: scouts on Sonnet at ⌈1.5·N⌉ with distinct focus areas; judges on Opus or Fable, named explicitly; the caller
-  opened every file a conclusion rests on; the summary names models AND counts ("5 scouts on Sonnet, 2 architects on
-  Opus").
+- **DoD**: the scout rule was followed (by reference, not restated); judges on Opus or Fable, named explicitly; the
+  caller opened every file a conclusion rests on; the summary names models AND counts ("5 scouts on Sonnet, 2
+  architects on Opus").
 
 ### 3.3 If the calibration does not say "switch"
 
@@ -135,8 +140,9 @@ here, because a conventions commit alone reaches no consumer:
 ## 4. Build order — two epics; the gate once per epic
 
 **Precondition — the verdict.** Nothing here starts before the benchmark plan's RESULTS is merged. On SWITCH, a second
-precondition: the benchmark's weekly alias check (§3.4) exists and has run green once — a switch with no watch on its
-model is not shipped.
+precondition: the benchmark's weekly alias check (§3.4) exists — a switch with no watch on its model is not shipped —
+and a **fresh** run of it is green at each step that ships: right before `promote-release`, and again right before each
+consumer's pin bump. A weekly green from days ago does not cover an alias that moved since.
 
 **E1 — the rule (one PR, branch `docs/scout-subagents-on-sonnet`).**
 
@@ -159,8 +165,8 @@ model is not shipped.
     `claudeEvents` learns to group events by `parent_tool_use_id`. The fixture is a frozen task whose text fixes the
     baseline — *"an Opus team for this would be three scouts and one reviewer"* — so the expectation is known before
     launch: **five** scouts with `model: "sonnet"` and distinct prompts, **one** reviewer with `model: "opus"`, every
-    child's `resolvedModel` matching, and a `Read` by the caller of at least one file a scout named before its
-    conclusion. A session's self-declared N proves only consistency, which is why the fixture states N. The observed
+    child's `resolvedModel` matching, and — because the fixture also fixes its CONCLUSION and the files it rests on —
+    a `Read` by the caller of **every** one of those files before the conclusion is written. A session's self-declared N proves only consistency, which is why the fixture states N. The observed
     calls are recorded in `research/RESULTS_scout_models.md`; a miss is a defect in the rule text, fixed and re-run,
     never a weakened check.
   - *On no switch*, one guard: the catalog contains no `common.subagent-scouts`, and `subagent-models.md` carries the
@@ -199,16 +205,17 @@ through `rule-bodies.mjs --update`.
 ## 7. Definition of Done
 
 - [ ] The benchmark's verdict is merged, and this plan followed the half of §4 it chose.
-- [ ] On SWITCH: `common/subagent-scouts.md` ≤ 700 B, the only statement of the decision; `subagent-models.md` depends
+- [ ] On SWITCH: `common/subagent-scouts.md` ≤ 700 B (CRLF counted), the only statement of the scout decision and of
+      the judges' model; `subagent-models.md` depends
       on it, carries the scout/judge table, the split rule, the explicit-model rule for both sides, the measured
       paragraph, Never and DoD.
 - [ ] `research/RESULTS_scout_models.md` and its README row exist in either case.
 - [ ] The guards for the branch taken exist (SWITCH or no switch), the break-it went red and back, and every check in
       S1.1 and S1.2 is green.
-- [ ] On SWITCH: the behaviour smoke, on a fixture that states N = 3, showed five scouts on Sonnet with distinct
-      prompts, the reviewer on Opus, every `resolvedModel` matching, and the caller reading a named file; its calls are
-      recorded.
-- [ ] On SWITCH: the measured model ids are in the rule; the benchmark's alias check existed and ran green before the
-      release; the suspension procedure (§3.4) is in the promoted record.
+- [ ] On SWITCH: the behaviour smoke, on a fixture that states N = 3 and its conclusion's files, showed five scouts on
+      Sonnet with distinct prompts, the reviewer on Opus, every `resolvedModel` matching, and the caller reading every
+      file the conclusion rests on; its calls are recorded.
+- [ ] On SWITCH: the measured model ids are in the rule; the benchmark's alias check exists and a fresh run was green right
+      before the promotion and before each consumer's pin bump; the suspension procedure (§3.4) is in the promoted record.
 - [ ] Released, every consumer's pin bumped and green, the session-start hook verified in one consumer.
 - [ ] This plan promoted to `research/` with its deviations; `todo/README.md` updated.
