@@ -139,7 +139,10 @@ here, because a conventions commit alone reaches no consumer:
 
 ## 4. Build order — two epics; the gate once per epic
 
-**Precondition — the verdict.** Nothing here starts before the benchmark plan's RESULTS is merged. On SWITCH, a second
+**Precondition — the verdict.** Nothing here starts before a **decision run** in the benchmark has produced a verdict
+under its pre-registered test. The benchmark plan's own E3 is, by the operator's decision of 2026-10-12, a 50-cell
+*preliminary* reading (its D7): it is not a verdict, and its RESULTS alone never unblocks this plan — a promising
+reading leads to a separate decision run (`dew_flow_benchmark · todo/PLAN_scout_decision_run.md`), whose verdict does. On SWITCH, a second
 precondition: the benchmark's weekly alias check (§3.4) exists — a switch with no watch on its model is not shipped —
 and a **fresh** run of it is green at each step that ships: right before `promote-release`, and again right before each
 consumer's pin bump. A weekly green from days ago does not cover an alias that moved since.
@@ -204,7 +207,8 @@ through `rule-bodies.mjs --update`.
 
 ## 7. Definition of Done
 
-- [ ] The benchmark's verdict is merged, and this plan followed the half of §4 it chose.
+- [ ] A benchmark DECISION run's verdict is merged (not the 50-cell preliminary reading), and this plan followed the
+      half of §4 it chose.
 - [ ] On SWITCH: `common/subagent-scouts.md` ≤ 700 B (CRLF counted), the only statement of the scout decision and of
       the judges' model; `subagent-models.md` depends
       on it, carries the scout/judge table, the split rule, the explicit-model rule for both sides, the measured
