@@ -13,6 +13,10 @@ import {git} from "./lib/git.mjs";
 import {resolverRead} from "./lib/rule-trace.mjs";
 import {roleRowsOf,declaredRole} from "./lib/rule-roles.mjs";
 
+// A node_modules link made with symlinkSync(…, "junction") is a junction on Windows (removed with rmdir) and a plain
+// symlink elsewhere (rmdir throws ENOTDIR — measured on the Linux CI runner); unlink removes the link, never the target.
+const removeLink=link=>process.platform==="win32"?fs.rmdirSync(link):fs.unlinkSync(link);
+
 const text="The complete canonical source.\n";
 const rule={id:"common.sample",text,hash:sha256(text)};
 const payload=`BEGIN RULE ${rule.id} sha256:${rule.hash}\n${text}\nEND RULE ${rule.id}`;
