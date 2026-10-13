@@ -6,7 +6,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { drift, findEntries, install, mergeEntry, removeEntry, targets } from './install-user-hook.mjs';
+import { drift, findEntries, install, mergeEntry, removeEntry, targets } from '../settings/hooks/lib/user-guard-install.mjs';
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'install-user-hook.mjs');
 
@@ -216,4 +216,69 @@ test('the pure helpers never mutate their input', () => {
   const removed = removeEntry(merged, hook);
   assert.deepEqual(removed, frozen);
   assert.deepEqual(drift(merged, hook, Buffer.from('a'), Buffer.from('a')), []);
+});
+
+test('--uninstall writes the opt-out marker, even when nothing was installed', t => {
+  const s = sandbox(t);
+  const r = s.run('--uninstall');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(fs.readFileSync(s.paths.optout, 'utf8'), /--install/);
+  s.run('--install');
+  s.run('--uninstall');
+  assert.ok(fs.existsSync(s.paths.optout));
+  assert.equal(fs.existsSync(s.paths.hook), false);
+});
+
+test('an explicit --install deletes the opt-out marker', t => {
+  const s = sandbox(t);
+  s.run('--uninstall');
+  assert.ok(fs.existsSync(s.paths.optout));
+  const r = s.run('--install');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(fs.existsSync(s.paths.optout), false);
+  assert.ok(fs.existsSync(s.paths.hook));
+});
+
+test('--install also withdraws the marker when the installation was already current', t => {
+  const s = sandbox(t);
+  s.run('--install');
+  fs.writeFileSync(s.paths.optout, 'x\n');
+  assert.equal(s.run('--install').status, 0);
+  assert.equal(fs.existsSync(s.paths.optout), false);
+});
+
+test('install writes a provenance manifest; --check prints it and --uninstall removes it', t => {
+  const s = sandbox(t);
+  s.run('--install');
+  const m = JSON.parse(fs.readFileSync(s.paths.manifest, 'utf8'));
+  assert.equal(m.by, 'cli');
+  assert.equal(m.source, s.source);
+  const ok = s.run('--check');
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.match(ok.stderr, /provenance: /);
+  s.run('--uninstall');
+  assert.equal(fs.existsSync(s.paths.manifest), false);
+});
+
+test('--check reports drift when the installed bytes no longer match the manifest hash', t => {
+  const s = sandbox(t);
+  s.run('--install');
+  fs.writeFileSync(s.paths.hook, 'tampered\n');
+  const r = s.run('--check');
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /sha256/);
+});
+
+test('installing over a NEWER guard is refused without --force and goes through with it', t => {
+  const s = sandbox(t);
+  fs.mkdirSync(path.dirname(s.paths.hook), { recursive: true });
+  fs.writeFileSync(s.paths.hook, 'export const GUARD_VERSION = 9;\n');
+  fs.writeFileSync(s.source, 'export const GUARD_VERSION = 3;\n');
+  const refused = s.run('--install');
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /--force/);
+  assert.match(fs.readFileSync(s.paths.hook, 'utf8'), /= 9;/);
+  const forced = s.run('--install', '--force');
+  assert.equal(forced.status, 0, forced.stderr);
+  assert.match(fs.readFileSync(s.paths.hook, 'utf8'), /= 3;/);
 });

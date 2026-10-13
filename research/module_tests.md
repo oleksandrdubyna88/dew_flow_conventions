@@ -173,6 +173,21 @@ The digest-vs-rule case reads `common/subagent-models.md` (or `SUBAGENT_MODEL_RU
 the rule is on another branch) through `tools/lib/role-table.mjs`; the permanent break-it changes one row's model in a
 copy and demands exactly one mismatch naming that role.
 
+`tools/ensure-user-guard.test.mjs` (14 cases, 2026-10-13) covers `settings/hooks/ensure-user-guard.mjs`, the
+`SessionStart` self-install of the user-level guard, with temporary homes only: missing installs, older and
+unversioned (version 0) upgrade, equal writes nothing (bytes and mtime of both files and the directory listing
+unchanged), a newer installed copy is never downgraded and is reported as `newer` with the `--force` command,
+`SUBAGENT_MODEL_GUARD=off`, the `subagent-model.optout` marker and a missing source skip without writing, an
+unparsable `settings.json` is refused byte-identical, a project hook with uncommitted changes (a real `git init`)
+is refused, every install writes the provenance manifest (source, sha256, version, UTC time, `self-install`), and
+spawned runs of the entry point print exactly one `systemMessage` line the first time and nothing the second, and
+survive garbage stdin (the payload `cwd` stands in for `CLAUDE_PROJECT_DIR`). The permanent break-it makes the
+version comparison always install: the "equal writes nothing" and the second-run-silent cases go red.
+`tools/install-user-hook.test.mjs` (now 22 cases, importing the extracted core `settings/hooks/lib/user-guard-install.mjs`)
+gains the opt-out marker (`--uninstall` writes it, an explicit `--install` deletes it), `--force` over a newer
+guard, and the manifest (`--check` prints it and fails when the installed bytes no longer match its sha256;
+`--uninstall` removes it).
+
 `tools/adapter-check.test.mjs` changes again for the third hook: a bare repository is now missing four files, and the
 cases that delete `hooks` or `PreToolUse` report one finding more, because the reference wires the guard by its own
 `PreToolUse` entry.

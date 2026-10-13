@@ -30,6 +30,8 @@
  * steered.</p>
  */
 
+/** Raise with every behaviour change; it decides whether a session self-install upgrades the user copy. */
+export const GUARD_VERSION = 1;
 export const DENY_MARKER = 'subagent-models.md:';
 export const ALLOWED_MODELS = Object.freeze(['sonnet', 'opus', 'fable']);
 export const OPT_OUT_VARIABLE = 'SUBAGENT_MODEL_GUARD';

@@ -1,0 +1,129 @@
+#!/usr/bin/env node
+/**
+ * Self-install the user-level subagent-model guard from a session start.
+ *
+ * <p>Copied verbatim into each consumer as `.claude/hooks/ensure-user-guard.mjs` and (from the release
+ * that wires it) run as a `SessionStart` hook. It puts the project's `subagent-model.mjs` into
+ * `~/.claude` when that copy is missing or older, so a fresh machine needs no manual step. All the
+ * safety (refusing unparsable or concurrently changed settings, atomic write, backup) is the installer
+ * core in `lib/user-guard-install.mjs`, shared with `tools/install-user-hook.mjs`.</p>
+ *
+ * <p><b>Versions are read as TEXT.</b> `GUARD_VERSION` is found with a regex in the source and in the
+ * installed copy; neither file is imported or executed. An equal or newer installed copy is never
+ * touched (no downgrade, so two repositories on different releases cannot flip it back and forth); an
+ * installed copy with no version counts as 0.</p>
+ *
+ * <p><b>It stays out of the way.</b> `SUBAGENT_MODEL_GUARD=off` (a measuring harness) and the
+ * `subagent-model.optout` marker (written by `--uninstall`) both skip it. It never blocks the session:
+ * any throw prints nothing, and the exit code is always 0. It speaks (one `systemMessage` line) only
+ * when it installed, upgraded, refused, or found a NEWER installed copy (never downgraded; the line names
+ * the `--force` command). It also refuses when git reports uncommitted changes to the project copy.</p>
+ */
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import process from 'node:process';
+
+import { guardVersion, install, targets } from './lib/user-guard-install.mjs';
+
+export { guardVersion };
+
+const STDIN_LIMIT = 256 * 1024;
+const STDIN_DEADLINE_MS = 2000;
+
+const skipped = () => ({ action: 'skipped', line: '' });
+
+const versionOf = file => guardVersion(fs.readFileSync(file, 'utf8'));
+
+const optedOut = env => String(env.SUBAGENT_MODEL_GUARD ?? '').trim().toLowerCase() === 'off';
+
+const refusal = reason =>
+  `subagent-model guard NOT installed into ~/.claude: ${reason}; run node <conventions>/tools/install-user-hook.mjs by hand`;
+
+/** Which action the two versions call for, or `none` when the installed copy is present and current. */
+function plan(installedFile, sourceVersion) {
+  if (!fs.existsSync(installedFile)) return { action: 'installed', from: 0 };
+  const from = versionOf(installedFile);
+  if (from === sourceVersion) return { action: 'none', from };
+  return { action: from < sourceVersion ? 'upgraded' : 'newer', from };
+}
+
+const newerLine = (installed, source) =>
+  `subagent-model guard in ~/.claude is version ${installed}, newer than this repository's ${source} — run node <conventions>/tools/install-user-hook.mjs --force to replace it`;
+
+/** True when git reports uncommitted changes to the file; false when git is unavailable or it is not a repository. */
+function hasUncommittedChanges(file) {
+  try {
+    const out = execFileSync('git', ['-C', path.dirname(file), 'status', '--porcelain', '--', file], {
+      encoding: 'utf8', timeout: 2000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return out.trim() !== '';
+  } catch {
+    return false;
+  }
+}
+
+const successLine = ({ action, from }, to) =>
+  action === 'installed'
+    ? `subagent-model guard installed into ~/.claude (version ${to})`
+    : `subagent-model guard upgraded in ~/.claude (version ${from} → ${to})`;
+
+/** Install or upgrade the user-level guard when needed; returns what happened and the line to show. */
+export function ensureUserGuard({ home, source, env }) {
+  const t = targets(home);
+  if (optedOut(env) || fs.existsSync(t.optout) || !fs.existsSync(source)) return skipped();
+  const to = versionOf(source);
+  const step = plan(t.hook, to);
+  if (step.action === 'none') return { action: 'none', line: '' };
+  if (step.action === 'newer') return { action: 'newer', line: newerLine(step.from, to) };
+  if (hasUncommittedChanges(source)) return { action: 'refused', line: refusal('the project copy of the hook has uncommitted changes') };
+  const { code, lines } = install({ home, source, by: 'self-install' });
+  if (code !== 0) return { action: 'refused', line: refusal(lines.at(-1) ?? 'unknown reason') };
+  return { action: step.action, line: successLine(step, to) };
+}
+
+/** The raw stdin text, abandoned after a deadline when the caller never closes the pipe. */
+async function readStdin() {
+  let text = '';
+  let timer;
+  const read = (async () => {
+    for await (const chunk of process.stdin) {
+      text += chunk;
+      if (text.length > STDIN_LIMIT) break;
+    }
+  })();
+  await Promise.race([read, new Promise(resolve => { timer = setTimeout(resolve, STDIN_DEADLINE_MS); })]);
+  clearTimeout(timer);
+  return text;
+}
+
+/** The payload's `cwd`, or '' for anything that is not a JSON object carrying one. */
+function payloadCwd(text) {
+  try {
+    const cwd = JSON.parse(text)?.cwd;
+    return typeof cwd === 'string' ? cwd : '';
+  } catch {
+    return '';
+  }
+}
+
+const SPEAKING = new Set(['installed', 'upgraded', 'refused', 'newer']);
+
+async function main() {
+  try {
+    const cwd = payloadCwd(await readStdin());
+    const project = process.env.CLAUDE_PROJECT_DIR || cwd;
+    if (!project) return;
+    const source = path.join(project, '.claude', 'hooks', 'subagent-model.mjs');
+    const { action, line } = ensureUserGuard({ home: os.homedir(), source, env: process.env });
+    if (SPEAKING.has(action)) process.stdout.write(`${JSON.stringify({ systemMessage: line })}\n`);
+  } catch {
+    // Fail open: a self-install must never cost a session its start.
+  }
+}
+
+if (process.argv[1]?.endsWith('ensure-user-guard.mjs')) {
+  await main();
+  process.exit(0);
+}

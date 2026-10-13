@@ -33,9 +33,8 @@ function whole(t) {
   const repo = repository(t);
   fs.mkdirSync(path.join(repo, '.claude/hooks'), { recursive: true });
   fs.copyFileSync(path.join(REFERENCE, 'settings.json'), path.join(repo, '.claude/settings.json'));
-  for (const hook of ['load-instructions.mjs', 'build-flags.mjs', 'subagent-model.mjs']) {
-    fs.copyFileSync(path.join(REFERENCE, 'hooks', hook), path.join(repo, '.claude/hooks', hook));
-  }
+  // Every file under settings/hooks, subdirectories included, exactly as the checker's inventory demands.
+  fs.cpSync(path.join(REFERENCE, 'hooks'), path.join(repo, '.claude/hooks'), { recursive: true });
   fs.writeFileSync(path.join(repo, 'CLAUDE.md'), '@AGENTS.md\n');
 
   return repo;
@@ -53,11 +52,13 @@ test('this repository hosts the adapter on itself, which is the only test the me
 test('a missing hook and missing settings are both named, with what to do', (t) => {
   const findings = adapterFindings(repository(t, 'adapter-bare-'));
 
-  assert.equal(findings.length, 4);
+  assert.equal(findings.length, 6);
   assert.match(findings.join('\n'), /\.claude\/settings\.json is missing/);
   assert.match(findings.join('\n'), /\.claude\/hooks\/load-instructions\.mjs is missing/);
   assert.match(findings.join('\n'), /\.claude\/hooks\/build-flags\.mjs is missing/);
   assert.match(findings.join('\n'), /\.claude\/hooks\/subagent-model\.mjs is missing/);
+  assert.match(findings.join('\n'), /\.claude\/hooks\/ensure-user-guard\.mjs is missing/);
+  assert.match(findings.join('\n'), /\.claude\/hooks\/lib\/user-guard-install\.mjs is missing/);
 });
 
 test('a hook copy that has drifted is caught — that is the whole reason this tool exists', (t) => {
