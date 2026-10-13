@@ -127,6 +127,7 @@ export function validateFixture(fixture,label="fixture") {
   const bad=message=>{throw new Error(`${label}: ${message}`);};
   if(!fixture||typeof fixture!=="object")bad("not an object");
   for(const key of ["name","prompt"])if(typeof fixture[key]!=="string"||!fixture[key])bad(`"${key}" must be a non-empty string`);
+  if(typeof fixture.loadRules!=="boolean")bad('"loadRules" must be true or false');
   if(typeof fixture.tools!=="string")bad('"tools" must be a string (comma-separated, "" for none)');
   const {caps}=fixture;
   for(const key of ["maxBudgetUsd","timeoutMs","maxOutputBytes","maxReportBytes"])

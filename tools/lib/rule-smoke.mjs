@@ -167,12 +167,21 @@ export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
  * Argument list of a behaviour run. Caps and the tool set come from the fixture, never from constants here.
  * Bash is narrowed to node and a rev-parse; every other offered tool is allowed outright (disposable worktree).
  */
-export function behaviourCliArgs(fixture,prompt,prefix=[]) {
-  const tools=fixture.tools.split(",").map(name=>name.trim()).filter(Boolean);
-  const allowed=tools.flatMap(name=>name==="Bash"?["Bash(node *)","Bash(git rev-parse *)","Bash(pwd)"]:[name]);
+export function behaviourCliArgs(fixture,prompt,prefix=[],resolver="") {
+  const offered=fixture.tools.split(",").map(name=>name.trim()).filter(Boolean);
+  const loading=fixture.loadRules?loadingTools(resolver):{tools:[],allowed:[]};
+  const tools=[...new Set([...offered,...loading.tools])];
+  const allowed=[...new Set([...offered.flatMap(name=>name==="Bash"?["Bash(node *)","Bash(git rev-parse *)","Bash(pwd)"]:[name]),...loading.allowed])];
   return [...prefix,"-p","--no-session-persistence","--output-format","stream-json","--verbose",
     "--max-budget-usd",String(fixture.caps.maxBudgetUsd),"--tools",tools.join(","),
     ...(allowed.length?["--allowedTools",...allowed]:[]),"--",prompt];
+}
+
+/** Tools the rule loading needs: Read, and Bash narrowed to the resolver's explain and read verbs. */
+function loadingTools(resolver) {
+  if(!resolver)throw new Error("A rule-loading fixture needs the resolver path");
+  const invocation=`node "${forwardSlashes(resolver)}"`;
+  return {tools:["Bash","Read"],allowed:["Read",...["explain","read"].map(verb=>`Bash(${invocation} ${verb} *)`)]};
 }
 
 function changedPaths(root) {
@@ -190,12 +199,14 @@ export async function behaviourSmoke({repo,fixture:fixtureName,cli:explicitCli})
   const fixture=loadFixture(root,fixtureName);
   const scope=fixture.files.map(targetPath);
   const resolver=smokeResolver(root);
-  execFileSync(process.execPath,[resolver,"explain","--repo",root,"--task","implement",...scope.flatMap(file=>["--file",file])],{encoding:"utf8",timeout:10000,maxBuffer:262144});
+  const manifest=JSON.parse(execFileSync(process.execPath,[resolver,"explain","--repo",root,"--task","implement",...scope.flatMap(file=>["--file",file])],{encoding:"utf8",timeout:10000,maxBuffer:262144}));
+  const expected=manifest.rules.map(rule=>({...rule,text:normalizedText(within(root,rule.source))}));
+  const prompt=loadingPrompt(fixture,{resolver,root});
   const executable=installedCli("claude",explicitCli);
   const label=`behaviour-${fixture.name}`;
   const {report,lock,save}=smokeReports(root,label,fixture.caps.maxReportBytes);
   const initial={status:"incomplete: running",agent:"claude",mode:"behaviour",fixture:fixture.name,platform:process.platform,
-    started:new Date().toISOString(),pid:process.pid,report,caps:fixture.caps,promptHash:sha256(fixture.prompt)};
+    started:new Date().toISOString(),pid:process.pid,report,caps:fixture.caps,promptHash:sha256(prompt)};
   const controller=new AbortController();
   const cancel=()=>controller.abort();
   process.once("SIGINT",cancel);process.once("SIGTERM",cancel);
@@ -203,9 +214,9 @@ export async function behaviourSmoke({repo,fixture:fixtureName,cli:explicitCli})
   try {
     const before=changedPaths(root);
     save(initial);
-    const result=await run(executable.command,behaviourCliArgs(fixture,fixture.prompt,executable.prefix),
+    const result=await run(executable.command,behaviourCliArgs(fixture,prompt,executable.prefix,resolver),
       {cwd:root,timeoutMs:fixture.caps.timeoutMs,maxOutputBytes:fixture.caps.maxOutputBytes,containTree:true,signal:controller.signal});
-    const outcome=await behaviourOutcome({fixture,root,result,before,initial});
+    const outcome=await behaviourOutcome({fixture,root,result,before,initial,expected,origin:{resolver,cwd:root,repo:root}});
     save(outcome);
     return outcome;
   } finally {
@@ -213,6 +224,42 @@ export async function behaviourSmoke({repo,fixture:fixtureName,cli:explicitCli})
     process.removeListener("SIGINT",cancel);process.removeListener("SIGTERM",cancel);
     fs.unlinkSync(lock);
   }
+}
+
+export const GATE_RULE="common.subagent-models";
+
+/** Rule ids of `expected` whose complete canonical body a successful resolver read in the trace delivered. */
+function rulesReadIn(out,expected,origin) {
+  const found=traceEvidence("claude",out,expected,origin);
+  return found.reads.filter(read=>read.complete).map(read=>read.id);
+}
+
+/**
+ * Pure verdict of a behaviour trace. A fixture that loads rules is never judged on a rule the session did not
+ * read completely: that is `inconclusive`, whatever the answers or launches were.
+ */
+export function judgeBehaviour({fixture,out,expected,origin}) {
+  const {events,parseFailed}=parseEvents(out);
+  const evidence=delegationEvidence(events,{marker:DENY_MARKER});
+  const verdict=behaviourVerdict(evidence,fixture.expectation);
+  const rulesRead=fixture.loadRules?rulesReadIn(out,expected,origin):[];
+  if(fixture.loadRules&&!rulesRead.includes(GATE_RULE))
+    return {evidence,verdict:{outcome:"inconclusive",reasons:[`rule ${GATE_RULE} was not loaded`]},parseFailed,rulesRead};
+  return {evidence,verdict,parseFailed,rulesRead};
+}
+
+const forwardSlashes=value=>value.replaceAll("\\","/");
+
+/** The loading instruction put before a rule-loading fixture's own prompt (style of the inspect smoke). */
+export function loadingPrompt(fixture,{resolver,root}) {
+  if(!fixture.loadRules)return fixture.prompt;
+  const node=`node "${forwardSlashes(resolver)}"`,repo=`--repo "${forwardSlashes(root)}"`;
+  const files=fixture.files.map(file=>`--file ${file}`).join(" ");
+  return `First load this repository's rules for the task through the resolver. Run \`${node} explain ${repo} --task implement ${files}\`, `
+    +`then run \`${node} read ${repo} --task implement ${files} --only <id>\` for each selected rule id (the whole payload is too large for one read). `
+    +`One command per tool call; do not prefix cd, do not chain or combine shell commands. Only after every selected rule is read, do the task below.
+
+${fixture.prompt}`;
 }
 
 function parseEvents(out) {
@@ -227,7 +274,7 @@ async function postCheck(fixture,root) {
   return {ran:true,ok:done.code===0};
 }
 
-async function behaviourOutcome({fixture,root,result,before,initial}) {
+async function behaviourOutcome({fixture,root,result,before,initial,expected,origin}) {
   const {events,parseFailed}=parseEvents(result.out);
   const evidence=delegationEvidence(events,{marker:DENY_MARKER});
   const verdict=behaviourVerdict(evidence,fixture.expectation);
@@ -241,6 +288,6 @@ async function behaviourOutcome({fixture,root,result,before,initial}) {
   const outcomeName=verdict.outcome==="pass"&&reasons.length?"fail":verdict.outcome;
   return {...initial,status:`behaviour ${outcomeName}`,outcome:outcomeName,reasons,changed,postCheck:post,
     exitCode:result.code,timedOut:result.timedOut,overflow:result.overflow,cancelled:result.cancelled,spawnFailed:result.spawnFailed,
-    evidence:{...evidence,launches:evidence.launches.map(launch=>({...launch,prompt:launch.prompt.slice(0,300)}))},
+    evidence:{...evidence,rulesRead,launches:evidence.launches.map(launch=>({...launch,prompt:launch.prompt.slice(0,300)}))},
     traceBytes:Buffer.byteLength(result.out),traceHash:sha256(result.out)};
 }

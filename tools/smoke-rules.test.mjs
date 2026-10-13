@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {traceEvidence,smokeResolver,installedCli,snapshot,behaviourCliArgs,behaviourSmoke} from "./lib/rule-smoke.mjs";
+import {traceEvidence,smokeResolver,installedCli,snapshot,behaviourCliArgs,behaviourSmoke,judgeBehaviour,loadingPrompt} from "./lib/rule-smoke.mjs";
 import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
 import {delegationEvidence} from "./lib/rule-trace.mjs";
@@ -220,15 +220,15 @@ test("a fixture without caps, tools or an expectation is refused with the defect
 });
 test("the caps and the tool set of a run come from the fixture",()=>{
   const fixture=loadNamed("behaviour");
-  const args=behaviourCliArgs(fixture,"PROMPT",["entry.js"]);
+  const args=behaviourCliArgs(fixture,"PROMPT",["entry.js"],"C:/r/tools/rules.mjs");
   assert.equal(args[0],"entry.js");
   assert.equal(args[args.indexOf("--max-budget-usd")+1],String(fixture.caps.maxBudgetUsd));
   assert.equal(args[args.indexOf("--tools")+1],fixture.tools);
   assert.equal(args.at(-1),"PROMPT");
   assert.equal(args.includes("Agent"),true,"the Agent tool is offered");
   assert.equal(args.includes("Bash"),false,"Bash is narrowed, never allowed outright");
-  const none=behaviourCliArgs(loadNamed("classification"),"P");
-  assert.equal(none.includes("--allowedTools"),false,"a toolless fixture allows nothing");
+  const none=behaviourCliArgs({...loadNamed("classification"),loadRules:false},"P");
+  assert.equal(none.includes("--allowedTools"),false,"a toolless fixture that loads nothing allows nothing");
   assert.equal(none[none.indexOf("--tools")+1],"");
 });
 test("the negative fixture expects one unmodelled launch, one denial and no child",()=>{
@@ -274,4 +274,63 @@ test("the toy passes its own checks before any change and stays out of npm test'
   assert.equal(done.status,0,done.stdout+done.stderr);
   assert.doesNotMatch(path.basename(toy),/\.test\.|-test\.|^test-|^test\.mjs$/);
   assert.equal(fs.readdirSync(new URL("toy/",fixtureDir)).sort().join(),"README.md,args.mjs,config.mjs,format.mjs,toy-checks.mjs");
+});
+
+// ---- defect: a behaviour verdict must never pass or fail a rule the session did not load ----
+const SUBAGENT_RULE_TEXT="Subagent models: the sonnet/opus table.\n";
+const subagentRule={id:"common.subagent-models",text:SUBAGENT_RULE_TEXT,hash:sha256(SUBAGENT_RULE_TEXT)};
+const subagentPayload=`BEGIN RULE ${subagentRule.id} sha256:${subagentRule.hash}\n${SUBAGENT_RULE_TEXT}\nEND RULE ${subagentRule.id}`;
+const classificationRight=["sonnet","opus","opus","sonnet","opus","sonnet","fable","main","sonnet","sonnet","sonnet"];
+const loadReadCommand=`node "${origin.resolver.replaceAll("\\","/")}" read --repo "${origin.repo.replaceAll("\\","/")}" --task implement --only ${subagentRule.id}`;
+function classificationTrace({read}) {
+  const events=withoutLaunches(derive(trace=>{trace.at(-1).result=JSON.stringify(classificationRight);return trace;}));
+  events.at(-1).subagent_stats={spawned:0,completed:0,requested:{background:0,foreground:0}};
+  if(read) {
+    events.splice(0,0,
+      {type:"assistant",parent_tool_use_id:null,message:{content:[{type:"tool_use",id:"load-1",name:"Bash",input:{command:loadReadCommand}}]}},
+      {type:"user",parent_tool_use_id:null,message:{content:[{type:"tool_result",tool_use_id:"load-1",is_error:false,content:read===true?subagentPayload:read}]}});
+  }
+  return events.map(event=>JSON.stringify(event)).join("\n");
+}
+const judge=(read,fixture=loadNamed("classification"))=>judgeBehaviour({fixture,out:classificationTrace({read}),expected:[subagentRule],origin});
+
+test("correct answers without a read of the rule are inconclusive, never a pass",()=>{
+  const judged=judge(false);
+  assert.equal(judged.verdict.outcome,"inconclusive");
+  assert.match(judged.verdict.reasons.join(),/rule common\.subagent-models was not loaded/);
+  assert.deepEqual(judged.rulesRead,[]);
+});
+test("correct answers after a complete read of the rule pass and record the rule as read",()=>{
+  const judged=judge(true);
+  assert.deepEqual(judged.verdict,{outcome:"pass",reasons:[]});
+  assert.deepEqual(judged.rulesRead,["common.subagent-models"]);
+});
+test("a partial body of the rule is inconclusive",()=>{
+  const judged=judge(subagentPayload.replace("sonnet/opus table","sonnet/opus"));
+  assert.equal(judged.verdict.outcome,"inconclusive");
+  assert.deepEqual(judged.rulesRead,[]);
+});
+test("a fixture that loads no rules is judged without the gate",()=>{
+  const judged=judgeBehaviour({fixture:{...loadNamed("classification"),loadRules:false},out:classificationTrace({read:false}),expected:[subagentRule],origin});
+  assert.equal(judged.verdict.outcome,"pass");
+});
+test("every fixture states whether it loads rules, and validation requires the key",()=>{
+  assert.deepEqual(fixtureNames.map(name=>loadNamed(name).loadRules),[false,true,true]);
+  assert.throws(()=>validateFixture({...loadNamed("negative"),loadRules:undefined}),/loadRules/);
+});
+test("a rule-loading classification run offers only Read and the two resolver patterns, never Agent",()=>{
+  const resolver="C:/r/tools/rules.mjs";
+  const args=behaviourCliArgs(loadNamed("classification"),"P",[],resolver);
+  const tools=args[args.indexOf("--tools")+1].split(",");
+  assert.deepEqual(tools.sort(),["Bash","Read"]);
+  const allowed=args.slice(args.indexOf("--allowedTools")+1,args.indexOf("--"));
+  assert.deepEqual(allowed,["Read",'Bash(node "C:/r/tools/rules.mjs" explain *)','Bash(node "C:/r/tools/rules.mjs" read *)']);
+  assert.equal(args.includes("Agent"),false);
+});
+test("the loading prompt names the explain and read commands for the fixture's files",()=>{
+  const prompt=loadingPrompt(loadNamed("classification"),{resolver:"C:/r/tools/rules.mjs",root:"C:/r"});
+  assert.match(prompt,/--task implement/);
+  assert.match(prompt,/tools\/fixtures\/behaviour\/toy\/format\.mjs/);
+  assert.match(prompt,/--only <id>/);
+  assert.ok(prompt.endsWith(loadNamed("classification").prompt));
 });
