@@ -8,7 +8,7 @@ import {run} from "./proc.mjs";
 import {bootstrap} from "./rule-cli.mjs";
 import {traceEvidence,delegationEvidence} from "./rule-trace.mjs";
 import {roleRowsOf} from "./rule-roles.mjs";
-import {behaviourVerdict,loadFixture,DENY_MARKER} from "./rule-behaviour.mjs";
+import {behaviourVerdict,loadFixture,changedFilesReasons,DENY_MARKER} from "./rule-behaviour.mjs";
 export {traceEvidence} from "./rule-trace.mjs";
 
 export function smokeResolver(root) {
@@ -285,18 +285,22 @@ async function postCheck(fixture,root) {
   return {ran:true,ok:done.code===0};
 }
 
+/** Report form of the launches: whole when the fixture asks (a judge audits the assigned work), else prompts cut to 300 characters. */
+export function recordedLaunches(fixture,launches) {
+  return launches.map(launch=>fixture.recordFullPrompts?{...launch}:{...launch,prompt:launch.prompt.slice(0,300)});
+}
+
 async function behaviourOutcome({fixture,root,result,before,initial,expected,origin}) {
   const {evidence,verdict,parseFailed,rulesRead}=judgeBehaviour({fixture,out:result.out,expected,origin,root});
-  const expectedChanged=[...(fixture.expectation.changedFiles??[])].sort(codeUnitOrder);
   const changed=changedSince(before,changedPaths(root));
   const reasons=[...verdict.reasons];
   if(parseFailed)reasons.push("the trace could not be decoded");
-  if(JSON.stringify(changed)!==JSON.stringify(expectedChanged))reasons.push(`changed files ${JSON.stringify(changed)}, expected ${JSON.stringify(expectedChanged)}`);
+  reasons.push(...changedFilesReasons(fixture.expectation.changedFiles,changed));
   const post=verdict.outcome==="inconclusive"?{ran:false,ok:true}:await postCheck(fixture,root);
   if(!post.ok)reasons.push("the post-run check failed");
   const outcomeName=verdict.outcome==="pass"&&reasons.length?"fail":verdict.outcome;
   return {...initial,status:`behaviour ${outcomeName}`,outcome:outcomeName,reasons,changed,postCheck:post,
     exitCode:result.code,timedOut:result.timedOut,overflow:result.overflow,cancelled:result.cancelled,spawnFailed:result.spawnFailed,
-    evidence:{...evidence,rulesRead,launches:evidence.launches.map(launch=>({...launch,prompt:launch.prompt.slice(0,300)}))},
+    evidence:{...evidence,rulesRead,launches:recordedLaunches(fixture,evidence.launches)},
     traceBytes:Buffer.byteLength(result.out),traceHash:sha256(result.out)};
 }

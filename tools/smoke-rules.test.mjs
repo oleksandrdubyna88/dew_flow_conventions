@@ -1,10 +1,10 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {traceEvidence,smokeResolver,installedCli,snapshot,behaviourCliArgs,behaviourSmoke,judgeBehaviour,loadingPrompt} from "./lib/rule-smoke.mjs";
+import {traceEvidence,smokeResolver,installedCli,snapshot,behaviourCliArgs,behaviourSmoke,recordedLaunches,judgeBehaviour,loadingPrompt} from "./lib/rule-smoke.mjs";
 import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
 import {delegationEvidence} from "./lib/rule-trace.mjs";
-import {behaviourVerdict,validateFixture,loadFixture,runBehaviourSequence,BEHAVIOUR_ORDER,DENY_MARKER} from "./lib/rule-behaviour.mjs";
+import {behaviourVerdict,validateFixture,loadFixture,changedFilesReasons,runBehaviourSequence,BEHAVIOUR_ORDER,DENY_MARKER} from "./lib/rule-behaviour.mjs";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -442,7 +442,7 @@ test("the classification fixture loads only the rule under test, with the measur
   assert.match(fixture.caps.capsNote,/overflowed 262144 B/);
   const full=loadNamed("behaviour");
   assert.equal(full.loadOnly,undefined);
-  assert.deepEqual([full.caps.maxOutputBytes,full.caps.maxBudgetUsd,full.caps.timeoutMs,full.caps.maxReportBytes,full.caps.measured],[8388608,10,1800000,65536,true]);
+  assert.deepEqual([full.caps.maxOutputBytes,full.caps.maxBudgetUsd,full.caps.timeoutMs,full.caps.maxReportBytes,full.caps.measured],[8388608,10,1800000,262144,true]);
 });
 
 // ---- the real code path: behaviourSmoke end to end with a fake claude, no paid run ----
@@ -463,4 +463,52 @@ test("behaviourSmoke runs end to end against a fake claude in a disposable workt
   assert.match(outcome.status,/^behaviour (pass|fail|inconclusive)$/);
   assert.equal(outcome.exitCode,0);
   assert.deepEqual(outcome.evidence.rulesRead,[]);
+});
+
+const TOY="tools/fixtures/behaviour/toy/";
+const toyScope=()=>loadNamed("behaviour").expectation.changedFiles;
+test("the behaviour fixture accepts run 7's changed set: parser, config, format, checks and README",()=>{
+  const changed=["README.md","args.mjs","config.mjs","format.mjs","toy-checks.mjs"].map(name=>TOY+name);
+  assert.deepEqual(changedFilesReasons(toyScope(),changed),[]);
+});
+test("a change outside the toy directory fails the changed-files check",()=>{
+  const changed=[TOY+"format.mjs",TOY+"toy-checks.mjs","tools/lib/rule-smoke.mjs"];
+  assert.match(changedFilesReasons(toyScope(),changed).join(),/outside .*tools\/lib\/rule-smoke\.mjs/);
+});
+test("leaving format.mjs untouched fails the changed-files check",()=>{
+  assert.match(changedFilesReasons(toyScope(),[TOY+"args.mjs",TOY+"toy-checks.mjs"]).join(),/unchanged.*format\.mjs/);
+});
+test("the exact-array form of changedFiles still means exactly that set",()=>{
+  assert.deepEqual(changedFilesReasons([],[]),[]);
+  assert.deepEqual(changedFilesReasons(["b","a"],["a","b"]),[]);
+  assert.match(changedFilesReasons(["a"],["a","b"])[0],/expected/);
+});
+
+test("behaviourSmoke handles an object-shaped changedFiles end to end (the caller path, not just the helper)",async t=>{
+  const home=fs.mkdtempSync(path.join(os.tmpdir(),"smoke-e2e-obj-"));
+  const worktree=path.join(home,"wt");
+  const top=git(process.cwd(),"rev-parse","--show-toplevel");
+  git(top,"worktree","add","--detach",worktree,"HEAD");
+  const modules=path.join(worktree,"node_modules");
+  fs.symlinkSync(path.join(top,"node_modules"),modules,"junction");
+  t.after(()=>{
+    try {fs.rmdirSync(modules);git(top,"worktree","remove","--force",worktree);} finally {fs.rmSync(home,{recursive:true,force:true});git(top,"worktree","prune");}
+  });
+  const negative=loadNamed("negative");
+  const fixtureFile=path.join(home,"object-shaped.json");
+  fs.writeFileSync(fixtureFile,JSON.stringify({...negative,name:"object-shaped",expectation:{...negative.expectation,changedFiles:{within:"tools/fixtures/behaviour/toy/",mustInclude:[]}}}));
+  const fake=path.join(home,"fake-claude.mjs");
+  const canned=fileURLToPath(new URL("./fixtures/traces/two-children.jsonl",import.meta.url));
+  fs.writeFileSync(fake,`import fs from "node:fs";process.stdout.write(fs.readFileSync(${JSON.stringify(canned)},"utf8"));`);
+  const outcome=await behaviourSmoke({repo:worktree,fixture:fixtureFile,cli:fake});
+  assert.match(outcome.status,/^behaviour (pass|fail|inconclusive)$/);
+  assert.deepEqual(outcome.changed,[]);
+});
+test("evidence keeps the full prompt and description when the fixture asks, and 300 characters otherwise",()=>{
+  const launch={description:"Scout: "+"d".repeat(400),prompt:"p".repeat(1000)};
+  const full=recordedLaunches({recordFullPrompts:true},[launch])[0];
+  assert.equal(full.prompt.length,1000);
+  assert.equal(full.description.length,407);
+  const cut=recordedLaunches({},[launch])[0];
+  assert.equal(cut.prompt.length,300);
 });

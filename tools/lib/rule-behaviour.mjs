@@ -162,8 +162,29 @@ export function validateFixture(fixture,label="fixture") {
   if(!validCount(expectation.children??0,0))bad("expectation.children must be an integer or {min, max}");
   for(const group of asArray(expectation.groups))
     if(group.after!==undefined&&!asArray(expectation.groups).some(other=>other.name===group.after&&other!==group))bad(`group "${group.name}": "after" names no other group`);
-  if(expectation.changedFiles!==undefined&&!Array.isArray(expectation.changedFiles))bad("expectation.changedFiles must be an array");
+  if(!validChangedFiles(expectation.changedFiles))bad('expectation.changedFiles must be an array or {"within": "dir/", "mustInclude": [paths]}');
   return fixture;
+}
+
+function validChangedFiles(spec) {
+  if(spec===undefined||Array.isArray(spec))return true;
+  const strings=list=>Array.isArray(list)&&list.every(item=>typeof item==="string");
+  return spec!==null&&typeof spec==="object"&&typeof spec.within==="string"&&spec.within.length>0&&strings(spec.mustInclude??[]);
+}
+
+/**
+ * Why the changed paths break the expectation (empty = fine). An array is the exact set; the
+ * {within, mustInclude} form accepts any change inside `within` that touches every mustInclude path.
+ */
+export function changedFilesReasons(spec,changed) {
+  if(!Array.isArray(spec)&&spec!==undefined&&spec!==null){
+    const outside=changed.filter(file=>!file.startsWith(spec.within));
+    const missing=(spec.mustInclude??[]).filter(file=>!changed.includes(file));
+    return [...outside.length?[`changed files outside ${spec.within}: ${JSON.stringify(outside)}`]:[],
+      ...missing.length?[`required files unchanged: ${JSON.stringify(missing)}`]:[]];
+  }
+  const expected=[...(spec??[])].sort();
+  return JSON.stringify(changed)===JSON.stringify(expected)?[]:[`changed files ${JSON.stringify(changed)}, expected ${JSON.stringify(expected)}`];
 }
 
 /** A fixture by name (`negative`) or by path; the name resolves under tools/fixtures/behaviour. */
