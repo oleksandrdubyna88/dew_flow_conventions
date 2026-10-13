@@ -56,6 +56,21 @@ Two anti-patterns this exists to stop, both observed: a growth bound described i
 assumed by this one without a link (the two then disagree — one deletes on finish, the other needs the
 artefact back later), and a state machine whose non-terminal state has no timeout.
 
+### A plan split into epics and stories
+
+One layout, because three namings for one practice were found across the family:
+
+- **The epics are the last section of the plan file**, `## Epics`: per epic a goal, its scope, what it depends on,
+  done-when, and the areas that are cornerstones. The section carries the cornerstone ledger line
+  `Cornerstones: k of Q — <story>, <story>`.
+- **Each epic's stories are one document**, `todo/PLAN_<topic>_E<n>.md`, written when that epic starts — not all at
+  once. It opens with its own status line and links its parent plan; the parent's epic links back (the both-sides rule
+  below). A story that is a cornerstone says so, and the commit that marks it updates the ledger.
+- **Each stories document is a plan of its own to the checker**: it gets its own `todo/README.md` row, and on promotion
+  its own `research/README.md` mention. Parent and stories documents promote together.
+- Existing files under other names are not renamed. Who writes each part is
+  [subagent-models.md](subagent-models.md)'s, not this rule's.
+
 ## Promoting a finished plan
 
 1. `git mv todo/PLAN_x.md research/PLAN_x.md`

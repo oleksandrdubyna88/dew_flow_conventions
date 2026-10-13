@@ -412,9 +412,11 @@ invisible to every check except the smoke itself, which can only test the text i
 false-assurance risk is answered by the requirements above rather than by a stronger model. The installer stays an
 Opus-spec story, now carrying the consultant's requirements.
 
-Cornerstones: 0 of 2 marked — the stories documents mark them (§3.1, the ledger).
+Cornerstones: 2 of 2 — E1.S1 (the rule text), E2.S1 (the hook contract with the host).
 
 ### E1 — The text: the rule rewritten, the layout written down
+
+Stories: [PLAN_subagent_model_tiers_E1.md](PLAN_subagent_model_tiers_E1.md).
 
 - **Goal.** `common/subagent-models.md` states D1–D6 and D12 once (§3.1); `common/planning-docs.md` gains the epic/story
   section (§3.3). Nothing executes yet; this is the text every other epic quotes.
@@ -432,6 +434,8 @@ Cornerstones: 0 of 2 marked — the stories documents mark them (§3.1, the ledg
   `todo/`, and `_E<n>.md` matches its pattern — the fixture run will say so; the new section should say it too.
 
 ### E2 — The guard: the hook, its tests, its installer, the harness inventory
+
+Stories: [PLAN_subagent_model_tiers_E2.md](PLAN_subagent_model_tiers_E2.md).
 
 - **Goal.** §3.2 as code in this repository: `settings/hooks/subagent-model.mjs` wired in `settings/settings.json`, copied
   onto this repository itself, demanded by `adapter-check`, with an installer that can put it into a user home.
