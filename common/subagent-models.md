@@ -18,10 +18,13 @@ tasks: ["audit","plan","implement","docs","policy","test","git","pr","release","
 | Scout | sonnet | search, research, evidence — logs, a reproduction, what a file says, a file list. ⌈1.5·N⌉ of them where N would have run on Opus (1→2, 2→3, 3→5), each with its own focus |
 | Coder | sonnet | code, fixes, review fixes, unit and integration tests |
 | Small edit | main session or sonnet | one file, at most 50 changed lines, bounded BEFORE the first edit (definition below). The exception permits; it never obliges |
-| Judge | opus | reviewer, architect, finding verifier, test scenarios, the brief that says what to change and how, splitting an epic into stories |
+| Judge | opus | reviewer, architect, any design or proposal, finding verifier, test scenarios, the brief that says what to change and how, splitting an epic into stories |
 | Plan → epics | fable | splitting a plan into epics and naming the cornerstone areas, after the question consultant was asked what is important |
 | Security judgement | fable | cryptography, authentication, authorisation — outside any quota |
 | Cornerstone spec | fable | the scenarios and brief of a cornerstone story, at most ⌈2·E/5⌉ per plan of E epics (1–2 → 1, 3–5 → 2, 6–7 → 3). Fable writes the spec, Sonnet codes, Opus reviews as for every story |
+
+Fable has exactly the three rows above. A design, an architecture or a proposal outside them is a judge's — Opus;
+between Opus and Fable, in doubt, Opus.
 
 ## The pipeline — who acts at each step
 
@@ -86,9 +89,7 @@ freeze an alias from outside either — `ANTHROPIC_DEFAULT_*_MODEL`, `CLAUDE_COD
 
 Precedence (the host's documentation, read 2026-10-13), highest first: the call's `model` argument →
 the agent definition's frontmatter → `CLAUDE_CODE_SUBAGENT_MODEL` → the session's model; `…_FORCE=1`
-puts the variable on top. So the argument beats every default. The built-in `Explore` and
-`general-purpose` agents inherit the session's model: an unnamed scout in an Opus session runs on
-Opus — money, not quality.
+puts the variable on top. Built-in `Explore` and `general-purpose` inherit the session's model.
 
 **A plugin's frontmatter is not a decision.** Measured 2026-09-12, re-checked 2026-10-13 across the 14
 cached versions: the `feature-dev` plugin pins `model: sonnet` in all three of its agents
