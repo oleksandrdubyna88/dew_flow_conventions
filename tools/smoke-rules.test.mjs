@@ -454,7 +454,7 @@ test("behaviourSmoke runs end to end against a fake claude in a disposable workt
   const modules=path.join(worktree,"node_modules");
   fs.symlinkSync(path.join(top,"node_modules"),modules,"junction");
   t.after(()=>{
-    try {fs.rmdirSync(modules);git(top,"worktree","remove","--force",worktree);} finally {fs.rmSync(home,{recursive:true,force:true});git(top,"worktree","prune");}
+    try {removeLink(modules);git(top,"worktree","remove","--force",worktree);} finally {fs.rmSync(home,{recursive:true,force:true});git(top,"worktree","prune");}
   });
   const fake=path.join(home,"fake-claude.mjs");
   const canned=fileURLToPath(new URL("./fixtures/traces/two-children.jsonl",import.meta.url));
@@ -492,7 +492,7 @@ test("behaviourSmoke handles an object-shaped changedFiles end to end (the calle
   const modules=path.join(worktree,"node_modules");
   fs.symlinkSync(path.join(top,"node_modules"),modules,"junction");
   t.after(()=>{
-    try {fs.rmdirSync(modules);git(top,"worktree","remove","--force",worktree);} finally {fs.rmSync(home,{recursive:true,force:true});git(top,"worktree","prune");}
+    try {removeLink(modules);git(top,"worktree","remove","--force",worktree);} finally {fs.rmSync(home,{recursive:true,force:true});git(top,"worktree","prune");}
   });
   const negative=loadNamed("negative");
   const fixtureFile=path.join(home,"object-shaped.json");
@@ -527,7 +527,7 @@ test("behaviourSmoke refuses a worktree that already carries an uncommitted chan
   git(top,"worktree","add","--detach",worktree,"HEAD");
   const modules=path.join(worktree,"node_modules");
   fs.symlinkSync(path.join(top,"node_modules"),modules,"junction");
-  t.after(()=>{try {fs.rmdirSync(modules);git(top,"worktree","remove","--force",worktree);} finally {fs.rmSync(home,{recursive:true,force:true});git(top,"worktree","prune");}});
+  t.after(()=>{try {removeLink(modules);git(top,"worktree","remove","--force",worktree);} finally {fs.rmSync(home,{recursive:true,force:true});git(top,"worktree","prune");}});
   const tracked=path.join(worktree,"tools/fixtures/behaviour/toy/format.mjs");
   fs.appendFileSync(tracked,"\n// dirty\n");
   const marker=path.join(home,"launched");
