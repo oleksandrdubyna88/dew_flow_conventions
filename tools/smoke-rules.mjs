@@ -12,10 +12,11 @@ try {
     else throw new Error(`Unknown option: ${key}`);
   }
   if(options.fixture) {
-    // pass 0 · fail 1 · inconclusive 2
+    // pass 0 · fail 1 · inconclusive 1 (named in the printed finding; the outcome stays distinct in the report)
     const result=await behaviourSmoke(options);
     console.log(JSON.stringify(result,null,2));
-    process.exitCode={pass:0,fail:1}[result.outcome]??2;
+    if(result.outcome!=="pass")console.error(`smoke-behaviour: ${options.fixture} ${result.outcome} — ${result.reasons.join("; ")||"no reasons recorded"}`);
+    process.exitCode=result.outcome==="pass"?0:1;
   } else {
     const result=await smoke(options);
     console.log(JSON.stringify(result,null,2));

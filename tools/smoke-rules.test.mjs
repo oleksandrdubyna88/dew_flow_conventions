@@ -469,6 +469,33 @@ test("behaviourSmoke runs end to end against a fake claude in a disposable workt
   assert.deepEqual(outcome.evidence.rulesRead,[]);
 });
 
+test("a claude that exits non-zero never passes, even when its trace reads as a pass",async t=>{
+  const home=fs.mkdtempSync(path.join(os.tmpdir(),"smoke-e2e-exit-"));
+  const worktree=path.join(home,"wt");
+  const top=git(process.cwd(),"rev-parse","--show-toplevel");
+  git(top,"worktree","add","--detach",worktree,"HEAD");
+  const modules=path.join(worktree,"node_modules");
+  fs.symlinkSync(path.join(top,"node_modules"),modules,"junction");
+  t.after(()=>{
+    try {removeLink(modules);git(top,"worktree","remove","--force",worktree);} finally {fs.rmSync(home,{recursive:true,force:true});git(top,"worktree","prune");}
+  });
+  const canned=fileURLToPath(new URL("./fixtures/traces/two-children.jsonl",import.meta.url));
+  const fakeWith=code=>{
+    const fake=path.join(home,`fake-claude-${code}.mjs`);
+    fs.writeFileSync(fake,`import fs from "node:fs";process.stdout.write(fs.readFileSync(${JSON.stringify(canned)},"utf8"));process.exitCode=${code};`);
+    return fake;
+  };
+  const negative=loadNamed("negative");
+  const fixtureFile=path.join(home,"passing.json");
+  fs.writeFileSync(fixtureFile,JSON.stringify({...negative,name:"passing",expectation:{...negative.expectation,groups:[{name:"sonnet",model:"sonnet",count:1},{name:"opus",model:"opus",count:1}],denials:0,children:2}}));
+  const clean=await behaviourSmoke({repo:worktree,fixture:fixtureFile,cli:fakeWith(0)});
+  assert.equal(clean.outcome+JSON.stringify(clean.reasons),"pass[]","control: the same trace with exit 0 is a pass");
+  const crashed=await behaviourSmoke({repo:worktree,fixture:fixtureFile,cli:fakeWith(3)});
+  assert.equal(crashed.exitCode,3);
+  assert.equal(crashed.outcome,"inconclusive");
+  assert.match(crashed.reasons.join(),/exited with code 3/);
+});
+
 const TOY="tools/fixtures/behaviour/toy/";
 const toyScope=()=>loadNamed("behaviour").expectation.changedFiles;
 test("the behaviour fixture accepts run 7's changed set: parser, config, format, checks and README",()=>{

@@ -307,6 +307,21 @@ export function recordedLaunches(fixture,launches) {
   return launches.map(launch=>fixture.recordFullPrompts?{...launch}:{...launch,prompt:launch.prompt.slice(0,300)});
 }
 
+/** Why the claude process itself did not finish cleanly; any entry means the run cannot count as a pass. */
+function cliAbnormalReasons(result) {
+  return [
+    result.spawnFailed&&"the claude CLI failed to spawn",
+    result.timedOut&&"the claude CLI timed out",
+    result.overflow&&"the claude CLI output overflowed its cap",
+    result.cancelled&&"the run was cancelled",
+    result.code!==0&&!result.spawnFailed&&!result.timedOut&&!result.overflow&&!result.cancelled&&`the claude CLI exited with code ${result.code}`
+  ].filter(Boolean);
+}
+
+/** A pass needs a clean CLI and no reasons; an unclean CLI downgrades a pass to inconclusive, never to fail. */
+const judgedOutcome=(outcome,hasReasons,cliUnclean)=>
+  outcome!=="pass"?outcome:(cliUnclean?"inconclusive":(hasReasons?"fail":"pass"));
+
 async function behaviourOutcome({fixture,root,result,before,initial,expected,origin}) {
   const {evidence,verdict,parseFailed,rulesRead}=judgeBehaviour({fixture,out:result.out,expected,origin,root});
   const changed=changedSince(before,changedPaths(root));
@@ -315,14 +330,16 @@ async function behaviourOutcome({fixture,root,result,before,initial,expected,ori
   reasons.push(...changedFilesReasons(fixture.expectation.changedFiles,changed));
   const post=verdict.outcome==="inconclusive"?{ran:false,ok:true}:await postCheck(fixture,root);
   if(!post.ok)reasons.push("the post-run check failed");
-  const outcomeName=verdict.outcome==="pass"&&reasons.length?"fail":verdict.outcome;
+  const abnormal=cliAbnormalReasons(result);
+  reasons.push(...abnormal);
+  const outcomeName=judgedOutcome(verdict.outcome,reasons.length>abnormal.length,abnormal.length>0);
   return {...initial,status:`behaviour ${outcomeName}`,outcome:outcomeName,reasons,changed,postCheck:post,
     exitCode:result.code,timedOut:result.timedOut,overflow:result.overflow,cancelled:result.cancelled,spawnFailed:result.spawnFailed,
     evidence:{...evidence,rulesRead,launches:recordedLaunches(fixture,evidence.launches)},
     traceBytes:Buffer.byteLength(result.out),traceHash:sha256(result.out)};
 }
 
-/** Command-line arguments of smoke-behaviour; anything unexpected throws so the caller can exit 2. */
+/** Command-line arguments of smoke-behaviour; anything unexpected throws so the caller can exit 1. */
 export function parseArgs(argv) {
   if(argv.length===0)return {cli:undefined};
   if(argv[0]!=="--cli")throw new Error(`Unknown argument: ${argv[0]}`);
