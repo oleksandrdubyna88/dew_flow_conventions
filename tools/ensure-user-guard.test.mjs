@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { ensureUserGuard, guardVersion } from '../settings/hooks/ensure-user-guard.mjs';
-import { OPTOUT_FILE, targets } from '../settings/hooks/lib/user-guard-install.mjs';
+import { OPTOUT_FILE, findEntries, install, targets } from '../settings/hooks/lib/user-guard-install.mjs';
 
 const ENTRY = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'settings', 'hooks', 'ensure-user-guard.mjs');
 const hookText = version => (version === null ? '// unversioned\n' : `export const GUARD_VERSION = ${version};\n`);
@@ -172,4 +172,29 @@ test('a project hook with uncommitted changes is refused and nothing is written'
   assert.match(r.line, /uncommitted changes/);
   assert.equal(fs.existsSync(s.paths.hook), false);
   assert.equal(fs.existsSync(s.paths.settings), false);
+});
+
+test('a refused install is repaired by the next session even though no version differs', t => {
+  const s = sandbox(t);
+  fs.mkdirSync(path.dirname(s.paths.settings), { recursive: true });
+  fs.writeFileSync(s.paths.settings, '{"model":"opus"}\n');
+  const refused = install({ home: s.home, source: s.source, beforeWrite: () => fs.writeFileSync(s.paths.settings, '{"model":"opus","injected":true}\n') });
+  assert.equal(refused.code, 1);
+  const r = s.ensure();
+  assert.equal(r.action, 'installed');
+  const settings = JSON.parse(fs.readFileSync(s.paths.settings, 'utf8'));
+  assert.equal(settings.injected, true);
+  assert.equal(findEntries(settings, s.paths.hook).length, 1);
+  assert.equal(s.ensure().action, 'none');
+});
+
+test('a current version with a missing registration or manifest is repaired, not skipped', t => {
+  const s = sandbox(t);
+  s.seedInstalled(2);
+  const r = s.ensure();
+  assert.equal(r.action, 'installed');
+  assert.equal(findEntries(JSON.parse(fs.readFileSync(s.paths.settings, 'utf8')), s.paths.hook).length, 1);
+  fs.rmSync(s.paths.manifest);
+  assert.equal(s.ensure().action, 'installed');
+  assert.equal(s.ensure().action, 'none');
 });

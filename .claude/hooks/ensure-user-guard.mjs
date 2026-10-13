@@ -25,7 +25,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
-import { guardVersion, install, targets } from './lib/user-guard-install.mjs';
+import { guardVersion, install, isRegistered, targets } from './lib/user-guard-install.mjs';
 
 export { guardVersion };
 
@@ -42,10 +42,11 @@ const refusal = reason =>
   `subagent-model guard NOT installed into ~/.claude: ${reason}; run node <conventions>/tools/install-user-hook.mjs by hand`;
 
 /** Which action the two versions call for, or `none` when the installed copy is present and current. */
-function plan(installedFile, sourceVersion) {
-  if (!fs.existsSync(installedFile)) return { action: 'installed', from: 0 };
-  const from = versionOf(installedFile);
-  if (from === sourceVersion) return { action: 'none', from };
+function plan(t, sourceVersion) {
+  if (!fs.existsSync(t.hook)) return { action: 'installed', from: 0 };
+  const from = versionOf(t.hook);
+  // An equal version is only "current" when it is also registered and its manifest vouches for the bytes.
+  if (from === sourceVersion) return isRegistered(t) ? { action: 'none', from } : { action: 'installed', from: 0 };
   return { action: from < sourceVersion ? 'upgraded' : 'newer', from };
 }
 
@@ -74,7 +75,7 @@ export function ensureUserGuard({ home, source, env }) {
   const t = targets(home);
   if (optedOut(env) || fs.existsSync(t.optout) || !fs.existsSync(source)) return skipped();
   const to = versionOf(source);
-  const step = plan(t.hook, to);
+  const step = plan(t, to);
   if (step.action === 'none') return { action: 'none', line: '' };
   if (step.action === 'newer') return { action: 'newer', line: newerLine(step.from, to) };
   if (hasUncommittedChanges(source)) return { action: 'refused', line: refusal('the project copy of the hook has uncommitted changes') };

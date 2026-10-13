@@ -61,20 +61,33 @@ export function findEntries(settings, hookPath) {
   return preToolUse(settings).filter(entry => entryIsOurs(entry, hookPath));
 }
 
-/** A copy of `settings` with our entry installed: replaced in place when present, appended otherwise. */
+const allOurs = (entry, hookPath) => entryIsOurs(entry, hookPath) && entry.hooks.every(item => itemIsOurs(item, hookPath));
+
+/** The entry without our handlers; null when nothing of it is left. Foreign handlers keep their group and matcher. */
+function withoutOurs(entry, hookPath) {
+  if (!entryIsOurs(entry, hookPath)) return entry;
+  const hooks = entry.hooks.filter(item => !itemIsOurs(item, hookPath));
+  return hooks.length ? { ...entry, hooks } : null;
+}
+
+/**
+ * A copy of `settings` with exactly one handler of ours. Works on handlers, not groups: ours are removed
+ * from every group (a group is dropped only when that empties it), and our entry goes back where the first
+ * group holding ONLY our handler stood, or is appended when ours shared a group with someone else's.
+ */
 export function mergeEntry(settings, hookPath) {
   const next = structuredClone(settings);
   if (!isObject(next.hooks)) next.hooks = {};
   if (!Array.isArray(next.hooks.PreToolUse)) next.hooks.PreToolUse = [];
   const list = next.hooks.PreToolUse;
-  const at = list.findIndex(e => entryIsOurs(e, hookPath));
-  if (at < 0) {
-    list.push(entryFor(hookPath));
-    return next;
-  }
-  list[at] = entryFor(hookPath);
-  // A hand-made twin collapses into the first copy.
-  next.hooks.PreToolUse = list.filter((e, i) => i <= at || !entryIsOurs(e, hookPath));
+  const home = list.findIndex(e => allOurs(e, hookPath));
+  const out = [];
+  list.forEach((entry, i) => {
+    if (i === home) out.push(entryFor(hookPath));
+    else if (withoutOurs(entry, hookPath) !== null) out.push(withoutOurs(entry, hookPath));
+  });
+  if (home < 0) out.push(entryFor(hookPath));
+  next.hooks.PreToolUse = out;
   return next;
 }
 
@@ -171,6 +184,14 @@ function writeManifest(t, source, sourceBytes, by) {
   writeAtomic(t.manifest, serialise(manifest));
 }
 
+/** True when the installation is registered and its manifest vouches for the installed bytes. */
+export function isRegistered(t) {
+  const parsed = parseSettings(readOrNull(t.settings));
+  const installed = readOrNull(t.hook);
+  const manifest = readManifest(t);
+  return !parsed.error && findEntries(parsed.settings, t.hook).length > 0 && installed !== null && manifest !== null && manifest.sha256 === sha256(installed);
+}
+
 function readManifest(t) {
   try {
     const value = JSON.parse(fs.readFileSync(t.manifest, 'utf8'));
@@ -199,16 +220,17 @@ export function install({ home, source, beforeWrite = () => {}, clearOptout = fa
   const sourceBytes = fs.readFileSync(source);
   const refusal = downgradeRefusal(t, sourceBytes, force);
   if (refusal) return result(1, [refusal]);
-  const upToDate = original !== null && original.equals(Buffer.from(serialise(merged))) && sameBytes(readOrNull(t.hook), sourceBytes);
+  const upToDate = original !== null && original.equals(Buffer.from(serialise(merged))) && sameBytes(readOrNull(t.hook), sourceBytes) && isRegistered(t);
   if (upToDate) return result(0, [...dropOptout(t, clearOptout), 'already installed']);
-  writeAtomic(t.hook, sourceBytes);
-  const lines = [`wrote ${t.hook}`, ...dropOptout(t, clearOptout)];
+  const lines = [...dropOptout(t, clearOptout)];
   if (original !== null) lines.push(`backup ${writeBackup(t.settings, original)}`);
   beforeWrite();
   if (!sameBytes(readOrNull(t.settings), original)) return result(1, [...lines, CHANGED]);
   writeAtomic(t.settings, serialise(merged));
+  // The copy comes AFTER the registration: a refusal above leaves no unregistered hook file behind.
+  writeAtomic(t.hook, sourceBytes);
   writeManifest(t, source, sourceBytes, by);
-  return result(0, [...lines, `wrote ${t.settings} (hooks.PreToolUse: ${MATCHER})`]);
+  return result(0, [`wrote ${t.hook}`, ...lines, `wrote ${t.settings} (hooks.PreToolUse: ${MATCHER})`]);
 }
 
 /** Remove only what `install` added, and leave the opt-out marker so a session does not reinstall it. */

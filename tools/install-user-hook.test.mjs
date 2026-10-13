@@ -282,3 +282,40 @@ test('installing over a NEWER guard is refused without --force and goes through 
   assert.equal(forced.status, 0, forced.stderr);
   assert.match(fs.readFileSync(s.paths.hook, 'utf8'), /= 3;/);
 });
+
+const theirs = { type: 'command', command: 'node', args: ['/x/their-hook.mjs'] };
+
+test('a group shared with another handler survives install, re-install and uninstall intact', t => {
+  const s = sandbox(t);
+  const shared = { matcher: 'Bash|Edit', hooks: [{ type: 'command', command: 'node', args: [s.paths.hook] }, theirs] };
+  s.writeSettings({ hooks: { PreToolUse: [shared] } });
+  assert.equal(s.run('--install').status, 0);
+  const foreign = { matcher: 'Bash|Edit', hooks: [theirs] };
+  const afterInstall = JSON.parse(s.readSettings()).hooks.PreToolUse;
+  assert.deepEqual(afterInstall.filter(e => e.matcher === 'Bash|Edit'), [foreign]);
+  assert.equal(findEntries(JSON.parse(s.readSettings()), s.paths.hook).length, 1);
+  assert.equal(s.run('--install').status, 0);
+  assert.deepEqual(JSON.parse(s.readSettings()).hooks.PreToolUse, afterInstall);
+  assert.equal(s.run('--uninstall').status, 0);
+  assert.deepEqual(JSON.parse(s.readSettings()).hooks.PreToolUse, [foreign]);
+});
+
+test('two duplicate groups of ours plus a foreign handler collapse to one handler of ours', t => {
+  const s = sandbox(t);
+  const mine = { type: 'command', command: 'node', args: [s.paths.hook] };
+  s.writeSettings({ hooks: { PreToolUse: [{ matcher: 'Task', hooks: [mine] }, { matcher: 'Bash', hooks: [mine, theirs] }] } });
+  assert.equal(s.run('--install').status, 0);
+  const list = JSON.parse(s.readSettings()).hooks.PreToolUse;
+  const handlers = list.flatMap(e => e.hooks);
+  assert.equal(handlers.filter(h => h.args[0] === s.paths.hook).length, 1);
+  assert.deepEqual(list.find(e => e.matcher === 'Bash'), { matcher: 'Bash', hooks: [theirs] });
+});
+
+test('a refused install does not leave the hook file or manifest behind', t => {
+  const s = sandbox(t);
+  s.writeSettings({ model: 'opus' });
+  const r = install({ home: s.home, source: s.source, beforeWrite: () => fs.writeFileSync(s.paths.settings, '{"model":"x"}\n') });
+  assert.equal(r.code, 1);
+  assert.equal(fs.existsSync(s.paths.hook), false);
+  assert.equal(fs.existsSync(s.paths.manifest), false);
+});

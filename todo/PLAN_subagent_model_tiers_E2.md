@@ -421,6 +421,15 @@ half), 23, 25, 29 and 30 go red — quote the first failing assertion; restore; 
   marker written by `--uninstall` and cleared by `--install`, `--force`, the provenance manifest, the dirty-source
   refusal, the never-silent newer-installed line; `tools/ensure-user-guard.test.mjs`. NOT wired into any settings file
   here — that is E4.S4, in the release commit.
+- **Handlers, not groups.** The merge and the removal work on OUR handler (identified by `args[0]` = the installed
+  hook path), never on a whole matcher group: a group shared with someone else's handler keeps that handler and its
+  matcher through install, re-install and uninstall, and a group is dropped only when we emptied it.
+- **No silent refusal.** The hook file is copied only AFTER `settings.json` was written, so a refused install leaves
+  nothing behind; and the self-install treats a copy as current only when its version is not older, our registration
+  is in `settings.json`, AND the provenance manifest matches the installed bytes' sha256 — otherwise it repairs.
+- **Decision.** The read-compare-rename window is now opened at session start, not only by an operator: accepted by
+  the operator 2026-10-13 — a write by the host inside those milliseconds would be lost; the self-install runs only
+  when the installed copy is missing, older or unregistered, not on every start.
 
 ## Order
 
