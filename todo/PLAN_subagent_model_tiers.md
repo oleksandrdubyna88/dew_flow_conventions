@@ -128,8 +128,13 @@ One canonical statement; nothing else restates it (two summaries of one rule dri
    brief (Opus; Fable on a cornerstone) → code and tests (Sonnet) → review (Opus) → fixes (Sonnet). The layout itself
    lives in `planning-docs.md` (§3.3); this rule says only who acts.
 3. **Scout or judge — the assigned output decides.** Facts and file lists → scout. Anything that proposes, decides,
-   verifies or reviews → judge, even read-only. A request to research AND propose → split it, or it is a judge. A scout
-   in a security area stays a scout; the Fable or Opus caller decides. *In doubt, it is a judge.*
+   verifies or reviews → judge, even read-only. A request to research AND propose → split it, or it is a judge.
+   **Collecting evidence** — logs, a reproduction, what a file says — is scouting; **determining the cause**, or
+   validating a cause someone proposed, is judging: "investigate why X fails" is a judge unless it is split into
+   "collect the evidence" (scout) and "decide the cause" (caller). A coder running the tests its brief prescribes is
+   still a coder; a separate agent asked whether the change is correct is a judge. Neither the agent's type nor its being
+   read-only changes the class. A scout in a security area stays a scout; the Fable or Opus caller decides. *In doubt,
+   it is a judge* (risk consultation on E1).
 4. **Scouts** — ⌈1.5·N⌉ with distinct focuses written before launch; two scouts with one brief are one scout paid twice;
    the caller opens every file a conclusion rests on (`measurement.md`).
 5. **Coders** — what the brief must carry so a Sonnet coder needs no re-discovery (files, the change, the scenarios to
@@ -145,14 +150,29 @@ One canonical statement; nothing else restates it (two summaries of one rule dri
 
 **Two definitions the text must carry, or two sessions will count differently:**
 
-- *50 changed lines* — added plus removed lines of the ONE file, as `git diff --numstat` counts them, summed over the
-  whole change the session is about to make, not per edit. A second file, or line 51, means a Sonnet coder.
+- *50 changed lines* — a decision made BEFORE the first edit, so it is an eligibility test, not a measurement: the main
+  session may write the change itself only when it can bound the WHOLE patch in advance to one file (tests and new files
+  count as files) and at most 50 added-plus-removed lines against the commit it started from — staging or committing
+  midway does not reset the count. A replaced line counts twice (25 replaced lines are 50). If the size is uncertain,
+  delegate; if the scope grows past the bound while writing, stop and hand the rest to a Sonnet coder with a brief
+  (risk consultation on E1). No helper tool counts it; the rule makes the conservative choice the default.
 - *The cornerstone ledger* — stories documents are written one epic at a time, so the quota is tracked in one place: the
   plan's `## Epics` section carries a line `Cornerstones: k of Q — <story>, <story>`, and the stories document that marks
   one updates it in the same commit. A mark that would make k exceed Q goes to the operator, not into the document.
 
-**Tasks.** Every task except `inspect` (covered by the guard, §2), each added only after E1 measures that it does not push
-a scope that is single-read today over 32 768 B; a test pins the outcome.
+**Tasks — measured, every task, at `750d811`** (`node tools/rules.mjs explain` for each task × no file, `src/x.cs`,
+`src/x.csproj`, `ui/a.ts`, `src/main.rs`, `api/x.http`, `src/App.slnx`). Fourteen tasks are already over 32 768 B in
+every one of those scopes and are read rule by rule with `--only`; adding ~9 KB changes nothing about how they load. Four
+tasks still have single-read scopes, and the rule would push them over: `inspect` (867 B free at `.csproj`), `ui` (439 B
+at `ui/a.ts`), `gpu` (475 B at `src/x.cs`) and `storage` (3 362 B, no file). So the rule is selected for the fourteen
+and **explicitly not** for those four, where the guard's refusal and allowed-call context carry the digest (risk
+consultation on E1, which measured `ui` and `gpu` first). A `rules.test.mjs` case enumerates the exported `TASKS` and
+asserts exactly this split — a new task must be placed on one side by a person, never by default — and asserts that
+every single-read scope of the four still fits.
+
+**What no hook sees.** `Workflow` scripts' `agent()` calls bypass the Agent-tool guard. In the fourteen tasks the rule
+text covers them; in the four excluded tasks nothing does. That gap is stated in the rule, not hidden; closing it (the
+host's `agent.spawn` extension point, which can rewrite a spawn's model) is §6, out of scope.
 
 **Size.** Target ≤ 9 000 B; E1 measures. A rule body may not name a family repository or product
 (`tools/ownership-check.mjs`), so evidence is cited through this repository's `research/RESULTS_subagent_model_tiers.md`.
@@ -256,6 +276,13 @@ or a nested child the fixture did not ask for makes the run **inconclusive** —
 mode has a second, tiny fixture that instructs the session to launch one Agent without a model: it passes only if the
 guard's marker appears. It runs before every behaviour run, so a silent guard turns the run red, not green.
 
+**A classification fixture for the boundaries.** The seven-child run never tests the hard lines of §3.1 item 3, so a
+third, cheap fixture launches nothing: a fresh session is handed paired requests — collect a failure's logs / decide its
+cause; research AND propose, unsplit; a coder's prescribed tests / an independent correctness check; a scout in a
+security area / a security judgement; a one-file 40-line edit / the same edit plus its test file — and must answer a
+model for each before acting. Expected: `sonnet`, `opus`, `opus`, `sonnet`, `opus`, `sonnet`, `fable`, main session,
+`sonnet` (risk consultation on E1). A wrong answer is a defect in the rule text.
+
 **What costs money and what does not.** The trace grouping, the counting and the three outcomes are unit-tested on
 recorded traces (the first real trace is recorded in E4, as E2 records a payload), so `npm test` guards the checker for
 free. The paid run (`npm run smoke:behaviour`, a new script; not in CI) is repeated only when the rule's MEANING changes —
@@ -336,6 +363,9 @@ repository's own `.claude/`), not the user-level install (consultant, cadence ro
 - The `inspect` read budget has 867 B left in the `.csproj` scope; the next rule that must ride in every scope has
   nowhere to go. Trimming the always-loaded rules, or a loader that splits one read, is its own plan.
 - `.rs` and `.http` scopes are already over the single-read limit and depend on the `--only` split.
+- `ui`, `gpu` and `storage` are three tasks a single shared rule away from losing their single read (§3.1, *Tasks*).
+- `Workflow` `agent()` calls are invisible to the Agent-tool guard; the host's `agent.spawn` extension point could
+  enforce the same verdict there — its own plan.
 
 ## 7. Definition of Done
 
