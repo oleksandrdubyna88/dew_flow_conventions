@@ -500,7 +500,10 @@ Stories: [PLAN_subagent_model_tiers_E2.md](PLAN_subagent_model_tiers_E2.md).
   harness preparation — consultant, cadence round.)
 - **Depends on.** E4's cascade complete — every consumer already pins the rewritten rule, so the user-level guard never
   refuses a session that is still reading the old text (gate round 1, accepted); E2's harness preparation is already
-  merged and proved.
+  merged and proved; and the scout calibration — the third measuring harness, on another session's branch — either
+  carries `SUBAGENT_MODEL_GUARD=off` in its allow-list or is not running (benchmark gate round, accepted). Because the
+  self-install fires at the first session after the cascade, the same condition gates E4.S4's wiring of
+  `ensure-user-guard.mjs` into the release commit: it is checked, and stated in the release PR, before that commit.
 - **Done when.** The self-install's one line appeared in the first session after the cascade; in a plain session in another repository an Agent call without `model` is refused with the role table
   and one with `model: "sonnet"` goes through; `node tools/install-user-hook.mjs --check` is clean; the probe's outcome
   (alias key honoured / not / not observable) is in the research record and `~/.claude/settings.json` matches it; the
