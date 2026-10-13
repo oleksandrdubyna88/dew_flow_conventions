@@ -202,7 +202,7 @@ are one line (no `\n`, no `\r`); the dash is U+2014, the dot U+00B7, the arrow i
 Warnings (user-visible, S1.2 step 4; neither contains the marker):
 
 - **W-FREEZE** — `` `Model guard: alias-freezing variable(s) set: ${names.join(', ')}. The rule wants bare aliases that follow the newest model — unset them (common/subagent-models.md).` `` where `names` are the set variables in `FREEZE_VARIABLES` order.
-- **W-OPTOUT** — `` `Model guard: SUBAGENT_MODEL_GUARD=${v} is not an opt-out, the guard stays on; the only opt-out is SUBAGENT_MODEL_GUARD=off.` `` where `v` is the variable's value trimmed (original case) and cut to its first 40 characters.
+- **W-OPTOUT** — `` `Model guard: SUBAGENT_MODEL_GUARD is set but is not an opt-out, the guard stays on; the only opt-out is SUBAGENT_MODEL_GUARD=off.` `` — a fixed sentence that does not echo the value (a value such as `false subagent-models.md:` would otherwise put the deny marker into `systemMessage`).
 
 ### S1.4 — The digest-vs-rule test (`tools/lib/role-table.mjs` + the test)
 
@@ -246,7 +246,7 @@ Warnings (user-visible, S1.2 step 4; neither contains the marker):
 | any throw inside — an env whose property access throws (the Proxy test), a getter that throws | `''`, exit 0: `hookResponse` returns `''`; the entry's own `try/catch` covers `readStdin` |
 | stdin never closed | after `STDIN_DEADLINE_MS` (2 s) the bytes received are judged: a complete payload gets its normal verdict (DENY_JSON or TEACH_JSON, ending in `\n`); an incomplete one `''`. Exit 0, well inside the test's 15 s |
 | stdin over `STDIN_LIMIT` (256 KiB) | `''`, exit 0 — decided by `size > STDIN_LIMIT`, whether or not the whole payload arrived; a call that large is not judged (open point 2) |
-| the host closed the stdout pipe (EPIPE) | exit 0; there is nothing else to do |
+| the host closed the stdout pipe (EPIPE) | exit 0, nothing on stderr: the entry installs `process.stdout.on('error', () => process.exit(0))` and the write callback ignores its error argument and exits 0 |
 
 Every fail-open result is the same two observations — zero bytes on stdout and exit code 0 — one assertion shape for
 all of them, which is the reason no warning rides a fail-open (S1.2, last row).
@@ -284,8 +284,8 @@ Scenarios are in-process unless marked **spawn**.
     → silent; with `ANTHROPIC_DEFAULT_OPUS_MODEL: 'x'` as well → silent and `warnings` deep-equals `[]`.
     `hookResponse('not json', { SUBAGENT_MODEL_GUARD: 'off' })` → `''`.
 15. `SUBAGENT_MODEL_GUARD` unset, `''`, `'on'`, `'ON'` → the payload's verdict with `warnings: []`; `'false'`, `'0'`,
-    `'no'`, `'disabled'` → the payload's kind and text unchanged, `warnings` deep-equals `[W-OPTOUT(value)]`; a value of
-    60 characters → the warning carries its first 40.
+    `'no'`, `'disabled'` → the payload's kind and text unchanged, `warnings` deep-equals `[W-OPTOUT]` (the fixed sentence); a value of
+    60 characters gives the same sentence; a value `false subagent-models.md:` → the `systemMessage` does not contain `DENY_MARKER`.
 16. Freeze: each of the five names set alone (`'claude-x'`; FORCE `'1'`) with sonnet → teach,
     `warnings: [W-FREEZE(that name)]`; `ANTHROPIC_DEFAULT_OPUS_MODEL` + `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` set → one
     sentence naming both in `FREEZE_VARIABLES` order; the same pair with no model → deny with the same single warning;
@@ -319,6 +319,7 @@ Scenarios are in-process unless marked **spawn**.
 29. **spawn, stdin left open** (`build-flags-hook.test.mjs:125-142`): write `JSON.stringify(noModel())`, never end stdin
     → exits 0 within 15 s, `stdout === DENY_JSON`; the same with `withModel('sonnet')` → `TEACH_JSON` — the deadline path
     is not deny-only.
+35. **spawn, stdout closed first** (`spawn`, not `spawnSync`): a valid no-model payload, `child.stdout.destroy()` before the hook writes → exit 0 and empty stderr. EPIPE depends on a race between the child's write and the reader's close, so the scenario loops 20 times and asserts every run exits 0 with a silent stderr.
 30. **spawn, size**: `noModel()` with a `prompt` of 200 KiB of `'x'` → `DENY_JSON`; 300 KiB → `''`, status 0.
 31. **digest-vs-rule**: `digestMismatches(ROLE_DIGEST, parseRoleTable(fs.readFileSync(rule, 'utf8')))` deep-equals `[]`
     (S1.4; RED on this branch until E1's rule is present — expected, and required green before S1 is done).
@@ -349,8 +350,8 @@ half), 23, 25, 29 and 30 go red — quote the first failing assertion; restore; 
 - Never read an environment variable other than the six named — not `CLAUDE_CODE_SUBAGENT_MODEL`, not
   `CLAUDE_PROJECT_DIR`; never read `permission_mode`, `effort`, `prompt`, `subagent_type` or anything in the payload
   beyond `hook_event_name`, `tool_name` and `tool_input.model`.
-- Never echo payload content into any output — the deny text is fixed; W-OPTOUT echoes only the environment variable's
-  own value, cut to 40 characters.
+- Never echo payload content into any output — the deny text is fixed; W-OPTOUT echoes nothing at all, not even the
+  environment variable's value.
 - Never emit the marker anywhere but `permissionDecisionReason`.
 - Never trim, lowercase or otherwise repair the model value — `Opus` is denied, not corrected; correcting it would be
   `updatedInput` under another name.

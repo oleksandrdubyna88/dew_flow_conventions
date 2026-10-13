@@ -97,7 +97,7 @@ function warningsFor(env) {
   ];
   const spelled = envText(env, OPT_OUT_VARIABLE);
   const optOut = spelled === '' || spelled.toLowerCase() === 'on' ? [] : [
-    `Model guard: ${OPT_OUT_VARIABLE}=${spelled.slice(0, 40)} is not an opt-out, the guard stays on; the only opt-out is ${OPT_OUT_VARIABLE}=off.`,
+    `Model guard: ${OPT_OUT_VARIABLE} is set but is not an opt-out, the guard stays on; the only opt-out is ${OPT_OUT_VARIABLE}=off.`,
   ];
 
   return [...freeze, ...optOut];
@@ -174,5 +174,9 @@ if (process.argv[1]?.endsWith('subagent-model.mjs')) {
     out = '';
   }
   if (out === '') process.exit(0);
-  else process.stdout.write(out, () => process.exit(0));
+  else {
+    // The host may close the pipe before the write completes: every stdout failure still exits 0, silently.
+    process.stdout.on('error', () => process.exit(0));
+    process.stdout.write(out, () => process.exit(0));
+  }
 }

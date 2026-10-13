@@ -38,7 +38,8 @@ const DENY_JSON = hookOutput({ kind: 'deny', text: DENY_TEXT, warnings: [] });
 const TEACH_JSON = hookOutput({ kind: 'teach', text: TEACH_TEXT, warnings: [] });
 
 const wFreeze = names => `Model guard: alias-freezing variable(s) set: ${names.join(', ')}. The rule wants bare aliases that follow the newest model — unset them (common/subagent-models.md).`;
-const wOptOut = value => `Model guard: SUBAGENT_MODEL_GUARD=${value.slice(0, 40)} is not an opt-out, the guard stays on; the only opt-out is SUBAGENT_MODEL_GUARD=off.`;
+const W_OPTOUT = 'Model guard: SUBAGENT_MODEL_GUARD is set but is not an opt-out, the guard stays on; the only opt-out is SUBAGENT_MODEL_GUARD=off.';
+const wOptOut = () => W_OPTOUT;
 
 /** The process environment minus the six variables the hook reads (Windows folds case), plus overrides. */
 function cleanEnv(overrides = {}) {
@@ -322,6 +323,25 @@ test('29. the process answers even when its stdin is never closed — deny and t
   const taught = await openStdin(withModel('sonnet'));
   assert.equal(taught.code, 0);
   assert.equal(taught.out, TEACH_JSON);
+});
+
+test('35. a stdout the host closed first still exits 0 and writes nothing to stderr', async () => {
+  // EPIPE depends on the race between the child's write and the reader's close, so one run may not provoke
+  // it on this OS; loop a bounded number of times and require EVERY run to exit 0 with a silent stderr.
+  for (let run = 0; run < 20; run++) {
+    const child = spawn(process.execPath, [HOOK], { stdio: ['pipe', 'pipe', 'pipe'], env: cleanEnv(), windowsHide: true });
+    let err = '';
+    child.stderr.on('data', data => { err += data; });
+    child.stdout.destroy();
+    child.stdin.on('error', () => {});
+    child.stdin.end(JSON.stringify(noModel()));
+    const code = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('the hook never exited')); }, 15_000);
+      child.on('exit', c => { clearTimeout(timer); resolve(c); });
+    });
+    assert.equal(code, 0, `run ${run}: exit code (stderr: ${err})`);
+    assert.equal(err, '', `run ${run}: stderr`);
+  }
 });
 
 test('30. a payload over 256 KiB is not judged', () => {
