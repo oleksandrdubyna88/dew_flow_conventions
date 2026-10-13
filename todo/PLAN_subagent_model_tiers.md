@@ -218,7 +218,18 @@ host's `agent.spawn` extension point, which can rewrite a spawn's model) is §6,
     `~/.claude/hooks/subagent-model.optout` exists — which `--uninstall` writes, or the next session would undo it;
   - with every safety of the installer below (refusal on unparsable or changed settings, atomic write, backup), and
     fail-open: any error leaves the session starting normally, with one `systemMessage` line saying what happened;
-  - silent when nothing changes, one line when it installed or upgraded.
+  - silent when nothing changes, one line when it installed or upgraded — and one line, never silence, when the installed
+    copy is NEWER than the project's (a work-in-progress checkout with a raised version would otherwise make every later
+    upgrade a silent no-op); the operator replaces it with `install-user-hook.mjs --force`, which the self-install never
+    passes;
+  - declining, with one line, when the project copy has uncommitted changes (`git status --porcelain` on that file) —
+    the only check that stops an experimental guard leaking into user scope from a working tree;
+  - recording provenance: `~/.claude/hooks/subagent-model.installed.json` (source path, sha256, version, time, CLI or
+    self-install), which `--check` prints and verifies.
+  - **The trust boundary, stated** (E1 code round; security judgement on Fable): the self-install is itself a project
+    hook, so it runs only in a workspace the operator trusted — and such a workspace can already write `~/.claude`
+    directly. D13 adds no capability; an integrity check inside the shipped hook would be circular (the same repository
+    ships the checker). What it adds is reliability risk, answered by the three items above.
   It reaches only the repositories wired with the adapter (this one and connect_other_ais today); it is wired into
   `settings/settings.json` in E4, in the commit the release is cut from, so the first self-install happens no earlier
   than the cascade it rides on.
