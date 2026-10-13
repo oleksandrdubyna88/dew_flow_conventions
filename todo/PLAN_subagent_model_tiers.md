@@ -230,9 +230,12 @@ host's `agent.spawn` extension point, which can rewrite a spawn's model) is §6,
     hook, so it runs only in a workspace the operator trusted — and such a workspace can already write `~/.claude`
     directly. D13 adds no capability; an integrity check inside the shipped hook would be circular (the same repository
     ships the checker). What it adds is reliability risk, answered by the three items above.
-  It reaches only the repositories wired with the adapter (this one and connect_other_ais today); it is wired into
-  `settings/settings.json` in E4, in the commit the release is cut from, so the first self-install happens no earlier
-  than the cascade it rides on.
+  It reaches only the repositories wired with the adapter, and it **never installs from this repository itself** — only
+  from a consumer, where the hook arrives only through a released pin (E4 cadence consultation): a session in a
+  conventions checkout, where work-in-progress guards live and whose self-hosted settings must mirror the reference,
+  would otherwise activate the user-level guard before the cascade. So the first self-install happens in
+  connect_other_ais after its pin bump — mid-cascade, before rag_qln's bump, which is harmless: the old rule text there
+  already requires an explicit model, so a compliant session passes the guard.
 - **Delivery, three ways:** `settings/settings.json` wires it (reference), and this repository copies it onto itself
   (`tools/adapter-check.test.mjs:48-50` asserts the self-hosted adapter is whole); connect_other_ais copies it, as
   `adapter-check` will demand; and `tools/install-user-hook.mjs` installs it into the operator's home.
@@ -411,10 +414,15 @@ repository's own `.claude/`), not the user-level install (consultant, cadence ro
       a real session; the digest matches the rule's table by test.
 - [ ] The guard is installed in `~/.claude` on this machine, `--check` is clean, and in a plain session in another
       repository an Agent call without a model is refused while one with `model: "sonnet"` goes through.
-- [ ] The negative control showed the marker; then the behaviour smoke showed five Sonnet scouts covering the five areas,
-      one Sonnet coder carrying the brief and scenarios, one Opus reviewer, no parent edit, seven launches with the
-      requested models, every requested family present in `modelUsage`, `subagent_stats` at seven, and zero denials — recorded, as is any inconclusive run, in `research/RESULTS_subagent_model_tiers.md`
-      (with its `research/README.md` row).
+- [ ] The negative control showed the marker; the classification answered 11 of 11 with the rule read; then one
+      behaviour run passed: every launch declared a role from the rule's table and requested that role's model; ≥ 5
+      scouts covering the five areas, a coder, a judge after it; no parent edit; changes only inside the toy, the toy's
+      checks green; every requested family present in `modelUsage`; `subagent_stats` matching the launches; zero
+      denials. What this proves is narrowed on purpose: the REQUESTED model per launch and the families in aggregate —
+      not each child's resolved model, which the host's stream does not expose. **And an independent audit:** an Opus
+      judge classified each launch's role from its full prompt alone (descriptions and models hidden) and the
+      classification matched the declared roles — recorded, with every run, in
+      `research/RESULTS_subagent_model_tiers.md` (and its `research/README.md` row).
 - [ ] The `modelSettings` probe ran after its control; its outcome is applied or recorded.
 - [ ] One release; every consumer's pin bumped and green; connect_other_ais carries the hook copy.
 - [ ] The benchmark plan's status line no longer claims to gate this rule, its citations name this file, and any arm
