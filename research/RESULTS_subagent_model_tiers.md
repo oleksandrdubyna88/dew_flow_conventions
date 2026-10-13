@@ -86,3 +86,15 @@ Run once each by the coder, 2026-10-13, then restored and green:
 The installer's (`mergeEntry` forced to append → "installing twice leaves settings.json byte-identical" and "replaced
 in place, never twinned" red) and the self-install's (version comparison forced to install → "an equal version writes
 nothing" and "prints one systemMessage first run, nothing on the second" red) were observed the same way.
+
+## Behaviour smoke runs (E4.S3)
+
+Every paid run, in order, 2026-10-13 — pass, fail and inconclusive alike. Each ran `npm run smoke:behaviour` in a fresh
+disposable worktree of the smoke branch (negative → classification → behaviour, stopping at the first non-pass).
+
+| # | Smoke at | negative | classification | What it showed | What changed |
+|---|---|---|---|---|---|
+| 1 | `f7c0a58` | **pass** — 1 launch, model absent, 1 denial with the marker, 0 spawned; $0.23 | **fail** — 10 of 11 right; request 3 (research AND propose, unsplit) answered `fable`, expected `opus`; $0.22 | the guard refuses a model-less launch on the real host | the rule: "Fable has exactly the three rows above; a design, an architecture or a proposal outside them is a judge's — Opus; in doubt, Opus" (`6bc7e51`) |
+| 2 | `ccccf20` | **pass** — $0.07 | **fail** — the same answer 3 | the classification session never loaded the rule: the mode ran `explain` and discarded it, offered no tools, and the session-start loader selects `inspect`, which excludes this rule — runs 1 and 2 measured the model's priors (10 of 11 without the rule), not the rule | the smoke: rule-loading fixtures load through the resolver, and a run that did not read `common.subagent-models` completely is **inconclusive** (`2d51999`) |
+| 3 | `2d51999` | — | — | the run died at once: `rulesRead is not defined` in the real code path, which no unit test reached | `behaviourOutcome` takes its verdict from `judgeBehaviour`; an end-to-end test drives the real path against a fake `claude` (`e0bec92`) |
+| 4 | `e0bec92` | **pass** — $0.07 | **inconclusive** — "rule not loaded; trace could not be decoded": loading every implement-scope rule pushed the stream past its 262 144 B cap (overflow at 261 865 B) | the inconclusive gate works as designed — no false pass | the classification loads only the rule under test (`loadOnly`); caps measured |
