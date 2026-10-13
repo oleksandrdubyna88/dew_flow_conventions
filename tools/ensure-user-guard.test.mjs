@@ -36,6 +36,12 @@ function sandbox(t, sourceVersion = 2) {
   return { home, project, source, paths, seedInstalled, run, ensure };
 }
 
+/** Writes the exact registration the installer writes, around whatever hook is already seeded. */
+function registerValidly(s) {
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  fs.writeFileSync(s.paths.settings, JSON.stringify({ hooks: { PreToolUse: [{ matcher: 'Agent|Task', hooks: [{ type: 'command', command: 'node', args: [s.paths.hook] }] }] } }));
+}
+
 const stat = file => ({ bytes: fs.readFileSync(file), mtime: fs.statSync(file).mtimeMs });
 
 test('guardVersion reads the integer, and 0 for an unversioned text', () => {
@@ -81,15 +87,34 @@ test('an equal version writes nothing: bytes and mtime of both files are untouch
   assert.deepEqual(fs.readdirSync(s.paths.dir).sort(), entriesBefore);
 });
 
-test('a newer installed copy is never downgraded, and never silent about it', t => {
+test('a newer installed copy that is validly registered is never downgraded, and never silent about it', t => {
   const s = sandbox(t, 2);
   s.seedInstalled(5);
+  registerValidly(s);
+  const settingsBefore = fs.readFileSync(s.paths.settings, 'utf8');
   const r = s.ensure();
   assert.equal(r.action, 'newer');
   assert.equal(r.line, "subagent-model guard in ~/.claude is version 5, newer than this repository's 2 — run node <conventions>/tools/install-user-hook.mjs --force to replace it");
   assert.deepEqual(JSON.parse(s.run().stdout), { systemMessage: r.line });
   assert.equal(fs.readFileSync(s.paths.hook, 'utf8'), hookText(5));
-  assert.equal(fs.existsSync(s.paths.settings), false);
+  assert.equal(fs.readFileSync(s.paths.settings, 'utf8'), settingsBefore);
+});
+
+test('a newer installed copy that is NOT validly registered gets only its registration repaired', t => {
+  const s = sandbox(t, 2);
+  s.seedInstalled(5);
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  fs.writeFileSync(s.paths.settings, JSON.stringify({ hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'node', args: [s.paths.hook] }] }] } }));
+  const hookBefore = stat(s.paths.hook);
+  const r = s.ensure();
+  assert.equal(r.line, "subagent-model guard version 5 in ~/.claude (newer than this repository's 2) was not registered — registration repaired");
+  assert.equal(r.action, 'repaired');
+  assert.deepEqual(stat(s.paths.hook), hookBefore);
+  assert.equal(fs.existsSync(s.paths.manifest), false);
+  const entries = findEntries(JSON.parse(fs.readFileSync(s.paths.settings, 'utf8')), s.paths.hook);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].matcher, 'Agent|Task');
+  assert.equal(s.ensure().action, 'newer');
 });
 
 test('SUBAGENT_MODEL_GUARD=off (any case, padded) skips and writes nothing', t => {

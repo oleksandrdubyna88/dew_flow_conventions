@@ -425,8 +425,15 @@ half), 23, 25, 29 and 30 go red — quote the first failing assertion; restore; 
   hook path), never on a whole matcher group: a group shared with someone else's handler keeps that handler and its
   matcher through install, re-install and uninstall, and a group is dropped only when we emptied it.
 - **No silent refusal.** The hook file is copied only AFTER `settings.json` was written, so a refused install leaves
-  nothing behind; and the self-install treats a copy as current only when its version is not older, our registration
-  is in `settings.json`, AND the provenance manifest matches the installed bytes' sha256 — otherwise it repairs.
+  nothing behind; and the self-install treats a copy as current only when its version is >= the source's AND the
+  registration is valid AND the provenance manifest matches the installed bytes' sha256 — otherwise it repairs.
+- **A valid registration is the full shape.** Ownership (a handler whose `args[0]` is our path, used for removal) is
+  kept apart from validity: one PreToolUse group with matcher exactly `Agent|Task` holding exactly one
+  `{type:"command", command:"node", args:[<our path>]}`; `--check`'s drift report and the self-install share that one
+  predicate, so a changed matcher or command is repaired instead of reported as current.
+- **Newer + invalid registration.** The no-downgrade rule stands, but a newer installed copy that is not validly
+  registered gets its registration repaired (settings.json only, with the installer's backup/re-read/atomic-write
+  safety); the newer hook bytes and their manifest are left untouched. Newer and validly registered keeps the old line.
 - **Decision.** The read-compare-rename window is now opened at session start, not only by an operator: accepted by
   the operator 2026-10-13 — a write by the host inside those milliseconds would be lost; the self-install runs only
   when the installed copy is missing, older or unregistered, not on every start.

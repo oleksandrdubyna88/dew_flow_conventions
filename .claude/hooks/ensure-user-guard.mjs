@@ -25,7 +25,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
-import { guardVersion, install, isRegistered, targets } from './lib/user-guard-install.mjs';
+import { guardVersion, install, isRegistered, registrationValid, repairRegistration, targets } from './lib/user-guard-install.mjs';
 
 export { guardVersion };
 
@@ -47,11 +47,16 @@ function plan(t, sourceVersion) {
   const from = versionOf(t.hook);
   // An equal version is only "current" when it is also registered and its manifest vouches for the bytes.
   if (from === sourceVersion) return isRegistered(t) ? { action: 'none', from } : { action: 'installed', from: 0 };
-  return { action: from < sourceVersion ? 'upgraded' : 'newer', from };
+  if (from < sourceVersion) return { action: 'upgraded', from };
+  // A newer copy is never replaced, but one nothing calls is still broken: only its registration is repaired.
+  return { action: registrationValid(t) ? 'newer' : 'repair-registration', from };
 }
 
 const newerLine = (installed, source) =>
   `subagent-model guard in ~/.claude is version ${installed}, newer than this repository's ${source} — run node <conventions>/tools/install-user-hook.mjs --force to replace it`;
+
+const repairedLine = (installed, source) =>
+  `subagent-model guard version ${installed} in ~/.claude (newer than this repository's ${source}) was not registered — registration repaired`;
 
 /** True when git reports uncommitted changes to the file; false when git is unavailable or it is not a repository. */
 function hasUncommittedChanges(file) {
@@ -70,6 +75,14 @@ const successLine = ({ action, from }, to) =>
     ? `subagent-model guard installed into ~/.claude (version ${to})`
     : `subagent-model guard upgraded in ~/.claude (version ${from} → ${to})`;
 
+/** Registration-only repair for a newer installed copy: bytes and manifest stay as they are. */
+function repairOnly(home, installed, source) {
+  const { code, lines } = repairRegistration({ home });
+  return code === 0
+    ? { action: 'repaired', line: repairedLine(installed, source) }
+    : { action: 'refused', line: refusal(lines.at(-1) ?? 'unknown reason') };
+}
+
 /** Install or upgrade the user-level guard when needed; returns what happened and the line to show. */
 export function ensureUserGuard({ home, source, env }) {
   const t = targets(home);
@@ -78,6 +91,7 @@ export function ensureUserGuard({ home, source, env }) {
   const step = plan(t, to);
   if (step.action === 'none') return { action: 'none', line: '' };
   if (step.action === 'newer') return { action: 'newer', line: newerLine(step.from, to) };
+  if (step.action === 'repair-registration') return repairOnly(home, step.from, to);
   if (hasUncommittedChanges(source)) return { action: 'refused', line: refusal('the project copy of the hook has uncommitted changes') };
   const { code, lines } = install({ home, source, by: 'self-install' });
   if (code !== 0) return { action: 'refused', line: refusal(lines.at(-1) ?? 'unknown reason') };
@@ -109,7 +123,7 @@ function payloadCwd(text) {
   }
 }
 
-const SPEAKING = new Set(['installed', 'upgraded', 'refused', 'newer']);
+const SPEAKING = new Set(['installed', 'upgraded', 'refused', 'newer', 'repaired']);
 
 async function main() {
   try {

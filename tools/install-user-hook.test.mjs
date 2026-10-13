@@ -6,6 +6,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { ensureUserGuard } from '../settings/hooks/ensure-user-guard.mjs';
 import { drift, findEntries, install, mergeEntry, removeEntry, targets } from '../settings/hooks/lib/user-guard-install.mjs';
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'install-user-hook.mjs');
@@ -319,3 +320,23 @@ test('a refused install does not leave the hook file or manifest behind', t => {
   assert.equal(fs.existsSync(s.paths.hook), false);
   assert.equal(fs.existsSync(s.paths.manifest), false);
 });
+
+for (const [what, tamper] of [
+  ['the matcher is changed to Bash', e => { e.matcher = 'Bash'; }],
+  ['the command is changed to nodejs', e => { e.hooks[0].command = 'nodejs'; }],
+]) {
+  test(`ensureUserGuard repairs an installation where ${what}, leaving one valid registration`, t => {
+    const s = sandbox(t);
+    assert.equal(s.run('--install').status, 0);
+    const doc = JSON.parse(s.readSettings());
+    tamper(doc.hooks.PreToolUse[0]);
+    s.writeSettings(doc);
+    assert.equal(s.run('--check').status, 1);
+    const r = ensureUserGuard({ home: s.home, source: s.source, env: {} });
+    assert.match(r.action, /^(installed|upgraded)$/);
+    assert.match(r.line, /installed|upgraded/);
+    const after = JSON.parse(s.readSettings());
+    assert.deepEqual(after.hooks.PreToolUse, [ours(s.paths.hook)]);
+    assert.equal(s.run('--check').status, 0);
+  });
+}

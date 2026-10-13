@@ -105,21 +105,33 @@ export function removeEntry(settings, hookPath) {
   return next;
 }
 
+/**
+ * Ownership is "a handler whose args[0] is our path" (used to find and remove what we added); a VALID
+ * registration is stricter: exactly one such handler, in a PreToolUse group whose matcher is exactly
+ * `MATCHER`, shaped exactly like `entryFor`. This returns one line per way the registration falls short;
+ * empty means valid. `drift` and `registrationValid` both read it, so --check and the self-install can
+ * never disagree about what a good registration is.
+ */
+export function registrationProblems(settings, hookPath) {
+  const handlers = preToolUse(settings).filter(e => isObject(e) && Array.isArray(e.hooks))
+    .flatMap(entry => entry.hooks.filter(item => itemIsOurs(item, hookPath)).map(item => ({ entry, item })));
+  if (handlers.length === 0) return ['no PreToolUse entry for the hook in settings.json'];
+  if (handlers.length > 1) return [`${handlers.length} PreToolUse entries for the hook (expected exactly one)`];
+  const [{ entry, item }] = handlers;
+  const out = [];
+  if (entry.matcher !== MATCHER) out.push(`matcher is ${JSON.stringify(entry.matcher)}, expected "${MATCHER}"`);
+  if (item.type !== 'command') out.push(`type is ${JSON.stringify(item.type)}, expected "command"`);
+  if (item.command !== 'node') out.push(`command is ${JSON.stringify(item.command)}, expected "node"`);
+  if (item.args.length !== 1) out.push(`args has ${item.args.length} items, expected only the hook path`);
+  return out;
+}
+
 /** One line per way the installation differs from what `--install` writes; empty when clean. */
 export function drift(settings, hookPath, installedBytes, sourceBytes) {
   const out = [];
   if (installedBytes === null) out.push(`hook file missing: ${hookPath}`);
   else if (!installedBytes.equals(sourceBytes)) out.push(`hook file differs from the source: ${hookPath}`);
-  const ours = findEntries(settings, hookPath);
-  if (ours.length === 0) out.push('no PreToolUse entry for the hook in settings.json');
-  if (ours.length > 1) out.push(`${ours.length} PreToolUse entries for the hook (expected exactly one)`);
-  if (ours.length === 1) {
-    const [entry] = ours;
-    const item = entry.hooks.find(i => itemIsOurs(i, hookPath));
-    if (entry.matcher !== MATCHER) out.push(`matcher is ${JSON.stringify(entry.matcher)}, expected "${MATCHER}"`);
-    if (item.command !== 'node') out.push(`command is ${JSON.stringify(item.command)}, expected "node"`);
-  }
-  return out;
+  return [...out, ...registrationProblems(settings, hookPath)];
 }
 
 function writeAtomic(dest, data) {
@@ -184,12 +196,36 @@ function writeManifest(t, source, sourceBytes, by) {
   writeAtomic(t.manifest, serialise(manifest));
 }
 
-/** True when the installation is registered and its manifest vouches for the installed bytes. */
-export function isRegistered(t) {
+/** True when settings.json holds a VALID registration of the hook (see `registrationProblems`). */
+export function registrationValid(t) {
   const parsed = parseSettings(readOrNull(t.settings));
+  return !parsed.error && registrationProblems(parsed.settings, t.hook).length === 0;
+}
+
+/** True when the registration is valid and the manifest vouches for the installed bytes. */
+export function isRegistered(t) {
   const installed = readOrNull(t.hook);
   const manifest = readManifest(t);
-  return !parsed.error && findEntries(parsed.settings, t.hook).length > 0 && installed !== null && manifest !== null && manifest.sha256 === sha256(installed);
+  return registrationValid(t) && installed !== null && manifest !== null && manifest.sha256 === sha256(installed);
+}
+
+/**
+ * Repair ONLY the registration in settings.json (backup, merge, re-read refusal, atomic write: the
+ * installer's own safety); the installed hook bytes and their manifest are not touched. Used when the
+ * installed copy is newer than the source and so must not be replaced.
+ */
+export function repairRegistration({ home, beforeWrite = () => {} }) {
+  const t = targets(home);
+  const original = readOrNull(t.settings);
+  const parsed = parseSettings(original);
+  if (parsed.error) return unparsable(t.settings, parsed.error);
+  const merged = serialise(mergeEntry(parsed.settings, t.hook));
+  if (original !== null && original.equals(Buffer.from(merged))) return result(0, ['already registered']);
+  const lines = original === null ? [] : [`backup ${writeBackup(t.settings, original)}`];
+  beforeWrite();
+  if (!sameBytes(readOrNull(t.settings), original)) return result(1, [...lines, CHANGED]);
+  writeAtomic(t.settings, merged);
+  return result(0, [...lines, `wrote ${t.settings} (hooks.PreToolUse: ${MATCHER})`]);
 }
 
 function readManifest(t) {
