@@ -159,8 +159,17 @@ a scope that is single-read today over 32 768 B; a test pins the outcome.
 
 ### 3.2 The guard — `settings/hooks/subagent-model.mjs`
 
-- `PreToolUse`, matcher `Agent|Task` (E2's first story records a real payload to confirm the tool name and that
-  `tool_input.model` carries the argument).
+- `PreToolUse`, matcher `Agent|Task`. The hooks reference documents the tool as `Agent` with an optional `model` input
+  (`code.claude.com/docs/en/hooks.md`, *Agent* under PreToolUse input, read 2026-10-13); E2's first story still records
+  real payloads — one with `model`, one without, and the observed denial — because a documented field is not yet an
+  observed one.
+- **Teach on the first allowed call, never approve.** A denial teaches only the session that got it wrong; a session in
+  `inspect` that launches a facts-only scout with `model: "opus"` is allowed and would never learn the table (consultant,
+  cadence round). So on the FIRST Agent call of a session (keyed by the payload's `session_id`, a marker file under the
+  OS temp directory; if that state cannot be read or written, every call teaches), the hook returns
+  `hookSpecificOutput.additionalContext` with the same role digest and **no** `permissionDecision` — an `"allow"` would
+  skip the operator's permission prompt, which is not the guard's to grant. The first launch of such a session may still
+  run on Opus; every later one is decided with the table in view. E2 records that the context reaches the parent.
 - **Two kinds of bad input, two answers.** A payload that is not a well-formed Agent call — unparsable, no
   `tool_input` object, a `tool_name` the matcher should not have sent — is the hook's problem and **fails open**. A
   well-formed Agent call whose `model` is wrong is the session's problem and is **denied**. Conflating them either blocks
@@ -169,6 +178,9 @@ a scope that is single-read today over 32 768 B; a test pins the outcome.
 - **Deny** when it is missing or empty, `haiku`, `inherit`, a versioned id, or anything else — the reason opens with a
   fixed marker (`subagent-models.md:`), which is what the behaviour smoke counts, then carries the role table in ≤ 600 B,
   so a session in `inspect`, which never loaded the rule, still learns it from the refusal.
+- **One digest, tested against the rule.** The ≤ 600 B digest used by both the refusal and the first-call context is the
+  hook's only copy of the table; a test parses the role table out of `common/subagent-models.md` and fails when the two
+  name different models for a role — so the second statement §3.1 forbids cannot drift silently.
 - **Warn, never deny,** when an alias-freezing variable (`ANTHROPIC_DEFAULT_*_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`)
   is set — through the hook's user-visible message; E2 confirms which output field shows.
 - **Opt-out** `SUBAGENT_MODEL_GUARD=off` in the environment → allow everything. E2 inventories every harness on this
@@ -183,9 +195,10 @@ a scope that is single-read today over 32 768 B; a test pins the outcome.
   - it re-reads and compares the file immediately before writing, and refuses if another writer changed it since it read;
   - the write is atomic (a temporary file in the same directory, then rename);
   - **the residual race, stated rather than hidden:** the host takes no lock a third party can share, so a write landing
-    between that final comparison and the rename is lost — a window of milliseconds, opened once per release by an
-    operator-run command. The backup exists for exactly that case: `--check` diffs the live file against the backup and
-    the merge, and names any key that is in neither;
+    between that final comparison and the rename is lost, and it is **undetectable afterwards** — the lost key exists in
+    neither the backup, the merge nor the live file (consultant, cadence round, correcting this plan's earlier claim). It
+    is accepted as a window of milliseconds, opened only by an operator-run command once per release; the installer
+    prints the exact keys it wrote, so the operator can see what the file should now contain;
   - its entry is identified by the hook's path, so a second run **upgrades** that entry in place and never adds a twin;
   - the hook is addressed by an absolute path passed as an `args` element, never a shell string — no quoting on Windows;
   - `--uninstall` removes exactly its own entry and its own hook file and nothing else. The timestamped backup is kept
@@ -271,22 +284,25 @@ the fact, and a result worse than the operator's margin (3 recall points, +0.5 w
 with the operator. The same PR repoints its three citations of this plan's old name (`PLAN_scout_model_calibration.md:11`,
 `:389`, `:503`) to `todo/PLAN_subagent_model_tiers.md`, and — if E2's inventory says a benchmark arm must opt out of
 the guard — sets `SUBAGENT_MODEL_GUARD=off` where that arm launches `claude`. Another session runs that plan's E1: the
-PR touches its status text, its citations and that one launch environment, never its measurements, and is merged
-BEFORE the user-level install (E3), so no running arm is refused.
+PR touches its status text, its citations and that one launch environment, never its measurements. It is part of E2's
+harness preparation and merges BEFORE E2 does — the first moment any copy of the guard is live is E2's merge (this
+repository's own `.claude/`), not the user-level install (consultant, cadence round).
 
 ## 4. Test plan
 
 - **Guard** (`tools/subagent-model-hook.test.mjs`, the `build-flags-hook.test.mjs` shape): the allow/deny matrix
   (each alias; missing, empty, `haiku`, `inherit`, `claude-opus-5-5`, `Opus` in another case, a non-string); a
   malformed envelope (no `tool_input`, garbage JSON) allowed while a well-formed call without `model` is denied; the
-  reason opens with the marker, carries the table and fits 600 B; the opt-out; the freeze-variable warning; fail-open on
-  a thrown error and on a stdin left open (spawned, as the existing test does). **Break-it:** make the hook allow
-  everything → the deny cases go red → restore.
+  reason opens with the marker, carries the table and fits 600 B; the first allowed call of a session gets the digest as
+  `additionalContext` with no `permissionDecision`, the second does not, and an unwritable state directory makes every
+  call teach; the digest names the same model per role as the rule's table (parsed from `common/subagent-models.md`);
+  the opt-out; the freeze-variable warning; fail-open on a thrown error and on a stdin left open (spawned, as the
+  existing test does). **Break-it:** make the hook allow everything → the deny cases go red → restore; change one role's
+  model in a fixture copy of the rule → the digest test goes red → restore.
 - **Installer** (`tools/install-user-hook.test.mjs`), against a temporary home: fresh install; idempotent second run
   (byte-identical settings); an upgrade replaces its entry in place, no twin; an existing unrelated `PreToolUse` entry
   and every other key preserved; an unparsable `settings.json` refused and left byte-identical; a change made between
-  read and write refused; a key in the live file that is in neither the backup nor the merge named by `--check`;
-  `--uninstall` leaves the file byte-identical to its pre-install state when nothing else
+  read and write refused; `--uninstall` leaves the file byte-identical to its pre-install state when nothing else
   changed, and keeps an unrelated change made after install; `--check` reports drift after the hook copy is altered.
 - **Smoke checker** (`tools/smoke-rules.test.mjs`), on recorded traces: the seven-children pass; each inconclusive
   cause (truncated trace, spent budget, missing terminal event, retry, unasked nested child); a parent edit; a missing
@@ -302,10 +318,12 @@ BEFORE the user-level install (E3), so no running arm is refused.
 
 | Risk | Answer |
 |---|---|
-| The guard blocks a harness that measures models | the opt-out, and E2's inventory of every `claude`-spawning harness before the user-level install |
+| The guard blocks a harness that measures models | the opt-out, set and proved through each real launcher by E2's harness preparation before any copy of the guard goes live |
 | The guard hangs or crashes a tool call | the `build-flags.mjs` fail-open contract, tested by spawn |
 | The Agent tool is renamed or its payload changes, and the guard goes silent | E2 records a real payload; the negative control (§3.4) runs before every behaviour run and turns it red when the marker does not appear; the matrix runs on every `npm test` |
-| The installer damages the operator's settings | refuse on unparsable or concurrently changed input, atomic write, `--uninstall` that removes only its own entry (§3.2), all tested on a temporary home; the millisecond race left between the last comparison and the rename is named, and `--check` finds what it lost |
+| The installer damages the operator's settings | refuse on unparsable or concurrently changed input, atomic write, `--uninstall` that removes only its own entry (§3.2), all tested on a temporary home; the millisecond race between the last comparison and the rename is accepted as undetectable and named as such |
+| A harness is refused before the user-level install — by the project copy in this repository (E2 merge) or in connect_other_ais (E4 cascade) | harness preparation is an E2 story, finished before E2 merges (§ E2) |
+| A session in `inspect` launches scouts on Opus and never learns otherwise | the first-call context (§3.2); the residual is the first launch of such a session |
 | The user-level guard reaches a repository still on the old rule | E3 installs only after E4's cascade (§ Order) |
 | A Sonnet coder needs context the brief omitted | §3.1's brief contents; the 50-line exception for the smallest edits; the Opus review catches the rest |
 | The alias moves to a model that is worse at a role | accepted by D6; the behaviour smoke and the calibration (§3.7) are where it would show |
@@ -325,8 +343,10 @@ BEFORE the user-level install (E3), so no running arm is refused.
 - [ ] `common/planning-docs.md` has the epic/story layout; the fixture pair passes `plan-lifecycle.mjs`.
 - [ ] The guard and its installer exist with the tests in §4; the break-it went red and back; `adapter-check` demands it;
       this repository's own `.claude/` carries it.
-- [ ] The harness inventory is recorded, with each variable's route (WSL included), and each harness that needs the
-      opt-out sets it.
+- [ ] The harness inventory is recorded, with each variable's route (WSL included); each harness that needs the opt-out
+      sets it, proved through its real launcher, all before E2 merges.
+- [ ] The first allowed Agent call of a session receives the role digest as context without being approved, observed in
+      a real session; the digest matches the rule's table by test.
 - [ ] The guard is installed in `~/.claude` on this machine, `--check` is clean, and in a plain session in another
       repository an Agent call without a model is refused while one with `model: "sonnet"` goes through.
 - [ ] The negative control showed the marker; then the behaviour smoke showed five Sonnet scouts covering the five areas,
@@ -336,7 +356,7 @@ BEFORE the user-level install (E3), so no running arm is refused.
 - [ ] The `modelSettings` probe ran after its control; its outcome is applied or recorded.
 - [ ] One release; every consumer's pin bumped and green; connect_other_ais carries the hook copy.
 - [ ] The benchmark plan's status line no longer claims to gate this rule, its citations name this file, and any arm
-      that measures models sets the opt-out — merged before the user-level install.
+      that measures models sets the opt-out — merged before E2 merges.
 - [ ] The assistant's memory note on subagent models is rewritten to D1–D12.
 - [ ] This plan and its stories documents promoted to `research/` with their deviations; `todo/README.md` updated.
 
@@ -389,9 +409,17 @@ Cornerstones: 0 of 2 marked — the stories documents mark them (§3.1, the ledg
   `research/RESULTS_subagent_model_tiers.md`.
 - **Depends on.** E1 merged before E2 merges: the deny reason is a ≤ 600 B digest of E1's table, and §3.1 forbids a second
   statement that can drift. The code can start in parallel.
-- **Done when.** The §4 guard and installer tests pass, the break-it went red and back; `adapter-check` names the missing
-  hook in a fixture consumer and reports nothing on this repository; the inventory lists every harness on this machine
-  that spawns `claude`, its verdict (opt-out or not) and HOW the variable reaches it; merged. `~/.claude` is E3, not here.
+- **Harness preparation — before this epic merges.** E2's merge is the first moment a copy of the guard is live (this
+  repository's `.claude/`), and E4's cascade the second (connect_other_ais' project copy) — both before the user-level
+  install. So the inventory is not a list but a change: every harness that spawns `claude` and must not be steered gets
+  `SUBAGENT_MODEL_GUARD=off` in its launcher, the benchmark's included (§3.7, its own PR, merged first), and each
+  exemption is proved through the ACTUAL launcher — WSL route included — by a call the guard would otherwise deny,
+  observed as allowed at the hook. A launcher already running keeps its old environment: the inventory says which
+  processes must be restarted, and they are.
+- **Done when.** The §4 guard and installer tests pass, both break-its went red and back; `adapter-check` names the
+  missing hook in a fixture consumer and reports nothing on this repository; the payloads (with and without `model`) and
+  the first-call context are recorded from a real session; the harness preparation above is merged and proved; merged.
+  `~/.claude` is E3, not here.
 - **Easy to get wrong.** (1) `settings/settings.json:31` addresses a hook through `${CLAUDE_PROJECT_DIR}`; a user-level
   entry has no project, so the installer writes an absolute `~/.claude/hooks/…` path and `--check` compares hook bytes and
   entry shape, never the args verbatim. (2) A variable set on the Windows side reaches a `claude` started inside WSL only
@@ -400,17 +428,17 @@ Cornerstones: 0 of 2 marked — the stories documents mark them (§3.1, the ledg
 
 ### E3 — This machine and the boundary (nothing merges to `main` here)
 
-- **Goal.** D8 and D11 on the operator's machine, §3.7 in the benchmark repository, the memory note (§7).
+- **Goal.** D8 and D11 on the operator's machine, and the memory note (§7).
 - **Scope.** `~/.claude/settings.json` and `~/.claude/hooks/subagent-model.mjs` via `tools/install-user-hook.mjs` run
-  from merged `main`; the §3.5 probe; one PR in the benchmark repository — the status line, the three citations, AND the
-  opt-out in the arm that measures models (the inventory's verdict, §3.2); the assistant's memory note rewritten to D1–D12.
+  from merged `main`; the §3.5 probe; the assistant's memory note rewritten to D1–D12. (The benchmark PR moved to E2's
+  harness preparation — consultant, cadence round.)
 - **Depends on.** E4's cascade complete — every consumer already pins the rewritten rule, so the user-level guard never
-  refuses a session that is still reading the old text (gate round 1, accepted); and the benchmark PR merged BEFORE the
-  install — a guard installed first would refuse a running arm's model-less launches and rewrite its series.
+  refuses a session that is still reading the old text (gate round 1, accepted); E2's harness preparation is already
+  merged and proved.
 - **Done when.** In a plain session in another repository an Agent call without `model` is refused with the role table
   and one with `model: "sonnet"` goes through; `node tools/install-user-hook.mjs --check` is clean; the probe's outcome
   (alias key honoured / not / not observable) is in the research record and `~/.claude/settings.json` matches it; the
-  benchmark plan's status line no longer gates; the memory note is rewritten.
+  memory note is rewritten.
 - **Easy to get wrong.** (1) Two edits to one file: the probe removes `claude-opus-5-5` and the installer merges an entry —
   one at a time, each with its own named backup, the probe restored before the install runs. (2) The probe needs a
   control: observe `low` from the exact-id key on the same surface first, or "not observed" and "not honoured" are one
@@ -452,8 +480,9 @@ E4's promotion.
 - E2 before E4: the smoke's zero-denial count needs the guard live in the worktree's `.claude/hooks/`; the smoke runs on
   the project-level hook and never needs `~/.claude`.
 - E3 after the cascade (gate round 1): the user-level guard reaches every repository on the machine at once, so it goes
-  in only when every consumer already carries the rule it enforces. The benchmark PR can be opened any time; it merges
-  before the install.
+  in only when every consumer already carries the rule it enforces.
+- Harness preparation (the benchmark PR included) inside E2, before E2 merges: E2's merge is the first live copy of the
+  guard, not E3 (consultant, cadence round).
 - **One release, after E1, E2 and the smoke are on `main`** (§5, last row — kept): a release is six bump pull requests
   (README § *Editing discipline*), so one per epic would be eighteen; a consumer holding the rule without the guard is
   exactly the state D8 rejects; and a release before the smoke publishes a text nothing has yet shown to carry.
@@ -465,7 +494,8 @@ E4's promotion.
    alias, not the role, so a misdrawn scout/judge line is invisible to every check, and §3.4 makes the text the only thing a
    denial may change. A fix is a body re-record, a release, six bump PRs and a paid smoke run.
 2. **E2 — the hook's contract with the host:** the payload shape recorded from a real session, the verdict matrix, the
-   three fail-open paths, the opt-out, the warning channel and the deny marker. Once E3 installs it, it runs before every
+   three fail-open paths, the opt-out, the warning channel, the deny marker and the first-call context that must teach
+   without approving. Once E3 installs it, it runs before every
    Agent call in every `claude` process on this machine; a wrong field name makes it silent for good, and only the
    negative control (§3.4) tells silent from obeyed — and only if the marker and the payload shape are right. The installer is not in this area; it is an Opus-spec story under the requirements in §3.2.
 
