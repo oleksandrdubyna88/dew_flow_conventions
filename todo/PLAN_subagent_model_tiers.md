@@ -352,6 +352,21 @@ PR touches its status text, its citations and that one launch environment, never
 harness preparation and merges BEFORE E2 does — the first moment any copy of the guard is live is E2's merge (this
 repository's own `.claude/`), not the user-level install (consultant, cadence round).
 
+**Done, 2026-10-13:** `dew_flow_benchmark` #79 (the subject runtime's opt-out, the calibration plan's status and
+citations; merged `e49fafc`) and #81 (`ProbeChildEnvironment` — the scout runner, the alias check and the probes —
+always carries the opt-out).
+
+### 3.8 Across the boundary — connect_other_ais
+
+The gate's operator command that tells a caller which model to split and build on said "ordinary stories on Opus" and
+contradicted D2. The operator asked for it to match (2026-10-13): `dew_flow_connect_other_ais · shared/commands/command-model.md`
+now carries this plan's pipeline (Fable splits the plan after asking the consultant; Opus splits epics into stories and
+marks ⌈2E/5⌉ cornerstones; Opus scenarios and brief, Sonnet code and tests, Opus review; Fable specs cornerstones and
+security; Sonnet scouts at ⌈1.5N⌉; aliases only), with a third per-caller slot `coder`; non-Claude callers keep generic
+words. Shipped in #792 (`d9a8cda7`) as **mcp 0.52.0** and **extension 0.72.0**; the team server renders no order and was
+not released. Its CoaiBench judge opts out of the guard: #793. Deviation recorded honestly: the session that built
+#792 ran on the old rule and wrote two files of ~70–90 changed lines itself rather than through a Sonnet coder.
+
 ## 4. Test plan
 
 - **Guard** (`tools/subagent-model-hook.test.mjs`, the `build-flags-hook.test.mjs` shape): the allow/deny matrix
