@@ -196,7 +196,7 @@ ${dirty}`);
 }
 
 export function changedPaths(root) {
-  const fields=git(root,"status","--porcelain=v1","-z","--untracked-files=all").split(" ").filter(Boolean);
+  const fields=git(root,"status","--porcelain=v1","-z","--untracked-files=all").split("\u0000").filter(Boolean);
   const paths=[];
   for(let i=0;i<fields.length;i++){
     paths.push(fields[i].slice(3).replaceAll("\\","/"));
