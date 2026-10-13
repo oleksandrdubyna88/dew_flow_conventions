@@ -17,6 +17,12 @@
             "type": "command",
             "command": "node",
             "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/load-instructions.mjs"]
+          },
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/ensure-user-guard.mjs"],
+            "timeout": 5
           }
         ]
       }

@@ -86,6 +86,30 @@ test('line endings are not drift', (t) => {
   assert.deepEqual(adapterFindings(repo), []);
 });
 
+test('the reference SessionStart carries the rules door then the bounded self-install, in that order', () => {
+  const reference = JSON.parse(fs.readFileSync(path.join(REFERENCE, 'settings.json'), 'utf8'));
+  const hooks = reference.hooks.SessionStart.flatMap((entry) => entry.hooks);
+
+  assert.deepEqual(hooks, [
+    { type: 'command', command: 'node', args: ['${CLAUDE_PROJECT_DIR}/.claude/hooks/load-instructions.mjs'] },
+    { type: 'command', command: 'node', args: ['${CLAUDE_PROJECT_DIR}/.claude/hooks/ensure-user-guard.mjs'], timeout: 5 },
+  ]);
+});
+
+test('a consumer missing the self-install SessionStart entry is told which one', (t) => {
+  const repo = whole(t);
+  const settingsPath = path.join(repo, '.claude/settings.json');
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  settings.hooks.SessionStart[0].hooks.pop();
+  fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}
+`);
+
+  const findings = adapterFindings(repo);
+
+  assert.equal(findings.length, 1);
+  assert.match(findings[0], /declares no SessionStart command `node .*ensure-user-guard\.mjs`/);
+});
+
 test('settings without the SessionStart command are named, and other permissions are left alone', (t) => {
   const repo = whole(t);
   const settingsPath = path.join(repo, '.claude/settings.json');
@@ -96,10 +120,10 @@ test('settings without the SessionStart command are named, and other permissions
 
   const findings = adapterFindings(repo);
 
-  // Deleting `hooks` unwires ALL THREE adapters, and each is named on its own: the rules door, the
+  // Deleting `hooks` unwires ALL FOUR hook entries, and each is named on its own: the rules door, the
   // build-flags refusal and the subagent-model guard fail for different reasons and are fixed by
   // different lines.
-  assert.equal(findings.length, 3);
+  assert.equal(findings.length, 4);
   assert.match(findings.join('\n'), /subagent-model\.mjs/);
   assert.match(findings.join('\n'), /declares no SessionStart command/);
   assert.match(findings.join('\n'), /starts without this repository’s rules/);

@@ -106,6 +106,7 @@ Hardening (code-review round, 2026-10-13):
   `.claude/settings.json` (parent § 3.2, D13) in the commit the release is cut from. Then the parent's E4 cascade:
   PR → CI → automatic review comments → merge → `promote-release` with the 40-character sha → the six pins in the
   README's order (rag_qln last), connect_other_ais' bump carrying the hook files and both settings entries.
+- Wired in <commit-to-be>, timeout 5 s.
 - The SessionStart entry carries a short host `timeout` (5 s) so a stalled self-install can never hold a session
   (E2 risk consultation); a test asserts the entry's shape.
 - **Precondition, checked and written into the release PR** (benchmark gate round): the scout calibration — the third
