@@ -161,6 +161,22 @@ drifted guard copy and an unwired `PreToolUse` entry as separate findings. The t
 were also run by hand against this repository — copy removed, copy edited, wiring deleted — each
 reported with the file and the event named, and OK restored afterwards.
 
+`tools/subagent-model-hook.test.mjs` (34 cases, 2026-10-13) covers `settings/hooks/subagent-model.mjs`, the
+`PreToolUse` guard on `Agent|Task`: an allowed alias teaches (`additionalContext`, never a decision); a missing,
+empty, padded, haiku, inherit, versioned, differently cased or non-string model is denied with one fixed reason that
+starts with `subagent-models.md:`; a tool that is not `Agent`/`Task`, a malformed envelope or garbage stdin is silent
+(zero bytes, exit 0); `SUBAGENT_MODEL_GUARD=off` silences everything, a misspelt opt-out and a set alias-freezing
+variable are named in `systemMessage` beside an unchanged verdict; both texts are bounded (600 and 300 bytes), one
+line, and rendered from the single `ROLE_DIGEST`. Spawned-process cases run the real file with a scrubbed
+environment: the protocol, the opt-out, the warning, stdin never closed (deny and teach alike) and the 256 KiB limit.
+The digest-vs-rule case reads `common/subagent-models.md` (or `SUBAGENT_MODEL_RULE_PATH`, a test-only override, while
+the rule is on another branch) through `tools/lib/role-table.mjs`; the permanent break-it changes one row's model in a
+copy and demands exactly one mismatch naming that role.
+
+`tools/adapter-check.test.mjs` changes again for the third hook: a bare repository is now missing four files, and the
+cases that delete `hooks` or `PreToolUse` report one finding more, because the reference wires the guard by its own
+`PreToolUse` entry.
+
 **What the tests do not cover, and why it is recorded here.** The measurements the rule cites
 (worker counts, peak and retained RAM, response-file discovery, which delivery of `-m` works) are
 not re-derived by any test: they are properties of MSBuild on a particular machine, and a test that

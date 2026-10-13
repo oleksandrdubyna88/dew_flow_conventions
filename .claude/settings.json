@@ -31,6 +31,16 @@
             "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/build-flags.mjs"]
           }
         ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/subagent-model.mjs"]
+          }
+        ]
       }
     ]
   }
