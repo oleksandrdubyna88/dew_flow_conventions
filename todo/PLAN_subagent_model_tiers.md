@@ -2,9 +2,11 @@
 
 > Status: **plan only, nothing implemented yet, 2026-10-13.** Scope: `common/subagent-models.md` (rewritten),
 > `common/planning-docs.md` (one new section), `settings/hooks/subagent-model.mjs` (new) and its wiring in
-> `settings/settings.json`, `tools/install-user-hook.mjs` (new), `tools/lib/rule-smoke.mjs` + `tools/lib/rule-trace.mjs`
-> (a behaviour mode), `research/rule-bodies.json`, `research/RESULTS_subagent_model_tiers.md` (new), the release and
-> the pin bump in every consumer, and — outside this repository — the operator's `~/.claude/settings.json`.
+> `settings/settings.json` and this repository's own `.claude/settings.json` + `.claude/hooks/` (it hosts the adapter on
+> itself), `tools/adapter-check.test.mjs`, `tools/install-user-hook.mjs` (new), `tools/lib/rule-smoke.mjs` +
+> `tools/lib/rule-trace.mjs` + `tools/smoke-rules.mjs` (a behaviour mode), `package.json`, `research/rule-bodies.json`,
+> `research/RESULTS_subagent_model_tiers.md` (new) with its `research/README.md` row, `research/module_tests.md`, the
+> release and the pin bump in every consumer, and — outside this repository — the operator's `~/.claude/settings.json`.
 >
 > Supersedes the calibration-gated scout plan this file used to be (`git log --follow` keeps it): the operator decided on
 > 2026-10-13 to switch without waiting for a verdict. Related: [subagent-models.md](../common/subagent-models.md),
@@ -141,6 +143,14 @@ One canonical statement; nothing else restates it (two summaries of one rule dri
 9. **Never** and **Definition of Done** — the summary names models AND counts ("5 scouts on Sonnet, 2 architects on
    Opus, 1 coder on Sonnet").
 
+**Two definitions the text must carry, or two sessions will count differently:**
+
+- *50 changed lines* — added plus removed lines of the ONE file, as `git diff --numstat` counts them, summed over the
+  whole change the session is about to make, not per edit. A second file, or line 51, means a Sonnet coder.
+- *The cornerstone ledger* — stories documents are written one epic at a time, so the quota is tracked in one place: the
+  plan's `## Epics` section carries a line `Cornerstones: k of Q — <story>, <story>`, and the stories document that marks
+  one updates it in the same commit. A mark that would make k exceed Q goes to the operator, not into the document.
+
 **Tasks.** Every task except `inspect` (covered by the guard, §2), each added only after E1 measures that it does not push
 a scope that is single-read today over 32 768 B; a test pins the outcome.
 
@@ -151,21 +161,36 @@ a scope that is single-read today over 32 768 B; a test pins the outcome.
 
 - `PreToolUse`, matcher `Agent|Task` (E2's first story records a real payload to confirm the tool name and that
   `tool_input.model` carries the argument).
+- **Two kinds of bad input, two answers.** A payload that is not a well-formed Agent call — unparsable, no
+  `tool_input` object, a `tool_name` the matcher should not have sent — is the hook's problem and **fails open**. A
+  well-formed Agent call whose `model` is wrong is the session's problem and is **denied**. Conflating them either blocks
+  work on a host change or lets a missing model through as "malformed".
 - **Allow** when `tool_input.model` is exactly `sonnet`, `opus` or `fable`.
-- **Deny** when it is missing or empty, `haiku`, `inherit`, a versioned id, or anything else — the reason carries the
-  role table in ≤ 600 B and names `subagent-models.md`, so a session in `inspect`, which never loaded the rule, still
-  learns it from the refusal.
+- **Deny** when it is missing or empty, `haiku`, `inherit`, a versioned id, or anything else — the reason opens with a
+  fixed marker (`subagent-models.md:`), which is what the behaviour smoke counts, then carries the role table in ≤ 600 B,
+  so a session in `inspect`, which never loaded the rule, still learns it from the refusal.
 - **Warn, never deny,** when an alias-freezing variable (`ANTHROPIC_DEFAULT_*_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`)
   is set — through the hook's user-visible message; E2 confirms which output field shows.
 - **Opt-out** `SUBAGENT_MODEL_GUARD=off` in the environment → allow everything. E2 inventories every harness on this
   machine that spawns `claude` and records which must set it (a model-measuring benchmark arm must; a coai reviewer is
   checked, not assumed).
 - Fails open on a malformed payload, an internal error and a stdin that never closes — the `build-flags.mjs` contract.
-- **Delivery, three ways:** `settings/settings.json` wires it (reference); connect_other_ais copies it, as
-  `adapter-check` will demand; and `tools/install-user-hook.mjs` installs it into `~/.claude/hooks/` and merges the
-  `PreToolUse` entry into `~/.claude/settings.json` idempotently, after a timestamped backup, with `--check` reporting
-  drift from the copy in this repository. In connect_other_ais the hook then fires twice per call (user + project); both
-  verdicts agree, so that is cost, not conflict.
+- **Delivery, three ways:** `settings/settings.json` wires it (reference), and this repository copies it onto itself
+  (`tools/adapter-check.test.mjs:48-50` asserts the self-hosted adapter is whole); connect_other_ais copies it, as
+  `adapter-check` will demand; and `tools/install-user-hook.mjs` installs it into the operator's home.
+- **The installer edits the file that holds the operator's permissions, so it is held to more than "idempotent":**
+  - an existing `settings.json` that does not parse is **refused**, never overwritten;
+  - it re-reads and compares the file immediately before writing, and refuses if another writer changed it since it read;
+  - the write is atomic (a temporary file in the same directory, then rename);
+  - its entry is identified by the hook's path, so a second run **upgrades** that entry in place and never adds a twin;
+  - the hook is addressed by an absolute path passed as an `args` element, never a shell string — no quoting on Windows;
+  - `--uninstall` removes exactly its own entry and its own hook file and nothing else. The timestamped backup is kept
+    for forensics, never as the rollback: restoring it would also erase every unrelated change made since;
+  - `--check` reports drift between the installed copy and this repository's, by bytes and by entry shape.
+- **Two copies, one window of disagreement.** In connect_other_ais the hook fires twice per call (user + project).
+  The two copies can differ between a release and the next install, and then they disagree exactly on a `model` value
+  one version allows and the other refuses — the stricter one wins, because either refusal stops the call. The window is
+  closed by `--check` in E3's done-when, and by re-running the installer as a step of every later release.
 
 ### 3.3 The layout — a new section in `common/planning-docs.md`
 
@@ -173,32 +198,56 @@ a scope that is single-read today over 32 768 B; a test pins the outcome.
 done-when, and the cornerstone areas); each epic's stories are one document, `todo/PLAN_<topic>_E<n>.md`, with its own
 status line, a link to the parent plan, and the parent linking back (the both-sides rule already in that file). The
 stories document is written when its epic starts, not all at once. Both promote together. Existing files under other
-names are not renamed. E1 runs `node tools/plan-lifecycle.mjs` against a fixture pair to learn whether each stories
-document needs its own `todo/README.md` row; if it does, the section says so — no change to the checker in this plan.
+names are not renamed. The checker already decides the index question: `tools/plan-lifecycle.mjs:233-236` demands a
+`todo/README.md` row for every `todo/PLAN_*.md`, `_E<n>` documents included, and `:252-262` a `research/README.md`
+mention for every promoted one — so the section says each stories document gets its own row. E1 keeps a fixture pair as
+the check that this stays true; no change to the checker in this plan.
 Who writes each part is `subagent-models.md`'s, by link, not restated.
 
 ### 3.4 The behaviour smoke
 
 `rule-smoke.mjs` gains a behaviour mode (one launcher, one trace reader — reuse, not a second tool): the Agent tool is
-offered and delegation allowed, in a disposable worktree, under a budget cap. The fixture is a frozen task whose text
-fixes its own baseline — *an Opus team would be three scouts; the change touches two files and about 120 lines; it must
-be reviewed* — so the expectation is known before launch:
+offered and delegation allowed, in a disposable worktree, under a budget cap. Today's smoke is sized for a read-only
+inspection, and the mode changes each limit deliberately, never by accident: `complete` requires an unchanged tree
+(`rule-smoke.mjs:145`) → the mode expects exactly the fixture's files changed; output and time are capped at 256 KiB and
+180 s (`:142`), spend at $3 (`:47`) and the report at 32 KiB (`:110`) → raised to measured values; the prompt asks for an
+`inspect` (`:126-128`), a scope that never selects the rule → the mode resolves `--task implement`.
 
-- **five** Agent calls with `model: "sonnet"` and distinct prompts (scouts);
-- **one** with `model: "sonnet"` that edits (the coder) — the change is over the 50-line exception by construction;
+The fixture is a frozen task whose text fixes its own baseline — *an Opus team would be three scouts, one per area named
+below; the change touches two files and about 120 lines; it must be reviewed* — and names FIVE focus areas, so the
+expectation is known before launch:
+
+- **five** Agent calls with `model: "sonnet"` (scouts), each prompt naming exactly one of the five areas and all five
+  covered — distinct prompts alone would not show distinct focuses;
+- **one** with `model: "sonnet"` that edits (the coder) — over the 50-line exception by construction — whose prompt
+  carries the brief and the scenarios under the headings the fixture requires, so the Opus thinking demonstrably came
+  BEFORE the code;
 - **one** with `model: "opus"` that reviews;
+- **no edit by the parent** to the fixture's files — the main session did not write the code itself;
 - every child's resolved `message.model` in the matching family (`claude-sonnet-*`, `claude-opus-*`), read by grouping
-  events on `parent_tool_use_id`;
-- **zero** guard denials — a denial means the rule text did not carry, which is a defect in the text, fixed and re-run,
-  never a loosened check.
+  events on `parent_tool_use_id`, and the COUNT of children with an observed model asserted (seven) — a family check over
+  an empty set passes;
+- **zero** guard denials, counted by the deny marker (§3.2) — a denial means the rule text did not carry, which is a
+  defect in the text, fixed and re-run, never a loosened check.
 
-It costs real money per run, so it is not in CI: `npm run smoke:behaviour`, run in E4 and on any later edit of the
-rule, each run recorded in `research/RESULTS_subagent_model_tiers.md`.
+**Three outcomes, never two.** A trace that ends early, a spent budget, a child with no terminal event, a retried launch
+or a nested child the fixture did not ask for makes the run **inconclusive** — recorded as such, never a pass.
+
+**A negative control on the real host.** Zero denials cannot tell an obeyed rule from a guard that never ran. The same
+mode has a second, tiny fixture that instructs the session to launch one Agent without a model: it passes only if the
+guard's marker appears. It runs before every behaviour run, so a silent guard turns the run red, not green.
+
+**What costs money and what does not.** The trace grouping, the counting and the three outcomes are unit-tested on
+recorded traces (the first real trace is recorded in E4, as E2 records a payload), so `npm test` guards the checker for
+free. The paid run (`npm run smoke:behaviour`, a new script; not in CI) is repeated only when the rule's MEANING changes —
+not for an editorial edit — and each run is recorded in `research/RESULTS_subagent_model_tiers.md`.
 
 ### 3.5 `modelSettings` by alias — on the operator's machine
 
-Back up `~/.claude/settings.json`; add `"opus": {"effortLevel": "low"}` beside the exact keys and remove `claude-opus-5-5`
-for one probe; start a session on `opus` and read the effort it reports (`/status`, or `--debug` output); restore. If the
+Back up `~/.claude/settings.json`. **Control first**: set `low` under the exact key `claude-opus-5-5`, start a session on
+`opus` and confirm the surface (`/status`, or `--debug` output) shows `low` — without that, "not observed" and "not
+honoured" are one result (`common/measurement.md` §3). Then the probe: move `low` to an `"opus"` key with no exact key,
+start again, read the same surface; restore. If the
 alias key is honoured, the file moves to alias keys (`opus`, `fable`, `sonnet`) with the operator's levels; if not, or if
 it cannot be observed, the result is recorded and the exact keys stay, with a line in the rule's research record that
 they need one edit per model release.
@@ -214,18 +263,28 @@ the read budget.
 `dew_flow_benchmark · todo/PLAN_scout_model_calibration.md` states that its verdict decides this rule. One status-line
 change there (its own repository, its own PR): the verdict no longer gates; the calibration, if finished, is a check after
 the fact, and a result worse than the operator's margin (3 recall points, +0.5 wrong claims per 10) reopens this decision
-with the operator. Another session runs that plan's E1; the change is to its status text only, never to its work.
+with the operator. The same PR repoints its three citations of this plan's old name (`PLAN_scout_model_calibration.md:11`,
+`:389`, `:503`) to `todo/PLAN_subagent_model_tiers.md`, and — if E2's inventory says a benchmark arm must opt out of
+the guard — sets `SUBAGENT_MODEL_GUARD=off` where that arm launches `claude`. Another session runs that plan's E1: the
+PR touches its status text, its citations and that one launch environment, never its measurements, and is merged
+BEFORE the user-level install (E3), so no running arm is refused.
 
 ## 4. Test plan
 
 - **Guard** (`tools/subagent-model-hook.test.mjs`, the `build-flags-hook.test.mjs` shape): the allow/deny matrix
-  (each alias; missing, empty, `haiku`, `inherit`, `claude-opus-5-5`, `Opus` in another case, a non-string); the reason
-  carries the table and fits 600 B; the opt-out; the freeze-variable warning; fail-open on garbage JSON, on a thrown
-  error and on a stdin left open (spawned, as the existing test does). **Break-it:** make the hook allow everything →
-  the deny cases go red → restore.
+  (each alias; missing, empty, `haiku`, `inherit`, `claude-opus-5-5`, `Opus` in another case, a non-string); a
+  malformed envelope (no `tool_input`, garbage JSON) allowed while a well-formed call without `model` is denied; the
+  reason opens with the marker, carries the table and fits 600 B; the opt-out; the freeze-variable warning; fail-open on
+  a thrown error and on a stdin left open (spawned, as the existing test does). **Break-it:** make the hook allow
+  everything → the deny cases go red → restore.
 - **Installer** (`tools/install-user-hook.test.mjs`), against a temporary home: fresh install; idempotent second run
-  (byte-identical settings); an existing unrelated `PreToolUse` entry and every other key preserved; backup written;
-  `--check` reports drift after the hook copy is altered.
+  (byte-identical settings); an upgrade replaces its entry in place, no twin; an existing unrelated `PreToolUse` entry
+  and every other key preserved; an unparsable `settings.json` refused and left byte-identical; a change made between
+  read and write refused; `--uninstall` leaves the file byte-identical to its pre-install state when nothing else
+  changed, and keeps an unrelated change made after install; `--check` reports drift after the hook copy is altered.
+- **Smoke checker** (`tools/smoke-rules.test.mjs`), on recorded traces: the seven-children pass; each inconclusive
+  cause (truncated trace, spent budget, missing terminal event, retry, unasked nested child); a parent edit; a missing
+  focus area; an empty child set; the negative control's marker present and absent.
 - **Adapter:** `adapter-check` against a fixture consumer without the new hook → fails naming it; with it → passes.
 - **Rule:** `node tools/rule-bodies.mjs` and `node tools/ownership-check.mjs` clean; a `rules.test.mjs` case pins the
   task list and that every single-read `inspect` scope measured in §2 still fits.
@@ -239,7 +298,8 @@ with the operator. Another session runs that plan's E1; the change is to its sta
 |---|---|
 | The guard blocks a harness that measures models | the opt-out, and E2's inventory of every `claude`-spawning harness before the user-level install |
 | The guard hangs or crashes a tool call | the `build-flags.mjs` fail-open contract, tested by spawn |
-| The Agent tool is renamed or its payload changes | E2 records a real payload; a payload without `tool_input` fails open; the behaviour smoke's zero-denial count would show the guard went silent only as missing denials, so its test matrix runs on every `npm test` |
+| The Agent tool is renamed or its payload changes, and the guard goes silent | E2 records a real payload; the negative control (§3.4) runs before every behaviour run and turns it red when the marker does not appear; the matrix runs on every `npm test` |
+| The installer damages the operator's settings | refuse on unparsable or concurrently changed input, atomic write, `--uninstall` that removes only its own entry (§3.2), all tested on a temporary home |
 | A Sonnet coder needs context the brief omitted | §3.1's brief contents; the 50-line exception for the smallest edits; the Opus review catches the rest |
 | The alias moves to a model that is worse at a role | accepted by D6; the behaviour smoke and the calibration (§3.7) are where it would show |
 | Rolling out reddens every open PR in the family | one release for all four epics (E1, E2, E4 merge to `main` first; one promotion; one cascade) |
@@ -250,22 +310,155 @@ with the operator. Another session runs that plan's E1; the change is to its sta
   nowhere to go. Trimming the always-loaded rules, or a loader that splits one read, is its own plan.
 - `.rs` and `.http` scopes are already over the single-read limit and depend on the `--only` split.
 
-## Epics
-
-*To be written by Fable, after the consultant is asked what and where is important (D4, D5).*
-
 ## 7. Definition of Done
 
 - [ ] `common/subagent-models.md` states D1–D6 and D12 once, with the pipeline, the scout/judge test, the brief contents,
-      the alias rule (Workflow `agent()` included), the guard, Never and DoD; body recorded; ownership clean.
+      the two definitions (50 changed lines, the cornerstone ledger), the alias rule (Workflow `agent()` included), the
+      guard, Never and DoD; body recorded; ownership clean.
 - [ ] `common/planning-docs.md` has the epic/story layout; the fixture pair passes `plan-lifecycle.mjs`.
-- [ ] The guard and its installer exist with the tests in §4; the break-it went red and back; `adapter-check` demands it.
-- [ ] The harness inventory is recorded and each harness that needs the opt-out sets it.
-- [ ] The guard is installed in `~/.claude` on this machine, and a session's Agent call without a model is refused.
-- [ ] The behaviour smoke ran and showed five Sonnet scouts, one Sonnet coder, one Opus reviewer, every resolved model
-      matching and zero denials; recorded in `research/RESULTS_subagent_model_tiers.md`.
-- [ ] The `modelSettings` probe ran; its outcome is applied or recorded.
+- [ ] The guard and its installer exist with the tests in §4; the break-it went red and back; `adapter-check` demands it;
+      this repository's own `.claude/` carries it.
+- [ ] The harness inventory is recorded, with each variable's route (WSL included), and each harness that needs the
+      opt-out sets it.
+- [ ] The guard is installed in `~/.claude` on this machine, `--check` is clean, and in a plain session in another
+      repository an Agent call without a model is refused while one with `model: "sonnet"` goes through.
+- [ ] The negative control showed the marker; then the behaviour smoke showed five Sonnet scouts covering the five areas,
+      one Sonnet coder carrying the brief and scenarios, one Opus reviewer, no parent edit, seven children with matching
+      resolved models and zero denials — recorded, as is any inconclusive run, in `research/RESULTS_subagent_model_tiers.md`
+      (with its `research/README.md` row).
+- [ ] The `modelSettings` probe ran after its control; its outcome is applied or recorded.
 - [ ] One release; every consumer's pin bumped and green; connect_other_ais carries the hook copy.
-- [ ] The benchmark plan's status line no longer claims to gate this rule.
+- [ ] The benchmark plan's status line no longer claims to gate this rule, its citations name this file, and any arm
+      that measures models sets the opt-out — merged before the user-level install.
 - [ ] The assistant's memory note on subagent models is rewritten to D1–D12.
 - [ ] This plan and its stories documents promoted to `research/` with their deviations; `todo/README.md` updated.
+
+## Epics
+
+Four epics; cornerstone quota ⌈2·4/5⌉ = 2 (D4). Stories live in `todo/PLAN_subagent_model_tiers_E<n>.md`, one
+document per epic, written by Opus when the epic starts (§3.3). Fable named the areas below; the question consultant's
+answer (D5) is recorded in the line under this paragraph before the split is final.
+
+*Consultant (D5), 2026-10-13, one row answering (two earlier attempts failed: a 300 s timeout, then a path resolved
+against the wrong root):* rank the guard **with** its installer first and the behaviour smoke second, the rule text
+third. Its reasons were verified and are now requirements, whichever story owns them: the installer's refusal on
+unparsable or concurrently changed settings, its atomic write, in-place upgrade and `--uninstall` (§3.2 — a backup is not
+a rollback); the smoke's three outcomes, negative control, focus-area and parent-edit checks, and recorded-trace tests
+(§3.4); the two definitions in §3.1.
+
+**Decision (the caller, on Opus, D5):** the two areas below stand as Fable named them. The guard is in both lists. For
+the second, the rule text keeps its place over the smoke: the guard cannot see a role, so a misdrawn scout/judge line is
+invisible to every check except the smoke itself, which can only test the text it is given; the smoke's
+false-assurance risk is answered by the requirements above rather than by a stronger model. The installer stays an
+Opus-spec story, now carrying the consultant's requirements.
+
+Cornerstones: 0 of 2 marked — the stories documents mark them (§3.1, the ledger).
+
+### E1 — The text: the rule rewritten, the layout written down
+
+- **Goal.** `common/subagent-models.md` states D1–D6 and D12 once (§3.1); `common/planning-docs.md` gains the epic/story
+  section (§3.3). Nothing executes yet; this is the text every other epic quotes.
+- **Scope.** The two rules; `research/rule-bodies.json` (both ids re-recorded in the same commit — `tools/rules.test.mjs:147-169`
+  freezes body AND headings); a `rules.test.mjs` case pinning the task list and the §2 scope sizes; a fixture pair for
+  `tools/plan-lifecycle.mjs`; `research/RESULTS_subagent_model_tiers.md`, opened with the size measurements.
+- **Depends on.** Nothing.
+- **Done when.** `npm test`, `npm run check`, `node tools/ownership-check.mjs`, `node tools/rule-bodies.mjs` and
+  `node tools/plan-lifecycle.mjs` are clean; the rule is ≤ 9 000 B and every scope single-read today stays under 32 768 B
+  with the new task list, numbers in the research record; the fixture pair passes; merged to `main`.
+- **Easy to get wrong.** (1) Measuring a scope with `explain --task <t>` and no `--file`: §2's tight scopes are the
+  file-driven ones, so each single-read scope is measured with the files §2 used. (2) The body may not say `coai`,
+  `dew_flow_*`, "the benchmark" or "the gate" (`tools/ownership-check.mjs:30,36,59`) — evidence lives in the research
+  record, cited by path. (3) `tools/plan-lifecycle.mjs:233-236` demands a `todo/README.md` row for every `PLAN_*.md` in
+  `todo/`, and `_E<n>.md` matches its pattern — the fixture run will say so; the new section should say it too.
+
+### E2 — The guard: the hook, its tests, its installer, the harness inventory
+
+- **Goal.** §3.2 as code in this repository: `settings/hooks/subagent-model.mjs` wired in `settings/settings.json`, copied
+  onto this repository itself, demanded by `adapter-check`, with an installer that can put it into a user home.
+- **Scope.** `settings/hooks/subagent-model.mjs`, `settings/settings.json`, `.claude/settings.json` +
+  `.claude/hooks/subagent-model.mjs` (self-hosting — `tools/adapter-check.test.mjs:48-50` fails without them),
+  `tools/subagent-model-hook.test.mjs`, `tools/install-user-hook.mjs` + test, `tools/adapter-check.test.mjs` (`whole()` at
+  `:36` names the hooks; `:55` counts three findings — both change), the recorded payload and the harness inventory in
+  `research/RESULTS_subagent_model_tiers.md`.
+- **Depends on.** E1 merged before E2 merges: the deny reason is a ≤ 600 B digest of E1's table, and §3.1 forbids a second
+  statement that can drift. The code can start in parallel.
+- **Done when.** The §4 guard and installer tests pass, the break-it went red and back; `adapter-check` names the missing
+  hook in a fixture consumer and reports nothing on this repository; the inventory lists every harness on this machine
+  that spawns `claude`, its verdict (opt-out or not) and HOW the variable reaches it; merged. `~/.claude` is E3, not here.
+- **Easy to get wrong.** (1) `settings/settings.json:31` addresses a hook through `${CLAUDE_PROJECT_DIR}`; a user-level
+  entry has no project, so the installer writes an absolute `~/.claude/hooks/…` path and `--check` compares hook bytes and
+  entry shape, never the args verbatim. (2) A variable set on the Windows side reaches a `claude` started inside WSL only
+  through `WSLENV`; the inventory records the route, not just the name. (3) The deny reason opens with a fixed marker
+  (`subagent-models.md:`) — it is what E4 counts; without it "zero denials" cannot be measured.
+
+### E3 — This machine and the boundary (nothing merges to `main` here)
+
+- **Goal.** D8 and D11 on the operator's machine, §3.7 in the benchmark repository, the memory note (§7).
+- **Scope.** `~/.claude/settings.json` and `~/.claude/hooks/subagent-model.mjs` via `tools/install-user-hook.mjs` run
+  from merged `main`; the §3.5 probe; one PR in the benchmark repository — the status line, the three citations, AND the
+  opt-out in the arm that measures models (the inventory's verdict, §3.2); the assistant's memory note rewritten to D1–D12.
+- **Depends on.** E2 merged (installer and inventory); the benchmark PR merged BEFORE the install — a guard installed
+  first would refuse a running arm's model-less launches and rewrite its series.
+- **Done when.** In a plain session in another repository an Agent call without `model` is refused with the role table
+  and one with `model: "sonnet"` goes through; `node tools/install-user-hook.mjs --check` is clean; the probe's outcome
+  (alias key honoured / not / not observable) is in the research record and `~/.claude/settings.json` matches it; the
+  benchmark plan's status line no longer gates; the memory note is rewritten.
+- **Easy to get wrong.** (1) Two edits to one file: the probe removes `claude-opus-5-5` and the installer merges an entry —
+  one at a time, each with its own named backup, the probe restored before the install runs. (2) The probe needs a
+  control: observe `low` from the exact-id key on the same surface first, or "not observed" and "not honoured" are one
+  result (`common/measurement.md` §3).
+
+### E4 — Prove, then ship: the behaviour smoke, one release, one cascade, the promotion
+
+- **Goal.** §3.4 as a mode of the existing smoke, run once and recorded; then the single release, six bump PRs, and
+  this plan promoted with its four stories documents.
+- **Scope.** `tools/lib/rule-smoke.mjs`, `tools/lib/rule-trace.mjs`, `tools/smoke-rules.mjs` + its test, `package.json`
+  (`smoke:behaviour` — no smoke script exists today), the frozen fixture task, the run in the research record; then
+  `release`, the six pins — connect_other_ais' bump also copies the hook and the `PreToolUse` entry — `todo/README.md`,
+  `research/README.md`, `research/module_tests.md`, and the `git mv` of this plan and `_E1`–`_E4`.
+- **Depends on.** E1 and E2 merged: the smoke's worktree must carry the rewritten rule and `.claude/hooks/subagent-model.mjs`,
+  or the zero-denial count counts nothing. E3 is not needed for the smoke; the promotion waits for E3.
+- **Done when.** The smoke checker's recorded-trace tests pass; the negative control showed the marker; then one recorded
+  run met every expectation in §3.4 (five areas covered, the coder's brief and scenarios, no parent edit, seven children
+  with matching resolved models, zero denials) inside its budget cap — an inconclusive run is recorded and re-run, never
+  counted;
+  `release` moved once, to a `main` sha carrying E1, E2 and this epic's code; every consumer's `pin-check` green;
+  `node tools/plan-lifecycle.mjs` clean after the promotion.
+- **Easy to get wrong.** (1) The smoke is sized for a read-only inspection: `rule-smoke.mjs:145` makes `complete` require
+  an UNCHANGED tree, `:142` caps output at 256 KiB and 180 s (`tools/lib/proc.mjs` kills the tree on overflow), `:47` caps
+  spend at $3, `:110` caps the report at 32 KiB, and `:126-128` ask for an `inspect` of hypothetical files — a scope that
+  never selects the rule (§2). Behaviour mode expects exactly the fixture's files changed, raises the four caps
+  deliberately, and routes the prompt through `--task implement`. (2) `rule-trace.mjs:65-69` remembers `Bash` blocks
+  only; Agent blocks (`input.model`, `input.prompt`) and `parent_tool_use_id` grouping are new — record one real trace
+  first, as E2 records a payload, and assert the COUNT of children with a model (7), or the family check passes on an
+  empty set. (3) The cascade: `promote-release` wants the 40-character sha and a `reason` (README § *Editing discipline*,
+  the *How `release` moves* bullet); the pinned-by repository goes last (same section, the rag_qln bullet);
+  `plan-lifecycle.mjs:252-262` wants a `research/README.md` mention for every promoted file — five plan rows, not one.
+
+### Order, and why
+
+E1 → E2 → {E3 ∥ E4's smoke} → E4's release → E4's cascade → E4's promotion.
+
+- E1 before E2 **merges**: the guard's reason quotes the table; one canonical text (§3.1), so the digest follows the text.
+- E2 before E3 and E4: the installer installs from `main`; the smoke's zero-denial count needs the guard live in the
+  worktree's `.claude/hooks/`. E3 and the smoke are then independent — the smoke runs on the project-level hook and never
+  needs `~/.claude`; E3 waits on the benchmark PR instead.
+- **One release, after E1, E2 and the smoke are on `main`** (§5, last row — kept): a release is six bump pull requests
+  (README § *Editing discipline*), so one per epic would be eighteen; a consumer holding the rule without the guard is
+  exactly the state D8 rejects; and a release before the smoke publishes a text nothing has yet shown to carry.
+
+### Cornerstone areas — two (⌈2·4/5⌉), named here, marked `model: fable` by Opus when the epic is split
+
+1. **E1 — the canonical statement:** the role table with the 50-line exception, the scout/judge test and the brief
+   contents (§3.1 items 1, 3, 5). Every task scope but `inspect`, in six repositories, loads it; the guard checks the
+   alias, not the role, so a misdrawn scout/judge line is invisible to every check, and §3.4 makes the text the only thing a
+   denial may change. A fix is a body re-record, a release, six bump PRs and a paid smoke run.
+2. **E2 — the hook's contract with the host:** the payload shape recorded from a real session, the verdict matrix, the
+   three fail-open paths, the opt-out, the warning channel and the deny marker. Once E3 installs it, it runs before every
+   Agent call in every `claude` process on this machine; a wrong field name makes it silent for good, and §5 row 3 concedes
+   nothing downstream tells silent from obeyed — the negative control (§3.4) now does, but only if the marker and the
+   payload shape are right. The installer is not in this area; it is an Opus-spec story under the requirements in §3.2.
+
+**Security:** none of the four epics touches authentication, authorisation or cryptography. The installer edits the file
+that holds the operator's permissions, but merges one hook entry and preserves the rest (§4) — reviewed, not security work.
+
