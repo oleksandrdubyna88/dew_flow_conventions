@@ -16,7 +16,8 @@ that needs the opt-out sets it, proved through its real launcher — all merged 
 - **Scope.** The hook; the role-table parser (a `tools/lib/` module, so E4's smoke can reuse it — one small deviation
   from the two-file scope first written here); the test (the parent's §4 *Guard* list, both break-its, the
   digest-vs-rule test). Not here: the wiring (S3), the installer (S2), the research record's harness inventory (S4).
-- **Status.** Spec written 2026-10-13; code not started.
+- **Status.** Spec written 2026-10-13; code written the same day (34 scenarios green; both break-its observed — RESULTS
+  § *E2.S1 break-its*).
 
 ### S1.0 — What the real host does (recorded 2026-10-13, headless `-p`, `permission_mode: "default"`)
 

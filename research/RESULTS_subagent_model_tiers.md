@@ -73,3 +73,16 @@ read from the stream; the behaviour smoke checks the requested model per launch 
 | rag_qln `ClaudeCliProbe.cs:45-55`, `extension.ts:392` | `--version` / an interactive terminal | — | no | no |
 
 No launcher passes `--settings` or `--setting-sources`; none launches `claude` through WSL from the C# runners.
+
+## E2.S1 break-its
+
+Run once each by the coder, 2026-10-13, then restored and green:
+
+1. `subagentModelVerdict` made to answer `teach` for every model → 16 scenarios red (2–9, 13, 15, 16, 18, 23, 25, 29,
+   30); the first failing assertion was scenario 2, expecting `kind: 'deny'` and receiving `'teach'` with `TEACH_TEXT`.
+2. `SUBAGENT_MODEL_RULE_PATH` pointed at a copy of the rule with `Judge`'s model changed to `sonnet` → scenario 31 red
+   with `"judge": rule says sonnet, hook says opus` (and 32, which tampers that already-tampered copy).
+
+The installer's (`mergeEntry` forced to append → "installing twice leaves settings.json byte-identical" and "replaced
+in place, never twinned" red) and the self-install's (version comparison forced to install → "an equal version writes
+nothing" and "prints one systemMessage first run, nothing on the second" red) were observed the same way.
