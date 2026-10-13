@@ -71,6 +71,20 @@ classification fixture answered as § 3.4 expects; one release; every consumer's
      afterwards. Caps: set in S3 from the first measured run, recorded.
 - **Scenarios** (unit, no paid run): each fixture file validates against the shape; the mode refuses to run outside a
   disposable worktree; the npm script stops at the first non-pass; the caps come from the fixture.
+- **Deviations, each forced by a paid run (RESULTS § *Behaviour smoke runs*):**
+  - **The rule must be LOADED, or the run proves nothing** (run 2): fixtures carry `loadRules`; a rule-loading fixture
+    gets the resolver's `explain`/`read` commands and a run that did not read `common.subagent-models` completely is
+    **inconclusive**. The classification loads only that rule (`loadOnly`) — a full implement-scope load overflowed
+    256 KiB of stream (run 4); the behaviour fixture keeps the full, realistic load.
+  - **Roles, not phrasing** (runs 5 and 6): the session followed the rule both times, and the phrasing checks (a
+    `Scenarios` heading, one file name per scout, an exact launch count) failed it anyway. The behaviour fixture now
+    asks each launch to declare its role from the rule's table in `description`; the verdict reads the table itself
+    (`parseRoleTable`, as the guard's digest test does) and checks each launch's model against its declared role, plus
+    structural minimums: ≥ 5 scouts whose prompts together cover the five files, ≥ 1 coder, a judge after the first
+    coder, no role outside scout/coder/judge, 7–10 launches. A judge writing the brief and a review-fix coder on
+    `sonnet` are what the rule prescribes, and pass.
+  - The toy's tests are `toy-checks.mjs`, a name `node --test`'s default globs do not pick up.
+  - Caps are measured: classification $2 / 1 MiB / 300 s; behaviour $10 / 8 MiB / 1 800 s (a full run cost $3.06–3.16).
 
 ## S3 — Run it and record it
 
@@ -87,6 +101,12 @@ classification fixture answered as § 3.4 expects; one release; every consumer's
   `.claude/settings.json` (parent § 3.2, D13) in the commit the release is cut from. Then the parent's E4 cascade:
   PR → CI → automatic review comments → merge → `promote-release` with the 40-character sha → the six pins in the
   README's order (rag_qln last), connect_other_ais' bump carrying the hook files and both settings entries.
+- The SessionStart entry carries a short host `timeout` (5 s) so a stalled self-install can never hold a session
+  (E2 risk consultation); a test asserts the entry's shape.
+- **Precondition, checked and written into the release PR** (benchmark gate round): the scout calibration — the third
+  model-measuring harness, on another session's branch — carries `SUBAGENT_MODEL_GUARD=off` in its child allow-list or
+  runs no paid arms. If neither holds, the self-install is left out of this release (the project-level guard still
+  ships) and the operator is asked.
 
 ## S5 — Promotion
 
