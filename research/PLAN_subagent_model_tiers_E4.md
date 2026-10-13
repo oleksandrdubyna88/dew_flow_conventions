@@ -41,13 +41,15 @@ classification fixture answered as § 3.4 expects; one release; every consumer's
   the coder's prompt, the fixture files the parent must not edit, the exact denial count).
 - **Recorded traces first.** Before the checker is trusted, record ONE real trace with a tiny paid run (a session
   told to launch two foreground Agents, one `sonnet`, one `opus`, each replying OK) and commit it under
-  `tools/fixtures/traces/` with secrets and paths scrubbed (session ids may stay); it is what confirms that a child's
-  assistant events carry the child's `message.model` (unconfirmed by the payload probe). Derive the failure fixtures
-  from it by editing copies (truncate, drop a terminal result, add a retry, add a nested launch, add a parent `Edit`,
-  add a marker denial, empty the child set).
-- **Scenarios** (`tools/smoke-rules.test.mjs`): the recorded trace yields two launches with the two models and each
-  child's resolved family; each inconclusive cause; a parent edit → fail; a missing focus token → fail; an empty child
-  set → fail (never pass); the marker present / absent; an unknown event type is ignored, not fatal.
+  `tools/fixtures/traces/` with secrets and paths scrubbed (session ids may stay). **What it showed** (recorded
+  2026-10-13): a child's own assistant events never reach the parent's stream, so no per-child `message.model` exists;
+  the checks are each launch's REQUESTED model plus the families in `result.modelUsage` and the counts in
+  `result.subagent_stats`. Derive the failure fixtures from it by editing copies (truncate, drop a terminal result, add
+  a retry, add a nested launch, add a parent `Edit`, add a marker denial, empty the child set).
+- **Scenarios** (`tools/smoke-rules.test.mjs`): the recorded trace yields two launches with their requested models, both
+  families present in `modelUsage` and `subagent_stats` counting two; each inconclusive cause; a parent edit → fail; a
+  missing focus token → fail; an empty child set → fail (never pass); the marker present / absent; an unknown event
+  type is ignored, not fatal.
 
 ## S2 — The behaviour mode and its three fixtures
 
