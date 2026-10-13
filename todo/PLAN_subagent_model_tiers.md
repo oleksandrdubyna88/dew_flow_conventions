@@ -247,8 +247,7 @@ not for an editorial edit — and each run is recorded in `research/RESULTS_suba
 Back up `~/.claude/settings.json`. **Control first**: set `low` under the exact key `claude-opus-5-5`, start a session on
 `opus` and confirm the surface (`/status`, or `--debug` output) shows `low` — without that, "not observed" and "not
 honoured" are one result (`common/measurement.md` §3). Then the probe: move `low` to an `"opus"` key with no exact key,
-start again, read the same surface; restore. If the
-alias key is honoured, the file moves to alias keys (`opus`, `fable`, `sonnet`) with the operator's levels; if not, or if
+start again, read the same surface; restore. If the alias key is honoured, the file moves to alias keys (`opus`, `fable`, `sonnet`) with the operator's levels; if not, or if
 it cannot be observed, the result is recorded and the exact keys stay, with a line in the rule's research record that
 they need one edit per model release.
 
@@ -421,8 +420,7 @@ Cornerstones: 0 of 2 marked — the stories documents mark them (§3.1, the ledg
 - **Done when.** The smoke checker's recorded-trace tests pass; the negative control showed the marker; then one recorded
   run met every expectation in §3.4 (five areas covered, the coder's brief and scenarios, no parent edit, seven children
   with matching resolved models, zero denials) inside its budget cap — an inconclusive run is recorded and re-run, never
-  counted;
-  `release` moved once, to a `main` sha carrying E1, E2 and this epic's code; every consumer's `pin-check` green;
+  counted; `release` moved once, to a `main` sha carrying E1, E2 and this epic's code; every consumer's `pin-check` green;
   `node tools/plan-lifecycle.mjs` clean after the promotion.
 - **Easy to get wrong.** (1) The smoke is sized for a read-only inspection: `rule-smoke.mjs:145` makes `complete` require
   an UNCHANGED tree, `:142` caps output at 256 KiB and 180 s (`tools/lib/proc.mjs` kills the tree on overflow), `:47` caps
@@ -455,9 +453,8 @@ E1 → E2 → {E3 ∥ E4's smoke} → E4's release → E4's cascade → E4's pro
    denial may change. A fix is a body re-record, a release, six bump PRs and a paid smoke run.
 2. **E2 — the hook's contract with the host:** the payload shape recorded from a real session, the verdict matrix, the
    three fail-open paths, the opt-out, the warning channel and the deny marker. Once E3 installs it, it runs before every
-   Agent call in every `claude` process on this machine; a wrong field name makes it silent for good, and §5 row 3 concedes
-   nothing downstream tells silent from obeyed — the negative control (§3.4) now does, but only if the marker and the
-   payload shape are right. The installer is not in this area; it is an Opus-spec story under the requirements in §3.2.
+   Agent call in every `claude` process on this machine; a wrong field name makes it silent for good, and only the
+   negative control (§3.4) tells silent from obeyed — and only if the marker and the payload shape are right. The installer is not in this area; it is an Opus-spec story under the requirements in §3.2.
 
 **Security:** none of the four epics touches authentication, authorisation or cryptography. The installer edits the file
 that holds the operator's permissions, but merges one hook entry and preserves the rest (§4) — reviewed, not security work.
