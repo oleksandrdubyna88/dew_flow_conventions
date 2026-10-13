@@ -32,7 +32,17 @@ export { guardVersion };
 const STDIN_LIMIT = 256 * 1024;
 const STDIN_DEADLINE_MS = 2000;
 
-const skipped = () => ({ action: 'skipped', line: '' });
+const skipped = (line = '') => ({ action: 'skipped', line });
+
+/**
+ * True when the source's project root has the conventions repository's own layout. That checkout is where
+ * guards are developed (work in progress, branches ahead of the release), so it never installs into the
+ * user's home; only a consumer, which receives the hook through a released pin, does.
+ */
+function isReferenceRepository(source) {
+  const root = path.resolve(path.dirname(source), '..', '..');
+  return fs.existsSync(path.join(root, 'tools', 'rules.mjs')) && fs.existsSync(path.join(root, 'settings', 'hooks', 'subagent-model.mjs'));
+}
 
 const versionOf = file => guardVersion(fs.readFileSync(file, 'utf8'));
 
@@ -87,6 +97,7 @@ function repairOnly(home, installed, source) {
 export function ensureUserGuard({ home, source, env }) {
   const t = targets(home);
   if (optedOut(env) || fs.existsSync(t.optout) || !fs.existsSync(source)) return skipped();
+  if (isReferenceRepository(source)) return skipped('subagent-model guard self-install skipped: this is the conventions repository itself');
   const to = versionOf(source);
   const step = plan(t, to);
   if (step.action === 'none') return { action: 'none', line: '' };

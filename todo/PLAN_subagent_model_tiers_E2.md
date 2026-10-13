@@ -434,6 +434,8 @@ half), 23, 25, 29 and 30 go red — quote the first failing assertion; restore; 
 - **Newer + invalid registration.** The no-downgrade rule stands, but a newer installed copy that is not validly
   registered gets its registration repaired (settings.json only, with the installer's backup/re-read/atomic-write
   safety); the newer hook bytes and their manifest are left untouched. Newer and validly registered keeps the old line.
+- **Interrupted self-install.** An interrupted self-install (killed by the host's SessionStart timeout between any two steps) is repaired by the next session start — tested for each step.
+- **Never from the reference repository.** The self-install skips (action `skipped`, nothing written) when the source's project root has the conventions repository's own layout (`tools/rules.mjs` and `settings/hooks/subagent-model.mjs` both present): that checkout is where guards are developed, ahead of any release, so only a consumer, whose hook arrives through a released pin, installs into the user's home.
 - **Decision.** The read-compare-rename window is now opened at session start, not only by an operator: accepted by
   the operator 2026-10-13 — a write by the host inside those milliseconds would be lost; the self-install runs only
   when the installed copy is missing, older or unregistered, not on every start.

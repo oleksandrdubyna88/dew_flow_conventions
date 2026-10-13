@@ -223,3 +223,78 @@ test('a current version with a missing registration or manifest is repaired, not
   assert.equal(s.ensure().action, 'installed');
   assert.equal(s.ensure().action, 'none');
 });
+
+/** What a repaired installation must look like: valid registration, manifest vouching for the source bytes. */
+function assertCurrent(s) {
+  assert.equal(findEntries(JSON.parse(fs.readFileSync(s.paths.settings, 'utf8')), s.paths.hook).length, 1);
+  assert.deepEqual(fs.readFileSync(s.paths.hook), fs.readFileSync(s.source));
+  const manifest = JSON.parse(fs.readFileSync(s.paths.manifest, 'utf8'));
+  assert.equal(manifest.sha256, createHash('sha256').update(fs.readFileSync(s.source)).digest('hex'));
+  assert.equal(s.ensure().action, 'none');
+}
+
+test('interrupted after settings.json, before the hook copy: the next session start installs the hook', t => {
+  const s = sandbox(t);
+  registerValidly(s);
+  assert.equal(fs.existsSync(s.paths.hook), false);
+  assert.equal(s.ensure().action, 'installed');
+  assertCurrent(s);
+});
+
+test('interrupted after the hook copy, before the manifest: the next session start writes the manifest', t => {
+  const s = sandbox(t);
+  s.seedInstalled(2);
+  registerValidly(s);
+  assert.equal(fs.existsSync(s.paths.manifest), false);
+  assert.equal(s.ensure().action, 'installed');
+  assertCurrent(s);
+});
+
+test('a leftover temp file from an interrupted atomic copy is ignored, and the hook is installed beside it', t => {
+  const s = sandbox(t);
+  registerValidly(s);
+  fs.mkdirSync(path.dirname(s.paths.hook), { recursive: true });
+  const stale = `${s.paths.hook}.tmp-424242`;
+  fs.writeFileSync(stale, 'half-written');
+  assert.equal(s.ensure().action, 'installed');
+  assertCurrent(s);
+  // Documented behaviour: a temp file of another pid is left alone (ignored), never promoted to the hook.
+  assert.equal(fs.readFileSync(stale, 'utf8'), 'half-written');
+});
+
+test('a leftover temp file of the SAME pid is overwritten by the next atomic copy', t => {
+  const s = sandbox(t);
+  registerValidly(s);
+  fs.mkdirSync(path.dirname(s.paths.hook), { recursive: true });
+  fs.writeFileSync(`${s.paths.hook}.tmp-${process.pid}`, 'half-written');
+  assert.equal(s.ensure().action, 'installed');
+  assertCurrent(s);
+  assert.equal(fs.existsSync(`${s.paths.hook}.tmp-${process.pid}`), false);
+});
+
+/** Gives the sandbox project the conventions repository's reference layout. */
+function makeReferenceLayout(s) {
+  fs.mkdirSync(path.join(s.project, 'tools'), { recursive: true });
+  fs.mkdirSync(path.join(s.project, 'settings', 'hooks'), { recursive: true });
+  fs.writeFileSync(path.join(s.project, 'tools', 'rules.mjs'), '// reference\n');
+  fs.writeFileSync(path.join(s.project, 'settings', 'hooks', 'subagent-model.mjs'), hookText(2));
+}
+
+test('the conventions repository itself (reference layout) is never installed from: skipped, home untouched', t => {
+  const s = sandbox(t);
+  makeReferenceLayout(s);
+  const r = s.ensure();
+  assert.equal(r.action, 'skipped');
+  assert.equal(fs.existsSync(path.join(s.home, '.claude')), false);
+  assert.deepEqual(fs.readdirSync(s.home), []);
+});
+
+test('a consumer (conventions mounted under .agents/, no tools/rules.mjs at the root) still installs', t => {
+  const s = sandbox(t);
+  const mount = path.join(s.project, '.agents', 'conventions');
+  fs.mkdirSync(path.join(mount, 'tools'), { recursive: true });
+  fs.mkdirSync(path.join(mount, 'settings', 'hooks'), { recursive: true });
+  fs.writeFileSync(path.join(mount, 'tools', 'rules.mjs'), '// mount\n');
+  fs.writeFileSync(path.join(mount, 'settings', 'hooks', 'subagent-model.mjs'), hookText(2));
+  assert.equal(s.ensure().action, 'installed');
+});
