@@ -1,6 +1,6 @@
 # PLAN — A subagent's model follows its role: Sonnet gathers and writes, Opus judges, Fable holds the cornerstones
 
-> Status: **plan only, nothing implemented yet, 2026-10-13.** Scope: `common/subagent-models.md` (rewritten),
+> Status: **in progress, 2026-10-13 — E1, E2 and E4 S1–S3 built and gated (PR #65); the release, the pin cascade and E3 are open.** Scope: `common/subagent-models.md` (rewritten),
 > `common/planning-docs.md` (one new section), `settings/hooks/subagent-model.mjs` (new) and its wiring in
 > `settings/settings.json` and this repository's own `.claude/settings.json` + `.claude/hooks/` (it hosts the adapter on
 > itself), `tools/adapter-check.test.mjs`, `tools/install-user-hook.mjs` (new), `tools/lib/rule-smoke.mjs` +

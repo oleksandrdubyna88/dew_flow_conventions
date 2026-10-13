@@ -109,3 +109,4 @@ its prompt asked it to produce. **9 of 9 matched the declared roles**; no prompt
 scout asked to describe visible conventions, a reviewer asked to name "the concrete fix" — was judged and accepted as
 in-role, with the deciding sentence quoted for each).
 | 9 | `88f5d6c` (Bash narrowed, clean worktree required, postCheck pinned) | **pass** | **pass** — 11 of 11 | **behaviour: PASS again under the hardened launcher** — the same nine-launch shape (5 Scout/sonnet, Judge/opus for the brief, Coder/sonnet, Judge/opus review, Coder/sonnet fixes); no parent edit; toy checks green; zero guard denials; 4 PERMISSION denials (the narrowed Bash refused commands outside the allow-list — the work completed regardless); $3.30 | — |
+
