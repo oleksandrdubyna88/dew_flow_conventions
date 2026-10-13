@@ -5,7 +5,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync, execFileSync } from "node:child_process";
-import { loadCatalog, selectRules, sha256 } from "./lib/rule-catalog.mjs";
+import { loadCatalog, selectRules, sha256, TASKS } from "./lib/rule-catalog.mjs";
 import {run} from "./lib/rule-cli.mjs";
 import {bodyOf, sectionsOf} from "./lib/rule-body.mjs";
 
@@ -192,6 +192,29 @@ test("the build-flags policy selects on solutions and the response file, and now
   const selects=file=>selectRules(catalog,["implement"],[file]).some(rule=>rule.id==="csharp.dotnet-build");
   for(const file of ["src/App.slnx","App.sln","Directory.Build.rsp"])assert.ok(selects(file),file);
   for(const file of ["src/Thing.cs","src/Thing.csproj","src/thing.ts","src/main.rs"])assert.ok(!selects(file),file);
+});
+
+// The subagent-models rule is scoped by `tasks` alone. The split is measured, not chosen: the four tasks
+// below are the ones whose scopes cannot afford its bytes inside one 32 KiB read. The lists are literal so
+// that adding a task to TASKS forces a person to place it on one side.
+const SPLIT_READ_TASKS=["audit","plan","implement","docs","policy","test","git","pr","release","deploy","dependencies","http","benchmark","logging"];
+const SINGLE_READ_TASKS=["inspect","ui","gpu","storage"];
+
+test("the subagent-models rule is selected for the fourteen split-read tasks and for none of the four single-read ones",()=>{
+  const catalog=loadCatalog(sourceRoot);
+  assert.deepEqual([...SPLIT_READ_TASKS,...SINGLE_READ_TASKS].sort(),Object.keys(TASKS).sort(),"a task was added to TASKS without being placed on one side of the split");
+  const selects=task=>selectRules(catalog,[task],[]).some(rule=>rule.id==="common.subagent-models");
+  for(const task of SPLIT_READ_TASKS)assert.ok(selects(task),`${task} must select common.subagent-models`);
+  for(const task of SINGLE_READ_TASKS)assert.ok(!selects(task),`${task} must not select common.subagent-models`);
+});
+
+test("every single-read scope of the four excluded tasks still fits one read",()=>{
+  const catalog=loadCatalog(sourceRoot);
+  const scopes={inspect:[[],["src/x.cs"],["src/x.csproj"],["ui/a.ts"]],ui:[[],["src/x.cs"],["ui/a.ts"]],gpu:[[],["src/x.cs"]],storage:[[]]};
+  for(const [task,fileSets] of Object.entries(scopes))for(const files of fileSets){
+    const bytes=selectRules(catalog,[task],files).reduce((sum,rule)=>sum+rule.bytes,0);
+    assert.ok(bytes<=32768,`${task} [${files.join(",")}] selects ${bytes} B, over the 32768 B read`);
+  }
 });
 
 test("an HTTP-only scope still receives the testing contract it depends on",()=>{

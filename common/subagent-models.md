@@ -8,8 +8,8 @@ tasks: ["audit","plan","implement","docs","policy","test","git","pr","release","
 > Spend the strongest model where a mistake compounds, the cheaper one where the next step catches it.
 > **Sonnet gathers and writes, Opus judges, Fable holds the cornerstones** — always the newest of each,
 > by alias. The evidence behind every number here:
-> [RESULTS_subagent_model_tiers.md](../research/RESULTS_subagent_model_tiers.md). The guard's digest is
-> derived from the table below, never written a second time.
+> [RESULTS_subagent_model_tiers.md](../research/RESULTS_subagent_model_tiers.md). The guard carries a
+> copy of the table below, and a test fails the moment the two name different models for a role.
 
 ## The role table
 

@@ -7,6 +7,7 @@
 | [PLAN_dotnet_build_node_reuse.md](PLAN_dotnet_build_node_reuse.md) | IMPLEMENTED: the MSBuild worker pool bounded — the rule, the PreToolUse guard, both checks, and the six-consumer rollout |
 | [PLAN_local_cpu_budget.md](PLAN_local_cpu_budget.md) | IMPLEMENTED 2026-10-11 — local test and build runs take at most 8 workers, at lowered CPU priority: the rule, `tools/low-priority.mjs` and its preload template, two `release` moves (791b25e, then the corrections in 03428e2), and the rollout to the seven dew_flow consumers and the ten corporate ones, each with a bare pin bump first. Open tail: creds_for_devs' WSL inner builds, owned there |
 | [2026-10-10_windows_cpu_priority.md](2026-10-10_windows_cpu_priority.md) | Measurement record 2026-10-10 — which Windows method lowers a whole process tree and keeps the exit code (lower yourself, then spawn; `start /belownormal` loses it), busy-loop shares, and a real `node --test` suite at 23 vs 8 workers, normal vs lowered, with an interactive probe |
+| [RESULTS_subagent_model_tiers.md](RESULTS_subagent_model_tiers.md) | Record 2026-10-13 — the read budget of all 18 tasks over seven scopes (which fit one 32 KiB read), and the size of the subagent-models rule; host facts follow in E2 |
 | [architecture.md](architecture.md) | Shared rule delivery and its current boundaries |
 | [module_rules.md](module_rules.md) | Resolver schema, selection, dependencies and failure behavior |
 | [module_rule_migration.md](module_rule_migration.md) | Disposable migration, rollback and bounded native CLI evidence |
