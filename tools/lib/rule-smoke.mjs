@@ -275,9 +275,7 @@ async function postCheck(fixture,root) {
 }
 
 async function behaviourOutcome({fixture,root,result,before,initial,expected,origin}) {
-  const {events,parseFailed}=parseEvents(result.out);
-  const evidence=delegationEvidence(events,{marker:DENY_MARKER});
-  const verdict=behaviourVerdict(evidence,fixture.expectation);
+  const {evidence,verdict,parseFailed,rulesRead}=judgeBehaviour({fixture,out:result.out,expected,origin});
   const expectedChanged=[...(fixture.expectation.changedFiles??[])].sort(codeUnitOrder);
   const changed=changedSince(before,changedPaths(root));
   const reasons=[...verdict.reasons];

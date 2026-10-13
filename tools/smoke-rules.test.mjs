@@ -334,3 +334,23 @@ test("the loading prompt names the explain and read commands for the fixture's f
   assert.match(prompt,/--only <id>/);
   assert.ok(prompt.endsWith(loadNamed("classification").prompt));
 });
+
+// ---- the real code path: behaviourSmoke end to end with a fake claude, no paid run ----
+test("behaviourSmoke runs end to end against a fake claude in a disposable worktree and records the rules read",async t=>{
+  const home=fs.mkdtempSync(path.join(os.tmpdir(),"smoke-e2e-"));
+  const worktree=path.join(home,"wt");
+  const top=git(process.cwd(),"rev-parse","--show-toplevel");
+  git(top,"worktree","add","--detach",worktree,"HEAD");
+  const modules=path.join(worktree,"node_modules");
+  fs.symlinkSync(path.join(top,"node_modules"),modules,"junction");
+  t.after(()=>{
+    try {fs.rmdirSync(modules);git(top,"worktree","remove","--force",worktree);} finally {fs.rmSync(home,{recursive:true,force:true});git(top,"worktree","prune");}
+  });
+  const fake=path.join(home,"fake-claude.mjs");
+  const canned=fileURLToPath(new URL("./fixtures/traces/two-children.jsonl",import.meta.url));
+  fs.writeFileSync(fake,`import fs from "node:fs";process.stdout.write(fs.readFileSync(${JSON.stringify(canned)},"utf8"));`);
+  const outcome=await behaviourSmoke({repo:worktree,fixture:"negative",cli:fake});
+  assert.match(outcome.status,/^behaviour (pass|fail|inconclusive)$/);
+  assert.equal(outcome.exitCode,0);
+  assert.deepEqual(outcome.evidence.rulesRead,[]);
+});
