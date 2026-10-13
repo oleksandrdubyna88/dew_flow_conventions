@@ -163,13 +163,14 @@ a scope that is single-read today over 32 768 B; a test pins the outcome.
   (`code.claude.com/docs/en/hooks.md`, *Agent* under PreToolUse input, read 2026-10-13); E2's first story still records
   real payloads — one with `model`, one without, and the observed denial — because a documented field is not yet an
   observed one.
-- **Teach on the first allowed call, never approve.** A denial teaches only the session that got it wrong; a session in
+- **Teach on every allowed call, never approve.** A denial teaches only the session that got it wrong; a session in
   `inspect` that launches a facts-only scout with `model: "opus"` is allowed and would never learn the table (consultant,
-  cadence round). So on the FIRST Agent call of a session (keyed by the payload's `session_id`, a marker file under the
-  OS temp directory; if that state cannot be read or written, every call teaches), the hook returns
-  `hookSpecificOutput.additionalContext` with the same role digest and **no** `permissionDecision` — an `"allow"` would
-  skip the operator's permission prompt, which is not the guard's to grant. The first launch of such a session may still
-  run on Opus; every later one is decided with the table in view. E2 records that the context reaches the parent.
+  cadence round). So every allowed Agent call returns `hookSpecificOutput.additionalContext` with a one-line role digest
+  (≤ 300 B) and **no** `permissionDecision` — an `"allow"` would skip the operator's permission prompt, which is not the
+  guard's to grant. Every call rather than the first per session: a per-session marker survives a `/compact` that drops
+  the digest from the summary and would then suppress its replacement (consultant, second turn); stateless costs ~75
+  tokens a launch and has nothing to invalidate. Hook context is read on the NEXT model request, so the residual is the
+  first BATCH of launches a session emits together, not one launch. E2 records that the context reaches the parent.
 - **Two kinds of bad input, two answers.** A payload that is not a well-formed Agent call — unparsable, no
   `tool_input` object, a `tool_name` the matcher should not have sent — is the hook's problem and **fails open**. A
   well-formed Agent call whose `model` is wrong is the session's problem and is **denied**. Conflating them either blocks
@@ -178,12 +179,13 @@ a scope that is single-read today over 32 768 B; a test pins the outcome.
 - **Deny** when it is missing or empty, `haiku`, `inherit`, a versioned id, or anything else — the reason opens with a
   fixed marker (`subagent-models.md:`), which is what the behaviour smoke counts, then carries the role table in ≤ 600 B,
   so a session in `inspect`, which never loaded the rule, still learns it from the refusal.
-- **One digest, tested against the rule.** The ≤ 600 B digest used by both the refusal and the first-call context is the
-  hook's only copy of the table; a test parses the role table out of `common/subagent-models.md` and fails when the two
+- **One digest, tested against the rule.** The ≤ 600 B digest in the refusal and its one-line form in the allowed-call
+  context are the hook's only copy of the table; a test parses the role table out of `common/subagent-models.md` and fails when the two
   name different models for a role — so the second statement §3.1 forbids cannot drift silently.
 - **Warn, never deny,** when an alias-freezing variable (`ANTHROPIC_DEFAULT_*_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`)
   is set — through the hook's user-visible message; E2 confirms which output field shows.
-- **Opt-out** `SUBAGENT_MODEL_GUARD=off` in the environment → allow everything. E2 inventories every harness on this
+- **Opt-out** `SUBAGENT_MODEL_GUARD=off` in the environment → the hook emits nothing at all: no refusal, no context, no
+  decision — a harness that measures models must not be steered by a hint either. E2 inventories every harness on this
   machine that spawns `claude` and records which must set it (a model-measuring benchmark arm must; a coai reviewer is
   checked, not assumed).
 - Fails open on a malformed payload, an internal error and a stdin that never closes — the `build-flags.mjs` contract.
@@ -293,9 +295,9 @@ repository's own `.claude/`), not the user-level install (consultant, cadence ro
 - **Guard** (`tools/subagent-model-hook.test.mjs`, the `build-flags-hook.test.mjs` shape): the allow/deny matrix
   (each alias; missing, empty, `haiku`, `inherit`, `claude-opus-5-5`, `Opus` in another case, a non-string); a
   malformed envelope (no `tool_input`, garbage JSON) allowed while a well-formed call without `model` is denied; the
-  reason opens with the marker, carries the table and fits 600 B; the first allowed call of a session gets the digest as
-  `additionalContext` with no `permissionDecision`, the second does not, and an unwritable state directory makes every
-  call teach; the digest names the same model per role as the rule's table (parsed from `common/subagent-models.md`);
+  reason opens with the marker, carries the table and fits 600 B; every allowed call gets the one-line digest (≤ 300 B)
+  as `additionalContext` with no `permissionDecision`; with the opt-out set, an allowed alias and an otherwise-denied
+  input both produce empty output; the digest names the same model per role as the rule's table (parsed from `common/subagent-models.md`);
   the opt-out; the freeze-variable warning; fail-open on a thrown error and on a stdin left open (spawned, as the
   existing test does). **Break-it:** make the hook allow everything → the deny cases go red → restore; change one role's
   model in a fixture copy of the rule → the digest test goes red → restore.
@@ -323,7 +325,7 @@ repository's own `.claude/`), not the user-level install (consultant, cadence ro
 | The Agent tool is renamed or its payload changes, and the guard goes silent | E2 records a real payload; the negative control (§3.4) runs before every behaviour run and turns it red when the marker does not appear; the matrix runs on every `npm test` |
 | The installer damages the operator's settings | refuse on unparsable or concurrently changed input, atomic write, `--uninstall` that removes only its own entry (§3.2), all tested on a temporary home; the millisecond race between the last comparison and the rename is accepted as undetectable and named as such |
 | A harness is refused before the user-level install — by the project copy in this repository (E2 merge) or in connect_other_ais (E4 cascade) | harness preparation is an E2 story, finished before E2 merges (§ E2) |
-| A session in `inspect` launches scouts on Opus and never learns otherwise | the first-call context (§3.2); the residual is the first launch of such a session |
+| A session in `inspect` launches scouts on Opus and never learns otherwise | the allowed-call context (§3.2); the residual is the first batch of launches such a session emits together |
 | The user-level guard reaches a repository still on the old rule | E3 installs only after E4's cascade (§ Order) |
 | A Sonnet coder needs context the brief omitted | §3.1's brief contents; the 50-line exception for the smallest edits; the Opus review catches the rest |
 | The alias moves to a model that is worse at a role | accepted by D6; the behaviour smoke and the calibration (§3.7) are where it would show |
@@ -345,7 +347,7 @@ repository's own `.claude/`), not the user-level install (consultant, cadence ro
       this repository's own `.claude/` carries it.
 - [ ] The harness inventory is recorded, with each variable's route (WSL included); each harness that needs the opt-out
       sets it, proved through its real launcher, all before E2 merges.
-- [ ] The first allowed Agent call of a session receives the role digest as context without being approved, observed in
+- [ ] Every allowed Agent call receives the one-line role digest as context without being approved, observed in
       a real session; the digest matches the rule's table by test.
 - [ ] The guard is installed in `~/.claude` on this machine, `--check` is clean, and in a plain session in another
       repository an Agent call without a model is refused while one with `model: "sonnet"` goes through.
@@ -418,7 +420,7 @@ Cornerstones: 0 of 2 marked — the stories documents mark them (§3.1, the ledg
   processes must be restarted, and they are.
 - **Done when.** The §4 guard and installer tests pass, both break-its went red and back; `adapter-check` names the
   missing hook in a fixture consumer and reports nothing on this repository; the payloads (with and without `model`) and
-  the first-call context are recorded from a real session; the harness preparation above is merged and proved; merged.
+  the allowed-call context are recorded from a real session; the harness preparation above is merged and proved; merged.
   `~/.claude` is E3, not here.
 - **Easy to get wrong.** (1) `settings/settings.json:31` addresses a hook through `${CLAUDE_PROJECT_DIR}`; a user-level
   entry has no project, so the installer writes an absolute `~/.claude/hooks/…` path and `--check` compares hook bytes and
@@ -473,7 +475,7 @@ Cornerstones: 0 of 2 marked — the stories documents mark them (§3.1, the ledg
 
 ### Order, and why
 
-E1 → E2 → E4's smoke → E4's release → E4's cascade → E3 (benchmark PR, then the user-level install and the probe) →
+E1 → E2 → E4's smoke → E4's release → E4's cascade → E3 (the user-level install and the probe) →
 E4's promotion.
 
 - E1 before E2 **merges**: the guard's reason quotes the table; one canonical text (§3.1), so the digest follows the text.
@@ -494,7 +496,7 @@ E4's promotion.
    alias, not the role, so a misdrawn scout/judge line is invisible to every check, and §3.4 makes the text the only thing a
    denial may change. A fix is a body re-record, a release, six bump PRs and a paid smoke run.
 2. **E2 — the hook's contract with the host:** the payload shape recorded from a real session, the verdict matrix, the
-   three fail-open paths, the opt-out, the warning channel, the deny marker and the first-call context that must teach
+   three fail-open paths, the opt-out, the warning channel, the deny marker and the allowed-call context that must teach
    without approving. Once E3 installs it, it runs before every
    Agent call in every `claude` process on this machine; a wrong field name makes it silent for good, and only the
    negative control (§3.4) tells silent from obeyed — and only if the marker and the payload shape are right. The installer is not in this area; it is an Opus-spec story under the requirements in §3.2.
