@@ -194,13 +194,14 @@ export function changedFilesReasons(spec,changed) {
     return [...outside.length?[`changed files outside ${spec.within}: ${JSON.stringify(outside)}`]:[],
       ...missing.length?[`required files unchanged: ${JSON.stringify(missing)}`]:[]];
   }
-  const expected=[...(spec??[])].sort();
+  const expected=[...(spec??[])].sort((a,b)=>{if(a===b)return 0;return a<b?-1:1;});
   return JSON.stringify(changed)===JSON.stringify(expected)?[]:[`changed files ${JSON.stringify(changed)}, expected ${JSON.stringify(expected)}`];
 }
 
 /** A fixture by name (`negative`) or by path; the name resolves under tools/fixtures/behaviour. */
 export function loadFixture(root,nameOrPath) {
-  const file=/[\\/]|\.json$/.test(nameOrPath)?path.resolve(nameOrPath):path.join(root,"tools/fixtures/behaviour",`${nameOrPath}.json`);
+  const isPath=/[\\/]/.test(nameOrPath)||nameOrPath.endsWith(".json");
+  const file=isPath?path.resolve(nameOrPath):path.join(root,"tools/fixtures/behaviour",`${nameOrPath}.json`);
   return validateFixture(JSON.parse(fs.readFileSync(file,"utf8")),path.basename(file));
 }
 
