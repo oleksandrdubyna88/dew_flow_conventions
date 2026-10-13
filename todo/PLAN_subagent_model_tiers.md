@@ -527,6 +527,9 @@ E1 → E2 → E4's smoke → E4's release → E4's cascade → E3 (the user-leve
 E4's promotion.
 
 - E1 before E2 **merges**: the guard's reason quotes the table; one canonical text (§3.1), so the digest follows the text.
+- **E1 and E2 reach `main` in ONE pull request** (E1 code round, accepted): the rule says a guard refuses a model-less
+  launch, so `main` must never carry the rule without the guard. E1 is gated and committed on its own branch; E2's branch
+  is built on it, and the pull request is E2's branch.
 - E2 before E4: the smoke's zero-denial count needs the guard live in the worktree's `.claude/hooks/`; the smoke runs on
   the project-level hook and never needs `~/.claude`.
 - E3 after the cascade (gate round 1): the user-level guard reaches every repository on the machine at once, so it goes
