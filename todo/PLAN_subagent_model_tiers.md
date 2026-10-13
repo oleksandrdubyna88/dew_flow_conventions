@@ -234,8 +234,10 @@ host's `agent.spawn` extension point, which can rewrite a spawn's model) is §6,
   from a consumer, where the hook arrives only through a released pin (E4 cadence consultation): a session in a
   conventions checkout, where work-in-progress guards live and whose self-hosted settings must mirror the reference,
   would otherwise activate the user-level guard before the cascade. So the first self-install happens in
-  connect_other_ais after its pin bump — mid-cascade, before rag_qln's bump, which is harmless: the old rule text there
-  already requires an explicit model, so a compliant session passes the guard.
+  connect_other_ais after its pin bump — mid-cascade, before rag_qln's bump. **Accepted, not harmless** (E4
+  consultation, second turn, which ran the verdict on both inputs): the old rule text demands an explicit model but
+  not a bare alias, so in a repository not yet bumped a session naming `claude-opus-5-5` is refused. The refusal tells
+  it the alias and it relaunches; the window is the minutes between connect_other_ais' bump and rag_qln's.
 - **Delivery, three ways:** `settings/settings.json` wires it (reference), and this repository copies it onto itself
   (`tools/adapter-check.test.mjs:48-50` asserts the self-hosted adapter is whole); connect_other_ais copies it, as
   `adapter-check` will demand; and `tools/install-user-hook.mjs` installs it into the operator's home.
@@ -386,7 +388,7 @@ repository's own `.claude/`), not the user-level install (consultant, cadence ro
 | The installer damages the operator's settings | refuse on unparsable or concurrently changed input, atomic write, `--uninstall` that removes only its own entry (§3.2), all tested on a temporary home; the millisecond race between the last comparison and the rename is accepted as undetectable and named as such |
 | A harness is refused before the user-level install — by the project copy in this repository (E2 merge) or in connect_other_ais (E4 cascade) | harness preparation is an E2 story, finished before E2 merges (§ E2) |
 | A session in `inspect` launches scouts on Opus and never learns otherwise | the allowed-call context (§3.2); the residual is the first batch of launches such a session emits together |
-| The user-level guard reaches a repository still on the old rule | E3 installs only after E4's cascade (§ Order) |
+| The user-level guard reaches a repository still on the old rule | it can first activate mid-cascade (connect_other_ais bumped, rag_qln not yet); a versioned id is then refused and the refusal names the alias — accepted for a window of minutes (§3.2); E3 observes the install after the cascade completes |
 | A Sonnet coder needs context the brief omitted | §3.1's brief contents; the 50-line exception for the smallest edits; the Opus review catches the rest |
 | The alias moves to a model that is worse at a role | accepted by D6; the behaviour smoke and the calibration (§3.7) are where it would show |
 | Rolling out reddens every open PR in the family | one release for all four epics (E1, E2, E4 merge to `main` first; one promotion; one cascade) |
