@@ -34,19 +34,27 @@ function matches(group,launch) {
   return !group.focusTokens||group.focusTokens.filter(token=>text.includes(token)).length===1;
 }
 
-function takeGroup(group,pool) {
-  const taken=pool.filter(launch=>matches(group,launch)).slice(0,group.count);
-  return {taken,rest:pool.filter(launch=>!taken.includes(launch))};
+/** A count is an exact integer or `{min, max}`; both normalise to bounds. */
+export const bounds=count=>typeof count==="number"?{min:count,max:count}:{min:Number(count?.min??0),max:Number(count?.max??0)};
+const describeBounds=({min,max})=>min===max?String(min):`${min}-${max}`;
+
+function takeGroup(group,pool,taken) {
+  const {max}=bounds(group.count);
+  const floor=group.after?Math.max(-1,...(taken.get(group.after)??[]).map(launch=>launch.order)):-1;
+  const took=pool.filter(launch=>launch.order>floor&&matches(group,launch)).slice(0,max);
+  return {took,rest:pool.filter(launch=>!took.includes(launch))};
 }
 
 function groupFailures(groups,launches) {
-  const reasons=[];
-  let pool=launches;
+  const reasons=[],taken=new Map();
+  let pool=launches.map((launch,order)=>({...launch,order}));
   for(const group of groups) {
-    const {taken,rest}=takeGroup(group,pool);
+    const {took,rest}=takeGroup(group,pool,taken);
     pool=rest;
-    if(taken.length!==group.count)reasons.push(`group "${group.name}": ${taken.length} launch(es) matched, ${group.count} expected`);
-    reasons.push(...focusFailures(group,taken));
+    taken.set(group.name,took);
+    const {min,max}=bounds(group.count);
+    if(took.length<min||took.length>max)reasons.push(`group "${group.name}": ${took.length} launch(es) matched, ${describeBounds({min,max})} expected`);
+    reasons.push(...focusFailures(group,took));
   }
   if(pool.length)reasons.push(`${pool.length} launch(es) matched no expected group`);
   return reasons;
@@ -65,13 +73,15 @@ function aggregateFailures(evidence,expectation) {
   for(const family of requested) {
     if(!(result.families[family]>0))reasons.push(`family "${family}" was requested but has no usage in result.modelUsage`);
   }
-  const children=expectation.children??0,stats=result.subagentStats??{};
-  if((stats.spawned??0)!==children)reasons.push(`subagent_stats.spawned is ${stats.spawned??"absent"}, ${children} expected`);
-  if((stats.completed??0)!==children)reasons.push(`subagent_stats.completed is ${stats.completed??"absent"}, ${children} expected`);
-  if(children>0&&(stats.requested?.foreground??0)!==children)reasons.push(`subagent_stats.requested.foreground is ${stats.requested?.foreground??"absent"}, ${children} expected`);
+  const range=bounds(expectation.children??0),stats=result.subagentStats??{};
+  const children=evidence.launches.filter(launch=>launch.denials===0).length;
+  if(children<range.min||children>range.max)reasons.push(`${children} launch(es) ran, ${describeBounds(range)} expected`);
+  if((stats.spawned??0)!==children)reasons.push(`subagent_stats.spawned is ${stats.spawned??"absent"}, ${children} launched`);
+  if((stats.completed??0)!==children)reasons.push(`subagent_stats.completed is ${stats.completed??"absent"}, ${children} launched`);
+  if(children>0&&(stats.requested?.foreground??0)!==children)reasons.push(`subagent_stats.requested.foreground is ${stats.requested?.foreground??"absent"}, ${children} launched`);
   if((stats.requested?.background??0)!==0)reasons.push("a background launch was requested");
   const started=evidence.launches.filter(launch=>launch.started).length;
-  if(started!==children)reasons.push(`${started} task_started event(s), ${children} expected`);
+  if(started!==children)reasons.push(`${started} task_started event(s), ${children} launched`);
   return reasons;
 }
 
@@ -105,7 +115,7 @@ function denialFailures(evidence,expectation) {
 }
 
 function launchFailures(evidence,expectation) {
-  const groups=asArray(expectation.groups),total=groups.reduce((sum,group)=>sum+group.count,0);
+  const groups=asArray(expectation.groups),total=groups.reduce((sum,group)=>sum+bounds(group.count).min,0);
   if(total>0&&evidence.launches.length===0)return ["no launches although the expectation asks for some"];
   return groupFailures(groups,evidence.launches);
 }
@@ -121,6 +131,12 @@ export function behaviourVerdict(evidence,expectation) {
     ...aggregateFailures(evidence,expectation),...answerFailures(evidence,expectation)];
   return {outcome:reasons.length?"fail":"pass",reasons};
 }
+
+const validCount=(count,floor)=>{
+  if(Number.isInteger(count))return count>=Math.max(floor,0);
+  const {min,max}=count??{};
+  return Number.isInteger(min)&&Number.isInteger(max)&&min>=0&&max>=min&&max>=1;
+};
 
 /** Validates a fixture's shape; throws a message naming the first defect, returns the fixture. */
 export function validateFixture(fixture,label="fixture") {
@@ -140,8 +156,10 @@ export function validateFixture(fixture,label="fixture") {
   const {expectation}=fixture;
   if(!expectation||typeof expectation!=="object")bad('"expectation" must be an object');
   for(const group of asArray(expectation.groups))
-    if(typeof group.name!=="string"||!(group.count>=1))bad("every expectation group needs a name and a count >= 1");
-  if(!Number.isInteger(expectation.children??0))bad("expectation.children must be an integer");
+    if(typeof group.name!=="string"||!validCount(group.count,1))bad("every expectation group needs a name and a count (integer >= 1, or {min, max})");
+  if(!validCount(expectation.children??0,0))bad("expectation.children must be an integer or {min, max}");
+  for(const group of asArray(expectation.groups))
+    if(group.after!==undefined&&!asArray(expectation.groups).some(other=>other.name===group.after&&other!==group))bad(`group "${group.name}": "after" names no other group`);
   if(expectation.changedFiles!==undefined&&!Array.isArray(expectation.changedFiles))bad("expectation.changedFiles must be an array");
   return fixture;
 }

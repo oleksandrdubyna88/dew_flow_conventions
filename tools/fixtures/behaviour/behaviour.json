@@ -10,16 +10,17 @@
     "tools/fixtures/behaviour/toy/toy-checks.mjs",
     "tools/fixtures/behaviour/toy/README.md"
   ],
-  "caps": { "maxBudgetUsd": 10, "timeoutMs": 1800000, "maxOutputBytes": 8388608, "maxReportBytes": 65536, "measured": false, "capsNote": "2026-10-13: provisional — a full implement-scope load alone exceeds 256 KiB of stream output" },
+  "caps": { "maxBudgetUsd": 10, "timeoutMs": 1800000, "maxOutputBytes": 8388608, "maxReportBytes": 65536, "measured": true, "capsNote": "2026-10-13: first full run cost $3.06, eight launches, no overflow" },
   "expectation": {
     "groups": [
       { "name": "coder", "model": "sonnet", "count": 1, "headings": ["Scenarios", "Brief"] },
       { "name": "scouts", "model": "sonnet", "count": 5, "focusTokens": ["args.mjs", "format.mjs", "config.mjs", "toy-checks.mjs", "README.md"] },
-      { "name": "reviewer", "model": "opus", "count": 1 }
+      { "name": "reviewer", "model": "opus", "count": 1 },
+      { "name": "review-fix", "model": "sonnet", "count": { "min": 0, "max": 1 }, "promptIncludes": ["review"], "after": "reviewer" }
     ],
     "forbiddenParentEdits": ["args.mjs", "format.mjs", "config.mjs", "toy-checks.mjs", "README.md"],
     "denials": 0,
-    "children": 7,
+    "children": { "min": 7, "max": 8 },
     "changedFiles": ["tools/fixtures/behaviour/toy/format.mjs", "tools/fixtures/behaviour/toy/toy-checks.mjs"],
     "postCheck": ["node", "--test", "tools/fixtures/behaviour/toy/toy-checks.mjs"]
   }

@@ -235,11 +235,58 @@ test("the negative fixture expects one unmodelled launch, one denial and no chil
   const {expectation}=loadNamed("negative");
   assert.deepEqual([expectation.groups[0].model,expectation.groups[0].count,expectation.denials,expectation.children],[null,1,1,0]);
 });
-test("the behaviour fixture asks for five scouts, a coder, a reviewer and seven children",()=>{
+test("the behaviour fixture asks for five scouts, a coder, a reviewer, an optional review-fix coder and seven or eight children",()=>{
   const {expectation}=loadNamed("behaviour");
-  assert.deepEqual(expectation.groups.map(group=>[group.name,group.model,group.count]),[["coder","sonnet",1],["scouts","sonnet",5],["reviewer","opus",1]]);
-  assert.equal(expectation.children,7);
+  assert.deepEqual(expectation.groups.map(group=>[group.name,group.model,group.count]),
+    [["coder","sonnet",1],["scouts","sonnet",5],["reviewer","opus",1],["review-fix","sonnet",{min:0,max:1}]]);
+  assert.equal(expectation.groups[3].after,"reviewer");
+  assert.deepEqual(expectation.children,{min:7,max:8});
   assert.equal(expectation.denials,0);
+});
+
+// ---- the recorded 2026-10-13 shape: five scouts, a coder, an opus reviewer, then (optionally) a review-fix coder ----
+const FILES=["args.mjs","format.mjs","config.mjs","toy-checks.mjs","README.md"];
+const scout=file=>({model:"sonnet",prompt:`Learn ${file} only`});
+const coder={model:"sonnet",prompt:"You are the coder for one small change. Scenarios: x. Brief: y."};
+const reviewer={model:"opus",prompt:"Review the change"};
+const fixer=model=>({model,prompt:"You are the coder for one review fix"});
+function pipelineTrace(launches) {
+  const template=recorded.filter(event=>event.type!=="result");
+  const one=template.filter(event=>JSON.stringify(event).includes("toolu_01AZZYqn2JzSMNhi7jedkgB8"));
+  const events=launches.flatMap(({model,prompt},index)=>{
+    const id=`toolu_pipeline_${index}`,text=JSON.stringify(structuredClone(one)).replaceAll("toolu_01AZZYqn2JzSMNhi7jedkgB8",id).replaceAll("Reply OK1",prompt.replaceAll('"','\\"'));
+    const copy=JSON.parse(text);
+    copy.find(event=>event.type==="assistant").message.content[0].input.model=model;
+    return copy;
+  });
+  const result=structuredClone(recorded.at(-1));
+  result.subagent_stats={...result.subagent_stats,spawned:launches.length,completed:launches.length,requested:{background:0,foreground:launches.length,unset:0}};
+  return [...events,result];
+}
+const behaviour=()=>loadNamed("behaviour").expectation;
+const base=[coder,...FILES.map(scout),reviewer];
+const pipelineVerdict=launches=>behaviourVerdict(delegationEvidence(pipelineTrace(launches),{marker:DENY_MARKER}),behaviour());
+
+test("the recorded pipeline shape passes: five scouts, coder, opus reviewer, sonnet review-fix",()=>{
+  assert.deepEqual(pipelineVerdict([...base,fixer("sonnet")]),{outcome:"pass",reasons:[]});
+});
+test("a pipeline with no review-fix coder passes too",()=>{
+  assert.deepEqual(pipelineVerdict(base),{outcome:"pass",reasons:[]});
+});
+test("a review-fix coder on opus fails: it matches no group",()=>{
+  const verdict=pipelineVerdict([...base,fixer("opus")]);
+  assert.equal(verdict.outcome,"fail");
+  assert.match(verdict.reasons.join(),/matched no expected group/);
+});
+test("two review-fix coders fail: the group allows at most one",()=>{
+  const verdict=pipelineVerdict([...base,fixer("sonnet"),{...fixer("sonnet"),prompt:"You are the coder for one more review fix"}]);
+  assert.equal(verdict.outcome,"fail");
+  assert.match(verdict.reasons.join(),/matched no expected group|9 launch/);
+});
+test("a review-fix coder launched before the reviewer fails",()=>{
+  const verdict=pipelineVerdict([coder,...FILES.map(scout),fixer("sonnet"),reviewer]);
+  assert.equal(verdict.outcome,"fail");
+  assert.match(verdict.reasons.join(),/matched no expected group/);
 });
 test("the behaviour mode refuses to run outside a disposable worktree",async t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"smoke-behaviour-"));
@@ -358,7 +405,7 @@ test("the classification fixture loads only the rule under test, with the measur
   assert.match(fixture.caps.capsNote,/overflowed 262144 B/);
   const full=loadNamed("behaviour");
   assert.equal(full.loadOnly,undefined);
-  assert.deepEqual([full.caps.maxOutputBytes,full.caps.maxBudgetUsd,full.caps.timeoutMs,full.caps.maxReportBytes,full.caps.measured],[8388608,10,1800000,65536,false]);
+  assert.deepEqual([full.caps.maxOutputBytes,full.caps.maxBudgetUsd,full.caps.timeoutMs,full.caps.maxReportBytes,full.caps.measured],[8388608,10,1800000,65536,true]);
 });
 
 // ---- the real code path: behaviourSmoke end to end with a fake claude, no paid run ----
