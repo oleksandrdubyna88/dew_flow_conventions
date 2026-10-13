@@ -129,6 +129,10 @@ export function validateFixture(fixture,label="fixture") {
   for(const key of ["name","prompt"])if(typeof fixture[key]!=="string"||!fixture[key])bad(`"${key}" must be a non-empty string`);
   if(typeof fixture.loadRules!=="boolean")bad('"loadRules" must be true or false');
   if(typeof fixture.tools!=="string")bad('"tools" must be a string (comma-separated, "" for none)');
+  if(fixture.loadOnly!==undefined) {
+    if(!fixture.loadRules)bad('"loadOnly" needs "loadRules": true');
+    if(!Array.isArray(fixture.loadOnly)||fixture.loadOnly.length<1||fixture.loadOnly.some(id=>typeof id!=="string"||!id))bad('"loadOnly" must be a non-empty array of non-empty rule ids');
+  }
   const {caps}=fixture;
   for(const key of ["maxBudgetUsd","timeoutMs","maxOutputBytes","maxReportBytes"])
     if(!(Number(caps?.[key])>0))bad(`caps.${key} must be a positive number`);

@@ -2,9 +2,10 @@
   "name": "classification",
   "prompt": "Below are eleven requests you might delegate. Launch nothing; once the rules are loaded, use no further tools. For each request, answer with the model the repository's rules prescribe for the subagent that would do it (sonnet, opus, fable, or main when the main session does it itself) and nothing else. Reply with a JSON array of exactly eleven strings, in order.\n\n1. Collect the logs of a failed run into one file.\n2. Decide the cause of that failure from those logs.\n3. Research a design question AND propose the design, as one unsplit task.\n4. Write the code of a change, with the tests the brief prescribes.\n5. Independently check that the change is correct.\n6. Map the files of a security-sensitive area and report what is there, judging nothing.\n7. Judge whether that security-sensitive area is safe.\n8. Edit one file, 40 added-plus-removed lines.\n9. The same edit, plus the file's test file.\n10. Edit one file, 25 replaced lines.\n11. Edit one file, 26 replaced lines.",
   "loadRules": true,
+  "loadOnly": ["common.subagent-models"],
   "tools": "",
   "files": ["tools/fixtures/behaviour/toy/format.mjs"],
-  "caps": { "maxBudgetUsd": 1, "timeoutMs": 180000, "maxOutputBytes": 262144, "maxReportBytes": 32768 },
+  "caps": { "maxBudgetUsd": 2, "timeoutMs": 300000, "maxOutputBytes": 1048576, "maxReportBytes": 32768, "measured": true, "capsNote": "2026-10-13: a full implement-scope load overflowed 262144 B; the classification loads only the rule under test" },
   "expectation": {
     "groups": [],
     "denials": 0,

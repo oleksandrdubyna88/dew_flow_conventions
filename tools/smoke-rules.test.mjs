@@ -328,11 +328,37 @@ test("a rule-loading classification run offers only Read and the two resolver pa
   assert.equal(args.includes("Agent"),false);
 });
 test("the loading prompt names the explain and read commands for the fixture's files",()=>{
-  const prompt=loadingPrompt(loadNamed("classification"),{resolver:"C:/r/tools/rules.mjs",root:"C:/r"});
+  const fixture={...loadNamed("classification"),loadOnly:undefined};
+  const prompt=loadingPrompt(fixture,{resolver:"C:/r/tools/rules.mjs",root:"C:/r"});
   assert.match(prompt,/--task implement/);
   assert.match(prompt,/tools\/fixtures\/behaviour\/toy\/format\.mjs/);
   assert.match(prompt,/--only <id>/);
-  assert.ok(prompt.endsWith(loadNamed("classification").prompt));
+  assert.match(prompt,/for each selected rule id/);
+  assert.ok(prompt.endsWith(fixture.prompt));
+});
+test("loadOnly narrows the loading prompt to the named rule ids",()=>{
+  const fixture={...loadNamed("classification"),loadOnly:["common.subagent-models"]};
+  const prompt=loadingPrompt(fixture,{resolver:"C:/r/tools/rules.mjs",root:"C:/r"});
+  assert.match(prompt,/--only <id>` ONLY for `common\.subagent-models` and for no other rule/);
+  assert.doesNotMatch(prompt,/for each selected rule id/);
+  assert.ok(prompt.endsWith(fixture.prompt));
+});
+test("validateFixture accepts loadOnly as non-empty id strings and refuses it without loadRules",()=>{
+  const good=loadNamed("classification");
+  assert.equal(validateFixture({...good,loadOnly:["a.b"]}).loadOnly[0],"a.b");
+  assert.throws(()=>validateFixture({...good,loadOnly:[]}),/loadOnly/);
+  assert.throws(()=>validateFixture({...good,loadOnly:[""]}),/loadOnly/);
+  assert.throws(()=>validateFixture({...good,loadOnly:"a.b"}),/loadOnly/);
+  assert.throws(()=>validateFixture({...good,loadRules:false}),/loadOnly/);
+});
+test("the classification fixture loads only the rule under test, with the measured caps",()=>{
+  const fixture=loadNamed("classification");
+  assert.deepEqual(fixture.loadOnly,["common.subagent-models"]);
+  assert.deepEqual([fixture.caps.maxBudgetUsd,fixture.caps.timeoutMs,fixture.caps.maxOutputBytes,fixture.caps.maxReportBytes,fixture.caps.measured],[2,300000,1048576,32768,true]);
+  assert.match(fixture.caps.capsNote,/overflowed 262144 B/);
+  const full=loadNamed("behaviour");
+  assert.equal(full.loadOnly,undefined);
+  assert.deepEqual([full.caps.maxOutputBytes,full.caps.maxBudgetUsd,full.caps.timeoutMs,full.caps.maxReportBytes,full.caps.measured],[8388608,10,1800000,65536,false]);
 });
 
 // ---- the real code path: behaviourSmoke end to end with a fake claude, no paid run ----

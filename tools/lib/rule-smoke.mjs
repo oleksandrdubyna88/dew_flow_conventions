@@ -255,9 +255,13 @@ export function loadingPrompt(fixture,{resolver,root}) {
   if(!fixture.loadRules)return fixture.prompt;
   const node=`node "${forwardSlashes(resolver)}"`,repo=`--repo "${forwardSlashes(root)}"`;
   const files=fixture.files.map(file=>`--file ${file}`).join(" ");
-  return `First load this repository's rules for the task through the resolver. Run \`${node} explain ${repo} --task implement ${files}\`, `
-    +`then run \`${node} read ${repo} --task implement ${files} --only <id>\` for each selected rule id (the whole payload is too large for one read). `
-    +`One command per tool call; do not prefix cd, do not chain or combine shell commands. Only after every selected rule is read, do the task below.
+  const only=fixture.loadOnly?.length>0;
+  const reads=only
+    ?`then run \`${node} read ${repo} --task implement ${files} --only <id>\` ONLY for ${fixture.loadOnly.map(id=>`\`${id}\``).join(", ")} and for no other rule (the whole payload is too large for one read). `
+    :`then run \`${node} read ${repo} --task implement ${files} --only <id>\` for each selected rule id (the whole payload is too large for one read). `;
+  return `First load this repository's rules for the task through the resolver. Run \`${node} explain ${repo} --task implement ${files}\` once, `
+    +reads
+    +`One command per tool call; do not prefix cd, do not chain or combine shell commands. Only after ${only?"that rule is":"every selected rule is"} read, do the task below.
 
 ${fixture.prompt}`;
 }

@@ -10,7 +10,7 @@
     "tools/fixtures/behaviour/toy/toy-checks.mjs",
     "tools/fixtures/behaviour/toy/README.md"
   ],
-  "caps": { "maxBudgetUsd": 5, "timeoutMs": 900000, "maxOutputBytes": 1048576, "maxReportBytes": 65536, "measured": false },
+  "caps": { "maxBudgetUsd": 10, "timeoutMs": 1800000, "maxOutputBytes": 8388608, "maxReportBytes": 65536, "measured": false, "capsNote": "2026-10-13: provisional — a full implement-scope load alone exceeds 256 KiB of stream output" },
   "expectation": {
     "groups": [
       { "name": "coder", "model": "sonnet", "count": 1, "headings": ["Scenarios", "Brief"] },
