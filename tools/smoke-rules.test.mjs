@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {traceEvidence,smokeResolver,installedCli,snapshot,behaviourCliArgs,behaviourSmoke,recordedLaunches,judgeBehaviour,loadingPrompt} from "./lib/rule-smoke.mjs";
+import {traceEvidence,smokeResolver,installedCli,snapshot,behaviourCliArgs,behaviourSmoke,recordedLaunches,judgeBehaviour,loadingPrompt,changedPaths,parseArgs} from "./lib/rule-smoke.mjs";
 import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
 import {delegationEvidence} from "./lib/rule-trace.mjs";
@@ -548,4 +548,23 @@ test("a postCheck that is not node --test <path inside the behaviour fixtures> i
   assert.throws(()=>withPost(["node","--test","tools/fixtures/behaviour/../../rule-smoke.mjs"]),/postCheck/);
   assert.throws(()=>withPost(["node","--test","/etc/x.mjs"]),/postCheck/);
   assert.throws(()=>withPost(["node","-e","1"]),/postCheck/);
+});
+
+test("changedPaths reports the new path of a renamed file",()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),"chg-"));
+  const run=(...a)=>spawnSync("git",a,{cwd:dir,encoding:"utf8"});
+  run("init","-q");
+  fs.writeFileSync(path.join(dir,"old.txt"),"some content more");
+  run("add","old.txt");
+  run("-c","user.name=t","-c","user.email=t@t","commit","-qm","x");
+  run("mv","old.txt","new name.txt");
+  assert.deepEqual(changedPaths(dir),["new name.txt"]);
+  fs.rmSync(dir,{recursive:true,force:true});
+});
+
+test("parseArgs: --cli needs a value, unknown arguments are refused",()=>{
+  assert.throws(()=>parseArgs(["--cli"]),/--cli/);
+  assert.throws(()=>parseArgs(["--bogus"]),/--bogus/);
+  assert.equal(parseArgs(["--cli","some/path"]).cli,"some/path");
+  assert.equal(parseArgs([]).cli,undefined);
 });

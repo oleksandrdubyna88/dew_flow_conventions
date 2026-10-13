@@ -195,9 +195,14 @@ function requireCleanWorktree(root) {
 ${dirty}`);
 }
 
-function changedPaths(root) {
-  return git(root,"status","--porcelain","--untracked-files=all").split(/\r?\n/).filter(Boolean)
-    .map(line=>line.slice(3).replace(/^"|"$/g,"").replaceAll("\\","/")).sort(codeUnitOrder);
+export function changedPaths(root) {
+  const fields=git(root,"status","--porcelain=v1","-z","--untracked-files=all").split(" ").filter(Boolean);
+  const paths=[];
+  for(let i=0;i<fields.length;i++){
+    paths.push(fields[i].slice(3).replaceAll("\\","/"));
+    if(/[RC]/.test(fields[i].slice(0,2)))i++; // a rename/copy record is followed by its origin as its own field
+  }
+  return paths.sort(codeUnitOrder);
 }
 
 function changedSince(before,after) {
@@ -315,4 +320,12 @@ async function behaviourOutcome({fixture,root,result,before,initial,expected,ori
     exitCode:result.code,timedOut:result.timedOut,overflow:result.overflow,cancelled:result.cancelled,spawnFailed:result.spawnFailed,
     evidence:{...evidence,rulesRead,launches:recordedLaunches(fixture,evidence.launches)},
     traceBytes:Buffer.byteLength(result.out),traceHash:sha256(result.out)};
+}
+
+/** Command-line arguments of smoke-behaviour; anything unexpected throws so the caller can exit 2. */
+export function parseArgs(argv) {
+  if(argv.length===0)return {cli:undefined};
+  if(argv[0]!=="--cli")throw new Error(`Unknown argument: ${argv[0]}`);
+  if(argv.length!==2||!argv[1]||argv[1].startsWith("--"))throw new Error("--cli requires exactly one value (path to the claude executable)");
+  return {cli:argv[1]};
 }
