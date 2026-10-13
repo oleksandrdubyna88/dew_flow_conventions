@@ -1097,3 +1097,18 @@ inheritance case and the export case; removing the second escaping round reddens
 --test-concurrency=min(8, CPUs - 1)`. A literal 8 had taken the 4-vCPU CI runner from 3 workers to 8. Its case in
 `low-priority.test.mjs` asserts `testConcurrency()` for 4, 9, 24 and 1 threads, and asserts that `test` and
 `test:coverage` go through it. Break-it: returning a bare `CAP` reddens the first.
+
+## Behaviour smoke (E4.S1/S2)
+
+`tools/lib/rule-trace.mjs` gains `delegationEvidence(events,{marker})` and `tools/lib/rule-behaviour.mjs` holds
+`behaviourVerdict` (pass, fail or inconclusive), fixture validation and the stop-at-first-non-pass sequence;
+`rule-smoke.mjs` gains `behaviourSmoke` (`smoke-rules.mjs --behaviour <fixture>`, `npm run smoke:behaviour`).
+The recorded trace `tools/fixtures/traces/two-children.jsonl` (a real headless run, 2026-10-13, paths scrubbed) showed
+that a child contributes no assistant events to the stream, so the checker reads the REQUESTED model per launch and the
+resolved families in aggregate from `result.modelUsage`; an opus child cannot be told from an opus parent.
+Scenarios in `tools/smoke-rules.test.mjs` (25 new): the recorded trace, each inconclusive cause, parent edit, focus
+coverage, empty launch set, marker denials, unknown events, missing family, `subagent_stats`, fixture shape, caps from
+the fixture, the disposable-worktree refusal, the sequence and the classification answers. The toy package under
+`tools/fixtures/behaviour/toy/` keeps its checks in `toy-checks.mjs`, a name outside the default globs of `node --test`,
+run by explicit path, so `npm test` never runs it. The paid fixtures are run by hand and recorded in
+`research/RESULTS_subagent_model_tiers.md`, never in CI.

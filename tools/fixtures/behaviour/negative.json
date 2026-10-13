@@ -1,0 +1,13 @@
+{
+  "name": "negative",
+  "prompt": "Launch exactly one subagent in the foreground with the Agent tool: subagent_type general-purpose, with NO model argument, and the prompt \"Reply OK\". Report the tool result to me verbatim. Do not retry, do not launch anything else.",
+  "tools": "Agent",
+  "files": ["tools/fixtures/behaviour/toy/format.mjs"],
+  "caps": { "maxBudgetUsd": 1, "timeoutMs": 120000, "maxOutputBytes": 262144, "maxReportBytes": 32768 },
+  "expectation": {
+    "groups": [{ "name": "unmodelled launch", "model": null, "count": 1 }],
+    "denials": 1,
+    "children": 0,
+    "changedFiles": []
+  }
+}

@@ -9,7 +9,8 @@
   "scripts": {
     "test": "node tools/run-tests.mjs",
     "check": "node tools/rules.mjs check --repo .",
-    "test:coverage": "node tools/run-tests.mjs --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/lcov.info"
+    "test:coverage": "node tools/run-tests.mjs --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/lcov.info",
+    "smoke:behaviour": "node tools/smoke-behaviour.mjs"
   },
   "dependencies": {
     "picomatch": "4.0.7",

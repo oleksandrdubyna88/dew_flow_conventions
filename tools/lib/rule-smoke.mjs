@@ -6,7 +6,8 @@ import {normalizedText,sha256,targetPath} from "./rule-catalog.mjs";
 import {within} from "./paths.mjs";
 import {run} from "./proc.mjs";
 import {bootstrap} from "./rule-cli.mjs";
-import {traceEvidence} from "./rule-trace.mjs";
+import {traceEvidence,delegationEvidence} from "./rule-trace.mjs";
+import {behaviourVerdict,loadFixture,DENY_MARKER} from "./rule-behaviour.mjs";
 export {traceEvidence} from "./rule-trace.mjs";
 
 export function smokeResolver(root) {
@@ -95,7 +96,7 @@ function assertAvailableLock(report,lock) {
   }
 }
 
-function smokeReports(root,agent) {
+function smokeReports(root,agent,maxBytes=32768) {
   const directory=git(root,"rev-parse","--path-format=absolute","--git-path","rules-smoke");
   if(fs.existsSync(directory)&&fs.lstatSync(directory).isSymbolicLink())throw new Error("Smoke report directory cannot be a symlink");
   fs.mkdirSync(directory,{recursive:true});
@@ -107,11 +108,17 @@ function smokeReports(root,agent) {
   fs.writeFileSync(lock,JSON.stringify({pid:process.pid}),{flag:"wx"});
   const save=value=>{
     const text=JSON.stringify(value,null,2)+"\n";
-    if(Buffer.byteLength(text)>32768)throw new Error("Smoke evidence exceeds 32 KiB");
+    if(Buffer.byteLength(text)>maxBytes)throw new Error(`Smoke evidence exceeds ${maxBytes} bytes`);
     fs.writeFileSync(report+".tmp",text,{flag:"wx"});
     fs.renameSync(report+".tmp",report);
   };
   return {report,lock,save};
+}
+
+export function disposableRoot(repo) {
+  const root=path.resolve(git(repo,"rev-parse","--show-toplevel"));
+  if(!fs.statSync(path.join(root,".git")).isFile())throw new Error("Smoke requires a disposable worktree, never the original checkout");
+  return root;
 }
 
 export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
@@ -154,4 +161,86 @@ export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
     process.removeListener("SIGINT",cancel);process.removeListener("SIGTERM",cancel);
     fs.unlinkSync(lock);
   }
+}
+
+/**
+ * Argument list of a behaviour run. Caps and the tool set come from the fixture, never from constants here.
+ * Bash is narrowed to node and a rev-parse; every other offered tool is allowed outright (disposable worktree).
+ */
+export function behaviourCliArgs(fixture,prompt,prefix=[]) {
+  const tools=fixture.tools.split(",").map(name=>name.trim()).filter(Boolean);
+  const allowed=tools.flatMap(name=>name==="Bash"?["Bash(node *)","Bash(git rev-parse *)","Bash(pwd)"]:[name]);
+  return [...prefix,"-p","--no-session-persistence","--output-format","stream-json","--verbose",
+    "--max-budget-usd",String(fixture.caps.maxBudgetUsd),"--tools",tools.join(","),
+    ...(allowed.length?["--allowedTools",...allowed]:[]),"--",prompt];
+}
+
+function changedPaths(root) {
+  return git(root,"status","--porcelain","--untracked-files=all").split(/\r?\n/).filter(Boolean)
+    .map(line=>line.slice(3).replace(/^"|"$/g,"").replaceAll("\\","/")).sort(codeUnitOrder);
+}
+
+function changedSince(before,after) {
+  return after.filter(file=>!before.includes(file));
+}
+
+/** Behaviour mode: one fixture in a disposable worktree, the verdict from `behaviourVerdict`. */
+export async function behaviourSmoke({repo,fixture:fixtureName,cli:explicitCli}) {
+  const root=disposableRoot(repo);
+  const fixture=loadFixture(root,fixtureName);
+  const scope=fixture.files.map(targetPath);
+  const resolver=smokeResolver(root);
+  execFileSync(process.execPath,[resolver,"explain","--repo",root,"--task","implement",...scope.flatMap(file=>["--file",file])],{encoding:"utf8",timeout:10000,maxBuffer:262144});
+  const executable=installedCli("claude",explicitCli);
+  const label=`behaviour-${fixture.name}`;
+  const {report,lock,save}=smokeReports(root,label,fixture.caps.maxReportBytes);
+  const initial={status:"incomplete: running",agent:"claude",mode:"behaviour",fixture:fixture.name,platform:process.platform,
+    started:new Date().toISOString(),pid:process.pid,report,caps:fixture.caps,promptHash:sha256(fixture.prompt)};
+  const controller=new AbortController();
+  const cancel=()=>controller.abort();
+  process.once("SIGINT",cancel);process.once("SIGTERM",cancel);
+  const heartbeat=setInterval(()=>console.error(`smoke-rules: behaviour ${fixture.name} running; deadline ${fixture.caps.timeoutMs/1000}s, report ${report}`),20000);
+  try {
+    const before=changedPaths(root);
+    save(initial);
+    const result=await run(executable.command,behaviourCliArgs(fixture,fixture.prompt,executable.prefix),
+      {cwd:root,timeoutMs:fixture.caps.timeoutMs,maxOutputBytes:fixture.caps.maxOutputBytes,containTree:true,signal:controller.signal});
+    const outcome=await behaviourOutcome({fixture,root,result,before,initial});
+    save(outcome);
+    return outcome;
+  } finally {
+    clearInterval(heartbeat);
+    process.removeListener("SIGINT",cancel);process.removeListener("SIGTERM",cancel);
+    fs.unlinkSync(lock);
+  }
+}
+
+function parseEvents(out) {
+  try {return {events:out.split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line)),parseFailed:false};}
+  catch {return {events:[],parseFailed:true};}
+}
+
+async function postCheck(fixture,root) {
+  const command=fixture.expectation.postCheck;
+  if(!command)return {ran:false,ok:true};
+  const done=await run(command[0]==="node"?process.execPath:command[0],command.slice(1),{cwd:root,timeoutMs:60000,maxOutputBytes:262144});
+  return {ran:true,ok:done.code===0};
+}
+
+async function behaviourOutcome({fixture,root,result,before,initial}) {
+  const {events,parseFailed}=parseEvents(result.out);
+  const evidence=delegationEvidence(events,{marker:DENY_MARKER});
+  const verdict=behaviourVerdict(evidence,fixture.expectation);
+  const expectedChanged=[...(fixture.expectation.changedFiles??[])].sort(codeUnitOrder);
+  const changed=changedSince(before,changedPaths(root));
+  const reasons=[...verdict.reasons];
+  if(parseFailed)reasons.push("the trace could not be decoded");
+  if(JSON.stringify(changed)!==JSON.stringify(expectedChanged))reasons.push(`changed files ${JSON.stringify(changed)}, expected ${JSON.stringify(expectedChanged)}`);
+  const post=verdict.outcome==="inconclusive"?{ran:false,ok:true}:await postCheck(fixture,root);
+  if(!post.ok)reasons.push("the post-run check failed");
+  const outcomeName=verdict.outcome==="pass"&&reasons.length?"fail":verdict.outcome;
+  return {...initial,status:`behaviour ${outcomeName}`,outcome:outcomeName,reasons,changed,postCheck:post,
+    exitCode:result.code,timedOut:result.timedOut,overflow:result.overflow,cancelled:result.cancelled,spawnFailed:result.spawnFailed,
+    evidence:{...evidence,launches:evidence.launches.map(launch=>({...launch,prompt:launch.prompt.slice(0,300)}))},
+    traceBytes:Buffer.byteLength(result.out),traceHash:sha256(result.out)};
 }
