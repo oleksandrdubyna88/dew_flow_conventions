@@ -279,9 +279,10 @@ guard's marker appears. It runs before every behaviour run, so a silent guard tu
 **A classification fixture for the boundaries.** The seven-child run never tests the hard lines of §3.1 item 3, so a
 third, cheap fixture launches nothing: a fresh session is handed paired requests — collect a failure's logs / decide its
 cause; research AND propose, unsplit; a coder's prescribed tests / an independent correctness check; a scout in a
-security area / a security judgement; a one-file 40-line edit / the same edit plus its test file — and must answer a
-model for each before acting. Expected: `sonnet`, `opus`, `opus`, `sonnet`, `opus`, `sonnet`, `fable`, main session,
-`sonnet` (risk consultation on E1). A wrong answer is a defect in the rule text.
+security area / a security judgement; a one-file edit of 40 added-plus-removed lines / the same edit plus its test file;
+a one-file edit of 25 replaced lines / of 26 replaced lines — and must answer a model for each before acting. Expected:
+`sonnet`, `opus`, `opus`, `sonnet`, `opus`, `sonnet`, `fable`, main session OR `sonnet` (the exception permits, it does
+not oblige), `sonnet`, main session OR `sonnet`, `sonnet` (risk consultation on E1, both turns). A wrong answer is a defect in the rule text.
 
 **What costs money and what does not.** The trace grouping, the counting and the three outcomes are unit-tested on
 recorded traces (the first real trace is recorded in E4, as E2 records a payload), so `npm test` guards the checker for
@@ -522,7 +523,7 @@ E4's promotion.
 ### Cornerstone areas — two (⌈2·4/5⌉), named here, marked `model: fable` by Opus when the epic is split
 
 1. **E1 — the canonical statement:** the role table with the 50-line exception, the scout/judge test and the brief
-   contents (§3.1 items 1, 3, 5). Every task scope but `inspect`, in six repositories, loads it; the guard checks the
+   contents (§3.1 items 1, 3, 5). Fourteen of the eighteen tasks, in six repositories, load it; the guard checks the
    alias, not the role, so a misdrawn scout/judge line is invisible to every check, and §3.4 makes the text the only thing a
    denial may change. A fix is a body re-record, a release, six bump PRs and a paid smoke run.
 2. **E2 — the hook's contract with the host:** the payload shape recorded from a real session, the verdict matrix, the
