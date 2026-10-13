@@ -8,7 +8,7 @@ import {run} from "./proc.mjs";
 import {bootstrap} from "./rule-cli.mjs";
 import {traceEvidence,delegationEvidence} from "./rule-trace.mjs";
 import {roleRowsOf} from "./rule-roles.mjs";
-import {behaviourVerdict,loadFixture,changedFilesReasons,DENY_MARKER} from "./rule-behaviour.mjs";
+import {behaviourVerdict,loadFixture,changedFilesReasons,validPostCheck,DENY_MARKER} from "./rule-behaviour.mjs";
 export {traceEvidence} from "./rule-trace.mjs";
 
 export function smokeResolver(root) {
@@ -164,15 +164,18 @@ export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
   }
 }
 
+/** The only node a behaviour session may run besides the resolver: the toy fixture's own checks. */
+const TOY_CHECKS_PATTERN="Bash(node --test tools/fixtures/behaviour/toy/*)";
+
 /**
  * Argument list of a behaviour run. Caps and the tool set come from the fixture, never from constants here.
- * Bash is narrowed to node and a rev-parse; every other offered tool is allowed outright (disposable worktree).
+ * Bash is narrowed to the toy checks and a rev-parse (resolver verbs come with rule loading); every other offered tool is allowed outright (disposable worktree).
  */
 export function behaviourCliArgs(fixture,prompt,prefix=[],resolver="") {
   const offered=fixture.tools.split(",").map(name=>name.trim()).filter(Boolean);
   const loading=fixture.loadRules?loadingTools(resolver):{tools:[],allowed:[]};
   const tools=[...new Set([...offered,...loading.tools])];
-  const allowed=[...new Set([...offered.flatMap(name=>name==="Bash"?["Bash(node *)","Bash(git rev-parse *)","Bash(pwd)"]:[name]),...loading.allowed])];
+  const allowed=[...new Set([...offered.flatMap(name=>name==="Bash"?[TOY_CHECKS_PATTERN,"Bash(git rev-parse *)","Bash(pwd)"]:[name]),...loading.allowed])];
   return [...prefix,"-p","--no-session-persistence","--output-format","stream-json","--verbose",
     "--max-budget-usd",String(fixture.caps.maxBudgetUsd),"--tools",tools.join(","),
     ...(allowed.length?["--allowedTools",...allowed]:[]),"--",prompt];
@@ -183,6 +186,13 @@ function loadingTools(resolver) {
   if(!resolver)throw new Error("A rule-loading fixture needs the resolver path");
   const invocation=`node "${forwardSlashes(resolver)}"`;
   return {tools:["Bash","Read"],allowed:["Read",...["explain","read"].map(verb=>`Bash(${invocation} ${verb} *)`)]};
+}
+
+/** A pre-existing change would be invisible to changedSince, so a dirty worktree is refused before anything launches. */
+function requireCleanWorktree(root) {
+  const dirty=git(root,"status","--porcelain","--untracked-files=all");
+  if(dirty.trim())throw new Error(`Smoke requires a clean disposable worktree; uncommitted changes:
+${dirty}`);
 }
 
 function changedPaths(root) {
@@ -197,6 +207,7 @@ function changedSince(before,after) {
 /** Behaviour mode: one fixture in a disposable worktree, the verdict from `behaviourVerdict`. */
 export async function behaviourSmoke({repo,fixture:fixtureName,cli:explicitCli}) {
   const root=disposableRoot(repo);
+  requireCleanWorktree(root);
   const fixture=loadFixture(root,fixtureName);
   const scope=fixture.files.map(targetPath);
   const resolver=smokeResolver(root);
@@ -281,7 +292,8 @@ function parseEvents(out) {
 async function postCheck(fixture,root) {
   const command=fixture.expectation.postCheck;
   if(!command)return {ran:false,ok:true};
-  const done=await run(command[0]==="node"?process.execPath:command[0],command.slice(1),{cwd:root,timeoutMs:60000,maxOutputBytes:262144});
+  if(!validPostCheck(command))throw new Error("postCheck must be [\"node\", \"--test\", <path inside tools/fixtures/behaviour/>]");
+  const done=await run(process.execPath,command.slice(1),{cwd:root,timeoutMs:60000,maxOutputBytes:262144});
   return {ran:true,ok:done.code===0};
 }
 

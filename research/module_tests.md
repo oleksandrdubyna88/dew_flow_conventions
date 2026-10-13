@@ -1108,7 +1108,7 @@ that a child contributes no assistant events to the stream, so the checker reads
 resolved families in aggregate from `result.modelUsage`; an opus child cannot be told from an opus parent.
 Scenarios in `tools/smoke-rules.test.mjs` (25 new): the recorded trace, each inconclusive cause, parent edit, focus
 coverage, empty launch set, marker denials, unknown events, missing family, `subagent_stats`, fixture shape, caps from
-the fixture, the disposable-worktree refusal, the sequence and the classification answers. The toy package under
+the fixture, the disposable-worktree refusal (and the refusal of a dirty one), the narrowed Bash allow-list, the `postCheck` shape, the sequence and the classification answers. The toy package under
 `tools/fixtures/behaviour/toy/` keeps its checks in `toy-checks.mjs`, a name outside the default globs of `node --test`,
 run by explicit path, so `npm test` never runs it. The paid fixtures are run by hand and recorded in
 `research/RESULTS_subagent_model_tiers.md`, never in CI.

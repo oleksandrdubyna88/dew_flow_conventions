@@ -512,3 +512,36 @@ test("evidence keeps the full prompt and description when the fixture asks, and 
   const cut=recordedLaunches({},[launch])[0];
   assert.equal(cut.prompt.length,300);
 });
+
+// ---- hardening from the accepted code-review round ----
+test("the behaviour args never allow arbitrary node, only the resolver verbs and the toy checks",()=>{
+  const args=behaviourCliArgs(loadNamed("behaviour"),"P",[],"C:/r/tools/rules.mjs");
+  assert.equal(args.includes("Bash(node *)"),false,"Bash(node *) runs arbitrary code");
+  assert.equal(args.includes("Bash(node --test tools/fixtures/behaviour/toy/*)"),true);
+  assert.equal(args.includes('Bash(node "C:/r/tools/rules.mjs" explain *)'),true);
+});
+test("behaviourSmoke refuses a worktree that already carries an uncommitted change, before launching",async t=>{
+  const home=fs.mkdtempSync(path.join(os.tmpdir(),"smoke-dirty-"));
+  const worktree=path.join(home,"wt");
+  const top=git(process.cwd(),"rev-parse","--show-toplevel");
+  git(top,"worktree","add","--detach",worktree,"HEAD");
+  const modules=path.join(worktree,"node_modules");
+  fs.symlinkSync(path.join(top,"node_modules"),modules,"junction");
+  t.after(()=>{try {fs.rmdirSync(modules);git(top,"worktree","remove","--force",worktree);} finally {fs.rmSync(home,{recursive:true,force:true});git(top,"worktree","prune");}});
+  const tracked=path.join(worktree,"tools/fixtures/behaviour/toy/format.mjs");
+  fs.appendFileSync(tracked,"\n// dirty\n");
+  const marker=path.join(home,"launched");
+  const fake=path.join(home,"fake-claude.mjs");
+  fs.writeFileSync(fake,`import fs from "node:fs";fs.writeFileSync(${JSON.stringify(marker)},"x");`);
+  await assert.rejects(behaviourSmoke({repo:worktree,fixture:"negative",cli:fake}),/uncommitted|clean/);
+  assert.equal(fs.existsSync(marker),false,"nothing was launched");
+});
+test("a postCheck that is not node --test <path inside the behaviour fixtures> is an invalid fixture",()=>{
+  const good=loadNamed("behaviour");
+  const withPost=postCheck=>validateFixture({...good,expectation:{...good.expectation,postCheck}});
+  assert.doesNotThrow(()=>withPost(["node","--test","tools/fixtures/behaviour/toy/toy-checks.mjs"]));
+  assert.throws(()=>withPost(["cmd","/c","calc"]),/postCheck/);
+  assert.throws(()=>withPost(["node","--test","tools/fixtures/behaviour/../../rule-smoke.mjs"]),/postCheck/);
+  assert.throws(()=>withPost(["node","--test","/etc/x.mjs"]),/postCheck/);
+  assert.throws(()=>withPost(["node","-e","1"]),/postCheck/);
+});

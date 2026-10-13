@@ -162,8 +162,19 @@ export function validateFixture(fixture,label="fixture") {
   if(!validCount(expectation.children??0,0))bad("expectation.children must be an integer or {min, max}");
   for(const group of asArray(expectation.groups))
     if(group.after!==undefined&&!asArray(expectation.groups).some(other=>other.name===group.after&&other!==group))bad(`group "${group.name}": "after" names no other group`);
+  if(expectation.postCheck!==undefined&&!validPostCheck(expectation.postCheck))bad('expectation.postCheck must be ["node", "--test", <relative path inside tools/fixtures/behaviour/>]');
   if(!validChangedFiles(expectation.changedFiles))bad('expectation.changedFiles must be an array or {"within": "dir/", "mustInclude": [paths]}');
   return fixture;
+}
+
+const POST_CHECK_DIR="tools/fixtures/behaviour/";
+
+/** postCheck is exactly node --test <relative path under tools/fixtures/behaviour/>; the caller runs process.execPath, never PATH. */
+export function validPostCheck(command) {
+  if(!Array.isArray(command)||command.length!==3||command[0]!=="node"||command[1]!=="--test")return false;
+  const target=command[2];
+  return typeof target==="string"&&target.startsWith(POST_CHECK_DIR)&&!path.isAbsolute(target)&&!target.includes("\\")
+    &&!target.split("/").includes("..")&&target.length>POST_CHECK_DIR.length;
 }
 
 function validChangedFiles(spec) {

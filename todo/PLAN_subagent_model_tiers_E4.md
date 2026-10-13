@@ -44,6 +44,11 @@ classification fixture answered as § 3.4 expects; one release; every consumer's
 
 ## S2 — The behaviour mode and its three fixtures
 
+Hardening (code-review round, 2026-10-13):
+- Bash is narrowed: no `Bash(node *)`; only the resolver `explain`/`read` verbs, `node --test tools/fixtures/behaviour/toy/*`, `git rev-parse *` and `pwd`.
+- `behaviourSmoke` refuses a worktree whose `git status --porcelain --untracked-files=all` is non-empty, before anything launches.
+- `postCheck` must be exactly `["node","--test",<relative path under tools/fixtures/behaviour/>]` (no `..`), validated in `validateFixture` and before the run, and run with `process.execPath`.
+
 - **Models.** Fixture design by Opus (below); code by a Sonnet coder; review by Opus.
 - **Mode.** `tools/smoke-rules.mjs --behaviour <fixture>` (and `npm run smoke:behaviour`, a new script that runs the
   three fixtures in the order *negative → classification → behaviour* and stops at the first non-pass). It reuses
