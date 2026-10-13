@@ -182,6 +182,10 @@ a scope that is single-read today over 32 768 B; a test pins the outcome.
   - an existing `settings.json` that does not parse is **refused**, never overwritten;
   - it re-reads and compares the file immediately before writing, and refuses if another writer changed it since it read;
   - the write is atomic (a temporary file in the same directory, then rename);
+  - **the residual race, stated rather than hidden:** the host takes no lock a third party can share, so a write landing
+    between that final comparison and the rename is lost — a window of milliseconds, opened once per release by an
+    operator-run command. The backup exists for exactly that case: `--check` diffs the live file against the backup and
+    the merge, and names any key that is in neither;
   - its entry is identified by the hook's path, so a second run **upgrades** that entry in place and never adds a twin;
   - the hook is addressed by an absolute path passed as an `args` element, never a shell string — no quoting on Windows;
   - `--uninstall` removes exactly its own entry and its own hook file and nothing else. The timestamped backup is kept
@@ -247,7 +251,9 @@ not for an editorial edit — and each run is recorded in `research/RESULTS_suba
 Back up `~/.claude/settings.json`. **Control first**: set `low` under the exact key `claude-opus-5-5`, start a session on
 `opus` and confirm the surface (`/status`, or `--debug` output) shows `low` — without that, "not observed" and "not
 honoured" are one result (`common/measurement.md` §3). Then the probe: move `low` to an `"opus"` key with no exact key,
-start again, read the same surface; restore. If the alias key is honoured, the file moves to alias keys (`opus`, `fable`, `sonnet`) with the operator's levels; if not, or if
+start again, read the same surface. **Restore by keys, not by file**: put back only the `modelSettings` entries the probe
+touched, and refuse — showing the diff — if anything else in the file changed since the backup, because restoring the
+whole backup would erase that change. If the alias key is honoured, the file moves to alias keys (`opus`, `fable`, `sonnet`) with the operator's levels; if not, or if
 it cannot be observed, the result is recorded and the exact keys stay, with a line in the rule's research record that
 they need one edit per model release.
 
@@ -279,7 +285,8 @@ BEFORE the user-level install (E3), so no running arm is refused.
 - **Installer** (`tools/install-user-hook.test.mjs`), against a temporary home: fresh install; idempotent second run
   (byte-identical settings); an upgrade replaces its entry in place, no twin; an existing unrelated `PreToolUse` entry
   and every other key preserved; an unparsable `settings.json` refused and left byte-identical; a change made between
-  read and write refused; `--uninstall` leaves the file byte-identical to its pre-install state when nothing else
+  read and write refused; a key in the live file that is in neither the backup nor the merge named by `--check`;
+  `--uninstall` leaves the file byte-identical to its pre-install state when nothing else
   changed, and keeps an unrelated change made after install; `--check` reports drift after the hook copy is altered.
 - **Smoke checker** (`tools/smoke-rules.test.mjs`), on recorded traces: the seven-children pass; each inconclusive
   cause (truncated trace, spent budget, missing terminal event, retry, unasked nested child); a parent edit; a missing
@@ -298,7 +305,8 @@ BEFORE the user-level install (E3), so no running arm is refused.
 | The guard blocks a harness that measures models | the opt-out, and E2's inventory of every `claude`-spawning harness before the user-level install |
 | The guard hangs or crashes a tool call | the `build-flags.mjs` fail-open contract, tested by spawn |
 | The Agent tool is renamed or its payload changes, and the guard goes silent | E2 records a real payload; the negative control (§3.4) runs before every behaviour run and turns it red when the marker does not appear; the matrix runs on every `npm test` |
-| The installer damages the operator's settings | refuse on unparsable or concurrently changed input, atomic write, `--uninstall` that removes only its own entry (§3.2), all tested on a temporary home |
+| The installer damages the operator's settings | refuse on unparsable or concurrently changed input, atomic write, `--uninstall` that removes only its own entry (§3.2), all tested on a temporary home; the millisecond race left between the last comparison and the rename is named, and `--check` finds what it lost |
+| The user-level guard reaches a repository still on the old rule | E3 installs only after E4's cascade (§ Order) |
 | A Sonnet coder needs context the brief omitted | §3.1's brief contents; the 50-line exception for the smallest edits; the Opus review catches the rest |
 | The alias moves to a model that is worse at a role | accepted by D6; the behaviour smoke and the calibration (§3.7) are where it would show |
 | Rolling out reddens every open PR in the family | one release for all four epics (E1, E2, E4 merge to `main` first; one promotion; one cascade) |
@@ -396,8 +404,9 @@ Cornerstones: 0 of 2 marked — the stories documents mark them (§3.1, the ledg
 - **Scope.** `~/.claude/settings.json` and `~/.claude/hooks/subagent-model.mjs` via `tools/install-user-hook.mjs` run
   from merged `main`; the §3.5 probe; one PR in the benchmark repository — the status line, the three citations, AND the
   opt-out in the arm that measures models (the inventory's verdict, §3.2); the assistant's memory note rewritten to D1–D12.
-- **Depends on.** E2 merged (installer and inventory); the benchmark PR merged BEFORE the install — a guard installed
-  first would refuse a running arm's model-less launches and rewrite its series.
+- **Depends on.** E4's cascade complete — every consumer already pins the rewritten rule, so the user-level guard never
+  refuses a session that is still reading the old text (gate round 1, accepted); and the benchmark PR merged BEFORE the
+  install — a guard installed first would refuse a running arm's model-less launches and rewrite its series.
 - **Done when.** In a plain session in another repository an Agent call without `model` is refused with the role table
   and one with `model: "sonnet"` goes through; `node tools/install-user-hook.mjs --check` is clean; the probe's outcome
   (alias key honoured / not / not observable) is in the research record and `~/.claude/settings.json` matches it; the
@@ -416,7 +425,8 @@ Cornerstones: 0 of 2 marked — the stories documents mark them (§3.1, the ledg
   `release`, the six pins — connect_other_ais' bump also copies the hook and the `PreToolUse` entry — `todo/README.md`,
   `research/README.md`, `research/module_tests.md`, and the `git mv` of this plan and `_E1`–`_E4`.
 - **Depends on.** E1 and E2 merged: the smoke's worktree must carry the rewritten rule and `.claude/hooks/subagent-model.mjs`,
-  or the zero-denial count counts nothing. E3 is not needed for the smoke; the promotion waits for E3.
+  or the zero-denial count counts nothing. E3 is not needed for the smoke; E3 waits for this epic's cascade, and the
+  promotion waits for E3.
 - **Done when.** The smoke checker's recorded-trace tests pass; the negative control showed the marker; then one recorded
   run met every expectation in §3.4 (five areas covered, the coder's brief and scenarios, no parent edit, seven children
   with matching resolved models, zero denials) inside its budget cap — an inconclusive run is recorded and re-run, never
@@ -435,12 +445,15 @@ Cornerstones: 0 of 2 marked — the stories documents mark them (§3.1, the ledg
 
 ### Order, and why
 
-E1 → E2 → {E3 ∥ E4's smoke} → E4's release → E4's cascade → E4's promotion.
+E1 → E2 → E4's smoke → E4's release → E4's cascade → E3 (benchmark PR, then the user-level install and the probe) →
+E4's promotion.
 
 - E1 before E2 **merges**: the guard's reason quotes the table; one canonical text (§3.1), so the digest follows the text.
-- E2 before E3 and E4: the installer installs from `main`; the smoke's zero-denial count needs the guard live in the
-  worktree's `.claude/hooks/`. E3 and the smoke are then independent — the smoke runs on the project-level hook and never
-  needs `~/.claude`; E3 waits on the benchmark PR instead.
+- E2 before E4: the smoke's zero-denial count needs the guard live in the worktree's `.claude/hooks/`; the smoke runs on
+  the project-level hook and never needs `~/.claude`.
+- E3 after the cascade (gate round 1): the user-level guard reaches every repository on the machine at once, so it goes
+  in only when every consumer already carries the rule it enforces. The benchmark PR can be opened any time; it merges
+  before the install.
 - **One release, after E1, E2 and the smoke are on `main`** (§5, last row — kept): a release is six bump pull requests
   (README § *Editing discipline*), so one per epic would be eighteen; a consumer holding the rule without the guard is
   exactly the state D8 rejects; and a release before the smoke publishes a text nothing has yet shown to carry.
