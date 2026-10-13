@@ -287,9 +287,14 @@ expectation is known before launch:
   BEFORE the code;
 - **one** with `model: "opus"` that reviews;
 - **no edit by the parent** to the fixture's files — the main session did not write the code itself;
-- every child's resolved `message.model` in the matching family (`claude-sonnet-*`, `claude-opus-*`), read by grouping
-  events on `parent_tool_use_id`, and the COUNT of children with an observed model asserted (seven) — a family check over
-  an empty set passes;
+- the models, from the evidence the host actually emits — **measured 2026-10-13: a child's own assistant events never
+  appear in the parent's stream** (a child contributes one `user` event with its prompt; `system/task_started` and
+  `task_notification` carry no model). So: each launch's REQUESTED model (`input.model`) is the exact per-child check;
+  resolution is checked in aggregate — every family requested at least once has a `claude-<family>-*` key with nonzero
+  usage in the final `result.modelUsage` (other families, such as the host's own small Haiku spend, are ignored); and
+  `result.subagent_stats` shows spawned = completed = foreground = seven. An Opus child cannot be separated from an Opus
+  parent in that aggregate — a stated limit of the measurement, not a check. Zero launches when seven are expected is a
+  fail, never a pass;
 - **zero** guard denials, counted by the deny marker (§3.2) — a denial means the rule text did not carry, which is a
   defect in the text, fixed and re-run, never a loosened check.
 
@@ -407,8 +412,8 @@ repository's own `.claude/`), not the user-level install (consultant, cadence ro
 - [ ] The guard is installed in `~/.claude` on this machine, `--check` is clean, and in a plain session in another
       repository an Agent call without a model is refused while one with `model: "sonnet"` goes through.
 - [ ] The negative control showed the marker; then the behaviour smoke showed five Sonnet scouts covering the five areas,
-      one Sonnet coder carrying the brief and scenarios, one Opus reviewer, no parent edit, seven children with matching
-      resolved models and zero denials — recorded, as is any inconclusive run, in `research/RESULTS_subagent_model_tiers.md`
+      one Sonnet coder carrying the brief and scenarios, one Opus reviewer, no parent edit, seven launches with the
+      requested models, every requested family present in `modelUsage`, `subagent_stats` at seven, and zero denials — recorded, as is any inconclusive run, in `research/RESULTS_subagent_model_tiers.md`
       (with its `research/README.md` row).
 - [ ] The `modelSettings` probe ran after its control; its outcome is applied or recorded.
 - [ ] One release; every consumer's pin bumped and green; connect_other_ais carries the hook copy.
@@ -518,7 +523,7 @@ Stories: [PLAN_subagent_model_tiers_E2.md](PLAN_subagent_model_tiers_E2.md).
   promotion waits for E3.
 - **Done when.** The smoke checker's recorded-trace tests pass; the negative control showed the marker; then one recorded
   run met every expectation in §3.4 (five areas covered, the coder's brief and scenarios, no parent edit, seven children
-  with matching resolved models, zero denials) inside its budget cap — an inconclusive run is recorded and re-run, never
+  with the requested models, every requested family in `modelUsage`, `subagent_stats` at seven, zero denials) inside its budget cap — an inconclusive run is recorded and re-run, never
   counted; `release` moved once, to a `main` sha carrying E1, E2 and this epic's code; every consumer's `pin-check` green;
   `node tools/plan-lifecycle.mjs` clean after the promotion.
 - **Easy to get wrong.** (1) The smoke is sized for a read-only inspection: `rule-smoke.mjs:145` makes `complete` require
