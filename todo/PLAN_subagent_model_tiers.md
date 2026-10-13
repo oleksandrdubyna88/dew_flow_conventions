@@ -38,6 +38,7 @@ mistake is caught by the next step. The decisions, as stated, with the follow-up
 | D10 | **A behaviour smoke**: a real session, observed, proves the rule is followed — loading is not obedience. |
 | D11 | **`modelSettings` by alias** on the operator's machine if the host accepts it, so a saved effort level survives the next model release. |
 | D12 | Scope: **every subagent in every task**, not only `feature-dev` (operator, 2026-10-12, unchanged). |
+| D13 | **The user-level guard installs itself** (operator, 2026-10-13, chosen over a start-up reminder): a session started in a repository that carries the adapter puts the guard into `~/.claude` when it is missing or older, so a fresh machine needs no manual step. |
 
 Derived, not separately decided: **Haiku is not used** (no role above names it). When Fable refuses a launch on a spend
 or session limit, the work continues on **Opus** and the summary says so (operator, 2026-10-10).
@@ -209,6 +210,18 @@ host's `agent.spawn` extension point, which can rewrite a spawn's model) is §6,
   machine that spawns `claude` and records which must set it (a model-measuring benchmark arm must; a coai reviewer is
   checked, not assumed).
 - Fails open on a malformed payload, an internal error and a stdin that never closes — the `build-flags.mjs` contract.
+- **Self-install (D13).** A second `SessionStart` hook, `settings/hooks/ensure-user-guard.mjs`, runs the installer's
+  logic against the operator's home from the project copy at `${CLAUDE_PROJECT_DIR}/.claude/hooks/subagent-model.mjs`:
+  - only when the installed copy is **missing or older** — the hook carries a `GUARD_VERSION` integer, raised with every
+    behaviour change, so two repositories on different releases never flip the installed copy back and forth;
+  - never when `SUBAGENT_MODEL_GUARD=off` (a measuring harness installs nothing) or when
+    `~/.claude/hooks/subagent-model.optout` exists — which `--uninstall` writes, or the next session would undo it;
+  - with every safety of the installer below (refusal on unparsable or changed settings, atomic write, backup), and
+    fail-open: any error leaves the session starting normally, with one `systemMessage` line saying what happened;
+  - silent when nothing changes, one line when it installed or upgraded.
+  It reaches only the repositories wired with the adapter (this one and connect_other_ais today); it is wired into
+  `settings/settings.json` in E4, in the commit the release is cut from, so the first self-install happens no earlier
+  than the cascade it rides on.
 - **Delivery, three ways:** `settings/settings.json` wires it (reference), and this repository copies it onto itself
   (`tools/adapter-check.test.mjs:48-50` asserts the self-hosted adapter is whole); connect_other_ais copies it, as
   `adapter-check` will demand; and `tools/install-user-hook.mjs` installs it into the operator's home.
@@ -465,14 +478,14 @@ Stories: [PLAN_subagent_model_tiers_E2.md](PLAN_subagent_model_tiers_E2.md).
 
 ### E3 — This machine and the boundary (nothing merges to `main` here)
 
-- **Goal.** D8 and D11 on the operator's machine, and the memory note (§7).
-- **Scope.** `~/.claude/settings.json` and `~/.claude/hooks/subagent-model.mjs` via `tools/install-user-hook.mjs` run
-  from merged `main`; the §3.5 probe; the assistant's memory note rewritten to D1–D12. (The benchmark PR moved to E2's
+- **Goal.** D8, D11 and D13 on the operator's machine, and the memory note (§7).
+- **Scope.** `~/.claude/settings.json` and `~/.claude/hooks/subagent-model.mjs`, put there by the self-install (D13) on
+  the first session after the cascade — observed, not run by hand; the §3.5 probe; the assistant's memory note rewritten to D1–D12. (The benchmark PR moved to E2's
   harness preparation — consultant, cadence round.)
 - **Depends on.** E4's cascade complete — every consumer already pins the rewritten rule, so the user-level guard never
   refuses a session that is still reading the old text (gate round 1, accepted); E2's harness preparation is already
   merged and proved.
-- **Done when.** In a plain session in another repository an Agent call without `model` is refused with the role table
+- **Done when.** The self-install's one line appeared in the first session after the cascade; in a plain session in another repository an Agent call without `model` is refused with the role table
   and one with `model: "sonnet"` goes through; `node tools/install-user-hook.mjs --check` is clean; the probe's outcome
   (alias key honoured / not / not observable) is in the research record and `~/.claude/settings.json` matches it; the
   memory note is rewritten.
