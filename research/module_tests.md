@@ -161,6 +161,37 @@ drifted guard copy and an unwired `PreToolUse` entry as separate findings. The t
 were also run by hand against this repository — copy removed, copy edited, wiring deleted — each
 reported with the file and the event named, and OK restored afterwards.
 
+`tools/subagent-model-hook.test.mjs` (34 cases, 2026-10-13) covers `settings/hooks/subagent-model.mjs`, the
+`PreToolUse` guard on `Agent|Task`: an allowed alias teaches (`additionalContext`, never a decision); a missing,
+empty, padded, haiku, inherit, versioned, differently cased or non-string model is denied with one fixed reason that
+starts with `subagent-models.md:`; a tool that is not `Agent`/`Task`, a malformed envelope or garbage stdin is silent
+(zero bytes, exit 0); `SUBAGENT_MODEL_GUARD=off` silences everything, a misspelt opt-out and a set alias-freezing
+variable are named in `systemMessage` beside an unchanged verdict; both texts are bounded (600 and 300 bytes), one
+line, and rendered from the single `ROLE_DIGEST`. Spawned-process cases run the real file with a scrubbed
+environment: the protocol, the opt-out, the warning, stdin never closed (deny and teach alike) and the 256 KiB limit.
+The digest-vs-rule case reads `common/subagent-models.md` (or `SUBAGENT_MODEL_RULE_PATH`, a test-only override used for
+the break-it) through `tools/lib/role-table.mjs`; the permanent break-it changes one row's model in a
+copy and demands exactly one mismatch naming that role.
+
+`tools/ensure-user-guard.test.mjs` (14 cases, 2026-10-13) covers `settings/hooks/ensure-user-guard.mjs`, the
+`SessionStart` self-install of the user-level guard, with temporary homes only: missing installs, older and
+unversioned (version 0) upgrade, equal writes nothing (bytes and mtime of both files and the directory listing
+unchanged), a newer installed copy is never downgraded and is reported as `newer` with the `--force` command,
+`SUBAGENT_MODEL_GUARD=off`, the `subagent-model.optout` marker and a missing source skip without writing, an
+unparsable `settings.json` is refused byte-identical, a project hook with uncommitted changes (a real `git init`)
+is refused, every install writes the provenance manifest (source, sha256, version, UTC time, `self-install`), and
+spawned runs of the entry point print exactly one `systemMessage` line the first time and nothing the second, and
+survive garbage stdin (the payload `cwd` stands in for `CLAUDE_PROJECT_DIR`). The permanent break-it makes the
+version comparison always install: the "equal writes nothing" and the second-run-silent cases go red.
+`tools/install-user-hook.test.mjs` (now 22 cases, importing the extracted core `settings/hooks/lib/user-guard-install.mjs`)
+gains the opt-out marker (`--uninstall` writes it, an explicit `--install` deletes it), `--force` over a newer
+guard, and the manifest (`--check` prints it and fails when the installed bytes no longer match its sha256;
+`--uninstall` removes it).
+
+`tools/adapter-check.test.mjs` changes again for the third hook: a bare repository is now missing four files, and the
+cases that delete `hooks` or `PreToolUse` report one finding more, because the reference wires the guard by its own
+`PreToolUse` entry.
+
 **What the tests do not cover, and why it is recorded here.** The measurements the rule cites
 (worker counts, peak and retained RAM, response-file discovery, which delivery of `-m` works) are
 not re-derived by any test: they are properties of MSBuild on a particular machine, and a test that
@@ -1066,3 +1097,28 @@ inheritance case and the export case; removing the second escaping round reddens
 --test-concurrency=min(8, CPUs - 1)`. A literal 8 had taken the 4-vCPU CI runner from 3 workers to 8. Its case in
 `low-priority.test.mjs` asserts `testConcurrency()` for 4, 9, 24 and 1 threads, and asserts that `test` and
 `test:coverage` go through it. Break-it: returning a bare `CAP` reddens the first.
+
+## Behaviour smoke (`npm run smoke:behaviour`)
+
+Whether a real session OBEYS `common/subagent-models.md` — loading is not obedience. `tools/smoke-behaviour.mjs` runs
+three fixtures from `tools/fixtures/behaviour/` in order and stops at the first non-pass: **negative** (one launch
+without a model must be refused with the guard's marker — a silent guard turns the run red, not green),
+**classification** (eleven paired requests answered with a model, the rule loaded alone through `loadOnly`) and
+**behaviour** (a toy CLI change in a disposable worktree, the full implement-scope load). A rule-loading fixture whose
+session did not read `common.subagent-models` completely is **inconclusive**, never a pass. The behaviour verdict grades
+roles: each launch declares a role from the rule's table in its `description`, `tools/lib/rule-roles.mjs` checks its
+requested model against the parsed table and the structure (≥ 5 scouts covering the five areas, a coder, a judge after
+it), and the families must appear in `result.modelUsage`. Nine paid runs on 2026-10-13; runs 8 and 9 passed all three.
+
+`tools/lib/rule-trace.mjs` gains `delegationEvidence(events,{marker})` and `tools/lib/rule-behaviour.mjs` holds
+`behaviourVerdict` (pass, fail or inconclusive), fixture validation and the stop-at-first-non-pass sequence;
+`rule-smoke.mjs` gains `behaviourSmoke` (`smoke-rules.mjs --behaviour <fixture>`, `npm run smoke:behaviour`).
+The recorded trace `tools/fixtures/traces/two-children.jsonl` (a real headless run, 2026-10-13, paths scrubbed) showed
+that a child contributes no assistant events to the stream, so the checker reads the REQUESTED model per launch and the
+resolved families in aggregate from `result.modelUsage`; an opus child cannot be told from an opus parent.
+Scenarios in `tools/smoke-rules.test.mjs` (25 new): the recorded trace, each inconclusive cause, parent edit, focus
+coverage, empty launch set, marker denials, unknown events, missing family, `subagent_stats`, fixture shape, caps from
+the fixture, the disposable-worktree refusal (and the refusal of a dirty one), the narrowed Bash allow-list, the `postCheck` shape, the sequence and the classification answers. The toy package under
+`tools/fixtures/behaviour/toy/` keeps its checks in `toy-checks.mjs`, a name outside the default globs of `node --test`,
+run by explicit path, so `npm test` never runs it. The paid fixtures are run by hand and recorded in
+`research/RESULTS_subagent_model_tiers.md`, never in CI.

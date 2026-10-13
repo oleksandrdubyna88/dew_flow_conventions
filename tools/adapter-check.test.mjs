@@ -33,9 +33,8 @@ function whole(t) {
   const repo = repository(t);
   fs.mkdirSync(path.join(repo, '.claude/hooks'), { recursive: true });
   fs.copyFileSync(path.join(REFERENCE, 'settings.json'), path.join(repo, '.claude/settings.json'));
-  for (const hook of ['load-instructions.mjs', 'build-flags.mjs']) {
-    fs.copyFileSync(path.join(REFERENCE, 'hooks', hook), path.join(repo, '.claude/hooks', hook));
-  }
+  // Every file under settings/hooks, subdirectories included, exactly as the checker's inventory demands.
+  fs.cpSync(path.join(REFERENCE, 'hooks'), path.join(repo, '.claude/hooks'), { recursive: true });
   fs.writeFileSync(path.join(repo, 'CLAUDE.md'), '@AGENTS.md\n');
 
   return repo;
@@ -53,10 +52,13 @@ test('this repository hosts the adapter on itself, which is the only test the me
 test('a missing hook and missing settings are both named, with what to do', (t) => {
   const findings = adapterFindings(repository(t, 'adapter-bare-'));
 
-  assert.equal(findings.length, 3);
+  assert.equal(findings.length, 6);
   assert.match(findings.join('\n'), /\.claude\/settings\.json is missing/);
   assert.match(findings.join('\n'), /\.claude\/hooks\/load-instructions\.mjs is missing/);
   assert.match(findings.join('\n'), /\.claude\/hooks\/build-flags\.mjs is missing/);
+  assert.match(findings.join('\n'), /\.claude\/hooks\/subagent-model\.mjs is missing/);
+  assert.match(findings.join('\n'), /\.claude\/hooks\/ensure-user-guard\.mjs is missing/);
+  assert.match(findings.join('\n'), /\.claude\/hooks\/lib\/user-guard-install\.mjs is missing/);
 });
 
 test('a hook copy that has drifted is caught — that is the whole reason this tool exists', (t) => {
@@ -84,6 +86,30 @@ test('line endings are not drift', (t) => {
   assert.deepEqual(adapterFindings(repo), []);
 });
 
+test('the reference SessionStart carries the rules door then the bounded self-install, in that order', () => {
+  const reference = JSON.parse(fs.readFileSync(path.join(REFERENCE, 'settings.json'), 'utf8'));
+  const hooks = reference.hooks.SessionStart.flatMap((entry) => entry.hooks);
+
+  assert.deepEqual(hooks, [
+    { type: 'command', command: 'node', args: ['${CLAUDE_PROJECT_DIR}/.claude/hooks/load-instructions.mjs'] },
+    { type: 'command', command: 'node', args: ['${CLAUDE_PROJECT_DIR}/.claude/hooks/ensure-user-guard.mjs'], timeout: 5 },
+  ]);
+});
+
+test('a consumer missing the self-install SessionStart entry is told which one', (t) => {
+  const repo = whole(t);
+  const settingsPath = path.join(repo, '.claude/settings.json');
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  settings.hooks.SessionStart[0].hooks.pop();
+  fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}
+`);
+
+  const findings = adapterFindings(repo);
+
+  assert.equal(findings.length, 1);
+  assert.match(findings[0], /declares no SessionStart command `node .*ensure-user-guard\.mjs`/);
+});
+
 test('settings without the SessionStart command are named, and other permissions are left alone', (t) => {
   const repo = whole(t);
   const settingsPath = path.join(repo, '.claude/settings.json');
@@ -94,9 +120,11 @@ test('settings without the SessionStart command are named, and other permissions
 
   const findings = adapterFindings(repo);
 
-  // Deleting `hooks` unwires BOTH adapters, and each is named on its own: the rules door and the
-  // build-flags refusal fail for different reasons and are fixed by different lines.
-  assert.equal(findings.length, 2);
+  // Deleting `hooks` unwires ALL FOUR hook entries, and each is named on its own: the rules door, the
+  // build-flags refusal and the subagent-model guard fail for different reasons and are fixed by
+  // different lines.
+  assert.equal(findings.length, 4);
+  assert.match(findings.join('\n'), /subagent-model\.mjs/);
   assert.match(findings.join('\n'), /declares no SessionStart command/);
   assert.match(findings.join('\n'), /starts without this repository’s rules/);
   assert.match(findings.join('\n'), /declares no PreToolUse command/);
@@ -121,8 +149,10 @@ test('the build-flags adapter is checked too, copy and wiring alike', (t) => {
   fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
   const wiringFindings = adapterFindings(unwired);
 
-  assert.equal(wiringFindings.length, 1);
+  // One finding per PreToolUse adapter: build-flags and subagent-model are wired by separate entries.
+  assert.equal(wiringFindings.length, 2);
   assert.match(wiringFindings[0], /declares no PreToolUse command/);
+  assert.match(wiringFindings.join('\n'), /subagent-model\.mjs/);
 });
 
 test('a narrowed matcher is drift, because the hook then never runs for the other tool', (t) => {

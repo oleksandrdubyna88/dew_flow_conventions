@@ -6,7 +6,9 @@ import {normalizedText,sha256,targetPath} from "./rule-catalog.mjs";
 import {within} from "./paths.mjs";
 import {run} from "./proc.mjs";
 import {bootstrap} from "./rule-cli.mjs";
-import {traceEvidence} from "./rule-trace.mjs";
+import {traceEvidence,delegationEvidence} from "./rule-trace.mjs";
+import {roleRowsOf} from "./rule-roles.mjs";
+import {behaviourVerdict,loadFixture,changedFilesReasons,validPostCheck,DENY_MARKER} from "./rule-behaviour.mjs";
 export {traceEvidence} from "./rule-trace.mjs";
 
 export function smokeResolver(root) {
@@ -95,7 +97,7 @@ function assertAvailableLock(report,lock) {
   }
 }
 
-function smokeReports(root,agent) {
+function smokeReports(root,agent,maxBytes=32768) {
   const directory=git(root,"rev-parse","--path-format=absolute","--git-path","rules-smoke");
   if(fs.existsSync(directory)&&fs.lstatSync(directory).isSymbolicLink())throw new Error("Smoke report directory cannot be a symlink");
   fs.mkdirSync(directory,{recursive:true});
@@ -107,11 +109,17 @@ function smokeReports(root,agent) {
   fs.writeFileSync(lock,JSON.stringify({pid:process.pid}),{flag:"wx"});
   const save=value=>{
     const text=JSON.stringify(value,null,2)+"\n";
-    if(Buffer.byteLength(text)>32768)throw new Error("Smoke evidence exceeds 32 KiB");
+    if(Buffer.byteLength(text)>maxBytes)throw new Error(`Smoke evidence exceeds ${maxBytes} bytes`);
     fs.writeFileSync(report+".tmp",text,{flag:"wx"});
     fs.renameSync(report+".tmp",report);
   };
   return {report,lock,save};
+}
+
+export function disposableRoot(repo) {
+  const root=path.resolve(git(repo,"rev-parse","--show-toplevel"));
+  if(!fs.statSync(path.join(root,".git")).isFile())throw new Error("Smoke requires a disposable worktree, never the original checkout");
+  return root;
 }
 
 export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
@@ -154,4 +162,187 @@ export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
     process.removeListener("SIGINT",cancel);process.removeListener("SIGTERM",cancel);
     fs.unlinkSync(lock);
   }
+}
+
+/** The only node a behaviour session may run besides the resolver: the toy fixture's own checks. */
+const TOY_CHECKS_PATTERN="Bash(node --test tools/fixtures/behaviour/toy/*)";
+
+/**
+ * Argument list of a behaviour run. Caps and the tool set come from the fixture, never from constants here.
+ * Bash is narrowed to the toy checks and a rev-parse (resolver verbs come with rule loading); every other offered tool is allowed outright (disposable worktree).
+ */
+export function behaviourCliArgs(fixture,prompt,prefix=[],resolver="") {
+  const offered=fixture.tools.split(",").map(name=>name.trim()).filter(Boolean);
+  const loading=fixture.loadRules?loadingTools(resolver):{tools:[],allowed:[]};
+  const tools=[...new Set([...offered,...loading.tools])];
+  const allowed=[...new Set([...offered.flatMap(name=>name==="Bash"?[TOY_CHECKS_PATTERN,"Bash(git rev-parse *)","Bash(pwd)"]:[name]),...loading.allowed])];
+  return [...prefix,"-p","--no-session-persistence","--output-format","stream-json","--verbose",
+    "--max-budget-usd",String(fixture.caps.maxBudgetUsd),"--tools",tools.join(","),
+    ...(allowed.length?["--allowedTools",...allowed]:[]),"--",prompt];
+}
+
+/** Tools the rule loading needs: Read, and Bash narrowed to the resolver's explain and read verbs. */
+function loadingTools(resolver) {
+  if(!resolver)throw new Error("A rule-loading fixture needs the resolver path");
+  const invocation=`node "${forwardSlashes(resolver)}"`;
+  return {tools:["Bash","Read"],allowed:["Read",...["explain","read"].map(verb=>`Bash(${invocation} ${verb} *)`)]};
+}
+
+/** A pre-existing change would be invisible to changedSince, so a dirty worktree is refused before anything launches. */
+function requireCleanWorktree(root) {
+  const dirty=git(root,"status","--porcelain","--untracked-files=all");
+  if(dirty.trim())throw new Error(`Smoke requires a clean disposable worktree; uncommitted changes:
+${dirty}`);
+}
+
+export function changedPaths(root) {
+  const fields=git(root,"status","--porcelain=v1","-z","--untracked-files=all").split(" ").filter(Boolean);
+  const paths=[];
+  for(let i=0;i<fields.length;i++){
+    paths.push(fields[i].slice(3).replaceAll("\\","/"));
+    if(/[RC]/.test(fields[i].slice(0,2)))i++; // a rename/copy record is followed by its origin as its own field
+  }
+  return paths.sort(codeUnitOrder);
+}
+
+function changedSince(before,after) {
+  return after.filter(file=>!before.includes(file));
+}
+
+/** Behaviour mode: one fixture in a disposable worktree, the verdict from `behaviourVerdict`. */
+export async function behaviourSmoke({repo,fixture:fixtureName,cli:explicitCli}) {
+  const root=disposableRoot(repo);
+  requireCleanWorktree(root);
+  const fixture=loadFixture(root,fixtureName);
+  const scope=fixture.files.map(targetPath);
+  const resolver=smokeResolver(root);
+  const manifest=JSON.parse(execFileSync(process.execPath,[resolver,"explain","--repo",root,"--task","implement",...scope.flatMap(file=>["--file",file])],{encoding:"utf8",timeout:10000,maxBuffer:262144}));
+  const expected=manifest.rules.map(rule=>({...rule,text:normalizedText(within(root,rule.source))}));
+  const prompt=loadingPrompt(fixture,{resolver,root});
+  const executable=installedCli("claude",explicitCli);
+  const label=`behaviour-${fixture.name}`;
+  const {report,lock,save}=smokeReports(root,label,fixture.caps.maxReportBytes);
+  const initial={status:"incomplete: running",agent:"claude",mode:"behaviour",fixture:fixture.name,platform:process.platform,
+    started:new Date().toISOString(),pid:process.pid,report,caps:fixture.caps,promptHash:sha256(prompt)};
+  const controller=new AbortController();
+  const cancel=()=>controller.abort();
+  process.once("SIGINT",cancel);process.once("SIGTERM",cancel);
+  const heartbeat=setInterval(()=>console.error(`smoke-rules: behaviour ${fixture.name} running; deadline ${fixture.caps.timeoutMs/1000}s, report ${report}`),20000);
+  try {
+    const before=changedPaths(root);
+    save(initial);
+    const result=await run(executable.command,behaviourCliArgs(fixture,prompt,executable.prefix,resolver),
+      {cwd:root,timeoutMs:fixture.caps.timeoutMs,maxOutputBytes:fixture.caps.maxOutputBytes,containTree:true,signal:controller.signal});
+    const outcome=await behaviourOutcome({fixture,root,result,before,initial,expected,origin:{resolver,cwd:root,repo:root}});
+    save(outcome);
+    return outcome;
+  } finally {
+    clearInterval(heartbeat);
+    process.removeListener("SIGINT",cancel);process.removeListener("SIGTERM",cancel);
+    fs.unlinkSync(lock);
+  }
+}
+
+export const GATE_RULE="common.subagent-models";
+
+/** Rule ids of `expected` whose complete canonical body a successful resolver read in the trace delivered. */
+function rulesReadIn(out,expected,origin) {
+  const found=traceEvidence("claude",out,expected,origin);
+  return found.reads.filter(read=>read.complete).map(read=>read.id);
+}
+
+/** The role table of the worktree being judged, for a role-based expectation; `[]` otherwise. */
+function roleRowsFor(fixture,root) {
+  const table=fixture.expectation.roles?.table;
+  return table?roleRowsOf(fs.readFileSync(path.join(root,table),"utf8")):[];
+}
+
+/**
+ * Pure verdict of a behaviour trace. A fixture that loads rules is never judged on a rule the session did not
+ * read completely: that is `inconclusive`, whatever the answers or launches were.
+ */
+export function judgeBehaviour({fixture,out,expected,origin,root}) {
+  const {events,parseFailed}=parseEvents(out);
+  const evidence=delegationEvidence(events,{marker:DENY_MARKER});
+  const verdict=behaviourVerdict(evidence,fixture.expectation,roleRowsFor(fixture,root));
+  const rulesRead=fixture.loadRules?rulesReadIn(out,expected,origin):[];
+  if(fixture.loadRules&&!rulesRead.includes(GATE_RULE))
+    return {evidence,verdict:{outcome:"inconclusive",reasons:[`rule ${GATE_RULE} was not loaded`]},parseFailed,rulesRead};
+  return {evidence,verdict,parseFailed,rulesRead};
+}
+
+const forwardSlashes=value=>value.replaceAll("\\","/");
+
+/** The loading instruction put before a rule-loading fixture's own prompt (style of the inspect smoke). */
+export function loadingPrompt(fixture,{resolver,root}) {
+  if(!fixture.loadRules)return fixture.prompt;
+  const node=`node "${forwardSlashes(resolver)}"`,repo=`--repo "${forwardSlashes(root)}"`;
+  const files=fixture.files.map(file=>`--file ${file}`).join(" ");
+  const only=fixture.loadOnly?.length>0;
+  const reads=only
+    ?`then run \`${node} read ${repo} --task implement ${files} --only <id>\` ONLY for ${fixture.loadOnly.map(id=>`\`${id}\``).join(", ")} and for no other rule (the whole payload is too large for one read). `
+    :`then run \`${node} read ${repo} --task implement ${files} --only <id>\` for each selected rule id (the whole payload is too large for one read). `;
+  return `First load this repository's rules for the task through the resolver. Run \`${node} explain ${repo} --task implement ${files}\` once, `
+    +reads
+    +`One command per tool call; do not prefix cd, do not chain or combine shell commands. Only after ${only?"that rule is":"every selected rule is"} read, do the task below.
+
+${fixture.prompt}`;
+}
+
+function parseEvents(out) {
+  try {return {events:out.split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line)),parseFailed:false};}
+  catch {return {events:[],parseFailed:true};}
+}
+
+async function postCheck(fixture,root) {
+  const command=fixture.expectation.postCheck;
+  if(!command)return {ran:false,ok:true};
+  if(!validPostCheck(command))throw new Error("postCheck must be [\"node\", \"--test\", <path inside tools/fixtures/behaviour/>]");
+  const done=await run(process.execPath,command.slice(1),{cwd:root,timeoutMs:60000,maxOutputBytes:262144});
+  return {ran:true,ok:done.code===0};
+}
+
+/** Report form of the launches: whole when the fixture asks (a judge audits the assigned work), else prompts cut to 300 characters. */
+export function recordedLaunches(fixture,launches) {
+  return launches.map(launch=>fixture.recordFullPrompts?{...launch}:{...launch,prompt:launch.prompt.slice(0,300)});
+}
+
+/** Why the claude process itself did not finish cleanly; any entry means the run cannot count as a pass. */
+function cliAbnormalReasons(result) {
+  return [
+    result.spawnFailed&&"the claude CLI failed to spawn",
+    result.timedOut&&"the claude CLI timed out",
+    result.overflow&&"the claude CLI output overflowed its cap",
+    result.cancelled&&"the run was cancelled",
+    result.code!==0&&!result.spawnFailed&&!result.timedOut&&!result.overflow&&!result.cancelled&&`the claude CLI exited with code ${result.code}`
+  ].filter(Boolean);
+}
+
+/** A pass needs a clean CLI and no reasons; an unclean CLI downgrades a pass to inconclusive, never to fail. */
+const judgedOutcome=(outcome,hasReasons,cliUnclean)=>
+  outcome!=="pass"?outcome:(cliUnclean?"inconclusive":(hasReasons?"fail":"pass"));
+
+async function behaviourOutcome({fixture,root,result,before,initial,expected,origin}) {
+  const {evidence,verdict,parseFailed,rulesRead}=judgeBehaviour({fixture,out:result.out,expected,origin,root});
+  const changed=changedSince(before,changedPaths(root));
+  const reasons=[...verdict.reasons];
+  if(parseFailed)reasons.push("the trace could not be decoded");
+  reasons.push(...changedFilesReasons(fixture.expectation.changedFiles,changed));
+  const post=verdict.outcome==="inconclusive"?{ran:false,ok:true}:await postCheck(fixture,root);
+  if(!post.ok)reasons.push("the post-run check failed");
+  const abnormal=cliAbnormalReasons(result);
+  reasons.push(...abnormal);
+  const outcomeName=judgedOutcome(verdict.outcome,reasons.length>abnormal.length,abnormal.length>0);
+  return {...initial,status:`behaviour ${outcomeName}`,outcome:outcomeName,reasons,changed,postCheck:post,
+    exitCode:result.code,timedOut:result.timedOut,overflow:result.overflow,cancelled:result.cancelled,spawnFailed:result.spawnFailed,
+    evidence:{...evidence,rulesRead,launches:recordedLaunches(fixture,evidence.launches)},
+    traceBytes:Buffer.byteLength(result.out),traceHash:sha256(result.out)};
+}
+
+/** Command-line arguments of smoke-behaviour; anything unexpected throws so the caller can exit 1. */
+export function parseArgs(argv) {
+  if(argv.length===0)return {cli:undefined};
+  if(argv[0]!=="--cli")throw new Error(`Unknown argument: ${argv[0]}`);
+  if(argv.length!==2||!argv[1]||argv[1].startsWith("--"))throw new Error("--cli requires exactly one value (path to the claude executable)");
+  return {cli:argv[1]};
 }

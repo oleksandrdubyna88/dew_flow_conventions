@@ -244,11 +244,12 @@
     {
       "id": "common.planning-docs",
       "source": "common/planning-docs.md",
-      "bodySha256": "ce44a145f7e3e584039c314634797145cd20416493a94e08f34654155e0f1a20",
+      "bodySha256": "870dd24e62ff1009ec48f90be825fa320699e83345411a55f0f7bb586c2277c7",
       "sections": [
         "# Planning Docs — `todo/` is open work, `research/` is documentation",
         "## Creating a plan",
         "### A plan that creates something that GROWS names its budget — before the first write",
+        "### A plan split into epics and stories",
         "## Promoting a finished plan",
         "### The `git mv` goes LAST, not first",
         "### The three link cases, because \"both directions\" hides one",
@@ -391,12 +392,18 @@
     {
       "id": "common.subagent-models",
       "source": "common/subagent-models.md",
-      "bodySha256": "1b029d1e49bd4b11e4ee356bb47bac511da40ed68e2c2b75abd93538664338fb",
+      "bodySha256": "f6f1254b0845484ea65cfc5047ccb24cb51a5334153bcb56959229447f757e63",
       "sections": [
-        "# Which model a subagent runs on (MANDATORY)",
-        "## The rule",
-        "## Pass it EXPLICITLY, every time",
-        "## Why not Fable everywhere",
+        "# A subagent's model follows its role (MANDATORY)",
+        "## The role table",
+        "## The pipeline — who acts at each step",
+        "## Scout or judge — the assigned output decides",
+        "## Scouts",
+        "## Coders",
+        "## Two definitions",
+        "## Name the model on every launch, as an alias",
+        "## The guard",
+        "## Fable unavailable → Opus; Haiku is not used",
         "## Never",
         "## Definition of Done"
       ]

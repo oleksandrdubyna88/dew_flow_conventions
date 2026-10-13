@@ -111,3 +111,72 @@ export function traceEvidence(agent,trace,expected,origin) {
       reads:expected.map(({id,hash})=>({id,hash,complete:false}))};
   }
 }
+
+const LAUNCH_TOOLS=new Set(["Agent","Task"]);
+const EDIT_TOOLS=new Set(["Edit","Write","MultiEdit","NotebookEdit"]);
+
+/** Measurement limit of the Claude stream, recorded in every evidence object (recorded trace 2026-10-13). */
+export const DELEGATION_LIMITS=["A child's own assistant events are not in the stream; resolution is aggregate (result.modelUsage), so an opus child cannot be separated from an opus parent."];
+
+const toolUses=event=>(event.message?.content??[]).filter(block=>block?.type==="tool_use");
+const toolResults=event=>(event.message?.content??[]).filter(block=>block?.type==="tool_result");
+
+function resultText(block) {
+  if(typeof block.content==="string")return block.content;
+  return (block.content??[]).filter(item=>item?.type==="text").map(item=>item.text).join("\n");
+}
+
+/** `claude-sonnet-5-5` -> `sonnet`; keys that are not `claude-<family>-...` give no family. */
+export function modelFamily(key) {
+  return /^claude-([a-z]+)/.exec(String(key))?.[1]??"";
+}
+
+function usageTotal(entry) {
+  return ["inputTokens","outputTokens","cacheReadInputTokens","cacheCreationInputTokens"].reduce((sum,name)=>sum+(Number(entry?.[name])||0),0);
+}
+
+function resultEvidence(event) {
+  if(!event)return {present:false};
+  const families={};
+  for(const [key,entry] of Object.entries(event.modelUsage??{})) {
+    const family=modelFamily(key);
+    if(family)families[family]=(families[family]??0)+usageTotal(entry);
+  }
+  return {present:true,subtype:event.subtype??"",isError:event.is_error===true,costUsd:event.total_cost_usd??null,
+    text:typeof event.result==="string"?event.result:"",families,subagentStats:event.subagent_stats??null,
+    permissionDenials:Array.isArray(event.permission_denials)?event.permission_denials.length:0,
+    terminalReason:event.terminal_reason??""};
+}
+
+/**
+ * What a Claude stream-json trace shows about delegation: the parent's Agent/Task launches, how each one ended,
+ * the marker denials, parent-level edits, nested launches and the final result. Unknown event types are ignored.
+ */
+export function delegationEvidence(events,{marker}={}) {
+  const launches=new Map(),parentEdits=[],nestedLaunches=[];
+  let result;
+  for(const event of events) {
+    const parent=event.parent_tool_use_id??null;
+    if(event.type==="assistant")for(const block of toolUses(event)) {
+      if(LAUNCH_TOOLS.has(block.name)&&parent===null) {
+        const prompt=String(block.input?.prompt??"");
+        launches.set(block.id,{id:block.id,model:block.input?.model??null,subagentType:block.input?.subagent_type??"",description:String(block.input?.description??""),prompt,
+          promptHash:sha256(prompt),background:block.input?.run_in_background===true,started:false,childEvents:0,taskStatus:"",terminal:false,denials:0});
+      } else if(LAUNCH_TOOLS.has(block.name))nestedLaunches.push(block.id);
+      else if(EDIT_TOOLS.has(block.name)&&parent===null)parentEdits.push(String(block.input?.file_path??block.input?.notebook_path??""));
+    }
+    if(event.type==="user"&&parent!==null&&launches.has(parent))launches.get(parent).childEvents++;
+    if(event.type==="user"&&parent===null)for(const block of toolResults(event)) {
+      const launch=launches.get(block.tool_use_id);
+      if(!launch)continue;
+      launch.terminal=true;
+      if(block.is_error===true&&marker&&resultText(block).includes(marker))launch.denials++;
+    }
+    if(event.type==="system"&&launches.has(event.tool_use_id)) {
+      if(event.subtype==="task_started")launches.get(event.tool_use_id).started=true;
+      if(event.subtype==="task_notification")launches.get(event.tool_use_id).taskStatus=String(event.status??"");
+    }
+    if(event.type==="result")result=event;
+  }
+  return {launches:[...launches.values()],parentEdits,nestedLaunches,result:resultEvidence(result),limits:DELEGATION_LIMITS};
+}

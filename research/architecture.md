@@ -19,3 +19,9 @@ so Windows checkout conversion does not create a false difference. See
 `tools/smoke-rules.mjs` measures actual native-CLI source reads with bounded process ownership
 and explicit incomplete results. See [module_rule_migration.md](module_rule_migration.md).
 Product-specific rule discovery adapters and the six consumer PRs remain in the rollout plan.
+
+Host hooks are delivered beside the rules, not by the resolver: `settings/settings.json` wires the hooks in
+`settings/hooks/`, and `tools/adapter-check.mjs` demands their byte-identical copies in a migrated consumer. One of
+them, the subagent-model guard, also reaches the user's own host settings — `tools/install-user-hook.mjs`, or the
+`ensure-user-guard.mjs` session-start hook in a consumer, writes it into `~/.claude`, so it applies in every repository
+on that machine. The resolver itself still never changes host settings. See [module_rules.md](module_rules.md).

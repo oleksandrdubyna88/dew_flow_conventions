@@ -48,6 +48,31 @@ The S1 review found a root-target loop: `--file .` started ancestry at the paren
 never reached the repository again. Directory-like targets now fail validation and ancestry
 also has a filesystem-root guard. The CLI regression was observed timing out before the fix.
 
+## The subagent-model rule and the guard that enforces it (2026-10-13)
+
+`common/subagent-models.md` (8 875 B) maps a subagent's role to a model alias: scouts and coders `sonnet`, judges
+`opus`, the epic split, security judgements and cornerstone specs `fable`. Its `tasks` name fourteen tasks and
+deliberately omit `inspect`, `ui`, `gpu` and `storage`, whose single-read scopes it would push past 32 768 B;
+`tools/rules.test.mjs` enumerates `TASKS` and pins both halves of that split, so a new task must be placed by a person.
+`common/planning-docs.md` carries the epics-and-stories layout the rule's pipeline refers to.
+
+Where the rule is not loaded, the guard carries it. `settings/hooks/subagent-model.mjs` is a `PreToolUse` hook on
+`Agent|Task`: a launch whose `model` is exactly `sonnet`, `opus` or `fable` gets a one-line role digest as
+`additionalContext` and no permission decision; anything else in a well-formed call is denied with a fixed reason that
+opens with `subagent-models.md:` and carries the table; a malformed payload, a throw or a stalled stdin fails open.
+`SUBAGENT_MODEL_GUARD=off` silences it for harnesses that measure models. Its `ROLE_DIGEST` is its only copy of the
+table, compared with the rule's own table by `tools/lib/role-table.mjs` in the test suite.
+
+The guard reaches a session three ways: `settings/settings.json` wires it for consumers (`adapter-check` demands the
+copy), this repository hosts it on itself in `.claude/`, and `tools/install-user-hook.mjs` (`--install`, `--uninstall`,
+`--check`, `--force`) puts it into `~/.claude` through `settings/hooks/lib/user-guard-install.mjs` — refusal on
+unparsable or concurrently changed settings, a backup, an atomic write, one handler upgraded in place. A second
+`SessionStart` hook, `settings/hooks/ensure-user-guard.mjs` (5 s timeout), runs that core at session start when the
+user copy is missing, older by `GUARD_VERSION`, or badly registered; it never downgrades, never runs from this
+repository's own layout, refuses a project copy with uncommitted changes, and writes a provenance manifest. Design
+record: [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md); its release to the consumers is open in
+[PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md).
+
 References: [yaml parser](https://eemeli.org/yaml/),
 [picomatch](https://github.com/micromatch/picomatch),
 [Codex instructions](https://learn.chatgpt.com/docs/agent-configuration/agents-md),
