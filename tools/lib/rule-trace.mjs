@@ -160,7 +160,7 @@ export function delegationEvidence(events,{marker}={}) {
     if(event.type==="assistant")for(const block of toolUses(event)) {
       if(LAUNCH_TOOLS.has(block.name)&&parent===null) {
         const prompt=String(block.input?.prompt??"");
-        launches.set(block.id,{id:block.id,model:block.input?.model??null,subagentType:block.input?.subagent_type??"",prompt,
+        launches.set(block.id,{id:block.id,model:block.input?.model??null,subagentType:block.input?.subagent_type??"",description:String(block.input?.description??""),prompt,
           promptHash:sha256(prompt),background:block.input?.run_in_background===true,started:false,childEvents:0,taskStatus:"",terminal:false,denials:0});
       } else if(LAUNCH_TOOLS.has(block.name))nestedLaunches.push(block.id);
       else if(EDIT_TOOLS.has(block.name)&&parent===null)parentEdits.push(String(block.input?.file_path??block.input?.notebook_path??""));

@@ -11,6 +11,7 @@ import path from "node:path";
 import {sha256} from "./lib/rule-catalog.mjs";
 import {git} from "./lib/git.mjs";
 import {resolverRead} from "./lib/rule-trace.mjs";
+import {roleRowsOf,declaredRole} from "./lib/rule-roles.mjs";
 
 const text="The complete canonical source.\n";
 const rule={id:"common.sample",text,hash:sha256(text)};
@@ -235,28 +236,30 @@ test("the negative fixture expects one unmodelled launch, one denial and no chil
   const {expectation}=loadNamed("negative");
   assert.deepEqual([expectation.groups[0].model,expectation.groups[0].count,expectation.denials,expectation.children],[null,1,1,0]);
 });
-test("the behaviour fixture asks for five scouts, a coder, a reviewer, an optional review-fix coder and seven or eight children",()=>{
-  const {expectation}=loadNamed("behaviour");
-  assert.deepEqual(expectation.groups.map(group=>[group.name,group.model,group.count]),
-    [["coder","sonnet",1],["scouts","sonnet",5],["reviewer","opus",1],["review-fix","sonnet",{min:0,max:1}]]);
-  assert.equal(expectation.groups[3].after,"reviewer");
-  assert.deepEqual(expectation.children,{min:7,max:8});
+test("the behaviour fixture is role-based: the table, five scouts, a coder, a judge after it, and the role-declaring prompt",()=>{
+  const {expectation,prompt}=loadNamed("behaviour");
+  assert.equal(expectation.groups,undefined);
+  assert.deepEqual([expectation.roles.table,expectation.roles.scouts.min,expectation.roles.coders.min,expectation.roles.judges.min,expectation.roles.judges.afterCoder],["common/subagent-models.md",5,1,1,true]);
+  assert.deepEqual(expectation.roles.scouts.focus,FILES);
+  assert.match(prompt,/Start every Agent call's `description` with the role it plays, exactly as the first column of the rule's role table names it, then a colon/);
   assert.equal(expectation.denials,0);
 });
 
-// ---- the recorded 2026-10-13 shape: five scouts, a coder, an opus reviewer, then (optionally) a review-fix coder ----
+// ---- the 2026-10-13 run 6 shape, judged by DECLARED role: the table is read from the rule, not from constants ----
 const FILES=["args.mjs","format.mjs","config.mjs","toy-checks.mjs","README.md"];
-const scout=file=>({model:"sonnet",prompt:`Learn ${file} only`});
-const coder={model:"sonnet",prompt:"You are the coder for one small change. Scenarios: x. Brief: y."};
-const reviewer={model:"opus",prompt:"Review the change"};
-const fixer=model=>({model,prompt:"You are the coder for one review fix"});
+const RULE_TEXT=fs.readFileSync("common/subagent-models.md","utf8");
+const rows=roleRowsOf(RULE_TEXT);
+const scout=(file,model="sonnet")=>({model,description:`Scout: ${file}`,prompt:`Learn ${file} only`});
+const coder=(model="sonnet")=>({model,description:"Coder: --json flag",prompt:"Implement exactly this brief"});
+const judgeLaunch=(model="opus",description="Judge: brief and scenarios")=>({model,description,prompt:`${description} - write it`});
+const fixer=(model="sonnet")=>({model,description:"Coder: review fix",prompt:"Fix the review findings"});
 function pipelineTrace(launches) {
   const template=recorded.filter(event=>event.type!=="result");
   const one=template.filter(event=>JSON.stringify(event).includes("toolu_01AZZYqn2JzSMNhi7jedkgB8"));
-  const events=launches.flatMap(({model,prompt},index)=>{
+  const events=launches.flatMap(({model,prompt,description},index)=>{
     const id=`toolu_pipeline_${index}`,text=JSON.stringify(structuredClone(one)).replaceAll("toolu_01AZZYqn2JzSMNhi7jedkgB8",id).replaceAll("Reply OK1",prompt.replaceAll('"','\\"'));
     const copy=JSON.parse(text);
-    copy.find(event=>event.type==="assistant").message.content[0].input.model=model;
+    Object.assign(copy.find(event=>event.type==="assistant").message.content[0].input,{model,description});
     return copy;
   });
   const result=structuredClone(recorded.at(-1));
@@ -264,29 +267,63 @@ function pipelineTrace(launches) {
   return [...events,result];
 }
 const behaviour=()=>loadNamed("behaviour").expectation;
-const base=[coder,...FILES.map(scout),reviewer];
-const pipelineVerdict=launches=>behaviourVerdict(delegationEvidence(pipelineTrace(launches),{marker:DENY_MARKER}),behaviour());
+const base=[...FILES.map(file=>scout(file)),judgeLaunch(),coder(),judgeLaunch("opus","Judge: review")];
+const pipelineVerdict=(launches,tableRows=rows)=>behaviourVerdict(delegationEvidence(pipelineTrace(launches),{marker:DENY_MARKER}),behaviour(),tableRows);
+const failedWith=(launches,pattern,tableRows)=>{
+  const verdict=pipelineVerdict(launches,tableRows);
+  assert.equal(verdict.outcome,"fail",verdict.reasons.join());
+  assert.match(verdict.reasons.join(),pattern);
+};
 
-test("the recorded pipeline shape passes: five scouts, coder, opus reviewer, sonnet review-fix",()=>{
-  assert.deepEqual(pipelineVerdict([...base,fixer("sonnet")]),{outcome:"pass",reasons:[]});
-});
-test("a pipeline with no review-fix coder passes too",()=>{
+test("run 6's shape passes by declared role: five scouts, an opus brief judge, a coder, an opus reviewer",()=>{
   assert.deepEqual(pipelineVerdict(base),{outcome:"pass",reasons:[]});
 });
-test("a review-fix coder on opus fails: it matches no group",()=>{
-  const verdict=pipelineVerdict([...base,fixer("opus")]);
-  assert.equal(verdict.outcome,"fail");
-  assert.match(verdict.reasons.join(),/matched no expected group/);
+test("an extra sonnet review-fix coder passes",()=>{
+  assert.deepEqual(pipelineVerdict([...base,fixer()]),{outcome:"pass",reasons:[]});
 });
-test("two review-fix coders fail: the group allows at most one",()=>{
-  const verdict=pipelineVerdict([...base,fixer("sonnet"),{...fixer("sonnet"),prompt:"You are the coder for one more review fix"}]);
-  assert.equal(verdict.outcome,"fail");
-  assert.match(verdict.reasons.join(),/matched no expected group|9 launch/);
+test("the table parsed from the rule maps scout, coder and judge to sonnet, sonnet and opus",()=>{
+  assert.deepEqual(["scout","coder","judge"].map(role=>rows.find(row=>row.role===role)?.model),["sonnet","sonnet","opus"]);
 });
-test("a review-fix coder launched before the reviewer fails",()=>{
-  const verdict=pipelineVerdict([coder,...FILES.map(scout),fixer("sonnet"),reviewer]);
-  assert.equal(verdict.outcome,"fail");
-  assert.match(verdict.reasons.join(),/matched no expected group/);
+test("a scout on opus fails, naming the launch and the role",()=>{failedWith([scout(FILES[0],"opus"),...base.slice(1)],/launch 1 \(role "scout"\) ran on opus/);});
+test("a coder on opus fails",()=>{failedWith([...base.slice(0,6),coder("opus"),base[7]],/launch 7 \(role "coder"\) ran on opus/);});
+test("a judge on sonnet fails",()=>{failedWith([...base.slice(0,5),judgeLaunch("sonnet"),...base.slice(6)],/launch 6 \(role "judge"\) ran on sonnet/);});
+test("a launch with no role in its description fails",()=>{
+  failedWith([...base.slice(0,4),{...scout(FILES[4]),description:"learn the README"},...base.slice(5)],/launch 5 declared no role from the table/);
+  failedWith([...base.slice(0,4),{...scout(FILES[4]),description:"Wizard: the README"},...base.slice(5)],/launch 5 declared no role/);
+});
+test("four scouts fail the minimum of five",()=>{failedWith([...FILES.slice(0,4).map(file=>scout(file)),...base.slice(5)],/4 scout launch\(es\), at least 5/);});
+test("scouts that together miss a focus file fail; one prompt naming two files does not",()=>{
+  const missing=[...FILES.slice(0,4).map(file=>scout(file)),{...scout("args.mjs"),prompt:"Learn args.mjs again"},...base.slice(5)];
+  failedWith(missing,/scouts together do not cover: README\.md/);
+  const two=[{...scout(FILES[0]),prompt:"Learn args.mjs and format.mjs"},...FILES.slice(2).map(file=>scout(file)),scout("x"),...base.slice(5)];
+  assert.deepEqual(pipelineVerdict(two),{outcome:"pass",reasons:[]});
+});
+test("no judge after the first coder fails",()=>{
+  failedWith([...FILES.map(file=>scout(file)),judgeLaunch(),coder()],/no judge launched after the first coder/);
+});
+test("no coder fails",()=>{failedWith([...FILES.map(file=>scout(file)),judgeLaunch(),judgeLaunch("opus","Judge: review")],/0 coder launch\(es\), at least 1/);});
+test("a Cornerstone spec launch fails as an unexpected role even on its table model",()=>{
+  failedWith([...base,judgeLaunch("fable","Cornerstone spec: the scenarios")],/launch 9 \(role "cornerstone spec"\): unexpected role for this task/);
+});
+test("a Small edit launch is held to sonnet and is still an unexpected role",()=>{
+  failedWith([...base,judgeLaunch("opus","Small edit: typo")],/launch 9 \(role "small edit"\) ran on opus/);
+  failedWith([...base,{...coder(),description:"Small edit: typo",prompt:"Make the typo edit"}],/unexpected role for this task/);
+});
+test("the check reads the rule's table: a copy with Judge on sonnet fails the opus judge and passes a sonnet one",()=>{
+  const edited=roleRowsOf(RULE_TEXT.replace(/^\| Judge \| opus \|/m,"| Judge | sonnet |"));
+  assert.equal(edited.find(row=>row.role==="judge").model,"sonnet");
+  failedWith(base,/\(role "judge"\) ran on opus, the table says sonnet/,edited);
+  const sonnetJudges=base.map(launch=>launch.description.startsWith("Judge")?{...launch,model:"sonnet"}:launch);
+  assert.deepEqual(pipelineVerdict(sonnetJudges,edited),{outcome:"pass",reasons:[]});
+});
+test("the declared role is the description before the first colon, cleaned like a table cell",()=>{
+  assert.deepEqual(["Scout: a","  **Judge** : b","Coder","","scout"].map(declaredRole),["scout","judge","","",""]);
+});
+test("judgeBehaviour reads the table from the worktree root named by the expectation",()=>{
+  const fixture=loadNamed("behaviour");
+  const out=pipelineTrace(base).map(event=>JSON.stringify(event)).join("\n");
+  const judged=judgeBehaviour({fixture:{...fixture,loadRules:false},out,expected:[],origin,root:path.resolve(".")});
+  assert.deepEqual(judged.verdict,{outcome:"pass",reasons:[]});
 });
 test("the behaviour mode refuses to run outside a disposable worktree",async t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"smoke-behaviour-"));

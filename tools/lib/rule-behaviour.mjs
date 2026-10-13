@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import {roleFailures} from "./rule-roles.mjs";
 
 /** The marker a denied Agent call carries (`common/subagent-models.md`, the guard's reason prefix). */
 export const DENY_MARKER="subagent-models.md:";
@@ -114,7 +115,8 @@ function denialFailures(evidence,expectation) {
   return denials===(expectation.denials??0)?[]:[`${denials} marker denial(s), ${expectation.denials??0} expected`];
 }
 
-function launchFailures(evidence,expectation) {
+function launchFailures(evidence,expectation,roleRows) {
+  if(expectation.roles)return roleFailures(evidence.launches,roleRows,expectation.roles);
   const groups=asArray(expectation.groups),total=groups.reduce((sum,group)=>sum+bounds(group.count).min,0);
   if(total>0&&evidence.launches.length===0)return ["no launches although the expectation asks for some"];
   return groupFailures(groups,evidence.launches);
@@ -124,10 +126,10 @@ function launchFailures(evidence,expectation) {
  * The verdict of a behaviour run: `inconclusive` when the evidence cannot decide, else `fail` on any unmet
  * expectation, else `pass`. The expectation is data (see tools/fixtures/behaviour/*.json).
  */
-export function behaviourVerdict(evidence,expectation) {
+export function behaviourVerdict(evidence,expectation,roleRows=[]) {
   const unsure=inconclusiveReasons(evidence,expectation);
   if(unsure.length)return {outcome:"inconclusive",reasons:unsure};
-  const reasons=[...launchFailures(evidence,expectation),...editFailures(evidence,expectation),...denialFailures(evidence,expectation),
+  const reasons=[...launchFailures(evidence,expectation,roleRows),...editFailures(evidence,expectation),...denialFailures(evidence,expectation),
     ...aggregateFailures(evidence,expectation),...answerFailures(evidence,expectation)];
   return {outcome:reasons.length?"fail":"pass",reasons};
 }

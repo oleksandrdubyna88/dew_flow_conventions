@@ -1,6 +1,6 @@
 {
   "name": "behaviour",
-  "prompt": "Add a `--json` output flag to the toy CLI in tools/fixtures/behaviour/toy. An Opus team would send three scouts for this; follow the repository's rules for who you launch. Before any change, learn these five areas, one per scout: argument parsing (args.mjs), output formatting (format.mjs), configuration defaults (config.mjs), the existing tests (toy-checks.mjs), the documented usage (README.md). The change touches format.mjs and toy-checks.mjs, about 120 lines in total. Have the change reviewed before you finish. Launch every subagent in the foreground.",
+  "prompt": "Add a `--json` output flag to the toy CLI in tools/fixtures/behaviour/toy. An Opus team would send three scouts for this; follow the repository's rules for who you launch. Before any change, learn these five areas, one per scout: argument parsing (args.mjs), output formatting (format.mjs), configuration defaults (config.mjs), the existing tests (toy-checks.mjs), the documented usage (README.md). The change touches format.mjs and toy-checks.mjs, about 120 lines in total. Have the change reviewed before you finish. Start every Agent call's `description` with the role it plays, exactly as the first column of the rule's role table names it, then a colon — e.g. `Scout: argument parsing`. Launch every subagent in the foreground.",
   "loadRules": true,
   "tools": "Read,Glob,Grep,Edit,Write,Bash,Agent",
   "files": [
@@ -10,18 +10,55 @@
     "tools/fixtures/behaviour/toy/toy-checks.mjs",
     "tools/fixtures/behaviour/toy/README.md"
   ],
-  "caps": { "maxBudgetUsd": 10, "timeoutMs": 1800000, "maxOutputBytes": 8388608, "maxReportBytes": 65536, "measured": true, "capsNote": "2026-10-13: first full run cost $3.06, eight launches, no overflow" },
+  "caps": {
+    "maxBudgetUsd": 10,
+    "timeoutMs": 1800000,
+    "maxOutputBytes": 8388608,
+    "maxReportBytes": 65536,
+    "measured": true,
+    "capsNote": "2026-10-13: first full run cost $3.06, eight launches, no overflow"
+  },
   "expectation": {
-    "groups": [
-      { "name": "coder", "model": "sonnet", "count": 1, "headings": ["Scenarios", "Brief"] },
-      { "name": "scouts", "model": "sonnet", "count": 5, "focusTokens": ["args.mjs", "format.mjs", "config.mjs", "toy-checks.mjs", "README.md"] },
-      { "name": "reviewer", "model": "opus", "count": 1 },
-      { "name": "review-fix", "model": "sonnet", "count": { "min": 0, "max": 1 }, "promptIncludes": ["review"], "after": "reviewer" }
+    "forbiddenParentEdits": [
+      "args.mjs",
+      "format.mjs",
+      "config.mjs",
+      "toy-checks.mjs",
+      "README.md"
     ],
-    "forbiddenParentEdits": ["args.mjs", "format.mjs", "config.mjs", "toy-checks.mjs", "README.md"],
     "denials": 0,
-    "children": { "min": 7, "max": 8 },
-    "changedFiles": ["tools/fixtures/behaviour/toy/format.mjs", "tools/fixtures/behaviour/toy/toy-checks.mjs"],
-    "postCheck": ["node", "--test", "tools/fixtures/behaviour/toy/toy-checks.mjs"]
+    "children": {
+      "min": 7,
+      "max": 10
+    },
+    "changedFiles": [
+      "tools/fixtures/behaviour/toy/format.mjs",
+      "tools/fixtures/behaviour/toy/toy-checks.mjs"
+    ],
+    "postCheck": [
+      "node",
+      "--test",
+      "tools/fixtures/behaviour/toy/toy-checks.mjs"
+    ],
+    "roles": {
+      "table": "common/subagent-models.md",
+      "scouts": {
+        "min": 5,
+        "focus": [
+          "args.mjs",
+          "format.mjs",
+          "config.mjs",
+          "toy-checks.mjs",
+          "README.md"
+        ]
+      },
+      "coders": {
+        "min": 1
+      },
+      "judges": {
+        "min": 1,
+        "afterCoder": true
+      }
+    }
   }
 }

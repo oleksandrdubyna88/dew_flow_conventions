@@ -7,6 +7,7 @@ import {within} from "./paths.mjs";
 import {run} from "./proc.mjs";
 import {bootstrap} from "./rule-cli.mjs";
 import {traceEvidence,delegationEvidence} from "./rule-trace.mjs";
+import {roleRowsOf} from "./rule-roles.mjs";
 import {behaviourVerdict,loadFixture,DENY_MARKER} from "./rule-behaviour.mjs";
 export {traceEvidence} from "./rule-trace.mjs";
 
@@ -234,14 +235,20 @@ function rulesReadIn(out,expected,origin) {
   return found.reads.filter(read=>read.complete).map(read=>read.id);
 }
 
+/** The role table of the worktree being judged, for a role-based expectation; `[]` otherwise. */
+function roleRowsFor(fixture,root) {
+  const table=fixture.expectation.roles?.table;
+  return table?roleRowsOf(fs.readFileSync(path.join(root,table),"utf8")):[];
+}
+
 /**
  * Pure verdict of a behaviour trace. A fixture that loads rules is never judged on a rule the session did not
  * read completely: that is `inconclusive`, whatever the answers or launches were.
  */
-export function judgeBehaviour({fixture,out,expected,origin}) {
+export function judgeBehaviour({fixture,out,expected,origin,root}) {
   const {events,parseFailed}=parseEvents(out);
   const evidence=delegationEvidence(events,{marker:DENY_MARKER});
-  const verdict=behaviourVerdict(evidence,fixture.expectation);
+  const verdict=behaviourVerdict(evidence,fixture.expectation,roleRowsFor(fixture,root));
   const rulesRead=fixture.loadRules?rulesReadIn(out,expected,origin):[];
   if(fixture.loadRules&&!rulesRead.includes(GATE_RULE))
     return {evidence,verdict:{outcome:"inconclusive",reasons:[`rule ${GATE_RULE} was not loaded`]},parseFailed,rulesRead};
@@ -279,7 +286,7 @@ async function postCheck(fixture,root) {
 }
 
 async function behaviourOutcome({fixture,root,result,before,initial,expected,origin}) {
-  const {evidence,verdict,parseFailed,rulesRead}=judgeBehaviour({fixture,out:result.out,expected,origin});
+  const {evidence,verdict,parseFailed,rulesRead}=judgeBehaviour({fixture,out:result.out,expected,origin,root});
   const expectedChanged=[...(fixture.expectation.changedFiles??[])].sort(codeUnitOrder);
   const changed=changedSince(before,changedPaths(root));
   const reasons=[...verdict.reasons];
