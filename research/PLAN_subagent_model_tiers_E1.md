@@ -1,7 +1,14 @@
 # PLAN — Model tiers, E1: the rule rewritten, the layout written down
 
-> Status: **in progress, 2026-10-13.** Stories of epic E1 of [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md)
-> (§ *Epics*, E1). Split by Opus; models per story below.
+> Status: **IMPLEMENTED, 2026-10-13.** Stories of epic E1 of [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md)
+> (§ *Epics*, E1), shipped in PR #65 together with E2 and E4 S1–S3. Deviations: the rule is 8 875 B and rides fourteen
+> tasks — `inspect`, `ui`, `gpu` and `storage` are excluded by measurement, pinned by `tools/rules.test.mjs`
+> ([RESULTS](RESULTS_subagent_model_tiers.md) § *Read budget*); one sentence was added to S1's text after smoke run 1
+> answered the unsplit "research AND propose" request with `fable` ("a design … outside them is a judge's — Opus",
+> `6bc7e51`); E1 goes to `main` in the same pull request as E2 (#65), not its own (E1 code round). Open tail: none in this epic — the
+> release that publishes the text is [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md).
+>
+> Split by Opus; models per story below.
 
 Done when (from the parent): `npm test`, `npm run check`, `node tools/ownership-check.mjs`, `node tools/rule-bodies.mjs`
 and `node tools/plan-lifecycle.mjs` are clean; the rule is ≤ 9 000 B; every scope that is single-read today still fits;

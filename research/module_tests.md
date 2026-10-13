@@ -169,8 +169,8 @@ starts with `subagent-models.md:`; a tool that is not `Agent`/`Task`, a malforme
 variable are named in `systemMessage` beside an unchanged verdict; both texts are bounded (600 and 300 bytes), one
 line, and rendered from the single `ROLE_DIGEST`. Spawned-process cases run the real file with a scrubbed
 environment: the protocol, the opt-out, the warning, stdin never closed (deny and teach alike) and the 256 KiB limit.
-The digest-vs-rule case reads `common/subagent-models.md` (or `SUBAGENT_MODEL_RULE_PATH`, a test-only override, while
-the rule is on another branch) through `tools/lib/role-table.mjs`; the permanent break-it changes one row's model in a
+The digest-vs-rule case reads `common/subagent-models.md` (or `SUBAGENT_MODEL_RULE_PATH`, a test-only override used for
+the break-it) through `tools/lib/role-table.mjs`; the permanent break-it changes one row's model in a
 copy and demands exactly one mismatch naming that role.
 
 `tools/ensure-user-guard.test.mjs` (14 cases, 2026-10-13) covers `settings/hooks/ensure-user-guard.mjs`, the
@@ -1098,7 +1098,17 @@ inheritance case and the export case; removing the second escaping round reddens
 `low-priority.test.mjs` asserts `testConcurrency()` for 4, 9, 24 and 1 threads, and asserts that `test` and
 `test:coverage` go through it. Break-it: returning a bare `CAP` reddens the first.
 
-## Behaviour smoke (E4.S1/S2)
+## Behaviour smoke (`npm run smoke:behaviour`)
+
+Whether a real session OBEYS `common/subagent-models.md` — loading is not obedience. `tools/smoke-behaviour.mjs` runs
+three fixtures from `tools/fixtures/behaviour/` in order and stops at the first non-pass: **negative** (one launch
+without a model must be refused with the guard's marker — a silent guard turns the run red, not green),
+**classification** (eleven paired requests answered with a model, the rule loaded alone through `loadOnly`) and
+**behaviour** (a toy CLI change in a disposable worktree, the full implement-scope load). A rule-loading fixture whose
+session did not read `common.subagent-models` completely is **inconclusive**, never a pass. The behaviour verdict grades
+roles: each launch declares a role from the rule's table in its `description`, `tools/lib/rule-roles.mjs` checks its
+requested model against the parsed table and the structure (≥ 5 scouts covering the five areas, a coder, a judge after
+it), and the families must appear in `result.modelUsage`. Nine paid runs on 2026-10-13; runs 8 and 9 passed all three.
 
 `tools/lib/rule-trace.mjs` gains `delegationEvidence(events,{marker})` and `tools/lib/rule-behaviour.mjs` holds
 `behaviourVerdict` (pass, fail or inconclusive), fixture validation and the stop-at-first-non-pass sequence;

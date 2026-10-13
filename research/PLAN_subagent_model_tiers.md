@@ -1,6 +1,49 @@
 # PLAN — A subagent's model follows its role: Sonnet gathers and writes, Opus judges, Fable holds the cornerstones
 
-> Status: **in progress, 2026-10-13 — E1, E2 and E4 S1–S3 built and gated (PR #65); the release, the pin cascade and E3 are open.** Scope: `common/subagent-models.md` (rewritten),
+> Status: **IMPLEMENTED, 2026-10-13.** E1, E2 and E4 S1–S3 built, gated and shipped in PR #65 (nine paid smoke runs,
+> runs 8 and 9 pass all three fixtures, blind role audit 9 of 9); E3's `modelSettings` probe (D11) and memory note done
+> on the operator's machine. **Open tail:** the single `promote-release`, the pin cascade and E3's observation of the
+> self-install — extracted to [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md).
+> Record: [RESULTS_subagent_model_tiers.md](RESULTS_subagent_model_tiers.md).
+>
+> **Deviations — what shipped differently from the text below:**
+>
+> 1. **The guard, not an every-scope rule.** The predecessor of this file planned one rule small enough for every scope;
+>    measured, the compact draft (814 B) left the `.csproj` scope 53 B and was rejected (§2). The rule rides fourteen
+>    tasks, and **four tasks are excluded by measurement** — `inspect`, `ui`, `gpu`, `storage`, whose single-read scopes
+>    it would overflow (`ui` and `gpu` found by the E1 risk consultation); there the guard's refusal and its allowed-call
+>    digest carry the table. `tools/rules.test.mjs` pins the split.
+> 2. **The behaviour verdict grades ROLE DECLARATIONS, not phrasing** (runs 5–7): each launch declares a role from the
+>    rule's table in its `description`, and the verdict checks the model against the parsed table plus structural
+>    minimums (≥ 5 scouts covering the five areas, a coder, a judge after it, 7–10 launches) — not the exact seven
+>    launches, the `Scenarios` heading or one file name per scout that §3.4 first specified. The changed-files check is
+>    "inside `toy/`, including `format.mjs` and `toy-checks.mjs`" (run 7).
+> 3. **The rule must be LOADED, or the run is inconclusive** (runs 2 and 4): runs 1–2 measured the model's priors, not
+>    the rule. Rule-loading fixtures read through the resolver; the classification loads only `common.subagent-models`
+>    (a full implement load overflowed the 256 KiB stream).
+> 4. **No per-child resolved model in the stream** (the recorded trace): a child's assistant events never reach the
+>    parent's stream, so the smoke checks the REQUESTED model per launch and the families in aggregate
+>    (`result.modelUsage`, `subagent_stats`); an Opus child cannot be told from an Opus parent.
+> 5. **The self-install never runs from the conventions repository** (E4 cadence consultation): it skips when the source
+>    has this repository's layout, so it first fires in a consumer after its bump — mid-cascade, accepted (§3.2).
+> 6. **Harness preparation moved from E3 into E2**, before E2 merged (consultant, cadence round). Each opt-out is proved
+>    by its launcher's unit test plus the hook's opt-out test, not by a paid real-launcher run (E2.S4); no launcher goes
+>    through WSL, so `WSLENV` was not needed.
+> 7. **The scout calibration's opt-out was done in `dew_flow_benchmark` #81** (`ProbeChildEnvironment`), not left to the
+>    other session's branch; with #79 and connect_other_ais #793 it meets E4.S4's precondition.
+> 8. **connect_other_ais' command text joined across the boundary** (§3.8, not in the first scope): #792, mcp 0.52.0,
+>    extension 0.72.0. Its builder session ran on the old rule and wrote two files of ~70–90 changed lines itself
+>    instead of through a Sonnet coder.
+> 9. **D11: the alias key IS honoured** — exact key `low` → low, the `opus` alias key alone `low` → low, no key → medium
+>    (the default); observed through a logging hook's `effort` field rather than `/status`. The operator's file carries
+>    `opus: high`.
+> 10. Smaller: the role-table parser is `tools/lib/role-table.mjs` (shared by the guard's digest test and the smoke);
+>    the self-install was wired in `565cd48` on the PR #65 branch rather than in a separate release commit; the smoke's
+>    Bash is narrowed and it refuses a dirty worktree (code round); its caps are measured ($10 / 8 MiB / 1 800 s); E3 got no stories
+>    document, so three promoted with this plan, not four; and the promotion came BEFORE the release and E3's
+>    observation (§ *Order* put it last), with those extracted to the rollout plan, because most of the value had shipped.
+>
+> Scope: `common/subagent-models.md` (rewritten),
 > `common/planning-docs.md` (one new section), `settings/hooks/subagent-model.mjs` (new) and its wiring in
 > `settings/settings.json` and this repository's own `.claude/settings.json` + `.claude/hooks/` (it hosts the adapter on
 > itself), `tools/adapter-check.test.mjs`, `tools/install-user-hook.mjs` (new), `tools/lib/rule-smoke.mjs` +
@@ -419,19 +462,22 @@ not released. Its CoaiBench judge opts out of the guard: #793. Deviation recorde
 
 ## 7. Definition of Done
 
-- [ ] `common/subagent-models.md` states D1–D6 and D12 once, with the pipeline, the scout/judge test, the brief contents,
+State at promotion, 2026-10-13: the open items moved to
+[PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md), each marked *→ rollout*.
+
+- [x] `common/subagent-models.md` states D1–D6 and D12 once, with the pipeline, the scout/judge test, the brief contents,
       the two definitions (50 changed lines, the cornerstone ledger), the alias rule (Workflow `agent()` included), the
       guard, Never and DoD; body recorded; ownership clean.
-- [ ] `common/planning-docs.md` has the epic/story layout; the fixture pair passes `plan-lifecycle.mjs`.
-- [ ] The guard and its installer exist with the tests in §4; the break-it went red and back; `adapter-check` demands it;
+- [x] `common/planning-docs.md` has the epic/story layout; the fixture pair passes `plan-lifecycle.mjs`.
+- [x] The guard and its installer exist with the tests in §4; the break-it went red and back; `adapter-check` demands it;
       this repository's own `.claude/` carries it.
-- [ ] The harness inventory is recorded, with each variable's route (WSL included); each harness that needs the opt-out
-      sets it, proved through its real launcher, all before E2 merges.
-- [ ] Every allowed Agent call receives the one-line role digest as context without being approved, observed in
+- [x] The harness inventory is recorded, with each variable's route (WSL included); each harness that needs the opt-out
+      sets it, proved through its real launcher, all before E2 merges. *(Proved by unit tests instead — deviation 6.)*
+- [x] Every allowed Agent call receives the one-line role digest as context without being approved, observed in
       a real session; the digest matches the rule's table by test.
-- [ ] The guard is installed in `~/.claude` on this machine, `--check` is clean, and in a plain session in another
+- [ ] *→ rollout (§ 4).* The guard is installed in `~/.claude` on this machine, `--check` is clean, and in a plain session in another
       repository an Agent call without a model is refused while one with `model: "sonnet"` goes through.
-- [ ] The negative control showed the marker; the classification answered 11 of 11 with the rule read; then one
+- [x] The negative control showed the marker; the classification answered 11 of 11 with the rule read; then one
       behaviour run passed: every launch declared a role from the rule's table and requested that role's model; ≥ 5
       scouts covering the five areas, a coder, a judge after it; no parent edit; changes only inside the toy, the toy's
       checks green; every requested family present in `modelUsage`; `subagent_stats` matching the launches; zero
@@ -440,16 +486,16 @@ not released. Its CoaiBench judge opts out of the guard: #793. Deviation recorde
       judge classified each launch's role from its full prompt alone (descriptions and models hidden) and the
       classification matched the declared roles — recorded, with every run, in
       `research/RESULTS_subagent_model_tiers.md` (and its `research/README.md` row).
-- [ ] The `modelSettings` probe ran after its control; its outcome is applied or recorded.
-- [ ] One release; every consumer's pin bumped and green; connect_other_ais carries the hook copy.
-- [ ] The benchmark plan's status line no longer claims to gate this rule, its citations name this file, and any arm
+- [x] The `modelSettings` probe ran after its control; its outcome is applied or recorded. *(Alias key honoured; `opus: high` applied.)*
+- [ ] *→ rollout (§ 3).* One release; every consumer's pin bumped and green; connect_other_ais carries the hook copy.
+- [x] The benchmark plan's status line no longer claims to gate this rule, its citations name this file, and any arm
       that measures models sets the opt-out — merged before E2 merges.
-- [ ] The assistant's memory note on subagent models is rewritten to D1–D12.
-- [ ] This plan and its stories documents promoted to `research/` with their deviations; `todo/README.md` updated.
+- [x] The assistant's memory note on subagent models is rewritten to D1–D12.
+- [x] This plan and its stories documents promoted to `research/` with their deviations; `todo/README.md` updated.
 
 ## Epics
 
-Four epics; cornerstone quota ⌈2·4/5⌉ = 2 (D4). Stories live in `todo/PLAN_subagent_model_tiers_E<n>.md`, one
+Four epics; cornerstone quota ⌈2·4/5⌉ = 2 (D4). Stories live in `research/PLAN_subagent_model_tiers_E<n>.md` (promoted with this plan), one
 document per epic, written by Opus when the epic starts (§3.3). Fable named the areas below; the question consultant's
 answer (D5) is recorded in the line under this paragraph before the split is final.
 
@@ -466,7 +512,7 @@ invisible to every check except the smoke itself, which can only test the text i
 false-assurance risk is answered by the requirements above rather than by a stronger model. The installer stays an
 Opus-spec story, now carrying the consultant's requirements.
 
-Cornerstones: 2 of 2 — E1.S1 (the rule text), E2.S1 (the hook contract with the host).
+Cornerstones: 2 of 2 — E1.S1 (the rule text), E2.S1 (the hook contract with the host). Both built and shipped in PR #65.
 
 ### E1 — The text: the rule rewritten, the layout written down
 
@@ -519,6 +565,11 @@ Stories: [PLAN_subagent_model_tiers_E2.md](PLAN_subagent_model_tiers_E2.md).
 
 ### E3 — This machine and the boundary (nothing merges to `main` here)
 
+No stories document. **State, 2026-10-13:** the §3.5 probe (D11) is **done** — the alias key is honoured, the
+operator's file carries `opus: high` ([RESULTS](RESULTS_subagent_model_tiers.md) § *`modelSettings` by alias*); the
+memory note is **done**. **Open:** the self-install observation and the plain-session refusal check, which wait for the
+cascade — [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md) § 4.
+
 - **Goal.** D8, D11 and D13 on the operator's machine, and the memory note (§7).
 - **Scope.** `~/.claude/settings.json` and `~/.claude/hooks/subagent-model.mjs`, put there by the self-install (D13) on
   the first session after the cascade — observed, not run by hand; the §3.5 probe; the assistant's memory note rewritten to D1–D12. (The benchmark PR moved to E2's
@@ -539,6 +590,9 @@ Stories: [PLAN_subagent_model_tiers_E2.md](PLAN_subagent_model_tiers_E2.md).
   result (`common/measurement.md` §3).
 
 ### E4 — Prove, then ship: the behaviour smoke, one release, one cascade, the promotion
+
+Stories: [PLAN_subagent_model_tiers_E4.md](PLAN_subagent_model_tiers_E4.md). The release and the cascade (S4's open
+half): [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md).
 
 - **Goal.** §3.4 as a mode of the existing smoke, run once and recorded; then the single release, six bump PRs, and
   this plan promoted with its four stories documents.

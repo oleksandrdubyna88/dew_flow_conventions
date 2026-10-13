@@ -1,7 +1,14 @@
 # PLAN — Model tiers, E4: prove it in a real session, then ship once
 
-> Status: **in progress, 2026-10-13.** Stories of epic E4 of [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md)
-> (§ *Epics*, E4). Split by Opus; models per story below. No cornerstone here (the ledger's two are E1.S1 and E2.S1).
+> Status: **IMPLEMENTED, 2026-10-13.** Stories of epic E4 of [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md)
+> (§ *Epics*, E4): S1–S3 shipped in PR #65, S4's wiring in `565cd48`, S5 is this promotion. Deviations (S2's list
+> below, each forced by a paid run): the rule must be loaded or the run is inconclusive; the verdict grades declared
+> roles, not phrasing; the per-child resolved model is not in the stream, so requested models and aggregate families are
+> checked; caps measured; Bash narrowed and a clean worktree required. Nine paid runs; runs 8 and 9 pass all three
+> fixtures; the blind role audit of run 8 matched 9 of 9 ([RESULTS](RESULTS_subagent_model_tiers.md)). Open tail —
+> S4's release and cascade: [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md).
+>
+> Split by Opus; models per story below. No cornerstone here (the ledger's two are E1.S1 and E2.S1).
 
 Done when (from the parent, § 3.4 and E4): the smoke checker's recorded-trace tests pass; the negative control showed
 the guard's marker; one recorded behaviour run met every § 3.4 expectation with zero denials inside its cap; the
@@ -106,7 +113,9 @@ Hardening (code-review round, 2026-10-13):
   `.claude/settings.json` (parent § 3.2, D13) in the commit the release is cut from. Then the parent's E4 cascade:
   PR → CI → automatic review comments → merge → `promote-release` with the 40-character sha → the six pins in the
   README's order (rag_qln last), connect_other_ais' bump carrying the hook files and both settings entries.
-- Wired in <commit-to-be>, timeout 5 s.
+- Wired in `565cd48` (on the PR #65 branch), timeout 5 s. The release and the six pins moved to
+  [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md) § 3; the precondition below is met
+  (benchmark #79 and #81, connect_other_ais #793, merged).
 - The SessionStart entry carries a short host `timeout` (5 s) so a stalled self-install can never hold a session
   (E2 risk consultation); a test asserts the entry's shape.
 - **Precondition, checked and written into the release PR** (benchmark gate round): the scout calibration — the third
@@ -119,6 +128,8 @@ Hardening (code-review round, 2026-10-13):
 - After E3 (the first self-install observed on this machine): this plan and its four stories documents to
   `research/`, `IMPLEMENTED <date>` with deviations, both READMEs, `research/module_rules.md` and
   `research/module_tests.md`.
+- **Done 2026-10-13, BEFORE E3's observation, at the operator's request:** the release, the cascade and the
+  observation were extracted to the rollout plan, so the parent and three stories documents (E3 had none) promoted now.
 
 ## Order
 

@@ -1,6 +1,6 @@
 # RESULTS — subagent model tiers
 
-> Status: **record, 2026-10-13** — measurements for [PLAN_subagent_model_tiers.md](../todo/PLAN_subagent_model_tiers.md) (epic E1, story S3); the host facts are filled by E2.
+> Status: **record, 2026-10-13** — measurements for [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md) (epic E1, story S3); the host facts are filled by E2, the behaviour runs by E4, the `modelSettings` probe by E3. The self-install's observation belongs to [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md).
 
 ## Read budget
 
@@ -109,4 +109,25 @@ prompts shuffled, with descriptions and models removed, and the rule's role tabl
 its prompt asked it to produce. **9 of 9 matched the declared roles**; no prompt mixed roles (borderline wording — a
 scout asked to describe visible conventions, a reviewer asked to name "the concrete fix" — was judged and accepted as
 in-role, with the deciding sentence quoted for each).
+
+## `modelSettings` by alias (D11, E3)
+
+Run by the operator on this machine, 2026-10-13. The surface was not `/status` (the plan's §3.5 named it, or
+`--debug`): a logging `PreToolUse` hook recorded the `effort` field the host puts into every payload (*Host facts*
+above), so each observation is the effort the session actually ran at, read from the host. Opus 5.5 sessions, one per
+row, `~/.claude/settings.json` edited between them:
+
+| `modelSettings` for Opus 5.5 | Observed `effort` |
+|---|---|
+| exact key `claude-opus-5-5: high` (the control's baseline) | `high` |
+| exact key `claude-opus-5-5: low` (the control) | `low` |
+| ONLY the alias key `opus: low`, no exact key | `low` |
+| no Opus 5.5 key at all | `medium` — the default |
+
+The control moved the observed value, and the alias key alone moved it the same way, while no key falls back to the
+default — so **the alias key `opus` is honoured**. Applied: the operator's file carries `opus: high` in place of
+`claude-opus-5-5`, observed `high` afterwards; the backup taken before the probe is kept. Not checked: `sonnet` and
+`fable` alias keys, and whether an exact key beats an alias key when both are present.
+
+The assistant's memory note on subagent models was rewritten the same day (E3's other item).
 

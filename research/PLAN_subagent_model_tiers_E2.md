@@ -1,7 +1,16 @@
 # PLAN — Model tiers, E2: the guard, its installer, and the harnesses prepared for it
 
-> Status: **in progress, 2026-10-13.** Stories of epic E2 of [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md)
-> (§ *Epics*, E2). Split by Opus; models per story below.
+> Status: **IMPLEMENTED, 2026-10-13.** Stories of epic E2 of [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md)
+> (§ *Epics*, E2), shipped in PR #65. Deviations: the role-table parser is a `tools/lib/` module (S1); each harness
+> opt-out is proved by its launcher's unit test plus the hook's opt-out test, not a paid real-launcher run, and no
+> launcher goes through WSL (S4); the scout calibration's opt-out landed in `dew_flow_benchmark` #81 rather than on the
+> other session's branch; the self-install (S5) grew handler-level merges, repair of an interrupted or invalid
+> registration, and a refusal to install from the conventions repository itself. Checked and NOT observed:
+> S1.8's open point 1 — `systemMessage` beside a decision on an interactive host has no record in
+> [RESULTS](RESULTS_subagent_model_tiers.md). Open tail: the first live user-level install is E3's, in
+> [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md).
+>
+> Split by Opus; models per story below.
 
 Done when (from the parent): the guard and installer tests pass and both break-its went red and back; `adapter-check`
 demands the hook and this repository hosts it; real payloads and the allowed-call context are recorded; every harness

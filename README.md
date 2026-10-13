@@ -195,6 +195,8 @@ of skipping it is a commit that breaks a rule written precisely because breaking
 | `dew_flow_benchmark` | .NET |
 | `dew_flow_creds_for_devs` | .NET + TypeScript — a VS Code extension over a C# broker, CLI and MCP server (one `.slnx`, seven projects), so `csharp/` and `typescript/` both match; `rust/` never does |
 | `dew_flow_connect_other_ais` | .NET + TypeScript — the ConnectOtherAIs review gate: a C# AOT MCP server and a VS Code extension, so `csharp/` and `typescript/` both match |
+| `wsl_care` | mounted at `.agents/conventions` on `release` (the migrated layout); its CI runs `pin-check` and `adapter-check` — found 2026-10-13 |
+| `dew_flow_vscode_kit` | mounted at `.agents/conventions` on `release` (the migrated layout) — found 2026-10-13 |
 
 A new repository joins with one `git submodule add` — see [ROLLOUT.md](ROLLOUT.md).
 
