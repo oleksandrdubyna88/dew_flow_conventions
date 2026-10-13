@@ -37,4 +37,39 @@ one read today still fit (`tools/rules.test.mjs` pins both halves).
 
 ## Host facts
 
-Recorded in E2.
+Recorded 2026-10-13 in E2, from real headless sessions (`claude -p --output-format stream-json --verbose`,
+`permission_mode: "default"`), by scouts on Sonnet.
+
+**The PreToolUse payload for the Agent tool.** Keys: `session_id`, `transcript_path`, `cwd`, `scratchpad_dir`,
+`prompt_id`, `permission_mode`, `effort`, `hook_event_name`, `tool_name`, `tool_input`, `tool_use_id`. `tool_name` is
+`"Agent"`. `tool_input` with a model: `{description, prompt, subagent_type, model: "sonnet", run_in_background}`;
+without one the `model` key is **absent** — nothing is injected.
+
+**What the hook's answers do.** A `deny` with a reason reaches the model as an error `tool_result`
+(`PreToolUse:Agent hook error: <reason>`) and the subagent never runs. An `additionalContext` with NO
+`permissionDecision` reaches the parent verbatim, and the call proceeds through normal permission handling.
+
+**What the stream shows of a child.** A child contributes ONE event with `parent_tool_use_id` set — a `user` event
+holding its prompt — plus `system/task_started` and `system/task_notification` (status, usage), none with a model. The
+parent receives the child's hand-back as a parent-level `tool_result`. Resolved models appear only in aggregate:
+`result.modelUsage` keyed by model (measured: `claude-opus-5-5[1m]` for the parent and an Opus child together,
+`claude-sonnet-5-5` for the Sonnet child, and a little `claude-haiku-4-5` the host spends itself), and
+`result.subagent_stats` `{spawned, requested.foreground, completed, max_depth}`. A per-child resolved model cannot be
+read from the stream; the behaviour smoke checks the requested model per launch and the families in aggregate.
+
+**Every launcher of `claude` on this machine** (two scouts, 2026-10-13), and whether it must opt out of the guard:
+
+| Where | What | Agent tool | Measures models? | Opt-out |
+|---|---|---|---|---|
+| connect_other_ais `src_mcp/runners/Reviewers/ClaudeRuntime.cs:71-92` | gate reviewer | allowed unless confined | no — work | no |
+| connect_other_ais `src_mcp/runners/Consultation/ClaudeConsultant.cs:53-71` | consultant | denied (`Task`, `Agent`) | no | no (never launches) |
+| connect_other_ais `src_bench/CoaiBench/Judging/Judge.cs:162-183` | bench judge, `--max-turns 1` | allowed | **yes** | **yes** |
+| connect_other_ais `src_vs_code/src/claudeAdapter.ts:22-49` | chat sessions | allowed | no — work | no |
+| connect_other_ais `src_vs_code/src/claudeProbe.ts:71`, `scripts/live-claude-models.mjs` | model probes (`-p "hi"`) | not used | availability only | no (never launches) |
+| connect_other_ais `src_server/src/Slots/SlotEnvironment.cs:67-77` | team-server slots, own `CLAUDE_CONFIG_DIR` | — | no | no (the user-level copy is not in that config dir) |
+| benchmark `src/Bench.Infrastructure/Models/CliAgentRuntime.cs:177` | authoring, vetting, assessor | allowed | no — work | no |
+| benchmark `src/Bench.Infrastructure/Models/CliSubjectRuntime.cs:107` | a CLI measured as a subject | allowed | **yes** | **yes** |
+| benchmark branch `feat/scouts-context`: `CliScoutRunner.cs:108`, `ScoutsAliasCommand.cs:57`, `CliProbeRunner.cs:65` | scout calibration, alias check, probes; environment REPLACED by an allow-list | used, models always named | **yes** | **yes — added to the allow-list on that branch; it is another session's, so the requirement is written into its plan** |
+| rag_qln `ClaudeCliProbe.cs:45-55`, `extension.ts:392` | `--version` / an interactive terminal | — | no | no |
+
+No launcher passes `--settings` or `--setting-sources`; none launches `claude` through WSL from the C# runners.

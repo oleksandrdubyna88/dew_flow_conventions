@@ -404,6 +404,21 @@ half), 23, 25, 29 and 30 go red — quote the first failing assertion; restore; 
   (WSL: through `WSLENV`); each proved by an otherwise-denied call through the REAL launcher; the benchmark's PR (status
   line, three citations, the opt-out) merged first; the restart list for processes already running; all recorded in
   `research/RESULTS_subagent_model_tiers.md`.
+- **What the inventory found** (RESULTS § *Host facts*): three launchers measure models — the connect_other_ais bench
+  judge, the benchmark's subject runtime, and the scout calibration on another session's unmerged branch. No launcher
+  goes through WSL, so `WSLENV` is not needed. **Deviation:** each opt-out is proved by its launcher's own unit test
+  (the variable is in the child's environment, everything else inherited) plus the hook's opt-out test (that variable
+  silences it) — not by a paid real-launcher run, which for the judge (`--max-turns 1`) cannot even reach an Agent call.
+  The calibration branch cannot be edited from here; its plan now carries the requirement.
+
+## S5 — The self-install (D13)
+
+- **Models.** Brief by Opus; code by Sonnet; the security finding on it judged by Fable; review by Opus.
+- **Scope.** `settings/hooks/ensure-user-guard.mjs` (SessionStart), the installer's core extracted to
+  `settings/hooks/lib/user-guard-install.mjs` (used by it and by the CLI), `GUARD_VERSION` in the guard, the optout
+  marker written by `--uninstall` and cleared by `--install`, `--force`, the provenance manifest, the dirty-source
+  refusal, the never-silent newer-installed line; `tools/ensure-user-guard.test.mjs`. NOT wired into any settings file
+  here — that is E4.S4, in the release commit.
 
 ## Order
 
