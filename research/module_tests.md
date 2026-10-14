@@ -183,6 +183,11 @@ is refused, every install writes the provenance manifest (source, sha256, versio
 spawned runs of the entry point print exactly one `systemMessage` line the first time and nothing the second, and
 survive garbage stdin (the payload `cwd` stands in for `CLAUDE_PROJECT_DIR`). The permanent break-it makes the
 version comparison always install: the "equal writes nothing" and the second-run-silent cases go red.
+`tools/effort-converge.test.mjs` (10 cases, 2026-10-14) covers the effort convergence (`effortProblems`,
+`convergeEffort`, `applyEffort`, `ensureEffort`) with temporary homes: all keys set, input never mutated, other keys and
+their order kept, other `modelSettings` keys (`claude-opus-5`) pinned, idempotent (no write, backup or output),
+opt-out and reference-repository skips, malformed JSON untouched, a missing file not created, every-start behaviour
+of the entry point, and the `--check` effort line.
 `tools/install-user-hook.test.mjs` (now 22 cases, importing the extracted core `settings/hooks/lib/user-guard-install.mjs`)
 gains the opt-out marker (`--uninstall` writes it, an explicit `--install` deletes it), `--force` over a newer
 guard, and the manifest (`--check` prints it and fails when the installed bytes no longer match its sha256;

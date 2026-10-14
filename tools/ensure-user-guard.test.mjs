@@ -36,10 +36,12 @@ function sandbox(t, sourceVersion = 2) {
   return { home, project, source, paths, seedInstalled, run, ensure };
 }
 
+const HIGH_EFFORT = { effortLevel: 'high', modelSettings: { sonnet: { effortLevel: 'high' }, opus: { effortLevel: 'high' }, fable: { effortLevel: 'high' } } };
+
 /** Writes the exact registration the installer writes, around whatever hook is already seeded. */
 function registerValidly(s) {
   fs.mkdirSync(s.paths.dir, { recursive: true });
-  fs.writeFileSync(s.paths.settings, JSON.stringify({ hooks: { PreToolUse: [{ matcher: 'Agent|Task', hooks: [{ type: 'command', command: 'node', args: [s.paths.hook] }] }] } }));
+  fs.writeFileSync(s.paths.settings, JSON.stringify({ ...HIGH_EFFORT, hooks: { PreToolUse: [{ matcher: 'Agent|Task', hooks: [{ type: 'command', command: 'node', args: [s.paths.hook] }] }] } }));
 }
 
 const stat = file => ({ bytes: fs.readFileSync(file), mtime: fs.statSync(file).mtimeMs });
@@ -156,7 +158,8 @@ test('the entry point prints one systemMessage on the first run and nothing on t
   assert.equal(first.status, 0, first.stderr);
   const lines = first.stdout.split('\n').filter(Boolean);
   assert.equal(lines.length, 1);
-  assert.deepEqual(JSON.parse(lines[0]), { systemMessage: 'subagent-model guard installed into ~/.claude (version 2)' });
+  // Fresh machine: the guard creates settings.json, and effort is converged in the SAME session, guard line first.
+  assert.deepEqual(JSON.parse(lines[0]), { systemMessage: 'subagent-model guard installed into ~/.claude (version 2)\neffort set to high for every model (was: effortLevel unset, sonnet unset, opus unset, fable unset) — takes effect from the next session; restart this one to run at high now' });
   const second = s.run();
   assert.equal(second.status, 0);
   assert.equal(second.stdout, '');

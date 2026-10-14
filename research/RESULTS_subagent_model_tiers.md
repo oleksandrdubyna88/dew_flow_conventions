@@ -33,7 +33,7 @@ one read today still fit (`tools/rules.test.mjs` pins both halves).
 
 ## The rule's size
 
-`common/subagent-models.md`: 8 875 bytes (LF line endings).
+`common/subagent-models.md`: 8 875 bytes (LF line endings); 10 201 bytes after the Effort section (2026-10-14).
 
 ## Host facts
 
@@ -161,3 +161,26 @@ benchmark (#86 → #88, `1138108`), wsl_care (#139 → #140), dew_flow_vscode_ki
 vendored `.claude/hooks/**`), connect_other_ais (#814 → `4474e25`), and rag_qln last with both code pins (#60 →
 #61, `905252f`; Release build 0 errors, 849 tests passed).
 
+## Effort — every model at high (2026-10-14)
+
+A subagent runs at the effort of ITS OWN model from the user settings (`modelSettings.<alias>.effortLevel`, else the
+top-level `effortLevel`), not the parent's. The operator had `effortLevel: "xhigh"` with only `opus` pinned to
+`high`, so every Sonnet scout ran at `xhigh`.
+
+| Scouts pilot (benchmark) | Time | Cost |
+|---|---|---|
+| 2 Sonnet scouts at `xhigh` | 92 s | $0.73 |
+| 2 Sonnet scouts at `high` | 41 s | $0.29 |
+| 1 Opus at `high` | — | $0.39 |
+
+At `xhigh` the scouts read about 4× more. **The probe** — a `PreToolUse` hook logging the payload's `effort` field
+per `agent_id`: with the user settings at `high` for all, the main Opus, a Sonnet child and a Fable child each logged
+`{"level":"high"}`. **Its break-it** — a one-run `--settings` overlay `{"modelSettings":{"sonnet":{"effortLevel":"xhigh"}}}`
+made the Sonnet child log `xhigh` while the others stayed `high`: the probe has teeth, and the setting that decides a
+subagent's effort is its own model's.
+
+Decision (owner): effort is the same for every model everywhere, and it is `high`. The rule carries it
+([subagent-models.md](../common/subagent-models.md) § *Effort*), and the session self-install now converges it:
+`ensure-user-guard.mjs` sets `effortLevel` and every `modelSettings.*.effortLevel` to `high` in an existing
+`~/.claude/settings.json` at every session start (backup, atomic write, one line, silent when converged, off under
+`SUBAGENT_MODEL_GUARD=off`). Convergence fixes the FILE, not the running session. **Probe (2026-10-14, $0.45):** project settings started with `modelSettings.sonnet.effortLevel = "xhigh"`; a SessionStart hook rewrote it to `"medium"` (file confirmed changed); in the SAME session the main Opus logged effort `high` and a Sonnet subagent launched AFTER the rewrite logged `xhigh`, the OLD value. A settings change at SessionStart reaches neither the main session nor subagents launched later in it, and there is no supported way for a hook to change the active session's effort; it takes effect from the next session, so the hook's line says to restart. Models measured at different efforts are not comparable.
