@@ -114,7 +114,7 @@ export function ensureUserGuard({ home, source, env }) {
   return { action: step.action, line: successLine(step, to) };
 }
 
-const effortLine = ({ problems }) => `effort set to high for every model (was: ${problems.join(', ')})`;
+const effortLine = ({ problems }) => `effort set to high for every model (was: ${problems.join(', ')}) — takes effect from the next session; restart this one to run at high now`;
 
 /** The outcome and line for what `applyEffort` reported. */
 function effortOutcome({ code, lines, changed, problems }) {

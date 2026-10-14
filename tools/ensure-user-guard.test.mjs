@@ -159,7 +159,7 @@ test('the entry point prints one systemMessage on the first run and nothing on t
   const lines = first.stdout.split('\n').filter(Boolean);
   assert.equal(lines.length, 1);
   // Fresh machine: the guard creates settings.json, and effort is converged in the SAME session, guard line first.
-  assert.deepEqual(JSON.parse(lines[0]), { systemMessage: 'subagent-model guard installed into ~/.claude (version 2)\neffort set to high for every model (was: effortLevel unset, sonnet unset, opus unset, fable unset)' });
+  assert.deepEqual(JSON.parse(lines[0]), { systemMessage: 'subagent-model guard installed into ~/.claude (version 2)\neffort set to high for every model (was: effortLevel unset, sonnet unset, opus unset, fable unset) — takes effect from the next session; restart this one to run at high now' });
   const second = s.run();
   assert.equal(second.status, 0);
   assert.equal(second.stdout, '');

@@ -33,7 +33,7 @@ one read today still fit (`tools/rules.test.mjs` pins both halves).
 
 ## The rule's size
 
-`common/subagent-models.md`: 8 875 bytes (LF line endings); 10 118 bytes after the Effort section (2026-10-14).
+`common/subagent-models.md`: 8 875 bytes (LF line endings); 10 201 bytes after the Effort section (2026-10-14).
 
 ## Host facts
 
@@ -183,4 +183,4 @@ Decision (owner): effort is the same for every model everywhere, and it is `high
 ([subagent-models.md](../common/subagent-models.md) § *Effort*), and the session self-install now converges it:
 `ensure-user-guard.mjs` sets `effortLevel` and every `modelSettings.*.effortLevel` to `high` in an existing
 `~/.claude/settings.json` at every session start (backup, atomic write, one line, silent when converged, off under
-`SUBAGENT_MODEL_GUARD=off`). Convergence fixes the FILE: the session that converged it had already resolved its own effort before SessionStart, so it takes effect from the next session. Models measured at different efforts are not comparable.
+`SUBAGENT_MODEL_GUARD=off`). Convergence fixes the FILE, not the running session. **Probe (2026-10-14, $0.45):** project settings started with `modelSettings.sonnet.effortLevel = "xhigh"`; a SessionStart hook rewrote it to `"medium"` (file confirmed changed); in the SAME session the main Opus logged effort `high` and a Sonnet subagent launched AFTER the rewrite logged `xhigh`, the OLD value. A settings change at SessionStart reaches neither the main session nor subagents launched later in it, and there is no supported way for a hook to change the active session's effort; it takes effect from the next session, so the hook's line says to restart. Models measured at different efforts are not comparable.

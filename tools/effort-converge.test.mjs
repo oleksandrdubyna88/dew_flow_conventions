@@ -64,7 +64,7 @@ test('an existing settings.json is converged: all keys, other keys kept, one lin
   s.write({ model: 'opus', effortLevel: 'xhigh', env: { A: '1' }, modelSettings: { opus: HIGH } });
   const r = s.ensure();
   assert.equal(r.action, 'converged');
-  assert.equal(r.line, 'effort set to high for every model (was: effortLevel xhigh, sonnet unset, fable unset)');
+  assert.equal(r.line, 'effort set to high for every model (was: effortLevel xhigh, sonnet unset, fable unset) — takes effect from the next session; restart this one to run at high now');
   const after = JSON.parse(s.read());
   assert.deepEqual(after, { model: 'opus', effortLevel: 'high', env: { A: '1' }, modelSettings: { opus: HIGH, sonnet: HIGH, fable: HIGH } });
   assert.deepEqual(Object.keys(after), ['model', 'effortLevel', 'env', 'modelSettings']);
@@ -139,12 +139,12 @@ test('the entry point converges at EVERY session start, even when the guard is c
   assert.equal(lines.length, 1);
   const { systemMessage } = JSON.parse(lines[0]);
   assert.match(systemMessage, /guard installed into ~\/\.claude/);
-  assert.match(systemMessage, /effort set to high for every model \(was: effortLevel xhigh, sonnet unset, opus unset, fable unset\)/);
+  assert.match(systemMessage, /effort set to high for every model \(was: effortLevel xhigh, sonnet unset, opus unset, fable unset\) — takes effect from the next session; restart this one to run at high now/);
   // Guard now current; someone sets xhigh again: the next start still converges, alone.
   const edited = JSON.parse(s.read());
   fs.writeFileSync(s.paths.settings, `${JSON.stringify({ ...edited, effortLevel: 'xhigh' }, null, 2)}\n`);
   const second = s.run();
-  assert.equal(JSON.parse(second.stdout).systemMessage, 'effort set to high for every model (was: effortLevel xhigh)');
+  assert.equal(JSON.parse(second.stdout).systemMessage, 'effort set to high for every model (was: effortLevel xhigh) — takes effect from the next session; restart this one to run at high now');
   assert.equal(s.run().stdout, '');
 });
 

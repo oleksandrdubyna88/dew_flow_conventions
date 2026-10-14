@@ -105,7 +105,7 @@ A subagent takes the effort of ITS OWN model from the user settings
 41 s / $0.29 at `high` (one Opus at `high`: $0.39), reading about 4× more (measured 2026-10-14, see the
 results file). So the user settings carry `"effortLevel": "high"` and `modelSettings` entries `sonnet`,
 `opus` and `fable` each `{ "effortLevel": "high" }` (and every other `modelSettings` key at `high` too);
-the session self-install converges them at every start (it fixes the FILE; the session that converged it had already resolved its own effort, so it takes effect from the next session). Never set a different effort per launch or per
+the session self-install converges them at every start (it fixes the FILE only: measured 2026-10-14, a SessionStart rewrite reached neither the running main session nor a subagent launched later in it, which kept the OLD value; it takes effect from the next session). Never set a different effort per launch or per
 model, and never compare models measured at different efforts.
 
 ## The guard
