@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Refuse a subagent launch that does not name its model as a bare alias, and teach the role table
- * on every launch that does.
+ * Refuse a subagent launch that does not name its model as a bare alias or that sets an `effort` other
+ * than `high` (effort is `high` for every model; the Agent tool's per-launch `effort` argument would
+ * defeat that), and teach the role table on every launch that passes.
  *
  * <p>Copied verbatim into each consumer as `.claude/hooks/subagent-model.mjs` and wired by
  * `settings/settings.json` as a `PreToolUse` hook on `Agent|Task`, exactly like `build-flags.mjs`. It
@@ -31,9 +32,11 @@
  */
 
 /** Raise with every behaviour change; it decides whether a session self-install upgrades the user copy. */
-export const GUARD_VERSION = 1;
+export const GUARD_VERSION = 2;
 export const DENY_MARKER = 'subagent-models.md:';
 export const ALLOWED_MODELS = Object.freeze(['sonnet', 'opus', 'fable']);
+/** The only `effort` a launch may carry (or none): high for every model. */
+export const REQUIRED_EFFORT = 'high';
 export const OPT_OUT_VARIABLE = 'SUBAGENT_MODEL_GUARD';
 export const FREEZE_VARIABLES = Object.freeze([
   'ANTHROPIC_DEFAULT_OPUS_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL',
@@ -77,9 +80,25 @@ export const TEACH_TEXT = `Subagent models — ${roleLine(ROLE_DIGEST)}. Name th
 
 export const DENY_TEXT = `${DENY_MARKER} name the model on every Agent call as a bare alias — sonnet, opus or fable. Missing, empty, haiku, inherit, a versioned id or another spelling is refused. Roles — ${roleLine(ROLE_DIGEST)}. Relaunch with the alias of the role.`;
 
+/** Why a launch that sets `effort` is refused: one level for every model, so a launch never sets one. */
+export const EFFORT_DENY_TEXT = `${DENY_MARKER} effort is high for every model and must not be set per launch. Drop the effort argument, or pass exactly "high".`;
+
 const isPlainObject = value => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const envText = (env, name) => String(env[name] ?? '').trim();
+
+const SILENT = Object.freeze({ kind: 'silent', text: '', warnings: Object.freeze([]) });
+
+const hasAllowedModel = toolInput => typeof toolInput.model === 'string' && ALLOWED_MODELS.includes(toolInput.model);
+
+const hasForeignEffort = toolInput => toolInput.effort !== undefined && toolInput.effort !== REQUIRED_EFFORT;
+
+/** The refusal for this `tool_input`, model before effort; `''` when the launch is fine. */
+function refusalText(toolInput) {
+  if (!hasAllowedModel(toolInput)) return DENY_TEXT;
+
+  return hasForeignEffort(toolInput) ? EFFORT_DENY_TEXT : '';
+}
 
 /** `silent` unless the payload is a PreToolUse `Agent`/`Task` call with an object `tool_input`. */
 function inEnvelope(payload) {
@@ -106,17 +125,18 @@ function warningsFor(env) {
 /**
  * The verdict on one hook payload. Pure: no I/O, no clock. Reads exactly six keys of `env`.
  *
+ * <p>Order: the opt-out and the envelope first (silent), then the MODEL (a missing or non-alias model is the
+ * model denial even when `effort` is also wrong), then `effort` (present and not exactly `"high"`, of any type,
+ * is the effort denial), otherwise teach.</p>
+ *
  * @returns {{ kind: 'deny' | 'teach' | 'silent', text: string, warnings: string[] }}
  */
 export function subagentModelVerdict(payload, env) {
-  if (envText(env, OPT_OUT_VARIABLE).toLowerCase() === 'off') return { kind: 'silent', text: '', warnings: [] };
-  if (!inEnvelope(payload)) return { kind: 'silent', text: '', warnings: [] };
-  const model = payload.tool_input.model;
-  const named = typeof model === 'string' && ALLOWED_MODELS.includes(model);
+  if (envText(env, OPT_OUT_VARIABLE).toLowerCase() === 'off') return SILENT;
+  if (!inEnvelope(payload)) return SILENT;
+  const text = refusalText(payload.tool_input);
 
-  return named
-    ? { kind: 'teach', text: TEACH_TEXT, warnings: warningsFor(env) }
-    : { kind: 'deny', text: DENY_TEXT, warnings: warningsFor(env) };
+  return { kind: text === '' ? 'teach' : 'deny', text: text === '' ? TEACH_TEXT : text, warnings: warningsFor(env) };
 }
 
 /** `''` for silent, otherwise ONE line of JSON ending in a newline. */

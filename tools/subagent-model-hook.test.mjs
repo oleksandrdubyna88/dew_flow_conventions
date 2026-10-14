@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
-  ALLOWED_MODELS, DENY_MARKER, DENY_TEXT, FREEZE_VARIABLES, ROLE_DIGEST, TEACH_TEXT,
+  ALLOWED_MODELS, DENY_MARKER, DENY_TEXT, EFFORT_DENY_TEXT, FREEZE_VARIABLES, GUARD_VERSION, ROLE_DIGEST, TEACH_TEXT,
   hookOutput, hookResponse, roleLine, subagentModelVerdict,
 } from '../settings/hooks/subagent-model.mjs';
+import { ensureUserGuard } from '../settings/hooks/ensure-user-guard.mjs';
+import { targets } from '../settings/hooks/lib/user-guard-install.mjs';
 import { digestMismatches, parseRoleTable } from './lib/role-table.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -401,4 +404,65 @@ test('34. digestMismatches names each kind of difference', () => {
   assert.deepEqual(digestMismatches([{ role: 'a', model: 'opus' }, { role: 'A', model: 'opus' }], [{ role: 'a', model: 'opus' }]), ['duplicate role "a" in the hook']);
   assert.deepEqual(digestMismatches([{ role: 'a', model: 'opus' }], [{ role: 'a', model: 'opus' }, { role: 'a', model: 'opus' }]), ['duplicate role "a" in the rule']);
   assert.deepEqual(digestMismatches([{ role: ' JUDGE ', model: 'opus' }], [{ role: 'judge', model: 'opus' }]), []);
+});
+
+// --- 35-41: effort is `high` or absent ---
+
+const withEffort = effort => REAL_PAYLOAD({ ...BASE_INPUT, model: 'sonnet', effort });
+const EFFORT_DENY = { kind: 'deny', text: EFFORT_DENY_TEXT, warnings: [] };
+
+test('35. a launch that sets effort to low, medium, xhigh or max is denied with the marker', () => {
+  assert.ok(EFFORT_DENY_TEXT.startsWith(DENY_MARKER));
+  for (const effort of ['low', 'medium', 'xhigh', 'max']) assert.deepEqual(verdict(withEffort(effort)), EFFORT_DENY, effort);
+  assert.deepEqual(oneLine(hookOutput(verdict(withEffort('low')))).hookSpecificOutput.permissionDecisionReason, EFFORT_DENY_TEXT);
+});
+
+test('36. effort "high" and an absent effort are allowed as before', () => {
+  assert.deepEqual(verdict(withEffort('high')), TEACH);
+  assert.deepEqual(verdict(withModel('opus')), TEACH);
+});
+
+test('37. an effort that is not the string "high" is denied: other cases, non-strings, null, objects', () => {
+  for (const effort of ['High', 'HIGH', ' high', '', 3, null, {}, [], true]) assert.deepEqual(verdict(withEffort(effort)), EFFORT_DENY, JSON.stringify(effort));
+});
+
+test('38. a missing model AND a bad effort give the model denial: the model is checked first', () => {
+  assert.deepEqual(verdict(REAL_PAYLOAD({ ...BASE_INPUT, effort: 'low' })), DENY);
+  assert.deepEqual(verdict(REAL_PAYLOAD({ ...BASE_INPUT, model: 'haiku', effort: 'max' })), DENY);
+});
+
+test('39. the opt-out and a foreign tool stay silent whatever the effort is', () => {
+  assert.deepEqual(verdict(withEffort('low'), { [OPT_OUT]: 'off' }), SILENT);
+  assert.deepEqual(verdict({ ...withEffort('low'), tool_name: 'Bash' }), SILENT);
+});
+
+test('40. through the process: a bad effort is one deny line, a high one a teach line', () => {
+  const denied = oneLine(spawnHook(JSON.stringify(withEffort('xhigh'))).stdout);
+  assert.equal(denied.hookSpecificOutput.permissionDecision, 'deny');
+  assert.equal(denied.hookSpecificOutput.permissionDecisionReason, EFFORT_DENY_TEXT);
+  assert.equal(oneLine(spawnHook(JSON.stringify(withEffort('high'))).stdout).hookSpecificOutput.additionalContext, TEACH_TEXT);
+});
+
+test('41. the effort refusal is short, one line, and teaches only the effort rule', () => {
+  assert.ok(Buffer.byteLength(EFFORT_DENY_TEXT, 'utf8') <= 300);
+  assert.ok(!/[\r\n]/.test(EFFORT_DENY_TEXT));
+  assert.ok(/\bhigh\b/.test(EFFORT_DENY_TEXT));
+});
+
+test('42. the guard is version 2, and a session self-install upgrades an installed version 1 to it', t => {
+  assert.equal(GUARD_VERSION, 2);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-effort-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const home = path.join(root, 'home');
+  const paths = targets(home);
+  fs.mkdirSync(path.dirname(paths.hook), { recursive: true });
+  fs.writeFileSync(paths.hook, 'export const GUARD_VERSION = 1;\n');
+  const source = path.join(root, 'project', '.claude', 'hooks', 'subagent-model.mjs');
+  fs.mkdirSync(path.dirname(source), { recursive: true });
+  fs.copyFileSync(HOOK, source);
+  const result = ensureUserGuard({ home, source, env: { SUBAGENT_MODEL_GUARD: '' } });
+  assert.equal(result.action, 'upgraded');
+  assert.match(result.line, /version 1 → 2/);
+  assert.deepEqual(fs.readFileSync(paths.hook), fs.readFileSync(HOOK));
+  assert.equal(ensureUserGuard({ home, source, env: { SUBAGENT_MODEL_GUARD: '' } }).action, 'none');
 });
