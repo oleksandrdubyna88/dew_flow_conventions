@@ -70,8 +70,8 @@ unparsable or concurrently changed settings, a backup, an atomic write, one hand
 `SessionStart` hook, `settings/hooks/ensure-user-guard.mjs` (5 s timeout), runs that core at session start when the
 user copy is missing, older by `GUARD_VERSION`, or badly registered; it never downgrades, never runs from this
 repository's own layout, refuses a project copy with uncommitted changes, and writes a provenance manifest. Design
-record: [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md); its release to the consumers is open in
-[PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md).
+record: [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md); its release to the consumers is recorded in
+[PLAN_subagent_model_tiers_rollout.md](PLAN_subagent_model_tiers_rollout.md).
 
 References: [yaml parser](https://eemeli.org/yaml/),
 [picomatch](https://github.com/micromatch/picomatch),

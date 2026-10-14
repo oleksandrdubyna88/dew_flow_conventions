@@ -1,7 +1,14 @@
 # PLAN — Model tiers, the rollout: one release, the pin cascade, the self-install observed
 
-> Status: **plan only, nothing of the rollout done yet, 2026-10-13.** Its one precondition is already met (below).
-> Extracted from [PLAN_subagent_model_tiers.md](../research/PLAN_subagent_model_tiers.md) when that plan was promoted:
+> Status: **IMPLEMENTED, 2026-10-14.** Deviations: (1) **two releases, not one** — `d88e293`, then the hotfix `ea3252f`
+> after a consumer's CI found a raw NUL byte in `tools/lib/rule-smoke.mjs` and another's ESLint found two findings in the
+> vendored hooks (both fixed at the source, PR #66, with a control-byte test); (2) **eight consumers, not six** — wsl_care
+> and dew_flow_vscode_kit pin `release` in the migrated layout too (vscode_kit's ESLint now ignores `.claude/hooks/**`);
+> (3) **rag_qln merged before connect_other_ais** in the first wave, which shrank the mid-cascade window below the plan's;
+> (4) **the auto-mode permission classifier refused subagents writing `.claude/` in consumer worktrees** ("Self-
+> Modification") even with the operator's relayed approval — the main session, where the approval was visible, wrote
+> those files, and the subagents did the commits, PRs and merges. E3 observed as §4 asks — RESULTS § *E3*.
+> Extracted from [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md) when that plan was promoted:
 > E1, E2 and E4 S1–S3 shipped in PR #65; this is its open tail — E4.S4's release and cascade, and E3's observation.
 > The operator wants it done LAST, after PR #65 merges.
 
@@ -22,7 +29,7 @@ consumer that carries the adapter installs it.
   the probes always carry `SUBAGENT_MODEL_GUARD=off`), and `dew_flow_connect_other_ais` #793 (the CoaiBench judge's
   opt-out) — all three merged. The release PR states this, as E4.S4 requires.
 - **E3's D11 and the memory note** — done on the operator's machine 2026-10-13, recorded in
-  [RESULTS_subagent_model_tiers.md](../research/RESULTS_subagent_model_tiers.md) § *`modelSettings` by alias (D11)*.
+  [RESULTS_subagent_model_tiers.md](RESULTS_subagent_model_tiers.md) § *`modelSettings` by alias (D11)*.
 
 ## 3. Build order
 
@@ -101,10 +108,10 @@ confirms.
 
 ## 7. Definition of Done
 
-- [ ] PR #65 merged; `release` promoted once to its sha, with a reason.
-- [ ] The six bumps merged in the order of §3, rag_qln last with both code pins; each `pin-check` green.
-- [ ] connect_other_ais carries the three hook files and both settings entries; its `adapter-check` green.
-- [ ] `wsl_care` and `dew_flow_vscode_kit` bumped, each carrying the hook files and settings entries.
-- [ ] The cross-repository citations in benchmark and connect_other_ais name `research/PLAN_subagent_model_tiers.md`.
-- [ ] E3 observed: the self-install line, `--check` clean, a silent second session, the plain-session refusal and pass.
-- [ ] RESULTS records E3; the promoted plan's E3 line updated; this plan promoted to `research/`.
+- [x] PR #65 merged; `release` promoted once to its sha, with a reason.
+- [x] The six bumps merged in the order of §3, rag_qln last with both code pins; each `pin-check` green.
+- [x] connect_other_ais carries the three hook files and both settings entries; its `adapter-check` green.
+- [x] `wsl_care` and `dew_flow_vscode_kit` bumped, each carrying the hook files and settings entries.
+- [x] The cross-repository citations in benchmark and connect_other_ais name `research/PLAN_subagent_model_tiers.md`.
+- [x] E3 observed: the self-install line, `--check` clean, a silent second session, the plain-session refusal and pass.
+- [x] RESULTS records E3; the promoted plan's E3 line updated; this plan promoted to `research/`.
