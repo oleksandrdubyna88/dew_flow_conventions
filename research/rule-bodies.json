@@ -425,9 +425,21 @@
       ]
     },
     {
+      "id": "common.test-leftovers",
+      "source": "common/test-leftovers.md",
+      "bodySha256": "34cb7bb47c467bc1933f4aca06b7de88c093e571da7102c6f7a6a861a5247f99",
+      "sections": [
+        "# Test leftovers are named `testsToDelete-…` (MANDATORY)",
+        "## Containers",
+        "## The sweep",
+        "## Never",
+        "## Definition of Done"
+      ]
+    },
+    {
       "id": "common.testing",
       "source": "common/testing.md",
-      "bodySha256": "4d8412741130960bb2cad1f180ee5f1369453bf77ac60d67a888360efdcf4d04",
+      "bodySha256": "f09c745c01ba8964f7f92d87c4f51dcbf2ae61f83b7e81bae00b513f5e502738",
       "sections": [
         "# Testing",
         "## Running tests — executables only, never `dotnet test` (MANDATORY)",
@@ -439,7 +451,6 @@
         "## A structural test that matches nothing passes forever",
         "## A test can only inspect what is PRESENT",
         "## A test must leave a shared store as it found it",
-        "## Everything a test run leaves outside its process is named `testsToDelete-…` (MANDATORY)",
         "## Passes alone, fails in the suite — that is a SHARED-STATE defect, never a flake (MANDATORY)",
         "## A green suite proves only the BINARIES you ran — check they are the ones you built",
         "## A green suite proves only the configuration you ran",
