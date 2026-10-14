@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { ensureEffort } from '../settings/hooks/ensure-user-guard.mjs';
-import { convergeEffort, effortProblems, targets } from '../settings/hooks/lib/user-guard-install.mjs';
+import { applyEffort, convergeEffort, effortProblems, targets } from '../settings/hooks/lib/user-guard-install.mjs';
 
 const TOOLS = path.dirname(fileURLToPath(import.meta.url));
 const ENTRY = path.join(TOOLS, '..', 'settings', 'hooks', 'ensure-user-guard.mjs');
@@ -159,4 +159,100 @@ test('install-user-hook --check reports the effort status without changing the e
   const good = run('--check');
   assert.equal(good.status, 0, good.stderr);
   assert.match(good.stderr, /effort: high for every model/);
+});
+
+const dirFiles = (s, part) => (fs.existsSync(s.paths.dir) ? fs.readdirSync(s.paths.dir).filter(f => f.includes(part)) : []);
+
+test('a read-only settings.json: one refusal line, no backup, no temp file, and nothing accumulates', t => {
+  const s = sandbox(t);
+  s.write({ effortLevel: 'xhigh' });
+  const bytes = s.read();
+  fs.chmodSync(s.paths.settings, 0o444);
+  try {
+    for (let run = 0; run < 3; run += 1) {
+      const r = s.ensure();
+      assert.equal(r.action, 'refused');
+      assert.match(r.line, /^effort NOT converged: .*not writable/);
+    }
+    assert.equal(s.backups().length, 0);
+    assert.deepEqual(dirFiles(s, '.tmp-'), []);
+    assert.equal(s.read(), bytes);
+  } finally {
+    fs.chmodSync(s.paths.settings, 0o666);
+  }
+});
+
+test('a write that fails after the backup is a refusal, and repeated runs add no further backup', t => {
+  const s = sandbox(t);
+  s.write({ effortLevel: 'xhigh' });
+  const bytes = s.read();
+  fs.mkdirSync(`${s.paths.settings}.tmp-${process.pid}`); // makes the temp-file write fail
+  for (let run = 0; run < 3; run += 1) {
+    const r = s.ensure();
+    assert.equal(r.action, 'refused');
+    assert.match(r.line, /^effort NOT converged: .*could not be written/);
+  }
+  assert.equal(s.backups().length, 1);
+  assert.equal(s.read(), bytes);
+});
+
+test('another session converging at the same moment: nothing printed, no extra backup', t => {
+  const s = sandbox(t);
+  s.write({ effortLevel: 'xhigh' });
+  const r = applyEffort({ home: s.home, beforeWrite: () => s.write(converged) });
+  assert.equal(r.code, 0);
+  assert.deepEqual(r.lines, []);
+  assert.equal(r.changed, false);
+  assert.equal(s.backups().length, 0);
+});
+
+test('a concurrent change that leaves effort unconverged is refused with the effort wording', t => {
+  const s = sandbox(t);
+  s.write({ effortLevel: 'xhigh' });
+  const r = applyEffort({ home: s.home, beforeWrite: () => s.write({ effortLevel: 'max' }) });
+  assert.equal(r.code, 1);
+  assert.match(r.lines.at(-1), /changed while converging effort/);
+  assert.equal(s.backups().length, 0);
+});
+
+for (const [name, settings, phrase] of [
+  ['modelSettings is an array', { modelSettings: ['x'] }, /modelSettings is not an object/],
+  ['modelSettings is a string', { modelSettings: 'x' }, /modelSettings is not an object/],
+  ['a per-model value is a string', { modelSettings: { opus: 'x' } }, /modelSettings\.opus is not an object/],
+]) {
+  test(`${name}: refused, nothing written (user data is never replaced)`, t => {
+    const s = sandbox(t);
+    s.write(settings);
+    const bytes = s.read();
+    const r = s.ensure();
+    assert.equal(r.action, 'refused');
+    assert.match(r.line, phrase);
+    assert.equal(s.read(), bytes);
+    assert.equal(s.backups().length, 0);
+  });
+}
+
+test('a symlinked settings.json stays a symlink and its target is converged', t => {
+  const s = sandbox(t);
+  const target = path.join(path.dirname(s.home), 'real-settings.json');
+  fs.writeFileSync(target, `${JSON.stringify({ effortLevel: 'xhigh' })}\n`);
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  try {
+    fs.symlinkSync(target, s.paths.settings);
+  } catch (e) {
+    return t.skip(`symlinks are not permitted here (${e.code})`);
+  }
+  assert.equal(s.ensure().action, 'converged');
+  assert.equal(fs.lstatSync(s.paths.settings).isSymbolicLink(), true);
+  assert.equal(JSON.parse(fs.readFileSync(target, 'utf8')).effortLevel, 'high');
+});
+
+test('the original file mode is kept on the new file and on the backup', t => {
+  if (process.platform === 'win32') return t.skip('POSIX modes do not exist on Windows');
+  const s = sandbox(t);
+  s.write({ effortLevel: 'xhigh', env: { TOKEN: 'x' } });
+  fs.chmodSync(s.paths.settings, 0o600);
+  assert.equal(s.ensure().action, 'converged');
+  assert.equal(fs.statSync(s.paths.settings).mode & 0o777, 0o600);
+  assert.equal(fs.statSync(path.join(s.paths.dir, s.backups()[0])).mode & 0o777, 0o600);
 });

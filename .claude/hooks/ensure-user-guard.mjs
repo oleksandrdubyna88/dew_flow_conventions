@@ -21,7 +21,8 @@
  *
  * <p><b>Effort.</b> Independently of the guard, every session start converges the existing
  * `~/.claude/settings.json` so `effortLevel` and `modelSettings.<model>.effortLevel` are all `high`
- * (`ensureEffort`; the same opt-outs and reference-repository skip; one line when it changed something).</p>
+ * (`ensureEffort`; one line when it changed something). Only `SUBAGENT_MODEL_GUARD=off` and the conventions
+ * repository itself skip it; the `subagent-model.optout` marker deliberately does not (high everywhere).</p>
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -115,17 +116,21 @@ export function ensureUserGuard({ home, source, env }) {
 
 const effortLine = ({ problems }) => `effort set to high for every model (was: ${problems.join(', ')})`;
 
+/** The outcome and line for what `applyEffort` reported. */
+function effortOutcome({ code, lines, changed, problems }) {
+  if (code !== 0) return { action: 'refused', line: `effort NOT converged: ${lines.at(-1) ?? 'unknown reason'}` };
+  return changed ? { action: 'converged', line: effortLine({ problems }) } : { action: 'none', line: '' };
+}
+
 /**
  * Converge every effort to `high` in the user's existing settings.json (the rule: common/subagent-models.md
  * § Effort). Runs at EVERY session start, independent of the guard's version; says nothing when converged.
- * Skipped for a measuring harness and for the conventions repository itself; a missing file is not created.
+ * Skipped for a measuring harness (`SUBAGENT_MODEL_GUARD=off`) and for the conventions repository itself; a
+ * missing file is not created. The `subagent-model.optout` marker does NOT skip it: effort is high everywhere.
  */
 export function ensureEffort({ home, source, env }) {
-  if (optedOut(env)) return skipped();
-  if (isReferenceRepository(source)) return skipped();
-  const { code, lines, changed, problems } = applyEffort({ home });
-  if (code !== 0) return { action: 'refused', line: `effort NOT converged: ${lines.at(-1) ?? 'unknown reason'}` };
-  return changed ? { action: 'converged', line: effortLine({ problems }) } : { action: 'none', line: '' };
+  if (optedOut(env) || isReferenceRepository(source)) return skipped();
+  return effortOutcome(applyEffort({ home }));
 }
 
 /** The raw stdin text, abandoned after a deadline when the caller never closes the pipe. */

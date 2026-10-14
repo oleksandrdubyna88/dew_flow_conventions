@@ -33,7 +33,7 @@ one read today still fit (`tools/rules.test.mjs` pins both halves).
 
 ## The rule's size
 
-`common/subagent-models.md`: 8 875 bytes (LF line endings); 9 989 bytes after the Effort section (2026-10-14).
+`common/subagent-models.md`: 8 875 bytes (LF line endings); 10 118 bytes after the Effort section (2026-10-14).
 
 ## Host facts
 
@@ -183,4 +183,4 @@ Decision (owner): effort is the same for every model everywhere, and it is `high
 ([subagent-models.md](../common/subagent-models.md) § *Effort*), and the session self-install now converges it:
 `ensure-user-guard.mjs` sets `effortLevel` and every `modelSettings.*.effortLevel` to `high` in an existing
 `~/.claude/settings.json` at every session start (backup, atomic write, one line, silent when converged, off under
-`SUBAGENT_MODEL_GUARD=off`). Models measured at different efforts are not comparable.
+`SUBAGENT_MODEL_GUARD=off`). Convergence fixes the FILE: the session that converged it had already resolved its own effort before SessionStart, so it takes effect from the next session. Models measured at different efforts are not comparable.

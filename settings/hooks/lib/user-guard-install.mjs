@@ -134,11 +134,16 @@ export function drift(settings, hookPath, installedBytes, sourceBytes) {
   return [...out, ...registrationProblems(settings, hookPath)];
 }
 
-function writeAtomic(dest, data) {
+/** Temp file + rename; the temp file never outlives a failed write, and `mode` (when given) is kept. */
+function writeAtomic(dest, data, mode) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   const tmp = `${dest}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, data);
-  fs.renameSync(tmp, dest);
+  try {
+    fs.writeFileSync(tmp, data, mode === undefined ? undefined : { mode });
+    fs.renameSync(tmp, dest);
+  } finally {
+    fs.rmSync(tmp, { force: true });
+  }
 }
 
 const readOrNull = file => (fs.existsSync(file) ? fs.readFileSync(file) : null);
@@ -158,11 +163,11 @@ function parseSettings(bytes) {
 
 const stamp = (now = new Date()) => now.toISOString().replace(/\.\d+Z$/, 'Z').replace(/[-:]/g, '');
 
-function writeBackup(settingsPath, bytes) {
+function writeBackup(settingsPath, bytes, mode) {
   for (let n = 0; ; n += 1) {
     const file = path.join(path.dirname(settingsPath), `${BACKUP_TAG}${stamp()}${n ? `-${n}` : ''}`);
     try {
-      fs.writeFileSync(file, bytes, { flag: 'wx' });
+      fs.writeFileSync(file, bytes, { flag: 'wx', mode });
       return file;
     } catch (e) {
       if (e.code !== 'EEXIST') throw e;
@@ -331,24 +336,91 @@ export function convergeEffort(settings) {
   return next;
 }
 
+const noEffort = (res, problems = []) => ({ ...res, changed: false, problems });
+const refuseEffort = message => noEffort(result(1, [message]));
+const EFFORT_CHANGED = 'settings.json changed while converging effort; nothing written to it — it converges at the next session start';
+
+/** The first reason `modelSettings` cannot be converged without replacing the user's data; '' when it can. */
+function effortShapeProblem(settings) {
+  const models = settings.modelSettings;
+  if (models === undefined) return '';
+  if (!isObject(models)) return 'modelSettings is not an object';
+  const bad = Object.keys(models).find(key => !isObject(models[key]));
+  return bad === undefined ? '' : `modelSettings.${bad} is not an object`;
+}
+
+/** Why settings.json cannot be converged (unparsable or an unexpected shape); '' when it can. */
+function effortRefusal(file, parsed) {
+  if (parsed.error) return `${file} ${parsed.error}; nothing changed — fix or move the file and run again`;
+  const shape = effortShapeProblem(parsed.settings);
+  return shape ? `${file}: ${shape}; nothing changed — fix it by hand` : '';
+}
+
+function writableReason(file) {
+  try {
+    fs.accessSync(file, fs.constants.W_OK);
+    return '';
+  } catch (e) {
+    return `is not writable (${e.code})`;
+  }
+}
+
+/** Where to read and write: the symlink's target when settings.json is a link; null when there is no file. */
+function effortTarget(settingsPath) {
+  return fs.existsSync(settingsPath) ? fs.realpathSync(settingsPath) : null;
+}
+
+/** A backup of `bytes`, unless the newest backup already holds exactly these bytes (a retry loop must not pile up files). */
+function backupOnce(file, bytes, mode) {
+  const dir = path.dirname(file);
+  const newest = fs.readdirSync(dir).filter(name => name.startsWith(BACKUP_TAG)).sort().at(-1);
+  const newestPath = newest === undefined ? '' : path.join(dir, newest);
+  return newestPath && sameBytes(readOrNull(newestPath), bytes) ? newestPath : writeBackup(file, bytes, mode);
+}
+
+function writeConverged(file, original, settings, problems) {
+  try {
+    const mode = fs.statSync(file).mode & 0o777;
+    const backup = backupOnce(file, original, mode);
+    writeAtomic(file, serialise(convergeEffort(settings)), mode);
+    return { ...result(0, [`backup ${backup}`, `wrote ${file} (effort: ${EFFORT} for every model)`]), changed: true, problems };
+  } catch (e) {
+    return refuseEffort(`${file} could not be written (${e.code ?? e.message}); nothing changed`);
+  }
+}
+
+/** The file changed under us: fine when whoever changed it converged effort too, a refusal otherwise. */
+function settledOrChanged(now) {
+  const again = parseSettings(now);
+  return !again.error && effortProblems(again.settings).length === 0 ? noEffort(result(0, [])) : refuseEffort(EFFORT_CHANGED);
+}
+
+function commitEffort({ file, original, settings, problems, beforeWrite }) {
+  const reason = writableReason(file);
+  if (reason) return refuseEffort(`${file} ${reason}; nothing changed`);
+  beforeWrite();
+  const now = readOrNull(file);
+  return sameBytes(now, original) ? writeConverged(file, original, settings, problems) : settledOrChanged(now);
+}
+
 /**
- * Converge the effort keys of an EXISTING settings.json (a missing file is not created). Same safety as
- * the installer: unparsable settings are refused untouched, a backup is taken, the file is re-read before
- * the atomic write. `changed` is false (and nothing is written) when everything is already `EFFORT`.
+ * Converge the effort keys of an EXISTING settings.json (a missing file is not created; a symlink is
+ * followed, never replaced). Same safety as the installer, and more: unparsable settings, a non-object
+ * `modelSettings` or per-model value, or an unwritable file are refused untouched; the original mode is
+ * kept; a failed write throws nothing and leaves no temp file; a concurrent session that converged first
+ * is not an error. `changed` is false (nothing written) when everything is already `EFFORT`.
  */
 export function applyEffort({ home, beforeWrite = () => {} }) {
   const t = targets(home);
-  const original = readOrNull(t.settings);
-  if (original === null) return { ...result(0, []), changed: false, problems: [] };
+  const file = effortTarget(t.settings);
+  if (file === null) return noEffort(result(0, []));
+  const original = fs.readFileSync(file);
   const parsed = parseSettings(original);
-  if (parsed.error) return { ...unparsable(t.settings, parsed.error), changed: false, problems: [] };
+  const refusal = effortRefusal(t.settings, parsed);
+  if (refusal) return refuseEffort(refusal);
   const problems = effortProblems(parsed.settings);
-  if (problems.length === 0) return { ...result(0, []), changed: false, problems };
-  const lines = [`backup ${writeBackup(t.settings, original)}`];
-  beforeWrite();
-  if (!sameBytes(readOrNull(t.settings), original)) return { ...result(1, [...lines, CHANGED]), changed: false, problems };
-  writeAtomic(t.settings, serialise(convergeEffort(parsed.settings)));
-  return { ...result(0, [...lines, `wrote ${t.settings} (effort: ${EFFORT} for every model)`]), changed: true, problems };
+  if (problems.length === 0) return noEffort(result(0, []));
+  return commitEffort({ file, original, settings: parsed.settings, problems, beforeWrite });
 }
 
 /** The `--check` line about effort; informational (it never changes the exit code). */

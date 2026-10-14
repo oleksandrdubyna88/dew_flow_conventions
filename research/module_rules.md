@@ -50,7 +50,7 @@ also has a filesystem-root guard. The CLI regression was observed timing out bef
 
 ## The subagent-model rule and the guard that enforces it (2026-10-13)
 
-`common/subagent-models.md` (9 989 B) maps a subagent's role to a model alias: scouts and coders `sonnet`, judges
+`common/subagent-models.md` (10 118 B) maps a subagent's role to a model alias: scouts and coders `sonnet`, judges
 `opus`, the epic split, security judgements and cornerstone specs `fable`. Its `tasks` name fourteen tasks and
 deliberately omit `inspect`, `ui`, `gpu` and `storage`, whose single-read scopes it would push past 32 768 B;
 `tools/rules.test.mjs` enumerates `TASKS` and pins both halves of that split, so a new task must be placed by a person.
@@ -71,7 +71,7 @@ unparsable or concurrently changed settings, a backup, an atomic write, one hand
 user copy is missing, older by `GUARD_VERSION`, or badly registered; it never downgrades, never runs from this
 repository's own layout, refuses a project copy with uncommitted changes, and writes a provenance manifest. The same hook, at EVERY start, converges an existing `~/.claude/settings.json` so `effortLevel` and every
 `modelSettings.*.effortLevel` (`sonnet`, `opus`, `fable` and any other key) are `high` — backup and atomic write, silent
-when already converged, skipped under `SUBAGENT_MODEL_GUARD=off` and in this repository, never creating the file
+when already converged, skipped under `SUBAGENT_MODEL_GUARD=off` and in this repository (the `subagent-model.optout` marker does NOT skip it: high everywhere), never creating the file, following a symlink and keeping the file mode, refusing (one warning line, nothing written) a read-only file, an unwritable target, or a non-object `modelSettings` / per-model value
 (`applyEffort`; `install-user-hook.mjs --check` reports it without gating the exit code). Design
 record: [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md); its release to the consumers is recorded in
 [PLAN_subagent_model_tiers_rollout.md](PLAN_subagent_model_tiers_rollout.md).
