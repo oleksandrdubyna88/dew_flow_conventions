@@ -105,17 +105,18 @@ A subagent takes the effort of ITS OWN model from the user settings
 41 s / $0.29 at `high` (one Opus at `high`: $0.39), reading about 4× more (measured 2026-10-14, see the
 results file). So the user settings carry `"effortLevel": "high"` and `modelSettings` entries `sonnet`,
 `opus` and `fable` each `{ "effortLevel": "high" }` (and every other `modelSettings` key at `high` too);
-the session self-install converges them at every start (it fixes the FILE only: measured 2026-10-14, a SessionStart rewrite reached neither the running main session nor a subagent launched later in it, which kept the OLD value; it takes effect from the next session). Never set a different effort per launch or per
-model (the guard denies a launch whose `effort` is anything but `high`), and never compare models measured at different efforts.
+the session self-install converges them at every start (it fixes the FILE only: measured 2026-10-14, a SessionStart rewrite reached neither the running main session nor a subagent launched later in it, which kept the OLD value; it takes effect from the next session). Never pass `effort` per launch: measured 2026-10-14, hooks never see the Agent tool's per-launch `effort`
+and the child's effort comes from these settings (a pinned setting wins), so the settings ARE the control.
+Never set a different effort per model, and never compare models measured at different efforts.
 
 ## The guard
 
 A `PreToolUse` hook on the Agent tool (`settings/hooks/subagent-model.mjs`, per repository and in the
 operator's user settings) refuses a launch whose `model` is missing or is not exactly `sonnet`, `opus`
-or `fable` (checked first), or whose `effort` is set to anything but `high`; each refusal opens with
-`subagent-models.md:`, the model refusal also carries the role table. Every allowed
+or `fable`; the refusal opens with
+`subagent-models.md:` and carries the role table. Every allowed
 launch receives a one-line digest of the table as context — it teaches, it never approves. **What it
-enforces:** a model is named and is an allowed alias, and no launch sets another effort. **What it cannot see:** whether the alias fits the
+enforces:** a model is named and is an allowed alias. **What it cannot see:** `effort` (not in the hook payload), and whether the alias fits the
 role — a facts-only scout on `opus` passes the guard and still breaks this rule. The four tasks this rule
 is not selected for (`inspect`, `ui`, `gpu`, `storage` — no room in their single read, measured in the
 results file above) learn the table from that digest alone, and a Workflow `agent()` call in those tasks

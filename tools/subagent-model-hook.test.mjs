@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
-  ALLOWED_MODELS, DENY_MARKER, DENY_TEXT, EFFORT_DENY_TEXT, FREEZE_VARIABLES, GUARD_VERSION, ROLE_DIGEST, TEACH_TEXT,
+  ALLOWED_MODELS, DENY_MARKER, DENY_TEXT, FREEZE_VARIABLES, GUARD_VERSION, ROLE_DIGEST, TEACH_TEXT,
   hookOutput, hookResponse, roleLine, subagentModelVerdict,
 } from '../settings/hooks/subagent-model.mjs';
 import { ensureUserGuard } from '../settings/hooks/ensure-user-guard.mjs';
@@ -406,48 +406,13 @@ test('34. digestMismatches names each kind of difference', () => {
   assert.deepEqual(digestMismatches([{ role: ' JUDGE ', model: 'opus' }], [{ role: 'judge', model: 'opus' }]), []);
 });
 
-// --- 35-41: effort is `high` or absent ---
+// --- 35: the guard does not judge effort (hooks never see the Agent tool's per-launch effort; measured 2026-10-14) ---
 
-const withEffort = effort => REAL_PAYLOAD({ ...BASE_INPUT, model: 'sonnet', effort });
-const EFFORT_DENY = { kind: 'deny', text: EFFORT_DENY_TEXT, warnings: [] };
-
-test('35. a launch that sets effort to low, medium, xhigh or max is denied with the marker', () => {
-  assert.ok(EFFORT_DENY_TEXT.startsWith(DENY_MARKER));
-  for (const effort of ['low', 'medium', 'xhigh', 'max']) assert.deepEqual(verdict(withEffort(effort)), EFFORT_DENY, effort);
-  assert.deepEqual(oneLine(hookOutput(verdict(withEffort('low')))).hookSpecificOutput.permissionDecisionReason, EFFORT_DENY_TEXT);
-});
-
-test('36. effort "high", null and an absent effort are allowed as before', () => {
-  assert.deepEqual(verdict(withEffort(null)), TEACH);
-  assert.deepEqual(verdict(withEffort('high')), TEACH);
-  assert.deepEqual(verdict(withModel('opus')), TEACH);
-});
-
-test('37. an effort that is not the string "high" is denied: other cases, non-strings, objects', () => {
-  for (const effort of ['High', 'HIGH', ' high', '', 3, {}, [], true]) assert.deepEqual(verdict(withEffort(effort)), EFFORT_DENY, JSON.stringify(effort));
-});
-
-test('38. a missing model AND a bad effort give the model denial: the model is checked first', () => {
-  assert.deepEqual(verdict(REAL_PAYLOAD({ ...BASE_INPUT, effort: 'low' })), DENY);
-  assert.deepEqual(verdict(REAL_PAYLOAD({ ...BASE_INPUT, model: 'haiku', effort: 'max' })), DENY);
-});
-
-test('39. the opt-out and a foreign tool stay silent whatever the effort is', () => {
-  assert.deepEqual(verdict(withEffort('low'), { [OPT_OUT]: 'off' }), SILENT);
-  assert.deepEqual(verdict({ ...withEffort('low'), tool_name: 'Bash' }), SILENT);
-});
-
-test('40. through the process: a bad effort is one deny line, a high one a teach line', () => {
-  const denied = oneLine(spawnHook(JSON.stringify(withEffort('xhigh'))).stdout);
-  assert.equal(denied.hookSpecificOutput.permissionDecision, 'deny');
-  assert.equal(denied.hookSpecificOutput.permissionDecisionReason, EFFORT_DENY_TEXT);
-  assert.equal(oneLine(spawnHook(JSON.stringify(withEffort('high'))).stdout).hookSpecificOutput.additionalContext, TEACH_TEXT);
-});
-
-test('41. the effort refusal is short, one line, and teaches only the effort rule', () => {
-  assert.ok(Buffer.byteLength(EFFORT_DENY_TEXT, 'utf8') <= 300);
-  assert.ok(!/[\r\n]/.test(EFFORT_DENY_TEXT));
-  assert.ok(/\bhigh\b/.test(EFFORT_DENY_TEXT));
+test('35. a launch WITH an effort key is judged exactly like one without: teach, or the model denial', () => {
+  for (const effort of ['low', 'high', 'xhigh', 'max', null, 3, {}]) {
+    assert.deepEqual(verdict(REAL_PAYLOAD({ ...BASE_INPUT, model: 'sonnet', effort })), TEACH, JSON.stringify(effort));
+    assert.deepEqual(verdict(REAL_PAYLOAD({ ...BASE_INPUT, effort })), DENY, JSON.stringify(effort));
+  }
 });
 
 test('42. the guard is version 2, and a session self-install upgrades an installed version 1 to it', t => {

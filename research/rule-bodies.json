@@ -392,7 +392,7 @@
     {
       "id": "common.subagent-models",
       "source": "common/subagent-models.md",
-      "bodySha256": "2de1fa1ba87510a8166a50f7b3cb06c7996284b66051cb970d4e9c60b30ad88b",
+      "bodySha256": "98303eb3cb7eecf128addc5dae94019df3ee7dc184260caccb063903fbf69d88",
       "sections": [
         "# A subagent's model follows its role (MANDATORY)",
         "## The role table",
