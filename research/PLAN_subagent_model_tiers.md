@@ -54,7 +54,7 @@
 > Supersedes the calibration-gated scout plan this file used to be (`git log --follow` keeps it): the operator decided on
 > 2026-10-13 to switch without waiting for a verdict. Related: [subagent-models.md](../common/subagent-models.md),
 > [planning-docs.md](../common/planning-docs.md), [measurement.md](../common/measurement.md),
-> [rule-ownership.md](../common/rule-ownership.md). Across the boundary: `dew_flow_benchmark · todo/PLAN_scout_model_calibration.md`
+> [rule-ownership.md](../common/rule-ownership.md). Across the boundary: `dew_flow_benchmark · research/PLAN_scout_model_calibration.md`
 > (its verdict stops gating anything — §3.7).
 
 ## 1. The goal, before any solution
@@ -385,7 +385,17 @@ the read budget.
 
 ### 3.7 Across the boundary — the benchmark
 
-`dew_flow_benchmark · todo/PLAN_scout_model_calibration.md` states that its verdict decides this rule. One status-line
+**After the fact (2026-10-14).** The calibration ran — `dew_flow_benchmark · research/PLAN_scout_model_calibration.md`
+(IMPLEMENTED) and `research/RESULTS_scout_models.md` (preliminary, 8 tasks in 8 repositories, 47 scored cells). At one effort
+(`high`) the Sonnet teams at ⌈1.5·N⌉ found at least as many of the needed files as the Opus teams (W1 0.79 → 0.82, W2 0.78 → 0.83,
+W3 0.78 → 0.85), 1.6–1.8× faster and 34–56 % cheaper, with more wrong claims (+0.15, +0.98, +0.75 per 10; on substance alone
++0.08, +0.73, +0.09). Recall is inside the 3-point margin; the wrong claims are not inside +0.5 — the operator decided recall is the
+primary metric because the Opus judge re-checks the claims, so the rule stands. **One condition carries the result:** the Sonnet
+scouts must run at effort `high`. Projected from a settings file with `effortLevel: xhigh` and only `opus` lowered to `high`, a
+Sonnet child runs at `xhigh` (a child takes `modelSettings` by its own model on claude 2.1.289), and the same team then took twice
+as long at 2.5× the cost. The operator's settings carry `modelSettings.sonnet.effortLevel: high`.
+
+`dew_flow_benchmark · research/PLAN_scout_model_calibration.md` (then in `todo/`) stated that its verdict decides this rule. One status-line
 change there (its own repository, its own PR): the verdict no longer gates; the calibration, if finished, is a check after
 the fact, and a result worse than the operator's margin (3 recall points, +0.5 wrong claims per 10) reopens this decision
 with the operator. The same PR repoints its three citations of this plan's old name (`PLAN_scout_model_calibration.md:11`,
