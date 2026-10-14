@@ -162,7 +162,8 @@ async function main() {
     if (!project) return;
     const source = path.join(project, '.claude', 'hooks', 'subagent-model.mjs');
     const args = { home: os.homedir(), source, env: process.env };
-    const lines = [guardStep(ensureEffort, args), guardStep(ensureUserGuard, args)].filter(Boolean);
+    // Guard first: on a fresh machine it creates settings.json, which effort then converges in the same session.
+    const lines = [guardStep(ensureUserGuard, args), guardStep(ensureEffort, args)].filter(Boolean);
     if (lines.length) process.stdout.write(`${JSON.stringify({ systemMessage: lines.join('\n') })}\n`);
   } catch {
     // Fail open: a self-install must never cost a session its start.

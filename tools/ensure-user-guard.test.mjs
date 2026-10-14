@@ -158,14 +158,11 @@ test('the entry point prints one systemMessage on the first run and nothing on t
   assert.equal(first.status, 0, first.stderr);
   const lines = first.stdout.split('\n').filter(Boolean);
   assert.equal(lines.length, 1);
-  assert.deepEqual(JSON.parse(lines[0]), { systemMessage: 'subagent-model guard installed into ~/.claude (version 2)' });
-  // The guard install created settings.json; the next start converges its (unset) effort, once.
+  // Fresh machine: the guard creates settings.json, and effort is converged in the SAME session, guard line first.
+  assert.deepEqual(JSON.parse(lines[0]), { systemMessage: 'subagent-model guard installed into ~/.claude (version 2)\neffort set to high for every model (was: effortLevel unset, sonnet unset, opus unset, fable unset)' });
   const second = s.run();
   assert.equal(second.status, 0);
-  assert.match(JSON.parse(second.stdout).systemMessage, /^effort set to high for every model/);
-  const third = s.run();
-  assert.equal(third.status, 0);
-  assert.equal(third.stdout, '');
+  assert.equal(second.stdout, '');
 });
 
 test('garbage stdin still works and exits 0; the payload cwd stands in for CLAUDE_PROJECT_DIR', t => {
