@@ -6,7 +6,7 @@
 > ([RESULTS](RESULTS_subagent_model_tiers.md) § *Read budget*); one sentence was added to S1's text after smoke run 1
 > answered the unsplit "research AND propose" request with `fable` ("a design … outside them is a judge's — Opus",
 > `6bc7e51`); E1 goes to `main` in the same pull request as E2 (#65), not its own (E1 code round). Open tail: none in this epic — the
-> release that publishes the text is [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md).
+> release that publishes the text is [PLAN_subagent_model_tiers_rollout.md](PLAN_subagent_model_tiers_rollout.md).
 >
 > Split by Opus; models per story below.
 

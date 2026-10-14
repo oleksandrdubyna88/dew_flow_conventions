@@ -6,7 +6,7 @@
 > roles, not phrasing; the per-child resolved model is not in the stream, so requested models and aggregate families are
 > checked; caps measured; Bash narrowed and a clean worktree required. Nine paid runs; runs 8 and 9 pass all three
 > fixtures; the blind role audit of run 8 matched 9 of 9 ([RESULTS](RESULTS_subagent_model_tiers.md)). Open tail —
-> S4's release and cascade: [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md).
+> S4's release and cascade: [PLAN_subagent_model_tiers_rollout.md](PLAN_subagent_model_tiers_rollout.md).
 >
 > Split by Opus; models per story below. No cornerstone here (the ledger's two are E1.S1 and E2.S1).
 
@@ -116,7 +116,7 @@ Hardening (code-review round, 2026-10-13):
   PR → CI → automatic review comments → merge → `promote-release` with the 40-character sha → the six pins in the
   README's order (rag_qln last), connect_other_ais' bump carrying the hook files and both settings entries.
 - Wired in `565cd48` (on the PR #65 branch), timeout 5 s. The release and the six pins moved to
-  [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md) § 3; the precondition below is met
+  [PLAN_subagent_model_tiers_rollout.md](PLAN_subagent_model_tiers_rollout.md) § 3; the precondition below is met
   (benchmark #79 and #81, connect_other_ais #793, merged).
 - The SessionStart entry carries a short host `timeout` (5 s) so a stalled self-install can never hold a session
   (E2 risk consultation); a test asserts the entry's shape.

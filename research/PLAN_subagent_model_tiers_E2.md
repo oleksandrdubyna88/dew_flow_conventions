@@ -8,7 +8,7 @@
 > registration, and a refusal to install from the conventions repository itself. Checked and NOT observed:
 > S1.8's open point 1 — `systemMessage` beside a decision on an interactive host has no record in
 > [RESULTS](RESULTS_subagent_model_tiers.md). Open tail: the first live user-level install is E3's, in
-> [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md).
+> [PLAN_subagent_model_tiers_rollout.md](PLAN_subagent_model_tiers_rollout.md).
 >
 > Split by Opus; models per story below.
 

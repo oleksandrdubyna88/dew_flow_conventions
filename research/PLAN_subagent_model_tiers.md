@@ -3,7 +3,7 @@
 > Status: **IMPLEMENTED, 2026-10-13.** E1, E2 and E4 S1–S3 built, gated and shipped in PR #65 (nine paid smoke runs,
 > runs 8 and 9 pass all three fixtures, blind role audit 9 of 9); E3's `modelSettings` probe (D11) and memory note done
 > on the operator's machine. **Open tail:** the single `promote-release`, the pin cascade and E3's observation of the
-> self-install — extracted to [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md).
+> self-install — extracted to [PLAN_subagent_model_tiers_rollout.md](PLAN_subagent_model_tiers_rollout.md).
 > Record: [RESULTS_subagent_model_tiers.md](RESULTS_subagent_model_tiers.md).
 >
 > **Deviations — what shipped differently from the text below:**
@@ -463,7 +463,7 @@ not released. Its CoaiBench judge opts out of the guard: #793. Deviation recorde
 ## 7. Definition of Done
 
 State at promotion, 2026-10-13: the open items moved to
-[PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md), each marked *→ rollout*.
+[PLAN_subagent_model_tiers_rollout.md](PLAN_subagent_model_tiers_rollout.md), each marked *→ rollout*.
 
 - [x] `common/subagent-models.md` states D1–D6 and D12 once, with the pipeline, the scout/judge test, the brief contents,
       the two definitions (50 changed lines, the cornerstone ledger), the alias rule (Workflow `agent()` included), the
@@ -568,7 +568,7 @@ Stories: [PLAN_subagent_model_tiers_E2.md](PLAN_subagent_model_tiers_E2.md).
 No stories document. **State, 2026-10-13:** the §3.5 probe (D11) is **done** — the alias key is honoured, the
 operator's file carries `opus: high` ([RESULTS](RESULTS_subagent_model_tiers.md) § *`modelSettings` by alias*); the
 memory note is **done**. **Open:** the self-install observation and the plain-session refusal check, which wait for the
-cascade — [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md) § 4.
+cascade — [PLAN_subagent_model_tiers_rollout.md](PLAN_subagent_model_tiers_rollout.md) § 4.
 
 - **Goal.** D8, D11 and D13 on the operator's machine, and the memory note (§7).
 - **Scope.** `~/.claude/settings.json` and `~/.claude/hooks/subagent-model.mjs`, put there by the self-install (D13) on
@@ -592,7 +592,7 @@ cascade — [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_t
 ### E4 — Prove, then ship: the behaviour smoke, one release, one cascade, the promotion
 
 Stories: [PLAN_subagent_model_tiers_E4.md](PLAN_subagent_model_tiers_E4.md). The release and the cascade (S4's open
-half): [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md).
+half): [PLAN_subagent_model_tiers_rollout.md](PLAN_subagent_model_tiers_rollout.md).
 
 - **Goal.** §3.4 as a mode of the existing smoke, run once and recorded; then the single release, six bump PRs, and
   this plan promoted with its four stories documents.

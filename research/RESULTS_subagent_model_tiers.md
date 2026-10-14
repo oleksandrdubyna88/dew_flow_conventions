@@ -1,6 +1,6 @@
 # RESULTS — subagent model tiers
 
-> Status: **record, 2026-10-13** — measurements for [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md) (epic E1, story S3); the host facts are filled by E2, the behaviour runs by E4, the `modelSettings` probe by E3. The self-install's observation belongs to [PLAN_subagent_model_tiers_rollout.md](../todo/PLAN_subagent_model_tiers_rollout.md).
+> Status: **record, 2026-10-13** — measurements for [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md) (epic E1, story S3); the host facts are filled by E2, the behaviour runs by E4, the `modelSettings` probe by E3. The self-install's observation belongs to [PLAN_subagent_model_tiers_rollout.md](PLAN_subagent_model_tiers_rollout.md).
 
 ## Read budget
 
@@ -130,4 +130,34 @@ default — so **the alias key `opus` is honoured**. Applied: the operator's fil
 `fable` alias keys, and whether an exact key beats an alias key when both are present.
 
 The assistant's memory note on subagent models was rewritten the same day (E3's other item).
+
+## E3 — the self-install observed (2026-10-14)
+
+After the cascade (below), on the operator's machine, recorded as seen:
+
+1. **First session in a consumer after its bump** — a headless session in a clean connect_other_ais worktree at its
+   merged `main` content printed `subagent-model guard installed into ~/.claude (version 1)`. Before it,
+   `~/.claude/settings.json` had no `PreToolUse` hook and no `~/.claude/hooks/subagent-model.mjs`; after it, exactly
+   one `PreToolUse` `Agent|Task` handler pointing at that file, and `modelSettings` still carried `opus: high` (D11).
+   rag_qln's bump was still in CI at that moment — the mid-cascade case of the rollout plan's §5, accepted.
+2. **`install-user-hook.mjs --check`**: `installed and current`, exit 0; provenance `version 1`, `by: self-install`.
+3. **A second session in the same consumer**: silent — no install line.
+4. **A plain session in a scratch `git init` with no adapter** (only the user-level guard): an Agent call without a
+   model was refused with `PreToolUse:Agent hook error: subagent-models.md: …`; one with `model: "sonnet"` ran
+   (`subagent_stats` spawned 1, completed 1), and the parent quoted the allowed-call context verbatim:
+   *"Subagent models — sonnet: scout, coder · opus: judge · fable: plan → epics, security judgement, cornerstone spec ·
+   main session or sonnet: small edit. Name the model on every launch as a bare alias; the role table is
+   common/subagent-models.md."*
+
+## The cascade — two releases, eight consumers
+
+| Release | Why |
+|---|---|
+| `d88e293` (PR #65) | the rule, the guard, the self-install, the smoke |
+| `ea3252f` (PR #66) | connect_other_ais' `NoSourceFileCarriesAControlByteTests` found a raw 0x00 in `tools/lib/rule-smoke.mjs` (the `git status -z` split); dew_flow_vscode_kit's ESLint, over its vendored hooks, found a useless assignment and a raw U+FEFF. Fixed at the source with a new control-byte test here (RED on the defect) |
+
+Every consumer is on `ea3252f`: creds_for_devs (#244 → #245), mcp (#48 → #49, `a1e7a60`), sidecar_rust (#56 → #57),
+benchmark (#86 → #88, `1138108`), wsl_care (#139 → #140), dew_flow_vscode_kit (#6 → #7; its ESLint now ignores the
+vendored `.claude/hooks/**`), connect_other_ais (#814 → `4474e25`), and rag_qln last with both code pins (#60 →
+#61, `905252f`; Release build 0 errors, 849 tests passed).
 
