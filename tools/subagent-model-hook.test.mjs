@@ -415,8 +415,8 @@ test('35. a launch WITH an effort key is judged exactly like one without: teach,
   }
 });
 
-test('42. the guard is version 2, and a session self-install upgrades an installed version 1 to it', t => {
-  assert.equal(GUARD_VERSION, 2);
+test('42. the guard is version 3, and a session self-install upgrades an installed version 1 to it', t => {
+  assert.equal(GUARD_VERSION, 3);
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-effort-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const home = path.join(root, 'home');
@@ -428,7 +428,12 @@ test('42. the guard is version 2, and a session self-install upgrades an install
   fs.copyFileSync(HOOK, source);
   const result = ensureUserGuard({ home, source, env: { SUBAGENT_MODEL_GUARD: '' } });
   assert.equal(result.action, 'upgraded');
-  assert.match(result.line, /version 1 → 2/);
+  assert.match(result.line, /version 1 → 3/);
   assert.deepEqual(fs.readFileSync(paths.hook), fs.readFileSync(HOOK));
   assert.equal(ensureUserGuard({ home, source, env: { SUBAGENT_MODEL_GUARD: '' } }).action, 'none');
+});
+
+test('43. the teach text states the scout count as ⌈1.5·N⌉ with N the count the instruction gives', () => {
+  assert.ok(TEACH_TEXT.includes('⌈1.5·N⌉'));
+  assert.ok(TEACH_TEXT.includes('2→3'));
 });

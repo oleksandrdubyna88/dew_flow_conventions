@@ -194,6 +194,43 @@ Two assertions usually need rewriting when you do this — anything that says "t
 run's history rather than the guarantee under test. State the guarantee instead, or the test passes once and
 fails forever after.
 
+## Everything a test run leaves outside its process is named `testsToDelete-…` (MANDATORY)
+
+Whatever a test run, a probe or a measurement creates OUTSIDE its own process — a container, a Docker
+volume or network, a git worktree, a branch, a temp or scratch folder, a database, a queue — carries
+the prefix **`testsToDelete-`** in its name: `testsToDelete-<what>-<short id>`
+(`testsToDelete-pg-3f9a1c`, `testsToDelete-wt-gate-e2e-1a2b`). The run still removes what it created
+(`finally`, `DisposeAsync`, `afterAll`); the prefix is the safety net for the run that crashed, was
+killed, or timed out before its cleanup ran — so one sweep finds every leftover and nothing else.
+
+Containers are the leftover that costs most: they stay up for weeks, holding memory, CPU and ports.
+So, in addition to the name:
+
+- **`docker run --rm`** for every container a test or script starts by hand — Docker removes it the
+  moment it stops, whatever stopped it.
+- **A Testcontainers fixture keeps the reaper (Ryuk) on** — it removes the run's containers when the
+  test process dies. Never set `TESTCONTAINERS_RYUK_DISABLED=true` in a test environment, and name the
+  container with the prefix too (`.WithName($"testsToDelete-pg-{Guid.NewGuid():N}"[..24])` or the
+  language's equivalent).
+- A long-lived container a test REUSES on purpose is not a leftover: it carries no prefix, and its
+  reuse is written down where it is started.
+
+Where a namespace refuses capitals — Docker image names, unquoted SQL identifiers, Kubernetes
+objects — use the lowercase `teststodelete-` (or `teststodelete_`). The sweep therefore matches the
+prefix **case-insensitively**, and only the prefix:
+
+```bash
+docker ps -aq --filter "name=testsToDelete-" | xargs -r docker rm -f
+docker ps -aq --filter "name=teststodelete-" | xargs -r docker rm -f
+docker volume ls -q | grep -i '^testsToDelete-' | xargs -r docker volume rm
+docker network ls --format '{{.Name}}' | grep -i '^testsToDelete-' | xargs -r docker network rm
+git worktree list --porcelain | grep -i '^worktree .*/testsToDelete-' | cut -d' ' -f2- | xargs -r -n1 git worktree remove --force
+```
+
+**Never** widen the sweep beyond the literal prefix (no `test*`, no `tmp*`), never sweep with a
+variable that can be empty (`rm -rf "$DIR/"*` with `$DIR` unset deletes from the root), and never give
+the prefix to something that must survive the run — the prefix is a promise that deleting it is safe.
+
 ## Passes alone, fails in the suite — that is a SHARED-STATE defect, never a flake (MANDATORY)
 
 The reflex is to re-run it, watch it go green, and move on. That reflex is how an architectural defect
@@ -381,3 +418,4 @@ is a red build. Do not relax it to make a reference convenient — the reference
 - [ ] No test asserts that a delegated option was SENT as though that were evidence it takes effect.
 - [ ] Any flow added in this task shipped with its scenario test, and `research/module_tests.md` names it
       — [scenario-tests.md](scenario-tests.md).
+- [ ] Everything the run created outside its process is named `testsToDelete-…` and removed by the run; every container it started by hand ran with `--rm`, and Testcontainers' reaper stayed on.
