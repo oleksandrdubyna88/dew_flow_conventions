@@ -417,13 +417,14 @@ test('35. a launch that sets effort to low, medium, xhigh or max is denied with 
   assert.deepEqual(oneLine(hookOutput(verdict(withEffort('low')))).hookSpecificOutput.permissionDecisionReason, EFFORT_DENY_TEXT);
 });
 
-test('36. effort "high" and an absent effort are allowed as before', () => {
+test('36. effort "high", null and an absent effort are allowed as before', () => {
+  assert.deepEqual(verdict(withEffort(null)), TEACH);
   assert.deepEqual(verdict(withEffort('high')), TEACH);
   assert.deepEqual(verdict(withModel('opus')), TEACH);
 });
 
-test('37. an effort that is not the string "high" is denied: other cases, non-strings, null, objects', () => {
-  for (const effort of ['High', 'HIGH', ' high', '', 3, null, {}, [], true]) assert.deepEqual(verdict(withEffort(effort)), EFFORT_DENY, JSON.stringify(effort));
+test('37. an effort that is not the string "high" is denied: other cases, non-strings, objects', () => {
+  for (const effort of ['High', 'HIGH', ' high', '', 3, {}, [], true]) assert.deepEqual(verdict(withEffort(effort)), EFFORT_DENY, JSON.stringify(effort));
 });
 
 test('38. a missing model AND a bad effort give the model denial: the model is checked first', () => {

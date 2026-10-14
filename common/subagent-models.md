@@ -113,7 +113,7 @@ model (the guard denies a launch whose `effort` is anything but `high`), and nev
 A `PreToolUse` hook on the Agent tool (`settings/hooks/subagent-model.mjs`, per repository and in the
 operator's user settings) refuses a launch whose `model` is missing or is not exactly `sonnet`, `opus`
 or `fable` (checked first), or whose `effort` is set to anything but `high`; each refusal opens with
-`subagent-models.md:`, the model's carries the role table. Every allowed
+`subagent-models.md:`, the model refusal also carries the role table. Every allowed
 launch receives a one-line digest of the table as context — it teaches, it never approves. **What it
 enforces:** a model is named and is an allowed alias, and no launch sets another effort. **What it cannot see:** whether the alias fits the
 role — a facts-only scout on `opus` passes the guard and still breaks this rule. The four tasks this rule

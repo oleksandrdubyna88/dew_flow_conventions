@@ -50,7 +50,7 @@ also has a filesystem-root guard. The CLI regression was observed timing out bef
 
 ## The subagent-model rule and the guard that enforces it (2026-10-13)
 
-`common/subagent-models.md` (10 377 B) maps a subagent's role to a model alias: scouts and coders `sonnet`, judges
+`common/subagent-models.md` (10 388 B) maps a subagent's role to a model alias: scouts and coders `sonnet`, judges
 `opus`, the epic split, security judgements and cornerstone specs `fable`. Its `tasks` name fourteen tasks and
 deliberately omit `inspect`, `ui`, `gpu` and `storage`, whose single-read scopes it would push past 32 768 B;
 `tools/rules.test.mjs` enumerates `TASKS` and pins both halves of that split, so a new task must be placed by a person.

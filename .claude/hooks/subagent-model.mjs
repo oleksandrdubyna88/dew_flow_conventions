@@ -91,7 +91,7 @@ const SILENT = Object.freeze({ kind: 'silent', text: '', warnings: Object.freeze
 
 const hasAllowedModel = toolInput => typeof toolInput.model === 'string' && ALLOWED_MODELS.includes(toolInput.model);
 
-const hasForeignEffort = toolInput => toolInput.effort !== undefined && toolInput.effort !== REQUIRED_EFFORT;
+const hasForeignEffort = toolInput => toolInput.effort != null && toolInput.effort !== REQUIRED_EFFORT;
 
 /** The refusal for this `tool_input`, model before effort; `''` when the launch is fine. */
 function refusalText(toolInput) {
@@ -136,7 +136,7 @@ export function subagentModelVerdict(payload, env) {
   if (!inEnvelope(payload)) return SILENT;
   const text = refusalText(payload.tool_input);
 
-  return { kind: text === '' ? 'teach' : 'deny', text: text === '' ? TEACH_TEXT : text, warnings: warningsFor(env) };
+  return text === '' ? { kind: 'teach', text: TEACH_TEXT, warnings: warningsFor(env) } : { kind: 'deny', text, warnings: warningsFor(env) };
 }
 
 /** `''` for silent, otherwise ONE line of JSON ending in a newline. */
