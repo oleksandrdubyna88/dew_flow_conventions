@@ -340,3 +340,13 @@ for (const [what, tamper] of [
     assert.equal(s.run('--check').status, 0);
   });
 }
+
+test('--check says a malformed modelSettings needs a manual repair, not that the session converges it', t => {
+  const s = sandbox(t);
+  assert.equal(s.run('--install').status, 0);
+  s.writeSettings({ ...JSON.parse(s.readSettings()), modelSettings: { sonnet: null } });
+  const r = s.run('--check');
+  const out = `${r.stdout}${r.stderr}`;
+  assert.match(out, /effort: needs a manual repair — modelSettings\.sonnet is not an object; set it to \{"effortLevel": "high"\}/);
+  assert.doesNotMatch(out, /self-install converges/);
+});
