@@ -163,7 +163,10 @@ test('install-user-hook --check reports the effort status without changing the e
 
 const dirFiles = (s, part) => (fs.existsSync(s.paths.dir) ? fs.readdirSync(s.paths.dir).filter(f => f.includes(part)) : []);
 
-test('a read-only settings.json: one refusal line, no backup, no temp file, and nothing accumulates', t => {
+// root passes W_OK whatever the mode bits say, so the file is not read-only to it.
+const RUNS_AS_ROOT = process.getuid?.() === 0;
+
+test('a read-only settings.json: one refusal line, no backup, no temp file, and nothing accumulates', { skip: RUNS_AS_ROOT && 'root ignores mode bits' }, t => {
   const s = sandbox(t);
   s.write({ effortLevel: 'xhigh' });
   const bytes = s.read();
