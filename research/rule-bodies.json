@@ -392,7 +392,7 @@
     {
       "id": "common.subagent-models",
       "source": "common/subagent-models.md",
-      "bodySha256": "f6f1254b0845484ea65cfc5047ccb24cb51a5334153bcb56959229447f757e63",
+      "bodySha256": "e882f819010d264bce5f57ab92206f2f5371b6d6043c8940f126362f7d28d103",
       "sections": [
         "# A subagent's model follows its role (MANDATORY)",
         "## The role table",
@@ -402,6 +402,7 @@
         "## Coders",
         "## Two definitions",
         "## Name the model on every launch, as an alias",
+        "## Effort — one level, high, for every model",
         "## The guard",
         "## Fable unavailable → Opus; Haiku is not used",
         "## Never",

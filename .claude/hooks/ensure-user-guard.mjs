@@ -18,6 +18,10 @@
  * any throw prints nothing, and the exit code is always 0. It speaks (one `systemMessage` line) only
  * when it installed, upgraded, refused, or found a NEWER installed copy (never downgraded; the line names
  * the `--force` command). It also refuses when git reports uncommitted changes to the project copy.</p>
+ *
+ * <p><b>Effort.</b> Independently of the guard, every session start converges the existing
+ * `~/.claude/settings.json` so `effortLevel` and `modelSettings.<model>.effortLevel` are all `high`
+ * (`ensureEffort`; the same opt-outs and reference-repository skip; one line when it changed something).</p>
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -25,7 +29,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
-import { guardVersion, install, isRegistered, registrationValid, repairRegistration, targets } from './lib/user-guard-install.mjs';
+import { applyEffort, guardVersion, install, isRegistered, registrationValid, repairRegistration, targets } from './lib/user-guard-install.mjs';
 
 export { guardVersion };
 
@@ -109,6 +113,21 @@ export function ensureUserGuard({ home, source, env }) {
   return { action: step.action, line: successLine(step, to) };
 }
 
+const effortLine = ({ problems }) => `effort set to high for every model (was: ${problems.join(', ')})`;
+
+/**
+ * Converge every effort to `high` in the user's existing settings.json (the rule: common/subagent-models.md
+ * § Effort). Runs at EVERY session start, independent of the guard's version; says nothing when converged.
+ * Skipped for a measuring harness and for the conventions repository itself; a missing file is not created.
+ */
+export function ensureEffort({ home, source, env }) {
+  if (optedOut(env)) return skipped();
+  if (isReferenceRepository(source)) return skipped();
+  const { code, lines, changed, problems } = applyEffort({ home });
+  if (code !== 0) return { action: 'refused', line: `effort NOT converged: ${lines.at(-1) ?? 'unknown reason'}` };
+  return changed ? { action: 'converged', line: effortLine({ problems }) } : { action: 'none', line: '' };
+}
+
 /** The raw stdin text, abandoned after a deadline when the caller never closes the pipe. */
 async function readStdin() {
   let text = '';
@@ -134,7 +153,7 @@ function payloadCwd(text) {
   }
 }
 
-const SPEAKING = new Set(['installed', 'upgraded', 'refused', 'newer', 'repaired']);
+const SPEAKING = new Set(['installed', 'upgraded', 'refused', 'newer', 'repaired', 'converged']);
 
 async function main() {
   try {
@@ -142,10 +161,21 @@ async function main() {
     const project = process.env.CLAUDE_PROJECT_DIR || cwd;
     if (!project) return;
     const source = path.join(project, '.claude', 'hooks', 'subagent-model.mjs');
-    const { action, line } = ensureUserGuard({ home: os.homedir(), source, env: process.env });
-    if (SPEAKING.has(action)) process.stdout.write(`${JSON.stringify({ systemMessage: line })}\n`);
+    const args = { home: os.homedir(), source, env: process.env };
+    const lines = [guardStep(ensureEffort, args), guardStep(ensureUserGuard, args)].filter(Boolean);
+    if (lines.length) process.stdout.write(`${JSON.stringify({ systemMessage: lines.join('\n') })}\n`);
   } catch {
     // Fail open: a self-install must never cost a session its start.
+  }
+}
+
+/** The line a step wants shown, or '' for a silent step or one that threw (the other step still runs). */
+function guardStep(step, args) {
+  try {
+    const { action, line } = step(args);
+    return SPEAKING.has(action) ? line : '';
+  } catch {
+    return '';
   }
 }
 

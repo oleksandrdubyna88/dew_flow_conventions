@@ -11,6 +11,10 @@
  * it that is refused); every install writes `subagent-model.installed.json` (provenance), which `--check`
  * prints and verifies and `--uninstall` removes.</p>
  *
+ * <p>`--check` also prints one `effort:` line — `high for every model`, or the settings that are not
+ * `high` (`effortLevel xhigh, sonnet unset`). It is information only: it never changes the exit code,
+ * because the session self-install (`ensure-user-guard.mjs`) converges effort itself at every start.</p>
+ *
  * <p><b>Why a tool and not "paste this into settings.json".</b> A user-level `settings.json` is shared
  * by every project on the machine and is edited by hand, by `/config`, and by other sessions. A
  * hand-merge either duplicates the entry on the second try or drops somebody else's hook. So the merge

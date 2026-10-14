@@ -96,6 +96,18 @@ cached versions: the `feature-dev` plugin pins `model: sonnet` in all three of i
 (`code-explorer`, `code-architect`, `code-reviewer`), so its architects and reviewers run on Sonnet
 unless the call says `opus`. Dated on purpose: a release can change it; the argument you pass cannot.
 
+## Effort — one level, high, for every model
+
+Every model — the main session and every subagent, Sonnet, Opus and Fable — runs at effort `high`.
+A subagent takes the effort of ITS OWN model from the user settings
+(`modelSettings.<alias>.effortLevel`, else the top-level `effortLevel`), not the parent's: with
+`effortLevel: "xhigh"` and only `opus` pinned to `high`, two Sonnet scouts took 92 s / $0.73 against
+41 s / $0.29 at `high` (one Opus at `high`: $0.39), reading about 4× more (measured 2026-10-14, see the
+results file). So the user settings carry `"effortLevel": "high"` and `modelSettings` entries `sonnet`,
+`opus` and `fable` each `{ "effortLevel": "high" }` (and every other `modelSettings` key at `high` too);
+the session self-install converges them at every start. Never set a different effort per launch or per
+model, and never compare models measured at different efforts.
+
 ## The guard
 
 A `PreToolUse` hook on the Agent tool (`settings/hooks/subagent-model.mjs`, per repository and in the
@@ -129,5 +141,6 @@ says so. **Haiku has no role** in the table and is not launched.
 - [ ] Every scout, coder and judge ran on the model its role prescribes; a cornerstone was in the ledger
       before Fable wrote its spec.
 - [ ] Every edit the main session wrote itself was bounded to one file and ≤ 50 lines BEFORE it started.
+- [ ] Effort is `high` for every model: the user settings are converged and no launch or measurement ran at another level.
 - [ ] The summary names models AND counts — "5 scouts on Sonnet, 2 architects on Opus, 1 coder on
       Sonnet" — and says where Opus stood in for Fable.
