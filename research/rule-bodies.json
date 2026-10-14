@@ -392,7 +392,7 @@
     {
       "id": "common.subagent-models",
       "source": "common/subagent-models.md",
-      "bodySha256": "98303eb3cb7eecf128addc5dae94019df3ee7dc184260caccb063903fbf69d88",
+      "bodySha256": "d794636d32fb4bf18de13c9fb58f8c27c144b9ea7c6791f340cb9ad789a8bdf9",
       "sections": [
         "# A subagent's model follows its role (MANDATORY)",
         "## The role table",
@@ -427,7 +427,7 @@
     {
       "id": "common.testing",
       "source": "common/testing.md",
-      "bodySha256": "f09c745c01ba8964f7f92d87c4f51dcbf2ae61f83b7e81bae00b513f5e502738",
+      "bodySha256": "4d8412741130960bb2cad1f180ee5f1369453bf77ac60d67a888360efdcf4d04",
       "sections": [
         "# Testing",
         "## Running tests — executables only, never `dotnet test` (MANDATORY)",
@@ -439,6 +439,7 @@
         "## A structural test that matches nothing passes forever",
         "## A test can only inspect what is PRESENT",
         "## A test must leave a shared store as it found it",
+        "## Everything a test run leaves outside its process is named `testsToDelete-…` (MANDATORY)",
         "## Passes alone, fails in the suite — that is a SHARED-STATE defect, never a flake (MANDATORY)",
         "## A green suite proves only the BINARIES you ran — check they are the ones you built",
         "## A green suite proves only the configuration you ran",

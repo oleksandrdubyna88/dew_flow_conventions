@@ -57,6 +57,11 @@ security area stays a scout; the security judgement itself is Fable's — the ca
 scout paid twice. The caller opens every file a scout's conclusion
 rests on before building on it ([measurement.md](measurement.md) § 5).
 
+**N is the count the instruction gives — never 1.** When a skill, a plugin or a workflow says how many
+agents to launch, that number IS N, because it was written for Opus: `/feature-dev`'s "launch 2-3
+code-explorer agents" means **3 to 5** Sonnet scouts (2→3, 3→5), never "1.5, rounded up to 2".
+Measured 2026-10-14: a session launched 2 scouts for `/feature-dev` and called it "1.5 rounded up".
+
 ## Coders
 
 A Sonnet coder re-discovers nothing. Its brief carries the files, the change (what and how), the
