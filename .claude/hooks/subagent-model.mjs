@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Refuse a subagent launch that does not name its model as a bare alias or that sets an `effort` other
- * than `high` (effort is `high` for every model; the Agent tool's per-launch `effort` argument would
- * defeat that), and teach the role table on every launch that passes.
+ * Refuse a subagent launch that does not name its model as a bare alias, and teach the role table on every
+ * launch that passes. It does not judge `effort`: measured 2026-10-14, the hook payload never carries the
+ * Agent tool's per-launch `effort`, and the child's effort comes from the settings.
  *
  * <p>Copied verbatim into each consumer as `.claude/hooks/subagent-model.mjs` and wired by
  * `settings/settings.json` as a `PreToolUse` hook on `Agent|Task`, exactly like `build-flags.mjs`. It
@@ -35,8 +35,6 @@
 export const GUARD_VERSION = 2;
 export const DENY_MARKER = 'subagent-models.md:';
 export const ALLOWED_MODELS = Object.freeze(['sonnet', 'opus', 'fable']);
-/** The only `effort` a launch may carry (or none): high for every model. */
-export const REQUIRED_EFFORT = 'high';
 export const OPT_OUT_VARIABLE = 'SUBAGENT_MODEL_GUARD';
 export const FREEZE_VARIABLES = Object.freeze([
   'ANTHROPIC_DEFAULT_OPUS_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL',
@@ -80,9 +78,6 @@ export const TEACH_TEXT = `Subagent models — ${roleLine(ROLE_DIGEST)}. Name th
 
 export const DENY_TEXT = `${DENY_MARKER} name the model on every Agent call as a bare alias — sonnet, opus or fable. Missing, empty, haiku, inherit, a versioned id or another spelling is refused. Roles — ${roleLine(ROLE_DIGEST)}. Relaunch with the alias of the role.`;
 
-/** Why a launch that sets `effort` is refused: one level for every model, so a launch never sets one. */
-export const EFFORT_DENY_TEXT = `${DENY_MARKER} effort is high for every model and must not be set per launch. Drop the effort argument, or pass exactly "high".`;
-
 const isPlainObject = value => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const envText = (env, name) => String(env[name] ?? '').trim();
@@ -91,14 +86,8 @@ const SILENT = Object.freeze({ kind: 'silent', text: '', warnings: Object.freeze
 
 const hasAllowedModel = toolInput => typeof toolInput.model === 'string' && ALLOWED_MODELS.includes(toolInput.model);
 
-const hasForeignEffort = toolInput => toolInput.effort != null && toolInput.effort !== REQUIRED_EFFORT;
-
-/** The refusal for this `tool_input`, model before effort; `''` when the launch is fine. */
-function refusalText(toolInput) {
-  if (!hasAllowedModel(toolInput)) return DENY_TEXT;
-
-  return hasForeignEffort(toolInput) ? EFFORT_DENY_TEXT : '';
-}
+/** The refusal for this `tool_input`; `''` when the launch is fine. */
+const refusalText = toolInput => (hasAllowedModel(toolInput) ? '' : DENY_TEXT);
 
 /** `silent` unless the payload is a PreToolUse `Agent`/`Task` call with an object `tool_input`. */
 function inEnvelope(payload) {
@@ -126,8 +115,7 @@ function warningsFor(env) {
  * The verdict on one hook payload. Pure: no I/O, no clock. Reads exactly six keys of `env`.
  *
  * <p>Order: the opt-out and the envelope first (silent), then the MODEL (a missing or non-alias model is the
- * model denial even when `effort` is also wrong), then `effort` (present and not exactly `"high"`, of any type,
- * is the effort denial), otherwise teach.</p>
+ * denial), otherwise teach. `effort` is never read.</p>
  *
  * @returns {{ kind: 'deny' | 'teach' | 'silent', text: string, warnings: string[] }}
  */

@@ -50,7 +50,7 @@ also has a filesystem-root guard. The CLI regression was observed timing out bef
 
 ## The subagent-model rule and the guard that enforces it (2026-10-13)
 
-`common/subagent-models.md` (10 388 B) maps a subagent's role to a model alias: scouts and coders `sonnet`, judges
+`common/subagent-models.md` (10 440 B) maps a subagent's role to a model alias: scouts and coders `sonnet`, judges
 `opus`, the epic split, security judgements and cornerstone specs `fable`. Its `tasks` name fourteen tasks and
 deliberately omit `inspect`, `ui`, `gpu` and `storage`, whose single-read scopes it would push past 32 768 B;
 `tools/rules.test.mjs` enumerates `TASKS` and pins both halves of that split, so a new task must be placed by a person.
@@ -59,7 +59,7 @@ deliberately omit `inspect`, `ui`, `gpu` and `storage`, whose single-read scopes
 Where the rule is not loaded, the guard carries it. `settings/hooks/subagent-model.mjs` is a `PreToolUse` hook on
 `Agent|Task`: a launch whose `model` is exactly `sonnet`, `opus` or `fable` gets a one-line role digest as
 `additionalContext` and no permission decision; anything else in a well-formed call is denied with a fixed reason that
-opens with `subagent-models.md:` and carries the table, and (guard v2) a launch that sets `effort` to anything but `high` is denied with a short reason after the model check; a malformed payload, a throw or a stalled stdin fails open.
+opens with `subagent-models.md:` and carries the table, and the guard does not judge `effort` (measured 2026-10-14: hooks never see the Agent tool's per-launch `effort`; the child's effort comes from the settings); a malformed payload, a throw or a stalled stdin fails open.
 `SUBAGENT_MODEL_GUARD=off` silences it for harnesses that measure models. Its `ROLE_DIGEST` is its only copy of the
 table, compared with the rule's own table by `tools/lib/role-table.mjs` in the test suite.
 
