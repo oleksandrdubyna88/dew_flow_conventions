@@ -256,6 +256,7 @@ asking in writing to be moved and another had two promoted plans absent from its
 | [`tools/gate-snippet-check.mjs`](tools/gate-snippet-check.mjs) | [`common/coai-review-gate.md`](common/coai-review-gate.md) is the ONLY copy — a consumer carrying its own is named | `node .agents/conventions/tools/gate-snippet-check.mjs [--warn]` |
 | [`tools/low-priority.mjs`](tools/low-priority.mjs) | [`common/local-cpu-budget.md`](common/local-cpu-budget.md) — not a check but the tool the rule prescribes: runs a command at BelowNormal (Windows) / nice 19 with its exit code, output and signals intact; lowers nothing under `CI`. A script that CI runs without the mount preloads a copy of `tools/templates/lower-priority-preload.mjs` instead | `node .agents/conventions/tools/low-priority.mjs <command> [args...]` |
 | [`tools/run-tests.mjs`](tools/run-tests.mjs) | The same rule, applied here: this repository's own `npm test`, lowered and capped at `min(8, CPUs - 1)` | `npm test` (this repository only) |
+| [`tools/janitor.sh`](tools/janitor.sh) | [`common/test-leftovers.md`](common/test-leftovers.md) § The janitor — the host-wide sweep of what test runs left behind (containers, volumes, networks, worktrees, branches, temp folders): one capture, owner-aware per resource, exit 3 when something was skipped | `bash .agents/conventions/tools/janitor.sh [--dry-run]` |
 
 The last three are new and every repository adopts them the same way: **`--warn` first**, so the
 finding is visible without a red build, then the flag comes off once the backfill is done. A check
