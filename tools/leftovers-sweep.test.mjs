@@ -22,7 +22,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { git } from "./lib/git.mjs";
 import { sweepLeftovers, MIN_AGE_MS } from "./lib/leftovers-sweep.mjs";
 import { cleanupScope, formatOwner, gitdirOf, ownedDir, ownedName, ownedWorktree, removeQuietly, thisOwner } from "./lib/owned.mjs";
-import { runWithSweep } from "./run-tests.mjs";
+import { REPO_ROOT, runWithSweep } from "./run-tests.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ownedUrl = pathToFileURL(path.join(here, "lib", "owned.mjs")).href;
@@ -376,18 +376,33 @@ test("9. runWithSweep: the sweep runs before the suite", () => {
   assert.deepEqual(order, ["sweep", "suite"]);
 });
 
-test("10. the real entry point sweeps the temp root it is given, reports once, and leaves with the suite's code", (t) => {
+test("10. the real entry point sweeps the temp root AND the repository it is given, reports once, and leaves with the suite's code", (t) => {
   const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "entry-repo");
   const dead = folder(own, tmp, "entry-dead", { claim: deadOwnerLine() });
   const live = folder(own, tmp, "entry-live", { claim: formatOwner(thisOwner()) + "\n" });
+  const listedDead = worktree(own, repo, tmp, "entry-wt", { claim: deadOwnerLine() }); // only the repository the runner is POINTED at lists it
+  // What a concurrent test makes in THIS checkout: a young, prefixed worktree. It must not reach the report below.
+  const bystander = ownedWorktree(t, REPO_ROOT, "entry-bystander");
   const suite = path.join(work, "trivial.test.mjs");
   fs.writeFileSync(suite, `import { test } from "node:test";\ntest("trivial", () => {});\n`);
   // The child's temp root is the private one: the OS temp-folder lookup reads TMPDIR on POSIX and TEMP/TMP on Windows.
-  const env = { ...process.env, TMPDIR: tmp, TEMP: tmp, TMP: tmp };
+  const env = { ...process.env, TMPDIR: tmp, TEMP: tmp, TMP: tmp, RUN_TESTS_REPO_ROOT: repo };
   const run = spawnSync(process.execPath, [path.join(here, "run-tests.mjs"), suite], { env, encoding: "utf8", timeout: 120_000 });
 
   assert.equal(run.status, 0, run.stderr);
   assert.equal(fs.existsSync(dead), false);
+  assert.equal(fs.existsSync(listedDead), false, "the worktree the pointed-at repository lists is removed");
   assert.ok(fs.existsSync(live));
-  assert.match(run.stderr, /^run-tests: leftovers — removed 1, preserved 1$/m);
+  assert.ok(fs.existsSync(bystander.path), "a worktree of the checkout is not the sweep's business when it is pointed elsewhere");
+  assert.match(run.stderr, /^run-tests: leftovers — removed 2, preserved 1$/m);
+});
+
+test("10b. REPO_ROOT is this checkout unless RUN_TESTS_REPO_ROOT names another, and a relative one is resolved", () => {
+  const out = (value) => spawnSync(process.execPath, ["--input-type=module", "-e",
+    `const { REPO_ROOT } = await import(${JSON.stringify(pathToFileURL(path.join(here, "run-tests.mjs")).href)}); process.stdout.write(REPO_ROOT);`],
+  { env: { ...process.env, RUN_TESTS_REPO_ROOT: value }, encoding: "utf8", timeout: 60_000, cwd: here }).stdout;
+  assert.equal(out(""), path.resolve(here, ".."), "empty means unset");
+  assert.equal(out(path.join(here, "fixtures")), path.join(here, "fixtures"));
+  assert.equal(out("fixtures"), path.join(here, "fixtures"), "relative to the working directory");
 });

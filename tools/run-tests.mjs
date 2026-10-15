@@ -12,7 +12,15 @@
  * (`lib/leftovers-sweep.mjs`, rule §4 of `common/test-leftovers.md`). It reports on one line and never changes the
  * exit code: the suite's own is the only verdict.</p>
  *
+ * <p>Which repository the sweep serves. It is this checkout (`REPO_ROOT`), because the worktrees it may remove are
+ * the ones its own `git worktree list` names. `RUN_TESTS_REPO_ROOT` points it at another repository instead and
+ * exists for ONE reader: the test that runs this file as a child. That test must sweep a disposable repository,
+ * because this checkout's worktree list is shared with every test running beside it — a young prefixed worktree
+ * another test made a moment ago changed the report from `preserved 1` to `preserved 2` and failed the suite on a
+ * loaded machine (2026-10-15). Empty means unset; a relative value is resolved against the working directory.</p>
+ *
  *   node tools/run-tests.mjs [extra node --test arguments...]
+ *   RUN_TESTS_REPO_ROOT=<dir> node tools/run-tests.mjs [...]     (test seam: sweep <dir>'s worktrees)
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -22,8 +30,8 @@ import { fileURLToPath } from "node:url";
 import { sweepLeftovers } from "./lib/leftovers-sweep.mjs";
 import { exitCodeFor, lowerOwnPriority } from "./low-priority.mjs";
 
-/** The checkout this runner belongs to — the repository whose worktrees its sweep may remove. */
-export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+/** The checkout this runner belongs to — the repository whose worktrees its sweep may remove (`RUN_TESTS_REPO_ROOT` overrides it: a test seam). */
+export const REPO_ROOT = path.resolve(process.env.RUN_TESTS_REPO_ROOT || path.join(path.dirname(fileURLToPath(import.meta.url)), ".."));
 
 /** The family cap. */
 export const CAP = 8;
