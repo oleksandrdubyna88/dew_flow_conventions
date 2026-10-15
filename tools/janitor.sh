@@ -9,27 +9,48 @@
 #      anything is decided; only captured, authorised items are deleted, by their captured id or path. A resource
 #      that appears after the capture is not touched in this run (the next run judges it).
 #   2. Owner-aware, per resource. Age selects (a resource younger than the window, or of unknown age, is left
-#      alone, silently); the owner authorises: a live owner, a foreign host, an owner that cannot be read, a lock
-#      that names nobody, or a worktree whose lock cannot be read is SKIPPED with one line naming it — never
-#      deleted. Unmarked resources older than the window are nobody's and go. A worktree is judged by its lock,
-#      read through its `.git` file whatever clone owns it (a relative gitdir is resolved against the worktree).
+#      alone, silently); the owner authorises: a live owner, a foreign host, an owner that is not exactly
+#      `<host>@<linux|macos|windows>:<pid>[:<start>]`, a lock that names nobody, or a worktree whose lock cannot be
+#      read is SKIPPED with one line naming it — never deleted. Unmarked resources older than the window are
+#      nobody's and go. A worktree is judged by its lock, read through its `.git` file whatever clone owns it (a
+#      relative gitdir is resolved against the worktree).
 #   3. Exact removal. Top-level links (a junction into a checkout) are unlinked before a worktree or folder is
-#      removed; `rm -rf` never crosses one. Worktrees go before branches, and before folders.
+#      removed; `rm -rf` never crosses one. Worktrees go before branches, and before folders. A deletion is never
+#      fatal: a target that vanished after the capture is a notice, one that survives a failed removal is skipped.
 #   4. Honest exit. 0 when nothing was skipped; 3 when something was (it is named on stderr); any other code is
 #      a docker/git failure — a stopped Docker daemon is a failure, not a clean machine. A machine with no
 #      `docker` binary says so once and still sweeps git and the temp root.
 #
 # Usage:  bash tools/janitor.sh [--dry-run]       — from inside the repository whose worktrees and branches
 #         are swept; on Windows from Git for Windows' bash, never WSL's (which sees neither the Windows temp
-#         root nor Windows pids).  JANITOR_MIN_AGE_MINUTES (default 60) is the window.  --dry-run announces
-#         what would be removed and removes nothing (exit codes unchanged).
+#         root nor Windows pids).  JANITOR_MIN_AGE_MINUTES (default 60) is the window.  --dry-run prints
+#         `would run: …` lines on stdout and removes nothing (exit codes unchanged).
 set -euo pipefail
 DRY=0; if [ "${1:-}" = "--dry-run" ]; then DRY=1; fi
 T="${TMPDIR:-/tmp}"; MIN_AGE=$(( ${JANITOR_MIN_AGE_MINUTES:-60} * 60 )); NOW="$(date -u +%s)"
 U=$'\x1f'   # the field separator of the capture: never whitespace, so an EMPTY owner or age keeps its column
-me="$(hostname)@$(case "$(uname -s)" in Linux) echo linux;; Darwin) echo macos;; *) echo windows;; esac)"
+OS="${JANITOR_OS:-$(case "$(uname -s)" in Linux) echo linux;; Darwin) echo macos;; *) echo windows;; esac)}"   # JANITOR_OS: test seam only
+me="$(hostname)@$OS"
 lower() { tr '[:upper:]' '[:lower:]'; }
-alive() { case "$me" in *@windows) tasklist //FI "PID eq $1" //NH //FO CSV | grep -q ",\"$1\",";; *) kill -0 "$1" 2>/dev/null;; esac; }
+owner_ok() { [[ "$1" =~ ^[^@:[:space:]]+@(linux|macos|windows):[0-9]+(:[0-9]+)?$ ]]; }   # the rule's marker grammar, exactly
+# Liveness is THREE-valued — 0 live, 1 dead, 2 unknown — and only "no process with that pid" is dead. A refused or
+# failed query (a missing `tasklist`, a `ps` that errors, no /proc) is unknown and preserves. `kill -0` is not used:
+# it cannot tell "no such process" from "not permitted" without parsing a localised message.
+TASKS=""; TASKS_RC=""   # one `tasklist` snapshot per run, taken on the first Windows liveness question
+liveness() {
+  case "$OS" in
+    windows)
+      if [ -z "$TASKS_RC" ]; then TASKS="$(tasklist //NH //FO CSV 2>/dev/null)" && TASKS_RC=0 || TASKS_RC=$?; fi
+      [ "$TASKS_RC" = 0 ] || return 2
+      if printf '%s\n' "$TASKS" | grep -q ",\"$1\","; then return 0; fi
+      if printf '%s\n' "$TASKS" | grep -q '","'; then return 1; fi   # a real snapshot that lacks the pid
+      return 2;;   # exit 0 with nothing in it: not an answer
+    *)
+      if [ "$OS" = linux ] && [ -d /proc ]; then if [ -d "/proc/$1" ]; then return 0; else return 1; fi; fi   # /proc answers for every user
+      ps -p "$1" -o pid= >/dev/null 2>&1 && return 0
+      case $? in 1) return 1;; *) return 2;; esac;;   # ps: 1 = no such process; anything else = refused or missing
+  esac
+}
 if command -v docker >/dev/null; then dk() { docker "$@"; }; else dk() { :; }; echo "janitor: no docker binary — containers, volumes and networks not swept" >&2; fi
 epoch_of() {   # docker's "2026-10-15 10:22:33 +0200 CEST" / "2026-10-15T08:22:33.123Z" → unix seconds; "" when unparseable
   local s="$1"; s="${s%% [A-Z]*}"; s="$(printf '%s' "$s" | sed -E 's/\.[0-9]+//; s/T/ /; s/Z$/ +0000/')"
@@ -37,6 +58,10 @@ epoch_of() {   # docker's "2026-10-15 10:22:33 +0200 CEST" / "2026-10-15T08:22:3
   date -u -d "$s" +%s 2>/dev/null || date -u -j -f '%Y-%m-%d %H:%M:%S %z' "$s" +%s 2>/dev/null || true
 }
 mtime_of() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || true; }
+canon() {   # one spelling for a path git (`C:/x`) and find (`/c/x`) print differently; the drive form is folded BEFORE the cd,
+  local p="$1"; case "$p" in [A-Za-z]:/*) p="/$(printf '%s' "${p:0:1}" | lower)${p:2}";; esac   # because MSYS resolves the two entries differently
+  (cd "$p" 2>/dev/null && pwd -P) || printf '%s' "$p"
+}
 gitdir_of() {   # a folder holding a .git FILE is a linked worktree of SOME clone; a relative gitdir is relative to the worktree
   local g; g="$(sed -n 's/^gitdir: //p' "$1/.git" 2>/dev/null || true)"
   case "$g" in ""|/*|[A-Za-z]:/*) ;; *) g="$1/$g";; esac; printf '%s' "$g"
@@ -44,12 +69,23 @@ gitdir_of() {   # a folder holding a .git FILE is a linked worktree of SOME clon
 row() { printf '%s\n' "$1$U$2$U$3$U$4$U$5"; }   # kind id name owner created
 capture() {   # ONE line per prefixed resource ("-" = an owner nobody can read). A failing listing fails the run.
   dk ps -a --format '{{.ID}}\t{{.Names}}\t{{.Label "testsToDelete.owner"}}\t{{.CreatedAt}}' | awk -F'\t' -v OFS="$U" 'tolower($2) ~ /^teststodelete[-_]/ {print "container",$1,$2,$3,$4}' || return 1
-  dk volume ls --format '{{.Name}}\t{{.Label "testsToDelete.owner"}}' | awk -F'\t' -v OFS="$U" 'tolower($1) ~ /^teststodelete[-_]/ {print "volume",$1,$1,$2,""}' || return 1
+  local vols created
+  vols="$(dk volume ls --format '{{.Name}}\t{{.Label "testsToDelete.owner"}}' | awk -F'\t' 'tolower($1) ~ /^teststodelete[-_]/')" || return 1
+  if [ -n "$vols" ]; then   # one inspect for all captured volumes, not one per volume
+    created="$(printf '%s\n' "$vols" | cut -f1 | xargs docker volume inspect --format '{{.Name}}\t{{.CreatedAt}}')" || return 1
+    printf '%s\n' "$vols" | while IFS=$'\t' read -r n o; do [ -n "$n" ] || continue; row volume "$n" "$n" "$o" "$(printf '%s\n' "$created" | awk -F'\t' -v n="$n" '$1==n{print $2; exit}')"; done
+  fi
   dk network ls --format '{{.ID}}\t{{.Name}}\t{{.Label "testsToDelete.owner"}}\t{{.CreatedAt}}' | awk -F'\t' -v OFS="$U" 'tolower($2) ~ /^teststodelete[-_]/ {print "network",$1,$2,$3,$4}' || return 1
-  git worktree list --porcelain | awk -v OFS="$U" '/^worktree /{if(p!="")print "wt-git",p,p,o,""; p=substr($0,10); o=""} /^locked/{o=substr($0,8); if(o=="")o="-"} END{if(p!="")print "wt-git",p,p,o,""}' | awk -F"$U" 'tolower($3) ~ /\/teststodelete[-_][^\/]*$/' || return 1
+  local wts; wts="$(git worktree list --porcelain)" || return 1
+  printf '%s\n' "$wts" | awk -v OFS="$U" '/^worktree /{if(p!="" && n>1)print "wt-git",p,p,o,""; p=substr($0,10); o=""; n++} /^locked/{o=substr($0,8); if(o=="")o="-"} END{if(p!="" && n>1)print "wt-git",p,p,o,""}' | awk -F"$U" 'tolower($3) ~ /\/teststodelete[-_][^\/]*$/'   # the first block is the MAIN worktree: never a candidate
+  local mine; mine="$(printf '%s\n' "$wts" | sed -n 's/^worktree //p' | while IFS= read -r p; do canon "$p"; echo; done)"   # this repo's trees, canonical: not captured twice from the temp root
   git for-each-ref --format='%(refname:short)' refs/heads | awk -v OFS="$U" 'tolower($0) ~ /^teststodelete[-_]/ {print "branch",$0,$0,"",""}' || return 1
+  local top; top="$(canon "$(git rev-parse --show-toplevel)")"   # the clone this runs from is never a candidate, prefixed or not
   find "$T" -mindepth 1 -maxdepth 1 -type d -iname 'teststodelete[-_]*' | while IFS= read -r d; do
-    if [ -f "$d/.git" ]; then g="$(gitdir_of "$d")"; o=""
+    case "$top/" in "$(canon "$d")/"*) continue;; esac
+    if [ -f "$d/.git" ]; then
+      if printf '%s\n' "$mine" | grep -qxF -- "$(canon "$d")"; then continue; fi
+      g="$(gitdir_of "$d")"; o=""
       if [ -z "$g" ] || [ ! -d "$g" ]; then o="-"; elif [ -e "$g/locked" ]; then o="$(head -c 200 "$g/locked")"; o="${o:--}"; fi
       row wt-dir "$d" "$d" "$o" "$(mtime_of "$d")"
     else o=""; if [ -e "$d.owner" ]; then o="$(head -c 200 "$d.owner")"; o="${o:--}"; fi
@@ -66,18 +102,19 @@ skip() { SKIPPED=1; echo "skipped: $1 $2 — $3" >&2; }
 while IFS="$U" read -r kind id name owner created; do
   [ -n "$id" ] || continue
   case "$kind" in
-    container|network) e="$(epoch_of "$created")";;
-    volume) e="$(epoch_of "$(dk volume inspect --format '{{.CreatedAt}}' "$id" 2>/dev/null || true)")";;
+    container|network|volume) e="$(epoch_of "$created")";;
     wt-git) e="$(mtime_of "$id")"; [ -n "$e" ] || e=0;;   # a registration whose folder is gone is old by definition; prune takes it
     branch) e=0;;
     *) e="$created";;
   esac
   if [ -z "$e" ] || [ $(( NOW - e )) -lt "$MIN_AGE" ]; then continue; fi   # unknown or young: left alone, silently
   if [ -n "$owner" ]; then
-    case "$owner" in *@*:*) ;; *) skip "$kind" "$name" "owner '$owner' is unreadable"; continue;; esac
+    if ! owner_ok "$owner"; then skip "$kind" "$name" "owner '$owner' is unreadable"; continue; fi   # validated BEFORE any liveness question
     if [ "$(printf '%s' "${owner%%:*}" | lower)" != "$(printf '%s' "$me" | lower)" ]; then skip "$kind" "$name" "belongs to ${owner%%:*}, not this host"; continue; fi
     p="${owner#*:}"; p="${p%%:*}"
-    if alive "$p"; then skip "$kind" "$name" "owned by live process $p — a run is in flight"; continue; fi
+    liveness "$p" && lv=0 || lv=$?
+    if [ "$lv" = 0 ]; then skip "$kind" "$name" "owned by live process $p — a run is in flight"; continue; fi
+    if [ "$lv" != 1 ]; then skip "$kind" "$name" "liveness unknown for process $p — the query failed or was refused"; continue; fi
   fi
   DEL="$DEL$kind$U$id$U$name"$'\n'
 done <<< "$CAPTURED"

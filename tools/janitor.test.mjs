@@ -66,6 +66,15 @@ const { bash: BASH, gitRoot: GIT_ROOT } = locateBash();
 
 const slash = (p) => p.replaceAll("\\", "/");
 
+/**
+ * A folder as the script's own bash spells it: `/c/Users/…` on Windows, never `C:/…`. MSYS turns a `C:/…` TMPDIR
+ * into `/tmp/…` whenever the folder is under the user's temp root, while git prints the same tree as `C:/…`; the
+ * janitor's `canon` folds the drive spelling to `/c/…` but not `/tmp/…`, so a repository's own worktree in a TMPDIR
+ * spelled the `/tmp` way would be captured twice (reported in the E1 hand-back; the script is hash-pinned and is not
+ * changed here). Every scenario therefore hands the script the spelling its harness always used.
+ */
+const posix = (p) => (win32 ? slash(p).replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`) : p);
+
 /** The PATH of a run: the stub dir first (when the scenario has docker), then ONLY the tools the script calls. */
 function pathFor(w, { docker }) {
   const parts = docker ? [w.stubDir] : [];
@@ -78,21 +87,54 @@ function pathFor(w, { docker }) {
   return parts.join(path.delimiter);
 }
 
-function envFor(w, { tmp, docker, minAge }) {
+function envFor(w, { tmp, docker, minAge, ahead, extra }) {
   const env = {};
   for (const [key, value] of Object.entries(process.env)) {
     if (!/^(path|git_.*|tmpdir|janitor_.*|dstub)$/i.test(key)) env[key] = value;
   }
-  return { ...env, PATH: pathFor(w, { docker }), TMPDIR: slash(tmp), JANITOR_MIN_AGE_MINUTES: String(minAge), DSTUB: slash(w.state) };
+  return {
+    ...env, PATH: [...ahead, pathFor(w, { docker })].join(path.delimiter), TMPDIR: posix(tmp),
+    JANITOR_MIN_AGE_MINUTES: String(minAge), DSTUB: slash(w.state), ...extra,
+  };
 }
 
-function runJanitor(w, { cwd = w.clone, tmp, args = [], docker = true, minAge = 60 }) {
-  const env = envFor(w, { tmp, docker, minAge });
+// --- a pid that no process can have ----------------------------------------------------------------------------
+// A dead owner is NEVER the pid of a child that was started and killed: the OS hands that number to the next
+// process (Windows reuses pids within seconds, and `conhost.exe` took one mid-suite, which read as "live"). It is
+// a pid the janitor's own query can never match, and the premise is asserted before and after every run.
+
+/** `/proc/sys/kernel/pid_max`, or the largest value any Linux allows when it cannot be read. */
+function pidMax() {
+  try {
+    return Number(fs.readFileSync("/proc/sys/kernel/pid_max", "utf8").trim());
+  } catch {
+    return 4_194_304;
+  }
+}
+
+/** Windows pids are multiples of 4, so one ≡ 2 (mod 4) is never in a `tasklist`; Linux `pid_max + 1`; macOS 100000 (its pids stop below). */
+const UNMATCHABLE_BASE = win32 ? 777_770 : linux ? pidMax() + 1 : 100_000;
+const unmatchablePid = (i = 0) => UNMATCHABLE_BASE + (win32 ? 4 * i : i);
+
+function assertNoSuchProcess(pid) {
+  if (win32) {
+    assert.equal(pid % 4, 2, `pid ${pid} is not ≡ 2 (mod 4): Windows could hand it out`);
+  } else if (linux) {
+    assert.ok(pid > pidMax() && !fs.existsSync(`/proc/${pid}`), `pid ${pid} is within pid_max or alive`);
+  } else {
+    assert.throws(() => process.kill(pid, 0), { code: "ESRCH" }, `pid ${pid} is alive`);
+  }
+}
+
+function runJanitor(w, { cwd = w.clone, tmp, args = [], docker = true, minAge = 60, ahead = [], env: extra = {} }) {
+  const env = envFor(w, { tmp, docker, minAge, ahead, extra });
   if (!docker) { // the no-docker case must PROVE it has no docker, or it proves nothing
     const probe = spawnSync(BASH, ["-c", "command -v docker"], { env, encoding: "utf8", windowsHide: true });
     assert.notEqual(probe.status, 0, `this PATH holds a docker: ${probe.stdout}`);
   }
+  for (let i = 0; i < 5; i += 1) assertNoSuchProcess(unmatchablePid(i)); // the premise, before the run
   const result = spawnSync(BASH, [slash(SCRIPT), ...args], { cwd, env, encoding: "utf8", timeout: 240_000, windowsHide: true });
+  for (let i = 0; i < 5; i += 1) assertNoSuchProcess(unmatchablePid(i)); // and after it
   const stderr = (result.stderr ?? "").split(/\r?\n/).filter(Boolean);
   const stdout = (result.stdout ?? "").split(/\r?\n/).filter(Boolean);
   return { status: result.status, stdout, stderr, text: stderr.join("\n"), error: result.error };
@@ -120,7 +162,7 @@ case "$1" in
   volume)
     case "$2" in
       ls) emit "$S/vol.tsv";;
-      inspect) if [ "$3" = "--format" ]; then created "$last"; else present "$last"; exit $?; fi;;
+      inspect) if [ "$3" = "--format" ]; then fmt="$4"; shift 4; for n in "$@"; do c="$(created "$n")"; case "$fmt" in *Name*) printf '%s\\t%s\\n' "$n" "$c";; *) printf '%s\\n' "$c";; esac; done; else present "$last"; exit $?; fi;;
       rm) if failrm "$last"; then exit 1; fi;;
     esac;;
   network)
@@ -239,6 +281,8 @@ async function deadPid() {
 }
 
 const DEAD = async () => ownerOf(await deadPid());
+/** An owner whose pid no process can have (see above): dead without any pid ever having been alive. */
+const NOBODY = (i = 0) => ownerOf(unmatchablePid(i));
 
 function age(target, msAgo) {
   const when = new Date(Date.now() - msAgo);
@@ -626,4 +670,177 @@ test("12. A vanished target is a notice, not an abort: a failed removal is judge
   assert.ok(mentions(run, "skipped: container testsToDelete-conventions-stuck — could not be removed"), run.text);
   assert.deepEqual(rmCalls(w), ["rm -f -v cv", "rm -f -v cs"], "both removals were attempted, by captured id");
   assert.equal(exists(dead) || exists(`${dead}.owner`), false, "a later pass still ran");
+});
+
+// --- 13 --------------------------------------------------------------------------------------------------------
+
+test("13. Malformed owners (code gate 1): each is unreadable — kept and named, never judged by a pid", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const machine = HOST.split("@")[0];
+  const malformed = [`${HOST}:abc`, `${HOST}:12:x`, `${HOST}:`, `${HOST}:1:2:3`, `${machine}@beos:1`];
+  const folders = malformed.map((owner, i) => folder(w, tmp, `bad${i}`, { owner }));
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 3, run.text);
+  for (const [i, dir] of folders.entries()) {
+    assert.ok(exists(dir) && exists(`${dir}.owner`), `${named(dir)} (owner ${JSON.stringify(malformed[i])}) was deleted\n${run.text}`);
+  }
+  assert.equal(run.stderr.filter((line) => line.includes("is unreadable")).length, 5, `one named line per malformed owner\n${run.text}`);
+});
+
+// --- 14 --------------------------------------------------------------------------------------------------------
+
+test("14. One row per worktree (code gate 2): the swept repository's own tree in the temp root is judged once", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dead = worktree(w, w.clone, tmp, "dup", { lock: NOBODY() });
+
+  const first = runJanitor(w, { tmp });
+
+  assert.equal(first.status, 0, first.text);
+  assert.deepEqual(first.stderr, [], "removed once and silently: a second capture would announce a vanished target");
+  assert.equal(exists(dead.path), false, `the dead-owned worktree is gone\n${first.text}`);
+  assert.equal(listedIn(w.clone).includes(named(dead.path)), false, "and unregistered");
+
+  const live = worktree(w, w.clone, tmp, "dup2", { lock: LIVE() });
+
+  const second = runJanitor(w, { tmp });
+
+  assert.equal(second.status, 3, second.text);
+  assert.ok(exists(live.path), `the live-owned worktree stays\n${second.text}`);
+  assert.equal(second.stderr.filter((line) => line.includes(named(live.path))).length, 1, `named exactly once\n${second.text}`);
+});
+
+// --- 15 --------------------------------------------------------------------------------------------------------
+
+test("15. One volume inspect for N volumes (code gate 3/4)", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const names = ["testsToDelete-v-a", "testsToDelete-v-b", "testsToDelete-v-c"];
+  setDocker(w, { vol: names.map((name) => [name, ""]), volCreated: names.map((name) => [name, volumeTime(OLD)]) });
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 0, run.text);
+  const inspects = dockerLog(w).filter((line) => line.startsWith("volume inspect"));
+  assert.equal(inspects.length, 1, `one inspect for three volumes, got [${inspects.join(" // ")}]\n${run.text}`);
+  assert.deepEqual(rmCalls(w), names.map((name) => `volume rm ${name}`), run.text);
+});
+
+// --- 16 – 18: liveness ------------------------------------------------------------------------------------------
+
+/** A directory holding a stub `tasklist` that logs its argv to the world's state folder and then answers as `kind` says. */
+function taskStub(w, kind) {
+  const body = {
+    fail: `echo "tasklist: command not found" >&2; exit 127`,
+    noPid: `printf '"node.exe","4242","Console","1","1 K"\\n'`,
+    empty: "exit 0",
+  }[kind];
+  const dir = ownedDir(w.scope, "jlive");
+  fs.writeFileSync(path.join(dir, "tasklist"), `#!/bin/sh\necho "tasklist $*" >> "$DSTUB/tasklistlog"\n${body}\n`, { mode: 0o755 });
+  return dir;
+}
+
+/**
+ * A `ps` that logs its argv and returns `rc`, handed over as an exported bash FUNCTION: on Windows the shell puts its
+ * own `/usr/bin` ahead of any PATH entry we add, so a stub FILE named `ps` would never be reached; a function
+ * outranks every file on every platform.
+ */
+const psStub = (rc) => ({ "BASH_FUNC_ps%%": `() {  echo "ps $*" >> "$DSTUB/pslog"; return ${rc}\n}` });
+const callsOf = (w, name) => {
+  try {
+    return fs.readFileSync(path.join(w.state, `${name}log`), "utf8").split("\n").filter(Boolean);
+  } catch {
+    return [];
+  }
+};
+const OWNER_AS = (os, pid) => `${HOST.split("@")[0]}@${os}:${pid}`;
+
+test("16. One tasklist per run (code gate 5): N Windows-owned folders cost one snapshot", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dirs = [0, 1, 2].map((i) => folder(w, tmp, `win${i}`, { owner: OWNER_AS("windows", unmatchablePid(i)) }));
+  const ahead = [taskStub(w, "noPid")];
+
+  const run = runJanitor(w, { tmp, ahead, env: { JANITOR_OS: "windows" } });
+
+  assert.equal(run.status, 0, run.text);
+  assert.equal(callsOf(w, "tasklist").length, 1, `one snapshot for three owners, got [${callsOf(w, "tasklist").join(" // ")}]\n${run.text}`);
+  assert.equal(dirs.some((dir) => exists(dir)), false, `all three are gone\n${run.text}`);
+});
+
+test("17. Windows liveness is three-valued (opus A): a failing or silent tasklist keeps; a snapshot without the pid is dead", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const unknownLines = (run, dir) => run.stderr.filter((line) => line.includes("liveness unknown") && line.includes(named(dir))).length;
+  const judge = (what, kind) => {
+    const dir = folder(w, tmp, what, { owner: OWNER_AS("windows", unmatchablePid()) });
+    const run = runJanitor(w, { tmp, ahead: [taskStub(w, kind)], env: { JANITOR_OS: "windows" } });
+    return { dir, run };
+  };
+
+  const failing = judge("lvfail", "fail");
+  assert.equal(failing.run.status, 3, failing.run.text);
+  assert.ok(exists(failing.dir) && exists(`${failing.dir}.owner`), `a tasklist that fails is not a dead process\n${failing.run.text}`);
+  assert.equal(unknownLines(failing.run, failing.dir), 1, failing.run.text);
+
+  const silent = judge("lvsilent", "empty"); // the folder above is still there and still unknown: count only this one's line
+  assert.equal(silent.run.status, 3, silent.run.text);
+  assert.ok(exists(silent.dir), `a tasklist that prints nothing is not an answer\n${silent.run.text}`);
+  assert.equal(unknownLines(silent.run, silent.dir), 1, silent.run.text);
+
+  const dead = judge("lvdead", "noPid");
+  assert.equal(dead.run.status, 0, dead.run.text);
+  assert.equal(exists(dead.dir) || exists(`${dead.dir}.owner`), false, `a real snapshot without the pid is the one answer that deletes\n${dead.run.text}`);
+});
+
+test("18. The non-Windows branch (opus A), through JANITOR_OS=macos and a ps stub: refused keeps, 'no such process' deletes, alive skips", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const judge = (what, rc) => {
+    const dir = folder(w, tmp, what, { owner: OWNER_AS("macos", unmatchablePid()) });
+    const run = runJanitor(w, { tmp, env: { JANITOR_OS: "macos", ...psStub(rc) } });
+    return { dir, run };
+  };
+
+  const refused = judge("psrefused", 2);
+  assert.equal(refused.run.status, 3, refused.run.text);
+  assert.ok(exists(refused.dir), `a ps that is refused (exit 2) is not a dead process\n${refused.run.text}`);
+  assert.equal(refused.run.stderr.filter((line) => line.includes("liveness unknown")).length, 1, refused.run.text);
+  assert.deepEqual(callsOf(w, "ps"), [`ps -p ${unmatchablePid()} -o pid=`], "the stub was the one asked");
+
+  const dead = judge("psdead", 1);
+  assert.equal(dead.run.status, 0, dead.run.text);
+  assert.equal(exists(dead.dir) || exists(`${dead.dir}.owner`), false, `ps exit 1 is "no such process"\n${dead.run.text}`);
+
+  const live = judge("pslive", 0);
+  assert.equal(live.run.status, 3, live.run.text);
+  assert.ok(exists(live.dir), `ps exit 0 is alive\n${live.run.text}`);
+  assert.equal(live.run.stderr.filter((line) => line.includes("owned by live process")).length, 1, live.run.text);
+});
+
+// --- 19 --------------------------------------------------------------------------------------------------------
+
+test("19. The clone the janitor runs from (opus B) is never a candidate, even when it is old, unclaimed and prefixed in the temp root", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const clone = folder(w, tmp, "self", { owner: null, ageMs: 0 });
+  git(clone, "init", "-q");
+  git(clone, ...COMMIT);
+  age(clone, OLD);
+
+  const run = runJanitor(w, { tmp, cwd: clone });
+
+  assert.equal(run.status, 0, run.text);
+  assert.ok(exists(path.join(clone, ".git")), `the clone it ran from was deleted\n${run.text}`);
+  assert.deepEqual(run.stderr, [], "and nothing was reported");
 });
