@@ -153,7 +153,10 @@ matches leaves in shared namespaces only, so a nested prefix is a name nothing e
   process.uptime()` (Node's own clock after bootstrap, ~tens of ms late, more under load; a different question
   than the one the reader asks).
 - **Comparison (when both sides have a start):** `live` iff the pid is alive on this host AND
-  `|start_marker − start_live| ≤ 2 s`. Two seconds
+  `|start_marker − start_live| ≤ 2 s`; **a larger mismatch is `unknown`, never `gone`** (Opus review, decision C):
+  Linux's start = `btime` + ticks shifts when the wall clock is stepped (a time sync, a VM after host sleep), so
+  a mismatch can be a LIVE owner; only "no process with that pid" is `gone`. A reused pid then only delays
+  reclamation (as on Windows and macOS, where no start is written); it never deletes anything live. Two seconds
   = two independent one-second roundings (macOS `lstart` and `btime` are whole seconds; .NET derives Linux start
   from the same `btime` and can differ from procps by one). A wider window only produces false `live` (a pid
   reused within the window) — which PRESERVES, the safe direction. A reader that cannot read start times (a
@@ -187,9 +190,11 @@ matches leaves in shared namespaces only, so a nested prefix is a name nothing e
   but leaks for as long as a reused pid lives; the start time is what turns "alive" into "the same process".
   *Hostname alone* — the WSL measurement.
 - **Liveness, one ordered procedure** (rule §3): lock-owned first (held → `live`, free → `gone`); then
-  unparseable/absent → `unknown`; foreign `host@os` → `unknown`; pid dead → `gone`; query refused (`EPERM`) →
-  `unknown`; alive and no start on either side (or the live one not readable without a spawn) → `live`; within
-  2 s → `live`; else → `gone`. S2's `ownerState` order is this order.
+  unparseable/absent → `unknown`; foreign `host@os` → `unknown`; **no process with that pid → `gone` (the only other
+  `gone`)**; query refused or failed (`EPERM`, a missing tool) → `unknown`; alive and no start on either side (or
+  the live one not readable without a spawn) → `live`; within 2 s → `live`; **else → `unknown`**. Liveness itself is
+  three-valued in every reader — live / dead / unknown — and a failed or refused query is unknown, never dead.
+  S2's `ownerState` order is this order.
 
 **D5 — The start-of-run sweep (rule §4).** Own `^testsToDelete-<repo>-` only, and **only worktrees its own
 `git worktree list` shows** — a prefixed folder holding a `.git` file it does not list is another clone's (this
@@ -263,7 +268,7 @@ consultation (epics 1–3), 2026-10-15, three accepted points.*
   gitdir resolved), reason-less lock = unreadable, unlink top-level links then `remove --force --force` then
   `rm -rf` if the directory stands, Git for Windows' bash with `tasklist`, no-docker notice.
 
-**Measured 2026-10-15, `tools/janitor.sh` (113 lines, `bash -n` clean), stub docker + two clones + private temp
+**Measured 2026-10-15, `tools/janitor.sh` (150 lines, `bash -n` clean), stub docker + two clones + private temp
 root, helper process killed by pid at the end:** (1) **TOCTOU** — stub returns nothing on the first `ps -a` and a
 live-owned prefixed container on every later call → `ps -a` called exactly once, zero `rm`, exit 0; (2) docker
 age + owner — old unlabelled container → `rm -f -v c1` (by ID), young unlabelled → kept silently, old
@@ -282,17 +287,57 @@ folder removed, `skipped: branch testsToDelete-conv-br-live — checked out in a
 once that worktree's owner is dead → worktree AND branch removed, exit 0; **(12)** a captured container whose
 `docker rm` fails and whose `inspect` says it is gone → `notice: container … — vanished after the capture`, the
 dead old folder beside it still removed, exit 0; the same with `inspect` saying it is still there →
-`skipped: … could not be removed`, exit 3. **Deletions are never fatal (J10):** every removal is `… || settle`,
+`skipped: … could not be removed`, exit 3. **`--dry-run` printed nothing (S3b's coder, 2026-10-15):** the J10 edit had put `2>/dev/null` after every `act …`
+call, which also swallowed the `would run:` line `act` wrote to stderr. RED first: scenario 8b on sha `5110061c…`
+→ `would-run lines on stdout=0`, exit 0, folder kept; fix: the redirect moved INSIDE `act` (`"$@" 2>/dev/null`
+for the real command only) and `would run:` goes to STDOUT so a person can pipe it, twelve call sites lost their
+`2>/dev/null`; GREEN: four `would run:` lines on stdout, empty stderr, exit 0, folder kept. **Deletions are never fatal (J10):** every removal is `… || settle`,
 where `settle` re-checks the target (`docker inspect`, `git show-ref`, `test -d`): still there → skipped (named,
 exit 3), gone → a notice; a prefixed branch is checked against `git worktree list` at its own pass — after the
 worktree pass, so a branch whose dead-owned worktree was just removed still goes — and skipped when a kept
-worktree holds it; only a failed LISTING is exit 1. Cosmetic, unchanged: this repository's own skipped worktree is announced twice (git's `C:/`
+worktree holds it; only a failed LISTING is exit 1. **CODE gate on E1 (branch feat/test-leftovers-e1 @ 601ca07), five accepted findings — each RED on sha `4c0e4f5b…` first, then GREEN:**
+(1) **safety** — the owner check was the loose `*@*:*`, so `<this host>@windows:abc` reached `alive`, the pid
+lookup failed and the resource was DELETED (RED: four of five malformed-owner folders gone); now `owner_ok()`
+validates the complete marker grammar `^[^@:[:space:]]+@(linux|macos|windows):[0-9]+(:[0-9]+)?$` BEFORE any
+liveness question and anything else is `unreadable` → skipped (GREEN: `h@linux:abc`, `h@linux:12:x`,
+`h@linux:`, `h@linux:1:2:3`, `h@beos:1` on old folders → all five kept and named, exit 3);
+(2) a prefixed worktree registered in the swept repository AND living under `TMPDIR` was captured twice
+(`wt-git` + `wt-dir`; RED: two `skipped:` lines for one live tree); the temp-root scan now drops any folder
+whose canonical path is one of this repository's worktrees — `canon()` folds git's `C:/x` to `/c/x` BEFORE the
+`cd … && pwd -P`, because MSYS resolves the two spellings through different mounts (`/tmp` vs `/c/Users/…`)
+— (GREEN: dead → removed once, empty stderr; live → exactly one `skipped:` line);
+(3)+(4) volume age cost one `docker volume inspect` per volume (RED: 2 calls for 2 volumes); the capture now
+inspects every captured volume name in ONE `docker volume inspect --format '{{.Name}}	{{.CreatedAt}}' <names…>`
+and maps CreatedAt per name (GREEN: 1 call, both old volumes removed) — the stub docker answers a multi-name
+inspect;
+(5) Windows liveness spawned `tasklist` per resource (RED: 3 calls for 3 folders); now ONE
+`tasklist //NH //FO CSV` snapshot per run, taken lazily on the first Windows owner question (GREEN: 1 call, all
+three dead-owned folders removed; a stub `tasklist` on PATH). Rejected by the gate and not done: a progress
+line on stderr (it would break test 8b's empty-stderr contract). Harness scenarios 13–16 added (`extra-13-16.sh`,
+run by `mini-harness.sh` against any sha, which is how RED was observed). **Opus code review (ship after fixes), three findings — each RED on sha `3f4ca10b…` first:**
+(A) **liveness was two-valued** — any failure read as dead: with `tasklist` missing from PATH a 3-hour-old folder
+of a LIVE owner was deleted, exit 0 (RED: 17a kept=no; 17c, an empty `tasklist` output, kept=no); on Linux a
+`kill -0` of another user's live process returns `EPERM` and read as dead. Fix: `liveness()` returns 0 live / 1
+dead / 2 unknown — Windows: the snapshot's exit status AND content (a matching row → live; a real snapshot without
+the pid → dead; a failed `tasklist` or an empty answer → unknown); Linux: `[ -d /proc/<pid> ]`, which answers for
+every user (no `kill -0` anywhere — it cannot tell "no such process" from "not permitted" without parsing a
+localised message); otherwise `ps -p <pid>` (exit 1 → dead, anything else → unknown); unknown ⇒
+`skipped: … liveness unknown for process <pid>`, exit 3. GREEN: 17 (missing tasklist → kept+named exit 3; rows
+without the pid → removed; empty output → kept) and 18 (via the `JANITOR_OS` test seam and a `ps` stub: exit 2 →
+kept+named, exit 1 → removed, exit 0 → skipped live).
+(B) **the MAIN worktree was a candidate** — run inside a prefixed, unlocked, 3-hour-old clone under `TMPDIR`,
+`git worktree remove` refused and `rm -rf` deleted the clone it ran from (RED: 19 clone survives=no). Fix: the
+first porcelain block is dropped (as the Node sweep's `listing.slice(1)`), and the temp-root scan never
+considers the toplevel the janitor runs from or any folder containing it (`git rev-parse --show-toplevel`,
+canonical). GREEN: 19 clone survives, exit 0.
+(C) **a start-time mismatch is `unknown`, never `gone`** — the janitor compares no start (bash never did), so
+this is a rule-text and S2 change (D4, §3). Cosmetic, unchanged: this repository's own skipped worktree is announced twice (git's `C:/`
 and find's `/c/` spelling).
 
 **D10 — Text constraints (rule-wide).**
 
-- Body **17 484 B** (file 17 595 B), from 4 736 B — the janitor's code left the rule for `tools/janitor.sh`
-  (113 lines), the `## Tokens` table gained the twin's eleven rows, §3 gained the optional start. The two core
+- Body **17 437 B** (file 17 548 B), from 4 736 B — the janitor's code left the rule for `tools/janitor.sh`
+  (150 lines), the `## Tokens` table gained the twin's eleven rows, §3 gained the optional start. The two core
   spans total 16 042 B. Over the stories document's *recommended* 12 KiB, under the
   32 KiB per-rule cap (`tools/lib/rule-cli.mjs:112`). The five tasks that select it are all split-read tasks
   (read one rule per `--only`), so the only bound is per rule; the per-scope 32 KiB test at
@@ -334,7 +379,7 @@ Code-observable, RED first where the code can prove it:
 4. **The janitor's verdicts** — S3b's scenarios (below); the ten harness runs in D9 are the RED/GREEN record.
 5. **Core spans.** Exactly two `<!-- core:begin -->` and two `<!-- core:end -->`, in order; a script that
    concatenates the spans of this file and of the twin's byte-compares them — the twin's E1 runs it.
-6. **Byte cap.** `bodyOf(...)` ≤ 32 768 (it is 17 484); the five selection figures of D10 re-measured with
+6. **Byte cap.** `bodyOf(...)` ≤ 32 768 (it is 17 437); the five selection figures of D10 re-measured with
    `node tools/rules.mjs explain --task <t> --repo .` and written into the PR.
 
 Review checklist for the prose (Opus, against this section and S2–S4):
@@ -367,8 +412,9 @@ Review checklist for the prose (Opus, against this section and S2–S4):
 - **S2.** `thisOwner()` returns `{ host: "<hostname>@<linux|macos|windows>", pid, start? }`; **`start` only on
   Linux** (read from `/proc/self/stat` + `btime`, no spawn) and absent elsewhere — the Windows PowerShell probe
   and the macOS `ps` probe disappear from the writer; `processProbe` reads a live start only on Linux and returns
-  `start: undefined` elsewhere; `ownerState`: alive and no start on either side → `live`; the J6 DoD measurement
-  is moot on Windows. The serialised form is `${host}:${pid}` plus `:${start}` when present; `readOwner` accepts
+  `start: undefined` elsewhere; `ownerState`: alive and no start on either side → `live`; **start times further than 2 s apart → `unknown`**
+  (never `gone`; decision C); `processProbe` is three-valued — `alive: true|false|undefined` — and `undefined`
+  (refused or failed) is `unknown`, never `gone`; the J6 DoD measurement is moot on Windows. The serialised form is `${host}:${pid}` plus `:${start}` when present; `readOwner` accepts
   only `^([^@:\s]+@(linux|macos|windows)):(\d+)(?::(\d+))?$`, everything else `{ unreadable: true }`. `writeOwner(dir,
   "folder")` writes the **sibling** `<dir>.owner` in `dir`'s parent (so `parent:` is honoured); `removeQuietly`
   removes the folder, then the sibling. **Worktrees carry no file**: `ownedWorktree` runs `git worktree add
@@ -385,19 +431,28 @@ Review checklist for the prose (Opus, against this section and S2–S4):
   not only from `git worktree list`, so S3 can judge any
   clone's tree; a bare `locked` / `added with --lock` is `{ unreadable: true }` (J5). There is no per-process start-time cost to measure: start is omitted off Linux (J6 superseded).
 - **S3b (new step, after S3, before S5): `tools/janitor.sh` shipped and tested.** Files: `tools/janitor.sh`
-  (copy `…\scratchpad\janitor.sh` verbatim — 113 lines, header comment included; executable bit set),
+  (copy `…\scratchpad\janitor.sh` verbatim — 150 lines, header comment included; executable bit set),
   new `tools/janitor.test.mjs` (replaces the "extract the fence" test planned for S3), README tool-table row
   (`tools/janitor.sh` · `common/test-leftovers.md` § The janitor · `bash .agents/conventions/tools/janitor.sh
   [--dry-run]`). The test is the harness as `node:test`: a stub `docker` first on `PATH` that logs argv and
   answers `ps -a`, `volume ls`, `volume inspect`, `network ls` from per-scenario fixtures (TOCTOU mode: empty on
   the first `ps -a`, a live container afterwards), two disposable clones and a private `TMPDIR` in owned folders,
   Git for Windows' bash resolved from `git --exec-path` on win32 (never `%SystemRoot%`'s), a helper child killed
-  by pid. Scenarios = D9's twelve (incl. 11: a kept worktree's checked-out prefixed branch is skipped and named while a
-  dead folder beside it goes; 12: a vanished target is a notice and later passes still run), each asserting
+  by pid. Scenarios = D9's nineteen (incl. 11: a kept worktree's checked-out prefixed branch is skipped and named while a
+  dead folder beside it goes; 12: a vanished target is a notice and later passes still run; 13: malformed owners are unreadable, never
+  deleted; 14: one row per worktree; 15: one volume inspect for N volumes; 16: one tasklist per run; 17–18: three-valued liveness on both branches;
+  19: the clone the janitor runs from survives), each asserting
   stderr lines, exit code, what remains and the stub's recorded `rm`/`volume rm`/`network rm` argv (by ID). RED first: write the test against the file, run it before the file
   exists (fails on spawn), then with the file. DoD: green on Windows (Git Bash) and the Linux CI runner; the
-  twin copies the file verbatim and hash-pins it (its S-step). The file as specified: 9 296 B, 113 lines,
-  sha256 `4c0e4f5b187dc7787502095b09b360e1792d5561b21cdaad2ba10654ccfd2037`.
+  twin copies the file verbatim and hash-pins it (its S-step). The file as specified: 12 166 B, 150 lines,
+  sha256 `0644a17517c2801e5909b24334a65cd7a6f8fba96e8b7e43b9fe3ee5fbe104a2` (after the Opus review's A/B; earlier shas `3f4ca10b…`, `4c0e4f5b…`,
+  `5110061c…`). **Dead pids in the tests are never a killed child's pid** — a pid the janitor's own query can
+  never match, with the premise asserted first: Windows a pid ≡ 2 (mod 4) (Windows pids are multiples of 4),
+  Linux `pid_max + 1` (read from `/proc/sys/kernel/pid_max`), macOS 100000; the harness's `999999` is ≡ 3 (mod 4)
+  and serves on Windows only. The non-Windows liveness branch is exercised through the `JANITOR_OS` seam with a
+  `ps` stub; the Windows branch with `tasklist` stubs that are missing, silent, or answer without the pid. Test 8b asserts the `would run:` lines on STDOUT (at least three for an old dead
+  folder: `git worktree prune`, the `find … -type l -delete`, the `rm -rf`, the sibling's `rm -f`), exit 0, folder
+  kept.
 - **S3.** `minAgeMs` = 10 minutes. **J1 is the rule now**: the sweep removes only worktrees its own `repo` lists;
   a prefixed folder holding a `.git` file that `repo` does not list is preserved with reason `other clone`
   (scenario 2 gains that case: a worktree of a second disposable repository, old, dead-owned, survives this
@@ -466,7 +521,7 @@ Review checklist for the prose (Opus, against this section and S2–S4):
 
 | Finding | Resolution |
 |---|---|
-| Whole-run refusal wedges cleanup | Applied: per-resource skipping with one named notice each, every `gone` resource removed, exit 3 at the END if anything was skipped (0 otherwise, 1 on a Docker daemon failure). Fail-closed kept: a skipped kind is never `rm -rf`'d. Core lines changed: the janitor's prose paragraph and the bash block (56 lines; since moved to `tools/janitor.sh`, 113 lines). |
+| Whole-run refusal wedges cleanup | Applied: per-resource skipping with one named notice each, every `gone` resource removed, exit 3 at the END if anything was skipped (0 otherwise, 1 on a Docker daemon failure). Fail-closed kept: a skipped kind is never `rm -rf`'d. Core lines changed: the janitor's prose paragraph and the bash block (56 lines; since moved to `tools/janitor.sh`, 150 lines). |
 | One live parallel run blocks everything | Same change; measured: a live owner beside a dead one → the dead one removed, the live one kept and named, exit 3. |
 
 ### Cadence consultation (epics 1–3), 2026-10-15 — resolution
@@ -474,7 +529,7 @@ Review checklist for the prose (Opus, against this section and S2–S4):
 | Point | Resolution |
 |---|---|
 | (1) TOCTOU | Applied: one `capture()` with identity + owner + age per resource (containers by ID, networks by ID, volumes by name with `inspect` age), decisions over the capture only, deletions by captured id/path; a later resource is untouched. Minimum age applied to containers/volumes/networks. Harness scenario 1 (interleaving) → one `ps -a`, zero removals. Two bugs the harness found on the way are recorded in D9 (tab `IFS` collapsing empty fields; `set -e` not inherited by `$(…)`). |
-| (2) Script, not fence | Applied: `tools/janitor.sh` (113 lines) in this repository, run from the mount; the rule keeps guarantees + invocation; new step S3b ships and tests it; README row; the twin copies and hash-pins it. My D10 rejection withdrawn on the README precedent. |
+| (2) Script, not fence | Applied: `tools/janitor.sh` (150 lines) in this repository, run from the mount; the rule keeps guarantees + invocation; new step S3b ships and tests it; README row; the twin copies and hash-pins it. My D10 rejection withdrawn on the README precedent. |
 | (3) Optional start | Applied: `<host>@<os>:<pid>[:<start>]`; start only where obtained without a spawn (Linux `/proc`, native APIs); Windows and other spawn-only writers omit it; a reader with no start on either side treats alive as live. Nothing keeps start mandatory, so no cost threshold. Harness scenario 9 covers the two-field form. |
 | Tokens (coordinator) | Applied, then narrowed by J11: three-column table `token | family | repository`, this repository's seven rows only (wording frozen for the twin's line compare), `conventions` row reworded, the "appended later" sentence dropped; the twin holds the full table. |
 
@@ -484,6 +539,35 @@ Review checklist for the prose (Opus, against this section and S2–S4):
 |---|---|
 | J10 | Applied in `janitor.sh`: no deletion is fatal — each removal is `… \|\| settle` (target still there → skipped and named, exit 3; gone → notice); a prefixed branch is checked against `git worktree list` at its pass (after worktrees) and skipped with a named line when a kept worktree holds it; only a failed listing exits 1. Harness scenarios 11 and 12 added and green. |
 | J11 | Applied: this public repository's `## Tokens` lists only its own seven rows (three columns, wording frozen); every other-family name and token removed from the rule and from this spec; core §1 carries the corporate sentence ("a rule repository lists every token that can share a machine with its family; a public one lists only its own, and the private one carries both"); uniqueness is enforced by the private twin's subset-and-uniqueness test; the guard here checks `REPO_TOKEN` against our seven rows. Stale S2 (PowerShell/J6), S3 (fence extraction) and brief step 5 (awk) paragraphs cleaned. |
+
+### S3b coder's finding, 2026-10-15 — resolution
+
+| Finding | Resolution |
+|---|---|
+| `--dry-run` prints nothing | Applied: `act()` now prints `would run: …` to stdout and silences only the real command (`"$@" 2>/dev/null`); the twelve `act … 2>/dev/null` call sites lost their redirect. RED observed on sha `5110061c…` (zero lines), GREEN after (four lines, folder kept). New file: 9 296 B, 150 lines, sha256 `4c0e4f5b187dc7787502095b09b360e1792d5561b21cdaad2ba10654ccfd2037`. Scenario 8 of the harness (= S3b test 8b) now asserts the lines. |
+
+### CODE gate on E1 (coai), 2026-10-15 — resolution
+
+| Finding | Resolution |
+|---|---|
+| (1) loose owner check deletes on a malformed pid | Applied: `owner_ok()` validates the full marker grammar before any liveness check; malformed → unreadable → skipped. RED (4 of 5 deleted) → GREEN (5 kept, 5 named). |
+| (2) a worktree captured twice | Applied: temp-root scan skips this repository's own worktrees by canonical path (`canon()` folds the drive spelling before `pwd -P`). RED (2 lines) → GREEN (1 line; dead removed once, silent). |
+| (3)+(4) N+1 volume inspects | Applied: one multi-name `docker volume inspect` in the capture; stub extended. RED (2 calls) → GREEN (1). |
+| (5) tasklist per resource | Applied: one `tasklist //NH //FO CSV` snapshot per run, lazily. RED (3 calls) → GREEN (1). |
+| progress line on stderr | Rejected by the gate; not done (8b's empty-stderr contract). |
+
+New file: 10 769 B, 150 lines, sha256 `3f4ca10b32c906dface8769ad17a3e37684b85e7c749d1d7066e81a56fb6a6a1`.
+
+### Opus code review on E1, 2026-10-15 — resolution
+
+| Finding | Resolution |
+|---|---|
+| (A) two-valued liveness deletes on a failed query | Applied: `liveness()` is live/dead/unknown; Windows judges the snapshot's exit status and content, Linux reads `/proc/<pid>`, else `ps -p`; `kill -0` removed; unknown ⇒ skipped, exit 3. RED 17/18 → GREEN. |
+| (B) the main worktree was a candidate | Applied: first porcelain block dropped; the toplevel the janitor runs from (and any folder containing it) is never a temp-root candidate. RED 19 → GREEN. |
+| (C) start-time mismatch read as `gone` | Applied in the core §3 (a mismatch → `unknown`, only "no process with that pid" is `gone`), in D4 and in the S2 binding (`ownerState` returns unknown on mismatch; `processProbe` three-valued). The janitor never compared starts. |
+| dead pids in tests | Noted for S3b: a pid the query can never match, premise asserted (Windows ≡ 2 mod 4, Linux pid_max + 1, macOS 100000). |
+
+New file: 12 166 B, 150 lines, sha256 `0644a17517c2801e5909b24334a65cd7a6f8fba96e8b7e43b9fe3ee5fbe104a2`. Rule body 17 437 B.
 
 ## S2 — The Node owned-resource helper and owner liveness
 
@@ -520,7 +604,7 @@ export function parseOwner(text)                  // owner | { unreadable: true 
 export function writeOwner(dir)                   // the sibling `${dir}.owner`
 export function gitdirOf(dir)                     // absolute gitdir of a linked worktree at `dir`, or "" (not one)
 export function readOwner(target, kind)           // kind "folder" | "worktree" → owner | null | { unreadable: true }
-export function processProbe(pid)                 // { alive: false } | { alive: true, refused: true } | { alive: true, start? } — never spawns
+export function processProbe(pid)                 // { alive: false } | { alive: undefined } (refused/failed) | { alive: true, start? } — never spawns
 export function ownerState(owner, probe = processProbe) // "live" | "gone" | "unknown"
 export function removeLink(link)                  // win32: fs.rmdirSync; else fs.unlinkSync — never follows the link
 export function removeQuietly(dir)                // folder, then its `.owner` sibling; never throws (the sweep reuses it)
@@ -571,18 +655,20 @@ export function removeQuietly(dir)                // folder, then its `.owner` s
   a `.git` file whose `gitdirOf` is `""` or names a directory that does not exist (a deleted clone) ⇒
   `{ unreadable: true }` — fail closed, never "unmarked"; `<g>/locked` absent ⇒ `null` (unlocked = unmarked);
   present ⇒ `parseOwner(<g>/locked contents)`. Never throws.
-- **`processProbe(pid)`**: `process.kill(pid, 0)` — `ESRCH` ⇒ `{ alive: false }`; `EPERM` ⇒ `{ alive: true, refused:
-  true }`; success ⇒ alive, and **only on Linux** a `start` (integer Unix seconds UTC, D4): `/proc/<pid>/stat`,
+- **`processProbe(pid)`** is THREE-valued: `process.kill(pid, 0)` — `ESRCH` ⇒ `{ alive: false }` (the only answer that
+  means "no such process"); any other error (`EPERM`, `EACCES`, anything) ⇒ `{ alive: undefined }` — the query was
+  refused or failed, nothing is known; success ⇒ alive, and **only on Linux** a `start` (integer Unix seconds UTC, D4): `/proc/<pid>/stat`,
   parsed AFTER the last `)` (the command name may hold spaces and parentheses), field 22 = index 19 of the remainder
   split on spaces, divided by the clock-tick rate (`100`, the value every Linux the family runs on reports for
   `CLK_TCK` — no `getconf` spawn), plus `btime` from `/proc/stat`, floored. Any failure, and every other OS ⇒
   `{ alive: true, start: undefined }`. `processProbe` never spawns a process.
 - **`ownerState(owner, probe)`** — rule §3's order exactly (D4): `null` or `{ unreadable }` ⇒ `"unknown"`;
   `owner.host` ≠ `thisOwner().host` compared case-insensitively ⇒ `"unknown"`; (no store locks in this repository)
-  `probe(pid)`: `alive: false` ⇒ `"gone"`; `refused` ⇒ `"unknown"`; alive and `owner.start` OR the probe's `start`
-  absent ⇒ `"live"` (pid reuse then PRESERVES, the safe direction); both present and
-  `|owner.start − start| <= START_TOLERANCE_S` ⇒ `"live"`; otherwise ⇒ `"gone"` (pid reused). (The sweep, not
-  `ownerState`, decides what an unmarked `null` means — rule §4.)
+  `probe(pid)`: `alive === false` ⇒ `"gone"` and ONLY that; `alive` anything but `true` (`undefined`, a probe that says
+  nothing or throws) ⇒ `"unknown"`; alive and `owner.start` OR the probe's `start` absent ⇒ `"live"` (pid reuse then
+  PRESERVES, the safe direction); both present and `|owner.start − start| <= START_TOLERANCE_S` ⇒ `"live"`; otherwise ⇒
+  `"unknown"` — a start mismatch is a reused pid or a skewed clock, and neither is proof of death (rule §3; the Opus code
+  review, 2026-10-15). (The sweep, not `ownerState`, decides what an unmarked `null` means — rule §4.)
 
 **Scenarios** (`tools/owned.test.mjs`; RED first — write it against the exported names before the module exists, watch
 it fail on the import, then on each assertion as the module grows). Every test learns the temp root from `tempRoot()`
@@ -631,17 +717,21 @@ only; no scenario touches this checkout's worktree list.
     reads `null`.
 13. `ownerState` with an injected probe: `null` ⇒ `unknown`; unreadable ⇒ `unknown`; host `other@<tag>` ⇒ `unknown`;
     this host with the other OS tag ⇒ `unknown`; the host in other case ⇒ evaluated (not foreign); `alive:false` ⇒
-    `gone`; `refused` ⇒ `unknown`; alive with the probe's `start` absent ⇒ `live`; alive with the owner's `start`
-    absent (two-field marker) ⇒ `live`; both present, Δ = 2 s ⇒ `live`; Δ = 3 s ⇒ `gone`.
+    `gone`; `alive: undefined` (a refused or failed query), a probe that returns `{}` or nothing ⇒ `unknown`; alive with
+    the probe's `start` absent ⇒ `live`; alive with the owner's `start` absent (two-field marker) ⇒ `live`; both
+    present, Δ = 2 s ⇒ `live`; Δ = 3 s, either way, and Δ ≫ 3 s ⇒ `unknown` (13b) — never `gone`.
 14. With the REAL probe: `ownerState(thisOwner())` ⇒ `live` (on Linux through the start comparison, elsewhere
-    through "alive, no start"); the pid of a spawned child that has exited ⇒ `gone`. **No spawn**: with
+    through "alive, no start"); **a pid no process can have** (`lib/unmatchable-pid.mjs`: Windows ≡ 2 mod 4, Linux
+    `pid_max + 1`, macOS 100000, the premise asserted before and after) ⇒ `gone` — never the pid of a child that has
+    exited, which the OS hands to the next process (Windows did, mid-suite). 14a: with `process.kill` replaced to throw
+    `EPERM`/`EACCES`/`EIO` the real probe answers `{ alive: undefined }` and `ownerState` answers `unknown`; only
+    `ESRCH` answers `{ alive: false }`. **No spawn**: with
     `child_process.spawn`/`execFile*` replaced by a counter for the duration of the test, `thisOwner()` and
     `processProbe(process.pid)` complete with the counter at 0.
 
 - **Commands.** `npm ci --ignore-scripts`; `node tools/run-tests.mjs tools/owned.test.mjs`; `npm test`.
 - **DoD.** Green on Windows locally and on the Linux CI runner, each scenario observed RED first; J6 is moot (no
-  writer spawns any more) — the suite's Windows wall time before and after S4 adopts the helper is still written in
-  the PR as a check; the module has no caller yet (S3/S4 adopt it).
+  writer spawns any more) — the suite's Windows wall time before and after S4 adopts the helper was measured: the whole suite, run from temporary worktrees on a 24-thread Windows machine at `--test-concurrency=8`, took 260.0 s at `3f6acf1^` (the helper present, the tests still on raw `mkdtemp`) and 265.8 s at `3f6acf1` (every site on the helper), and 221.8 s on a second run of the latter — a difference well inside the run-to-run spread, so adopting the helper has no measurable cost (7 and 6 tests failed in those two trees, a worktree in the temp root being a place some tests do not expect — the guard's repository scan, two real-CLI tests, a real-Git test and sweep case 10, which the new repository seam fixes; the same kind of failures on both sides). `owned.test.mjs` alone: 12.6 s at its first commit (25 tests), 9.0 s now (28). The full `npm test` at the tip of this branch: 540 tests, 536 pass, 4 skipped, 0 fail, 798 s — 15 more tests than the trees above, 7 of them the janitor's, whose file alone takes about 8.5 minutes on Windows; the module has no caller yet (S3/S4 adopt it).
 
 ## S3 — The start-of-run sweep in `run-tests.mjs`
 
@@ -714,9 +804,10 @@ only; no scenario touches this checkout's worktree list.
 - **Models.** Brief by Opus (this section, from S1's binding change and D9); code by a Sonnet coder — the script is a
   verbatim copy, the work is the test; review by Opus against D9 and the rule's § The janitor.
 - **Goal.** The host-wide janitor is a shipped, tested file in this repository, run from the mount by every consumer
-  and copied verbatim (hash-pinned) by the twin — its twelve measured verdicts held by a test, not by a record.
-- **Files.** New `tools/janitor.sh` — a byte-for-byte copy of the scratchpad draft `janitor.sh`: **9 296 B, 113 lines,
-  sha256 `4c0e4f5b187dc7787502095b09b360e1792d5561b21cdaad2ba10654ccfd2037`** (header comment included; LF line
+  and copied verbatim (hash-pinned) by the twin — its nineteen measured verdicts held by a test, not by a record.
+- **Files.** New `tools/janitor.sh` — a byte-for-byte copy of the scratchpad draft `janitor.sh`: **12 166 B, 150 lines,
+  sha256 `0644a17517c2801e5909b24334a65cd7a6f8fba96e8b7e43b9fe3ee5fbe104a2`** (after the code gate and the Opus review;
+  earlier shas `5110061c…`, `4c0e4f5b…`, `3f4ca10b…`; header comment included; LF line
   endings; the executable bit set with `git update-index --chmod=+x tools/janitor.sh`, since Windows checkouts do not
   carry it). Verify the hash after the copy; the file is never edited in the repository — a change starts in the spec
   and comes with a new hash. New `tools/janitor.test.mjs`; `README.md` tool table — one row: `tools/janitor.sh` ·
@@ -734,7 +825,7 @@ only; no scenario touches this checkout's worktree list.
   test's own owned folder, never a checkout. Never this checkout, the real temp root, or a real Docker daemon.
 - **The stub `docker`** (a `#!/bin/sh` script in a stub directory placed FIRST on `PATH`) logs every argv to a file and
   answers from a per-scenario fixture file: `ps -a --format '{{.ID}}\t{{.Names}}\t{{.Label "testsToDelete.owner"}}\t{{.CreatedAt}}'`,
-  `volume ls --format '{{.Name}}\t{{.Label "testsToDelete.owner"}}'`, `volume inspect --format '{{.CreatedAt}}' <name>`,
+  `volume ls --format '{{.Name}}\t{{.Label "testsToDelete.owner"}}'`, `volume inspect --format '{{.Name}}\t{{.CreatedAt}}' <name>…` (ONE call for all captured volumes; the stub also answers the single-name form),
   `network ls --format '{{.ID}}\t{{.Name}}\t{{.Label "testsToDelete.owner"}}\t{{.CreatedAt}}'`; `rm`, `volume rm`,
   `network rm` only log (exit 0), and `inspect --type container <id>`, `volume inspect <name>`, `network inspect <id>`
   answer "present" or "absent" (exit 0 / 1) from the fixture — the script's re-check after a failed removal. Modes:
@@ -742,11 +833,18 @@ only; no scenario touches this checkout's worktree list.
   call — the counter kept in a file); `fail-rm:<id>[:present|:absent]` (that `rm` exits 1 and the following
   `inspect` of it answers as named — scenario 12). For the no-docker scenario, a PATH that
   provably holds no `docker`: Linux/macOS — a private `bin` of symlinks to exactly the tools the script calls
-  (`bash sed awk grep find head tr git hostname uname date stat rm env`, resolved with `command -v`); Windows — Git for Windows' `usr/bin`, `mingw64/bin`, `cmd` and `%SystemRoot%\System32` only; assert
+  (`bash sed awk grep find head tr cut xargs git hostname uname date stat rm env`, resolved with `command -v` — the first Linux run failed on a list without `cut` and `xargs`); Windows — Git for Windows' `usr/bin`, `mingw64/bin`, `cmd` and `%SystemRoot%\System32` only; assert
   `command -v docker` fails under it first (on Windows, skip with the reason if it does not).
 - **Owners.** A live owner is the test's own `process.pid` (a Windows pid on win32, so `tasklist` sees it); a dead
-  owner is the pid of a spawned child that has exited (killed by pid, never by image name). Owners are written in the
-  three-field form on Linux and the two-field form elsewhere, plus explicit two-field cases (scenario 9).
+  owner is **a pid the janitor's own query can never match**, with the premise asserted before and after every run
+  (`tools/lib/unmatchable-pid.mjs`: Windows a pid ≡ 2 mod 4, Linux `pid_max + 1`, macOS 100000) — never the pid of a
+  child that was started and killed, because the OS hands that number to the next process. Owners are written in the
+  three-field form on Linux and the two-field form elsewhere, plus explicit two-field cases (scenario 9). `TMPDIR` is
+  handed over in the spelling the script's own bash uses (`/c/Users/…` on Windows). Known limit of the pinned script: its
+  `canon` folds `C:/…` to `/c/…` but not MSYS's `/tmp/…` (the user temp root), so with `TMPDIR` unset or spelled `C:/…` on
+  Windows this clone's own prefixed worktree in the temp root is captured twice (a duplicate `vanished` notice or a
+  duplicate `skipped` line) and the clone the script runs from is not recognised as such; the next change to the script
+  fixes it and comes with a new hash.
 - **Fixtures through the helper.** Folders: `ownedDir(t, what, { parent: privateTmp })`, then the scenario's `.owner`
   content written over the sibling. Worktrees: `ownedWorktree(t, clone, what, { parent: privateTmp })`, then
   `git worktree unlock` + `git worktree lock --reason <the scenario's owner>` (or a bare `lock` for the reason-less
@@ -787,10 +885,24 @@ notices), what remains on disk / in `git worktree list` / in `git branch`, and t
     `inspect` then reports it absent ⇒ `notice: container … — vanished after the capture`; a second captured
     container whose `rm` fails while `inspect` still finds it ⇒ `skipped: container … — could not be removed`; the
     later passes still run (a dead-owned old folder after them is removed); exit 3.
+13. **Malformed owners are unreadable, never deleted** (code gate 1): old folders owned by `<host>@windows:abc`,
+    `:12:x`, `:`, `:1:2:3` and `<host>@beos:1` ⇒ all five kept with their claims, five `is unreadable` lines, exit 3.
+14. **One row per worktree** (code gate 2): this clone's own dead-owned worktree directly in the temp root ⇒ removed once,
+    silently (stderr empty, exit 0); a live-owned one ⇒ named exactly once (exit 3).
+15. **One volume inspect for N volumes** (code gates 3, 4): three old volumes ⇒ exactly ONE `volume inspect`, three `volume rm`.
+16. **One tasklist per run** (code gate 5): three Windows-owned old folders (`JANITOR_OS=windows`, a `tasklist` stub that
+    answers a snapshot without their pids) ⇒ ONE `tasklist` call, all three removed.
+17. **Windows liveness is three-valued** (Opus A): a `tasklist` that fails (exit 127) ⇒ the folder kept, one `liveness
+    unknown` line, exit 3; one that prints nothing ⇒ the same; a real snapshot without the pid ⇒ removed.
+18. **The non-Windows branch** (Opus A), through `JANITOR_OS=macos` and a `ps` stub handed over as an exported bash
+    FUNCTION (a stub file named `ps` never wins on Windows, where the shell puts its own `/usr/bin` first): exit 2 ⇒
+    kept, `liveness unknown`; exit 1 ⇒ removed; exit 0 ⇒ skipped as live.
+19. **The clone the janitor runs from is never a candidate** (Opus B): run INSIDE an old, unclaimed, prefixed clone that
+    lives in the temp root ⇒ the clone survives, exit 0, nothing on stderr.
 
 - **Commands.** `node tools/run-tests.mjs tools/janitor.test.mjs`; `bash -n tools/janitor.sh`; `npm test`.
 - **DoD.** Every scenario observed RED (no file) and then GREEN, on Windows (Git Bash) and on the Linux CI runner,
-  skipped nowhere in CI; `tools/janitor.sh` hashes to `4c0e4f5b187dc7787502095b09b360e1792d5561b21cdaad2ba10654ccfd2037`
+  skipped nowhere in CI; `tools/janitor.sh` hashes to `0644a17517c2801e5909b24334a65cd7a6f8fba96e8b7e43b9fe3ee5fbe104a2`
   (recorded in the PR, for the twin's pin); README row present.
 
 ## S4 — The structural guard, and every site migrated to the helper

@@ -1135,14 +1135,17 @@ This repository's own tests obey `common/test-leftovers.md`, in four pieces that
 - **The helper.** `tools/lib/owned.mjs` is the only way a test makes a temp folder or a worktree: `ownedDir(scope, what)` and
   `ownedWorktree(scope, repo, what)` name the resource with the repository's token, write its owner (this process, with its
   start time where no spawn is needed), register the removal in the cleanup scope (`cleanupScope()`, or the test's own), and `ownerState` answers `live`,
-  `gone` or `unknown` (unmarked, unreadable or foreign — never removed) for any later reader. A worktree's owner lives in its lock reason, read through its `.git`
+  `gone` or `unknown` (unmarked, unreadable, foreign, a refused or failed query, or two starts that disagree by more than 2 s — never removed) for
+  any later reader. Only "no process has that pid" is `gone`: `processProbe` is three-valued (`alive: true | false | undefined`). A worktree's owner lives in its lock reason, read through its `.git`
   file, so a reader never has to know which clone made it. The 34 `mkdtemp` sites, `selftest`'s `process.env.TEMP`
   read, the in-repository `tmp-gate-` folder and the four `smoke-rules` worktrees were migrated; the `chg-` leak closed by
   construction.
 - **The start-of-run sweep.** `run-tests.mjs` calls `tools/lib/leftovers-sweep.mjs` before `node --test`: it removes
   what a killed earlier run left (owner gone, or unmarked and older than ten minutes), preserves with a reason what is
   live, foreign, unreadable, young or another clone's, prints one report line, and never changes the exit code even
-  when the sweep itself throws. `leftovers-sweep.test.mjs` pins the ten scenarios plus `2b` and `3b` (twelve tests).
+  when the sweep itself throws. `leftovers-sweep.test.mjs` pins the ten scenarios plus `2b`, `3b` and `10b` (thirteen tests). The entry-point
+  scenario (10) sweeps a disposable repository: `run-tests.mjs` reads `RUN_TESTS_REPO_ROOT` (documented in its header) so the child process
+  never lists this checkout's worktrees, which every concurrently running test shares.
 - **The guard.** `tools/leftovers-check.mjs` is rule §7 as code, and `leftovers-check.test.mjs` runs it over the real
   repository (test 1) and asserts no `mkdtemp` / `tmpdir` / `TEMP` read remains in any `tools/*.test.mjs` (test 1b). Its
   classes are `raw-temp`, `raw-worktree`, `docker-run`, `docker-name`, `shared-store`, `ryuk-off` (never exemptible) and
@@ -1152,15 +1155,39 @@ This repository's own tests obey `common/test-leftovers.md`, in four pieces that
   `janitor.test.mjs`'s `rawWorktree`, under one inline `testsToDelete-exempt: raw-worktree` exemption. When the three
   story branches were first combined, the guard reddened on that file (**4 findings**: two in prose, two in the
   helper) and, through 1b, on one comment in `leftovers-sweep.test.mjs`; both were fixed in the integration and the guard
-  reports `clean (41 files)`.
-- **The janitor.** `tools/janitor.sh` (113 lines, 9 296 B, sha256 `4c0e4f5b…d2037`, LF through `.gitattributes`) is the
+  reports `clean (42 files)`.
+- **The janitor.** `tools/janitor.sh` (150 lines, 12 166 B, sha256 `0644a175…be104a2`, LF through `.gitattributes`, mode 100755) is the
   host-wide tool of the rule's `## The janitor` heading — a shipped file, not a block to paste. `janitor.test.mjs` holds
-  its twelve verdicts (plus `8b`, the `--dry-run` announcement) as `node:test`: a stub `docker` first on `PATH`, two
-  disposable clones, a private temp root, Git for Windows' bash located from `git --exec-path`, owners from this process
-  and from killed children. One capture then captured-only deletion; age selects, the owner authorises; an unreadable
+  its twelve verdicts, `8b` (the `--dry-run` announcement) and `13`–`19` (the code gate and the Opus review: malformed owners, one row per
+  worktree, one volume inspect, one `tasklist` snapshot, three-valued liveness on both branches, the running clone) as `node:test`: a stub
+  `docker` first on `PATH`, two disposable clones, a private temp root, Git for Windows' bash located from `git --exec-path`, owners from
+  this process and from pids no query can match. One capture then captured-only deletion; age selects, the owner authorises; an unreadable
   lock or gitdir is skipped and named, never removed; exit 3 when something was skipped.
 
-Measured: one full `npm test` on a heavily loaded Windows machine ran 525 tests in 392 s; `janitor.test.mjs` alone takes
-about 3.5 minutes because every case builds real clones. Under that parallel load its case 3 failed once after 54 s (the
-dead-owned folder was still present after a run that exited 3) and passed on rerun alone in 13 s and in the five-file run;
-treat it as load-sensitive until a second occurrence names the cause. No before/after wall time for S2's DoD was recorded.
+**Why `janitor.test.mjs` case 3 failed once, and what changed.** The case took its dead owner from the pid of a child it had
+started, killed and awaited. A killed child's pid goes back to the operating system, and Windows hands pids out again within
+seconds: when a new process (the E1 review found `conhost.exe`) received that number, the janitor's `tasklist` correctly
+answered *live*, the folder was kept, and the test saw a survivor it had declared dead — reproduced 1 run in 15 under process churn
+by the review. (On an idle machine this session could not provoke the reuse: 0 of 28 kills followed by 3 200 spawns, so the
+failure needs churn; the premise below is therefore asserted, not hoped for.) The fix is structural, not a retry: **no test takes
+"dead" from a killed child any more.** `tools/lib/unmatchable-pid.mjs` hands out a pid no query can match — on Windows a pid ≡ 2
+(mod 4), because Windows pids are multiples of 4; on Linux `pid_max + 1`, read from `/proc/sys/kernel/pid_max`; on macOS `100000` —
+and `janitor.test.mjs` asserts that premise before and after every run; the Node sweeps (`owned.test.mjs` 14,
+`leftovers-sweep.test.mjs` 1, 2, 2b, 3, 3b, 4, 5) are told the verdict through the existing `probe` seam instead, and the one sweep
+that runs in a child process (10) uses the unmatchable pid. Every assertion that follows a janitor run now prints the run's
+stderr, so the next survivor explains itself.
+
+**Wall time of the suite before and after the helper (S2's DoD).** The whole suite, run from temporary worktrees on a 24-thread Windows machine at `--test-concurrency=8`, took 260.0 s at `3f6acf1^` (the helper present, the tests still on raw `mkdtemp`) and 265.8 s at `3f6acf1` (every site on the helper), and 221.8 s on a second run of the latter — a difference well inside the run-to-run spread, so adopting the helper has no measurable cost (7 and 6 tests failed in those two trees, a worktree in the temp root being a place some tests do not expect — the guard's repository scan, two real-CLI tests, a real-Git test and sweep case 10, which the new repository seam fixes; the same kind of failures on both sides). `owned.test.mjs` alone: 12.6 s at its first commit (25 tests), 9.0 s now (28). The full `npm test` at the tip of this branch: 540 tests, 536 pass, 4 skipped, 0 fail, 798 s — 15 more tests than the trees above, 7 of them the janitor's, whose file alone takes about 8.5 minutes on Windows.
+
+**On Linux (WSL 2, Node 20.20.2, git 2.43).** `owned`, `leftovers-sweep`, `janitor`, `leftovers-check` and `unmatchable-pid` tests,
+serial: 97 tests, 95 pass, 0 fail, 2 skipped (this git has no `--relative-paths` for a worktree: janitor case 5 and owned case 12 skip with that reason, and 12b covers the same read with a hand-made relative gitdir) in 20 s — the janitor file takes seconds there against about eight minutes on Windows. The
+first Linux run found what Windows could not: the private `PATH` of the janitor test lacked `cut` and `xargs`, which the one-inspect
+capture added, so cases 2 and 15 failed with `cut: command not found`; the tool list now names them. The run was made in a WSL-native
+copy of the tree (`git archive` into a scratch repository), because a worktree's `.git` file names a Windows path that WSL's git cannot read.
+
+**Known limit of the pinned `tools/janitor.sh`.** On Windows its `canon` folds `C:/…` to `/c/…` but not MSYS's `/tmp/…` (the user
+temp root), and git prints worktrees as `C:/…`. With `TMPDIR` unset or spelled `C:/…`, this clone's own prefixed worktree in the
+temp root is captured twice (a duplicate `vanished` notice or `skipped` line) and the clone the script runs from is not
+recognised as such — it then tries to remove its own working directory (Windows refuses; the line reads `could not be removed`).
+`janitor.test.mjs` therefore hands the script `/c/Users/…`, the spelling its harness always used; the next change to the script fixes
+`canon` and comes with a new hash (the twin pins it).
