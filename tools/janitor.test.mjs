@@ -94,7 +94,8 @@ function runJanitor(w, { cwd = w.clone, tmp, args = [], docker = true, minAge = 
   }
   const result = spawnSync(BASH, [slash(SCRIPT), ...args], { cwd, env, encoding: "utf8", timeout: 240_000, windowsHide: true });
   const stderr = (result.stderr ?? "").split(/\r?\n/).filter(Boolean);
-  return { status: result.status, stderr, text: stderr.join("\n"), error: result.error };
+  const stdout = (result.stdout ?? "").split(/\r?\n/).filter(Boolean);
+  return { status: result.status, stdout, stderr, text: stderr.join("\n"), error: result.error };
 }
 
 // --- the stub docker -------------------------------------------------------------------------------------------
@@ -511,20 +512,27 @@ test("8. --dry-run removes nothing, in any pass, and leaves the exit code alone"
   assert.deepEqual(rmCalls(w), [], "docker was never asked to remove anything");
 });
 
-// The brief (S3b scenario 8) also asks for `would run:` lines. The shipped, hash-pinned script cannot print them:
-// every `act …` call site ends in `2>/dev/null`, which silences the announcement `act` writes to stderr. The script
-// is never edited here, so the expectation is recorded as a todo (reported, not failing) until the spec changes.
-test("8b. --dry-run announces the removals as `would run:` lines", { timeout: TIMEOUT, todo: "janitor.sh redirects act's own stderr to /dev/null at every call site, so no announcement survives" }, async (t) => {
+test("8b. --dry-run announces every removal as a `would run:` line on STDOUT and keeps stderr empty", { timeout: TIMEOUT }, async (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
   const dead = folder(w, tmp, "dryb", { owner: await DEAD() });
+  const branch = ownedName("drybb");
+  git(w.clone, "branch", branch);
+  w.scope.after(() => spawnSync("git", ["-C", w.clone, "branch", "-D", branch], { timeout: 30_000, windowsHide: true }));
   setDocker(w, { ps: [["c1", "testsToDelete-conventions-dry", "", dockerTime(OLD)]] });
 
   const run = runJanitor(w, { tmp, args: ["--dry-run"] });
 
-  assert.ok(mentions(run, "would run: docker rm -f -v c1"), run.text);
-  assert.ok(mentions(run, "would run: rm -rf -- ", named(dead)), run.text);
+  assert.equal(run.status, 0, run.text);
+  const wouldRun = run.stdout.filter((line) => line.startsWith("would run: "));
+  assert.ok(wouldRun.length >= 3, `expected at least three would-run lines on stdout, got [${run.stdout.join(" // ")}]`);
+  assert.ok(wouldRun.includes("would run: docker rm -f -v c1"), run.stdout.join("\n"));
+  assert.ok(wouldRun.some((line) => line.startsWith("would run: rm -rf -- ") && line.includes(named(dead))), run.stdout.join("\n"));
+  assert.ok(wouldRun.includes(`would run: git branch -D ${branch}`), run.stdout.join("\n"));
+  assert.deepEqual(run.stderr, [], "a dry run says nothing on stderr");
+  assert.ok(exists(dead) && exists(`${dead}.owner`), "the folder and its sibling are still there");
+  assert.deepEqual(rmCalls(w), [], "docker was never asked to remove anything");
 });
 
 // --- 9 ---------------------------------------------------------------------------------------------------------

@@ -81,15 +81,15 @@ while IFS="$U" read -r kind id name owner created; do
   fi
   DEL="$DEL$kind$U$id$U$name"$'\n'
 done <<< "$CAPTURED"
-act() { if [ "$DRY" = 1 ]; then echo "would run: $*" >&2; else "$@"; fi; }
+act() { if [ "$DRY" = 1 ]; then echo "would run: $*"; else "$@" 2>/dev/null; fi; }   # stdout, so a person can pipe it; only the REAL command is silenced
 # A deletion is never fatal. A target that vanished after the capture is a notice; one that is still there after a
 # failed removal is skipped like a live one (named, exit 3). Only a failed LISTING ends the run (above).
 vanished() { echo "notice: $1 $2 — vanished after the capture" >&2; }
 settle() { local k="$1" n="$2"; shift 2; if "$@" >/dev/null 2>&1; then skip "$k" "$n" "could not be removed"; else vanished "$k" "$n"; fi; }   # $3… = "still there?" test
 remove_worktree() {   # $1 = the clone's .git dir, $2 = the worktree path: unlock, drop top-level links, remove by exact path
-  act git --git-dir="$1" worktree unlock "$2" 2>/dev/null || true
-  if [ -d "$2" ]; then act find "$2" -mindepth 1 -maxdepth 1 -type l -delete 2>/dev/null || true; fi
-  act git --git-dir="$1" worktree remove --force --force "$2" 2>/dev/null || true
+  act git --git-dir="$1" worktree unlock "$2" || true
+  if [ -d "$2" ]; then act find "$2" -mindepth 1 -maxdepth 1 -type l -delete || true; fi
+  act git --git-dir="$1" worktree remove --force --force "$2" || true
   if [ -d "$2" ] && [ "$DRY" = 0 ]; then rm -rf -- "$2" 2>/dev/null || true; fi
   if [ -d "$2" ] && [ "$DRY" = 0 ]; then skip worktree "$2" "could not be removed"; fi
 }
@@ -98,16 +98,16 @@ for pass in container volume network wt-git wt-dir prune branch folder marker; d
   while IFS="$U" read -r kind id name; do
     [ "$kind" = "$pass" ] || continue
     case "$kind" in
-      container) act docker rm -f -v "$id" 2>/dev/null || settle container "$name" dk inspect --type container "$id";;
-      volume) act docker volume rm "$id" 2>/dev/null || settle volume "$name" dk volume inspect "$id";;
-      network) act docker network rm "$id" 2>/dev/null || settle network "$name" dk network inspect "$id";;
+      container) act docker rm -f -v "$id" || settle container "$name" dk inspect --type container "$id";;
+      volume) act docker volume rm "$id" || settle volume "$name" dk volume inspect "$id";;
+      network) act docker network rm "$id" || settle network "$name" dk network inspect "$id";;
       wt-git) remove_worktree "$(git rev-parse --git-common-dir)" "$id";;
       wt-dir) remove_worktree "$(g="$(gitdir_of "$id")"; printf '%s' "${g%/worktrees/*}")" "$id";;
-      branch) if checked_out "$id"; then skip branch "$id" "checked out in a worktree that was kept"; else act git branch -D "$id" 2>/dev/null || settle branch "$id" git show-ref --verify -q "refs/heads/$id"; fi;;
-      folder) if [ -d "$id" ]; then act find "$id" -mindepth 1 -maxdepth 1 -type l -delete 2>/dev/null || true; act rm -rf -- "$id" 2>/dev/null || settle folder "$id" test -d "$id"; else vanished folder "$id"; fi; if [ -e "$id.owner" ]; then act rm -f -- "$id.owner" 2>/dev/null || true; fi;;
-      marker) act rm -f -- "$id" 2>/dev/null || true;;
+      branch) if checked_out "$id"; then skip branch "$id" "checked out in a worktree that was kept"; else act git branch -D "$id" || settle branch "$id" git show-ref --verify -q "refs/heads/$id"; fi;;
+      folder) if [ -d "$id" ]; then act find "$id" -mindepth 1 -maxdepth 1 -type l -delete || true; act rm -rf -- "$id" || settle folder "$id" test -d "$id"; else vanished folder "$id"; fi; if [ -e "$id.owner" ]; then act rm -f -- "$id.owner" || true; fi;;
+      marker) act rm -f -- "$id" || true;;
     esac
   done <<< "$DEL"
-  if [ "$pass" = prune ]; then act git worktree prune 2>/dev/null || true; fi
+  if [ "$pass" = prune ]; then act git worktree prune || true; fi
 done
 [ "$SKIPPED" = 0 ] || exit 3

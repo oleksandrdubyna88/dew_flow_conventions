@@ -396,8 +396,8 @@ Review checklist for the prose (Opus, against this section and S2–S4):
   dead folder beside it goes; 12: a vanished target is a notice and later passes still run), each asserting
   stderr lines, exit code, what remains and the stub's recorded `rm`/`volume rm`/`network rm` argv (by ID). RED first: write the test against the file, run it before the file
   exists (fails on spawn), then with the file. DoD: green on Windows (Git Bash) and the Linux CI runner; the
-  twin copies the file verbatim and hash-pins it (its S-step). The file as specified: 9 361 B, 113 lines,
-  sha256 `5110061c54afb3f73b55907204551ad6cb3be686db4145f997bb0921a331ac40`.
+  twin copies the file verbatim and hash-pins it (its S-step). The file as specified: 9 296 B, 113 lines,
+  sha256 `4c0e4f5b187dc7787502095b09b360e1792d5561b21cdaad2ba10654ccfd2037`.
 - **S3.** `minAgeMs` = 10 minutes. **J1 is the rule now**: the sweep removes only worktrees its own `repo` lists;
   a prefixed folder holding a `.git` file that `repo` does not list is preserved with reason `other clone`
   (scenario 2 gains that case: a worktree of a second disposable repository, old, dead-owned, survives this
@@ -715,8 +715,8 @@ only; no scenario touches this checkout's worktree list.
   verbatim copy, the work is the test; review by Opus against D9 and the rule's § The janitor.
 - **Goal.** The host-wide janitor is a shipped, tested file in this repository, run from the mount by every consumer
   and copied verbatim (hash-pinned) by the twin — its twelve measured verdicts held by a test, not by a record.
-- **Files.** New `tools/janitor.sh` — a byte-for-byte copy of the scratchpad draft `janitor.sh`: **9 361 B, 113 lines,
-  sha256 `5110061c54afb3f73b55907204551ad6cb3be686db4145f997bb0921a331ac40`** (header comment included; LF line
+- **Files.** New `tools/janitor.sh` — a byte-for-byte copy of the scratchpad draft `janitor.sh`: **9 296 B, 113 lines,
+  sha256 `4c0e4f5b187dc7787502095b09b360e1792d5561b21cdaad2ba10654ccfd2037`** (header comment included; LF line
   endings; the executable bit set with `git update-index --chmod=+x tools/janitor.sh`, since Windows checkouts do not
   carry it). Verify the hash after the copy; the file is never edited in the repository — a change starts in the spec
   and comes with a new hash. New `tools/janitor.test.mjs`; `README.md` tool table — one row: `tools/janitor.sh` ·
@@ -790,7 +790,7 @@ notices), what remains on disk / in `git worktree list` / in `git branch`, and t
 
 - **Commands.** `node tools/run-tests.mjs tools/janitor.test.mjs`; `bash -n tools/janitor.sh`; `npm test`.
 - **DoD.** Every scenario observed RED (no file) and then GREEN, on Windows (Git Bash) and on the Linux CI runner,
-  skipped nowhere in CI; `tools/janitor.sh` hashes to `5110061c54afb3f73b55907204551ad6cb3be686db4145f997bb0921a331ac40`
+  skipped nowhere in CI; `tools/janitor.sh` hashes to `4c0e4f5b187dc7787502095b09b360e1792d5561b21cdaad2ba10654ccfd2037`
   (recorded in the PR, for the twin's pin); README row present.
 
 ## S4 — The structural guard, and every site migrated to the helper
@@ -932,7 +932,7 @@ drops its `t.after(() => fs.rmSync(...))` or its `finally { fs.rmSync(...) }`; a
     (`<!-- core:begin/end -->`) byte for byte; OUR seven `## Tokens` rows, whose wording is frozen — the twin's test
     checks that each of them appears verbatim (line compare) in its own full table and that every token across both
     families is unique (the subset check); `tools/janitor.sh` verbatim with sha256
-    `5110061c54afb3f73b55907204551ad6cb3be686db4145f997bb0921a331ac40`, which the twin hash-pins; and the release
+    `4c0e4f5b187dc7787502095b09b360e1792d5561b21cdaad2ba10654ccfd2037`, which the twin hash-pins; and the release
     sha. The twin places its own stack section and its own rows between the spans. Nothing of the twin's — no
     family name, repository name or token — is ever written into this public repository (J11).
   - **A later row of OURS** (a new repository of this family): a rule body edit here — `node tools/rule-bodies.mjs
@@ -947,7 +947,7 @@ drops its `t.after(() => fs.rmSync(...))` or its `finally { fs.rmSync(...) }`; a
 ## Judge's notes — status
 
 Opus, 2026-10-15, final pass over the fifth spec revision (42.1 KB), the proposed body (17 222 B, no code fence) and
-`janitor.sh` (9 361 B, 113 lines, sha256 `5110061c…1ac40`, `bash -n` clean, read line by line), against
+`janitor.sh` (9 296 B, 113 lines, sha256 `4c0e4f5b…d2037`, `bash -n` clean, read line by line), against
 `origin/main` 2be89ab and one re-probe of the shipped script.
 
 | Note | Status |
