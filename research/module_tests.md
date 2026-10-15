@@ -1127,3 +1127,40 @@ the fixture, the disposable-worktree refusal (and the refusal of a dirty one), t
 `tools/fixtures/behaviour/toy/` keeps its checks in `toy-checks.mjs`, a name outside the default globs of `node --test`,
 run by explicit path, so `npm test` never runs it. The paid fixtures are run by hand and recorded in
 `research/RESULTS_subagent_model_tiers.md`, never in CI.
+
+## Test leftovers (`tools/lib/owned.mjs`, `tools/lib/leftovers-sweep.mjs`, `tools/leftovers-check.mjs`, `tools/janitor.sh`; epic E1, 2026-10-15)
+
+This repository's own tests obey `common/test-leftovers.md`, in four pieces that each answer one clause of it.
+
+- **The helper.** `tools/lib/owned.mjs` is the only way a test makes a temp folder or a worktree: `ownedDir(scope, what)` and
+  `ownedWorktree(scope, repo, what)` name the resource with the repository's token, write its owner (this process, with its
+  start time where no spawn is needed), register the removal in the cleanup scope (`cleanupScope()`, or the test's own), and `ownerState` answers `live`,
+  `gone` or `unknown` (unmarked, unreadable or foreign — never removed) for any later reader. A worktree's owner lives in its lock reason, read through its `.git`
+  file, so a reader never has to know which clone made it. The 34 `mkdtemp` sites, `selftest`'s `process.env.TEMP`
+  read, the in-repository `tmp-gate-` folder and the four `smoke-rules` worktrees were migrated; the `chg-` leak closed by
+  construction.
+- **The start-of-run sweep.** `run-tests.mjs` calls `tools/lib/leftovers-sweep.mjs` before `node --test`: it removes
+  what a killed earlier run left (owner gone, or unmarked and older than ten minutes), preserves with a reason what is
+  live, foreign, unreadable, young or another clone's, prints one report line, and never changes the exit code even
+  when the sweep itself throws. `leftovers-sweep.test.mjs` pins the ten scenarios plus `2b` and `3b` (twelve tests).
+- **The guard.** `tools/leftovers-check.mjs` is rule §7 as code, and `leftovers-check.test.mjs` runs it over the real
+  repository (test 1) and asserts no `mkdtemp` / `tmpdir` / `TEMP` read remains in any `tools/*.test.mjs` (test 1b). Its
+  classes are `raw-temp`, `raw-worktree`, `docker-run`, `docker-name`, `shared-store`, `ryuk-off` (never exemptible) and
+  `exemption` (a malformed exemption). Observed RED over the unmigrated repository: **38 findings** (34 `mkdtemp` lines,
+  `selftest.test.mjs:291`'s `process.env.TEMP`, 4 worktree creations), then green after the migration. The one place that
+  legitimately makes worktrees the helper cannot (a `--relative-paths` worktree, a `-b <branch>` worktree) is
+  `janitor.test.mjs`'s `rawWorktree`, under one inline `testsToDelete-exempt: raw-worktree` exemption. When the three
+  story branches were first combined, the guard reddened on that file (**4 findings**: two in prose, two in the
+  helper) and, through 1b, on one comment in `leftovers-sweep.test.mjs`; both were fixed in the integration and the guard
+  reports `clean (41 files)`.
+- **The janitor.** `tools/janitor.sh` (113 lines, 9 296 B, sha256 `4c0e4f5b…d2037`, LF through `.gitattributes`) is the
+  host-wide tool of the rule's `## The janitor` heading — a shipped file, not a block to paste. `janitor.test.mjs` holds
+  its twelve verdicts (plus `8b`, the `--dry-run` announcement) as `node:test`: a stub `docker` first on `PATH`, two
+  disposable clones, a private temp root, Git for Windows' bash located from `git --exec-path`, owners from this process
+  and from killed children. One capture then captured-only deletion; age selects, the owner authorises; an unreadable
+  lock or gitdir is skipped and named, never removed; exit 3 when something was skipped.
+
+Measured: one full `npm test` on a heavily loaded Windows machine ran 525 tests in 392 s; `janitor.test.mjs` alone takes
+about 3.5 minutes because every case builds real clones. Under that parallel load its case 3 failed once after 54 s (the
+dead-owned folder was still present after a run that exited 3) and passed on rerun alone in 13 s and in the five-file run;
+treat it as load-sensitive until a second occurrence names the cause. No before/after wall time for S2's DoD was recorded.
