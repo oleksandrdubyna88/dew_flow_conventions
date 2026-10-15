@@ -47,7 +47,8 @@ const TIMEOUT = 300_000;
 const TAB = "\t";
 const COMMIT = ["-c", "user.name=Janitor test", "-c", "user.email=janitor@example.invalid", "-c", "commit.gpgsign=false",
   "commit", "--allow-empty", "-qm", "fixture"];
-const LINUX_TOOLS = ["bash", "sed", "awk", "grep", "find", "head", "tr", "git", "hostname", "uname", "date", "stat", "rm", "env"];
+// Exactly what the script calls (a private PATH of symlinks proves it; `cut` and `xargs` joined with the one-inspect capture).
+const LINUX_TOOLS = ["bash", "sed", "awk", "grep", "find", "head", "tr", "cut", "xargs", "git", "hostname", "uname", "date", "stat", "rm", "env"];
 
 // --- bash and PATH ---------------------------------------------------------------------------------------------
 
@@ -71,8 +72,8 @@ const slash = (p) => p.replaceAll("\\", "/");
  * A folder as the script's own bash spells it: `/c/Users/…` on Windows, never `C:/…`. MSYS turns a `C:/…` TMPDIR
  * into `/tmp/…` whenever the folder is under the user's temp root, while git prints the same tree as `C:/…`; the
  * janitor's `canon` folds the drive spelling to `/c/…` but not `/tmp/…`, so a repository's own worktree in a TMPDIR
- * spelled the `/tmp` way would be captured twice (reported in the E1 hand-back; the script is hash-pinned and is not
- * changed here). Every scenario therefore hands the script the spelling its harness always used.
+ * spelled the `/tmp` way would be captured twice (a known limit recorded in `research/module_tests.md`; the script is
+ * hash-pinned and is not changed here). Every scenario therefore hands the script the spelling its harness always used.
  */
 const posix = (p) => (win32 ? slash(p).replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`) : p);
 
