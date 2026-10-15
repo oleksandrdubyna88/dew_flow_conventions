@@ -380,7 +380,7 @@ test("12. any clone, any path form: a worktree made with --relative-paths reads 
   const added = spawnSync("git", ["-C", repo, "worktree", "add", "--detach", "--relative-paths", "--lock", "--reason", formatOwner(thisOwner()), leaf, "HEAD"],
     { encoding: "utf8", timeout: 30_000 });
   if (added.status !== 0 && /relative-paths/.test(added.stderr)) {
-    t.skip("this git has no `worktree add --relative-paths`; 12b covers the same read with a hand-made relative gitdir");
+    t.skip("this git has no `--relative-paths` for a new worktree; 12b covers the same read with a hand-made relative gitdir");
     return;
   }
   assert.equal(added.status, 0, added.stderr);
