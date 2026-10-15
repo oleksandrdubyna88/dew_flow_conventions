@@ -382,7 +382,7 @@ test("10. the real entry point sweeps the temp root it is given, reports once, a
   const live = folder(own, tmp, "entry-live", { claim: formatOwner(thisOwner()) + "\n" });
   const suite = path.join(work, "trivial.test.mjs");
   fs.writeFileSync(suite, `import { test } from "node:test";\ntest("trivial", () => {});\n`);
-  // The child's temp root is the private one: `os.tmpdir()` reads TMPDIR on POSIX and TEMP/TMP on Windows.
+  // The child's temp root is the private one: the OS temp-folder lookup reads TMPDIR on POSIX and TEMP/TMP on Windows.
   const env = { ...process.env, TMPDIR: tmp, TEMP: tmp, TMP: tmp };
   const run = spawnSync(process.execPath, [path.join(here, "run-tests.mjs"), suite], { env, encoding: "utf8", timeout: 120_000 });
 
