@@ -5,6 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
+import {ownedDir} from "./lib/owned.mjs";
 
 // The preload a consumer copies is executable policy: when may it fall back, and when must it fail?
 // Each case builds a throwaway consumer — scripts/lower-priority.mjs from the template, and a mount
@@ -22,8 +23,7 @@ const EMPTY = Symbol("empty mount folder");
 const STALE = Symbol("stale mount");
 
 function consumer(t, mount) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "low-priority-preload-"));
-  t.after(() => fs.rmSync(root, {recursive: true, force: true}));
+  const root = ownedDir(t, "low-priority-preload");
   fs.mkdirSync(path.join(root, "scripts"));
   assert.match(template, MOUNT_LINE, "the template must keep exactly one MOUNT line for consumers to edit");
   fs.writeFileSync(path.join(root, "scripts", "lower-priority.mjs"),

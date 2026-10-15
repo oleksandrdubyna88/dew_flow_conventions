@@ -334,7 +334,7 @@ test("4. the exclusion list is exactly one file", () => {
 
 test("5. spaces and Unicode survive the migration: the three tests still make such paths", () => {
   const source = (name) => fs.readFileSync(path.join(root, "tools", name), "utf8");
-  assert.match(source("rules.test.mjs"), /ownedDir\(t, "rules Unicode пробел"\)/);
-  assert.match(source("migrate-rules.test.mjs"), /ownedDir\(t, "migration пробел"\)/);
-  assert.match(source("plan-lifecycle.test.mjs"), /ownedDir\(t, "plan-lifecycle "\)/);
+  assert.match(source("rules.test.mjs"), /ownedDir\(t,\s*"rules Unicode пробел"\)/);
+  assert.match(source("migrate-rules.test.mjs"), /ownedDir\(t,\s*"migration пробел"\)/);
+  assert.match(source("plan-lifecycle.test.mjs"), /ownedDir\(t,\s*"plan-lifecycle "\)/);
 });

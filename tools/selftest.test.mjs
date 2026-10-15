@@ -29,6 +29,7 @@ import { filterByTag, parseHttpFile, requestPath } from "./lib/http-files.mjs";
 import { parseJUnit, verdict } from "./lib/junit.mjs";
 import { pathsMatch, scanRoutes } from "./http-coverage.mjs";
 import { inspect, parseTable } from "./post-deploy-check.mjs";
+import { ownedDir } from "./lib/owned.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixtureRepo = path.join(here, "fixtures", "repo");
@@ -287,14 +288,10 @@ test("without --target the check is structural only and executes nothing", () =>
   assert.doesNotMatch(out, /PASS|FAIL/);
 });
 
-test("a missing checklist is a finding, and --warn is how a repository adopts", () => {
-  const empty = fs.mkdtempSync(path.join(process.env.TEMP ?? "/tmp", "pdc-"));
-  try {
-    assert.equal(runTool("post-deploy-check.mjs", [], empty).code, 1);
-    assert.equal(runTool("post-deploy-check.mjs", ["--warn"], empty).code, 0);
-  } finally {
-    fs.rmSync(empty, { recursive: true, force: true });
-  }
+test("a missing checklist is a finding, and --warn is how a repository adopts", (t) => {
+  const empty = ownedDir(t, "pdc");
+  assert.equal(runTool("post-deploy-check.mjs", [], empty).code, 1);
+  assert.equal(runTool("post-deploy-check.mjs", ["--warn"], empty).code, 0);
 });
 
 // ── http-run.mjs's configuration refusals ────────────────────────────────────────────────────────
@@ -367,16 +364,12 @@ test("a declared rules mount with nothing behind it FAILS, rather than reading a
   assert.match(out, /git submodule update --init \.claude\/rules\/shared/);
 });
 
-test("a repository that mounts no rule has nothing to check, and says so rather than passing silently", () => {
-  const empty = fs.mkdtempSync(path.join(here, "..", "tmp-gate-"));
-  try {
-    fs.writeFileSync(path.join(empty, "CLAUDE.md"), "## Multi-model review gate (ConnectOtherAIs)\n");
-    const { code, out } = runTool("gate-snippet-check.mjs", [], empty);
-    assert.equal(code, 0);
-    assert.match(out, /has not adopted the shared rule/);
-  } finally {
-    fs.rmSync(empty, { recursive: true, force: true });
-  }
+test("a repository that mounts no rule has nothing to check, and says so rather than passing silently", (t) => {
+  const empty = ownedDir(t, "gate");
+  fs.writeFileSync(path.join(empty, "CLAUDE.md"), "## Multi-model review gate (ConnectOtherAIs)\n");
+  const { code, out } = runTool("gate-snippet-check.mjs", [], empty);
+  assert.equal(code, 0);
+  assert.match(out, /has not adopted the shared rule/);
 });
 
 // ---------- lib/paths.mjs: a flag cannot name a path outside the repository ----------

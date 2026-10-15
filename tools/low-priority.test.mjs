@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {setTimeout as delay} from "node:timers/promises";
+import {ownedDir} from "./lib/owned.mjs";
 
 // The wrapper is tested the only way that means anything: through real processes. Every case starts
 // `node low-priority.mjs …` and reads what the child and its own child report about themselves.
@@ -95,21 +96,17 @@ test("no command prints the usage and exits 2", () => {
 
 test("a .cmd shim found on PATH receives its arguments intact, spaces and quotes included", (t) => {
   if (!windows) { t.skip("command shims are a Windows concern"); return; }
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "low-priority-shim-"));
-  try {
-    const argsFile = path.join(dir, "argv.json");
-    fs.writeFileSync(path.join(dir, "argv.js"), `require('node:fs').writeFileSync(${JSON.stringify(argsFile)},JSON.stringify(process.argv.slice(2)));process.exitCode=5;`);
-    // The shape npm writes for its own shims: forward every argument to node.
-    fs.writeFileSync(path.join(dir, "shimprobe.cmd"), `@"${process.execPath}" "%~dp0argv.js" %*\r\n`);
-    // The matrix a consultant ran against npm.cmd, npx.cmd and a node_modules/.bin shim on
-    // 2026-10-10, kept as the regression set: nothing here may be expanded, split or dropped.
-    const args = ["two words", "plain", "with\"quote", "a&b", "100%", "%PATH%", "!PATH!", "", "trail\\", "a^b", "(x)", "x|y", "<in>"];
-    const result = wrap(["shimprobe", ...args], {env: {PATH: `${dir}${path.delimiter}${process.env.PATH}`}});
-    assert.equal(result.status, 5, result.stderr);
-    assert.deepEqual(JSON.parse(fs.readFileSync(argsFile, "utf8")), args);
-  } finally {
-    fs.rmSync(dir, {recursive: true, force: true});
-  }
+  const dir = ownedDir(t, "low-priority-shim");
+  const argsFile = path.join(dir, "argv.json");
+  fs.writeFileSync(path.join(dir, "argv.js"), `require('node:fs').writeFileSync(${JSON.stringify(argsFile)},JSON.stringify(process.argv.slice(2)));process.exitCode=5;`);
+  // The shape npm writes for its own shims: forward every argument to node.
+  fs.writeFileSync(path.join(dir, "shimprobe.cmd"), `@"${process.execPath}" "%~dp0argv.js" %*\r\n`);
+  // The matrix a consultant ran against npm.cmd, npx.cmd and a node_modules/.bin shim on
+  // 2026-10-10, kept as the regression set: nothing here may be expanded, split or dropped.
+  const args = ["two words", "plain", "with\"quote", "a&b", "100%", "%PATH%", "!PATH!", "", "trail\\", "a^b", "(x)", "x|y", "<in>"];
+  const result = wrap(["shimprobe", ...args], {env: {PATH: `${dir}${path.delimiter}${process.env.PATH}`}});
+  assert.equal(result.status, 5, result.stderr);
+  assert.deepEqual(JSON.parse(fs.readFileSync(argsFile, "utf8")), args);
 });
 
 test("terminating the wrapper ends the child AND its child — no orphan keeps the CPU", async (t) => {
@@ -179,8 +176,7 @@ test("launch plan: node is this node, a POSIX command runs as given", async () =
 
 test("launch plan on Windows: PATHEXT finds the shim, cmd.exe runs it, an .exe runs directly", async (t) => {
   const {launchPlan, resolveWindowsCommand} = await import(new URL("./low-priority.mjs", import.meta.url).href);
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "low-priority-plan-"));
-  t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
+  const dir = ownedDir(t, "low-priority-plan");
   fs.writeFileSync(path.join(dir, "probe.cmd"), "");
   fs.writeFileSync(path.join(dir, "tool.exe"), "");
   const env = {PATH: dir, PATHEXT: ".EXE;.CMD", ComSpec: "C:\\Windows\\System32\\cmd.exe"};

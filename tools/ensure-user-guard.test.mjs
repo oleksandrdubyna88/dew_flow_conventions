@@ -2,21 +2,20 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { ensureUserGuard, guardVersion } from '../settings/hooks/ensure-user-guard.mjs';
 import { OPTOUT_FILE, findEntries, install, targets } from '../settings/hooks/lib/user-guard-install.mjs';
+import { ownedDir } from './lib/owned.mjs';
 
 const ENTRY = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'settings', 'hooks', 'ensure-user-guard.mjs');
 const hookText = version => (version === null ? '// unversioned\n' : `export const GUARD_VERSION = ${version};\n`);
 
 /** A temporary home plus a project carrying a source hook of `sourceVersion`. Never os.homedir(). */
 function sandbox(t, sourceVersion = 2) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ensure-user-guard-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = ownedDir(t, 'ensure-user-guard');
   const home = path.join(root, 'home');
   const project = path.join(root, 'project');
   fs.mkdirSync(home);
