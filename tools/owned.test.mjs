@@ -447,15 +447,21 @@ test("13. ownerState follows rule §3's order with an injected probe", () => {
   assert.equal(ownerState({ host: `${name}@${otherTag}`, pid: 1 }, alive), "unknown", "the same name in another pid space");
   assert.equal(ownerState({ host: me.host.toUpperCase(), pid: 1 }, alive), "live", "the host name in another case is the same host");
   assert.equal(ownerState({ host: me.host, pid: 1 }, () => ({ alive: false })), "gone");
-  assert.equal(ownerState({ host: me.host, pid: 1 }, () => ({ alive: true, refused: true })), "unknown");
+  assert.equal(ownerState({ host: me.host, pid: 1 }, () => ({ alive: undefined })), "unknown", "a refused or failed query is not a dead process");
+  assert.equal(ownerState({ host: me.host, pid: 1 }, () => ({})), "unknown", "a probe that says nothing");
+  assert.equal(ownerState({ host: me.host, pid: 1 }, () => undefined), "unknown", "a probe that returns nothing");
   assert.equal(ownerState({ host: me.host, pid: 1, start: 100 }, () => ({ alive: true })), "live", "the probe has no start");
   assert.equal(ownerState({ host: me.host, pid: 1 }, () => ({ alive: true, start: 100 })), "live", "a two-field claim");
   assert.equal(START_TOLERANCE_S, 2);
-  const marker = { host: me.host, pid: 1, start: 1_000 };
+});
+
+test("13b. two starts further apart than the tolerance are unknown, never gone (rule §3)", () => {
+  const marker = { host: thisOwner().host, pid: 1, start: 1_000 };
   assert.equal(ownerState(marker, () => ({ alive: true, start: 1_002 })), "live", "2 s apart");
   assert.equal(ownerState(marker, () => ({ alive: true, start: 998 })), "live", "2 s apart, the other way");
-  assert.equal(ownerState(marker, () => ({ alive: true, start: 1_003 })), "gone", "3 s apart: the pid was reused");
-  assert.equal(ownerState(marker, () => ({ alive: true, start: 997 })), "gone");
+  assert.equal(ownerState(marker, () => ({ alive: true, start: 1_003 })), "unknown", "3 s apart: a reused pid or a skewed clock");
+  assert.equal(ownerState(marker, () => ({ alive: true, start: 997 })), "unknown", "3 s apart, the other way");
+  assert.equal(ownerState(marker, () => ({ alive: true, start: 1_000_000 })), "unknown", "far apart is still unknown: only a missing pid is gone");
 });
 
 // 14 --------------------------------------------------------------------------------------------------------
@@ -469,6 +475,24 @@ test("14. the real probe: this process is live, an exited child is gone", () => 
   const self = processProbe(process.pid);
   assert.equal(self.alive, true);
   assert.equal("refused" in self, false);
+});
+
+test("14a. the real probe is three-valued: a refused query is undefined, never dead", () => {
+  const original = process.kill;
+  const refusing = (code) => { process.kill = () => { throw Object.assign(new Error(code), { code }); }; };
+  try {
+    refusing("EPERM");
+    assert.deepEqual(processProbe(4242), { alive: undefined }, "EPERM: refused");
+    refusing("EACCES");
+    assert.deepEqual(processProbe(4242), { alive: undefined }, "EACCES: refused");
+    refusing("EIO");
+    assert.deepEqual(processProbe(4242), { alive: undefined }, "any other failure: failed");
+    refusing("ESRCH");
+    assert.deepEqual(processProbe(4242), { alive: false }, "ESRCH is the one answer that means no such process");
+  } finally {
+    process.kill = original;
+  }
+  assert.equal(ownerState({ host: thisOwner().host, pid: 4242 }, (pid) => { refusing("EPERM"); try { return processProbe(pid); } finally { process.kill = original; } }), "unknown");
 });
 
 test("14b. a start only on Linux, read from /proc: within a few seconds of this process's real start", () => {

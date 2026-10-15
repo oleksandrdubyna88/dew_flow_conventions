@@ -26,6 +26,10 @@
 // `/proc` read on Linux. Windows and macOS write the two-field form, and a reader that has no start on either
 // side treats an alive pid as live — pid reuse then PRESERVES, the safe direction. Nothing here spawns
 // PowerShell or `ps`, and nothing uses Node's own clock (`performance.timeOrigin`) as a start.
+//
+// Three answers, never two. "No process has that pid" is the ONLY thing that makes an owner `gone`: a query that
+// was refused or failed, and two starts that disagree by more than the tolerance (a reused pid, or a skewed clock),
+// are `unknown` — the resource is kept and named, never deleted on a guess (rule §3).
 
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -137,15 +141,16 @@ function readLinuxStart(pid) {
 }
 
 /**
- * Is `pid` alive on this machine? `{ alive: false }`, `{ alive: true, refused: true }` (the query was refused),
- * or `{ alive: true, start }` — `start` only on Linux. Never spawns a process.
+ * Is `pid` alive on this machine? Three-valued: `{ alive: false }` (no such process — the one answer that means
+ * gone), `{ alive: undefined }` (the query was refused or failed: nothing is known), or `{ alive: true, start }` —
+ * `start` only on Linux. Never spawns a process.
  */
 export function processProbe(pid) {
   if (!Number.isSafeInteger(pid) || pid <= 0) return { alive: false }; // pid 0 and negatives address process GROUPS
   try {
     process.kill(pid, 0);
   } catch (error) {
-    return error?.code === "ESRCH" ? { alive: false } : { alive: true, refused: true };
+    return error?.code === "ESRCH" ? { alive: false } : { alive: undefined };
   }
   return { alive: true, start: process.platform === "linux" ? readLinuxStart(pid) : undefined };
 }
@@ -225,7 +230,7 @@ export function readOwner(target, kind) {
   throw new TypeError(`owned: unknown kind ${JSON.stringify(kind)}`);
 }
 
-/** Rule §3's order: unreadable/unmarked → unknown; foreign host → unknown; dead → gone; refused → unknown; alive → live unless both starts differ by more than the tolerance. */
+/** Rule §3's order: unreadable/unmarked → unknown; foreign host → unknown; no such pid → gone; a refused or failed query → unknown; alive → live, or unknown when both starts differ by more than the tolerance. */
 export function ownerState(owner, probe = processProbe) {
   if (owner === null || owner === undefined || owner.unreadable === true) return "unknown";
   if (owner.host.toLowerCase() !== thisOwner().host.toLowerCase()) return "unknown";
@@ -235,10 +240,10 @@ export function ownerState(owner, probe = processProbe) {
   } catch {
     return "unknown";
   }
-  if (!seen.alive) return "gone";
-  if (seen.refused === true) return "unknown";
+  if (seen?.alive === false) return "gone"; // the one answer that deletes: no process has that pid
+  if (seen?.alive !== true) return "unknown"; // refused, failed or silent
   if (owner.start === undefined || seen.start === undefined) return "live"; // pid reuse then PRESERVES
-  return Math.abs(owner.start - seen.start) <= START_TOLERANCE_S ? "live" : "gone";
+  return Math.abs(owner.start - seen.start) <= START_TOLERANCE_S ? "live" : "unknown"; // a mismatch is never proof of death
 }
 
 // --- creation and removal ------------------------------------------------------------------------------------
