@@ -21,6 +21,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { git, gitOutput } from "./lib/git.mjs";
+import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import {
   OWNED, OWNED_PATTERN, PREFIX, REPO_TOKEN, START_TOLERANCE_S,
   cleanupScope, formatOwner, gitdirOf, ownedDir, ownedName, ownedWorktree, ownerState, parseOwner, processProbe,
@@ -466,12 +467,15 @@ test("13b. two starts further apart than the tolerance are unknown, never gone (
 
 // 14 --------------------------------------------------------------------------------------------------------
 
-test("14. the real probe: this process is live, an exited child is gone", () => {
+test("14. the real probe: this process is live, a pid no process can have is gone", () => {
   assert.equal(ownerState(thisOwner()), "live");
-  const child = spawnSync(process.execPath, ["-e", ""], { timeout: 30_000 });
-  assert.ok(child.pid > 0);
-  assert.equal(ownerState({ host: thisOwner().host, pid: child.pid }), "gone");
-  assert.deepEqual(processProbe(child.pid), { alive: false });
+  // Never an exited child's pid: the OS hands that number to the next process (Windows did, mid-suite), and `pid + 1`
+  // reads ALIVE there. The premise is asserted around the call instead of hoped for.
+  const pid = unmatchablePid();
+  assertNoSuchProcess(pid);
+  assert.equal(ownerState({ host: thisOwner().host, pid }), "gone");
+  assert.deepEqual(processProbe(pid), { alive: false });
+  assertNoSuchProcess(pid);
   const self = processProbe(process.pid);
   assert.equal(self.alive, true);
   assert.equal("refused" in self, false);
@@ -492,7 +496,16 @@ test("14a. the real probe is three-valued: a refused query is undefined, never d
   } finally {
     process.kill = original;
   }
-  assert.equal(ownerState({ host: thisOwner().host, pid: 4242 }, (pid) => { refusing("EPERM"); try { return processProbe(pid); } finally { process.kill = original; } }), "unknown");
+});
+
+test("14a2. a refused real query makes the owner unknown, not gone", () => {
+  const original = process.kill;
+  process.kill = () => { throw Object.assign(new Error("EPERM"), { code: "EPERM" }); };
+  try {
+    assert.equal(ownerState({ host: thisOwner().host, pid: 4242 }), "unknown");
+  } finally {
+    process.kill = original;
+  }
 });
 
 test("14b. a start only on Linux, read from /proc: within a few seconds of this process's real start", () => {

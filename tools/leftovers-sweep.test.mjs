@@ -21,7 +21,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { git } from "./lib/git.mjs";
 import { sweepLeftovers, MIN_AGE_MS } from "./lib/leftovers-sweep.mjs";
-import { cleanupScope, formatOwner, gitdirOf, ownedDir, ownedName, ownedWorktree, removeQuietly, thisOwner } from "./lib/owned.mjs";
+import {
+  cleanupScope, formatOwner, gitdirOf, ownedDir, ownedName, ownedWorktree, processProbe, removeQuietly, thisOwner,
+} from "./lib/owned.mjs";
+import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import { REPO_ROOT, runWithSweep } from "./run-tests.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -39,15 +42,17 @@ function lifo(t) {
   return scope;
 }
 
-/** A pid that has exited. */
-function deadPid() {
-  const child = spawnSync(process.execPath, ["-e", ""], { timeout: 30_000 });
-  assert.ok(child.pid > 0);
-  return child.pid;
-}
+/**
+ * Dead is NEVER taken from the pid of a child that exited: the OS hands that number to the next process (Windows did,
+ * mid-suite), and a test that is red once in fifteen runs is a test nobody trusts. A sweep that goes through the
+ * `probe` seam is TOLD that `PRETEND_DEAD` is gone; the one scenario whose sweep runs in a child process (10) cannot
+ * be told, so it uses a pid no process can have (`lib/unmatchable-pid.mjs`) with the premise asserted around the run.
+ */
+const PRETEND_DEAD = 4242;
+const deadProbe = (pid) => (pid === PRETEND_DEAD ? { alive: false } : processProbe(pid));
 
 const ownerLine = (host, pid) => `${host}:${pid}\n`;
-const deadOwnerLine = () => ownerLine(thisOwner().host, deadPid());
+const deadOwnerLine = () => ownerLine(thisOwner().host, PRETEND_DEAD);
 
 /** `work` (repositories, scripts) and `tmp` (what the sweep sweeps) — two owned folders, so neither holds the other. */
 function arena(t) {
@@ -167,7 +172,8 @@ test("1. a killed run is collected: the folder, its claim and the worktree go, t
   setOld(made.dir);
   setOld(made.worktree);
 
-  const result = sweepLeftovers({ repo, tmp });
+  const killed = (pid) => (pid === child.pid ? { alive: false } : processProbe(pid)); // told, not asked: the pid may already be someone else's
+  const result = sweepLeftovers({ repo, tmp, probe: killed });
   assert.deepEqual(result.errors, []);
   assert.deepEqual(namesOf(result.removed), namesOf([made.dir, made.worktree]));
   assert.equal(fs.existsSync(made.dir), false);
@@ -199,7 +205,7 @@ test("2. a resource that may belong to a running run survives, with its reason; 
   const mine = worktree(own, repo, tmp, "mine", { claim: me });
   const other = worktree(own, repo2, tmp, "other-clone", { claim: deadOwnerLine() });
 
-  const result = sweepLeftovers({ repo, tmp });
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe });
 
   assert.deepEqual(result.errors, []);
   assert.deepEqual(namesOf(result.removed), namesOf([unmarked, dotGitDir]));
@@ -227,7 +233,7 @@ test("2b. an unmarked old worktree and a dead-owned one of this repository are r
   const dead = worktree(own, repo, tmp, "dead", { claim: deadOwnerLine() });
   const bare = worktree(own, repo, tmp, "bare-lock", { claim: "added with --lock\n" });
 
-  const result = sweepLeftovers({ repo, tmp });
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe });
 
   assert.deepEqual(result.errors, []);
   assert.deepEqual(namesOf(result.removed), namesOf([unmarked, dead]));
@@ -252,7 +258,7 @@ test("3. only this repository's token is matched, anchored and case-insensitive"
   const upper = plant("TESTSTODELETE-CONVENTIONS-a-xyz123");
   const underscore = plant("teststodelete_conventions_a_xyz123");
 
-  const result = sweepLeftovers({ repo, tmp });
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe });
 
   assert.deepEqual(result.errors, []);
   assert.deepEqual(namesOf(result.removed), namesOf([upper, underscore]));
@@ -277,7 +283,7 @@ test("3b. an old claim whose folder is gone is removed; a young one and one besi
   fs.writeFileSync(`${foreignName}.owner`, deadOwnerLine());
   setOld(`${foreignName}.owner`);
 
-  const result = sweepLeftovers({ repo, tmp });
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe });
 
   assert.equal(fs.existsSync(`${orphan}.owner`), false);
   assert.ok(fs.existsSync(`${youngOrphan}.owner`));
@@ -291,7 +297,7 @@ test("3b. an old claim whose folder is gone is removed; a young one and one besi
 test("4. liveness is asked once per pid; the age is a selector, and `minAgeMs` moves it", (t) => {
   const { own, work, tmp } = arena(t);
   const repo = ownedRepo(own, work, "probe-repo");
-  const pid = deadPid();
+  const pid = PRETEND_DEAD;
   const claim = ownerLine(thisOwner().host, pid);
   const a = folder(own, tmp, "a", { claim });
   const b = folder(own, tmp, "b", { claim });
@@ -318,7 +324,7 @@ test("5. a sweep that cannot list worktrees reports an error, never throws, and 
   const wt = worktree(own, ownedRepo(own, work, "real-repo"), tmp, "stray", { claim: deadOwnerLine() });
 
   let result;
-  assert.doesNotThrow(() => { result = sweepLeftovers({ repo: notARepo, tmp }); });
+  assert.doesNotThrow(() => { result = sweepLeftovers({ repo: notARepo, tmp, probe: deadProbe }); });
 
   assert.equal(result.errors.length, 1);
   assert.match(result.errors[0], /worktree/);
@@ -379,22 +385,25 @@ test("9. runWithSweep: the sweep runs before the suite", () => {
 test("10. the real entry point sweeps the temp root AND the repository it is given, reports once, and leaves with the suite's code", (t) => {
   const { own, work, tmp } = arena(t);
   const repo = ownedRepo(own, work, "entry-repo");
-  const dead = folder(own, tmp, "entry-dead", { claim: deadOwnerLine() });
+  const unmatchable = ownerLine(thisOwner().host, unmatchablePid());
+  const dead = folder(own, tmp, "entry-dead", { claim: unmatchable });
   const live = folder(own, tmp, "entry-live", { claim: formatOwner(thisOwner()) + "\n" });
-  const listedDead = worktree(own, repo, tmp, "entry-wt", { claim: deadOwnerLine() }); // only the repository the runner is POINTED at lists it
+  const listedDead = worktree(own, repo, tmp, "entry-wt", { claim: unmatchable }); // only the repository the runner is POINTED at lists it
   // What a concurrent test makes in THIS checkout: a young, prefixed worktree. It must not reach the report below.
   const bystander = ownedWorktree(t, REPO_ROOT, "entry-bystander");
   const suite = path.join(work, "trivial.test.mjs");
   fs.writeFileSync(suite, `import { test } from "node:test";\ntest("trivial", () => {});\n`);
   // The child's temp root is the private one: the OS temp-folder lookup reads TMPDIR on POSIX and TEMP/TMP on Windows.
   const env = { ...process.env, TMPDIR: tmp, TEMP: tmp, TMP: tmp, RUN_TESTS_REPO_ROOT: repo };
+  assertNoSuchProcess(unmatchablePid());
   const run = spawnSync(process.execPath, [path.join(here, "run-tests.mjs"), suite], { env, encoding: "utf8", timeout: 120_000 });
+  assertNoSuchProcess(unmatchablePid()); // the premise held for the whole run
 
   assert.equal(run.status, 0, run.stderr);
-  assert.equal(fs.existsSync(dead), false);
-  assert.equal(fs.existsSync(listedDead), false, "the worktree the pointed-at repository lists is removed");
-  assert.ok(fs.existsSync(live));
-  assert.ok(fs.existsSync(bystander.path), "a worktree of the checkout is not the sweep's business when it is pointed elsewhere");
+  assert.equal(fs.existsSync(dead), false, run.stderr);
+  assert.equal(fs.existsSync(listedDead), false, `the worktree the pointed-at repository lists is removed\n${run.stderr}`);
+  assert.ok(fs.existsSync(live), run.stderr);
+  assert.ok(fs.existsSync(bystander.path), `a worktree of the checkout is not the sweep's business when it is pointed elsewhere\n${run.stderr}`);
   assert.match(run.stderr, /^run-tests: leftovers — removed 2, preserved 1$/m);
 });
 

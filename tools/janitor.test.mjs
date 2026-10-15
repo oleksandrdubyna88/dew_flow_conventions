@@ -13,10 +13,11 @@
  * `%SystemRoot%` (WSL's: it sees neither the Windows temp root nor Windows pids). If it is not there the
  * tests skip with the reason. Elsewhere it is `/bin/bash`.
  *
- * Owners. A live owner is this process; a dead owner is the pid of a child that was started, killed by pid and
- * awaited — never found by image name. Ages are made with `fs.utimesSync` and, for Docker, with the fixture's
- * `CreatedAt`. The two clones stay YOUNG on purpose: they live in a folder the janitor never scans, and what
- * the janitor does not judge it cannot touch.
+ * Owners. A live owner is this process; a dead owner is a pid that no query can match (`lib/unmatchable-pid.mjs`: a
+ * pid ≡ 2 mod 4 on Windows, `pid_max + 1` on Linux, 100000 on macOS) with that premise asserted before and after every
+ * run — never the pid of a child that was started and killed, because the OS hands that number to the next process.
+ * Ages are made with `fs.utimesSync` and, for Docker, with the fixture's `CreatedAt`. The two clones stay YOUNG on
+ * purpose: they live in a folder the janitor never scans, and what the janitor does not judge it cannot touch.
  *
  * Scratch follows the rule under test: every folder and worktree is made by `ownedDir` / `ownedWorktree`. The
  * two shapes the helper never makes (a `--relative-paths` worktree, a `-b <branch>` worktree) are made by one
@@ -27,11 +28,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { once } from "node:events";
 import { fileURLToPath } from "node:url";
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
 import { git } from "./lib/git.mjs";
+import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import {
   cleanupScope, formatOwner, ownedDir, ownedName, ownedWorktree, processProbe, removeLink, removeQuietly, thisOwner,
 } from "./lib/owned.mjs";
@@ -96,34 +97,6 @@ function envFor(w, { tmp, docker, minAge, ahead, extra }) {
     ...env, PATH: [...ahead, pathFor(w, { docker })].join(path.delimiter), TMPDIR: posix(tmp),
     JANITOR_MIN_AGE_MINUTES: String(minAge), DSTUB: slash(w.state), ...extra,
   };
-}
-
-// --- a pid that no process can have ----------------------------------------------------------------------------
-// A dead owner is NEVER the pid of a child that was started and killed: the OS hands that number to the next
-// process (Windows reuses pids within seconds, and `conhost.exe` took one mid-suite, which read as "live"). It is
-// a pid the janitor's own query can never match, and the premise is asserted before and after every run.
-
-/** `/proc/sys/kernel/pid_max`, or the largest value any Linux allows when it cannot be read. */
-function pidMax() {
-  try {
-    return Number(fs.readFileSync("/proc/sys/kernel/pid_max", "utf8").trim());
-  } catch {
-    return 4_194_304;
-  }
-}
-
-/** Windows pids are multiples of 4, so one ≡ 2 (mod 4) is never in a `tasklist`; Linux `pid_max + 1`; macOS 100000 (its pids stop below). */
-const UNMATCHABLE_BASE = win32 ? 777_770 : linux ? pidMax() + 1 : 100_000;
-const unmatchablePid = (i = 0) => UNMATCHABLE_BASE + (win32 ? 4 * i : i);
-
-function assertNoSuchProcess(pid) {
-  if (win32) {
-    assert.equal(pid % 4, 2, `pid ${pid} is not ≡ 2 (mod 4): Windows could hand it out`);
-  } else if (linux) {
-    assert.ok(pid > pidMax() && !fs.existsSync(`/proc/${pid}`), `pid ${pid} is within pid_max or alive`);
-  } else {
-    assert.throws(() => process.kill(pid, 0), { code: "ESRCH" }, `pid ${pid} is alive`);
-  }
 }
 
 function runJanitor(w, { cwd = w.clone, tmp, args = [], docker = true, minAge = 60, ahead = [], env: extra = {} }) {
@@ -266,22 +239,11 @@ function ownerOf(pid, { twoField = false } = {}) {
 
 const LIVE = () => ownerOf(process.pid);
 
-/** A pid that was alive, was killed by pid and has exited. */
-async function deadPid() {
-  const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore", windowsHide: true });
-  await once(child, "spawn");
-  const { pid } = child;
-  const exited = once(child, "exit");
-  try {
-    process.kill(pid);
-  } finally {
-    await exited;
-  }
-  return pid;
-}
-
-const DEAD = async () => ownerOf(await deadPid());
-/** An owner whose pid no process can have (see above): dead without any pid ever having been alive. */
+/**
+ * An owner that is dead for the whole run: its pid is one no query can match (`lib/unmatchable-pid.mjs`), and `runJanitor`
+ * asserts that premise before and after every run. NEVER the pid of a child that was started and killed — the OS hands
+ * that number to the next process, and on Windows it did, mid-suite.
+ */
 const NOBODY = (i = 0) => ownerOf(unmatchablePid(i));
 
 function age(target, msAgo) {
@@ -374,18 +336,18 @@ test("1. TOCTOU: a container that shows up after the capture is never listed aga
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 0, run.text);
-  assert.equal(dockerLog(w).filter((line) => line.startsWith("ps -a")).length, 1, "the capture lists `ps -a` exactly once");
+  assert.equal(dockerLog(w).filter((line) => line.startsWith("ps -a")).length, 1, `the capture lists \`ps -a\` exactly once\n${run.text}`);
   assert.deepEqual(rmCalls(w), [], "nothing was removed");
   assert.deepEqual(run.stderr, [], "and nothing was reported: the late container was never seen");
 });
 
 // --- 2 ---------------------------------------------------------------------------------------------------------
 
-test("2. Docker: age selects, the owner authorises, and the prefix is anchored", { timeout: TIMEOUT }, async (t) => {
+test("2. Docker: age selects, the owner authorises, and the prefix is anchored", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const dead = await DEAD();
+  const dead = NOBODY();
   setDocker(w, {
     ps: [
       ["c1", "testsToDelete-conventions-old", "", dockerTime(OLD)],
@@ -405,34 +367,34 @@ test("2. Docker: age selects, the owner authorises, and the prefix is anchored",
   assert.deepEqual(rmCalls(w), ["rm -f -v c1", "rm -f -v c4", "volume rm testsToDelete-v-old", "network rm n1"]);
   assert.equal(run.stderr.filter((line) => line.startsWith("skipped:")).length, 1, run.text);
   assert.ok(mentions(run, "skipped: container testsToDelete-conventions-live — owned by live process"), run.text);
-  assert.equal(mentions(run, "young"), false, "a young resource is left alone silently");
-  assert.equal(mentions(run, "prod-testsToDelete-b") || dockerLog(w).some((line) => line.includes("c5")), false, "an unanchored name is never named or touched");
+  assert.equal(mentions(run, "young"), false, `a young resource is left alone silently\n${run.text}`);
+  assert.equal(mentions(run, "prod-testsToDelete-b") || dockerLog(w).some((line) => line.includes("c5")), false, `an unanchored name is never named or touched\n${run.text}`);
 });
 
 // --- 3 ---------------------------------------------------------------------------------------------------------
 
-test("3. Per resource: a live-owned folder beside a dead old one — the dead one, its claim and an orphan claim go", { timeout: TIMEOUT }, async (t) => {
+test("3. Per resource: a live-owned folder beside a dead old one — the dead one, its claim and an orphan claim go", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
   const live = folder(w, tmp, "live", { owner: LIVE() });
-  const dead = folder(w, tmp, "dead", { owner: await DEAD() });
+  const dead = folder(w, tmp, "dead", { owner: NOBODY() });
   const nobody = folder(w, tmp, "nobody", { owner: null });
-  const orphan = orphanMarker(w, tmp, await DEAD());
+  const orphan = orphanMarker(w, tmp, NOBODY());
 
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 3, run.text);
-  assert.ok(exists(live) && exists(`${live}.owner`), "the live-owned folder and its claim stay");
+  assert.ok(exists(live) && exists(`${live}.owner`), `the live-owned folder and its claim stay\n${run.text}`);
   assert.ok(mentions(run, "skipped: folder ", named(live), "owned by live process"), run.text);
-  assert.equal(exists(dead) || exists(`${dead}.owner`), false, "the dead-owned folder and its sibling are gone");
-  assert.equal(exists(nobody), false, "an unclaimed old folder is nobody's and goes");
-  assert.equal(exists(orphan), false, "an old claim with no folder is removed");
+  assert.equal(exists(dead) || exists(`${dead}.owner`), false, `the dead-owned folder and its sibling are gone\n${run.text}`);
+  assert.equal(exists(nobody), false, `an unclaimed old folder is nobody's and goes\n${run.text}`);
+  assert.equal(exists(orphan), false, `an old claim with no folder is removed\n${run.text}`);
 });
 
 // --- 4 ---------------------------------------------------------------------------------------------------------
 
-test("4. Fail closed, not wedged: a worktree of a deleted clone is kept and named while two dead folders beside it go", { timeout: TIMEOUT }, async (t) => {
+test("4. Fail closed, not wedged: a worktree of a deleted clone is kept and named while two dead folders beside it go", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
@@ -440,20 +402,20 @@ test("4. Fail closed, not wedged: a worktree of a deleted clone is kept and name
   const stranded = worktree(w, doomed, tmp, "stranded", { lock: LIVE() });
   fs.rmSync(doomed, { recursive: true, force: true }); // the clone is gone: the worktree's `.git` file points nowhere
   age(stranded.path, OLD);
-  const first = folder(w, tmp, "dead1", { owner: await DEAD() });
-  const second = folder(w, tmp, "dead2", { owner: await DEAD() });
+  const first = folder(w, tmp, "dead1", { owner: NOBODY() });
+  const second = folder(w, tmp, "dead2", { owner: NOBODY() });
 
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 3, run.text);
-  assert.equal(exists(first) || exists(second), false, "both dead folders are removed");
-  assert.ok(exists(stranded.path), "the worktree whose clone is gone is kept");
+  assert.equal(exists(first) || exists(second), false, `both dead folders are removed\n${run.text}`);
+  assert.ok(exists(stranded.path), `the worktree whose clone is gone is kept\n${run.text}`);
   assert.ok(mentions(run, `${named(stranded.path)} — owner '-' is unreadable`), run.text);
 });
 
 // --- 5 ---------------------------------------------------------------------------------------------------------
 
-test("5. Another clone, relative paths (J9): live-owned is skipped and kept; dead-owned and old is removed and unregistered", { timeout: TIMEOUT }, async (t) => {
+test("5. Another clone, relative paths (J9): live-owned is skipped and kept; dead-owned and old is removed and unregistered", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
@@ -467,7 +429,7 @@ test("5. Another clone, relative paths (J9): live-owned is skipped and kept; dea
   }
   assert.equal(liveAdded.status, 0, liveAdded.stderr);
   // testsToDelete-exempt: raw-worktree — the same relative-path shape, dead-owned
-  const deadAdded = rawWorktree(w, w.other, deadLeaf, ["--detach", "--relative-paths", "--lock", "--reason", await DEAD(), deadLeaf, "HEAD"]);
+  const deadAdded = rawWorktree(w, w.other, deadLeaf, ["--detach", "--relative-paths", "--lock", "--reason", NOBODY(), deadLeaf, "HEAD"]);
   assert.equal(deadAdded.status, 0, deadAdded.stderr);
   age(liveLeaf, OLD);
   age(deadLeaf, OLD);
@@ -475,15 +437,15 @@ test("5. Another clone, relative paths (J9): live-owned is skipped and kept; dea
   const run = runJanitor(w, { tmp }); // run from the FIRST clone: the worktrees belong to the second
 
   assert.equal(run.status, 3, run.text);
-  assert.ok(exists(liveLeaf) && listedIn(w.other).includes(named(liveLeaf)), "the live-owned one stays, registered");
+  assert.ok(exists(liveLeaf) && listedIn(w.other).includes(named(liveLeaf)), `the live-owned one stays, registered\n${run.text}`);
   assert.ok(mentions(run, `${named(liveLeaf)} — owned by live process`), run.text);
-  assert.equal(exists(deadLeaf), false, "the dead-owned one is gone");
-  assert.equal(listedIn(w.other).includes(named(deadLeaf)), false, "and its clone no longer lists it");
+  assert.equal(exists(deadLeaf), false, `the dead-owned one is gone\n${run.text}`);
+  assert.equal(listedIn(w.other).includes(named(deadLeaf)), false, `and its clone no longer lists it\n${run.text}`);
 });
 
 // --- 6 ---------------------------------------------------------------------------------------------------------
 
-test("6. Locks and junctions (J1, J2, J5): a reason-less lock is kept, links are unlinked, targets survive", { timeout: TIMEOUT }, async (t) => {
+test("6. Locks and junctions (J1, J2, J5): a reason-less lock is kept, links are unlinked, targets survive", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
@@ -491,7 +453,7 @@ test("6. Locks and junctions (J1, J2, J5): a reason-less lock is kept, links are
   const branch = `${ownedName("br")}`;
   git(w.clone, "branch", branch);
   w.scope.after(() => spawnSync("git", ["-C", w.clone, "branch", "-D", branch], { timeout: 30_000, windowsHide: true }));
-  const dead = await DEAD();
+  const dead = NOBODY();
   const linkedA = worktree(w, w.clone, tmp, "linka", { lock: dead, ageMs: 0 });
   const targetA = junctionInto(w, linkedA, "ta");
   age(linkedA.path, OLD);
@@ -504,19 +466,19 @@ test("6. Locks and junctions (J1, J2, J5): a reason-less lock is kept, links are
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 3, run.text);
-  assert.ok(exists(nameless.path) && listedIn(w.clone).includes(named(nameless.path)), "the reason-less lock is kept and still registered");
+  assert.ok(exists(nameless.path) && listedIn(w.clone).includes(named(nameless.path)), `the reason-less lock is kept and still registered\n${run.text}`);
   assert.ok(mentions(run, named(nameless.path)) && mentions(run, "unreadable"), run.text);
-  assert.equal(branchesOf(w.clone).includes(branch), false, "the prefixed branch is deleted");
-  assert.equal(exists(linkedA.path) || exists(linkedB.path), false, "both junction-holding worktrees are gone");
-  assert.ok(exists(path.join(targetA, "keep.txt")) && exists(path.join(targetB, "keep.txt")), "the junction targets' files are intact");
-  assert.equal(exists(unlocked.path), false, "an unlocked old worktree of the other clone is gone");
+  assert.equal(branchesOf(w.clone).includes(branch), false, `the prefixed branch is deleted\n${run.text}`);
+  assert.equal(exists(linkedA.path) || exists(linkedB.path), false, `both junction-holding worktrees are gone\n${run.text}`);
+  assert.ok(exists(path.join(targetA, "keep.txt")) && exists(path.join(targetB, "keep.txt")), `the junction targets' files are intact\n${run.text}`);
+  assert.equal(exists(unlocked.path), false, `an unlocked old worktree of the other clone is gone\n${run.text}`);
   assert.equal(listedIn(w.other).includes(named(unlocked.path)), false);
-  assert.ok(exists(young.path) && listedIn(w.other).includes(named(young.path)), "a young dead-owned one is kept");
+  assert.ok(exists(young.path) && listedIn(w.other).includes(named(young.path)), `a young dead-owned one is kept\n${run.text}`);
 });
 
 // --- 7 ---------------------------------------------------------------------------------------------------------
 
-test("7. A foreign host is skipped (exit 3); a tree holding only a young worktree exits 0", { timeout: TIMEOUT }, async (t) => {
+test("7. A foreign host is skipped (exit 3); a tree holding only a young worktree exits 0", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
@@ -525,25 +487,25 @@ test("7. A foreign host is skipped (exit 3); a tree holding only a young worktre
   const first = runJanitor(w, { tmp });
 
   assert.equal(first.status, 3, first.text);
-  assert.ok(exists(foreign), "a foreign owner's folder is kept");
+  assert.ok(exists(foreign), `a foreign owner's folder is kept\n${first.text}`);
   assert.ok(mentions(first, `${named(foreign)} — belongs to elsewhere@linux, not this host`), first.text);
 
   const quiet = makeTmp(w, "jquiet");
-  const fresh = worktree(w, w.clone, quiet, "fresh", { lock: await DEAD(), ageMs: 0 });
+  const fresh = worktree(w, w.clone, quiet, "fresh", { lock: NOBODY(), ageMs: 0 });
   const second = runJanitor(w, { tmp: quiet });
 
   assert.equal(second.status, 0, second.text);
   assert.deepEqual(second.stderr, []);
-  assert.ok(exists(fresh.path), "a young worktree is untouched");
+  assert.ok(exists(fresh.path), `a young worktree is untouched\n${second.text}`);
 });
 
 // --- 8 ---------------------------------------------------------------------------------------------------------
 
-test("8. --dry-run removes nothing, in any pass, and leaves the exit code alone", { timeout: TIMEOUT }, async (t) => {
+test("8. --dry-run removes nothing, in any pass, and leaves the exit code alone", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const dead = folder(w, tmp, "dry", { owner: await DEAD() });
+  const dead = folder(w, tmp, "dry", { owner: NOBODY() });
   const branch = ownedName("drybr");
   git(w.clone, "branch", branch);
   w.scope.after(() => spawnSync("git", ["-C", w.clone, "branch", "-D", branch], { timeout: 30_000, windowsHide: true }));
@@ -552,16 +514,16 @@ test("8. --dry-run removes nothing, in any pass, and leaves the exit code alone"
   const run = runJanitor(w, { tmp, args: ["--dry-run"] });
 
   assert.equal(run.status, 0, run.text);
-  assert.ok(exists(dead) && exists(`${dead}.owner`), "the folder and its sibling are still there");
-  assert.ok(branchesOf(w.clone).includes(branch), "the branch is still there");
+  assert.ok(exists(dead) && exists(`${dead}.owner`), `the folder and its sibling are still there\n${run.text}`);
+  assert.ok(branchesOf(w.clone).includes(branch), `the branch is still there\n${run.text}`);
   assert.deepEqual(rmCalls(w), [], "docker was never asked to remove anything");
 });
 
-test("8b. --dry-run announces every removal as a `would run:` line on STDOUT and keeps stderr empty", { timeout: TIMEOUT }, async (t) => {
+test("8b. --dry-run announces every removal as a `would run:` line on STDOUT and keeps stderr empty", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const dead = folder(w, tmp, "dryb", { owner: await DEAD() });
+  const dead = folder(w, tmp, "dryb", { owner: NOBODY() });
   const branch = ownedName("drybb");
   git(w.clone, "branch", branch);
   w.scope.after(() => spawnSync("git", ["-C", w.clone, "branch", "-D", branch], { timeout: 30_000, windowsHide: true }));
@@ -576,18 +538,18 @@ test("8b. --dry-run announces every removal as a `would run:` line on STDOUT and
   assert.ok(wouldRun.some((line) => line.startsWith("would run: rm -rf -- ") && line.includes(named(dead))), run.stdout.join("\n"));
   assert.ok(wouldRun.includes(`would run: git branch -D ${branch}`), run.stdout.join("\n"));
   assert.deepEqual(run.stderr, [], "a dry run says nothing on stderr");
-  assert.ok(exists(dead) && exists(`${dead}.owner`), "the folder and its sibling are still there");
+  assert.ok(exists(dead) && exists(`${dead}.owner`), `the folder and its sibling are still there\n${run.text}`);
   assert.deepEqual(rmCalls(w), [], "docker was never asked to remove anything");
 });
 
 // --- 9 ---------------------------------------------------------------------------------------------------------
 
-test("9. A two-field owner <host>@<os>:<pid>: live is skipped, dead is removed", { timeout: TIMEOUT }, async (t) => {
+test("9. A two-field owner <host>@<os>:<pid>: live is skipped, dead is removed", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
   const live = folder(w, tmp, "twolive", { owner: ownerOf(process.pid, { twoField: true }) });
-  const dead = folder(w, tmp, "twodead", { owner: ownerOf(await deadPid(), { twoField: true }) });
+  const dead = folder(w, tmp, "twodead", { owner: ownerOf(unmatchablePid(), { twoField: true }) });
   assert.doesNotMatch(fs.readFileSync(`${live}.owner`, "utf8").trim(), /:\d+:\d+$/, "the fixture is the two-field form");
 
   const run = runJanitor(w, { tmp });
@@ -600,31 +562,31 @@ test("9. A two-field owner <host>@<os>:<pid>: live is skipped, dead is removed",
 
 // --- 10 --------------------------------------------------------------------------------------------------------
 
-test("10. Docker absent or failing (J7): one notice and the rest is swept; a failed listing removes nothing and exits 1", { timeout: TIMEOUT }, async (t) => {
+test("10. Docker absent or failing (J7): one notice and the rest is swept; a failed listing removes nothing and exits 1", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const dead = folder(w, tmp, "nodocker", { owner: await DEAD() });
+  const dead = folder(w, tmp, "nodocker", { owner: NOBODY() });
 
   const absent = runJanitor(w, { tmp, docker: false });
 
   assert.equal(absent.status, 0, absent.text);
   assert.equal(absent.stderr.filter((line) => line.includes("janitor: no docker binary")).length, 1, absent.text);
-  assert.equal(exists(dead), false, "the temp root is still swept");
+  assert.equal(exists(dead), false, `the temp root is still swept\n${absent.text}`);
 
-  const kept = folder(w, tmp, "failing", { owner: await DEAD() });
+  const kept = folder(w, tmp, "failing", { owner: NOBODY() });
   setDocker(w, { mode: ["fail-ps"] });
 
   const failing = runJanitor(w, { tmp });
 
   assert.equal(failing.status, 1, failing.text);
   assert.ok(mentions(failing, "janitor: a listing failed — nothing was removed"), failing.text);
-  assert.ok(exists(kept), "a failed listing is a failure, not a clean machine: nothing was removed");
+  assert.ok(exists(kept), `a failed listing is a failure, not a clean machine: nothing was removed\n${failing.text}`);
 });
 
 // --- 11 --------------------------------------------------------------------------------------------------------
 
-test("11. A branch checked out in a kept worktree (J10) is skipped and named while a dead folder beside it goes", { timeout: TIMEOUT }, async (t) => {
+test("11. A branch checked out in a kept worktree (J10) is skipped and named while a dead folder beside it goes", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
@@ -635,26 +597,26 @@ test("11. A branch checked out in a kept worktree (J10) is skipped and named whi
   assert.equal(added.status, 0, added.stderr);
   w.scope.after(() => spawnSync("git", ["-C", w.clone, "branch", "-D", branch], { timeout: 30_000, windowsHide: true }));
   age(leaf, OLD);
-  const dead = folder(w, tmp, "beside", { owner: await DEAD() });
+  const dead = folder(w, tmp, "beside", { owner: NOBODY() });
 
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 3, run.text);
-  assert.ok(exists(leaf) && listedIn(w.clone).includes(named(leaf)), "the worktree is kept");
-  assert.ok(branchesOf(w.clone).includes(branch), "and so is its branch");
+  assert.ok(exists(leaf) && listedIn(w.clone).includes(named(leaf)), `the worktree is kept\n${run.text}`);
+  assert.ok(branchesOf(w.clone).includes(branch), `and so is its branch\n${run.text}`);
   assert.ok(mentions(run, `skipped: branch ${branch} — checked out in a worktree that was kept`), run.text);
   assert.ok(mentions(run, `${named(leaf)} — owned by live process`), run.text);
-  assert.equal(exists(dead) || exists(`${dead}.owner`), false, "the dead folder and its claim are gone");
+  assert.equal(exists(dead) || exists(`${dead}.owner`), false, `the dead folder and its claim are gone\n${run.text}`);
   assert.equal(mentions(run, "cannot delete branch"), false);
 });
 
 // --- 12 --------------------------------------------------------------------------------------------------------
 
-test("12. A vanished target is a notice, not an abort: a failed removal is judged by a re-check and later passes still run", { timeout: TIMEOUT }, async (t) => {
+test("12. A vanished target is a notice, not an abort: a failed removal is judged by a re-check and later passes still run", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const dead = folder(w, tmp, "after", { owner: await DEAD() });
+  const dead = folder(w, tmp, "after", { owner: NOBODY() });
   setDocker(w, {
     ps: [
       ["cv", "testsToDelete-conventions-vanish", "", dockerTime(OLD)],
@@ -669,7 +631,7 @@ test("12. A vanished target is a notice, not an abort: a failed removal is judge
   assert.ok(mentions(run, "notice: container testsToDelete-conventions-vanish — vanished after the capture"), run.text);
   assert.ok(mentions(run, "skipped: container testsToDelete-conventions-stuck — could not be removed"), run.text);
   assert.deepEqual(rmCalls(w), ["rm -f -v cv", "rm -f -v cs"], "both removals were attempted, by captured id");
-  assert.equal(exists(dead) || exists(`${dead}.owner`), false, "a later pass still ran");
+  assert.equal(exists(dead) || exists(`${dead}.owner`), false, `a later pass still ran\n${run.text}`);
 });
 
 // --- 13 --------------------------------------------------------------------------------------------------------
@@ -704,7 +666,7 @@ test("14. One row per worktree (code gate 2): the swept repository's own tree in
   assert.equal(first.status, 0, first.text);
   assert.deepEqual(first.stderr, [], "removed once and silently: a second capture would announce a vanished target");
   assert.equal(exists(dead.path), false, `the dead-owned worktree is gone\n${first.text}`);
-  assert.equal(listedIn(w.clone).includes(named(dead.path)), false, "and unregistered");
+  assert.equal(listedIn(w.clone).includes(named(dead.path)), false, `and unregistered\n${first.text}`);
 
   const live = worktree(w, w.clone, tmp, "dup2", { lock: LIVE() });
 
