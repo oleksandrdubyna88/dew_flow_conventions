@@ -19,8 +19,8 @@
  * the janitor does not judge it cannot touch.
  *
  * Scratch follows the rule under test: every folder and worktree is made by `ownedDir` / `ownedWorktree`. The
- * two shapes the helper never makes (a `--relative-paths` worktree, a `-b <branch>` worktree) are raw
- * `git worktree add` calls under an inline exemption.
+ * two shapes the helper never makes (a `--relative-paths` worktree, a `-b <branch>` worktree) are made by one
+ * raw-git function (`rawWorktree`) that carries the inline exemption.
  */
 
 import { test } from "node:test";
@@ -273,8 +273,9 @@ function worktree(w, repo, tmp, what, { lock, ageMs = OLD }) {
   return made;
 }
 
-/** `git worktree add` with arguments the helper never makes; its removal is registered on the next statement. */
+/** A worktree made with arguments the helper never makes; its removal is registered on the next statement. */
 function rawWorktree(w, repo, leaf, addArgs) {
+  // testsToDelete-exempt: raw-worktree — the --relative-paths and -b <branch> shapes ownedWorktree never makes; removal is registered below
   const added = spawnSync("git", ["-C", repo, "worktree", "add", ...addArgs], { encoding: "utf8", timeout: 30_000, windowsHide: true });
   w.scope.after(() => {
     spawnSync("git", ["-C", repo, "worktree", "unlock", leaf], { timeout: 30_000, windowsHide: true });
@@ -417,7 +418,7 @@ test("5. Another clone, relative paths (J9): live-owned is skipped and kept; dea
   // testsToDelete-exempt: raw-worktree — a --relative-paths worktree the helper never makes, to prove the janitor resolves its gitdir
   const liveAdded = rawWorktree(w, w.other, liveLeaf, ["--detach", "--relative-paths", "--lock", "--reason", LIVE(), liveLeaf, "HEAD"]);
   if (liveAdded.status !== 0 && /relative-paths/.test(liveAdded.stderr)) {
-    t.skip("this git has no `worktree add --relative-paths`");
+    t.skip("this git has no `--relative-paths` for a worktree");
     return;
   }
   assert.equal(liveAdded.status, 0, liveAdded.stderr);
