@@ -72,12 +72,14 @@ inside the resource where a test can see it:
 
 **Liveness, one procedure** → `live` / `gone` / `unknown`. A **lock-owned** resource first, since it carries no
 owner string: lock held → `live`, lock free → `gone` (it was taken before the resource existed and dies with the
-owner's session — no age is needed or read). Everything else: no owner, or one that does not parse → `unknown`;
-`<host>@<os>` not this machine's (case-insensitive) → `unknown`; pid not alive → `gone`; alive but the query was
-REFUSED (`EPERM`, access denied) → `unknown`; alive, and the owner carries no start or the reader cannot
-read the live one without spawning → `live` (a reused pid preserves — the safe direction); alive, start times
-within **2 seconds** → `live`; further apart → `gone` (pid reused). Two seconds covers two one-second roundings;
-a wider window only preserves more.
+owner's session — no age is needed or read). Everything else: no owner, or one that is not exactly the form above
+→ `unknown`; `<host>@<os>` not this machine's (case-insensitive) → `unknown`; **no process with that pid → `gone`
+— the only other `gone` there is**; the liveness query refused or failed (`EPERM`, access denied, a missing tool)
+→ `unknown`; alive, and the owner carries no start or the reader cannot read the live one without spawning →
+`live`; alive, start times within **2 seconds** → `live`; further apart → `unknown` — a reused pid, or a wall
+clock stepped between the write and the read (a time sync, a virtual machine after host sleep); a mismatch delays
+reclamation and never deletes something live. Two seconds covers two one-second roundings; a wider window only
+preserves more.
 
 ## 4. The start-of-run sweep — *age selects, owner liveness authorises, uncertainty preserves*
 
