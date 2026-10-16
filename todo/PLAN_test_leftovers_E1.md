@@ -413,8 +413,8 @@ Review checklist for the prose (Opus, against this section and S2–S4):
   Linux** (read from `/proc/self/stat` + `btime`, no spawn) and absent elsewhere — the Windows PowerShell probe
   and the macOS `ps` probe disappear from the writer; `processProbe` reads a live start only on Linux and returns
   `start: undefined` elsewhere; `ownerState`: alive and no start on either side → `live`; **start times further than 2 s apart → `unknown`**
-  (never `gone`; decision C); `processProbe` is three-valued — `alive: true|false|undefined` — and `undefined`
-  (refused or failed) is `unknown`, never `gone`; the J6 DoD measurement is moot on Windows. The serialised form is `${host}:${pid}` plus `:${start}` when present; `readOwner` accepts
+  (never `gone`; decision C); `processProbe` answers with a NAMED state — `state: "live"|"dead"|"unknown"` (a bare `alive` flag's third value, `undefined`, vanishes from JSON) — and `unknown`
+  (refused or failed, or a pid that is not a positive safe integer) is `unknown`, never `gone`; the J6 DoD measurement is moot on Windows. The serialised form is `${host}:${pid}` plus `:${start}` when present; `readOwner` accepts
   only `^([^@:\s]+@(linux|macos|windows)):(\d+)(?::(\d+))?$`, everything else `{ unreadable: true }`. `writeOwner(dir,
   "folder")` writes the **sibling** `<dir>.owner` in `dir`'s parent (so `parent:` is honoured); `removeQuietly`
   removes the folder, then the sibling. **Worktrees carry no file**: `ownedWorktree` runs `git worktree add
@@ -604,7 +604,7 @@ export function parseOwner(text)                  // owner | { unreadable: true 
 export function writeOwner(dir)                   // the sibling `${dir}.owner`
 export function gitdirOf(dir)                     // absolute gitdir of a linked worktree at `dir`, or "" (not one)
 export function readOwner(target, kind)           // kind "folder" | "worktree" → owner | null | { unreadable: true }
-export function processProbe(pid)                 // { alive: false } | { alive: undefined } (refused/failed) | { alive: true, start? } — never spawns
+export function processProbe(pid)                 // { state: "dead" } | { state: "unknown" } (refused/failed/not a process id) | { state: "live", start? } — never spawns
 export function ownerState(owner, probe = processProbe) // "live" | "gone" | "unknown"
 export function removeLink(link)                  // win32: fs.rmdirSync; else fs.unlinkSync — never follows the link
 export function removeQuietly(dir)                // folder, then its `.owner` sibling; never throws (the sweep reuses it)
@@ -655,13 +655,13 @@ export function removeQuietly(dir)                // folder, then its `.owner` s
   a `.git` file whose `gitdirOf` is `""` or names a directory that does not exist (a deleted clone) ⇒
   `{ unreadable: true }` — fail closed, never "unmarked"; `<g>/locked` absent ⇒ `null` (unlocked = unmarked);
   present ⇒ `parseOwner(<g>/locked contents)`. Never throws.
-- **`processProbe(pid)`** is THREE-valued: `process.kill(pid, 0)` — `ESRCH` ⇒ `{ alive: false }` (the only answer that
-  means "no such process"); any other error (`EPERM`, `EACCES`, anything) ⇒ `{ alive: undefined }` — the query was
-  refused or failed, nothing is known; success ⇒ alive, and **only on Linux** a `start` (integer Unix seconds UTC, D4): `/proc/<pid>/stat`,
+- **`processProbe(pid)`** has THREE NAMED states: a pid that is not a positive safe integer (0 and negatives address process groups) ⇒ `{ state: "unknown" }` without a signal; otherwise `process.kill(pid, 0)` — `ESRCH` ⇒ `{ state: "dead" }` (the only answer that
+  means "no such process"); any other error (`EPERM`, `EACCES`, anything) ⇒ `{ state: "unknown" }` — the query was
+  refused or failed, nothing is known; success ⇒ `{ state: "live" }`, and **only on Linux** a `start` (integer Unix seconds UTC, D4): `/proc/<pid>/stat`,
   parsed AFTER the last `)` (the command name may hold spaces and parentheses), field 22 = index 19 of the remainder
   split on spaces, divided by the clock-tick rate (`100`, the value every Linux the family runs on reports for
   `CLK_TCK` — no `getconf` spawn), plus `btime` from `/proc/stat`, floored. Any failure, and every other OS ⇒
-  `{ alive: true, start: undefined }`. `processProbe` never spawns a process.
+  `{ state: "live" }` with no `start`. `ownerState` reads `state` only (a bare `alive` is `unknown`) and refuses a pid that is not a positive safe integer before asking. `processProbe` never spawns a process.
 - **`ownerState(owner, probe)`** — rule §3's order exactly (D4): `null` or `{ unreadable }` ⇒ `"unknown"`;
   `owner.host` ≠ `thisOwner().host` compared case-insensitively ⇒ `"unknown"`; (no store locks in this repository)
   `probe(pid)`: `alive === false` ⇒ `"gone"` and ONLY that; `alive` anything but `true` (`undefined`, a probe that says

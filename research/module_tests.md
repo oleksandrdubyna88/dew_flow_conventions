@@ -1136,7 +1136,7 @@ This repository's own tests obey `common/test-leftovers.md`, in four pieces that
   `ownedWorktree(scope, repo, what)` name the resource with the repository's token, write its owner (this process, with its
   start time where no spawn is needed), register the removal in the cleanup scope (`cleanupScope()`, or the test's own), and `ownerState` answers `live`,
   `gone` or `unknown` (unmarked, unreadable, foreign, a refused or failed query, or two starts that disagree by more than 2 s — never removed) for
-  any later reader. Only "no process has that pid" is `gone`: `processProbe` is three-valued (`alive: true | false | undefined`). A worktree's owner lives in its lock reason, read through its `.git`
+  any later reader. Only "no process has that pid" is `gone`: `processProbe` answers with a named `state` (`live | dead | unknown`; a pid that is not a positive safe integer is `unknown`, never `dead`). A worktree's owner lives in its lock reason, read through its `.git`
   file, so a reader never has to know which clone made it. The 34 `mkdtemp` sites, `selftest`'s `process.env.TEMP`
   read, the in-repository `tmp-gate-` folder and the four `smoke-rules` worktrees were migrated; the `chg-` leak closed by
   construction.

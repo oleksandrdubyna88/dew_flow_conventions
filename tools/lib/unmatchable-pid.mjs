@@ -11,7 +11,7 @@
 //   macOS    100000 — its pids stop below that
 //
 // For a test that goes through a seam rather than through the OS (`ownerState(owner, probe)`), no pid is needed at
-// all: inject `() => ({ alive: false })`.
+// all: inject `() => ({ state: "dead" })`.
 
 import * as fs from "node:fs";
 import assert from "node:assert/strict";

@@ -49,7 +49,7 @@ function lifo(t) {
  * be told, so it uses a pid no process can have (`lib/unmatchable-pid.mjs`) with the premise asserted around the run.
  */
 const PRETEND_DEAD = 4242;
-const deadProbe = (pid) => (pid === PRETEND_DEAD ? { alive: false } : processProbe(pid));
+const deadProbe = (pid) => (pid === PRETEND_DEAD ? { state: "dead" } : processProbe(pid));
 
 const ownerLine = (host, pid) => `${host}:${pid}\n`;
 const deadOwnerLine = () => ownerLine(thisOwner().host, PRETEND_DEAD);
@@ -172,7 +172,7 @@ test("1. a killed run is collected: the folder, its claim and the worktree go, t
   setOld(made.dir);
   setOld(made.worktree);
 
-  const killed = (pid) => (pid === child.pid ? { alive: false } : processProbe(pid)); // told, not asked: the pid may already be someone else's
+  const killed = (pid) => (pid === child.pid ? { state: "dead" } : processProbe(pid)); // told, not asked: the pid may already be someone else's
   const result = sweepLeftovers({ repo, tmp, probe: killed });
   assert.deepEqual(result.errors, []);
   assert.deepEqual(namesOf(result.removed), namesOf([made.dir, made.worktree]));
@@ -303,7 +303,7 @@ test("4. liveness is asked once per pid; the age is a selector, and `minAgeMs` m
   const b = folder(own, tmp, "b", { claim });
   const fresh = folder(own, tmp, "fresh", { claim, young: true });
   const asked = [];
-  const probe = (p) => { asked.push(p); return { alive: false }; };
+  const probe = (p) => { asked.push(p); return { state: "dead" }; };
 
   const first = sweepLeftovers({ repo, tmp, probe });
   assert.deepEqual(namesOf(first.removed), namesOf([a, b]));
@@ -407,9 +407,9 @@ test("10. the real entry point sweeps the temp root AND the repository it is giv
   assert.match(run.stderr, /^run-tests: leftovers — removed 2, preserved 1$/m);
 });
 
-test("10b. REPO_ROOT is this checkout unless RUN_TESTS_REPO_ROOT names another, and a relative one is resolved", () => {
+test("10b. sweepRepoRoot is this checkout unless RUN_TESTS_REPO_ROOT names another, and a relative one is resolved", () => {
   const out = (value) => spawnSync(process.execPath, ["--input-type=module", "-e",
-    `const { REPO_ROOT } = await import(${JSON.stringify(pathToFileURL(path.join(here, "run-tests.mjs")).href)}); process.stdout.write(REPO_ROOT);`],
+    `const { sweepRepoRoot } = await import(${JSON.stringify(pathToFileURL(path.join(here, "run-tests.mjs")).href)}); process.stdout.write(sweepRepoRoot());`],
   { env: { ...process.env, RUN_TESTS_REPO_ROOT: value }, encoding: "utf8", timeout: 60_000, cwd: here }).stdout;
   assert.equal(out(""), path.resolve(here, ".."), "empty means unset");
   assert.equal(out(path.join(here, "fixtures")), path.join(here, "fixtures"));

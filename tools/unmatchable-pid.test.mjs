@@ -28,10 +28,10 @@ test("2. each platform's shape: Windows ≡ 2 mod 4, Linux above pid_max, macOS 
   else assert.equal(unmatchablePid(), 100_000);
 });
 
-test("3. the real probe answers `gone` for such a pid, three-valued: alive is false, not undefined", () => {
+test("3. the real probe answers `gone` for such a pid, three-named: the state is `dead`, not an absent flag", () => {
   for (const i of SAMPLE) {
     const pid = unmatchablePid(i);
-    assert.deepEqual(processProbe(pid), { alive: false }, `pid ${pid}`);
+    assert.deepEqual(processProbe(pid), { state: "dead" }, `pid ${pid}`);
     assert.equal(ownerState({ host: thisOwner().host, pid }), "gone", `pid ${pid}`);
   }
 });
