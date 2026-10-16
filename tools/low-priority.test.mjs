@@ -68,14 +68,50 @@ test("under CI nothing is lowered — the child keeps the caller's priority", ()
   assert.equal(seen.grandchild, before, result.stdout);
 });
 
-test("a caller that is already lower than the target is never raised", (t) => {
+/** A stand-in for `os` that remembers every setPriority call, so the decision can be read without a process. */
+function fakeHost(start) {
+  const host = {level: start, sets: [], getPriority: () => host.level, setPriority: (pid, level) => { host.sets.push([pid, level]); host.level = level; }};
+  return host;
+}
+
+// The "never raised" decision, checked on every platform and with no process started at Idle. The
+// real-process case below cannot be the only guard: a process at Idle gets no CPU while anything at
+// a higher class wants the core, so on a busy machine its start-up alone outlasts any timeout.
+test("lowerOwnPriority: a caller already lower than the target is never raised (decision, no process)", async () => {
+  const {lowerOwnPriority} = await import(new URL("./low-priority.mjs", import.meta.url).href);
+  const idle = fakeHost(19);
+  assert.equal(lowerOwnPriority({}, idle, 10), 19);
+  assert.deepEqual(idle.sets, [], "an Idle caller must not be moved up to the target");
+  const equal = fakeHost(10);
+  assert.equal(lowerOwnPriority({}, equal, 10), 10);
+  assert.deepEqual(equal.sets, [], "a caller already at the target is left alone");
+});
+
+test("lowerOwnPriority: a caller above the target is lowered, once, to the target; under CI it is left alone", async () => {
+  const {lowerOwnPriority} = await import(new URL("./low-priority.mjs", import.meta.url).href);
+  const normal = fakeHost(0);
+  assert.equal(lowerOwnPriority({}, normal, 10), 10);
+  assert.deepEqual(normal.sets, [[0, 10]]);
+  const ci = fakeHost(0);
+  assert.equal(lowerOwnPriority({CI: "true"}, ci, 10), 0);
+  assert.deepEqual(ci.sets, []);
+});
+
+// How long the real-process case may take. It measures a PRIORITY, not a speed: starvation delays the
+// answer but never changes it, so the bound only exists to stop a hung test from hanging the suite.
+// 30 s was measured too short: with one Normal-priority busy loop on the same core the Idle chain got
+// no CPU at all for as long as the loop ran, and spawnSync returned status null.
+const IDLE_CHAIN_BUDGET_MS = 180_000;
+
+test("a caller that is already lower than the target is never raised (real processes, Windows)", (t) => {
   // Idle (Windows) / nice 19: there is nothing lower to start from on POSIX, so the case only has
   // teeth on Windows, where Idle is below the BelowNormal the wrapper would otherwise set.
   if (!windows) { t.skip("POSIX has no level below nice 19 to start from"); return; }
   const outer = `require('node:os').setPriority(0,${os.constants.priority.PRIORITY_LOW});`
     + `const r=require('node:child_process').spawnSync(process.execPath,${JSON.stringify([tool, "node", "-e", tree])},{stdio:'inherit'});process.exitCode=r.status;`;
-  const result = spawnSync(process.execPath, ["-e", outer], {encoding: "utf8", timeout: 30_000, env: env()});
-  assert.equal(result.status, 0, result.stderr);
+  const result = spawnSync(process.execPath, ["-e", outer], {encoding: "utf8", timeout: IDLE_CHAIN_BUDGET_MS, env: env()});
+  assert.equal(result.status, 0, `status ${result.status}, error ${result.error?.code ?? "none"}: a null status means the Idle-class chain was starved of CPU past ${IDLE_CHAIN_BUDGET_MS} ms
+${result.stderr}`);
   const seen = priorities(result.stdout);
   assert.equal(seen.child, os.constants.priority.PRIORITY_LOW, result.stdout);
   assert.equal(seen.grandchild, os.constants.priority.PRIORITY_LOW, result.stdout);
