@@ -6,6 +6,14 @@ import os from "node:os";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {setTimeout as delay} from "node:timers/promises";
+import {chainFailure, runChain} from "./lib/idle-chain.mjs";
+
+// OPT-IN: one case below starts a chain of processes at the IDLE class, which gets no CPU while anything at a
+// higher class wants the core — on a busy machine it can take as long as the machine stays busy, and `npm test`
+// must not wait on that. It runs only when LOW_PRIORITY_E2E=1 is set:
+//   LOW_PRIORITY_E2E=1 node --test --test-concurrency=1 tools/low-priority.test.mjs
+// The decision it checks ("an Idle caller is never raised") is also tested without any Idle process, in the
+// default suite, through the fake host below.
 
 // The wrapper is tested the only way that means anything: through real processes. Every case starts
 // `node low-priority.mjs …` and reads what the child and its own child report about themselves.
@@ -97,21 +105,21 @@ test("lowerOwnPriority: a caller above the target is lowered, once, to the targe
   assert.deepEqual(ci.sets, []);
 });
 
-// How long the real-process case may take. It measures a PRIORITY, not a speed: starvation delays the
-// answer but never changes it, so the bound only exists to stop a hung test from hanging the suite.
-// 30 s was measured too short: with one Normal-priority busy loop on the same core the Idle chain got
-// no CPU at all for as long as the loop ran, and spawnSync returned status null.
+// How long the opt-in real-process case may take. It measures a PRIORITY, not a speed: starvation delays
+// the answer but never changes it, so the bound only stops a hung run. 30 s was measured too short: with one
+// Normal-priority busy loop on the same core the Idle chain got no CPU for as long as the loop ran. At the
+// bound the whole tree is killed by pid (tools/lib/idle-chain.mjs), and only ETIMEDOUT is called starvation.
 const IDLE_CHAIN_BUDGET_MS = 180_000;
 
-test("a caller that is already lower than the target is never raised (real processes, Windows)", (t) => {
+test("a caller that is already lower than the target is never raised (real processes, Windows, opt-in LOW_PRIORITY_E2E=1)", async (t) => {
   // Idle (Windows) / nice 19: there is nothing lower to start from on POSIX, so the case only has
   // teeth on Windows, where Idle is below the BelowNormal the wrapper would otherwise set.
+  if (process.env.LOW_PRIORITY_E2E !== "1") { t.skip("opt-in: set LOW_PRIORITY_E2E=1 (an Idle-class chain starves on a busy machine)"); return; }
   if (!windows) { t.skip("POSIX has no level below nice 19 to start from"); return; }
   const outer = `require('node:os').setPriority(0,${os.constants.priority.PRIORITY_LOW});`
     + `const r=require('node:child_process').spawnSync(process.execPath,${JSON.stringify([tool, "node", "-e", tree])},{stdio:'inherit'});process.exitCode=r.status;`;
-  const result = spawnSync(process.execPath, ["-e", outer], {encoding: "utf8", timeout: IDLE_CHAIN_BUDGET_MS, env: env()});
-  assert.equal(result.status, 0, `status ${result.status}, error ${result.error?.code ?? "none"}: a null status means the Idle-class chain was starved of CPU past ${IDLE_CHAIN_BUDGET_MS} ms
-${result.stderr}`);
+  const result = await runChain(process.execPath, ["-e", outer], {budgetMs: IDLE_CHAIN_BUDGET_MS, env: env()});
+  assert.equal(result.status, 0, chainFailure(result, IDLE_CHAIN_BUDGET_MS));
   const seen = priorities(result.stdout);
   assert.equal(seen.child, os.constants.priority.PRIORITY_LOW, result.stdout);
   assert.equal(seen.grandchild, os.constants.priority.PRIORITY_LOW, result.stdout);
