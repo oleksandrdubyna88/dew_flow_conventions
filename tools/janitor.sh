@@ -58,9 +58,18 @@ epoch_of() {   # docker's "2026-10-15 10:22:33 +0200 CEST" / "2026-10-15T08:22:3
   date -u -d "$s" +%s 2>/dev/null || date -u -j -f '%Y-%m-%d %H:%M:%S %z' "$s" +%s 2>/dev/null || true
 }
 mtime_of() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || true; }
-canon() {   # one spelling for a path git (`C:/x`) and find (`/c/x`) print differently; the drive form is folded BEFORE the cd,
-  local p="$1"; case "$p" in [A-Za-z]:/*) p="/$(printf '%s' "${p:0:1}" | lower)${p:2}";; esac   # because MSYS resolves the two entries differently
-  (cd "$p" 2>/dev/null && pwd -P) || printf '%s' "$p"
+# canon — ONE spelling for one folder, however it was reached: git prints a worktree `C:/x`, `find` prints the same folder `/c/x`
+# or, under MSYS's default temp root, `/tmp/x`. Where bash can say the Windows form (`pwd -W`: Git for Windows) every spelling
+# resolves to it, lower-cased because Windows paths are case-blind; elsewhere it is the physical path. The drive form is
+# folded BEFORE the cd because MSYS resolves `C:/x` and `/c/x` as different entries. The answer is left in CANON (no command
+# substitution at the call site) and remembered per path in CANON_CACHE, so a path is resolved once per shell.
+CANON=""; CANON_CACHE=$'\n'; ALPHA=ABCDEFGHIJKLMNOPQRSTUVWXYZ; alpha=abcdefghijklmnopqrstuvwxyz
+canon() {
+  local p="$1" q="$1" hit pre dl w x
+  case "$CANON_CACHE" in *$'\n'"$p$U"*) hit="${CANON_CACHE#*$'\n'"$p$U"}"; CANON="${hit%%$'\n'*}"; return 0;; esac
+  case "$q" in [A-Za-z]:/*) dl="${q:0:1}"; case "$dl" in [A-Z]) pre="${ALPHA%%$dl*}"; dl="${alpha:${#pre}:1}";; esac; q="/$dl${q:2}";; esac
+  w="$(cd "$q" 2>/dev/null && { x="$(pwd -W 2>/dev/null)" && printf '%s' "$x" | lower || pwd -P; })" || w=""
+  CANON="${w:-$q}"; CANON_CACHE="$CANON_CACHE$p$U$CANON"$'\n'
 }
 gitdir_of() {   # a folder holding a .git FILE is a linked worktree of SOME clone; a relative gitdir is relative to the worktree
   local g; g="$(sed -n 's/^gitdir: //p' "$1/.git" 2>/dev/null || true)"
@@ -78,13 +87,16 @@ capture() {   # ONE line per prefixed resource ("-" = an owner nobody can read).
   dk network ls --format '{{.ID}}\t{{.Name}}\t{{.Label "testsToDelete.owner"}}\t{{.CreatedAt}}' | awk -F'\t' -v OFS="$U" 'tolower($2) ~ /^teststodelete[-_]/ {print "network",$1,$2,$3,$4}' || return 1
   local wts; wts="$(git worktree list --porcelain)" || return 1
   printf '%s\n' "$wts" | awk -v OFS="$U" '/^worktree /{if(p!="" && n>1)print "wt-git",p,p,o,""; p=substr($0,10); o=""; n++} /^locked/{o=substr($0,8); if(o=="")o="-"} END{if(p!="" && n>1)print "wt-git",p,p,o,""}' | awk -F"$U" 'tolower($3) ~ /\/teststodelete[-_][^\/]*$/'   # the first block is the MAIN worktree: never a candidate
-  local mine; mine="$(printf '%s\n' "$wts" | sed -n 's/^worktree //p' | while IFS= read -r p; do canon "$p"; echo; done)"   # this repo's trees, canonical: not captured twice from the temp root
+  local mine=$'\n' main="" wp c   # this repo's trees, canonical, one per line: not captured twice from the temp root; the first is the MAIN checkout
+  while IFS= read -r wp; do canon "$wp"; mine="$mine$CANON"$'\n'; if [ -z "$main" ]; then main="$CANON"; fi; done <<< "$(printf '%s\n' "$wts" | sed -n 's/^worktree //p')"
   git for-each-ref --format='%(refname:short)' refs/heads | awk -v OFS="$U" 'tolower($0) ~ /^teststodelete[-_]/ {print "branch",$0,$0,"",""}' || return 1
-  local top; top="$(canon "$(git rev-parse --show-toplevel)")"   # the clone this runs from is never a candidate, prefixed or not
+  local top; canon "$(git rev-parse --show-toplevel)"; top="$CANON"   # the clone this runs from and the MAIN checkout are never candidates, nor is a folder holding either
   find "$T" -mindepth 1 -maxdepth 1 -type d -iname 'teststodelete[-_]*' | while IFS= read -r d; do
-    case "$top/" in "$(canon "$d")/"*) continue;; esac
+    canon "$d"; c="$CANON"   # once per candidate
+    case "$top/" in "$c/"*) continue;; esac
+    case "$main/" in "$c/"*) continue;; esac
     if [ -f "$d/.git" ]; then
-      if printf '%s\n' "$mine" | grep -qxF -- "$(canon "$d")"; then continue; fi
+      case "$mine" in *$'\n'"$c"$'\n'*) continue;; esac
       g="$(gitdir_of "$d")"; o=""
       if [ -z "$g" ] || [ ! -d "$g" ]; then o="-"; elif [ -e "$g/locked" ]; then o="$(head -c 200 "$g/locked")"; o="${o:--}"; fi
       row wt-dir "$d" "$d" "$o" "$(mtime_of "$d")"
