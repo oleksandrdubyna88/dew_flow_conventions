@@ -78,7 +78,7 @@ export function run(command, args, { cwd, env, timeoutMs = 60_000, shell = false
     child.on("error", error => { spawnError = error; });
     // A child can exit with descendants still holding its pipes. End our process group now.
     if (containTree && !useJob) child.on("exit", () => killTree(child));
-    child.on("close", code => {
+    child.on("close", (code, exitSignal) => {
       clearTimeout(timer);
       signal?.removeEventListener("abort",cancel);
       const err=Buffer.concat(output.err).toString("utf8");
@@ -86,7 +86,7 @@ export function run(command, args, { cwd, env, timeoutMs = 60_000, shell = false
       if(supervisorError)spawnError={code:supervisorError.slice(errorMarker.length).trim().slice(0,512)};
       resolve({ code: overflow || cancelled || timedOut ? -1 : code ?? -1,
         out: Buffer.concat(output.out).toString("utf8"),
-        err,
+        err, signal: exitSignal ?? null,
         timedOut, overflow, cancelled, spawnFailed: !!spawnError,
         ...(spawnError ? {spawnError:spawnError.code ?? "spawn failed"} : {}) });
     });

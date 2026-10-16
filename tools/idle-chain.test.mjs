@@ -44,7 +44,7 @@ function pidsOf(result) {
   return result.stdout.split(/\s+/).filter(Boolean).map(Number);
 }
 
-async function runStubChain() {
+async function runStubChain(t) {
   // chain → child → grandchild, the child sleeping like the Idle chain would while starved.
   const script = "const {spawn}=require('node:child_process');"
     + "const g=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});"
@@ -54,12 +54,16 @@ async function runStubChain() {
     result = await runChain(process.execPath, ["-e", script], {budgetMs});
     assert.equal(result.error?.code, "ETIMEDOUT", chainFailure(result, budgetMs));
     if (pidsOf(result).length === 2) break;
+    const next = BUDGETS_MS[BUDGETS_MS.indexOf(budgetMs) + 1];
+    t.diagnostic(next === undefined
+      ? `the stub chain printed no pids within ${budgetMs} ms, the last ceiling`
+      : `the stub chain printed no pids within ${budgetMs} ms; widening the ceiling to ${next} ms`);
   }
   return result;
 }
 
-test("at the ceiling the WHOLE tree is killed: a sleeping child and grandchild do not survive", async () => {
-  const result = await runStubChain();
+test("at the ceiling the WHOLE tree is killed: a sleeping child and grandchild do not survive", async (t) => {
+  const result = await runStubChain(t);
   const pids = pidsOf(result);
   assert.equal(pids.length, 2, `the stub chain never printed its pids, even at ${BUDGETS_MS.at(-1)} ms: ${JSON.stringify(result.stdout)}`);
   for (const pid of pids) await assertGone(pid);
@@ -70,6 +74,16 @@ test("a chain that ends in time reports its own status, output and no error", as
   assert.equal(result.error, undefined);
   assert.equal(result.status, 0);
   assert.equal(result.stdout.trim(), "c 19");
+});
+
+test("a child that kills itself with SIGTERM reports the signal, a null status and no error (POSIX)", async (t) => {
+  if (process.platform === "win32") { t.skip("Windows has no POSIX signals: a self-kill there is an ordinary exit code"); return; }
+  const result = await runChain(process.execPath, ["-e", "process.kill(process.pid,'SIGTERM');setInterval(()=>{},1000)"], {budgetMs: 30000});
+  assert.equal(result.error, undefined);
+  assert.equal(result.signal, "SIGTERM");
+  assert.equal(result.status, null);
+  assert.match(chainFailure(result, 30000), /signal SIGTERM/);
+  assert.doesNotMatch(chainFailure(result, 30000), /starv/i);
 });
 
 test("a command that cannot start is an error that is not ETIMEDOUT", async () => {

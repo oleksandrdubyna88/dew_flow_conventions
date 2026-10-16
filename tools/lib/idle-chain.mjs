@@ -10,14 +10,15 @@ import { run } from "./proc.mjs";
 /**
  * Run `command args` with a ceiling of `budgetMs` and report it the way `child_process.spawnSync` does:
  * `{status, signal, error, stdout, stderr}`. The ceiling being reached is `error.code === "ETIMEDOUT"` and
- * nothing else is; a process that could not start is `error.code` = the reason; a kill is `status === -1`.
+ * nothing else is; a process that could not start is `error.code` = the reason; a process ended by a signal has `status === null` and `signal` set.
  */
 export async function runChain(command, args, { budgetMs, env } = {}) {
   const result = await run(command, args, { env, timeoutMs: budgetMs, containTree: true });
   const error = (result.timedOut && { code: "ETIMEDOUT" })
     || (result.spawnFailed && { code: result.spawnError })
     || undefined;
-  return { status: error ? null : result.code, signal: null, error, stdout: result.out, stderr: result.err };
+  const signal = result.signal ?? null;
+  return { status: error || signal ? null : result.code, signal, error, stdout: result.out, stderr: result.err };
 }
 
 /**

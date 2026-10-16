@@ -41,6 +41,9 @@ export function isCi(env = process.env) {
  * (`os.getPriority` maps Windows' classes onto the nice scale), so "already lower" is `>=`.
  * `host` and `target` are seams for the tests: the "never raised" decision can then be checked without
  * starting a process at Idle, which a busy machine starves (see low-priority.test.mjs).
+ *
+ * `host` must provide `getPriority(pid)` and `setPriority(pid, level)` — the subset of `node:os` this
+ * function uses; `os` itself is the default. `target` is a level on the same scale as `os.getPriority`.
  */
 export function lowerOwnPriority(env = process.env, host = os, target = TARGET) {
   const current = host.getPriority(0);

@@ -43,6 +43,22 @@ test("process containment preserves argv and exit status",async()=>{
   assert.deepEqual(JSON.parse(result.out),args);
 });
 
+test("a process that exits on its own reports signal null next to its exit code",async()=>{
+  for(const containTree of [false,true]) {
+    const result=await run(process.execPath,["-e","process.exitCode=3"],{timeoutMs:15000,containTree});
+    assert.equal(result.code,3,result.err);
+    assert.equal(result.signal,null,`containTree=${containTree}: a normal exit must say signal: null, not leave it undefined`);
+  }
+});
+
+test("a process ended by a signal reports it, and its code keeps the old -1 (POSIX)",async(t)=>{
+  if(process.platform==="win32") { t.skip("Windows has no POSIX signals: a self-kill there is an ordinary exit code"); return; }
+  const result=await run(process.execPath,["-e","process.kill(process.pid,'SIGTERM');setInterval(()=>{},1000)"],{timeoutMs:15000});
+  assert.equal(result.signal,"SIGTERM");
+  assert.equal(result.code,-1);
+  assert.equal(result.timedOut,false);
+});
+
 test("exited parent cannot strand a descendant holding inherited output pipes",async()=>{
   const script="const {spawn}=require('node:child_process');const p=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'inherit'});console.log(p.pid);p.unref();";
   const result=await run(process.execPath,["-e",script],{timeoutMs:5000,containTree:true});
