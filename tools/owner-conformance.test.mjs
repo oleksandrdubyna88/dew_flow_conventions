@@ -106,7 +106,7 @@ function extractFunction(lines, start) {
 function ownerOkSource(scriptText) {
   const lines = scriptText.split(/\r?\n/);
   const defined = definedFunctions(lines);
-  const wanted = ["owner_ok"];
+  const wanted = ["owner_ok", "claim_norm"];
   const parts = new Map();
   while (wanted.length > 0) {
     const name = wanted.pop();
@@ -130,7 +130,7 @@ function bashGrammarAnswers(t, vectors) {
   const harness = path.join(dir, "grammar.sh");
   fs.writeFileSync(harness, `${source}
 while IFS= read -r -d '' raw; do
-  v="$(printf '%s' "$raw")"   # the janitor's own read: o="$(head -c 200 file)" — command substitution drops trailing newlines
+  v="$(claim_norm "$raw")"   # the janitor's own read of a claim file (claim_of keeps the trailing newlines claim_norm judges)
   if owner_ok "$v"; then echo 1; else echo 0; fi
 done
 `);
