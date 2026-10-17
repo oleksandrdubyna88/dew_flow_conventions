@@ -46,6 +46,12 @@ resource under a name it generated · **register the cleanup as the very next st
 the resource (a held lock, a registry row), **claim first, then create**, so nothing ever exists unclaimed. A
 claim that cannot be written is a resource the run does not create: the helper removes what it made and throws.
 
+A folder is created, then registered, then claimed. Where the platform has no exclusive folder create (C#:
+`Directory.CreateDirectory` succeeds on an existing folder), the helper MAY claim first with an exclusive write
+(`FileMode.CreateNew`, like Node's `wx`) and then create the folder: the exclusive claim is what detects a name
+collision there. So a claim whose folder does not exist — an **orphan claim**, left by a run that died between the
+two — is collectable like any claim: its owner judges it (`gone` removes the claim; `live` and `unknown` keep it).
+
 Teardown **removes by the exact full name, never by the prefix**; **never throws** (in Rust never panics — a
 panic in `Drop` during unwinding aborts the process); retries a bounded number of times with a short back-off
 (five tries 100 ms apart is the family's figure); and on giving up leaves the resource **prefixed and
@@ -54,9 +60,12 @@ cleanup's shape — a failed assertion skips it (found in one repository, 2026-1
 
 ## 3. The owner — who may delete what
 
-Every prefixed resource carries its owner, **`<host>@<os>:<pid>[:<start>]`**: the machine name as the OS
-reports it; `linux`, `macos` or `windows` (a Windows machine and its Linux subsystem answer to ONE name with TWO
-pid spaces, measured 2026-10-15); the process id; and, **only where the OS gives it without spawning a
+Every prefixed resource carries its owner, **`<host>@<os>:<pid>[:<start>]`**: the machine's DNS host name
+(`hostname`, Node `os.hostname()`, C# `Dns.GetHostName()`), compared case-insensitively — never the NetBIOS name
+(C# `Environment.MachineName`, `%COMPUTERNAME%`: upper-case, cut at 15 characters); `linux`, `macos` or `windows`
+(a Windows machine and its Linux subsystem answer to ONE name with TWO pid spaces, measured 2026-10-15); the
+process id — in a CI job, the runner worker process that runs the job's steps (`$PPID` of a step's shell), because
+the step's own shell is gone before the job is; and, **only where the OS gives it without spawning a
 process** (a `/proc` read, a native process API — never a shell or PowerShell child per test process), the
 process's start time as **integer Unix seconds, UTC**, from the OS's record of that pid — never the writer's
 own clock at startup. A writer that would have to spawn to learn its start omits it. The owner never lives
@@ -96,7 +105,8 @@ resource kind wires a sweep of that kind into the **start** of its test run (the
 - removes only on `gone`; **`live` and `unknown` preserve**, each with its reason in the report;
 - treats an **unmarked** prefixed resource of the new form as `gone` once old enough (the helper claims within
   milliseconds or does not create), and matches an OLD prefix from before the migration only until a written
-  end date in its configuration — age-only, because nothing live makes such a name any more;
+  end date in its configuration — age-only, because nothing live makes such a name any more. The end date counts
+  from the day old branches and agent worktrees stop running the old suites, not from the merge;
 - **never fails the run**: a sweep error is one reported line; the exit code is the tests'.
 
 Age alone where a concurrent run can own the resource is forbidden: a measuring harness's run store did that
@@ -144,10 +154,10 @@ red when it **scanned nothing** (exit 2, with a sentence — discovery broke; th
 
 | class | finding |
 |---|---|
-| `raw-temp` | any API that makes a temp path (`mkdtemp`, `tmpdir()`, `TEMP`/`TMP`/`TMPDIR`, `GetTempPath`, `temp_dir()`, `mktemp`) |
+| `raw-temp` | any API that makes a temp path (`mkdtemp`, `tmpdir()`, `TEMP`/`TMP`/`TMPDIR`, `GetTempPath`, `Directory.CreateTempSubdirectory`, `Path.GetTempFileName`, `temp_dir()`, `mktemp`) |
 | `raw-worktree` | any `worktree add` |
 | `docker-run` | a `docker run` with neither `--rm` nor the complete carve-out of §5 |
-| `docker-name` | a `--name`, `volume create`, `network create` or `WithName` without one of the three spellings; an image tag only where a test step builds it — a job that builds and pushes the product image is the product, not a leftover |
+| `docker-name` | a `--name`, `volume create`, `network create`, `WithName`, `docker compose -p`/`--project-name` or `COMPOSE_PROJECT_NAME` (a compose project's containers carry the project's name) without one of the three spellings; an image tag only where a test step builds it — a job that builds and pushes the product image is the product, not a leftover |
 | `shared-store` | a `DROP`, `TRUNCATE`, `FLUSH` or delete-all against an unprefixed name without exemption (a) |
 | `ryuk-off` | `TESTCONTAINERS_RYUK_DISABLED` set to true — no exemption accepted |
 
@@ -163,7 +173,10 @@ The **host-wide** tool — every token, every kind; neither a teardown nor the s
 tested script, not a block to paste: `tools/janitor.sh` in the rule repository, run from the mount
 (`bash .agents/conventions/tools/janitor.sh` or `bash .claude/rules/shared/tools/janitor.sh`, `--dry-run` to
 look first) from inside the repository whose worktrees and branches are swept; on Windows from **Git for
-Windows' bash, never WSL's** (which sees neither the Windows temp root nor Windows pids). What it guarantees,
+Windows' bash, never WSL's** (which sees neither the Windows temp root nor Windows pids). `--token <t>` narrows
+the sweep to `testsToDelete-<t>-…` (all three spellings, any case, anchored: `alpha` never matches `alphabet`);
+it combines with `--dry-run`, and an invalid token or an unknown argument prints the usage line and exits 2 with
+nothing touched. `JANITOR_MIN_AGE_MINUTES` (default 60) is whole minutes, digits only. What it guarantees,
 and what a copy of it must keep:
 
 - **One capture.** Every prefixed resource is listed ONCE with its identity, owner and age before anything is
@@ -172,7 +185,7 @@ and what a copy of it must keep:
 - **Age selects, the owner authorises, per resource.** A resource younger than the window (one hour) or of
   unknown age is left alone silently; a live owner, a foreign host, an owner it cannot read, a lock that names
   nobody, or a worktree whose lock it cannot read is **skipped** with one line naming it — never deleted;
-  unmarked resources older than the window are nobody's and go. A worktree is judged by its lock, read through
+  unmarked resources older than the window are nobody's and go. An orphan claim (§2) is judged like any other. A worktree is judged by its lock, read through
   its `.git` file whatever clone owns it (a relative gitdir resolved against the worktree).
 - **Exact removal.** Top-level links (a junction into a checkout) are unlinked before a worktree or folder is
   removed and `rm -rf` never crosses one; worktrees go before branches and folders; `docker ps --filter name=`
