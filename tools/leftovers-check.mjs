@@ -4,10 +4,12 @@
  * not remove, outside the one helper (`tools/lib/owned.mjs`), and red when it scanned nothing.
  *
  * What it refuses, as classes of the rule's §7 table:
- *   raw-temp      a temp path made by hand (`mkdtemp`, `tmpdir()`, `TEMP`/`TMP`/`TMPDIR`, `GetTempPath`, `mktemp`)
+ *   raw-temp      a temp path made by hand (`mkdtemp`, `tmpdir()`, `TEMP`/`TMP`/`TMPDIR`, `GetTempPath`, `CreateTempSubdirectory`,
+ *                 `GetTempFileName`, `mktemp`)
  *   raw-worktree  any `git worktree add`
  *   docker-run    a `docker run` with neither `--rm` nor the complete carve-out of §5
- *   docker-name   a `--name`, `volume create`, `network create`, `WithName`, or the tag of an image a test builds,
+ *   docker-name   a `--name`, `volume create`, `network create`, `WithName`, a compose project name (`-p`, `--project-name`,
+ *                 `COMPOSE_PROJECT_NAME`), or the tag of an image a test builds,
  *                 that is not one of the three spellings of §1
  *   shared-store  a `DROP`, `TRUNCATE`, `FLUSH` or delete-all against an unprefixed name
  *   ryuk-off      `TESTCONTAINERS_RYUK_DISABLED` set to true — no exemption accepted
@@ -49,7 +51,7 @@ export const CURES = Object.freeze({
   "raw-temp": "Make temp folders with ownedDir(t, what) from tools/lib/owned.mjs — common/test-leftovers.md §7 (raw-temp), §2.",
   "raw-worktree": "Make worktrees with ownedWorktree(t, repo, what) from tools/lib/owned.mjs — common/test-leftovers.md §7 (raw-worktree), §3.",
   "docker-run": "Add --rm, or the complete carve-out: a testsToDelete name, a remover step on every path after the diagnostics — common/test-leftovers.md §5, §7 (docker-run).",
-  "docker-name": "Give the container, volume, network or test-built image one of the three spellings of testsToDelete-<repo>-<what>-<id> — common/test-leftovers.md §1, §7 (docker-name).",
+  "docker-name": "Give the container, volume, network, compose project or test-built image one of the three spellings of testsToDelete-<repo>-<what>-<id> — common/test-leftovers.md §1, §7 (docker-name).",
   "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers.md §6, §7 (shared-store).",
   "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers.md §5, §7 (ryuk-off).",
   exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers.md §7 (the exemption grammar).",
@@ -124,6 +126,8 @@ const RAW_TEMP = [
   /process\.env\.(?:TEMP|TMP|TMPDIR)\b/,
   /\btemp_dir\s*\(/,
   /GetTempPath/,
+  /CreateTempSubdirectory/,
+  /GetTempFileName/,
 ];
 const RAW_TEMP_BY_EXTENSION = { ".sh": [/\bmktemp\b/], ".ps1": [/New-TemporaryFile|\$env:TE?MP\b/] };
 const RAW_WORKTREE = [/["']worktree["']\s*,\s*["']add["']/, /\bworktree\s+add\b/];
@@ -151,6 +155,13 @@ function allMatches(patterns, line) {
   });
 }
 
+/** `COMPOSE_PROJECT_NAME=x` or `: x` on a line: one hit when x is not a testsToDelete name — a compose project's containers carry the project's name. */
+function composeEnvHits(line) {
+  return [...line.matchAll(/COMPOSE_PROJECT_NAME["']?\s*[:=]\s*["']?([^\s"';,}]*)/g)]
+    .filter((match) => !PREFIX_OK.test(match[1]))
+    .map((match) => `COMPOSE_PROJECT_NAME is not a testsToDelete name: ${match[1] === "" ? "(empty)" : match[1]}`);
+}
+
 function lineFindings(file, lines, exemptions) {
   const extra = RAW_TEMP_BY_EXTENSION[path.extname(file)] ?? [];
   const found = [];
@@ -164,6 +175,7 @@ function lineFindings(file, lines, exemptions) {
       ["raw-worktree", allMatches(RAW_WORKTREE, line).slice(0, 1)],
       ["shared-store", sharedStoreHit(line)],
       ["ryuk-off", RYUK_OFF.test(line) ? ["TESTCONTAINERS_RYUK_DISABLED"] : []],
+      ["docker-name", composeEnvHits(line)],
     ];
     for (const [cls, hits] of checks) if (hits.length > 0) add(index, cls, [...new Set(hits)].map((hit) => `\`${hit}\``).join(", "));
   });
@@ -223,6 +235,25 @@ function createdName(tokens, createAt) {
   return "";
 }
 
+const COMPOSE_VALUE_FLAGS = new Set(["-f", "--file", "-p", "--project-name", "--profile", "--env-file", "--project-directory", "--parallel", "--ansi", "--progress"]);
+
+/** The project names a `docker compose` / `docker-compose` command line gives, from its GLOBAL options only (`-p` after the subcommand is `--publish`). */
+function composeProjectNames(tokens) {
+  const at = tokens.findIndex((token, index) => token === "docker-compose" || (token === "compose" && tokens[index - 1] === "docker"));
+  if (at < 0) return [];
+  const names = [];
+  for (let index = at + 1; index < tokens.length && tokens[index].startsWith("-"); index += 1) {
+    const token = tokens[index];
+    const inline = /^--project-name=(.*)$/.exec(token);
+    if (inline !== null) names.push(inline[1]);
+    else if (COMPOSE_VALUE_FLAGS.has(token)) {
+      if (token === "-p" || token === "--project-name") names.push(tokens[index + 1] ?? "");
+      index += 1;
+    }
+  }
+  return names;
+}
+
 /** `docker-name` findings of one command; `pushed` is the set of images the scope publishes. */
 function nameFindings(file, command, pushed) {
   const tokens = words(command.text);
@@ -237,6 +268,7 @@ function nameFindings(file, command, pushed) {
     if (name === "") bad(`\`docker ${match[1]} create\` makes an unnamed ${match[1]}`);
     else if (!PREFIX_OK.test(name)) bad(`\`docker ${match[1]} create ${name}\` is not a testsToDelete name`);
   }
+  for (const name of composeProjectNames(tokens)) if (!PREFIX_OK.test(name)) bad(`the compose project \`${name}\` is not a testsToDelete name`);
   for (const match of command.text.matchAll(/\bWithName\(\s*"([^"]*)"/g)) if (!PREFIX_OK.test(match[1])) bad(`\`WithName("${match[1]}")\` is not a testsToDelete name`);
   if (/\bdocker\s+build\b/.test(command.text)) {
     for (const tag of flagValues(tokens, ["-t", "--tag"])) {

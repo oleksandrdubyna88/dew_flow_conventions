@@ -99,6 +99,18 @@ test("2. raw-temp in the other languages: mktemp in .sh, New-TemporaryFile and $
   assert.equal(one(t, "tools/c.test.mjs", "const p = Path.GetTempPath();\n").code, 1);
 });
 
+test("2. raw-temp in C#: Directory.CreateTempSubdirectory and Path.GetTempFileName name their line", (t) => {
+  for (const [code, pattern] of [
+    ["var d = Directory.CreateTempSubdirectory(\"x-\");", /CreateTempSubdirectory/],
+    ["var f = Path.GetTempFileName();", /GetTempFileName/],
+  ]) {
+    const result = one(t, "tools/x.test.mjs", `// c#\n${code}\n`);
+    assert.equal(result.code, 1, code);
+    assert.match(result.text, /tools\/x\.test\.mjs:2 — raw-temp/);
+    assert.match(result.text, pattern);
+  }
+});
+
 test("2. raw-temp: a whole-line comment is not a use; a lookalike word is not a use", (t) => {
   assert.equal(one(t, "tools/x.test.mjs", "// mkdtempSync is what we replaced\n# tmpdir()\nconst a = 'mkdtemp';\n").code, 0);
 });
@@ -169,6 +181,37 @@ test("2. docker-name: volume create / network create / --name / WithName without
   assert.equal(one(t, "tools/w.test.mjs", 'new ContainerBuilder().WithName("db");\n').code, 1);
   assert.equal(one(t, "tools/ok.sh", "docker volume create testsToDelete-x-cache-abc123\n").code, 0);
   assert.equal(one(t, "tools/ok2.test.mjs", 'new ContainerBuilder().WithName("testsToDelete-x-db-abc123");\n').code, 0);
+});
+
+test("2. docker-name: a compose project name — -p, --project-name, COMPOSE_PROJECT_NAME — needs a spelling", (t) => {
+  const GOOD = "testsToDelete-x-stack-abc123";
+  for (const command of [
+    "docker compose -p web up -d",
+    "docker compose --project-name web up -d",
+    "docker compose --project-name=web up -d",
+    "docker-compose -p web up -d",
+    "docker compose -f a.yml -p web up -d",
+    "COMPOSE_PROJECT_NAME=web docker compose up -d",
+    "export COMPOSE_PROJECT_NAME=web",
+  ]) {
+    const result = one(t, "tools/c.sh", `${command}\n`);
+    assert.equal(result.code, 1, command);
+    assert.match(result.text, /c\.sh:1 — docker-name/, command);
+  }
+  const workflow = ["name: x", "on: push", "jobs:", "  j:", "    runs-on: ubuntu-latest", "    env:", "      COMPOSE_PROJECT_NAME: web", "    steps:", "      - run: docker compose up -d"].join("\n") + FOOT;
+  assert.equal(one(t, ".github/workflows/c.yml", workflow).code, 1, "a workflow env");
+  assert.equal(one(t, "tools/c.test.mjs", 'spawn("docker", ["compose", "up"], { env: { COMPOSE_PROJECT_NAME: "web" } });\n').code, 1, "a spawn env");
+  for (const command of [
+    `docker compose -p ${GOOD} up -d`,
+    `docker compose --project-name ${GOOD} up -d`,
+    `docker-compose -f a.yml -p teststodelete-x-s-abc123 up -d`,
+    `COMPOSE_PROJECT_NAME=${GOOD} docker compose up -d`,
+    "docker compose up -d",
+    "docker compose run -p 8080:80 svc",
+    "docker compose -f a.yml run -p 8080:80 svc",
+  ]) assert.equal(one(t, "tools/ok.sh", `${command}\n`).code, 0, command);
+  assert.equal(one(t, "tools/ok.test.mjs", `spawn("docker", ["compose", "up"], { env: { COMPOSE_PROJECT_NAME: "${GOOD}" } });\n`).code, 0);
+  assert.equal(one(t, "tools/ex.sh", "# testsToDelete-exempt: docker-name — the compose file is the product's own sample\ndocker compose -p web up -d\n").code, 0, "an exemption clears it");
 });
 
 test("2. docker-name: a test-built image tag; a pushed one is the publish and out of scope", (t) => {
