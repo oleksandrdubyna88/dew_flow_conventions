@@ -6,6 +6,14 @@ import os from "node:os";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {setTimeout as delay} from "node:timers/promises";
+import {chainFailure, runChain} from "./lib/idle-chain.mjs";
+
+// OPT-IN: one case below starts a chain of processes at the IDLE class, which gets no CPU while anything at a
+// higher class wants the core — on a busy machine it can take as long as the machine stays busy, and `npm test`
+// must not wait on that. It runs only when LOW_PRIORITY_E2E=1 is set:
+//   LOW_PRIORITY_E2E=1 node --test --test-concurrency=1 tools/low-priority.test.mjs
+// The decision it checks ("an Idle caller is never raised") is also tested without any Idle process, in the
+// default suite, through the fake host below.
 
 // The wrapper is tested the only way that means anything: through real processes. Every case starts
 // `node low-priority.mjs …` and reads what the child and its own child report about themselves.
@@ -68,14 +76,51 @@ test("under CI nothing is lowered — the child keeps the caller's priority", ()
   assert.equal(seen.grandchild, before, result.stdout);
 });
 
-test("a caller that is already lower than the target is never raised", (t) => {
+/** A stand-in for `os` that remembers every setPriority call, so the decision can be read without a process. */
+function fakeHost(start) {
+  const host = {level: start, sets: [], getPriority: () => host.level, setPriority: (pid, level) => { host.sets.push([pid, level]); host.level = level; }};
+  return host;
+}
+
+// The "never raised" decision, checked on every platform and with no process started at Idle. The
+// real-process case below cannot be the only guard: a process at Idle gets no CPU while anything at
+// a higher class wants the core, so on a busy machine its start-up alone outlasts any timeout.
+test("lowerOwnPriority: a caller already lower than the target is never raised (decision, no process)", async () => {
+  const {lowerOwnPriority} = await import(new URL("./low-priority.mjs", import.meta.url).href);
+  const idle = fakeHost(19);
+  assert.equal(lowerOwnPriority({}, idle, 10), 19);
+  assert.deepEqual(idle.sets, [], "an Idle caller must not be moved up to the target");
+  const equal = fakeHost(10);
+  assert.equal(lowerOwnPriority({}, equal, 10), 10);
+  assert.deepEqual(equal.sets, [], "a caller already at the target is left alone");
+});
+
+test("lowerOwnPriority: a caller above the target is lowered, once, to the target; under CI it is left alone", async () => {
+  const {lowerOwnPriority} = await import(new URL("./low-priority.mjs", import.meta.url).href);
+  const normal = fakeHost(0);
+  assert.equal(lowerOwnPriority({}, normal, 10), 10);
+  assert.deepEqual(normal.sets, [[0, 10]]);
+  const ci = fakeHost(0);
+  assert.equal(lowerOwnPriority({CI: "true"}, ci, 10), 0);
+  assert.deepEqual(ci.sets, []);
+});
+
+// How long the opt-in real-process case may take. It measures a PRIORITY, not a speed: starvation delays
+// the answer but never changes it, so the bound only stops a hung run. 30 s was measured too short: with one
+// Normal-priority busy loop on the same core the Idle chain got no CPU for as long as the loop ran. At the
+// bound the whole tree is killed by pid (tools/lib/idle-chain.mjs), and only ETIMEDOUT is called starvation.
+const IDLE_CHAIN_BUDGET_MS = 180_000;
+
+test("a caller that is already lower than the target is never raised (real processes, Windows, opt-in LOW_PRIORITY_E2E=1)", async (t) => {
   // Idle (Windows) / nice 19: there is nothing lower to start from on POSIX, so the case only has
   // teeth on Windows, where Idle is below the BelowNormal the wrapper would otherwise set.
+  if (process.env.LOW_PRIORITY_E2E !== "1") { t.skip("opt-in: set LOW_PRIORITY_E2E=1 (an Idle-class chain starves on a busy machine)"); return; }
   if (!windows) { t.skip("POSIX has no level below nice 19 to start from"); return; }
   const outer = `require('node:os').setPriority(0,${os.constants.priority.PRIORITY_LOW});`
     + `const r=require('node:child_process').spawnSync(process.execPath,${JSON.stringify([tool, "node", "-e", tree])},{stdio:'inherit'});process.exitCode=r.status;`;
-  const result = spawnSync(process.execPath, ["-e", outer], {encoding: "utf8", timeout: 30_000, env: env()});
-  assert.equal(result.status, 0, result.stderr);
+  t.diagnostic(`starting the Idle-class chain with a ${IDLE_CHAIN_BUDGET_MS} ms ceiling; a busy machine may starve it of CPU until then`);
+  const result = await runChain(process.execPath, ["-e", outer], {budgetMs: IDLE_CHAIN_BUDGET_MS, env: env()});
+  assert.equal(result.status, 0, chainFailure(result, IDLE_CHAIN_BUDGET_MS));
   const seen = priorities(result.stdout);
   assert.equal(seen.child, os.constants.priority.PRIORITY_LOW, result.stdout);
   assert.equal(seen.grandchild, os.constants.priority.PRIORITY_LOW, result.stdout);
