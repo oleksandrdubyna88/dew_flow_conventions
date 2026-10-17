@@ -40,6 +40,7 @@ import { git } from "./git.mjs";
 
 export const PREFIX = "testsToDelete-";                              // rule §1
 export const REPO_TOKEN = "conventions";                             // rule §1 — the ONLY place the token is written
+export const REPO_ROW = "the shared-rules repository";                // rule §1 — the `## Tokens` row (its repository column) that names THIS repository: a token is only this repository's if its row says so
 export const OWNED = `${PREFIX}${REPO_TOKEN}-`;
 export const OWNED_PATTERN = /^teststodelete[-_]conventions[-_]/i;   // what this repository's sweep matches (rule §1, §4)
 export const MAX_NAME = 63;                                          // rule §1

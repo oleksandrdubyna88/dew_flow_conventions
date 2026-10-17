@@ -17,8 +17,8 @@ const REFERENCE = path.join(ROOT, 'settings');
  * <p>`git init` rather than a bare directory: a fixture that is not a repository would test a code
  * path no consumer has.</p>
  */
-function repository(t, prefix = 'adapter') {
-  const dir = ownedDir(t, prefix);
+function repository(t, what = 'adapter') {
+  const dir = ownedDir(t, what);
   execFileSync('git', ['-C', dir, 'init', '-q'], { timeout: 30_000, windowsHide: true });
 
   // macOS puts temp dirs under a symlink, and git answers with the resolved path; the checker

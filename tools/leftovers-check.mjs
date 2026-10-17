@@ -36,7 +36,7 @@ import { fileURLToPath } from "node:url";
 import { LineCounter, parseDocument } from "yaml";
 
 import { gitOutput } from "./lib/git.mjs";
-import { REPO_TOKEN } from "./lib/owned.mjs";
+import { REPO_ROW, REPO_TOKEN } from "./lib/owned.mjs";
 import { isReason } from "./ownership-check.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -420,16 +420,24 @@ export function parseTokenTable(ruleText) {
   if (headerAt < 0) return { heading: start + 1, header: undefined, rows: [] };
   const rows = [];
   for (let index = headerAt + 2; index < section.length && /^\s*\|/.test(section[index]); index += 1) {
-    const [token = "", family = ""] = cells(section[index]);
-    rows.push({ token: token.replace(/`/g, ""), family, line: start + index + 2 });
+    const [token = "", family = "", repository = ""] = cells(section[index]);
+    rows.push({ token: token.replace(/`/g, ""), family, repository, line: start + index + 2 });
   }
   return { heading: start + 1, header: cells(section[headerAt]), rows };
 }
 
 const EXPECTED_HEADER = ["token", "family", "repository"];
 
-/** Findings (class `token`) when `token` is not a registered row of `ruleText`'s `## Tokens` table. Fails closed: a rule with no table registers nothing. */
-export function tokenFindings(ruleText, token, rulePath = "common/test-leftovers.md") {
+/** A registered token must also be THIS repository's: its row's repository column is the one `identity` (`REPO_ROW` in the helper) names. No identity is a finding — the check fails closed. */
+function belongsFindings(row, token, identity, rulePath) {
+  const at = (text) => [finding(rulePath, row.line, "token", text)];
+  if (identity.trim() === "") return at(`this repository's identity is unknown, so the token \`${token}\` cannot be proven to belong to it`);
+  if (row.repository.trim().toLowerCase() === identity.trim().toLowerCase()) return [];
+  return at(`the token \`${token}\` belongs to \`${row.repository}\` in ${rulePath}, not to this repository (\`${identity}\`)`);
+}
+
+/** Findings (class `token`) when `token` is not a registered row of `ruleText`'s `## Tokens` table, or is the row of another repository. Fails closed: a rule with no table registers nothing. */
+export function tokenFindings(ruleText, token, rulePath = "common/test-leftovers.md", identity = REPO_ROW) {
   const at = (line, text) => [finding(rulePath, Math.max(line, 1), "token", text)];
   if (!TOKEN_SHAPE.test(token)) return at(1, `the token \`${token}\` is not [a-z0-9]{2,12} (${rulePath})`);
   const table = parseTokenTable(ruleText);
@@ -446,6 +454,7 @@ export function tokenFindings(ruleText, token, rulePath = "common/test-leftovers
     if (row.family !== "dew_flow") found.push(...at(row.line, `the row \`${row.token}\` of ${rulePath} has family \`${row.family}\`; this public copy lists only \`dew_flow\``));
   }
   if (!seen.has(token)) found.push(...at(table.heading, `the token \`${token}\` is not a row of the \`## Tokens\` table of ${rulePath}`));
+  else found.push(...belongsFindings(table.rows.find((row) => row.token === token), token, identity, rulePath));
   return found;
 }
 

@@ -13,7 +13,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { git } from "./lib/git.mjs";
-import { REPO_TOKEN, ownedDir } from "./lib/owned.mjs";
+import { REPO_ROW, REPO_TOKEN, ownedDir } from "./lib/owned.mjs";
 import { EXCLUDED_FILES, main, scanText, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -339,8 +339,29 @@ test("3a. the repository's token is a row of the rule's table; the table is the 
   }
   assert.ok(table.rows.some((row) => row.token === REPO_TOKEN));
   assert.deepEqual(tokenFindings(fs.readFileSync(RULE, "utf8"), "conventions"), []);
-  assert.deepEqual(tokenFindings(fs.readFileSync(RULE, "utf8"), "qln"), []);
-  assert.doesNotMatch(guard(root, ["--token", "qln"]).text, / — token — /);
+  assert.deepEqual(tokenFindings(fs.readFileSync(RULE, "utf8"), "qln", undefined, "the code-search product"), [], "qln is a registered token — of the code-search product");
+});
+
+test("3a. a registered token is not enough: the row of REPO_TOKEN must name THIS repository", () => {
+  const rule = fs.readFileSync(RULE, "utf8");
+  assert.equal(REPO_ROW, "the shared-rules repository", "the helper's one statement of which row is this repository's");
+  for (const [token, owner] of [["coai", "the multi-model review extension and server"], ["qln", "the code-search product"], ["bench", "the measuring harness"]]) {
+    const found = tokenFindings(rule, token);
+    assert.equal(found.length, 1, token);
+    assert.ok(found[0].text.includes("belongs to `" + owner + "`"), "names the row's repository: " + found[0].text);
+    const run = guard(root, ["--token", token]);
+    assert.equal(run.code, 1, token);
+    assert.match(run.text, / — token — /, token);
+  }
+});
+
+test("3a. fail closed: an unknown identity of this repository is a finding, never a pass", () => {
+  const rule = fs.readFileSync(RULE, "utf8");
+  for (const identity of ["", "   "]) {
+    const found = tokenFindings(rule, "conventions", undefined, identity);
+    assert.equal(found.length, 1, JSON.stringify(identity));
+    assert.match(found[0].text, /identity/);
+  }
 });
 
 test("3a. break-it: an unregistered, upper-case or one-character token is exit 1, class token", () => {
@@ -357,16 +378,18 @@ test("3a. tokenFindings: no section, no table, two columns, a duplicate, a forei
   assert.equal(tokenFindings("# Rule\n\n## Never\n", "conventions").length, 1, "no ## Tokens section");
   assert.equal(tokenFindings("# Rule\n\n## Tokens\n\nprose only\n", "conventions").length, 1, "no table");
   assert.equal(tokenFindings(table(["| `conventions` | dew_flow |"], "| token | family |"), "conventions").length, 1, "two columns");
-  assert.equal(tokenFindings(table(["| `conventions` | dew_flow | a |", "| `conventions` | dew_flow | b |"]), "conventions").length, 1, "duplicate");
-  assert.equal(tokenFindings(table(["| `conventions` | dew_flow | a |", "| `other` | elsewhere | b |"]), "conventions").length, 1, "foreign family");
+  assert.equal(tokenFindings(table(["| `conventions` | dew_flow | the shared-rules repository |", "| `conventions` | dew_flow | the shared-rules repository |"]), "conventions").length, 1, "duplicate");
+  assert.equal(tokenFindings(table(["| `conventions` | dew_flow | the shared-rules repository |", "| `other` | elsewhere | b |"]), "conventions").length, 1, "foreign family");
   assert.equal(tokenFindings(table(["| `creds` | dew_flow | conventions |"]), "conventions").length, 1, "only in the repository column");
-  assert.equal(tokenFindings(table(["| `conventions` | dew_flow | a |"]), "conventions").length, 0, "the happy path");
+  assert.equal(tokenFindings(table(["| `conventions` | dew_flow | the shared-rules repository |"]), "conventions").length, 0, "the happy path");
 });
 
 test("3a. --rule points the token check at another rule text", (t) => {
   const repo = tree(t, { "tools/x.test.mjs": "const a = 1;\n", "other.md": table(["| `zzz` | dew_flow | a |"]) });
   assert.equal(guard(repo, ["--rule", path.join(repo, "other.md")]).code, 1);
-  assert.equal(guard(repo, ["--rule", path.join(repo, "other.md"), "--token", "zzz"]).code, 0);
+  assert.equal(guard(repo, ["--rule", path.join(repo, "other.md"), "--token", "zzz"]).code, 1, "registered, but as another repository's row");
+  const own = tree(t, { "tools/x.test.mjs": "const a = 1;", "other.md": table(["| `conventions` | dew_flow | " + REPO_ROW + " |"]) });
+  assert.equal(guard(own, ["--rule", path.join(own, "other.md")]).code, 0);
 });
 
 // 4 / 5 ------------------------------------------------------------------------------------------------------------
