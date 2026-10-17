@@ -6,8 +6,14 @@ import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {execFileSync,spawnSync} from "node:child_process";
 import {rebaseLinks,migrationPlan,applyMigration} from "./lib/rule-migration.mjs";
-import {git} from "./lib/git.mjs";
+import {gitOutput} from "./lib/git.mjs";
 import {smoke} from "./lib/rule-smoke.mjs";
+
+// Every child this file starts ends on its own (fixture git, the resolver, a dry-run CLI), so its ceiling is a guard
+// against a HANG, not a measure of speed. A short one also covers process start-up, which a machine running other
+// suites stretches without limit: the 30 s of lib/git.mjs expired in `git submodule add` after 66 s of a loaded run.
+const GUARD_MS=180000;
+const git=(repo,...args)=>gitOutput(repo,args,{timeoutMs:GUARD_MS}).trimEnd();
 
 test("moved project links resolve to the same repository targets",()=>{
   const original='Read [design](research/architecture.md) and [gate](.claude/rules/shared/common/coai-review-gate.md). Keep [web](https://example.org/a) and [local](#here).';
@@ -34,7 +40,7 @@ test("the existing gate checker recognizes missing neutral mounts and relocated 
   const tool=path.join(path.dirname(fileURLToPath(import.meta.url)),"gate-snippet-check.mjs");
   fs.writeFileSync(path.join(root,".gitmodules"),'[submodule "conventions"]\n path = .agents/conventions\n url = https://example.invalid/conventions\n');
   const check=()=>{
-    try{return {code:0,out:execFileSync(process.execPath,[tool],{cwd:root,encoding:"utf8",timeout:10000,stdio:["ignore","pipe","pipe"]})};}
+    try{return {code:0,out:execFileSync(process.execPath,[tool],{cwd:root,encoding:"utf8",timeout:GUARD_MS,stdio:["ignore","pipe","pipe"]})};}
     catch(error){return {code:error.status,out:error.stdout+error.stderr};}
   };
   const missing=check();
@@ -108,7 +114,7 @@ test("real Git migration leaves source work intact and prepares exactly one relo
   assert.equal(git(repo,"rev-parse","HEAD"),base);
   const dryCli=spawnSync(process.execPath,[path.join(conventions,"tools/migrate-rules.mjs"),
     "--repo",repo,"--conventions",conventions,"--sha",sha,"--base",base,
-    "--output",output,"--branch","migrate-test","--rewrite","scripts/check.ps1"],{encoding:"utf8",timeout:30000});
+    "--output",output,"--branch","migrate-test","--rewrite","scripts/check.ps1"],{encoding:"utf8",timeout:GUARD_MS});
   assert.equal(dryCli.status,0,dryCli.stderr);
   assert.deepEqual(JSON.parse(dryCli.stdout),JSON.parse(JSON.stringify(plan.journal)));
   const result=applyMigration(plan);
@@ -122,7 +128,7 @@ test("real Git migration leaves source work intact and prepares exactly one relo
   assert.match(fs.readFileSync(path.join(output,"scripts/check.ps1"),"utf8"),/\.agents\/conventions/);
   // Locked packages are JS only; copy the already-installed exact dependencies for this offline fixture.
   fs.cpSync(path.join(conventions,"node_modules"),path.join(output,".agents/conventions/node_modules"),{recursive:true});
-  const check=JSON.parse(execFileSync(process.execPath,[path.join(output,".agents/conventions/tools/rules.mjs"),"check","--repo",output],{encoding:"utf8",timeout:10000}));
+  const check=JSON.parse(execFileSync(process.execPath,[path.join(output,".agents/conventions/tools/rules.mjs"),"check","--repo",output],{encoding:"utf8",timeout:GUARD_MS}));
   assert.equal(check.version.actual,sha);
   assert.equal(check.version.staged,true);
   assert.ok(check.rules.some(rule=>rule.id==="local.common.deep.local"));
@@ -157,7 +163,7 @@ test("real Git migration leaves source work intact and prepares exactly one relo
     await assert.rejects(smoke({repo:output,agent,files:["src/fixture.cs"],cli:fixtureCli}),/already owned/);
     fs.unlinkSync(observed.report+".lock");
   }
-  const cli=(args=["check"],cwd=output)=>spawnSync(process.execPath,[path.join(mounted,"tools/rules.mjs"),...args],{cwd,encoding:"utf8",timeout:10000});
+  const cli=(args=["check"],cwd=output)=>spawnSync(process.execPath,[path.join(mounted,"tools/rules.mjs"),...args],{cwd,encoding:"utf8",timeout:GUARD_MS});
   const scoped=cli(["explain","--task","inspect","--file","src/новый.cs"]);
   assert.equal(scoped.status,0,scoped.stderr);
   assert.ok(JSON.parse(scoped.stdout).rules.some(rule=>rule.id==="local.common.deep.local"));
@@ -177,7 +183,7 @@ test("real Git migration leaves source work intact and prepares exactly one relo
   git(temp,"clone","-q",output,clone);
   git(clone,"-c","protocol.file.allow=always","submodule","update","--init","--",".agents/conventions");
   fs.cpSync(path.join(conventions,"node_modules"),path.join(clone,".agents/conventions/node_modules"),{recursive:true});
-  const fresh=spawnSync(process.execPath,[path.join(clone,".agents/conventions/tools/rules.mjs"),"read","--task","inspect","--file","src/новый.cs"],{cwd:clone,encoding:"utf8",timeout:10000});
+  const fresh=spawnSync(process.execPath,[path.join(clone,".agents/conventions/tools/rules.mjs"),"read","--task","inspect","--file","src/новый.cs"],{cwd:clone,encoding:"utf8",timeout:GUARD_MS});
   assert.equal(fresh.status,0,fresh.stderr);
   assert.match(fresh.stdout,/END RULE local.common.deep.local/);
   // Roll back only this disposable clone; the user's source and prepared worktree stay untouched.
