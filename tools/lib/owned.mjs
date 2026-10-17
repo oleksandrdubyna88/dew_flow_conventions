@@ -140,19 +140,26 @@ function readLinuxStart(pid) {
   }
 }
 
+/** A pid a process can have: a positive safe integer. 0 and the negatives address process GROUPS; the rest address nothing. */
+export function isProcessId(pid) {
+  return Number.isSafeInteger(pid) && pid > 0;
+}
+
 /**
- * Is `pid` alive on this machine? Three-valued: `{ alive: false }` (no such process — the one answer that means
- * gone), `{ alive: undefined }` (the query was refused or failed: nothing is known), or `{ alive: true, start }` —
- * `start` only on Linux. Never spawns a process.
+ * Is `pid` alive on this machine? Three NAMED answers, never a flag with an invisible third value:
+ * `{ state: "dead" }` (no such process — the ONE answer that means gone), `{ state: "unknown" }` (the query was
+ * refused or failed, or `pid` is not a process id at all: nothing is known), or `{ state: "live", start? }` —
+ * `start` only on Linux. Never spawns a process, and never signals anything but a real process id.
  */
 export function processProbe(pid) {
-  if (!Number.isSafeInteger(pid) || pid <= 0) return { alive: false }; // pid 0 and negatives address process GROUPS
+  if (!isProcessId(pid)) return { state: "unknown" };
   try {
     process.kill(pid, 0);
   } catch (error) {
-    return error?.code === "ESRCH" ? { alive: false } : { alive: undefined };
+    return { state: error?.code === "ESRCH" ? "dead" : "unknown" };
   }
-  return { alive: true, start: process.platform === "linux" ? readLinuxStart(pid) : undefined };
+  const start = process.platform === "linux" ? readLinuxStart(pid) : undefined;
+  return start === undefined ? { state: "live" } : { state: "live", start };
 }
 
 let cachedOwner;
@@ -230,18 +237,19 @@ export function readOwner(target, kind) {
   throw new TypeError(`owned: unknown kind ${JSON.stringify(kind)}`);
 }
 
-/** Rule §3's order: unreadable/unmarked → unknown; foreign host → unknown; no such pid → gone; a refused or failed query → unknown; alive → live, or unknown when both starts differ by more than the tolerance. */
+/** Rule §3's order: unreadable/unmarked → unknown; foreign host → unknown; a pid no process can have → unknown; `state: "dead"` (no such pid) → gone; a refused or failed query → unknown; alive → live, or unknown when both starts differ by more than the tolerance. */
 export function ownerState(owner, probe = processProbe) {
   if (owner === null || owner === undefined || owner.unreadable === true) return "unknown";
   if (owner.host.toLowerCase() !== thisOwner().host.toLowerCase()) return "unknown";
+  if (!isProcessId(owner.pid)) return "unknown"; // pid 0, a negative, a fraction or one past 2^53 is no process: never asked, never gone
   let seen;
   try {
     seen = probe(owner.pid);
   } catch {
     return "unknown";
   }
-  if (seen?.alive === false) return "gone"; // the one answer that deletes: no process has that pid
-  if (seen?.alive !== true) return "unknown"; // refused, failed or silent
+  if (seen?.state === "dead") return "gone"; // the one answer that deletes: no process has that pid
+  if (seen?.state !== "live") return "unknown"; // unknown, refused, failed, silent or in any other shape (a bare `alive: false` too)
   if (owner.start === undefined || seen.start === undefined) return "live"; // pid reuse then PRESERVES
   return Math.abs(owner.start - seen.start) <= START_TOLERANCE_S ? "live" : "unknown"; // a mismatch is never proof of death
 }
