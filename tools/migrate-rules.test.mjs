@@ -8,11 +8,11 @@ import {execFileSync,spawnSync} from "node:child_process";
 import {rebaseLinks,migrationPlan,applyMigration} from "./lib/rule-migration.mjs";
 import {gitOutput} from "./lib/git.mjs";
 import {smoke} from "./lib/rule-smoke.mjs";
+import {GUARD_MS} from "./lib/startup-ceilings.mjs";
 
-// Every child this file starts ends on its own (fixture git, the resolver, a dry-run CLI), so its ceiling is a guard
-// against a HANG, not a measure of speed. A short one also covers process start-up, which a machine running other
-// suites stretches without limit: the 30 s of lib/git.mjs expired in `git submodule add` after 66 s of a loaded run.
-const GUARD_MS=180000;
+// Every child this file starts ends on its own and prints nothing before the behaviour under test, so none has a
+// start-up signal to widen on: each gets ONE hang-guard ceiling (GUARD_MS), not a speed bound. The 30 s of lib/git.mjs
+// expired in `git submodule add` after 66 s of a loaded run.
 const git=(repo,...args)=>gitOutput(repo,args,{timeoutMs:GUARD_MS}).trimEnd();
 
 test("moved project links resolve to the same repository targets",()=>{
