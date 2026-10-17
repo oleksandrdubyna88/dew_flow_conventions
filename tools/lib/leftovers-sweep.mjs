@@ -154,11 +154,19 @@ function sweepFolders(context, listedPaths) {
 }
 
 function sweepOrphanClaims(context) {
-  const { tmp, now, minAgeMs, result } = context;
+  const { tmp, now, minAgeMs, state, result } = context;
   for (const entry of fs.readdirSync(tmp, { withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith(OWNER_SUFFIX) || !OWNED_PATTERN.test(entry.name)) continue;
     const claim = path.join(tmp, entry.name);
-    if (fs.existsSync(claim.slice(0, -OWNER_SUFFIX.length)) || ageOf(claim, now) < minAgeMs) continue;
+    const folderPath = claim.slice(0, -OWNER_SUFFIX.length);
+    if (fs.existsSync(folderPath) || ageOf(claim, now) < minAgeMs) continue;
+    // A claim with no folder is what a helper that claims FIRST leaves when it dies between the claim and the create. It is a
+    // claim like any other: its owner decides — gone removes it; live, foreign, unknown and unreadable keep it.
+    const verdict = decide({ owner: readOwner(folderPath, "folder"), ageMs: Infinity, minAgeMs, state });
+    if (!verdict.remove) {
+      result.preserved.push({ path: claim, reason: verdict.reason });
+      continue;
+    }
     try {
       fs.rmSync(claim, { force: true });
       result.removed.push(claim);

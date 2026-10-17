@@ -489,6 +489,46 @@ test("L6d. A readable owner label still works through the quoted template: dead 
     ["network rm n1", "rm -f -v c1", "rm -f -v c2", "volume rm testsToDelete-conventions-vdead"], run.text);
 });
 
+// --- orphan claims: a `<name>.owner` whose folder does not exist (a claim-first helper that died before it created) -------
+
+function orphanClaim(tmp, name, text) {
+  const file = path.join(tmp, `${name}.owner`);
+  fs.writeFileSync(file, text);
+  age(file, OLD);
+  return file;
+}
+
+test("L12. An orphan claim is judged by its owner: gone is removed, live and unreadable stay; --token narrows it and --dry-run keeps it", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const proc = posix(fakeProc(w, [1, 5555]));
+  const env = { JANITOR_OS: "linux", JANITOR_PROC: proc };
+  const gone = (name) => orphanClaim(tmp, name, `${OWNER_AS("linux", unmatchablePid())}\n`);
+  const liveClaim = orphanClaim(tmp, "testsToDelete-alpha-orphanlive", `${OWNER_AS("linux", 5555)}\n`);
+  const garbled = orphanClaim(tmp, "testsToDelete-alpha-orphangarbled", "not an owner\n");
+  const alpha = gone("testsToDelete-alpha-orphangone");
+  const beta = gone("testsToDelete-beta-orphangone");
+
+  const dry = runJanitor(w, { tmp, args: ["--dry-run", "--token", "alpha"], env });
+  assert.equal(dry.status, 3, dry.text);
+  assert.deepEqual([alpha, beta, liveClaim, garbled].filter((file) => !exists(file)), [], `a dry run removes nothing\n${dry.text}`);
+  const would = dry.stdout.filter((line) => line.startsWith("would run:"));
+  assert.equal(would.some((line) => line.includes("orphangone") && line.includes("alpha")), true, `the alpha orphan is announced: ${would.join(" // ")}`);
+  assert.equal(would.some((line) => line.includes("beta")), false, `--token alpha never announces beta: ${would.join(" // ")}`);
+
+  const narrowed = runJanitor(w, { tmp, args: ["--token", "alpha"], env });
+  assert.equal(exists(alpha), false, `the dead alpha claim is removed\n${narrowed.text}`);
+  assert.ok(exists(beta), `--token alpha leaves the beta claim\n${narrowed.text}`);
+  assert.ok(exists(liveClaim) && exists(garbled), `a live or unreadable claim stays\n${narrowed.text}`);
+  assert.ok(narrowed.stderr.some((line) => line.startsWith("skipped: marker ") && line.includes("owned by live process 5555")), narrowed.text);
+  assert.equal(narrowed.status, 3, narrowed.text);
+
+  const all = runJanitor(w, { tmp, env });
+  assert.equal(exists(beta), false, `without --token the beta claim goes too\n${all.text}`);
+  assert.ok(exists(liveClaim) && exists(garbled), all.text);
+});
+
 // --- 13: the header ------------------------------------------------------------------------------------------------------------
 
 test("L7. The header says --dry-run prints its `would run:` lines on STDOUT (gate 13)", () => {

@@ -292,6 +292,29 @@ test("3b. an old claim whose folder is gone is removed; a young one and one besi
   assert.deepEqual(result.removed.map((p) => path.basename(p)), [path.basename(`${orphan}.owner`)]);
 });
 
+test("3c. an orphan claim is judged by its owner like any claim: gone goes; live, foreign, unknown and unreadable stay (claim-first helpers)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "orphan-owner-repo");
+  const claim = (what, text) => {
+    const target = path.join(tmp, ownedName(what));
+    fs.writeFileSync(`${target}.owner`, text);
+    setOld(`${target}.owner`);
+    return `${target}.owner`;
+  };
+  const gone = claim("o-gone", deadOwnerLine());
+  const live = claim("o-live", formatOwner(thisOwner()) + "\n");
+  const foreign = claim("o-foreign", ownerLine("elsewhere@linux", PRETEND_DEAD));
+  const garbled = claim("o-garbled", "not an owner\n");
+  const empty = claim("o-empty", "");
+
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe });
+
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.removed.map((p) => path.basename(p)), [path.basename(gone)], "only the claim whose process is gone is removed");
+  for (const kept of [live, foreign, garbled, empty]) assert.ok(fs.existsSync(kept), `${path.basename(kept)} must stay`);
+  assert.deepEqual(result.preserved.map((entry) => entry.reason).sort(), ["foreign host", "live", "unreadable", "unreadable"], JSON.stringify(result.preserved));
+});
+
 // 4 ---------------------------------------------------------------------------------------------------------
 
 test("4. liveness is asked once per pid; the age is a selector, and `minAgeMs` moves it", (t) => {
