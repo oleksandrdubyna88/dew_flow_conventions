@@ -475,18 +475,21 @@ test("L6d. A readable owner label still works through the quoted template: dead 
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const dead = `${OWNER_AS("macos", unmatchablePid())}`;
+  const dead = `${OWNER_AS("linux", unmatchablePid())}`;
+  const proc = posix(fakeProc(w, [1, 5555]));
   setDocker(w, {
-    ps: [["c1", "testsToDelete-conventions-dead", dead, dockerTime(OLD)], ["c2", "testsToDelete-conventions-none", "", dockerTime(OLD)]],
+    ps: [["c1", "testsToDelete-conventions-dead", dead, dockerTime(OLD)], ["c2", "testsToDelete-conventions-none", "", dockerTime(OLD)],
+      ["c3", "testsToDelete-conventions-live", OWNER_AS("linux", 5555), dockerTime(OLD)]],
     net: [["n1", "testsToDelete-conventions-ndead", dead, dockerTime(OLD)]],
     vol: [["testsToDelete-conventions-vdead", dead]], volCreated: [["testsToDelete-conventions-vdead", volumeTime(OLD)]],
   });
 
-  const run = runJanitor(w, { tmp, env: { JANITOR_OS: "macos" } });
+  const run = runJanitor(w, { tmp, env: { JANITOR_OS: "linux", JANITOR_PROC: proc } });
 
-  assert.equal(run.status, 0, run.text);
+  assert.equal(run.status, 3, `the live container is the one skip\n${run.text}`);
   assert.deepEqual(dockerLog(w).filter((line) => /^(rm|network rm|volume rm) /.test(line)).sort(),
     ["network rm n1", "rm -f -v c1", "rm -f -v c2", "volume rm testsToDelete-conventions-vdead"], run.text);
+  assert.ok(run.stderr.some((line) => line.startsWith("skipped: container testsToDelete-conventions-live") && line.includes("owned by live process 5555")), run.text);
 });
 
 // --- the host name: normalised exactly as owned.mjs does, compared case-insensitively ------------------------------------

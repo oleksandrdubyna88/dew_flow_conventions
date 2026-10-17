@@ -53,7 +53,13 @@ host_norm() { printf '%s\n' "$1" | sed -E 's/[@:[:space:]]+/-/g'; }   # the host
 me="$(host_norm "${JANITOR_HOSTNAME:-$(hostname)}")@$OS"
 lower() { tr '[:upper:]' '[:lower:]'; }
 clean() { printf '%s' "$1" | LC_ALL=C tr -c '\040-\176' '?'; }   # text for a person's terminal: all but printable ASCII (escapes, CR, LF) becomes '?'
-owner_ok() { local t="${1%$'\r'}"; [[ "$t" =~ ^[^@:[:space:]]+@(linux|macos|windows):[0-9]+(:[0-9]+)?$ ]]; }   # the rule's marker grammar, exactly; ONE trailing CR (a CRLF line end that lost its LF) is no part of it
+uspace() {   # does $1 hold a Unicode space (what Node's \s names beyond ASCII)? [[:space:]] knows only the ASCII ones in a C/POSIX locale, so the UTF-8 bytes are listed
+  local s; for s in $'\xc2\xa0' $'\xe1\x9a\x80' $'\xe2\x80\x80' $'\xe2\x80\x81' $'\xe2\x80\x82' $'\xe2\x80\x83' $'\xe2\x80\x84' $'\xe2\x80\x85' $'\xe2\x80\x86' $'\xe2\x80\x87' $'\xe2\x80\x88' $'\xe2\x80\x89' $'\xe2\x80\x8a' $'\xe2\x80\xa8' $'\xe2\x80\xa9' $'\xe2\x80\xaf' $'\xe2\x81\x9f' $'\xe3\x80\x80' $'\xef\xbb\xbf'; do
+    case "$1" in *"$s"*) return 0;; esac
+  done
+  return 1
+}
+owner_ok() { local t="${1%$'\r'}"; if uspace "$t"; then return 1; fi; [[ "$t" =~ ^[^@:[:space:]]+@(linux|macos|windows):[0-9]+(:[0-9]+)?$ ]]; }   # the rule's marker grammar, exactly; ONE trailing CR (a CRLF line end that lost its LF) is no part of it
 pid_ok() { [[ "$1" =~ ^[1-9][0-9]{0,15}$ ]] && [ "$1" -le 9007199254740991 ]; }   # a process id: positive, no leading zero, a safe integer. Grammar-valid is not enough: 0, 007 or 25 digits name no process, so "no such process" about them would be a lie
 claim_norm() {   # $1 = the RAW text of a claim, trailing newlines intact → the claim as ONE line, or "-" when it is not exactly one line
   local raw="$1"; raw="${raw%$'\n'}"; raw="${raw%$'\r'}"   # one line end: LF or CRLF
