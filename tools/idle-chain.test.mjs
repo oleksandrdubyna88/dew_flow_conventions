@@ -104,6 +104,14 @@ test("a budget that is not a positive safe integer is refused, never replaced by
   }
 });
 
+test("a budget past what a timer can hold is refused, the largest one is accepted", async () => {
+  // setTimeout clamps a delay above 2^31-1 ms to 1 ms: the chain would be killed at once and reported as starved.
+  await assert.rejects(runChain(process.execPath, ["-e", ""], {budgetMs: 2_147_483_648}), TypeError);
+  const result = await runChain(process.execPath, ["-e", "process.exitCode=0"], {budgetMs: 2_147_483_647});
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 0);
+});
+
 test("a command that cannot start is an error that is not ETIMEDOUT", async () => {
   const result = await runChain("no-such-executable-idle-chain-5521", [], {budgetMs: 30000});
   assert.ok(result.error, "expected a spawn error");

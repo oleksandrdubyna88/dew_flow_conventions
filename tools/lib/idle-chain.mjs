@@ -5,13 +5,13 @@
 // ceiling, kills the WHOLE tree at it (tools/lib/proc.mjs — by pid: a job object on Windows, the process
 // group elsewhere, never by image name), and keeps "starved" apart from every other way a run can fail.
 
-import { run } from "./proc.mjs";
+import { MAX_TIMER_MS, run } from "./proc.mjs";
 
 /**
  * Run `command args` with a ceiling of `budgetMs` and report it the way `child_process.spawnSync` does:
  * `{status, signal, error, stdout, stderr}`.
  *
- * - `budgetMs` is required and must be a positive safe integer; anything else is a `TypeError`, never a
+ * - `budgetMs` is required and must be a positive safe integer no larger than `MAX_TIMER_MS` (a timer clamps more to 1 ms); anything else is a `TypeError`, never a
  *   silent fall back to `run()`'s own default.
  * - `maxOutputBytes` is passed to `run()` as is; omitted, `run()`'s own cap applies.
  * - `error.code` is `"ETIMEDOUT"` when the ceiling was reached (and for nothing else), `"EOVERFLOW"` when
@@ -21,8 +21,8 @@ import { run } from "./proc.mjs";
  * Every outcome except a spawn failure has ended the whole tree: `run()` runs it contained.
  */
 export async function runChain(command, args, { budgetMs, env, maxOutputBytes } = {}) {
-  if (!Number.isSafeInteger(budgetMs) || budgetMs < 1) {
-    throw new TypeError(`runChain needs budgetMs as a positive safe integer, got ${String(budgetMs)}`);
+  if (!Number.isSafeInteger(budgetMs) || budgetMs < 1 || budgetMs > MAX_TIMER_MS) {
+    throw new TypeError(`runChain needs budgetMs as a positive safe integer of at most ${MAX_TIMER_MS}, got ${String(budgetMs)}`);
   }
   const result = await run(command, args, { env, timeoutMs: budgetMs, containTree: true, ...(maxOutputBytes === undefined ? {} : { maxOutputBytes }) });
   const error = (result.timedOut && { code: "ETIMEDOUT" })

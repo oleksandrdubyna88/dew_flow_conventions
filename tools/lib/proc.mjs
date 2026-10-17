@@ -11,6 +11,9 @@ import { randomUUID } from "node:crypto";
 
 const contained = Symbol("job supervisor");
 
+/** The largest delay `setTimeout` honours (2^31-1 ms, about 24.8 days); a larger one is clamped to 1 ms and fires at once. */
+export const MAX_TIMER_MS = 2_147_483_647;
+
 /** Kill a process and everything it started. `taskkill /T` on Windows, the process group elsewhere. */
 export function killTree(child) {
   if (!child.pid) return;
@@ -36,8 +39,8 @@ export function killTree(child) {
  */
 export function run(command, args, { cwd, env, timeoutMs = 60_000, shell = false, stdout,
   maxOutputBytes = 4 * 1024 * 1024, containTree = false, signal } = {}) {
-  if (!Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 1 || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1) {
-    throw new Error("Process timeout and output budget must be positive integers");
+  if (!Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 1 || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_TIMER_MS) {
+    throw new Error(`Process timeout and output budget must be positive integers, the timeout at most ${MAX_TIMER_MS} ms (a timer holds no more)`);
   }
   if (containTree && shell) throw new Error("Contained processes require exe and argv, not a shell");
   const useJob = containTree && process.platform === "win32";

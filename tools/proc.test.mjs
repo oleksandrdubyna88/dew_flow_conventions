@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {run} from "./lib/proc.mjs";
+import {run,MAX_TIMER_MS} from "./lib/proc.mjs";
 import fs from "node:fs";
 import {setTimeout as delay} from "node:timers/promises";
 
@@ -41,6 +41,15 @@ test("process containment preserves argv and exit status",async()=>{
   const result=await run(process.execPath,["-e","console.log(JSON.stringify(process.argv.slice(1)));process.exitCode=7","--",...args],{timeoutMs:15000,containTree:true});
   assert.equal(result.code,7,result.err);
   assert.deepEqual(JSON.parse(result.out),args);
+});
+
+test("a timeout past what a timer can hold is refused, the largest one is accepted",async()=>{
+  // setTimeout clamps any delay above 2^31-1 ms to 1 ms, which would kill the child almost at once and call it a timeout.
+  assert.equal(MAX_TIMER_MS,2_147_483_647);
+  assert.throws(()=>run(process.execPath,["-e",""],{timeoutMs:MAX_TIMER_MS+1}),/timeout/i);
+  const result=await run(process.execPath,["-e","process.exitCode=0"],{timeoutMs:MAX_TIMER_MS});
+  assert.equal(result.timedOut,false);
+  assert.equal(result.code,0,result.err);
 });
 
 test("a process that exits on its own reports signal null next to its exit code",async()=>{
