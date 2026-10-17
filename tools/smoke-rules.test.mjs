@@ -13,9 +13,20 @@ import {git} from "./lib/git.mjs";
 import {resolverRead} from "./lib/rule-trace.mjs";
 import {roleRowsOf,declaredRole} from "./lib/rule-roles.mjs";
 
-// A node_modules link made with symlinkSync(…, "junction") is a junction on Windows (removed with rmdir) and a plain
-// symlink elsewhere (rmdir throws ENOTDIR — measured on the Linux CI runner); unlink removes the link, never the target.
-const removeLink=link=>process.platform==="win32"?fs.rmdirSync(link):fs.unlinkSync(link);
+import {ownedDir,ownedWorktree,removeLink} from "./lib/owned.mjs";
+
+// A disposable worktree of this checkout for the end-to-end behaviour runs. `home` (an owned folder) holds what a test
+// writes beside the worktree; `worktree` stays free of untracked files (behaviourSmoke refuses any). The node_modules
+// junction is unlinked by the helper's removeLink before the worktree goes, never following it into the checkout.
+function disposableWorktree(t,what){
+  const home=ownedDir(t,what);
+  const top=git(process.cwd(),"rev-parse","--show-toplevel");
+  const wt=ownedWorktree(t,top,"wt");
+  const modules=path.join(wt.path,"node_modules");
+  fs.symlinkSync(path.join(top,"node_modules"),modules,"junction");
+  wt.beforeRemove(()=>removeLink(modules));
+  return {home,worktree:wt.path};
+}
 
 const text="The complete canonical source.\n";
 const rule={id:"common.sample",text,hash:sha256(text)};
@@ -55,8 +66,7 @@ test("only one recognized resolver invocation is accepted through a shell wrappe
   }
 });
 test("a consumer's unrelated ENTRY cannot shadow its mounted resolver",t=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),"smoke-resolver-"));
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const root=ownedDir(t,"smoke-resolver");
   fs.mkdirSync(path.join(root,".agents/conventions/tools"),{recursive:true});
   fs.writeFileSync(path.join(root,"ENTRY.md"),"Unrelated entry");
   const mounted=path.join(root,".agents/conventions/tools/rules.mjs");
@@ -71,8 +81,7 @@ test("CLI entries outside default install directories run without shell wrappers
   assert.throws(()=>installedCli("codex",undefined,"win32",{PATH:"",APPDATA:"missing-smoke-cli",USERPROFILE:"missing-smoke-cli"}),/pass --cli/);
 });
 test("snapshot bounds inspected content and ignores unrelated large file bodies",t=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),"smoke-snapshot-"));
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const root=ownedDir(t,"smoke-snapshot");
   git(root,"init","-q");
   git(root,"-c","user.name=Smoke test","-c","user.email=test@example.invalid","-c","commit.gpgsign=false","commit","--allow-empty","-qm","fixture");
   fs.writeFileSync(path.join(root,"inspected.md"),"first");
@@ -330,8 +339,7 @@ test("judgeBehaviour reads the table from the worktree root named by the expecta
   assert.deepEqual(judged.verdict,{outcome:"pass",reasons:[]});
 });
 test("the behaviour mode refuses to run outside a disposable worktree",async t=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),"smoke-behaviour-"));
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const root=ownedDir(t,"smoke-behaviour");
   git(root,"init","-q");
   await assert.rejects(behaviourSmoke({repo:root,fixture:"negative"}),/disposable worktree/);
 });
@@ -451,15 +459,7 @@ test("the classification fixture loads only the rule under test, with the measur
 
 // ---- the real code path: behaviourSmoke end to end with a fake claude, no paid run ----
 test("behaviourSmoke runs end to end against a fake claude in a disposable worktree and records the rules read",async t=>{
-  const home=fs.mkdtempSync(path.join(os.tmpdir(),"smoke-e2e-"));
-  const worktree=path.join(home,"wt");
-  const top=git(process.cwd(),"rev-parse","--show-toplevel");
-  git(top,"worktree","add","--detach",worktree,"HEAD");
-  const modules=path.join(worktree,"node_modules");
-  fs.symlinkSync(path.join(top,"node_modules"),modules,"junction");
-  t.after(()=>{
-    try {removeLink(modules);git(top,"worktree","remove","--force",worktree);} finally {fs.rmSync(home,{recursive:true,force:true});git(top,"worktree","prune");}
-  });
+  const {home,worktree}=disposableWorktree(t,"smoke-e2e");
   const fake=path.join(home,"fake-claude.mjs");
   const canned=fileURLToPath(new URL("./fixtures/traces/two-children.jsonl",import.meta.url));
   fs.writeFileSync(fake,`import fs from "node:fs";process.stdout.write(fs.readFileSync(${JSON.stringify(canned)},"utf8"));`);
@@ -470,15 +470,7 @@ test("behaviourSmoke runs end to end against a fake claude in a disposable workt
 });
 
 test("a claude that exits non-zero never passes, even when its trace reads as a pass",async t=>{
-  const home=fs.mkdtempSync(path.join(os.tmpdir(),"smoke-e2e-exit-"));
-  const worktree=path.join(home,"wt");
-  const top=git(process.cwd(),"rev-parse","--show-toplevel");
-  git(top,"worktree","add","--detach",worktree,"HEAD");
-  const modules=path.join(worktree,"node_modules");
-  fs.symlinkSync(path.join(top,"node_modules"),modules,"junction");
-  t.after(()=>{
-    try {removeLink(modules);git(top,"worktree","remove","--force",worktree);} finally {fs.rmSync(home,{recursive:true,force:true});git(top,"worktree","prune");}
-  });
+  const {home,worktree}=disposableWorktree(t,"smoke-e2e-exit");
   const canned=fileURLToPath(new URL("./fixtures/traces/two-children.jsonl",import.meta.url));
   const fakeWith=code=>{
     const fake=path.join(home,`fake-claude-${code}.mjs`);
@@ -516,15 +508,7 @@ test("the exact-array form of changedFiles still means exactly that set",()=>{
 });
 
 test("behaviourSmoke handles an object-shaped changedFiles end to end (the caller path, not just the helper)",async t=>{
-  const home=fs.mkdtempSync(path.join(os.tmpdir(),"smoke-e2e-obj-"));
-  const worktree=path.join(home,"wt");
-  const top=git(process.cwd(),"rev-parse","--show-toplevel");
-  git(top,"worktree","add","--detach",worktree,"HEAD");
-  const modules=path.join(worktree,"node_modules");
-  fs.symlinkSync(path.join(top,"node_modules"),modules,"junction");
-  t.after(()=>{
-    try {removeLink(modules);git(top,"worktree","remove","--force",worktree);} finally {fs.rmSync(home,{recursive:true,force:true});git(top,"worktree","prune");}
-  });
+  const {home,worktree}=disposableWorktree(t,"smoke-e2e-obj");
   const negative=loadNamed("negative");
   const fixtureFile=path.join(home,"object-shaped.json");
   fs.writeFileSync(fixtureFile,JSON.stringify({...negative,name:"object-shaped",expectation:{...negative.expectation,changedFiles:{within:"tools/fixtures/behaviour/toy/",mustInclude:[]}}}));
@@ -552,13 +536,7 @@ test("the behaviour args never allow arbitrary node, only the resolver verbs and
   assert.equal(args.includes('Bash(node "C:/r/tools/rules.mjs" explain *)'),true);
 });
 test("behaviourSmoke refuses a worktree that already carries an uncommitted change, before launching",async t=>{
-  const home=fs.mkdtempSync(path.join(os.tmpdir(),"smoke-dirty-"));
-  const worktree=path.join(home,"wt");
-  const top=git(process.cwd(),"rev-parse","--show-toplevel");
-  git(top,"worktree","add","--detach",worktree,"HEAD");
-  const modules=path.join(worktree,"node_modules");
-  fs.symlinkSync(path.join(top,"node_modules"),modules,"junction");
-  t.after(()=>{try {removeLink(modules);git(top,"worktree","remove","--force",worktree);} finally {fs.rmSync(home,{recursive:true,force:true});git(top,"worktree","prune");}});
+  const {home,worktree}=disposableWorktree(t,"smoke-dirty");
   const tracked=path.join(worktree,"tools/fixtures/behaviour/toy/format.mjs");
   fs.appendFileSync(tracked,"\n// dirty\n");
   const marker=path.join(home,"launched");
@@ -577,8 +555,8 @@ test("a postCheck that is not node --test <path inside the behaviour fixtures> i
   assert.throws(()=>withPost(["node","-e","1"]),/postCheck/);
 });
 
-test("changedPaths reports the new path of a renamed file",()=>{
-  const dir=fs.mkdtempSync(path.join(os.tmpdir(),"chg-"));
+test("changedPaths reports the new path of a renamed file",t=>{
+  const dir=ownedDir(t,"chg");
   const run=(...a)=>spawnSync("git",a,{cwd:dir,encoding:"utf8"});
   run("init","-q");
   fs.writeFileSync(path.join(dir,"old.txt"),"some content more");
@@ -586,7 +564,6 @@ test("changedPaths reports the new path of a renamed file",()=>{
   run("-c","user.name=t","-c","user.email=t@t","commit","-qm","x");
   run("mv","old.txt","new name.txt");
   assert.deepEqual(changedPaths(dir),["new name.txt"]);
-  fs.rmSync(dir,{recursive:true,force:true});
 });
 
 test("parseArgs: --cli needs a value, unknown arguments are refused",()=>{

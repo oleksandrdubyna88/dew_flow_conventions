@@ -1,0 +1,160 @@
+#!/usr/bin/env node
+/**
+ * The liveness answer of `lib/owned.mjs` (rule §3 of `common/test-leftovers.md`): `processProbe` and `ownerState`.
+ *
+ * Only "no process has that pid" may make an owner `gone`, and `gone` is what authorises a deletion. So:
+ *   - a pid that is not a positive safe integer (0, a negative, a fraction, NaN, a number past 2^53, a string) is
+ *     UNKNOWN, never dead — 0 and the negatives address process groups, the rest address nothing at all;
+ *   - the answer is a named state (`live` | `dead` | `unknown`), not an `alive` flag whose third value is
+ *     `undefined`: that value vanishes from JSON and is one `if (!probe.alive)` away from treating a refusal as death;
+ *   - a probe that does not say `state: "dead"` in so many words is never read as dead.
+ */
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { sweepLeftovers } from "./lib/leftovers-sweep.mjs";
+import { cleanupScope, formatOwner, ownedDir, ownerState, parseOwner, processProbe, thisOwner } from "./lib/owned.mjs";
+
+const HOUR = 3_600_000;
+const BAD_PIDS = [0, -1, -4242, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 60, "4242", null, undefined];
+const me = () => thisOwner().host;
+
+/** Run `fn` with `process.kill` replaced by one that throws `code`. */
+function withKill(code, fn) {
+  const original = process.kill;
+  process.kill = () => { throw Object.assign(new Error(code), { code }); };
+  try { return fn(); } finally { process.kill = original; }
+}
+
+function lifo(t) {
+  const scope = cleanupScope();
+  t.after(() => scope.close());
+  return scope;
+}
+
+test("1. the real probe: a pid that is not a positive safe integer is unknown, never dead", () => {
+  for (const pid of BAD_PIDS) {
+    const probe = processProbe(pid);
+    assert.equal(probe.state, "unknown", `pid ${String(pid)} → ${JSON.stringify(probe)}`);
+  }
+});
+
+test("2. the real probe never signals a bad pid (0 and the negatives would reach a process GROUP)", () => {
+  const original = process.kill;
+  const signalled = [];
+  process.kill = (pid) => { signalled.push(pid); throw Object.assign(new Error("ESRCH"), { code: "ESRCH" }); };
+  try {
+    for (const pid of BAD_PIDS) processProbe(pid);
+  } finally {
+    process.kill = original;
+  }
+  assert.deepEqual(signalled, []);
+});
+
+test("3. ownerState: an owner whose pid is not a positive safe integer is unknown, even when the probe says dead", () => {
+  const asked = [];
+  const sayingDead = (pid) => { asked.push(pid); return { state: "dead", alive: false }; };
+  for (const pid of BAD_PIDS) {
+    assert.equal(ownerState({ host: me(), pid }, sayingDead), "unknown", `pid ${String(pid)}`);
+  }
+  assert.deepEqual(asked, [], "a bad pid is refused before the probe is asked");
+});
+
+test("4. a claim naming pid 0 or a pid past 2^53 parses, and its owner is unknown with the REAL probe", () => {
+  for (const text of [`${me()}:0\n`, `${me()}:00\n`, `${me()}:99999999999999999999\n`]) {
+    const owner = parseOwner(text);
+    assert.equal(owner.unreadable, undefined, `${text.trim()} is a well-formed claim`);
+    assert.equal(ownerState(owner), "unknown", text.trim());
+  }
+});
+
+test("5. the unknown state is visible in JSON: a refused query names 'unknown' (an `undefined` field would vanish)", () => {
+  for (const code of ["EPERM", "EACCES", "EIO"]) {
+    withKill(code, () => {
+      const probe = processProbe(4242);
+      assert.match(JSON.stringify(probe), /"state":"unknown"/, `${code}: ${JSON.stringify(probe)}`);
+      assert.equal(ownerState({ host: me(), pid: 4242 }), "unknown", code);
+    });
+  }
+});
+
+test("6. only ESRCH is dead, only success is live", () => {
+  withKill("ESRCH", () => assert.equal(processProbe(4242).state, "dead"));
+  assert.equal(processProbe(process.pid).state, "live");
+  assert.equal(ownerState(thisOwner()), "live");
+});
+
+test("7. no field of a probe answer is `undefined` except the Linux-only start", () => {
+  for (const probe of [withKill("EPERM", () => processProbe(4242)), withKill("ESRCH", () => processProbe(4242)), processProbe(0)]) {
+    for (const [key, value] of Object.entries(probe)) assert.notEqual(value, undefined, `${key} in ${JSON.stringify(probe)}`);
+  }
+});
+
+test("8. ownerState reads the NAMED state: dead → gone, live → live, unknown → unknown", () => {
+  const owner = { host: me(), pid: 4242 };
+  assert.equal(ownerState(owner, () => ({ state: "dead" })), "gone");
+  assert.equal(ownerState(owner, () => ({ state: "live" })), "live");
+  assert.equal(ownerState(owner, () => ({ state: "unknown" })), "unknown");
+});
+
+test("9. ownerState never reads a falsy `alive` (or a missing state) as dead", () => {
+  const owner = { host: me(), pid: 4242 };
+  for (const answer of [{ alive: false }, { alive: undefined }, { alive: 0 }, {}, { state: undefined }, { state: "gone" }, { state: "DEAD" }, { state: false }, undefined, null]) {
+    assert.equal(ownerState(owner, () => answer), "unknown", JSON.stringify(answer));
+  }
+  assert.equal(ownerState(owner, () => { throw new Error("probe broke"); }), "unknown");
+});
+
+test("10. a live answer with a start that disagrees is unknown, with the new shape", () => {
+  const owner = { host: me(), pid: 4242, start: 1_000 };
+  assert.equal(ownerState(owner, () => ({ state: "live", start: 1_001 })), "live");
+  assert.equal(ownerState(owner, () => ({ state: "live", start: 2_000 })), "unknown");
+});
+
+test("11. the sweep keeps a dead-looking folder when its probe answers in the old `alive: false` shape, and removes it on `state: dead`", (t) => {
+  const own = lifo(t);
+  const tmp = ownedDir(own, "liveness-tmp");
+  const repo = ownedDir(own, "liveness-repo");
+  const claim = (dir) => fs.writeFileSync(`${dir}.owner`, `${formatOwner({ host: me(), pid: 4242 })}\n`);
+  const old = (dir) => fs.utimesSync(dir, new Date(Date.now() - HOUR), new Date(Date.now() - HOUR));
+  const make = (what) => { const dir = ownedDir(own, what, { parent: tmp }); claim(dir); old(dir); return dir; };
+
+  const kept = make("liveness-kept");
+  const result = sweepLeftovers({ repo, tmp, probe: () => ({ alive: false }) });
+  assert.ok(fs.existsSync(kept), "a bare `alive: false` is not a death certificate");
+  assert.deepEqual(result.removed, []);
+
+  const unknown = sweepLeftovers({ repo, tmp, probe: () => ({ state: "unknown" }) });
+  assert.ok(fs.existsSync(kept), "an unknown probe keeps it");
+  assert.equal(unknown.preserved.find((entry) => entry.path === kept)?.reason, "unknown");
+
+  const dead = sweepLeftovers({ repo, tmp, probe: () => ({ state: "dead" }) });
+  assert.equal(fs.existsSync(kept), false, JSON.stringify(dead));
+});
+
+// --- the sweep seam must not change what REPO_ROOT means (finding 22) ----------------------------------------
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const runTestsUrl = pathToFileURL(path.join(here, "run-tests.mjs")).href;
+
+/** What `run-tests.mjs` exports, read in a child whose `RUN_TESTS_REPO_ROOT` is `value` (a child: the constant is read at import). */
+function exportsWith(value) {
+  const code = `const m = await import(${JSON.stringify(runTestsUrl)}); process.stdout.write(JSON.stringify({ root: m.REPO_ROOT, sweep: m.sweepRepoRoot?.() }));`;
+  const out = spawnSync(process.execPath, ["--input-type=module", "-e", code],
+    { env: { ...process.env, RUN_TESTS_REPO_ROOT: value }, encoding: "utf8", timeout: 60_000, cwd: here });
+  assert.equal(out.status, 0, out.stderr);
+  return JSON.parse(out.stdout);
+}
+
+test("12. REPO_ROOT is always this checkout; the test seam changes only the sweep's repository", () => {
+  const checkout = path.resolve(here, "..");
+  const seam = path.join(here, "fixtures");
+  assert.deepEqual(exportsWith(""), { root: checkout, sweep: checkout }, "unset: both are this checkout");
+  assert.deepEqual(exportsWith(seam), { root: checkout, sweep: seam }, "REPO_ROOT does not follow the environment");
+  assert.deepEqual(exportsWith("fixtures"), { root: checkout, sweep: seam }, "a relative seam is resolved against the working directory");
+});

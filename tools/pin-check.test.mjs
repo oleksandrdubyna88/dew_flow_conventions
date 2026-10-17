@@ -21,9 +21,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ownedDir } from "./lib/owned.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const tool = path.join(here, "pin-check.mjs");
@@ -38,8 +38,7 @@ function run(cwd) {
 }
 
 function workspace(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pin-check-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = ownedDir(t, "pin-check");
   return root;
 }
 

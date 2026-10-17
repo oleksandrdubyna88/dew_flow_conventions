@@ -1,15 +1,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
 import { buildFlagsFindings } from './build-flags-check.mjs';
+import { ownedDir } from './lib/owned.mjs';
 
 /** A throwaway repository root. Files are given as a path -> contents map. */
 function repository(t, files) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'build-flags-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = ownedDir(t, 'build-flags');
   for (const [relative, contents] of Object.entries(files)) {
     const full = path.join(dir, relative);
     fs.mkdirSync(path.dirname(full), { recursive: true });

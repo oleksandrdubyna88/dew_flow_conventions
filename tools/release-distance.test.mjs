@@ -12,17 +12,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 
 import { EXIT, main, measure } from "./release-distance.mjs";
+import { ownedDir } from "./lib/owned.mjs";
 
 const git = (cwd, ...args) =>
   execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", timeout: 20000, windowsHide: true }).trim();
 
 function workspace(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-distance-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = ownedDir(t, "release-distance");
   return root;
 }
 

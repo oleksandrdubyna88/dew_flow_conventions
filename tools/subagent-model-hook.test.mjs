@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +12,7 @@ import {
 import { ensureUserGuard } from '../settings/hooks/ensure-user-guard.mjs';
 import { targets } from '../settings/hooks/lib/user-guard-install.mjs';
 import { digestMismatches, parseRoleTable } from './lib/role-table.mjs';
+import { ownedDir } from './lib/owned.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const HOOK = path.join(HERE, '..', 'settings', 'hooks', 'subagent-model.mjs');
@@ -417,8 +417,7 @@ test('35. a launch WITH an effort key is judged exactly like one without: teach,
 
 test('42. the guard is version 3, and a session self-install upgrades an installed version 1 to it', t => {
   assert.equal(GUARD_VERSION, 3);
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-effort-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = ownedDir(t, 'guard-effort');
   const home = path.join(root, 'home');
   const paths = targets(home);
   fs.mkdirSync(path.dirname(paths.hook), { recursive: true });
