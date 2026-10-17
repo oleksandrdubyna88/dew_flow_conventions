@@ -93,12 +93,18 @@ last=""; for a in "$@"; do last="$a"; done
 emit() { [ -f "$1" ] || return 0; while IFS= read -r l || [ -n "$l" ]; do printf '%s\\n' "$l"; done < "$1"; }
 has() { [ -f "$S/mode" ] || return 1; while IFS= read -r l || [ -n "$l" ]; do [ "$l" = "$1" ] && return 0; done < "$S/mode"; return 1; }
 TAB=$(printf '\\t')
+Q=""; for a in "$@"; do case "$a" in *'%q'*) Q=".q";; esac; done   # a template that quotes the label (Go's %q): the fixture files hold what docker prints in each mode
 created() { [ -f "$S/volcreated.tsv" ] || return 0; while IFS= read -r l || [ -n "$l" ]; do case "$l" in "$1$TAB"*) printf '%s\\n' "\${l#*"$TAB"}";; esac; done < "$S/volcreated.tsv"; }
 case "$1" in
-  ps) emit "$S/ps.tsv";;
+  ps) emit "$S/ps$Q.tsv";;
+  network)
+    case "$2" in
+      ls) emit "$S/net$Q.tsv";;
+      rm) ;;
+    esac;;
   volume)
     case "$2" in
-      ls) emit "$S/vol.tsv";;
+      ls) emit "$S/vol$Q.tsv";;
       inspect)
         if [ "$3" = "--format" ]; then
           fmt="$4"; shift 4; rc=0
@@ -120,9 +126,30 @@ const dockerTime = (msAgo) => `${new Date(Date.now() - msAgo).toISOString().repl
 const volumeTime = (msAgo) => new Date(Date.now() - msAgo).toISOString().replace(/\.\d+Z$/, "Z");
 const rows = (list) => list.map((cells) => cells.join(TAB)).join("\n") + (list.length > 0 ? "\n" : "");
 
-function setDocker(w, { ps = [], vol = [], volCreated = [], mode = [] } = {}) {
+/** Go's `%q` of a string: what `{{printf "%q" (.Label …)}}` prints — one line, whatever the label holds. */
+function goQuote(text) {
+  const named = { "\n": "\\n", "\t": "\\t", "\r": "\\r", '"': '\\"', "\\": "\\\\" };
+  const escaped = [...text].map((ch) => {
+    const code = ch.codePointAt(0);
+    if (named[ch] !== undefined) return named[ch];
+    return code < 0x20 || code === 0x7f ? `\\x${code.toString(16).padStart(2, "0")}` : ch;
+  });
+  return `"${escaped.join("")}"`;
+}
+const quotedAt = (list, column) => list.map((cells) => cells.map((cell, i) => (i === column ? goQuote(cell) : cell)));
+
+/**
+ * `ps`/`net` rows: id, name, owner label, created; `vol`: name, owner label. Each is written twice, the way docker prints it
+ * for the two kinds of template: raw (the label as it is — a newline in it is a newline in docker's output) and `.q` (the label
+ * quoted, so it is one line whatever it holds).
+ */
+function setDocker(w, { ps = [], vol = [], volCreated = [], net = [], mode = [] } = {}) {
   fs.writeFileSync(path.join(w.state, "ps.tsv"), rows(ps));
+  fs.writeFileSync(path.join(w.state, "ps.q.tsv"), rows(quotedAt(ps, 2)));
+  fs.writeFileSync(path.join(w.state, "net.tsv"), rows(net));
+  fs.writeFileSync(path.join(w.state, "net.q.tsv"), rows(quotedAt(net, 2)));
   fs.writeFileSync(path.join(w.state, "vol.tsv"), rows(vol));
+  fs.writeFileSync(path.join(w.state, "vol.q.tsv"), rows(quotedAt(vol, 1)));
   fs.writeFileSync(path.join(w.state, "volcreated.tsv"), rows(volCreated));
   fs.writeFileSync(path.join(w.state, "mode"), mode.map((line) => `${line}\n`).join(""));
   fs.rmSync(path.join(w.state, "log"), { force: true });
@@ -401,6 +428,65 @@ test("L6. An owner written with escape sequences and a newline reaches stderr as
   assert.equal(/[\x00-\x09\x0b-\x1f\x7f]/.test(run.raw), false, `a control character reached stderr: ${JSON.stringify(run.raw)}`);
   assert.equal(run.stderr.length, 1, `one skip line, not a forged second one: ${JSON.stringify(run.stderr)}`);
   assert.ok(run.stderr[0].startsWith("skipped: folder ") && run.stderr[0].includes("is unreadable"), run.text);
+});
+
+/** A label a stranger wrote: a newline, then a whole record of its own that ends where docker's real record continues. */
+const FORGE_CONTAINER = "x\ncFORGED\ttestsToDelete-conventions-forged\t";
+const FORGE_NETWORK = "x\nnFORGED\ttestsToDelete-conventions-nforged\t";
+
+test("L6b. A container or network label holding a newline cannot forge a capture row: the forged id is never removed (gate 29)", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  setDocker(w, {
+    ps: [["c1", "testsToDelete-conventions-real", FORGE_CONTAINER, dockerTime(OLD)]],
+    net: [["n1", "testsToDelete-conventions-nreal", FORGE_NETWORK, dockerTime(OLD)]],
+  });
+
+  const run = runJanitor(w, { tmp });
+
+  const calls = dockerLog(w).filter((line) => /^(rm|network rm) /.test(line));
+  assert.deepEqual(calls, [], `nothing may be removed — the forged rows named cFORGED and nFORGED\n${run.text}`);
+  assert.equal(run.status, 3, run.text);
+  assert.equal(run.stderr.filter((line) => line.startsWith("skipped: ")).length, 2, `exactly the two real resources are skipped: ${JSON.stringify(run.stderr)}`);
+  assert.equal(run.stderr.some((line) => /^skipped: (container|network) [^ ]*forged/i.test(line)), false, `a forged resource was captured: ${JSON.stringify(run.stderr)}`);
+  assert.equal(/[\x00-\x09\x0b-\x1f\x7f]/.test(run.raw), false, `a control character reached stderr: ${JSON.stringify(run.raw)}`);
+});
+
+test("L6c. A volume label holding a newline cannot forge a volume row", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const real = "testsToDelete-conventions-vreal";
+  const forged = "testsToDelete-conventions-vforged";
+  setDocker(w, {
+    vol: [[real, `x\n${forged}`]], volCreated: [[real, volumeTime(OLD)], [forged, volumeTime(OLD)]],
+  });
+
+  const run = runJanitor(w, { tmp });
+
+  assert.deepEqual(dockerLog(w).filter((line) => line.startsWith("volume rm ")), [], `neither volume may be removed: the real one has an unreadable owner\n${run.text}`);
+  assert.equal(run.status, 3, run.text);
+  assert.equal(run.stderr.some((line) => line.startsWith(`skipped: volume ${forged}`)), false, `a forged volume was captured: ${JSON.stringify(run.stderr)}`);
+  assert.equal(run.stderr.filter((line) => line.startsWith("skipped: volume ")).length, 1, run.text);
+});
+
+test("L6d. A readable owner label still works through the quoted template: dead → removed, live → kept", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dead = `${OWNER_AS("macos", unmatchablePid())}`;
+  setDocker(w, {
+    ps: [["c1", "testsToDelete-conventions-dead", dead, dockerTime(OLD)], ["c2", "testsToDelete-conventions-none", "", dockerTime(OLD)]],
+    net: [["n1", "testsToDelete-conventions-ndead", dead, dockerTime(OLD)]],
+    vol: [["testsToDelete-conventions-vdead", dead]], volCreated: [["testsToDelete-conventions-vdead", volumeTime(OLD)]],
+  });
+
+  const run = runJanitor(w, { tmp, env: { JANITOR_OS: "macos" } });
+
+  assert.equal(run.status, 0, run.text);
+  assert.deepEqual(dockerLog(w).filter((line) => /^(rm|network rm|volume rm) /.test(line)).sort(),
+    ["network rm n1", "rm -f -v c1", "rm -f -v c2", "volume rm testsToDelete-conventions-vdead"], run.text);
 });
 
 // --- 13: the header ------------------------------------------------------------------------------------------------------------

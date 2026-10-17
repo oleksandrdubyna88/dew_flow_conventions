@@ -129,18 +129,23 @@ volume_created() {   # $1 = captured volume names, one per line → "name<TAB>Cr
     elif ! printf '%s\n' "$one" | grep -qi 'no such volume'; then echo "janitor: docker volume inspect failed: $(clean "$(printf '%s\n' "$one" | head -n 1)")" >&2; return 1; fi
   done <<< "$1"
 }
+# A docker label is text a stranger wrote, and docker prints it raw: a newline in it would end the record, and the rest of the label would
+# read as a record of its own — a forged row naming any id. So every template asks for the label through Go's `%q`, which prints it as ONE
+# quoted line with its control characters escaped; uq() takes the quotes off. A value that is not quoted is left as it is.
+LBL='{{printf "%q" (.Label "testsToDelete.owner")}}'
+UQ='function uq(s) { if (s ~ /^".*"$/) s = substr(s, 2, length(s) - 2); return s } '
 row() { printf '%s\n' "$1$U$2$U$3$U$(printf '%s' "$4" | LC_ALL=C tr '\000-\037\177' '?')$U$5"; }   # kind id name owner created — an owner is text a stranger wrote: a newline or \x1f in it would forge a row
 capture() {   # ONE line per prefixed resource ("-" = an owner nobody can read). A failing listing fails the run.
-  dk ps -a --format '{{.ID}}\t{{.Names}}\t{{.Label "testsToDelete.owner"}}\t{{.CreatedAt}}' | awk -F'\t' -v OFS="$U" -v rx="^$RX" 'tolower($2) ~ rx {print "container",$1,$2,$3,$4}' || return 1
+  dk ps -a --format '{{.ID}}\t{{.Names}}\t'"$LBL"'\t{{.CreatedAt}}' | awk -F'\t' -v OFS="$U" -v rx="^$RX" "$UQ"'tolower($2) ~ rx {print "container",$1,$2,uq($3),$4}' || return 1
   local vols created
-  vols="$(dk volume ls --format '{{.Name}}\t{{.Label "testsToDelete.owner"}}' | awk -F'\t' -v rx="^$RX" 'tolower($1) ~ rx')" || return 1
+  vols="$(dk volume ls --format '{{.Name}}\t'"$LBL" | awk -F'\t' -v rx="^$RX" 'tolower($1) ~ rx')" || return 1
   if [ -n "$vols" ]; then   # one inspect for all captured volumes, not one per volume
     created="$(volume_created "$(printf '%s\n' "$vols" | cut -f1)")" || return 1
     # one linear pass: the name→CreatedAt map first (C lines), then every listed volume (V lines); one that is not in the map vanished
     { printf '%s\n' "$created" | sed -n "s/^/C$TAB/p"; printf '%s\n' "$vols" | sed -n "s/^/V$TAB/p"; } |
-      awk -F'\t' -v OFS="$U" '$1=="C"{c[$2]=$3; next} $1=="V"{ gsub(/[[:cntrl:]]/, "?", $3); if ($2 in c) print "volume",$2,$2,$3,c[$2]; else print "notice: volume " $2 " — vanished after the capture" > "/dev/stderr" }'
+      awk -F'\t' -v OFS="$U" "$UQ"'$1=="C"{c[$2]=$3; next} $1=="V"{ $3 = uq($3); gsub(/[[:cntrl:]]/, "?", $3); if ($2 in c) print "volume",$2,$2,$3,c[$2]; else print "notice: volume " $2 " — vanished after the capture" > "/dev/stderr" }'
   fi
-  dk network ls --format '{{.ID}}\t{{.Name}}\t{{.Label "testsToDelete.owner"}}\t{{.CreatedAt}}' | awk -F'\t' -v OFS="$U" -v rx="^$RX" 'tolower($2) ~ rx {print "network",$1,$2,$3,$4}' || return 1
+  dk network ls --format '{{.ID}}\t{{.Name}}\t'"$LBL"'\t{{.CreatedAt}}' | awk -F'\t' -v OFS="$U" -v rx="^$RX" "$UQ"'tolower($2) ~ rx {print "network",$1,$2,uq($3),$4}' || return 1
   local wts; wts="$(git worktree list --porcelain)" || return 1
   printf '%s\n' "$wts" | awk -v OFS="$U" '/^worktree /{if(p!="" && n>1)print "wt-git",p,p,o,""; p=substr($0,10); o=""; n++} /^locked/{o=substr($0,8); if(o=="")o="-"} END{if(p!="" && n>1)print "wt-git",p,p,o,""}' | awk -F"$U" -v rx="/$RX[^/]*\$" 'tolower($3) ~ rx'   # the first block is the MAIN worktree: never a candidate
   local mine=$'\n' main="" wp c   # this repo's trees, canonical, one per line: not captured twice from the temp root; the first is the MAIN checkout
