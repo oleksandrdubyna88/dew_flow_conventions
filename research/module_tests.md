@@ -1156,7 +1156,7 @@ This repository's own tests obey `common/test-leftovers.md`, in four pieces that
   story branches were first combined, the guard reddened on that file (**4 findings**: two in prose, two in the
   helper) and, through 1b, on one comment in `leftovers-sweep.test.mjs`; both were fixed in the integration and the guard
   reports `clean (42 files)`.
-- **The janitor.** `tools/janitor.sh` (150 lines, 12 166 B, sha256 `0644a175…be104a2`, LF through `.gitattributes`, mode 100755) is the
+- **The janitor.** `tools/janitor.sh` (225 lines, 19 304 B, sha256 `54ba6151…a8498d3`, LF through `.gitattributes`, mode 100755) is the
   host-wide tool of the rule's `## The janitor` heading — a shipped file, not a block to paste. `janitor.test.mjs` holds
   its twelve verdicts, `8b` (the `--dry-run` announcement) and `13`–`19` (the code gate and the Opus review: malformed owners, one row per
   worktree, one volume inspect, one `tasklist` snapshot, three-valued liveness on both branches, the running clone) as `node:test`: a stub
@@ -1185,9 +1185,11 @@ first Linux run found what Windows could not: the private `PATH` of the janitor 
 capture added, so cases 2 and 15 failed with `cut: command not found`; the tool list now names them. The run was made in a WSL-native
 copy of the tree (`git archive` into a scratch repository), because a worktree's `.git` file names a Windows path that WSL's git cannot read.
 
-**Known limit of the pinned `tools/janitor.sh`.** On Windows its `canon` folds `C:/…` to `/c/…` but not MSYS's `/tmp/…` (the user
-temp root), and git prints worktrees as `C:/…`. With `TMPDIR` unset or spelled `C:/…`, this clone's own prefixed worktree in the
-temp root is captured twice (a duplicate `vanished` notice or `skipped` line) and the clone the script runs from is not
-recognised as such — it then tries to remove its own working directory (Windows refuses; the line reads `could not be removed`).
-`janitor.test.mjs` therefore hands the script `/c/Users/…`, the spelling its harness always used; the next change to the script fixes
-`canon` and comes with a new hash (the twin pins it).
+**Round 3 of the code gate (the janitor, owner and guard hardening).** Four branches were merged into the epic, and one integration pass added the rest. The janitor is now 225 lines, 19 304 B (sha in § The janitor above); new test files, each runnable alone with `node --test --test-concurrency=1 <file>`:
+
+- `tools/owned-liveness.test.mjs` — `processProbe` answers a named `state`; a pid that is not a positive safe integer is `unknown` and the OS is never asked; `sweepRepoRoot(env)` keeps the real repository root.
+- `tools/owner-conformance.test.mjs` over `tools/fixtures/owner-vectors.json` — ONE table of vectors (owner grammar, verdicts, host names) asked of both `owned.mjs` and `janitor.sh`; a disagreement names the vector and both answers. The harness feeds the janitor's `owner_ok` the raw claim text through `claim_norm` (command substitution alone drops trailing newlines, which made the multi-line vector i29 look valid to bash only because of the harness).
+- `tools/janitor-paths.test.mjs` — `canon()` resolves every spelling of one folder to one (`pwd -W` where bash has it, cached per path); the clone the janitor runs from and the MAIN checkout are never temp-root candidates. This **fixed the known `/tmp` limit** an earlier round recorded: a worktree in a `TMPDIR` spelled the MSYS way is no longer captured twice, and the janitor no longer tries to remove its own working directory.
+- `tools/janitor-liveness.test.mjs` — the Windows `tasklist` PID column is matched alone; a failed `tasklist` is one notice; a volume that vanished between `ls` and `inspect` is a notice; `hidepid` makes a missing `/proc/<pid>` unknown; `JANITOR_MIN_AGE_MINUTES` is digits only (`10#` forces decimal); control characters never reach stderr; a claim of more than one line is unreadable; a pid that cannot name a process is unknown; `--token <t>`; docker owner labels are read through Go's `%q` (L6b–L6d: a label holding a newline can no longer forge a capture row); orphan claims (L12); the host name is normalised like `owned.mjs` (L13, through the `JANITOR_HOSTNAME` seam — Git for Windows' bash puts `/usr/bin` first on its PATH, so a `hostname` stub cannot win there).
+
+Also in the integration: `leftovers-check.mjs` covers `docker compose -p`/`--project-name` (global options only; `-p` after the subcommand is `--publish`) and `COMPOSE_PROJECT_NAME`, and C#'s `Directory.CreateTempSubdirectory` and `Path.GetTempFileName`; `leftovers-sweep.mjs` judges an orphan claim (`<name>.owner` with no folder, left by a helper that claims first) by its owner instead of by age alone; the rule's contract text gained the DNS host name and its normalisation, the CI owner pid, the claim-first folder variant, the old-prefix end date and the janitor's `--token` and `JANITOR_MIN_AGE_MINUTES`.

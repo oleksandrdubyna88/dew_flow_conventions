@@ -68,13 +68,7 @@ const { bash: BASH, gitRoot: GIT_ROOT } = locateBash();
 
 const slash = (p) => p.replaceAll("\\", "/");
 
-/**
- * A folder as the script's own bash spells it: `/c/Users/…` on Windows, never `C:/…`. MSYS turns a `C:/…` TMPDIR
- * into `/tmp/…` whenever the folder is under the user's temp root, while git prints the same tree as `C:/…`; the
- * janitor's `canon` folds the drive spelling to `/c/…` but not `/tmp/…`, so a repository's own worktree in a TMPDIR
- * spelled the `/tmp` way would be captured twice (a known limit recorded in `research/module_tests.md`; the script is
- * hash-pinned and is not changed here). Every scenario therefore hands the script the spelling its harness always used.
- */
+/** A folder as the script's own bash spells it: `/c/Users/…` on Windows, never `C:/…`. The harness's habit; the script resolves every spelling of one folder alike (`janitor-paths.test.mjs` pins that). */
 const posix = (p) => (win32 ? slash(p).replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`) : p);
 
 /** The PATH of a run: the stub dir first (when the scenario has docker), then ONLY the tools the script calls. */

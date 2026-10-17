@@ -489,6 +489,30 @@ test("L6d. A readable owner label still works through the quoted template: dead 
     ["network rm n1", "rm -f -v c1", "rm -f -v c2", "volume rm testsToDelete-conventions-vdead"], run.text);
 });
 
+// --- the host name: normalised exactly as owned.mjs does, compared case-insensitively ------------------------------------
+
+// Git for Windows' bash puts /usr/bin first on its own PATH, so a `hostname` stub cannot win there: the script reads JANITOR_HOSTNAME (a test seam, like JANITOR_OS).
+
+test("L13. A machine name holding a space, ':' or '@' is normalised like owned.mjs (one dash per run), and the comparison ignores case", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const proc = posix(fakeProc(w, [1]));
+  const env = { JANITOR_OS: "linux", JANITOR_PROC: proc };
+  const dead = unmatchablePid();
+  const same = folder(w, tmp, "hostsame", { owner: `my-host-x-y@linux:${dead}\n` });
+  const upper = folder(w, tmp, "hostupper", { owner: `MY-HOST-X-Y@linux:${dead}\n` });
+  const other = folder(w, tmp, "hostother", { owner: `my-host@linux:${dead}\n` });
+
+  const run = runJanitor(w, { tmp, env: { ...env, JANITOR_HOSTNAME: "my host:x@y" } });
+
+  assert.equal(exists(same) || exists(`${same}.owner`), false, `the owner this machine writes (my-host-x-y) is ours, and its process is gone\n${run.text}`);
+  assert.equal(exists(upper) || exists(`${upper}.owner`), false, `the same name in another case is the same host\n${run.text}`);
+  assert.ok(exists(other), `a different name is another host\n${run.text}`);
+  assert.ok(run.stderr.some((line) => line.includes("belongs to my-host@linux, not this host")), run.text);
+  assert.equal(run.status, 3, run.text);
+});
+
 // --- orphan claims: a `<name>.owner` whose folder does not exist (a claim-first helper that died before it created) -------
 
 function orphanClaim(tmp, name, text) {

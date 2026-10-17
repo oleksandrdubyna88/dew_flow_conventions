@@ -164,12 +164,17 @@ export function processProbe(pid) {
 
 let cachedOwner;
 
-/** This process: `{ host: "<hostname>@<linux|macos|windows>", pid, start? }`, computed once. Throws on any other platform. */
+/** A machine's DNS host name as an owner writes it: each run of `@`, `:` or whitespace becomes ONE `-`; nothing is trimmed, the case is kept. `janitor.sh`'s `host_norm` is the same rule, pinned by `owner-conformance.test.mjs`. */
+export function hostName(raw) {
+  return raw.replace(/[@:\s]+/g, "-");
+}
+
+/** This process:`{ host: "<hostname>@<linux|macos|windows>", pid, start? }`, computed once. Throws on any other platform. */
 export function thisOwner() {
   if (cachedOwner !== undefined) return cachedOwner;
   const tag = OS_TAGS[process.platform];
   if (tag === undefined) throw new Error(`owned: no owner shape for platform ${process.platform}`);
-  const owner = { host: `${os.hostname().replace(/[@:\s]+/g, "-")}@${tag}`, pid: process.pid };
+  const owner = { host: `${hostName(os.hostname())}@${tag}`, pid: process.pid };
   const start = tag === "linux" ? processProbe(process.pid).start : undefined;
   if (start !== undefined) owner.start = start;
   cachedOwner = Object.freeze(owner);

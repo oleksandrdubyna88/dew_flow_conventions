@@ -62,7 +62,9 @@ cleanup's shape — a failed assertion skips it (found in one repository, 2026-1
 
 Every prefixed resource carries its owner, **`<host>@<os>:<pid>[:<start>]`**: the machine's DNS host name
 (`hostname`, Node `os.hostname()`, C# `Dns.GetHostName()`), compared case-insensitively — never the NetBIOS name
-(C# `Environment.MachineName`, `%COMPUTERNAME%`: upper-case, cut at 15 characters); `linux`, `macos` or `windows`
+(C# `Environment.MachineName`, `%COMPUTERNAME%`: upper-case, cut at 15 characters), with each run of `@`, `:` or
+whitespace in it written as ONE `-` (nothing is trimmed, the case is kept — every reader applies this same rule
+before it compares); `linux`, `macos` or `windows`
 (a Windows machine and its Linux subsystem answer to ONE name with TWO pid spaces, measured 2026-10-15); the
 process id — in a CI job, the runner worker process that runs the job's steps (`$PPID` of a step's shell), because
 the step's own shell is gone before the job is; and, **only where the OS gives it without spawning a

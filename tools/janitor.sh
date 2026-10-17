@@ -29,7 +29,7 @@
 #         root nor Windows pids).  JANITOR_MIN_AGE_MINUTES (default 60) is the window: whole minutes, digits only —
 #         anything else is refused in one line (exit 1, nothing removed).  --dry-run prints `would run: …` lines on
 #         STDOUT (skips and notices stay on stderr) and removes nothing (exit codes unchanged).
-#         JANITOR_OS and JANITOR_PROC (the /proc root, default /proc) are test seams only.
+#         JANITOR_OS, JANITOR_PROC (the /proc root, default /proc) and JANITOR_HOSTNAME (the machine name, default `hostname`) are test seams only.
 set -euo pipefail
 usage() { echo "usage: bash tools/janitor.sh [--dry-run] [--token <t>]   (<t>: lower-case letters and digits)" >&2; exit 2; }
 DRY=0; TOKEN=""; HAVE_TOKEN=0
@@ -49,7 +49,8 @@ T="${TMPDIR:-/tmp}"; MIN_AGE=$(( 10#$AGE_MIN * 60 )); NOW="$(date -u +%s)"   # 1
 TAB=$'\t'
 U=$'\x1f'   # the field separator of the capture: never whitespace, so an EMPTY owner or age keeps its column
 OS="${JANITOR_OS:-$(case "$(uname -s)" in Linux) echo linux;; Darwin) echo macos;; *) echo windows;; esac)}"   # JANITOR_OS: test seam only
-me="$(hostname)@$OS"
+host_norm() { printf '%s\n' "$1" | sed -E 's/[@:[:space:]]+/-/g'; }   # the host as an owner writes it: each run of '@', ':' or whitespace is ONE '-', nothing trimmed, case kept (owned.mjs hostName, the same rule)
+me="$(host_norm "${JANITOR_HOSTNAME:-$(hostname)}")@$OS"
 lower() { tr '[:upper:]' '[:lower:]'; }
 clean() { printf '%s' "$1" | LC_ALL=C tr -c '\040-\176' '?'; }   # text for a person's terminal: all but printable ASCII (escapes, CR, LF) becomes '?'
 owner_ok() { local t="${1%$'\r'}"; [[ "$t" =~ ^[^@:[:space:]]+@(linux|macos|windows):[0-9]+(:[0-9]+)?$ ]]; }   # the rule's marker grammar, exactly; ONE trailing CR (a CRLF line end that lost its LF) is no part of it

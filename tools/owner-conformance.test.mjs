@@ -38,6 +38,7 @@ import { spawnSync } from "node:child_process";
 
 import { git } from "./lib/git.mjs";
 import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
+import * as owned from "./lib/owned.mjs";
 import { cleanupScope, ownerState, ownedDir, parseOwner, thisOwner } from "./lib/owned.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -102,11 +103,11 @@ function extractFunction(lines, start) {
   return "";
 }
 
-/** `owner_ok` plus every other top-level function of the script that it (transitively) names. */
-function ownerOkSource(scriptText) {
+/** The function `root`, plus `extra` and every other top-level function of the script that they (transitively) name. */
+function ownerOkSource(scriptText, root = "owner_ok", extra = ["claim_norm"]) {
   const lines = scriptText.split(/\r?\n/);
   const defined = definedFunctions(lines);
-  const wanted = ["owner_ok", "claim_norm"];
+  const wanted = [root, ...extra];
   const parts = new Map();
   while (wanted.length > 0) {
     const name = wanted.pop();
@@ -118,7 +119,7 @@ function ownerOkSource(scriptText) {
       if (new RegExp(`(^|[^A-Za-z0-9_])${other}([^A-Za-z0-9_]|$)`).test(body)) wanted.push(other);
     }
   }
-  return parts.has("owner_ok") && parts.get("owner_ok") !== "" ? [...parts.values()].join("\n") : "";
+  return parts.has(root) && parts.get(root) !== "" ? [...parts.values()].join("\n") : "";
 }
 
 /** For every grammar vector: does `owner_ok` accept it, as the janitor would be handed it? */
@@ -168,6 +169,43 @@ test("grammar: every vector, asked of parseOwner (owned.mjs) and owner_ok (janit
       const message = `vector ${v.id} ${JSON.stringify(v.text)}: rule §3 says ${word(v.valid)} (${v.why}); `
         + `node parseOwner says ${word(node)}; bash owner_ok says ${word(bash)}`;
       assert.deepEqual({ node, bash: bash ?? v.valid }, { node: v.valid, bash: v.valid }, message);
+    });
+  }
+});
+
+// --- host names: one normalisation rule on both sides ---------------------------------------------------------
+
+const HOSTNAMES = VECTORS.hostnames.vectors;
+
+/** What `host_norm` (janitor.sh, cut out by name) prints for each raw host name; one NUL-separated name in, one line out. */
+function bashHostNames(t, vectors) {
+  const scope = lifo(t);
+  const source = ownerOkSource(fs.readFileSync(SCRIPT, "utf8"), "host_norm", []);
+  assert.notEqual(source, "", "host_norm could not be cut out of tools/janitor.sh by name");
+  const dir = ownedDir(scope, "ochost");
+  const harness = path.join(dir, "host.sh");
+  fs.writeFileSync(harness, `${source}
+while IFS= read -r -d '' raw; do
+  printf '[%s]\\n' "$(host_norm "$raw")"
+done
+`);
+  const input = Buffer.from(vectors.map((v) => `${v.raw}\0`).join(""), "utf8");
+  const result = spawnSync(BASH, [slash(harness)], { input, encoding: "utf8", windowsHide: true });
+  const lines = (result.stdout ?? "").split(/\r?\n/).filter(Boolean).map((line) => line.slice(1, -1));
+  assert.equal(lines.length, vectors.length, `the bash harness answered ${lines.length} of ${vectors.length} names (status ${result.status})\n${result.stderr}`);
+  return new Map(vectors.map((v, i) => [v.id, lines[i]]));
+}
+
+test("host names: every raw name is normalised alike by hostName (owned.mjs) and host_norm (janitor.sh)", { timeout: TIMEOUT }, async (t) => {
+  assert.equal(typeof owned.hostName, "function", "owned.mjs exports hostName(raw) — the one normalisation of a host name");
+  let bashSays = null;
+  if (BASH === "") t.diagnostic("bash not found: the bash half of every host-name vector is skipped");
+  else bashSays = bashHostNames(t, HOSTNAMES);
+  for (const v of HOSTNAMES) {
+    await t.test(`${v.id} ${JSON.stringify(v.raw)} → ${JSON.stringify(v.host)}`, () => {
+      const node = owned.hostName(v.raw);
+      const bash = bashSays === null ? v.host : bashSays.get(v.id);
+      assert.deepEqual({ node, bash }, { node: v.host, bash: v.host }, `vector ${v.id} ${JSON.stringify(v.raw)} (${v.why}): node hostName says ${JSON.stringify(node)}; bash host_norm says ${JSON.stringify(bash)}`);
     });
   }
 });
