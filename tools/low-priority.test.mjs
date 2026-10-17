@@ -118,6 +118,7 @@ test("a caller that is already lower than the target is never raised (real proce
   if (!windows) { t.skip("POSIX has no level below nice 19 to start from"); return; }
   const outer = `require('node:os').setPriority(0,${os.constants.priority.PRIORITY_LOW});`
     + `const r=require('node:child_process').spawnSync(process.execPath,${JSON.stringify([tool, "node", "-e", tree])},{stdio:'inherit'});process.exitCode=r.status;`;
+  t.diagnostic(`starting the Idle-class chain with a ${IDLE_CHAIN_BUDGET_MS} ms ceiling; a busy machine may starve it of CPU until then`);
   const result = await runChain(process.execPath, ["-e", outer], {budgetMs: IDLE_CHAIN_BUDGET_MS, env: env()});
   assert.equal(result.status, 0, chainFailure(result, IDLE_CHAIN_BUDGET_MS));
   const seen = priorities(result.stdout);

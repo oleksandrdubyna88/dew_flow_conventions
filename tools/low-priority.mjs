@@ -39,8 +39,8 @@ export function isCi(env = process.env) {
  * Lower the calling process to {@link TARGET} unless it is already lower, or this is CI.
  * Returns the priority the process ends up at. Higher numbers are LOWER priority on every platform
  * (`os.getPriority` maps Windows' classes onto the nice scale), so "already lower" is `>=`.
- * `host` and `target` are seams for the tests: the "never raised" decision can then be checked without
- * starting a process at Idle, which a busy machine starves (see low-priority.test.mjs).
+ * `host` and `target` are injection points: they let a caller verify the "never raised" decision without
+ * starting a process at the Idle class, which a busy machine starves of CPU.
  *
  * `host` must provide `getPriority(pid)` and `setPriority(pid, level)` — the subset of `node:os` this
  * function uses; `os` itself is the default. `target` is a level on the same scale as `os.getPriority`.

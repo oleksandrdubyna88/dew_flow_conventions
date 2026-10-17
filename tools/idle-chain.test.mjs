@@ -13,9 +13,9 @@ test("starvation is reported for the ceiling being reached — and only for it",
 });
 
 test("a spawn error, a signal and a plain exit are never called starvation", () => {
-  const enoent = chainFailure({status: null, signal: null, error: {code: "ENOENT", message: "spawn x ENOENT"}, stdout: "", stderr: ""}, 1000);
+  // The shape runChain really emits: a spawn failure carries a code, nothing else.
+  const enoent = chainFailure({status: null, signal: null, error: {code: "ENOENT"}, stdout: "", stderr: ""}, 1000);
   assert.match(enoent, /ENOENT/);
-  assert.match(enoent, /spawn x ENOENT/);
   const emfile = chainFailure({status: null, signal: null, error: {code: "EMFILE"}, stdout: "", stderr: ""}, 1000);
   assert.match(emfile, /EMFILE/);
   const signalled = chainFailure({status: null, signal: "SIGKILL", error: undefined, stdout: "", stderr: ""}, 1000);
@@ -26,6 +26,9 @@ test("a spawn error, a signal and a plain exit are never called starvation", () 
   for (const text of [enoent, emfile, signalled, failed]) assert.doesNotMatch(text, /starv/i);
 });
 
+// Known limit: this returns at the FIRST ESRCH. A pid the OS reused before the first poll would make
+// `process.kill(pid, 0)` succeed on a stranger and could keep the exit from being seen at all; the window
+// is a few milliseconds after the kill and the failure mode is a false "outlived", never a false pass.
 async function assertGone(pid) {
   const deadline = performance.now() + 5000;
   do {
@@ -84,6 +87,21 @@ test("a child that kills itself with SIGTERM reports the signal, a null status a
   assert.equal(result.status, null);
   assert.match(chainFailure(result, 30000), /signal SIGTERM/);
   assert.doesNotMatch(chainFailure(result, 30000), /starv/i);
+});
+
+test("output past the capture limit is EOVERFLOW, not starvation, and the tree is killed", async () => {
+  const result = await runChain(process.execPath, ["-e", "process.stdout.write('x'.repeat(200000));setInterval(()=>{},1000)"], {budgetMs: 60000, maxOutputBytes: 4096});
+  assert.equal(result.error?.code, "EOVERFLOW", JSON.stringify(result.error));
+  assert.equal(result.status, null);
+  const message = chainFailure(result, 60000);
+  assert.match(message, /output exceeded the capture limit; the tree was killed/);
+  assert.doesNotMatch(message, /starv/i);
+});
+
+test("a budget that is not a positive safe integer is refused, never replaced by a default", async () => {
+  for (const budgetMs of [undefined, 0, -1, 1.5, "1000", Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+    await assert.rejects(runChain(process.execPath, ["-e", ""], budgetMs === undefined ? {} : {budgetMs}), TypeError, `budgetMs=${String(budgetMs)}`);
+  }
 });
 
 test("a command that cannot start is an error that is not ETIMEDOUT", async () => {
