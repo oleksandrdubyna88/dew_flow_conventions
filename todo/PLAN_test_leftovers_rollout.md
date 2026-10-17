@@ -364,12 +364,12 @@ spends 78 855 of coai's 80 000-byte budget, `src_mcp/tests/StageRulesTests.cs:14
 | Epic | Repository | Depends on | Why this place |
 |---|---|---|---|
 | E1 | conventions | — | the contract everyone encodes; the carve-out creds needs; one release |
-| E2 | creds_for_devs | E1; E3 for its C# helper story | ~35 temp files without cleanup, the acme-test state and the stub files leak locally; CI containers die with the hosted job's VM (`docker.yml:30`), so CI needs only the always-run exact-name cleanup and a test that a failed smoke never publishes |
+| E2 | creds_for_devs | E1; E2.S3 (its C# helper story) waits for E3 | ~35 temp files without cleanup, the acme-test state and the stub files leak locally; CI containers die with the hosted job's VM (`docker.yml:30`), so CI needs only the always-run exact-name cleanup and a test that a failed smoke never publishes |
 | E3 | mcp | E1 | nineteen sites, zero cleanup, no Docker: the smallest full adoption and the C# template — runs before E2's C# helper story |
-| E4 | sidecar_rust | E1 | seven not-panic-safe removals, two pre-clean-only; the Rust shape of the helper |
-| E5 | coai | E1 | the largest site count and a live-data sweep; needs the contract's concurrency sentence |
-| E6 | benchmark | E1 | the Testcontainers fixture and decision 2b's first use |
-| E7 | rag_qln | E1 | the shared-store contradiction must be settled before any rename, and needs 2a's wording |
+| E4 | sidecar_rust | E1 — independent of the other consumer epics | seven not-panic-safe removals, two pre-clean-only; the Rust shape of the helper |
+| E5 | coai | E1 — independent of the other consumer epics | the largest site count and a live-data sweep; needs the contract's concurrency sentence |
+| E6 | benchmark | E1; E6 waits for E3.S2 (its C# helper ports E3's merged S2 — E6's amended order) | the Testcontainers fixture and decision 2b's first use |
+| E7 | rag_qln | E1; E7.S3 waits for E3's merged helper | the shared-store contradiction must be settled before any rename, and needs 2a's wording |
 
 ### Cornerstone areas
 
@@ -397,4 +397,4 @@ The Fable spec of each marked story settles what a later round cannot cheaply re
   collection) and what it does when the standing is unknown; the exact new prefix under Qdrant's naming; and
   the one-change migration of every reader and every pinning test so no reader is left on `qlntest_`.
 
-Cornerstones: 1 of 3 — E1.S1 (the contract text in common/test-leftovers.md, model: fable); reserved, not yet marked: E5 (coai's temp sweep), E7 (rag_qln's shared store).
+Cornerstones: 3 of 3 — E1.S1 (the contract text, model: fable), E5.S2 (coai's test sweep: temp-sweep.json, both sweeps, owner liveness, model: fable), E7.S2 (rag_qln's corpus ownership and drop protocol, model: fable).
