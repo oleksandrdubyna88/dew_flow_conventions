@@ -427,11 +427,11 @@
     {
       "id": "common.test-leftovers",
       "source": "common/test-leftovers.md",
-      "bodySha256": "848699ca1f09dcd4a7014760cead7b8eb369f372a63d7a32af209ac05da1cf3f",
+      "bodySha256": "38dd68d41b6fa9f7e99142760121b1250ae6cd42afd950ae57e8961bb5192399",
       "sections": [
         "# Test leftovers are named `testsToDelete-…`, owned by their run, and collected (MANDATORY)",
         "## 1. The name — one form, three spellings",
-        "## 2. The helper — one per repository, in its language",
+        "## 2. The helper — one per language a repository tests in",
         "## 3. The owner — who may delete what",
         "## 4. The start-of-run sweep — *age selects, owner liveness authorises, uncertainty preserves*",
         "## 5. Containers",

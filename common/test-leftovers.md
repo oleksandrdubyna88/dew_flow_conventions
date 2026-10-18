@@ -35,14 +35,20 @@ one text.
   `teststodelete_api_pg_k3f9a1`). Every guard, sweep and janitor matches `^teststodelete[-_]`
   case-insensitively; an unanchored or single-case match is a bug.
 - **What dies with its container needs no name of its own.** A branch, clone or worktree INSIDE a repository
-  that lives in an owned folder carries no prefix and no owner — it goes with the folder. The prefix is on the
-  OWN name of what lives in a shared namespace: the leaf of a folder or worktree, never a parent.
+  that lives in an owned folder — and a row, key, queue, index, schema or account INSIDE a database, store
+  container or claimed namespace the run owns — carries no prefix and no owner: it goes with what holds it.
+  The prefix is on the OWN name of what lives in a shared namespace: the leaf of a folder or worktree, the
+  database, never a parent and never a row.
 
-## 2. The helper — one per repository, in its language
+## 2. The helper — one per language a repository tests in
 
-Every test-created name comes from one module that does, in the order that leaves no window: **create** the
+Every test-created name comes from one module per test language — a repository that tests in bash, Node and C#
+has three, each holding the token ONCE, and its guard checks that the constants are equal and are one row of the
+mounted table — that does, in the order that leaves no window: **create** the
 resource under a name it generated · **register the cleanup as the very next statement** (`using`/`DisposeAsync`,
-`Drop`, `t.after`, `finally`, `trap … EXIT`) · **claim** it with the owner of §3 — or, where the claim can precede
+`Drop`, `t.after`, `finally`, `trap … EXIT`) — inside a hook or a test whose teardown pair is registered first,
+never at module load: a runner that filters every test of a file away skips the file's hooks, and a resource
+made at import time then has no remover — · **claim** it with the owner of §3 — or, where the claim can precede
 the resource (a held lock, a registry row), **claim first, then create**, so nothing ever exists unclaimed. A
 claim that cannot be written is a resource the run does not create: the helper removes what it made and throws.
 
@@ -51,6 +57,11 @@ A folder is created, then registered, then claimed. Where the platform has no ex
 (`FileMode.CreateNew`, like Node's `wx`) and then create the folder: the exclusive claim is what detects a name
 collision there. So a claim whose folder does not exist — an **orphan claim**, left by a run that died between the
 two — is collectable like any claim: its owner judges it (`gone` removes the claim; `live` and `unknown` keep it).
+
+A library or child process that makes temp paths of its own (an in-memory database's data path, a script's
+`mktemp`) is handed an owned folder to make them in — its data-path option, or `TMPDIR`, `TEMP` and `TMP` in the
+child's environment — so what it makes dies with the folder; the guard cannot see such paths, the helper's seam
+is what covers them.
 
 Teardown **removes by the exact full name, never by the prefix**; **never throws** (in Rust never panics — a
 panic in `Drop` during unwinding aborts the process); retries a bounded number of times with a short back-off
@@ -67,11 +78,16 @@ whitespace in it written as ONE `-` (nothing is trimmed, the case is kept — ev
 before it compares) — and under WSL (`$WSL_DISTRO_NAME` set) `~` and the distribution's name, normalised alike:
 `devbox~Ubuntu`, because distributions share one host name and one Docker daemon but each has its own pid space;
 `linux`, `macos` or `windows` (a Windows machine and its Linux subsystem answer to ONE name with TWO pid spaces,
-measured 2026-10-15); the process id — in a CI job, the runner worker process that runs the job's steps: on Linux
-and macOS the `$PPID` of a step's shell, on a Windows bash step never `$PPID` (it is 1) or `$$` (an MSYS pid) but the
-step shell's Windows pid from `/proc/$$/winpid`, followed up `ParentProcessId` (`Get-CimInstance Win32_Process`)
-past the `bash.exe` shims — Git's launcher is one too — to the first process that is not a `bash.exe` (measured from
-a Git Bash started by `pwsh`: it returns that `pwsh`). Windows has no pid 1, so `<host>@windows:1` is `unknown`. A
+measured 2026-10-15); the id of the process whose lifetime bounds the resource — the runner's parent process for
+what a global setup makes, the script for what one script makes and removes; in a CI job, ONLY for a resource that
+outlives the step that made it (a container a later step reads), the runner worker process — an ancestor of the
+step's shell (`$PPID` of the step's own shell; a script a step launches sees the step's shell as its `$PPID`),
+because the step's shell is gone before the job is. A hosted runner is discarded with its job and needs no owner
+rule beyond this; a persistent self-hosted runner is a machine like any other. On a Windows bash step `$PPID` is 1
+and `$$` an MSYS pid, never used there: take the step shell's Windows pid from `/proc/$$/winpid`, follow
+`ParentProcessId` (`Get-CimInstance Win32_Process`) past the `bash.exe` shims — Git's launcher is one too — to the
+first process that is not a `bash.exe` (measured from a Git Bash started by `pwsh`: that `pwsh`). Windows has no
+pid 1, so `<host>@windows:1` is `unknown`. A
 claim is ONE line (an LF or CRLF line end) of at most **512 bytes**: anything else — a second line, a lone CR, a
 longer text — is unreadable. And, **only where the OS gives it without spawning a
 process** (a `/proc` read, a native process API — never a shell or PowerShell child per test process), the
@@ -85,7 +101,7 @@ inside the resource where a test can see it:
 | worktree | the lock: `git worktree add --detach --lock --reason "<owner>" <path> <ref>` (git ≥ 2.30); `prune` never touches a locked tree. A folder holding a `.git` FILE is a linked worktree of SOME clone, read through that file (`gitdir:` → `<gitdir>/locked`) — never judged as an unmarked folder; a lock that names nobody is unreadable |
 | branch | none — it lives inside an owned folder (§1), or is made by that one `worktree add -b` for a prefixed worktree and removed with it |
 | container, volume, network | `--label testsToDelete.owner=<owner>` on `run` / `volume create` / `network create`; a Testcontainers builder adds the same label |
-| database, schema, queue, collection | **lock-owned** where the store has a session-held named lock (`GET_LOCK`, an advisory lock): the run takes the lock named after the resource BEFORE creating it and holds it for its lifetime — the lock is the whole owner, no marker, no age. Otherwise **marker-owned**: `<owner>` plus the creation time, written before the resource into a registry OUTSIDE it (a server-level table or key, a claim record) that no reset of the resource can wipe |
+| database, schema, queue, collection | **lock-owned** where the run holds a session-held named lock (`GET_LOCK`, an advisory lock) — on the store itself, or, for a store that has none (an index, a queue), on ONE lock server every sweeper of that kind consults first, the lock named after the resource —: the run takes the lock named after the resource BEFORE creating it and holds it for its lifetime — the lock is the whole owner, no marker, no age. Otherwise **marker-owned**: `<owner>` plus the creation time, written before the resource into a registry OUTSIDE it (a server-level table or key, a claim record) that no reset of the resource can wipe |
 
 **Liveness, one procedure** → `live` / `gone` / `unknown`. A **lock-owned** resource first, since it carries no
 owner string: lock held → `live`, lock free → `gone` (it was taken before the resource existed and dies with the
@@ -118,7 +134,8 @@ resource kind wires a sweep of that kind into the **start** of its test run (the
 - removes only on `gone`; **`live` and `unknown` preserve**, each with its reason in the report;
 - treats an **unmarked** prefixed resource of the new form as `gone` once old enough (the helper claims within
   milliseconds or does not create), and matches an OLD prefix from before the migration only until a written
-  end date in its configuration — age-only, because nothing live makes such a name any more. The end date counts
+  end date in its configuration — age-only for kinds that carried no owner, **by its OLD lock name for a kind that
+  was lock-owned** (an old branch's run still holds it; age proves nothing about a lock). The end date counts
   from the day old branches and agent worktrees stop running the old suites, not from the merge;
 - **never fails the run**: a sweep error is one reported line; the exit code is the tests'.
 
@@ -129,7 +146,10 @@ until 2026-08-16 and requeued a leg another worker was still measuring.
 
 The costliest leftover. Beyond the name and the label:
 
-- **`docker run --rm`** for every container a script starts by hand — removed whatever stopped it.
+- **`docker run --rm`** for every container a script starts by hand — removed when it stops, whatever stopped it,
+  anonymous volumes included. `--rm` acts when the CONTAINER stops: a detached container whose starter was killed
+  runs on, and is collected by the repository's start-of-run sweep through its label, then by the janitor. The
+  run's own teardown is `docker rm -f -v <name>` by exact name.
 - **A Testcontainers fixture keeps the reaper on** (`TESTCONTAINERS_RYUK_DISABLED=true` is never set in a test
   environment, no exemption) and names its container with the prefix.
 - **The carve-out: a container whose logs, exit code or state are read after it exits or fails** runs WITHOUT
@@ -144,8 +164,11 @@ The costliest leftover. Beyond the name and the label:
 ## 6. Stores — isolate first, share only under the exact exception
 
 Where a run can own its store it does: a per-run database or schema `teststodelete_<repo>_<what>_<id>`, a
-per-run queue name, a per-run key prefix the application under test honours. Clearing a shared store is the
-last resort, exempt from the name only in two shapes, written where a guard reads them (§7):
+per-run queue name, a per-run key prefix the application under test honours. A test that would write rows into a
+store it does not own — the developer's database, a shared test database, a deployed environment's — isolates
+instead: the run starts what it tests against on a store of its own. It never "cleans up" there: a row it cannot
+name it cannot sweep, and a sweep that guesses deletes a user's. What a test may do against a store it does not
+own is read. Clearing a shared store is the last resort, exempt from the name only in two shapes, written where a guard reads them (§7):
 
 - **(a) A long-lived SHARED store**, only where the place that creates or configures it carries
   `testsToDelete-exempt: shared-store …` naming the exact endpoint and store name, saying the reuse is
@@ -155,10 +178,12 @@ last resort, exempt from the name only in two shapes, written where a guard read
   erased each other's fixtures, 2026-10-14). A reset wider than the run's own names — flushing a logical
   database or namespace the run does not own exclusively, dropping a shared-name database — is never exempt; a
   per-run, prefixed logical database or namespace is the run's own name, and its teardown drops it whole.
-- **(b) A database or schema inside a disposable Testcontainers container**, exempt from the name and from its
-  own teardown when its whole lifetime is the container's: the fixture names the container with the prefix,
-  keeps the reaper on, never sets reuse, disposes the container, and carries
-  `testsToDelete-exempt: container-scoped — <what> lives and dies with <fixture>`.
+- **(b) A database, schema or namespace inside a disposable container the run or its job owns** — a Testcontainers
+  container, or a workflow `services:` container, which the runner removes with the job — exempt from the name and
+  from its own teardown when its whole lifetime is the container's: a fixture names its container with the prefix,
+  keeps the reaper on, never sets reuse and disposes it; a job names the service in the workflow; either carries
+  `testsToDelete-exempt: container-scoped — <what> lives and dies with <fixture or job>`. The per-run path is still
+  the better one where it exists (one code path for CI and a developer machine).
 
 ## 7. The guard — what every repository's structural check refuses
 
@@ -167,7 +192,7 @@ red when it **scanned nothing** (exit 2, with a sentence — discovery broke; th
 
 | class | finding |
 |---|---|
-| `raw-temp` | any API that makes a temp path (`mkdtemp`, `tmpdir()`, `TEMP`/`TMP`/`TMPDIR`, `GetTempPath`, `Directory.CreateTempSubdirectory`, `Path.GetTempFileName`, `temp_dir()`, `mktemp`) |
+| `raw-temp` | any API that makes a temp path (`mkdtemp`, `tmpdir()`, `TEMP`/`TMP`/`TMPDIR`, `GetTempPath`, `Directory.CreateTempSubdirectory`, `Path.GetTempFileName`, `temp_dir()`, `mktemp`). Not `RUNNER_TEMP`: the Actions runner empties it at the start and end of every job, hosted or self-hosted, so a path under it is job-scoped — no finding; a helper takes it as its temp root under Actions |
 | `raw-worktree` | any `worktree add` |
 | `docker-run` | a `docker run` with neither `--rm` nor the complete carve-out of §5 |
 | `docker-name` | a `--name`, `volume create`, `network create`, `WithName`, `docker compose -p`/`--project-name` or `COMPOSE_PROJECT_NAME` (a compose project's containers carry the project's name) without one of the three spellings; an image tag only where a test step builds it — a job that builds and pushes the product image is the product, not a leftover |
@@ -210,8 +235,9 @@ and what a copy of it must keep:
   — a stopped Docker daemon is a failure, not a clean machine (`pipefail`, and a failed listing removes
   nothing); a machine with no `docker` binary says so once and still sweeps git and the temp root.
 
-Databases, schemas and queues have no command common to every stack: the repository that creates them keeps its
-own prefixed sweep (§4) beside the fixture.
+Databases, schemas and queues have no command common to every stack, and **this janitor sweeps no images**: the
+repository that creates them keeps its own prefixed sweep (§4) beside the fixture — for a per-run image tag, by
+the `testsToDelete.owner` label set on `docker build`, under the lowercase spelling.
 <!-- core:end -->
 
 ## Tokens
