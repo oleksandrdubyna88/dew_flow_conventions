@@ -9,3 +9,6 @@ export function gitOutput(repo,args,{timeoutMs=GIT_TIMEOUT_MS}={}) {
   return execFileSync("git",["-C",repo,...args],{encoding:"utf8",timeout:timeoutMs,maxBuffer:4*1024*1024,windowsHide:true,stdio:["ignore","pipe","pipe"]});
 }
 export function git(repo,...args) {return gitOutput(repo,args).trimEnd();}
+// A `git(repo, ...args)` with its own hang guard, for a caller whose git work ends on its own and may meet a loaded
+// machine (a test building a fixture). It goes through this module, so the stdio, buffer and window settings stay one.
+export function gitWith({timeoutMs}={}) {return (repo,...args)=>gitOutput(repo,args,{timeoutMs}).trimEnd();}

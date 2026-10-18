@@ -6,14 +6,14 @@ import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {execFileSync,spawnSync} from "node:child_process";
 import {rebaseLinks,migrationPlan,applyMigration} from "./lib/rule-migration.mjs";
-import {gitOutput} from "./lib/git.mjs";
+import {gitWith} from "./lib/git.mjs";
 import {smoke} from "./lib/rule-smoke.mjs";
 import {GUARD_MS} from "./lib/startup-ceilings.mjs";
 
 // Every child this file starts ends on its own and prints nothing before the behaviour under test, so none has a
 // start-up signal to widen on: each gets ONE hang-guard ceiling (GUARD_MS), not a speed bound. The 30 s of lib/git.mjs
 // expired in `git submodule add` after 66 s of a loaded run.
-const git=(repo,...args)=>gitOutput(repo,args,{timeoutMs:GUARD_MS}).trimEnd();
+const git=gitWith({timeoutMs:GUARD_MS});
 
 test("moved project links resolve to the same repository targets",()=>{
   const original='Read [design](research/architecture.md) and [gate](.claude/rules/shared/common/coai-review-gate.md). Keep [web](https://example.org/a) and [local](#here).';

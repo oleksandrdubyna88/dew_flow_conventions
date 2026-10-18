@@ -17,12 +17,12 @@ import * as path from "node:path";
 
 import { EXIT, main, measure } from "./release-distance.mjs";
 import { GUARD_MS } from "./lib/startup-ceilings.mjs";
+import { gitWith } from "./lib/git.mjs";
 
 // No run here prints a line before the behaviour under test (git and the CLI answer at completion), so there is no
 // start-up signal to widen on: every child ends on its own and gets ONE hang-guard ceiling (GUARD_MS), not a speed bound.
 
-const git = (cwd, ...args) =>
-  execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", timeout: GUARD_MS, windowsHide: true }).trim();
+const git = gitWith({ timeoutMs: GUARD_MS });
 
 function workspace(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-distance-"));
@@ -39,13 +39,14 @@ const daysAgo = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
 function scene(t, { commits = 3, ageDays = 0 } = {}) {
   const root = workspace(t);
   const url = path.join(root, "conventions.git").replaceAll("\\", "/");
-  execFileSync("git", ["init", "-q", "--bare", "--initial-branch=main", url], { timeout: GUARD_MS });
+  git(root, "init", "-q", "--bare", "--initial-branch=main", url);
   const work = path.join(root, "work");
-  execFileSync("git", ["clone", "-q", url, work], { timeout: GUARD_MS });
+  git(root, "clone", "-q", url, work);
 
   const shas = [];
   for (let i = 0; i < commits; i += 1) {
     const when = daysAgo(ageDays);
+    // The one raw call left: it needs an environment (backdated author and committer dates), which git() does not take.
     execFileSync("git", ["-C", work,
       "-c", "user.name=Distance test", "-c", "user.email=d@example.invalid", "-c", "commit.gpgsign=false",
       "commit", "-q", "--allow-empty", "-m", `commit ${i}`,
@@ -56,12 +57,10 @@ function scene(t, { commits = 3, ageDays = 0 } = {}) {
 
   // An unrelated history, for the divergence case: a commit that shares no ancestor with main.
   const orphanDir = path.join(root, "orphan");
-  execFileSync("git", ["clone", "-q", url, orphanDir], { timeout: GUARD_MS });
+  git(root, "clone", "-q", url, orphanDir);
   git(orphanDir, "checkout", "-q", "--orphan", "elsewhere");
-  execFileSync("git", ["-C", orphanDir,
-    "-c", "user.name=Distance test", "-c", "user.email=d@example.invalid", "-c", "commit.gpgsign=false",
-    "commit", "-q", "--allow-empty", "-m", "unrelated",
-  ], { timeout: GUARD_MS });
+  git(orphanDir, "-c", "user.name=Distance test", "-c", "user.email=d@example.invalid", "-c", "commit.gpgsign=false",
+    "commit", "-q", "--allow-empty", "-m", "unrelated");
   const orphan = git(orphanDir, "rev-parse", "HEAD");
   git(orphanDir, "push", "-q", "origin", "elsewhere");
   // `publish` pushes from `work`, which has never seen that object — without this the push fails
@@ -69,7 +68,7 @@ function scene(t, { commits = 3, ageDays = 0 } = {}) {
   git(work, "fetch", "-q", "origin", "elsewhere");
 
   const clone = path.join(root, "runner");
-  execFileSync("git", ["clone", "-q", url, clone], { timeout: GUARD_MS });
+  git(root, "clone", "-q", url, clone);
   return {
     shas,
     orphan,
@@ -131,7 +130,7 @@ test("no release yet is not a fault, and says so in those words", (t) => {
 test("a remote that cannot be reached is UNDECIDED, not a distance of zero", (t) => {
   const root = workspace(t);
   const clone = path.join(root, "repo");
-  execFileSync("git", ["init", "-q", "--initial-branch=main", clone], { timeout: GUARD_MS });
+  git(root, "init", "-q", "--initial-branch=main", clone);
   const verdict = measure((...args) => git(clone, ...args));
   assert.equal(verdict.code, EXIT.UNDECIDED, verdict.headline);
 });

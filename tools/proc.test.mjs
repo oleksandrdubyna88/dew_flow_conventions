@@ -96,7 +96,7 @@ test("exited parent cannot strand a descendant holding inherited output pipes",a
   // An attempt counts only if the parent was ready with at least RUNWAY_MS of its ceiling left; the exit itself must
   // then end the run. A conclusive run that still reached its ceiling is the defect (the descendant kept the pipes).
   const RUNWAY_MS=3000;
-  const {result,budgetMs}=await startup.run(t,process.execPath,["-e",script],{containTree:true},{readyAt:readyLine(2),runwayMs:RUNWAY_MS});
+  const {result,budgetMs}=await startup.runWhenReady(t,process.execPath,["-e",script],{containTree:true,readyAt:readyLine(2),runwayMs:RUNWAY_MS});
   assert.equal(result.timedOut,false,`the run reached its ${budgetMs} ms ceiling with the parent ready at least ${RUNWAY_MS} ms before it: the exited parent's descendant kept the output pipes open. ${result.err}`);
   const descendant=Number(result.out.trim().split(/\s+/)[1]);
   assert.ok(descendant>0,result.err);
@@ -114,7 +114,7 @@ test("deadline terminates the running process and its descendant before returnin
   // while the line is absent, and what is asserted (timedOut, how long run() took AFTER the deadline, both pids
   // gone) never depends on the ceiling that finally applied.
   const script="const {spawn}=require('node:child_process');const p=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});console.log(Date.now(),process.pid,p.pid);setInterval(()=>{},1000);";
-  const {result,budgetMs,elapsedMs}=await startup.run(t,process.execPath,["-e",script],{containTree:true},{readyAt:readyLine(3)});
+  const {result,budgetMs,elapsedMs}=await startup.runWhenReady(t,process.execPath,["-e",script],{containTree:true,readyAt:readyLine(3)});
   assert.equal(result.timedOut,true);
   assert.ok(elapsedMs-budgetMs<RETURN_SLACK_MS,`the deadline must bound wall time as well as set a flag: run() returned ${Math.round(elapsedMs-budgetMs)} ms after its ${budgetMs} ms deadline (allowed ${RETURN_SLACK_MS} ms)`);
   const pids=result.out.trim().split(/\s+/).slice(1).map(Number);

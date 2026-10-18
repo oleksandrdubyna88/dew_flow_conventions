@@ -27,46 +27,66 @@ export const STARTUP_TOTAL_MS = 300_000;
 
 /** Whether an attempt tested what it was meant to: see `runWhenReady`. A pure function so its edges can be pinned. */
 export function isConclusive({ startedAt, budgetMs, ready, timedOut, runwayMs }) {
-  return ready !== undefined && (!timedOut || startedAt + budgetMs - ready >= runwayMs);
+  if (!Number.isFinite(ready)) return false; // anything that is not a number is "no readiness line"
+  return !timedOut || startedAt + budgetMs - ready >= runwayMs;
 }
 
 /**
  * @param {{budgets?: number[], totalMs?: number}} [options]
- * @returns {{run: Function, spentMs: () => number}}
+ * @returns {{runWhenReady: Function, spentMs: () => number}}
  */
 export function startupBudget({ budgets = STARTUP_BUDGETS_MS, totalMs = STARTUP_TOTAL_MS } = {}) {
   let spent = 0;
 
   /**
-   * Run `command args` with a ceiling from `budgets`, widened only while `readyAt` finds no readiness line.
+   * Run `command args` with a ceiling, widened only while `readyAt` finds no readiness line.
    *
-   * `readyAt(result)` returns the epoch milliseconds at which the child said it was ready, or undefined when the
-   * line never appeared (the child prints `Date.now()` itself, so readiness is a fact about the child's clock, not
-   * about when output reached us). An attempt is CONCLUSIVE when the line appeared and either the run ended on its
-   * own, or the deadline still left `runwayMs` after readiness. An inconclusive attempt is retried with the next
-   * ceiling; the ceiling under test is therefore never widened on a run that had its full say.
+   * One options object. `readyAt(result)` (required, a function) returns the epoch milliseconds at which the child
+   * said it was ready, or anything that is not a number when the line never appeared (the child prints `Date.now()`
+   * itself, so readiness is a fact about the child's clock, not about when output reached us). `runwayMs` is how
+   * much of the ceiling must remain after readiness for a run that reached its ceiling to count. `timeoutMs`, when
+   * given, is the first ceiling tried (the file's wider ceilings still follow it). `run` is the runner, `(command,
+   * args, options) => Promise<{timedOut: boolean, ...}>`, proc.mjs's `run` by default; every other option
+   * (`containTree`, `maxOutputBytes`, `cwd`, `env`, ...) is handed to it as is, with `timeoutMs` set to the ceiling.
+   *
+   * An attempt is CONCLUSIVE when the line appeared and either the run ended on its own, or the deadline still left
+   * `runwayMs` after readiness. An inconclusive attempt is retried (a fresh child) with the next ceiling; the
+   * ceiling under test is therefore never widened on a run that had its full say. Each attempt is billed the lesser
+   * of its ceiling and its real elapsed time against the file's total, and nothing is started once the total is gone.
    *
    * Returns `{result, budgetMs, startedAt, readyAt, elapsedMs}` of the conclusive attempt.
    */
-  async function runWhenReady(t, command, args, options, { readyAt, runwayMs = 0 }) {
-    for (const budget of budgets) {
-      const budgetMs = Math.min(budget, totalMs - spent);
-      if (budgetMs <= 0) break;
+  async function runWhenReady(t, command, args, { timeoutMs, readyAt, runwayMs = 0, run: runner = run, ...runOptions } = {}) {
+    if (typeof readyAt !== "function") throw new TypeError("runWhenReady needs readyAt, a function from a run result to the child's readiness timestamp");
+    const ceilings = timeoutMs === undefined ? budgets : [timeoutMs, ...budgets.filter(budget => budget > timeoutMs)];
+    const wallStart = performance.now();
+    let anyReady = false;
+    let granted = 0;
+    for (const ceiling of ceilings) {
+      const remaining = totalMs - spent;
+      if (remaining <= 0) break;
+      const budgetMs = Math.min(ceiling, remaining);
+      granted += budgetMs;
       const startedAt = Date.now();
       const begin = performance.now();
-      const result = await run(command, args, { ...options, timeoutMs: budgetMs });
+      const result = await runner(command, args, { ...runOptions, timeoutMs: budgetMs });
       const elapsedMs = performance.now() - begin;
-      spent += budgetMs;
+      spent += Math.min(budgetMs, elapsedMs);
       const ready = readyAt(result);
-      const conclusive = isConclusive({ startedAt, budgetMs, ready, timedOut: result.timedOut, runwayMs });
-      if (conclusive) return { result, budgetMs, startedAt, readyAt: ready, elapsedMs };
-      t.diagnostic(ready === undefined
-        ? `no readiness line within ${budgetMs} ms (start-up not complete); widening`
-        : `readiness line ${startedAt + budgetMs - ready} ms before the ${budgetMs} ms ceiling, under the ${runwayMs} ms runway; widening`);
+      anyReady ||= Number.isFinite(ready);
+      if (isConclusive({ startedAt, budgetMs, ready, timedOut: result.timedOut, runwayMs })) {
+        return { result, budgetMs, startedAt, readyAt: ready, elapsedMs };
+      }
+      t?.diagnostic?.(Number.isFinite(ready)
+        ? `readiness line ${startedAt + budgetMs - ready} ms before the ${budgetMs} ms ceiling, under the ${runwayMs} ms runway; widening`
+        : `no readiness line within ${budgetMs} ms (start-up not complete); widening`);
     }
-    throw new Error(`start-up never completed within ${spent} ms — the readiness line never appeared`
-      + ` (ceilings ${budgets.join("/")} ms, total cap ${totalMs} ms)`);
+    const wallMs = Math.round(performance.now() - wallStart);
+    const why = anyReady
+      ? `start-up completed but left less than ${runwayMs} ms before the ceiling in every attempt`
+      : "start-up never completed — the readiness line never appeared";
+    throw new Error(`${why} (ceilings tried: ${granted} ms in total; elapsed wall time: ${wallMs} ms; total cap ${totalMs} ms)`);
   }
 
-  return { run: runWhenReady, spentMs: () => spent };
+  return { runWhenReady, spentMs: () => spent };
 }
