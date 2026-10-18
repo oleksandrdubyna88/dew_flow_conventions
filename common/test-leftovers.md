@@ -211,7 +211,7 @@ The **host-wide** tool — every token, every kind; neither a teardown nor the s
 tested script, not a block to paste: `tools/janitor.sh` in the rule repository, run from the mount
 (`bash .agents/conventions/tools/janitor.sh` or `bash .claude/rules/shared/tools/janitor.sh`, `--dry-run` to
 look first) from inside the repository whose worktrees and branches are swept; on Windows from **Git for
-Windows' bash, never WSL's** (which sees neither the Windows temp root nor Windows pids). `--token <t>` narrows
+Windows' bash, never WSL's** (which sees neither the Windows temp root nor Windows pids). Run the janitor from the side that owns the resources — never a Git-for-Windows bash launched through WSL interop, which inherits `WSL_DISTRO_NAME` and reads every Windows claim as foreign. `--token <t>` narrows
 the sweep to `testsToDelete-<t>-…` (all three spellings, any case, anchored: `alpha` never matches `alphabet`);
 it combines with `--dry-run`, and an invalid token or an unknown argument prints the usage line and exits 2 with
 nothing touched. `JANITOR_MIN_AGE_MINUTES` (default 60) is whole minutes, digits only, at least 1; `--token` is 2 to 12 characters of
