@@ -101,6 +101,17 @@ test("nothing is started once the total is spent, and spent never exceeds it",as
   assert.ok(calls.length-before<=1,"a spent total starts at most the remainder, never a whole ceiling");
 });
 
+test("every ceiling handed to the runner is a positive safe integer, whatever the elapsed times were",async()=>{
+  // proc.mjs run() refuses a fractional or sub-millisecond timeoutMs; elapsed times are fractional, so the
+  // remainder of the total must be whole before it becomes a ceiling.
+  const calls=[];
+  const budget=startupBudget({budgets:[60,60,60,60],totalMs:100});
+  await assert.rejects(budget.runWhenReady(undefined,"cmd",[],{readyAt,run:stub(async timeoutMs=>{await delay(Math.min(timeoutMs,30));return {timedOut:true};},calls)}),/never appeared/);
+  assert.ok(calls.length>=2);
+  for(const call of calls) assert.ok(Number.isSafeInteger(call.options.timeoutMs)&&call.options.timeoutMs>=1,`ceiling ${call.options.timeoutMs}`);
+  assert.ok(Number.isInteger(budget.spentMs()),`spent ${budget.spentMs()}`);
+});
+
 test("a missing t, or one without diagnostic, is tolerated",async()=>{
   const budget=startupBudget({budgets:[10,20],totalMs:1000});
   const run=stub(timeoutMs=>({timedOut:timeoutMs<20,ready:timeoutMs<20?undefined:1}));

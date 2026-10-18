@@ -63,15 +63,14 @@ export function startupBudget({ budgets = STARTUP_BUDGETS_MS, totalMs = STARTUP_
     let anyReady = false;
     let granted = 0;
     for (const ceiling of ceilings) {
-      const remaining = totalMs - spent;
-      if (remaining <= 0) break;
-      const budgetMs = Math.min(ceiling, remaining);
+      const budgetMs = Math.floor(Math.min(ceiling, totalMs - spent)); // run() takes whole milliseconds, 1 at least
+      if (budgetMs < 1) break;
       granted += budgetMs;
       const startedAt = Date.now();
       const begin = performance.now();
       const result = await runner(command, args, { ...runOptions, timeoutMs: budgetMs });
       const elapsedMs = performance.now() - begin;
-      spent += Math.min(budgetMs, elapsedMs);
+      spent += Math.ceil(Math.min(budgetMs, elapsedMs)); // whole milliseconds, so the remainder is whole too
       const ready = readyAt(result);
       anyReady ||= Number.isFinite(ready);
       if (isConclusive({ startedAt, budgetMs, ready, timedOut: result.timedOut, runwayMs })) {
