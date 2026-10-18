@@ -444,8 +444,8 @@ Review checklist for the prose (Opus, against this section and S2–S4):
   19: the clone the janitor runs from survives), each asserting
   stderr lines, exit code, what remains and the stub's recorded `rm`/`volume rm`/`network rm` argv (by ID). RED first: write the test against the file, run it before the file
   exists (fails on spawn), then with the file. DoD: green on Windows (Git Bash) and the Linux CI runner; the
-  twin copies the file verbatim and hash-pins it (its S-step). The file as specified: 19 894 B, 231 lines,
-  sha256 `036785f59ed81032f1b757717b26796a0083e832ae1218fd906207c71c6ec5e4` (after the Opus review's A/B and the code-gate round 3; earlier shas `0644a175…` (the round-2 file, 12 166 B, 150 lines), `3f4ca10b…`, `4c0e4f5b…`,
+  twin copies the file verbatim and hash-pins it (its S-step). The file as specified: 25 644 B, 308 lines,
+  sha256 `bf9f0c64846f1d8d52405a9c4e713f893078f7d27a7d3a2044f73ad9c79ed8e1` (after the Opus review's A/B and the code-gate round 3; earlier shas `036785f5…` (before the security batch, 19 894 B, 231 lines), `0644a175…` (the round-2 file, 12 166 B, 150 lines), `3f4ca10b…`, `4c0e4f5b…`,
   `5110061c…`). **Dead pids in the tests are never a killed child's pid** — a pid the janitor's own query can
   never match, with the premise asserted first: Windows a pid ≡ 2 (mod 4) (Windows pids are multiples of 4),
   Linux `pid_max + 1` (read from `/proc/sys/kernel/pid_max`), macOS 100000; the harness's `999999` is ≡ 3 (mod 4)
@@ -567,7 +567,7 @@ New file: 10 769 B, 150 lines, sha256 `3f4ca10b32c906dface8769ad17a3e37684b85e7c
 | (C) start-time mismatch read as `gone` | Applied in the core §3 (a mismatch → `unknown`, only "no process with that pid" is `gone`), in D4 and in the S2 binding (`ownerState` returns unknown on mismatch; `processProbe` three-valued). The janitor never compared starts. |
 | dead pids in tests | Noted for S3b: a pid the query can never match, premise asserted (Windows ≡ 2 mod 4, Linux pid_max + 1, macOS 100000). |
 
-New file: 19 894 B, 231 lines, sha256 `036785f59ed81032f1b757717b26796a0083e832ae1218fd906207c71c6ec5e4`. Rule body 17 437 B.
+New file: 25 644 B, 308 lines, sha256 `bf9f0c64846f1d8d52405a9c4e713f893078f7d27a7d3a2044f73ad9c79ed8e1`. Rule body 17 437 B.
 
 ## S2 — The Node owned-resource helper and owner liveness
 
@@ -805,9 +805,9 @@ only; no scenario touches this checkout's worktree list.
   verbatim copy, the work is the test; review by Opus against D9 and the rule's § The janitor.
 - **Goal.** The host-wide janitor is a shipped, tested file in this repository, run from the mount by every consumer
   and copied verbatim (hash-pinned) by the twin — its nineteen measured verdicts held by a test, not by a record.
-- **Files.** New `tools/janitor.sh` — the scratchpad draft `janitor.sh`, as hardened since: **19 894 B, 231 lines,
-  sha256 `036785f59ed81032f1b757717b26796a0083e832ae1218fd906207c71c6ec5e4`** (after the code gate, the Opus review and the code-gate round 3 — the file grew from the 150-line draft to 231 lines: three-valued `tasklist`/`ps`/`/proc` liveness, a canonical spelling per folder, `--token`, control-character hygiene, docker labels read through `%q`;
-  earlier shas `0644a175…` (the round-2 file, 12 166 B, 150 lines), `5110061c…`, `4c0e4f5b…`, `3f4ca10b…`; header comment included; LF line
+- **Files.** New `tools/janitor.sh` — the scratchpad draft `janitor.sh`, as hardened since: **25 644 B, 308 lines,
+  sha256 `bf9f0c64846f1d8d52405a9c4e713f893078f7d27a7d3a2044f73ad9c79ed8e1`** (after the code gate, the Opus review and the code-gate round 3 — the file grew from the 150-line draft to 308 lines: three-valued `tasklist`/`ps`/`/proc` liveness, a canonical spelling per folder, `--token`, control-character hygiene, docker labels read through `%q`;
+  earlier shas `036785f5…` (before the security batch, 19 894 B, 231 lines), `0644a175…` (the round-2 file, 12 166 B, 150 lines), `5110061c…`, `4c0e4f5b…`, `3f4ca10b…`; header comment included; LF line
   endings; the executable bit set with `git update-index --chmod=+x tools/janitor.sh`, since Windows checkouts do not
   carry it). Verify the hash after the copy; the file is never edited in the repository — a change starts in the spec
   and comes with a new hash. New `tools/janitor.test.mjs`; `README.md` tool table — one row: `tools/janitor.sh` ·
@@ -902,7 +902,7 @@ notices), what remains on disk / in `git worktree list` / in `git branch`, and t
 
 - **Commands.** `node tools/run-tests.mjs tools/janitor.test.mjs`; `bash -n tools/janitor.sh`; `npm test`.
 - **DoD.** Every scenario observed RED (no file) and then GREEN, on Windows (Git Bash) and on the Linux CI runner,
-  skipped nowhere in CI; `tools/janitor.sh` hashes to `036785f59ed81032f1b757717b26796a0083e832ae1218fd906207c71c6ec5e4`
+  skipped nowhere in CI; `tools/janitor.sh` hashes to `bf9f0c64846f1d8d52405a9c4e713f893078f7d27a7d3a2044f73ad9c79ed8e1`
   (recorded in the PR, for the twin's pin); README row present.
 
 ## S4 — The structural guard, and every site migrated to the helper

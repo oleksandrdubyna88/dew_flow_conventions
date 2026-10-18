@@ -64,10 +64,16 @@ Every prefixed resource carries its owner, **`<host>@<os>:<pid>[:<start>]`**: th
 (`hostname`, Node `os.hostname()`, C# `Dns.GetHostName()`), compared case-insensitively — never the NetBIOS name
 (C# `Environment.MachineName`, `%COMPUTERNAME%`: upper-case, cut at 15 characters), with each run of `@`, `:` or
 whitespace in it written as ONE `-` (nothing is trimmed, the case is kept — every reader applies this same rule
-before it compares); `linux`, `macos` or `windows`
-(a Windows machine and its Linux subsystem answer to ONE name with TWO pid spaces, measured 2026-10-15); the
-process id — in a CI job, the runner worker process that runs the job's steps (`$PPID` of a step's shell), because
-the step's own shell is gone before the job is; and, **only where the OS gives it without spawning a
+before it compares) — and under WSL (`$WSL_DISTRO_NAME` set) `~` and the distribution's name, normalised alike:
+`devbox~Ubuntu`, because distributions share one host name and one Docker daemon but each has its own pid space;
+`linux`, `macos` or `windows` (a Windows machine and its Linux subsystem answer to ONE name with TWO pid spaces,
+measured 2026-10-15); the process id — in a CI job, the runner worker process that runs the job's steps: on Linux
+and macOS the `$PPID` of a step's shell, on a Windows bash step never `$PPID` (it is 1) or `$$` (an MSYS pid) but the
+step shell's Windows pid from `/proc/$$/winpid`, followed up `ParentProcessId` (`Get-CimInstance Win32_Process`)
+past the `bash.exe` shims — Git's launcher is one too — to the first process that is not a `bash.exe` (measured from
+a Git Bash started by `pwsh`: it returns that `pwsh`). Windows has no pid 1, so `<host>@windows:1` is `unknown`. A
+claim is ONE line (an LF or CRLF line end) of at most **512 bytes**: anything else — a second line, a lone CR, a
+longer text — is unreadable. And, **only where the OS gives it without spawning a
 process** (a `/proc` read, a native process API — never a shell or PowerShell child per test process), the
 process's start time as **integer Unix seconds, UTC**, from the OS's record of that pid — never the writer's
 own clock at startup. A writer that would have to spawn to learn its start omits it. The owner never lives
@@ -91,6 +97,11 @@ owner's session — no age is needed or read). Everything else: no owner, or one
 clock stepped between the write and the read (a time sync, a virtual machine after host sleep); a mismatch delays
 reclamation and never deletes something live. Two seconds covers two one-second roundings; a wider window only
 preserves more.
+
+**The probe must not signal.** On Windows Python's `os.kill(pid, 0)` does NOT probe: it calls `TerminateProcess`
+and KILLS the process (signal 0 becomes the exit code). A Python reader uses a non-destructive probe — `OpenProcess`
+through `ctypes`, `psutil.pid_exists`, or `tasklist /FI "PID eq <pid>"` as the janitor does — and the same
+three-valued rule applies.
 
 ## 4. The start-of-run sweep — *age selects, owner liveness authorises, uncertainty preserves*
 
@@ -178,7 +189,9 @@ look first) from inside the repository whose worktrees and branches are swept; o
 Windows' bash, never WSL's** (which sees neither the Windows temp root nor Windows pids). `--token <t>` narrows
 the sweep to `testsToDelete-<t>-…` (all three spellings, any case, anchored: `alpha` never matches `alphabet`);
 it combines with `--dry-run`, and an invalid token or an unknown argument prints the usage line and exits 2 with
-nothing touched. `JANITOR_MIN_AGE_MINUTES` (default 60) is whole minutes, digits only. What it guarantees,
+nothing touched. `JANITOR_MIN_AGE_MINUTES` (default 60) is whole minutes, digits only, at least 1; `--token` is 2 to 12 characters of
+`[a-z0-9]`. A name or id holding a control character is refused with a skip line, `--dry-run` prints the same exit
+code the real run would, and every test seam that is set is announced once on stderr. What it guarantees,
 and what a copy of it must keep:
 
 - **One capture.** Every prefixed resource is listed ONCE with its identity, owner and age before anything is
@@ -190,7 +203,8 @@ and what a copy of it must keep:
   unmarked resources older than the window are nobody's and go. An orphan claim (§2) is judged like any other. A worktree is judged by its lock, read through
   its `.git` file whatever clone owns it (a relative gitdir resolved against the worktree).
 - **Exact removal.** Top-level links (a junction into a checkout) are unlinked before a worktree or folder is
-  removed and `rm -rf` never crosses one; worktrees go before branches and folders; `docker ps --filter name=`
+  removed and `rm -rf` never crosses one; a locked worktree is removed with `git worktree remove --force --force`;
+  worktrees go before branches and folders; `docker ps --filter name=`
   (a substring match) is never used.
 - **Honest exit.** 0 when nothing was skipped; 3 when something was; any other code is a docker or git failure
   — a stopped Docker daemon is a failure, not a clean machine (`pipefail`, and a failed listing removes
