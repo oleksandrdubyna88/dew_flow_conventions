@@ -177,19 +177,19 @@ test("grammar: every vector, asked of parseOwner (owned.mjs) and owner_ok (janit
 
 const HOSTNAMES = VECTORS.hostnames.vectors;
 
-/** What `host_norm` (janitor.sh, cut out by name) prints for each raw host name; one NUL-separated name in, one line out. */
+/** What `host_id` (janitor.sh, cut out by name) prints for each raw host name and distribution; two NUL-separated texts in, one line out. */
 function bashHostNames(t, vectors) {
   const scope = lifo(t);
-  const source = ownerOkSource(fs.readFileSync(SCRIPT, "utf8"), "host_norm", []);
-  assert.notEqual(source, "", "host_norm could not be cut out of tools/janitor.sh by name");
+  const source = ownerOkSource(fs.readFileSync(SCRIPT, "utf8"), "host_id", []);
+  assert.notEqual(source, "", "host_id could not be cut out of tools/janitor.sh by name");
   const dir = ownedDir(scope, "ochost");
   const harness = path.join(dir, "host.sh");
   fs.writeFileSync(harness, `${source}
-while IFS= read -r -d '' raw; do
-  printf '[%s]\\n' "$(host_norm "$raw")"
+while IFS= read -r -d '' raw && IFS= read -r -d '' distro; do
+  printf '[%s]\\n' "$(host_id "$raw" "$distro")"
 done
 `);
-  const input = Buffer.from(vectors.map((v) => `${v.raw}\0`).join(""), "utf8");
+  const input = Buffer.from(vectors.map((v) => `${v.raw}\0${v.distro ?? ""}\0`).join(""), "utf8");
   const result = spawnSync(BASH, [slash(harness)], { input, encoding: "utf8", windowsHide: true });
   const lines = (result.stdout ?? "").split(/\r?\n/).filter(Boolean).map((line) => line.slice(1, -1));
   assert.equal(lines.length, vectors.length, `the bash harness answered ${lines.length} of ${vectors.length} names (status ${result.status})\n${result.stderr}`);
@@ -197,13 +197,13 @@ done
 }
 
 test("host names: every raw name is normalised alike by hostName (owned.mjs) and host_norm (janitor.sh)", { timeout: TIMEOUT }, async (t) => {
-  assert.equal(typeof owned.hostName, "function", "owned.mjs exports hostName(raw) — the one normalisation of a host name");
+  assert.equal(typeof owned.hostId, "function", "owned.mjs exports hostId(raw, distro) — the host part of an owner");
   let bashSays = null;
   if (BASH === "") t.diagnostic("bash not found: the bash half of every host-name vector is skipped");
   else bashSays = bashHostNames(t, HOSTNAMES);
   for (const v of HOSTNAMES) {
     await t.test(`${v.id} ${JSON.stringify(v.raw)} → ${JSON.stringify(v.host)}`, () => {
-      const node = owned.hostName(v.raw);
+      const node = owned.hostId(v.raw, v.distro ?? "");
       const bash = bashSays === null ? v.host : bashSays.get(v.id);
       assert.deepEqual({ node, bash }, { node: v.host, bash: v.host }, `vector ${v.id} ${JSON.stringify(v.raw)} (${v.why}): node hostName says ${JSON.stringify(node)}; bash host_norm says ${JSON.stringify(bash)}`);
     });

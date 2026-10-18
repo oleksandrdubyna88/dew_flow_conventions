@@ -444,20 +444,20 @@ test("13. ownerState follows rule §3's order with an injected probe", () => {
   const alive = () => ({ state: "live" });
   assert.equal(ownerState(null, alive), "unknown");
   assert.equal(ownerState({ unreadable: true }, alive), "unknown");
-  assert.equal(ownerState({ host: `other@${tag}`, pid: 1 }, alive), "unknown", "another host");
-  assert.equal(ownerState({ host: `${name}@${otherTag}`, pid: 1 }, alive), "unknown", "the same name in another pid space");
-  assert.equal(ownerState({ host: me.host.toUpperCase(), pid: 1 }, alive), "live", "the host name in another case is the same host");
-  assert.equal(ownerState({ host: me.host, pid: 1 }, () => ({ state: "dead" })), "gone");
-  assert.equal(ownerState({ host: me.host, pid: 1 }, () => ({ state: "unknown" })), "unknown", "a refused or failed query is not a dead process");
-  assert.equal(ownerState({ host: me.host, pid: 1 }, () => ({})), "unknown", "a probe that says nothing");
-  assert.equal(ownerState({ host: me.host, pid: 1 }, () => undefined), "unknown", "a probe that returns nothing");
-  assert.equal(ownerState({ host: me.host, pid: 1, start: 100 }, () => ({ state: "live" })), "live", "the probe has no start");
-  assert.equal(ownerState({ host: me.host, pid: 1 }, () => ({ state: "live", start: 100 })), "live", "a two-field claim");
+  assert.equal(ownerState({ host: `other@${tag}`, pid: 4242 }, alive), "unknown", "another host");
+  assert.equal(ownerState({ host: `${name}@${otherTag}`, pid: 4242 }, alive), "unknown", "the same name in another pid space");
+  assert.equal(ownerState({ host: me.host.toUpperCase(), pid: 4242 }, alive), "live", "the host name in another case is the same host");
+  assert.equal(ownerState({ host: me.host, pid: 4242 }, () => ({ state: "dead" })), "gone");
+  assert.equal(ownerState({ host: me.host, pid: 4242 }, () => ({ state: "unknown" })), "unknown", "a refused or failed query is not a dead process");
+  assert.equal(ownerState({ host: me.host, pid: 4242 }, () => ({})), "unknown", "a probe that says nothing");
+  assert.equal(ownerState({ host: me.host, pid: 4242 }, () => undefined), "unknown", "a probe that returns nothing");
+  assert.equal(ownerState({ host: me.host, pid: 4242, start: 100 }, () => ({ state: "live" })), "live", "the probe has no start");
+  assert.equal(ownerState({ host: me.host, pid: 4242 }, () => ({ state: "live", start: 100 })), "live", "a two-field claim");
   assert.equal(START_TOLERANCE_S, 2);
 });
 
 test("13b. two starts further apart than the tolerance are unknown, never gone (rule §3)", () => {
-  const marker = { host: thisOwner().host, pid: 1, start: 1_000 };
+  const marker = { host: thisOwner().host, pid: 4242, start: 1_000 };
   assert.equal(ownerState(marker, () => ({ state: "live", start: 1_002 })), "live", "2 s apart");
   assert.equal(ownerState(marker, () => ({ state: "live", start: 998 })), "live", "2 s apart, the other way");
   assert.equal(ownerState(marker, () => ({ state: "live", start: 1_003 })), "unknown", "3 s apart: a reused pid or a skewed clock");

@@ -103,9 +103,11 @@ function runJanitor(w, { cwd = w.clone, tmp, args = [], docker = true, minAge = 
   for (let i = 0; i < 5; i += 1) assertNoSuchProcess(unmatchablePid(i)); // the premise, before the run
   const result = spawnSync(BASH, [slash(SCRIPT), ...args], { cwd, env, encoding: "utf8", timeout: 240_000, windowsHide: true });
   for (let i = 0; i < 5; i += 1) assertNoSuchProcess(unmatchablePid(i)); // and after it
-  const stderr = (result.stderr ?? "").split(/\r?\n/).filter(Boolean);
+  const lines = (result.stderr ?? "").split(/\r?\n/).filter(Boolean);
+  const seams = lines.filter((line) => line.startsWith("janitor: test seam ")); // announced, not asserted about
+  const stderr = lines.filter((line) => !line.startsWith("janitor: test seam "));
   const stdout = (result.stdout ?? "").split(/\r?\n/).filter(Boolean);
-  return { status: result.status, stdout, stderr, text: stderr.join("\n"), error: result.error };
+  return { status: result.status, stdout, stderr, seams, text: stderr.join("\n"), error: result.error };
 }
 
 // --- the stub docker -------------------------------------------------------------------------------------------
@@ -353,13 +355,13 @@ test("2. Docker: age selects, the owner authorises, and the prefix is anchored",
     ],
     vol: [["testsToDelete-v-old", ""], ["testsToDelete-v-young", ""]],
     volCreated: [["testsToDelete-v-old", volumeTime(OLD)], ["testsToDelete-v-young", volumeTime(YOUNG)]],
-    net: [["n1", "testsToDelete-n-old", dead, dockerTime(OLD)]],
+    net: [["a1", "testsToDelete-n-old", dead, dockerTime(OLD)]],
   });
 
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 3, run.text);
-  assert.deepEqual(rmCalls(w), ["rm -f -v c1", "rm -f -v c4", "volume rm testsToDelete-v-old", "network rm n1"]);
+  assert.deepEqual(rmCalls(w), ["rm -f -v c1", "rm -f -v c4", "volume rm testsToDelete-v-old", "network rm a1"]);
   assert.equal(run.stderr.filter((line) => line.startsWith("skipped:")).length, 1, run.text);
   assert.ok(mentions(run, "skipped: container testsToDelete-conventions-live — owned by live process"), run.text);
   assert.equal(mentions(run, "young"), false, `a young resource is left alone silently\n${run.text}`);
@@ -614,10 +616,10 @@ test("12. A vanished target is a notice, not an abort: a failed removal is judge
   const dead = folder(w, tmp, "after", { owner: NOBODY() });
   setDocker(w, {
     ps: [
-      ["cv", "testsToDelete-conventions-vanish", "", dockerTime(OLD)],
-      ["cs", "testsToDelete-conventions-stuck", "", dockerTime(OLD)],
+      ["ce", "testsToDelete-conventions-vanish", "", dockerTime(OLD)],
+      ["cb", "testsToDelete-conventions-stuck", "", dockerTime(OLD)],
     ],
-    mode: ["fail-rm:cv:absent", "fail-rm:cs:present"],
+    mode: ["fail-rm:ce:absent", "fail-rm:cb:present"],
   });
 
   const run = runJanitor(w, { tmp });
@@ -625,7 +627,7 @@ test("12. A vanished target is a notice, not an abort: a failed removal is judge
   assert.equal(run.status, 3, run.text);
   assert.ok(mentions(run, "notice: container testsToDelete-conventions-vanish — vanished after the capture"), run.text);
   assert.ok(mentions(run, "skipped: container testsToDelete-conventions-stuck — could not be removed"), run.text);
-  assert.deepEqual(rmCalls(w), ["rm -f -v cv", "rm -f -v cs"], "both removals were attempted, by captured id");
+  assert.deepEqual(rmCalls(w), ["rm -f -v ce", "rm -f -v cb"], "both removals were attempted, by captured id");
   assert.equal(exists(dead) || exists(`${dead}.owner`), false, `a later pass still ran\n${run.text}`);
 });
 

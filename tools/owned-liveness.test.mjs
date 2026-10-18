@@ -158,3 +158,17 @@ test("12. REPO_ROOT is always this checkout; the test seam changes only the swee
   assert.deepEqual(exportsWith(seam), { root: checkout, sweep: seam }, "REPO_ROOT does not follow the environment");
   assert.deepEqual(exportsWith("fixtures"), { root: checkout, sweep: seam }, "a relative seam is resolved against the working directory");
 });
+
+test("L-win1. Windows has no pid 1: an owner `<host>@windows:1` is unknown whatever a probe says, and the real probe never calls it dead", () => {
+  const dead = () => ({ state: "dead" });
+  assert.equal(ownerState({ host: "devbox@windows", pid: 1 }, dead), "unknown", "a bash started by a native process reports pid 1; it is no process id there");
+  assert.equal(ownerState({ host: "DEVBOX@WINDOWS", pid: 1 }, dead), "unknown", "in any case");
+  assert.equal(ownerState({ host: thisOwner().host, pid: 4242 }, dead), "gone", "any other pid is still asked");
+  if (process.platform === "win32") assert.equal(processProbe(1).state, "unknown", "process.kill(1, 0) says ESRCH on Windows, which proves nothing");
+});
+
+test("L-len. A claim longer than 512 bytes is unreadable, one of exactly 512 is not", () => {
+  assert.equal(parseOwner(`${"a".repeat(504)}@linux:1`).unreadable, undefined);
+  assert.equal(parseOwner(`${"a".repeat(505)}@linux:1`).unreadable, true);
+  assert.equal(parseOwner(`${"a".repeat(504)}@linux:1\n`).unreadable, true, "the line end counts: 513 bytes");
+});

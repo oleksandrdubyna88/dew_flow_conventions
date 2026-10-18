@@ -50,7 +50,10 @@
       { "id": "i31", "text": "h@linux:1;x", "valid": false, "why": "trailing garbage after the pid" },
       { "id": "i32", "text": "h@linuxx:1", "valid": false, "why": "the os tag is exactly one of three words, not a prefix of one" },
       { "id": "i33", "text": "h@linux:1e3", "valid": false, "why": "an exponent is not a decimal digit" },
-      { "id": "i34", "text": "h@ linux:1", "valid": false, "why": "whitespace inside the os tag" }
+      { "id": "i34", "text": "h@ linux:1", "valid": false, "why": "whitespace inside the os tag" },
+      { "id": "i35", "text": "h@linux:1\r", "valid": false, "why": "a carriage return with no line feed is no line end: it is not exactly the form (node rejects it; bash must too)" },
+      { "id": "g15", "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@linux:1", "valid": true, "why": "512 bytes is the longest claim a reader accepts" },
+      { "id": "i36", "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@linux:1", "valid": false, "why": "513 bytes is longer than any claim a reader accepts: unreadable, kept (bash reads 513 bytes to see it; node reads all of it)" }
     ]
   },
   "hostnames": {
@@ -65,7 +68,14 @@
       { "id": "h07", "raw": " lead", "host": "-lead", "why": "nothing is trimmed: a leading separator becomes a dash" },
       { "id": "h08", "raw": "Dev-Box", "host": "Dev-Box", "why": "the case is kept in what is written; readers compare case-insensitively" },
       { "id": "h09", "raw": "tab\there", "host": "tab-here", "why": "any whitespace, a tab too" },
-      { "id": "h10", "raw": "box.example.invalid", "host": "box.example.invalid", "why": "dots stay: a DNS name keeps its labels" }
+      { "id": "h10", "raw": "box.example.invalid", "host": "box.example.invalid", "why": "dots stay: a DNS name keeps its labels" },
+      { "id": "h11", "raw": "my box", "host": "my-box", "why": "a no-break space is whitespace for node; bash must say so in any locale" },
+      { "id": "h13", "raw": "xn--a@b", "host": "xn--a-b", "why": "a doubled dash in a name (punycode) is kept: only a run of separators collapses — `tr -s` would squeeze it" },
+      { "id": "h14", "raw": "devbox", "distro": "Ubuntu", "host": "devbox~Ubuntu", "why": "under WSL the host carries the distribution: distributions share one host name and one Docker daemon, but each has its own pid space" },
+      { "id": "h15", "raw": "devbox", "distro": "Ubuntu-26.04", "host": "devbox~Ubuntu-26.04", "why": "the distribution name is kept as it is, dots and dashes included" },
+      { "id": "h16", "raw": "devbox", "distro": "My Distro", "host": "devbox~My-Distro", "why": "the distribution name is normalised by the same rule as the host" },
+      { "id": "h17", "raw": "devbox", "distro": "", "host": "devbox", "why": "no distribution (not WSL): the plain host" },
+      { "id": "h12", "raw": "a 　b", "host": "a-b", "why": "a run of Unicode spaces is ONE dash too (narrow no-break space, ideographic space)" }
     ]
   },
   "verdicts": {
@@ -94,6 +104,7 @@
       { "id": "v21", "host": "same", "pid": "absent", "startDelta": null, "liveStart": false, "ownerText": "{NAME}@beos:1", "expected": "unknown", "why": "an unknown os tag is not this machine's, and not the form" },
       { "id": "v22", "host": "same", "pid": "absent", "startDelta": null, "liveStart": false, "ownerText": "{HOST}:1:2:3", "expected": "unknown", "why": "four fields are not the form" },
       { "id": "v23", "host": "same", "pid": "absent", "pidText": "0", "startDelta": null, "liveStart": false, "expected": "unknown", "why": "pid 0 is digits (the grammar takes it) but names no process; a pid that cannot be a process says nothing, so it is never 'gone' (the 'no such process' answer is about a real pid that nothing holds). The stub ps answers 'no such process' for it, as ps -p 0 does on Linux" },
+      { "id": "v25", "tasklist": true, "host": "same", "pid": "absent", "pidText": "1", "startDelta": null, "liveStart": false, "ownerText": "{NAME}@windows:1", "expected": "unknown", "why": "on Windows a bash started by a native process reports pid 1 for itself and its parent, and Windows has no pid 1: the process list has no row and process.kill says ESRCH, so a live CI job whose owner pid was taken from $PPID would read as gone. Pid 1 on a windows owner is unknown. (On any other machine this owner is another host's.)" },
       { "id": "v24", "host": "same", "pid": "absent", "pidText": "1234567890123456789012345", "startDelta": null, "liveStart": false, "expected": "unknown", "why": "a 25-digit pid cannot name a process and is not a safe integer; same reasoning as v23" }
     ]
   }

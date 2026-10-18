@@ -25,7 +25,7 @@ import { spawnSync } from "node:child_process";
 
 import { git } from "./lib/git.mjs";
 import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
-import { cleanupScope, ownedDir, thisOwner } from "./lib/owned.mjs";
+import { cleanupScope, ownedDir, ownedWorktree, thisOwner } from "./lib/owned.mjs";
 
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "janitor.sh");
 const win32 = process.platform === "win32";
@@ -67,7 +67,10 @@ function pathFor(w) {
   return parts.join(path.delimiter);
 }
 
-function runJanitor(w, { tmp, args = [], ahead = [], env: extra = {} }) {
+/** The one-line announcements of a test seam are split off into `seams`: they are not what a scenario asserts about. */
+const SEAM_LINE = /^janitor: test seam /;
+
+function runJanitor(w, { tmp, args = [], ahead = [], cwd = w.clone, env: extra = {} }) {
   const env = {};
   for (const [key, value] of Object.entries(process.env)) {
     if (!/^(path|git_.*|tmpdir|janitor_.*|dstub)$/i.test(key)) env[key] = value;
@@ -76,12 +79,14 @@ function runJanitor(w, { tmp, args = [], ahead = [], env: extra = {} }) {
     PATH: [...ahead, pathFor(w)].join(path.delimiter), TMPDIR: posix(tmp), JANITOR_MIN_AGE_MINUTES: "60", DSTUB: slash(w.state), ...extra,
   });
   for (let i = 0; i < 5; i += 1) assertNoSuchProcess(unmatchablePid(i));
-  const result = spawnSync(BASH, [slash(SCRIPT), ...args], { cwd: w.clone, env, encoding: "utf8", timeout: RUN_TIMEOUT, windowsHide: true });
+  const result = spawnSync(BASH, [slash(SCRIPT), ...args], { cwd, env, encoding: "utf8", timeout: RUN_TIMEOUT, windowsHide: true });
   for (let i = 0; i < 5; i += 1) assertNoSuchProcess(unmatchablePid(i));
-  const raw = result.stderr ?? "";
-  const stderr = raw.split(/\r?\n/).filter(Boolean);
+  const lines = (result.stderr ?? "").split(/\r?\n/).filter(Boolean);
+  const seams = lines.filter((line) => SEAM_LINE.test(line));
+  const stderr = lines.filter((line) => !SEAM_LINE.test(line));
+  const raw = stderr.length === 0 ? "" : `${stderr.join("\n")}\n`;
   const stdout = (result.stdout ?? "").split(/\r?\n/).filter(Boolean);
-  return { status: result.status, stdout, stderr, raw, text: stderr.join("\n"), error: result.error };
+  return { status: result.status, stdout, stderr, seams, raw, text: stderr.join("\n"), error: result.error };
 }
 
 // --- the stub docker (volumes only: that is all these tests ask of it) ------------------------------------------
@@ -136,7 +141,7 @@ function goQuote(text) {
   });
   return `"${escaped.join("")}"`;
 }
-const quotedAt = (list, column) => list.map((cells) => cells.map((cell, i) => (i === column ? goQuote(cell) : cell)));
+const quotedAt = (list, columns) => list.map((cells) => cells.map((cell, i) => (columns.includes(i) ? goQuote(cell) : cell)));
 
 /**
  * `ps`/`net` rows: id, name, owner label, created; `vol`: name, owner label. Each is written twice, the way docker prints it
@@ -145,11 +150,11 @@ const quotedAt = (list, column) => list.map((cells) => cells.map((cell, i) => (i
  */
 function setDocker(w, { ps = [], vol = [], volCreated = [], net = [], mode = [] } = {}) {
   fs.writeFileSync(path.join(w.state, "ps.tsv"), rows(ps));
-  fs.writeFileSync(path.join(w.state, "ps.q.tsv"), rows(quotedAt(ps, 2)));
+  fs.writeFileSync(path.join(w.state, "ps.q.tsv"), rows(quotedAt(ps, [1, 2])));
   fs.writeFileSync(path.join(w.state, "net.tsv"), rows(net));
-  fs.writeFileSync(path.join(w.state, "net.q.tsv"), rows(quotedAt(net, 2)));
+  fs.writeFileSync(path.join(w.state, "net.q.tsv"), rows(quotedAt(net, [1, 2])));
   fs.writeFileSync(path.join(w.state, "vol.tsv"), rows(vol));
-  fs.writeFileSync(path.join(w.state, "vol.q.tsv"), rows(quotedAt(vol, 1)));
+  fs.writeFileSync(path.join(w.state, "vol.q.tsv"), rows(quotedAt(vol, [0, 1])));
   fs.writeFileSync(path.join(w.state, "volcreated.tsv"), rows(volCreated));
   fs.writeFileSync(path.join(w.state, "mode"), mode.map((line) => `${line}\n`).join(""));
   fs.rmSync(path.join(w.state, "log"), { force: true });
@@ -440,7 +445,7 @@ test("L6b. A container or network label holding a newline cannot forge a capture
   const tmp = makeTmp(w);
   setDocker(w, {
     ps: [["c1", "testsToDelete-conventions-real", FORGE_CONTAINER, dockerTime(OLD)]],
-    net: [["n1", "testsToDelete-conventions-nreal", FORGE_NETWORK, dockerTime(OLD)]],
+    net: [["a1b3", "testsToDelete-conventions-nreal", FORGE_NETWORK, dockerTime(OLD)]],
   });
 
   const run = runJanitor(w, { tmp });
@@ -480,7 +485,7 @@ test("L6d. A readable owner label still works through the quoted template: dead 
   setDocker(w, {
     ps: [["c1", "testsToDelete-conventions-dead", dead, dockerTime(OLD)], ["c2", "testsToDelete-conventions-none", "", dockerTime(OLD)],
       ["c3", "testsToDelete-conventions-live", OWNER_AS("linux", 5555), dockerTime(OLD)]],
-    net: [["n1", "testsToDelete-conventions-ndead", dead, dockerTime(OLD)]],
+    net: [["a1b3", "testsToDelete-conventions-ndead", dead, dockerTime(OLD)]],
     vol: [["testsToDelete-conventions-vdead", dead]], volCreated: [["testsToDelete-conventions-vdead", volumeTime(OLD)]],
   });
 
@@ -488,7 +493,7 @@ test("L6d. A readable owner label still works through the quoted template: dead 
 
   assert.equal(run.status, 3, `the live container is the one skip\n${run.text}`);
   assert.deepEqual(dockerLog(w).filter((line) => /^(rm|network rm|volume rm) /.test(line)).sort(),
-    ["network rm n1", "rm -f -v c1", "rm -f -v c2", "volume rm testsToDelete-conventions-vdead"], run.text);
+    ["network rm a1b3", "rm -f -v c1", "rm -f -v c2", "volume rm testsToDelete-conventions-vdead"], run.text);
   assert.ok(run.stderr.some((line) => line.startsWith("skipped: container testsToDelete-conventions-live") && line.includes("owned by live process 5555")), run.text);
 });
 
@@ -507,7 +512,7 @@ test("L13. A machine name holding a space, ':' or '@' is normalised like owned.m
   const upper = folder(w, tmp, "hostupper", { owner: `MY-HOST-X-Y@linux:${dead}\n` });
   const other = folder(w, tmp, "hostother", { owner: `my-host@linux:${dead}\n` });
 
-  const run = runJanitor(w, { tmp, env: { ...env, JANITOR_HOSTNAME: "my host:x@y" } });
+  const run = runJanitor(w, { tmp, env: { ...env, JANITOR_HOSTNAME: "my host:x@y", WSL_DISTRO_NAME: "" } });
 
   assert.equal(exists(same) || exists(`${same}.owner`), false, `the owner this machine writes (my-host-x-y) is ours, and its process is gone\n${run.text}`);
   assert.equal(exists(upper) || exists(`${upper}.owner`), false, `the same name in another case is the same host\n${run.text}`);
@@ -706,4 +711,234 @@ test("L11d. The header documents --token", () => {
   const header = fs.readFileSync(SCRIPT, "utf8").split(/\r?\n/).filter((line) => line.startsWith("#")).join(" ").replace(/#\s+/g, "");
   assert.match(header, /--token <t>/);
   assert.match(header, /Usage:\s+bash tools\/janitor\.sh \[--dry-run\] \[--token <t>\]/);
+});
+
+// --- security round: names are data a stranger wrote -----------------------------------------------------------------------
+
+const NL_NAME = "testsToDelete-conventions-nl\nsrc";
+
+// Windows forbids control characters in a file name, so the scenario cannot be made there: it is skipped, not faked.
+test("S1. A temp-root folder whose NAME holds a newline is never read as two paths: the repository's own `src` survives (F1)", { timeout: TIMEOUT, skip: win32 ? "Windows file names cannot hold a newline" : false }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const src = path.join(w.clone, "src");
+  fs.mkdirSync(src);
+  fs.writeFileSync(path.join(src, "keep.txt"), "mine");
+  age(src, OLD);
+  const evil = path.join(tmp, NL_NAME);
+  fs.mkdirSync(evil);
+  age(evil, OLD);
+  const claimless = path.join(tmp, "testsToDelete-conventions-mark\nsrc.owner");
+  fs.writeFileSync(claimless, `${OWNER_AS("linux", unmatchablePid())}\n`);
+  age(claimless, OLD);
+
+  const dry = runJanitor(w, { tmp, args: ["--dry-run"], env: { JANITOR_OS: "linux", JANITOR_PROC: posix(fakeProc(w, [1])) } });
+  assert.equal(dry.stdout.some((line) => /rm -rf -- src$/.test(line) || /rm -f -- src(\.owner)?$/.test(line)), false, `a relative path was announced for removal: ${dry.stdout.join(" // ")}`);
+
+  const run = runJanitor(w, { tmp, env: { JANITOR_OS: "linux", JANITOR_PROC: posix(fakeProc(w, [1])) } });
+  assert.ok(exists(path.join(src, "keep.txt")), `the repository's src was deleted\n${run.text}`);
+  assert.ok(exists(evil), `a name that cannot be handled safely is kept\n${run.text}`);
+  assert.ok(run.stderr.some((line) => line.startsWith("skipped: ") && line.includes("control character")), `one skip line names it\n${run.text}`);
+  assert.equal(run.status, 3, run.text);
+});
+
+test("S2. A docker NETWORK name holding a newline cannot forge a row: only the real prefixed network is touched (F2)", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  setDocker(w, { net: [["a1b2", "testsToDelete-conventions-nreal\nbeef01\ttestsToDelete-conventions-nforged", "", dockerTime(OLD)]] });
+
+  const run = runJanitor(w, { tmp, env: { JANITOR_OS: "linux", JANITOR_PROC: posix(fakeProc(w, [1])) } });
+
+  assert.deepEqual(dockerLog(w).filter((line) => line.startsWith("network rm ")), ["network rm a1b2"], `only the real network, by its real id\n${run.text}`);
+});
+
+test("S2b. A container or network row whose id is not lower-case hex is dropped with a notice, never acted on (F2)", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  setDocker(w, {
+    ps: [["abc123", "testsToDelete-conventions-good", "", dockerTime(OLD)], ["br-prod", "testsToDelete-conventions-badid", "", dockerTime(OLD)]],
+    net: [["a1b2", "testsToDelete-conventions-ngood", "", dockerTime(OLD)], ["NOTHEX", "testsToDelete-conventions-nbad", "", dockerTime(OLD)]],
+  });
+
+  const run = runJanitor(w, { tmp, env: { JANITOR_OS: "linux", JANITOR_PROC: posix(fakeProc(w, [1])) } });
+
+  assert.deepEqual(dockerLog(w).filter((line) => /^(rm|network rm) /.test(line)).sort(), ["network rm a1b2", "rm -f -v abc123"], run.text);
+  assert.equal(run.stderr.filter((line) => line.startsWith("notice: ") && line.includes("not a docker id")).length, 2, run.text);
+});
+
+test("S3. The worktree the janitor runs FROM is never a removal candidate, even unlocked, old and prefixed (F3)", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const self = ownedWorktree(w.scope, w.clone, "self", { parent: tmp }).path;
+  git(w.clone, "worktree", "unlock", self);
+  age(self, OLD);
+  const env = { JANITOR_OS: "linux", JANITOR_PROC: posix(fakeProc(w, [1])) };
+
+  const dry = runJanitor(w, { tmp, cwd: self, args: ["--dry-run"], env });
+  assert.equal(dry.stdout.some((line) => line.includes("worktree remove") && line.includes("self")), false, `the janitor offered to remove its own working tree: ${dry.stdout.join(" // ")}`);
+
+  const run = runJanitor(w, { tmp, cwd: self, env });
+  assert.ok(exists(path.join(self, ".git")), `the working tree the janitor runs from is gone\n${run.text}`);
+  assert.equal(run.stderr.filter((line) => line.startsWith("skipped: ") && line.includes("runs from")).length, 1, `one skip line\n${run.text}`);
+  assert.equal(run.status, 3, run.text);
+});
+
+test("S4. Every test seam that is set is announced once on stderr, and still honoured (F4)", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const proc = posix(fakeProc(w, [1]));
+
+  const run = runJanitor(w, { tmp, env: { JANITOR_OS: "linux", JANITOR_PROC: proc, JANITOR_HOSTNAME: "some box" } });
+  for (const name of ["JANITOR_OS", "JANITOR_PROC", "JANITOR_HOSTNAME"]) {
+    assert.equal(run.seams.filter((line) => line.startsWith(`janitor: test seam ${name} is set`)).length, 1, `${name}: ${JSON.stringify(run.seams)}`);
+  }
+  assert.equal(run.seams.length, 3, JSON.stringify(run.seams));
+
+  const none = runJanitor(w, { tmp, env: {} });
+  assert.deepEqual(none.seams, [], "a run with no seam says nothing");
+});
+
+test("S5. JANITOR_MIN_AGE_MINUTES=0 is refused in one line, exit 1, nothing removed (F5)", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const young = ownedDir(w.scope, "zeroage", { parent: tmp });
+  for (const value of ["0", "00", "000"]) {
+    const run = runJanitor(w, { tmp, env: { JANITOR_OS: "macos", JANITOR_MIN_AGE_MINUTES: value } });
+    assert.equal(run.status, 1, `${value}\n${run.text}`);
+    assert.equal(run.stderr.length, 1, run.text);
+    assert.match(run.stderr[0], /^janitor: JANITOR_MIN_AGE_MINUTES must be at least 1/, run.text);
+    assert.ok(exists(young), "nothing was removed");
+  }
+});
+
+const unixOnly = win32 ? "Windows file names cannot hold control characters" : false;
+
+test("S6. A folder named to shift the fields cannot reach bash arithmetic: no command runs, one skip line, exit 3 (B2)", { timeout: TIMEOUT, skip: unixOnly }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const marker = path.join(w.clone, "injected-marker");
+  const evil = path.join(tmp, "testsToDelete-q\x1f\x1f\x1fNOW[$(touch injected-marker)]+");
+  fs.mkdirSync(evil);
+  age(evil, OLD);
+
+  const run = runJanitor(w, { tmp, env: { JANITOR_OS: "linux", JANITOR_PROC: posix(fakeProc(w, [1])) } });
+
+  assert.equal(exists(marker), false, `the name's $(…) ran as the janitor's user\n${run.text}`);
+  assert.ok(exists(evil), `a name that cannot be handled safely is kept\n${run.text}`);
+  assert.ok(run.stderr.some((line) => line.startsWith("skipped: ") && line.includes("control character")), `one skip line names it\n${run.text}`);
+  assert.equal(run.status, 3, run.text);
+});
+
+test("S7. Windows has no pid 1: a claim `<host>@windows:1` is unknown and kept, whatever the process list says (M2)", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const kept = folder(w, tmp, "winpid1", { owner: `${OWNER_AS("windows", 1)}\n` });
+  const task = taskStub(w, `printf '"node.exe","4242","Console","1","9 K"\r\n'`);
+
+  const run = runJanitor(w, { tmp, ahead: [task], env: { JANITOR_OS: "windows" } });
+
+  assert.ok(exists(kept) && exists(`${kept}.owner`), `a claim of pid 1 on Windows was deleted\n${run.text}`);
+  assert.ok(run.stderr.some((line) => line.includes("Windows has no pid 1")), run.text);
+  assert.equal(run.status, 3, run.text);
+});
+
+test("S8. A claim longer than 512 bytes is unreadable and kept; a lone trailing CR is no line end (m1, m2)", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dead = unmatchablePid();
+  const proc = posix(fakeProc(w, [1]));
+  const long = folder(w, tmp, "claimlong", { owner: `${OWNER_AS("linux", dead)}:${"1".repeat(520)}
+` }); // the first 200 bytes are a valid owner; the whole is longer than any claim
+  const toolong = folder(w, tmp, "claimwide", { owner: `${"a".repeat(505)}@linux:${dead}\n` });
+  const lonecr = folder(w, tmp, "claimcr", { owner: `${OWNER_AS("linux", dead)}\r` });
+  const ok = folder(w, tmp, "claimok", { owner: `${OWNER_AS("linux", dead)}\r\n` });
+
+  const run = runJanitor(w, { tmp, env: { JANITOR_OS: "linux", JANITOR_PROC: proc } });
+
+  for (const kept of [long, toolong, lonecr]) assert.ok(exists(kept), `${path.basename(kept)} must be kept\n${run.text}`);
+  assert.equal(exists(ok), false, `CRLF is one line end: the dead owner's folder goes\n${run.text}`);
+  assert.equal(run.status, 3, run.text);
+});
+
+test("S9. A dry run and the real run exit alike when a branch is checked out in a worktree the run removes (m4)", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const tree = ownedWorktree(w.scope, w.clone, "brwt", { parent: tmp }).path;
+  git(w.clone, "worktree", "unlock", tree);
+  git(tree, "checkout", "-q", "-b", "testsToDelete-conventions-m4branch");
+  age(tree, OLD);
+  const env = { JANITOR_OS: "linux", JANITOR_PROC: posix(fakeProc(w, [1])) };
+
+  const dry = runJanitor(w, { tmp, args: ["--dry-run"], env });
+  const real = runJanitor(w, { tmp, env });
+
+  assert.equal(exists(tree), false, `the real run removed the worktree\n${real.text}`);
+  assert.equal(real.status, 0, real.text);
+  assert.equal(dry.status, real.status, `a dry run must predict the exit code\n${dry.text}`);
+});
+
+test("S10. `would run:` lines are printable ASCII (m5)", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  plainFolder(tmp, "testsToDelete-conventions-caf\u00e9-abc123");
+  const run = runJanitor(w, { tmp, args: ["--dry-run"], env: { JANITOR_OS: "linux", JANITOR_PROC: posix(fakeProc(w, [1])) } });
+  const would = run.stdout.filter((line) => line.startsWith("would run:") && line.includes("caf"));
+  assert.ok(would.length > 0, run.text);
+  assert.ok(would.every((line) => /^[\x20-\x7e]*$/.test(line)), `a non-ASCII byte reached stdout: ${JSON.stringify(would)}`);
+});
+
+test("S11. --token is 2 to 12 characters of [a-z0-9]: anything else is usage and exit 2 (m6)", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  for (const token of ["a", "abcdefghijklm"]) {
+    const run = runJanitor(w, { tmp, args: ["--token", token], env: {} });
+    assert.equal(run.status, 2, `${token}\n${run.text}`);
+    assert.ok(run.stderr[0]?.startsWith("usage: bash tools/janitor.sh"), run.text);
+  }
+  for (const token of ["ab", "abcdefghijkl"]) assert.equal(runJanitor(w, { tmp, args: ["--token", token], env: {} }).status, 0, token);
+});
+
+test("S12. A TMPDIR that is a symlink is followed: the folder behind it is swept (m7)", { timeout: TIMEOUT, skip: win32 ? "creating a symlink needs a privilege on Windows" : false }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const real = makeTmp(w, "jlsymreal");
+  const holder = ownedDir(w.scope, "jlsymlink");
+  const link = path.join(holder, "linkroot");
+  fs.symlinkSync(real, link);
+  const dead = plainFolder(real, "testsToDelete-conventions-behindlink-abc123");
+
+  const run = runJanitor(w, { tmp: link, env: { JANITOR_OS: "linux", JANITOR_PROC: posix(fakeProc(w, [1])) } });
+
+  assert.equal(exists(dead), false, `find without -H lists nothing behind a symlinked root\n${run.text}`);
+});
+
+test("S13. Under WSL the host is <host>~<distro>: another distribution's claim is another host's and is kept; this distribution's own dead claim goes (M3)", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dead = unmatchablePid();
+  const mine = folder(w, tmp, "wslmine", { owner: `devbox~A@linux:${dead}\n` });
+  const sibling = folder(w, tmp, "wslsibling", { owner: `devbox~B@linux:${dead}\n` });
+  const plain = folder(w, tmp, "wslplain", { owner: `devbox@linux:${dead}\n` });
+  const env = { JANITOR_OS: "linux", JANITOR_PROC: posix(fakeProc(w, [1])), JANITOR_HOSTNAME: "devbox", WSL_DISTRO_NAME: "A" };
+
+  const run = runJanitor(w, { tmp, env });
+
+  assert.equal(exists(mine) || exists(`${mine}.owner`), false, `this distribution's own dead claim goes\n${run.text}`);
+  assert.ok(exists(sibling), `another distribution's claim: its pid is in another pid space, so it is unknown, never gone\n${run.text}`);
+  assert.ok(exists(plain), `a claim with no distribution is no distribution's here\n${run.text}`);
+  assert.ok(run.stderr.some((line) => line.includes("belongs to devbox~B@linux, not this host")), run.text);
+  assert.equal(run.status, 3, run.text);
 });

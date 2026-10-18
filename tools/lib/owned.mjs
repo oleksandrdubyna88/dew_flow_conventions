@@ -154,6 +154,7 @@ export function isProcessId(pid) {
  */
 export function processProbe(pid) {
   if (!isProcessId(pid)) return { state: "unknown" };
+  if (process.platform === "win32" && pid === 1) return { state: "unknown" }; // Windows has no pid 1: process.kill says ESRCH, which proves nothing
   try {
     process.kill(pid, 0);
   } catch (error) {
@@ -170,12 +171,17 @@ export function hostName(raw) {
   return raw.replace(/[@:\s]+/g, "-");
 }
 
+/** The host part of an owner: `hostName(raw)`, and under WSL `~` and the normalised distribution name — distributions share one host name and one Docker daemon but not pid spaces, so another distribution's claim must be another host's. `janitor.sh`'s `host_id` is the same rule. */
+export function hostId(raw, distro = "") {
+  return distro.trim() === "" ? hostName(raw) : `${hostName(raw)}~${hostName(distro)}`;
+}
+
 /** This process:`{ host: "<hostname>@<linux|macos|windows>", pid, start? }`, computed once. Throws on any other platform. */
 export function thisOwner() {
   if (cachedOwner !== undefined) return cachedOwner;
   const tag = OS_TAGS[process.platform];
   if (tag === undefined) throw new Error(`owned: no owner shape for platform ${process.platform}`);
-  const owner = { host: `${hostName(os.hostname())}@${tag}`, pid: process.pid };
+  const owner = { host: `${hostId(os.hostname(), process.env.WSL_DISTRO_NAME ?? "")}@${tag}`, pid: process.pid };
   const start = tag === "linux" ? processProbe(process.pid).start : undefined;
   if (start !== undefined) owner.start = start;
   cachedOwner = Object.freeze(owner);
@@ -187,8 +193,12 @@ export function formatOwner(owner) {
   return `${owner.host}:${owner.pid}${owner.start === undefined ? "" : `:${owner.start}`}`;
 }
 
-/** The owner a text names, or `{ unreadable: true }` — git's own `added with --lock` among the latter. */
+/** The longest claim a reader accepts, in bytes, line end included. `janitor.sh` reads 513 bytes of a claim file to see one past it. */
+export const MAX_CLAIM_BYTES = 512;
+
+/** The owner a text names, or `{ unreadable: true }` — git's own `added with --lock` among the latter, and any text longer than `MAX_CLAIM_BYTES`. */
 export function parseOwner(text) {
+  if (typeof text === "string" && Buffer.byteLength(text) > MAX_CLAIM_BYTES) return { unreadable: true };
   const match = OWNER_TEXT.exec(typeof text === "string" ? text.replace(/\r?\n$/, "") : "");
   if (match === null) return { unreadable: true };
   const owner = { host: match[1], pid: Number(match[3]) };
@@ -248,6 +258,7 @@ export function ownerState(owner, probe = processProbe) {
   if (owner === null || owner === undefined || owner.unreadable === true) return "unknown";
   if (owner.host.toLowerCase() !== thisOwner().host.toLowerCase()) return "unknown";
   if (!isProcessId(owner.pid)) return "unknown"; // pid 0, a negative, a fraction or one past 2^53 is no process: never asked, never gone
+  if (owner.pid === 1 && owner.host.toLowerCase().endsWith("@windows")) return "unknown"; // Windows has no pid 1; a bash started by a native process reports it for itself and its parent
   let seen;
   try {
     seen = probe(owner.pid);
