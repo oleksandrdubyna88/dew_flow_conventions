@@ -392,6 +392,31 @@ test("3a. --rule points the token check at another rule text", (t) => {
   assert.equal(guard(own, ["--rule", path.join(own, "other.md")]).code, 0);
 });
 
+test("3a. one helper per language: every token constant in the repository is the same and is a row of the table", (t) => {
+  const rule = table(["| `conventions` | dew_flow | " + REPO_ROW + " |", "| `other` | dew_flow | another repository |"]);
+  const files = (extra) => ({ "tools/x.test.mjs": "const a = 1;", "rule.md": rule, ...extra });
+  const own = tree(t, files({ "helper/owned.mjs": 'export const REPO_TOKEN = "conventions";\n', "helper/owned.sh": 'REPO_TOKEN="conventions"\n', "helper/Owned.cs": 'public const string RepoToken = "conventions";\n' }));
+  assert.equal(guard(own, ["--rule", path.join(own, "rule.md")]).code, 0, "three languages, one token");
+
+  const differ = tree(t, files({ "helper/owned.mjs": 'export const REPO_TOKEN = "conventions";\n', "helper/owned.sh": 'REPO_TOKEN="other"\n' }));
+  const result = guard(differ, ["--rule", path.join(differ, "rule.md")]);
+  assert.equal(result.code, 1, result.text);
+  assert.match(result.text, /token constants differ/);
+  assert.match(result.text, /helper\/owned\.mjs/);
+  assert.match(result.text, /helper\/owned\.sh/);
+
+  const unregistered = tree(t, files({ "helper/owned.mjs": 'export const REPO_TOKEN = "conventions";\n', "helper/owned.sh": 'REPO_TOKEN="zzz"\n' }));
+  assert.match(guard(unregistered, ["--rule", path.join(unregistered, "rule.md")]).text, /zzz/, "an unregistered constant is named");
+  const comment = tree(t, files({ "helper/owned.sh": '# REPO_TOKEN="zzz" was the old name\nREPO_TOKEN="conventions"\n' }));
+  assert.equal(guard(comment, ["--rule", path.join(comment, "rule.md")]).code, 0, "a comment is not a constant");
+});
+
+test("2. raw-temp: RUNNER_TEMP is a job-scoped namespace, not a finding", (t) => {
+  assert.equal(one(t, "tools/x.test.mjs", "const d = process.env.RUNNER_TEMP;\n").code, 0);
+  assert.equal(one(t, "tools/a.sh", "d=\"$RUNNER_TEMP/run\"\n").code, 0);
+  assert.equal(one(t, ".github/workflows/a.yml", ["name: x", "on: push", "jobs:", "  j:", "    runs-on: ubuntu-latest", "    steps:", "      - run: echo \"$RUNNER_TEMP\""].join("\n") + FOOT).code, 0);
+});
+
 // 4 / 5 ------------------------------------------------------------------------------------------------------------
 
 test("4. the exclusion list is exactly one file", () => {

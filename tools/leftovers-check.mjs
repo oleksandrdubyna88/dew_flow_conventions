@@ -460,6 +460,37 @@ export function tokenFindings(ruleText, token, rulePath = "common/test-leftovers
 
 // --- the repository ------------------------------------------------------------------------------------------
 
+// A repository has one helper per test language (rule §2), each holding the token ONCE. The constants are found by shape, in every
+// tracked source file — the helper itself lives where the scan above does not look — and they must all be the same and a row of the table.
+const TOKEN_CONSTANT = /\b(?:REPO_TOKEN|RepoToken)\b\s*(?::\s*[\w<>[\]]+\s*)?=\s*["']([^"'\n]*)["']/;
+const CONSTANT_FILE = /\.(?:mjs|cjs|js|ts|cs|sh|ps1|py|rs)$/;
+
+/** Every token constant of the repository: `[{ file, line, value }]`. */
+export function tokenConstants(repo) {
+  const listing = gitOutput(repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
+  const found = [];
+  for (const file of [...new Set(listing.split("\0").filter(Boolean))].sort()) {
+    if (!CONSTANT_FILE.test(file) || EXCLUDED_FILES.includes(file) || !fs.existsSync(path.join(repo, file))) continue;
+    fs.readFileSync(path.join(repo, file), "utf8").split(/\r?\n/).forEach((line, index) => {
+      const match = isComment(line) ? null : TOKEN_CONSTANT.exec(line);
+      if (match !== null) found.push({ file, line: index + 1, value: match[1] });
+    });
+  }
+  return found;
+}
+
+/** Findings (class `token`): constants that differ, and every constant that is not this repository's registered token. */
+export function constantFindings(constants, token, ruleText, rulePath) {
+  const values = [...new Set(constants.map((entry) => entry.value))];
+  const found = [];
+  if (values.length > 1) {
+    const where = constants.map((entry) => `\`${entry.value}\` in ${entry.file}:${entry.line}`).join(", ");
+    found.push(finding(constants[0].file, constants[0].line, "token", `token constants differ: ${where} — every helper of a repository holds the same token (§2)`));
+  }
+  for (const value of values) if (value !== token) found.push(...tokenFindings(ruleText, value, rulePath));
+  return found;
+}
+
 /** The rule text the token is checked against: `--rule`, else the repository's own, else the one beside this tool. */
 export function resolveRule(repo, rule) {
   const candidates = rule === undefined ? [path.join(repo, "common", "test-leftovers.md"), path.join(HERE, "..", "common", "test-leftovers.md")] : [rule];
@@ -476,7 +507,8 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule } = {}) {
   }
   const rulePath = resolveRule(repo, rule);
   const ruleText = rulePath === undefined ? "" : fs.readFileSync(rulePath, "utf8");
-  findings.push(...tokenFindings(ruleText, token, rulePath === undefined ? "common/test-leftovers.md (not found)" : path.basename(path.dirname(rulePath)) + "/" + path.basename(rulePath)));
+  const ruleName = rulePath === undefined ? "common/test-leftovers.md (not found)" : path.basename(path.dirname(rulePath)) + "/" + path.basename(rulePath);
+  findings.push(...tokenFindings(ruleText, token, ruleName), ...constantFindings(tokenConstants(repo), token, ruleText, ruleName));
   findings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.cls.localeCompare(b.cls));
   return { files: files.length, findings };
 }
