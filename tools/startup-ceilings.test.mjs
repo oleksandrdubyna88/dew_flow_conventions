@@ -148,3 +148,11 @@ test("gitWith gives a git() of the same shape with its own hang guard, and no ar
   const sleeper=gitWith({timeoutMs:300});
   assert.throws(()=>sleeper(".","-c","alias.hang=!sleep 30","hang"),error=>error.code==="ETIMEDOUT");
 });
+
+test("the repository argument is a path, never an option: an empty, non-string or dash-led repo is refused before git runs",()=>{
+  for (const repo of ["","-c","--exec-path=/tmp",undefined,null,42]) {
+    assert.throws(()=>gitOutput(repo,["--version"]),error=>error instanceof TypeError&&/repository path/.test(error.message),
+      `repo ${JSON.stringify(repo)} must be refused`);
+  }
+  assert.match(gitOutput("./",["--version"]),/^git version/);
+});
