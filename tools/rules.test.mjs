@@ -4,10 +4,14 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync, execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { loadCatalog, selectRules, sha256, TASKS } from "./lib/rule-catalog.mjs";
 import {run} from "./lib/rule-cli.mjs";
 import {bodyOf, sectionsOf} from "./lib/rule-body.mjs";
+import {GUARD_MS} from "./lib/startup-ceilings.mjs";
+import {gitWith} from "./lib/git.mjs";
+
+const gitGuarded=gitWith({timeoutMs:GUARD_MS});
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "rules Unicode пробел "));
@@ -227,9 +231,9 @@ function cliFixture(t) {
   for(const name of ["tools","node_modules","common","csharp","rust","typescript","AGENTS.md","CLAUDE.md","ENTRY.md",".agents","README.md","research"]) {
     fs.cpSync(path.join(sourceRoot,name),path.join(root,name),{recursive:true});
   }
-  execFileSync("git",["init","-q",root],{timeout:10000});
-  execFileSync("git",["-C",root,"-c","user.name=Rule test","-c","user.email=rules@example.invalid","-c","commit.gpgsign=false","commit","--allow-empty","-qm","fixture"],{timeout:10000});
-  const cli=(args,cwd=root)=>spawnSync(process.execPath,[path.join(root,"tools/rules.mjs"),...args],{cwd,encoding:"utf8",timeout:10000,maxBuffer:1024*1024});
+  gitGuarded(root,"init","-q");
+  gitGuarded(root,"-c","user.name=Rule test","-c","user.email=rules@example.invalid","-c","commit.gpgsign=false","commit","--allow-empty","-qm","fixture");
+  const cli=(args,cwd=root)=>spawnSync(process.execPath,[path.join(root,"tools/rules.mjs"),...args],{cwd,encoding:"utf8",timeout:GUARD_MS,maxBuffer:1024*1024});
   return {root,cli};
 }
 
