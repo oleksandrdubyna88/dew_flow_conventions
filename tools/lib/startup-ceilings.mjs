@@ -51,8 +51,9 @@ export function startupBudget({ budgets = STARTUP_BUDGETS_MS, totalMs = STARTUP_
    *
    * An attempt is CONCLUSIVE when the line appeared and either the run ended on its own, or the deadline still left
    * `runwayMs` after readiness. An inconclusive attempt is retried (a fresh child) with the next ceiling; the
-   * ceiling under test is therefore never widened on a run that had its full say. Each attempt is billed the lesser
-   * of its ceiling and its real elapsed time against the file's total, and nothing is started once the total is gone.
+   * ceiling under test is therefore never widened on a run that had its full say. Each attempt is billed its real
+   * elapsed time against the file's total — a run that timed out is still closing its child after the ceiling, and
+   * that is wall time too — the total never grows past its cap, and nothing is started once the total is gone.
    *
    * Returns `{result, budgetMs, startedAt, readyAt, elapsedMs}` of the conclusive attempt.
    */
@@ -70,7 +71,7 @@ export function startupBudget({ budgets = STARTUP_BUDGETS_MS, totalMs = STARTUP_
       const begin = performance.now();
       const result = await runner(command, args, { ...runOptions, timeoutMs: budgetMs });
       const elapsedMs = performance.now() - begin;
-      spent += Math.ceil(Math.min(budgetMs, elapsedMs)); // whole milliseconds, so the remainder is whole too
+      spent = Math.min(totalMs, spent + Math.ceil(elapsedMs)); // whole milliseconds, so the remainder is whole too
       const ready = readyAt(result);
       anyReady ||= Number.isFinite(ready);
       if (isConclusive({ startedAt, budgetMs, ready, timedOut: result.timedOut, runwayMs })) {

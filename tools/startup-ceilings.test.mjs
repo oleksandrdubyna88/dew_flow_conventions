@@ -84,10 +84,20 @@ test("when start-up did complete but never with runway the failure says that ins
   });
 });
 
-test("an attempt is billed the lesser of its ceiling and its elapsed time",async()=>{
+test("an attempt is billed its real elapsed time, not its ceiling",async()=>{
   const budget=startupBudget({budgets:[60000],totalMs:120000});
   await budget.runWhenReady(undefined,"cmd",[],{readyAt,run:stub(()=>({timedOut:false,ready:1}))});
   assert.ok(budget.spentMs()<1000,`an instant run was billed ${budget.spentMs()} ms of a 60000 ms ceiling`);
+});
+
+test("the time a timed-out run takes to close after its ceiling is billed too, and spent never passes the total",async()=>{
+  // run() marks timedOut at the ceiling but resolves only when the child has closed; that cleanup is real wall time.
+  const budget=startupBudget({budgets:[100],totalMs:10000});
+  await assert.rejects(budget.runWhenReady(undefined,"cmd",[],{readyAt,run:stub(async timeoutMs=>{await delay(timeoutMs+200);return {timedOut:true};})}),/never appeared/);
+  assert.ok(budget.spentMs()>=300,`a 100 ms ceiling that closed after ~300 ms was billed only ${budget.spentMs()} ms`);
+  const capped=startupBudget({budgets:[100],totalMs:150});
+  await assert.rejects(capped.runWhenReady(undefined,"cmd",[],{readyAt,run:stub(async timeoutMs=>{await delay(timeoutMs+200);return {timedOut:true};})}),/never appeared/);
+  assert.equal(capped.spentMs(),150,"spent is capped at the total");
 });
 
 test("nothing is started once the total is spent, and spent never exceeds it",async()=>{
