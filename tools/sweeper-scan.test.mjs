@@ -107,7 +107,6 @@ test("S5a 10 the classifier's own module and this test spell no broad line", () 
 
 // --- S5b: the scan ---------------------------------------------------------------------------------------------------
 
-import * as os from "node:os";
 import { spawnSync } from "node:child_process";
 import { ownedDir, cleanupScope } from "./lib/owned.mjs";
 import { git } from "./lib/git.mjs";
@@ -146,7 +145,7 @@ const withGit = (answers) => (command, args) => (command === "git" ? realRun(com
 function runScan(argv, deps = {}) {
   const out = [];
   const err = [];
-  const code = main(argv, { out: (line) => out.push(line), err: (line) => err.push(line) }, { run: withGit(NO_CRONTAB), home: os.tmpdir(), platform: "linux", ...deps });
+  const code = main(argv, { out: (line) => out.push(line), err: (line) => err.push(line) }, { run: withGit(NO_CRONTAB), home: path.join(here, "no-such-home"), platform: "linux", ...deps });
   return { code, out: out.join("\n"), err: err.join("\n") };
 }
 
