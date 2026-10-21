@@ -81,10 +81,13 @@ export function isScanned(file) {
   );
 }
 
+/** Paths in code-unit order — the order a bare `.sort()` gives, stated, so it never depends on the locale. */
+const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
 /** The files to read, from git's own idea of the tree (tracked plus untracked-not-ignored). Throws when `repo` is not a repository. */
 export function discover(repo) {
   const listing = gitOutput(repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
-  return [...new Set(listing.split("\0").filter(Boolean))].filter(isScanned).sort();
+  return [...new Set(listing.split("\0").filter(Boolean))].filter(isScanned).sort(byCodeUnit);
 }
 
 // --- lines, comments, exemptions -----------------------------------------------------------------------------
@@ -479,7 +482,7 @@ const CONSTANT_FILE = /\.(?:mjs|cjs|js|ts|cs|sh|ps1|py|rs)$/;
 function candidateFiles(repo) {
   try {
     const listing = gitOutput(repo, ["grep", "-l", "-z", "-I", "-F", "--untracked", "-e", "REPO_TOKEN", "-e", "RepoToken"]);
-    return [...new Set(listing.split("\0").filter(Boolean))].sort();
+    return [...new Set(listing.split("\0").filter(Boolean))].sort(byCodeUnit);
   } catch (error) {
     if (error.status === 1) return [];
     throw error;
