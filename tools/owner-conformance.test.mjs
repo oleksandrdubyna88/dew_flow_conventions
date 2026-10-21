@@ -39,7 +39,8 @@ import { spawnSync } from "node:child_process";
 import { git } from "./lib/git.mjs";
 import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import * as owned from "./lib/owned.mjs";
-import { cleanupScope, ownerState, ownedDir, parseOwner, thisOwner } from "./lib/owned.mjs";
+// formatLegacyOwner: until the janitor reads the merged record (its own story), the claims fed to it are in the form it reads.
+import { cleanupScope, ownerState, ownedDir, parseLegacyOwner, thisOwner } from "./lib/owned.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(HERE, "janitor.sh");
@@ -145,7 +146,7 @@ done
 // --- grammar -------------------------------------------------------------------------------------------------
 
 const GRAMMAR = VECTORS.grammar.vectors;
-const nodeAccepts = (text) => parseOwner(text).unreadable !== true;
+const nodeAccepts = (text) => parseLegacyOwner(text).unreadable !== true; // the old grammar, until the janitor reads the merged record
 
 test("the tables are what they claim: ≥ 25 grammar vectors, ≥ 10 verdict vectors, unique ids, a reason on each", () => {
   assert.ok(GRAMMAR.length >= 25, `${GRAMMAR.length} grammar vectors`);
@@ -248,7 +249,9 @@ function nodeVerdict(v, pid) {
     if (v.pid === "refused") return { state: "unknown" };
     return v.liveStart ? { state: "live", start: LIVE_START } : { state: "live" };
   };
-  const verdict = ownerState(parseOwner(ownerText(v, REAL_HOST.split("@")[1], pid)), probe);
+  const legacy = parseLegacyOwner(ownerText(v, REAL_HOST.split("@")[1], pid));
+  const record = legacy.unreadable === true ? legacy : { ...legacy, owner: thisOwner().owner, ...(thisOwner().ns === undefined ? {} : { ns: thisOwner().ns }) };
+  const verdict = ownerState(record, probe, { hidepid: false });
   return { verdict, asked };
 }
 

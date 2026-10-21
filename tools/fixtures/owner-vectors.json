@@ -107,5 +107,43 @@
       { "id": "v25", "tasklist": true, "host": "same", "pid": "absent", "pidText": "1", "startDelta": null, "liveStart": false, "ownerText": "{NAME}@windows:1", "expected": "unknown", "why": "on Windows a bash started by a native process reports pid 1 for itself and its parent, and Windows has no pid 1: the process list has no row and process.kill says ESRCH, so a live CI job whose owner pid was taken from $PPID would read as gone. Pid 1 on a windows owner is unknown. (On any other machine this owner is another host's.)" },
       { "id": "v24", "host": "same", "pid": "absent", "pidText": "1234567890123456789012345", "startDelta": null, "liveStart": false, "expected": "unknown", "why": "a 25-digit pid cannot name a process and is not a safe integer; same reasoning as v23" }
     ]
+  },
+  "names": {
+    "about": "name is a resource name as the rule's section 1 reads it: form is owner when the ONE segment after the prefix is of the owner grammar ^[uw][0-9]{1,10}$, legacy when it is any other segment, none when the name does not start with the prefix. owner and token are what the name carries (token: the segment after the owner, or after the prefix for a legacy name). Data only.",
+    "vectors": [
+      { "id": "n01", "name": "testsToDelete-u1000-api-pg-k3f9a1", "form": "owner", "owner": "u1000", "token": "api", "why": "the canonical example of the rule: owner, token, what, id" },
+      { "id": "n02", "name": "teststodelete_u1000_api_pg_k3f9a1", "form": "owner", "owner": "u1000", "token": "api", "why": "the SQL spelling: every separator is an underscore" },
+      { "id": "n03", "name": "TESTSTODELETE-U1000-API-PG-K3F9A1", "form": "owner", "owner": "u1000", "token": "api", "why": "names are matched case-insensitively and the owner is read lower-cased" },
+      { "id": "n04", "name": "testsToDelete-u0-api-x-abc123", "form": "owner", "owner": "u0", "token": "api", "why": "root is an owner like any other, not every owner" },
+      { "id": "n05", "name": "testsToDelete-w42-api-x-abc123", "form": "owner", "owner": "w42", "token": "api", "why": "a Windows owner is w and digits" },
+      { "id": "n06", "name": "testsToDelete-w4294967295-api-x-abc123", "form": "owner", "owner": "w4294967295", "token": "api", "why": "the largest Windows token, ten digits" },
+      { "id": "n07", "name": "testsToDelete-api-pg-k3f9a1", "form": "legacy", "token": "api", "why": "the form from before the owner segment: the second segment is the repository token" },
+      { "id": "n08", "name": "testsToDelete-mcp-zip-abc123", "form": "legacy", "token": "mcp", "why": "a token is never mistaken for an owner" },
+      { "id": "n09", "name": "testsToDelete-u1000", "form": "owner", "owner": "u1000", "why": "a name that ends after the owner is still of the owner form; it has no token" },
+      { "id": "n10", "name": "testsToDelete-u1000-u2000-x-abc123", "form": "owner", "owner": "u1000", "token": "u2000", "why": "the owner is the ONE segment after the prefix; a token shaped like an owner is a finding of the guard, not a second owner" },
+      { "id": "n11", "name": "testsToDelete-u12345678901-api-x-abc123", "form": "legacy", "token": "u12345678901", "why": "eleven digits are not the grammar: the second segment is no owner, so the name is a legacy one" },
+      { "id": "n12", "name": "testsToDelete-uabc-api-x-abc123", "form": "legacy", "token": "uabc", "why": "u followed by letters is no owner" },
+      { "id": "n13", "name": "testsToDelete-w-api-x-abc123", "form": "legacy", "token": "w", "why": "a bare w is no owner" },
+      { "id": "n14", "name": "prod-testsToDelete-u1000-api-x-abc123", "form": "none", "why": "the prefix must start the name: a substring is not a leftover" },
+      { "id": "n15", "name": "testsToDelete-", "form": "none", "why": "the prefix with no segment after it names nothing" },
+      { "id": "n16", "name": "testsToDelete-u1000_api_x_abc123", "form": "owner", "owner": "u1000", "token": "api", "why": "either separator may follow the prefix and the owner" }
+    ]
+  },
+  "windows-owner": {
+    "about": "token is the Windows owner of an account name, rule section 1: the account name without its domain (a domain-qualified name is not an input; the bare name is), the ASCII letters A-Z lower-cased and nothing else changed, encoded as UTF-8 (the bytes of the name alone, NO line end: printf '%s' in bash, never echo), hashed with SHA-256, the first four bytes of the digest read as a big-endian unsigned 32-bit integer, written in decimal without leading zeros (1 to 10 digits), behind the letter w. A hash collision confers no authority: the file's owner decides.",
+    "vectors": [
+      { "id": "w01", "username": "alice", "token": "w735577801", "why": "a plain lower-case name" },
+      { "id": "w02", "username": "Alice", "token": "w735577801", "why": "an upper-case letter is lower-cased first: Alice and alice are one account" },
+      { "id": "w03", "username": "ALICE", "token": "w735577801", "why": "every ASCII capital is lower-cased" },
+      { "id": "w04", "username": "Ann Lee", "token": "w3835007348", "why": "a space is part of the name and is hashed as it is (a Windows account name may hold one)" },
+      { "id": "w05", "username": "Søren", "token": "w1810497863", "why": "a multi-byte letter: the UTF-8 bytes of the name are hashed; only ASCII A-Z is lower-cased" },
+      { "id": "w06", "username": "SØREN", "token": "w2206899590", "why": "the capital Ø is NOT lower-cased (ASCII only), so this is another token than søren" },
+      { "id": "w07", "username": "søren", "token": "w1810497863", "why": "the same bytes as Søren: only the ASCII S changed" },
+      { "id": "w08", "username": "李雷", "token": "w977744522", "why": "a name with no ASCII letters at all" },
+      { "id": "w09", "username": "Ünal", "token": "w3565888966", "why": "the capital Ü stays: ASCII-only lower-casing" },
+      { "id": "w10", "username": "ünal", "token": "w4000935336", "why": "a different token from Ünal, for the same reason" },
+      { "id": "w11", "username": "Dev.User-1", "token": "w3432688411", "why": "dots and hyphens are part of the name" },
+      { "id": "w12", "username": "a", "token": "w3398926610", "why": "the shortest name" }
+    ]
   }
 }

@@ -22,7 +22,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { git } from "./lib/git.mjs";
 import { sweepLeftovers, MIN_AGE_MS } from "./lib/leftovers-sweep.mjs";
 import {
-  cleanupScope, formatOwner, gitdirOf, ownedDir, ownedName, ownedWorktree, processProbe, removeQuietly, thisOwner,
+  cleanupScope, formatOwner, gitdirOf, ownedDir, ownedName, ownedWorktree, processProbe, removeQuietly, thisOwner, thisOwnerToken,
 } from "./lib/owned.mjs";
 import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import { REPO_ROOT, runWithSweep } from "./run-tests.mjs";
@@ -51,7 +51,9 @@ function lifo(t) {
 const PRETEND_DEAD = 4242;
 const deadProbe = (pid) => (pid === PRETEND_DEAD ? { state: "dead" } : processProbe(pid));
 
-const ownerLine = (host, pid) => `${host}:${pid}\n`;
+const OWNER = thisOwnerToken();
+const nsPart = thisOwner().ns === undefined ? "" : `:1:${thisOwner().ns}`; // a Linux record carries its start and pid namespace
+const ownerLine = (host, pid) => `${OWNER}:${host}:${pid}${nsPart}\n`;
 const deadOwnerLine = () => ownerLine(thisOwner().host, PRETEND_DEAD);
 
 /** `work` (repositories, scripts) and `tmp` (what the sweep sweeps) — two owned folders, so neither holds the other. */
@@ -238,7 +240,7 @@ test("2b. an unmarked old worktree and a dead-owned one of this repository are r
   assert.deepEqual(result.errors, []);
   assert.deepEqual(namesOf(result.removed), namesOf([unmarked, dead]));
   assert.deepEqual(reasonsOf(result), { [path.basename(bare)]: "unreadable" });
-  assert.deepEqual(listed(repo).map((p) => path.basename(p)).filter((n) => /^teststodelete/i.test(n) && !/^teststodelete-conventions-wt-repo-/i.test(n)), [path.basename(bare).toLowerCase()]);
+  assert.deepEqual(listed(repo).map((p) => path.basename(p)).filter((n) => /^teststodelete/i.test(n) && !n.toLowerCase().startsWith(`testsToDelete-${OWNER}-conventions-wt-repo-`.toLowerCase())), [path.basename(bare).toLowerCase()]);
 });
 
 // 3 ---------------------------------------------------------------------------------------------------------
@@ -254,9 +256,9 @@ test("3. only this repository's token is matched, anchored and case-insensitive"
     setOld(dir);
     return dir;
   };
-  const untouched = ["x-testsToDelete-conventions-a", "testsToDelete-other-a-123456", "testsToDeleteconventions-a", "testsToDelete-conventionsx-a-123456"].map(plant);
-  const upper = plant("TESTSTODELETE-CONVENTIONS-a-xyz123");
-  const underscore = plant("teststodelete_conventions_a_xyz123");
+  const untouched = [`x-testsToDelete-${OWNER}-conventions-a`, `testsToDelete-${OWNER}-other-a-123456`, `testsToDelete${OWNER}-conventions-a`, `testsToDelete-${OWNER}-conventionsx-a-123456`].map(plant);
+  const upper = plant(`TESTSTODELETE-${OWNER.toUpperCase()}-CONVENTIONS-a-xyz123`);
+  const underscore = plant(`teststodelete_${OWNER}_conventions_a_xyz123`);
 
   const result = sweepLeftovers({ repo, tmp, probe: deadProbe });
 

@@ -393,7 +393,7 @@ test("within: a parent, a sibling and an absolute path elsewhere are refused by 
 import { git as gitIn } from "./lib/git.mjs";
 
 function leftoversRepo(t, files) {
-  const repo = ownedDir(t, "leftovers-selftest");
+  const repo = ownedDir(t, "left-selftest");
   gitIn(repo, "init", "-q");
   for (const [name, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(repo, name)), { recursive: true });

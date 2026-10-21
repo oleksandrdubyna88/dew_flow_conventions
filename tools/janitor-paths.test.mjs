@@ -28,7 +28,7 @@ import { spawnSync } from "node:child_process";
 import { git } from "./lib/git.mjs";
 import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import {
-  cleanupScope, formatOwner, ownedDir, ownedWorktree, processProbe, tempRoot, thisOwner,
+  cleanupScope, formatLegacyOwner as formatOwner, ownedDir, ownedWorktree, processProbe, tempRoot, thisOwner,
 } from "./lib/owned.mjs";
 
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "janitor.sh");

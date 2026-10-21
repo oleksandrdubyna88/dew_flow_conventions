@@ -22,11 +22,12 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { git } from "./git.mjs";
-import { OWNED_PATTERN, ownerState, parseOwner, processProbe, readOwner, removeLink, removeQuietly, tempRoot, thisOwner } from "./owned.mjs";
+import { ownedPattern, ownerState, parseOwner, processProbe, readOwner, removeLink, removeQuietly, tempRoot, thisOwner } from "./owned.mjs";
 
 export const MIN_AGE_MS = 10 * 60_000; // rule §4: ten minutes
 
 const OWNER_SUFFIX = ".owner";
+const OWNED_PATTERN = ownedPattern(); // this caller's owner and this repository's token, anchored (rule §1, §4)
 
 /** One line saying what went wrong: an errno code, or the first line of the message. */
 function messageOf(error) {
