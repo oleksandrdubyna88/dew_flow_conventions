@@ -19,21 +19,26 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ownedDir } from "./lib/owned.mjs";
 
+import { GUARD_MS } from "./lib/startup-ceilings.mjs";
+import { gitWith } from "./lib/git.mjs";
+
+// Nothing in this file prints a line before the behaviour under test, so no run here has a start-up signal to
+// widen on: every child ends on its own and gets ONE hang-guard ceiling (GUARD_MS), not a speed bound.
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const tool = path.join(here, "pin-check.mjs");
 
-const git = (cwd, ...args) =>
-  execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", timeout: 20000, windowsHide: true }).trim();
+const git = gitWith({ timeoutMs: GUARD_MS });
 
 /** Run the real tool in a repository, the way a consumer's CI step runs it. */
 function run(cwd) {
-  const result = spawnSync(process.execPath, [tool], { cwd, encoding: "utf8", timeout: 30000 });
+  const result = spawnSync(process.execPath, [tool], { cwd, encoding: "utf8", timeout: GUARD_MS });
   return { code: result.status, out: `${result.stdout}${result.stderr}` };
 }
 
@@ -50,9 +55,9 @@ function remote(root, name, defaultBranch = "main") {
   // Forward slashes: a backslash is an ESCAPE inside a .gitmodules value, so a Windows path written
   // verbatim there is `fatal: bad config line`, which looks like a tool bug and is not one.
   const url = path.join(root, `${name}.git`).replaceAll("\\", "/");
-  execFileSync("git", ["init", "-q", "--bare", `--initial-branch=${defaultBranch}`, url], { timeout: 20000 });
+  git(root, "init", "-q", "--bare", `--initial-branch=${defaultBranch}`, url);
   const work = path.join(root, `${name}-work`);
-  execFileSync("git", ["clone", "-q", url, work], { timeout: 20000 });
+  git(root, "clone", "-q", url, work);
   const commit = (message) =>
     git(work, "-c", "user.name=Pin test", "-c", "user.email=pin@example.invalid", "-c", "commit.gpgsign=false",
       "commit", "-q", "--allow-empty", "-m", message);
@@ -68,7 +73,7 @@ function remote(root, name, defaultBranch = "main") {
 /** A consumer: one commit carrying a gitlink per mount, plus the `.gitmodules` that describes it. */
 function consumer(root, name, mounts) {
   const repo = path.join(root, name);
-  execFileSync("git", ["init", "-q", "--initial-branch=main", repo], { timeout: 20000 });
+  git(root, "init", "-q", "--initial-branch=main", repo);
   const lines = [];
   for (const mount of mounts) {
     lines.push(`[submodule "${mount.path}"]`, `\tpath = ${mount.path}`, `\turl = ${mount.url}`);
@@ -179,7 +184,7 @@ test("an unreachable remote is a WARN, and the run still exits 0", t => {
 test("a repository with no .gitmodules has nothing to check, and says so", t => {
   const root = workspace(t);
   const repo = path.join(root, "plain");
-  execFileSync("git", ["init", "-q", "--initial-branch=main", repo], { timeout: 20000 });
+  git(root, "init", "-q", "--initial-branch=main", repo);
   const { code, out } = run(repo);
   assert.equal(code, 0, out);
   assert.match(out, /no committed \.gitmodules/);
