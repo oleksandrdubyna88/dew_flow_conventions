@@ -966,7 +966,7 @@ test("20a. F-A: a worktree whose .git points into a clone owned by someone else 
   const tmp = makeTmp(w);
   const wt = worktree(w, w.other, tmp, "stranger", { lock: undefined });
 
-  const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: "foreign", ...timeoutStub() } }); // bounded, so the .git is read and it is the CLONE that is refused
+  const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: "foreign-clone", ...timeoutStub() } }); // only the CLONE is someone else's
 
   assert.equal(kept.status, 3, kept.text);
   assert.ok(exists(wt.path) && listedIn(w.other).includes(named(wt.path)), `the worktree of a foreign clone is kept, registered\n${kept.text}`);
@@ -1544,8 +1544,9 @@ test("23h. (h) a .git that names something that is not <clone>/worktrees/<name> 
   const wt = worktree(w, w.other, tmp, "malformed", { lock: undefined });
   const dotGit = path.join(wt.path, ".git");
   const original = fs.readFileSync(dotGit);
-  w.scope.after(() => fs.writeFileSync(dotGit, original));
-  fs.writeFileSync(dotGit, `gitdir: ${slash(path.join(w.other, ".git"))}\n`); // a real directory, but a clone and no worktree entry
+  const put = (text) => { fs.rmSync(dotGit, { force: true }); fs.writeFileSync(dotGit, text); }; // git leaves .git read-only on Windows
+  w.scope.after(() => put(original));
+  put(`gitdir: ${slash(path.join(w.other, ".git"))}\n`); // a real directory, but a clone and no worktree entry
 
   const run = runJanitor(w, { tmp });
 
