@@ -1358,7 +1358,7 @@ test("22a. A directory ABOVE the clone renamed between the check and the git cal
   assert.ok(exists(wt.path), `the folder is kept: its clone is no longer where it was\n${run.text}`);
   assert.ok(mentions(run, named(wt.path), "changed after the capture"), run.text);
   assert.equal(exists(path.join(aside, ".git", "worktrees", path.basename(admin), "locked")), false, "the unlock ran in the clone that was entered (now moved aside)");
-  assert.ok(exists(path.join(bait, "gitdir")), "and the trap was left alone");
+  assert.ok(exists(path.join(w.other, ".git", "worktrees", "zz", "gitdir")), "and the trap, which now stands where the clone was, was left alone");
 });
 
 test("22b. Gate A: with nothing to bound a read, a .git inside a folder this user does not own is not read — even when the file itself is this user's", { timeout: TIMEOUT }, (t) => {
