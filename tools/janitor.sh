@@ -36,7 +36,7 @@
 #         at least 1 — anything else is refused in one line (exit 1, nothing removed).  --dry-run prints `would run: …`
 #         lines on STDOUT (skips and notices stay on stderr) and removes nothing; its exit code is the real run's.
 #         Progress goes to stderr: `janitor: looking for testsToDelete resources…` when the capture starts and one
-#         `janitor: removed <kind> <name>` line per real removal (the name printed through clean(); a dry run has none).
+#         `janitor: removed <kind> "<name>"` line per real removal (the name printed through clean() and quoted; a dry run has none).
 #         JANITOR_OS, JANITOR_PROC (the /proc root, default /proc) and JANITOR_HOSTNAME (the machine name, default
 #         `hostname`) are test seams only: honoured, and announced once each on stderr when set.
 set -euo pipefail
@@ -105,7 +105,9 @@ claim_norm() {   # $1 = the RAW text of a claim, line end intact → the claim a
   case "$raw" in *$'\n'*|*$'\r'*) printf -- '-';; *) printf '%s' "${raw:--}";; esac   # a second line, or a CR that is no part of a line end, is not exactly one line
 }
 claim_of() {   # the claim in file $1: 513 bytes are read, so one past the limit is seen. $(...) alone drops EVERY trailing newline, so a sentinel carries them to claim_norm
-  local raw; raw="$(head -c 513 -- "$1" 2>/dev/null; printf x)"; claim_norm "${raw%x}"
+  local raw
+  if [ ! -f "$1" ] || [ -L "$1" ]; then printf -- '-'; return 0; fi   # only a regular file is read: a FIFO (or a device) planted as a claim would block `head` forever; anything else is unreadable, so preserved
+  raw="$(head -c 513 -- "$1" 2>/dev/null; printf x)"; claim_norm "${raw%x}"
 }
 # Liveness is THREE-valued — 0 live, 1 dead, 2 unknown — and only "no process with that pid" is dead. A refused or
 # failed query (a missing `tasklist`, a `ps` that errors, no /proc) is unknown and preserves. `kill -0` is not used:
@@ -276,7 +278,7 @@ act() { if [ "$DRY" = 1 ]; then echo "would run: $(clean "$*")"; else "$@" 2>/de
 # A deletion is never fatal. A target that vanished after the capture is a notice; one that is still there after a
 # failed removal is skipped like a live one (named, exit 3). Only a failed LISTING ends the run (above).
 vanished() { echo "notice: $(clean "$1") $(clean "$2") — vanished after the capture" >&2; }
-removed() { if [ "$DRY" = 0 ]; then echo "janitor: removed $1 $(clean "$2")" >&2; fi; return 0; }   # progress, one line per REAL removal; the name goes through clean() like every other captured text, so no escape or line end reaches the terminal. A dry run says "would run:" instead
+removed() { if [ "$DRY" = 0 ]; then echo "janitor: removed $1 \"$(clean "$2")\"" >&2; fi; return 0; }   # progress, one line per REAL removal; the name goes through clean() like every other captured text, so no escape or line end reaches the terminal. A dry run says "would run:" instead
 act_rm() { local k="$1" n="$2"; shift 2; act "$@" && removed "$k" "$n"; }   # act, and announce the removal only when the command succeeded
 settle() { local k="$1" n="$2"; shift 2; if "$@" >/dev/null 2>&1; then skip "$k" "$n" "could not be removed"; else vanished "$k" "$n"; fi; }   # $3… = "still there?" test
 WT_GONE=$'\n'   # dry run only: the worktrees the real run would already have removed, canonical, one per line

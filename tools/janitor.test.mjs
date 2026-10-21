@@ -96,14 +96,14 @@ function envFor(w, { tmp, docker, minAge, ahead, extra }) {
 
 const PROGRESS_LINE = /^janitor: (?:looking for testsToDelete resources|removed )/; // progress, not findings: a scenario asserts about them on purpose, in the tests that name them
 
-function runJanitor(w, { cwd = w.clone, tmp, args = [], docker = true, minAge = 60, ahead = [], env: extra = {} }) {
+function runJanitor(w, { cwd = w.clone, tmp, args = [], docker = true, minAge = 60, ahead = [], env: extra = {}, timeoutMs = 240_000 }) {
   const env = envFor(w, { tmp, docker, minAge, ahead, extra });
   if (!docker) { // the no-docker case must PROVE it has no docker, or it proves nothing
     const probe = spawnSync(BASH, ["-c", "command -v docker"], { env, encoding: "utf8", windowsHide: true });
     assert.notEqual(probe.status, 0, `this PATH holds a docker: ${probe.stdout}`);
   }
   for (let i = 0; i < 5; i += 1) assertNoSuchProcess(unmatchablePid(i)); // the premise, before the run
-  const result = spawnSync(BASH, [slash(SCRIPT), ...args], { cwd, env, encoding: "utf8", timeout: 240_000, windowsHide: true });
+  const result = spawnSync(BASH, [slash(SCRIPT), ...args], { cwd, env, encoding: "utf8", timeout: timeoutMs, windowsHide: true });
   for (let i = 0; i < 5; i += 1) assertNoSuchProcess(unmatchablePid(i)); // and after it
   const lines = (result.stderr ?? "").split(/\r?\n/).filter(Boolean);
   const seams = lines.filter((line) => line.startsWith("janitor: test seam ")); // announced, not asserted about
@@ -561,8 +561,8 @@ test("8c. progress: one line when the capture starts and one per real removal, i
 
   assert.equal(run.status, 3, "the live folder is skipped: " + run.text);
   assert.equal(run.progress.length, 4, run.progress.join(" // "));
-  assert.deepEqual(run.progress.slice(0, 3), [LOOKING, "janitor: removed container testsToDelete-conventions-prog", `janitor: removed branch ${branch}`]);
-  assert.ok(run.progress[3].startsWith("janitor: removed folder ") && run.progress[3].includes(named(dead)), run.progress.join(" // "));
+  assert.deepEqual(run.progress.slice(0, 3), [LOOKING, "janitor: removed container \"testsToDelete-conventions-prog\"", `janitor: removed branch "${branch}"`]);
+  assert.ok(run.progress[3].startsWith("janitor: removed folder \"") && run.progress[3].endsWith("\"") && run.progress[3].includes(named(dead)), run.progress.join(" // "));
   assert.equal(run.progress.some((line) => line.includes(named(live))), false, "a skipped resource is not announced as removed");
   assert.equal(exists(dead), false, "and it really went: " + run.text);
 });
@@ -590,8 +590,20 @@ test("8c. progress: a name is printed through clean() — non-ASCII text never r
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 0, run.text);
-  assert.deepEqual(run.progress, [LOOKING, "janitor: removed container testsToDelete-conventions-caf??"]);
+  assert.deepEqual(run.progress, [LOOKING, "janitor: removed container \"testsToDelete-conventions-caf??\""]);
   assert.equal(/[^ -~]/.test(run.progress[1]), false, "the removed line is printable ASCII only");
+});
+
+test("8c. progress: printable text inside a name cannot pass for a second message — the name is quoted", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  setDocker(w, { ps: [["c1", "testsToDelete-conventions-x janitor: removed container fake", "", dockerTime(OLD)]] });
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 0, run.text);
+  assert.deepEqual(run.progress, [LOOKING, "janitor: removed container \"testsToDelete-conventions-x janitor: removed container fake\""]);
 });
 
 test("8c. progress: a removal that failed is not announced as removed", { timeout: TIMEOUT }, (t) => {
@@ -605,6 +617,31 @@ test("8c. progress: a removal that failed is not announced as removed", { timeou
   assert.equal(run.status, 3, run.text);
   assert.deepEqual(run.progress, [LOOKING]);
   assert.ok(run.stderr.some((line) => line.includes("could not be removed")), run.text);
+});
+
+// --- 8d --------------------------------------------------------------------------------------------------------
+
+test("8d. A FIFO named `locked` in a worktree's admin folder never hangs the janitor: it is unreadable, so the worktree is kept and named", { timeout: TIMEOUT }, (t) => {
+  if (process.platform === "win32") {
+    t.skip("mkfifo: a FIFO needs a POSIX filesystem");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.clone, tmp, "fifo", { lock: undefined });
+  const fifo = path.join(git(wt.path, "rev-parse", "--absolute-git-dir"), "locked");
+  const made = spawnSync("mkfifo", [fifo], { timeout: 30_000 });
+  assert.equal(made.status, 0, String(made.stderr));
+  w.scope.after(() => fs.rmSync(fifo, { force: true }));
+
+  const run = runJanitor(w, { tmp, timeoutMs: 60_000 });
+
+  assert.equal(run.error, undefined, "the run finished instead of blocking on the FIFO");
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(wt.path) && listedIn(w.clone).includes(named(wt.path)), `the worktree is kept, registered
+${run.text}`);
+  assert.ok(mentions(run, named(wt.path), "is unreadable"), run.text);
 });
 
 // --- 9 ---------------------------------------------------------------------------------------------------------
@@ -730,7 +767,7 @@ test("14. One row per worktree (code gate 2): the swept repository's own tree in
 
   assert.equal(first.status, 0, first.text);
   assert.deepEqual(first.stderr, [], "removed once and silently: a second capture would announce a vanished target");
-  assert.equal(first.progress.filter((line) => line.startsWith("janitor: removed worktree ") && line.includes(named(dead.path))).length, 1, `one progress line for the worktree\n${first.progress.join("\n")}`);
+  assert.equal(first.progress.filter((line) => line.startsWith("janitor: removed worktree \"") && line.includes(named(dead.path))).length, 1, `one progress line for the worktree\n${first.progress.join("\n")}`);
   assert.equal(exists(dead.path), false, `the dead-owned worktree is gone\n${first.text}`);
   assert.equal(listedIn(w.clone).includes(named(dead.path)), false, `and unregistered\n${first.text}`);
 
