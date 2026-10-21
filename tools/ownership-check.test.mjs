@@ -18,11 +18,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { downwardDependencies, findingsIn, markersIn } from "./ownership-check.mjs";
+import { ownedDir } from "./lib/owned.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const tool = path.join(here, "ownership-check.mjs");
@@ -44,8 +44,7 @@ function run(cwd, ...args) {
  * `undefined` writes no baseline at all, which is the armed state.
  */
 function baselineScene(t, files) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ownership-baseline-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = ownedDir(t, "ownership-baseline");
   fs.mkdirSync(path.join(root, "common"), { recursive: true });
   fs.mkdirSync(path.join(root, "tools"), { recursive: true });
   fs.writeFileSync(path.join(root, "common", "x.md"), ["# One", "", "Measured in dew_flow_rag_qln today.", ""].join("\n"));
@@ -119,8 +118,7 @@ test("scanning no rule files at all is a failure, not a pass", (t) => {
   // The repository is built here rather than committed, because an empty directory is the one thing
   // git cannot carry: `tools/fixtures/ownership/empty/` existed on the machine that wrote it and
   // nowhere else. It passed locally and failed on CI with `null !== 1` — the tool was never spawned.
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ownership-empty-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = ownedDir(t, "ownership-empty");
   const { code, out } = run(root);
   assert.equal(code, 1, out);
   assert.match(out, /scanned no rule files/);
@@ -133,23 +131,19 @@ test("--warn reports every finding in full and still exits 0", () => {
   assert.match(out, /--warn — reported, not failed/);
 });
 
-test("a marker grants its token only in the file that carries it", () => {
+test("a marker grants its token only in the file that carries it", (t) => {
   // Otherwise one declaration anywhere would licence the name everywhere, which is an allowlist with
   // extra steps. The token is matched exactly, so the marker names the tool rather than the product:
   // `coai` and `mcp__coai__open` are two names, and each one is declared where it is used.
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ownership-"));
-  try {
-    fs.mkdirSync(path.join(root, "common"), { recursive: true });
-    fs.writeFileSync(path.join(root, "common", "declared.md"),
-      "<!-- owns: mcp__coai__open — a tool name a session must type -->\n# One\n\nCall `mcp__coai__open`.\n");
-    fs.writeFileSync(path.join(root, "common", "undeclared.md"), "# Two\n\nCall `mcp__coai__open`.\n");
-    const { code, out } = run(root);
-    assert.equal(code, 1, out);
-    assert.match(out, /undeclared\.md/);
-    assert.doesNotMatch(out, /PRODUCT common[\\/]declared\.md/, "the declaring file is not a finding");
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
+  const root = ownedDir(t, "ownership");
+  fs.mkdirSync(path.join(root, "common"), { recursive: true });
+  fs.writeFileSync(path.join(root, "common", "declared.md"),
+    "<!-- owns: mcp__coai__open — a tool name a session must type -->\n# One\n\nCall `mcp__coai__open`.\n");
+  fs.writeFileSync(path.join(root, "common", "undeclared.md"), "# Two\n\nCall `mcp__coai__open`.\n");
+  const { code, out } = run(root);
+  assert.equal(code, 1, out);
+  assert.match(out, /undeclared\.md/);
+  assert.doesNotMatch(out, /PRODUCT common[\\/]declared\.md/, "the declaring file is not a finding");
 });
 
 test("markersIn refuses a reason that is only punctuation or a shrug", () => {
@@ -347,23 +341,19 @@ test("a reason that is the shape of a reason rather than one is refused", () => 
   }
 });
 
-test("the directories this scans are the directories the resolver loads", async () => {
+test("the directories this scans are the directories the resolver loads", async (t) => {
   // Two hardcoded lists that must agree: if a fifth rule directory is ever added, loadCatalog would
   // distribute those rules to consumers while this check skipped them entirely.
   const { rulesIn: scanned } = await import("./ownership-check.mjs");
   const catalogSource = fs.readFileSync(path.join(here, "lib", "rule-catalog.mjs"), "utf8");
   const declared = /const DIRECTORIES = \[([^\]]*)\]/.exec(catalogSource)[1]
     .split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ownership-dirs-"));
-  try {
-    for (const dir of declared) {
-      fs.mkdirSync(path.join(root, dir), { recursive: true });
-      fs.writeFileSync(path.join(root, dir, "probe.md"), "# probe\n");
-    }
-    const seen = scanned(root).map((f) => path.dirname(f)).sort();
-    assert.deepEqual(seen, [...declared].sort(),
-      "ownership-check and rule-catalog must walk the same directories");
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+  const root = ownedDir(t, "ownership-dirs");
+  for (const dir of declared) {
+    fs.mkdirSync(path.join(root, dir), { recursive: true });
+    fs.writeFileSync(path.join(root, dir, "probe.md"), "# probe\n");
   }
+  const seen = scanned(root).map((f) => path.dirname(f)).sort();
+  assert.deepEqual(seen, [...declared].sort(),
+    "ownership-check and rule-catalog must walk the same directories");
 });

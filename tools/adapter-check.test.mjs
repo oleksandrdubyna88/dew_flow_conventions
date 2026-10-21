@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { adapterFindings, sessionStartCommands } from './adapter-check.mjs';
+import { ownedDir } from './lib/owned.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -17,9 +17,8 @@ const REFERENCE = path.join(ROOT, 'settings');
  * <p>`git init` rather than a bare directory: a fixture that is not a repository would test a code
  * path no consumer has.</p>
  */
-function repository(t, prefix = 'adapter-') {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+function repository(t, what = 'adapter') {
+  const dir = ownedDir(t, what);
   execFileSync('git', ['-C', dir, 'init', '-q'], { timeout: 30_000, windowsHide: true });
 
   // macOS puts temp dirs under a symlink, and git answers with the resolved path; the checker
@@ -50,7 +49,7 @@ test('this repository hosts the adapter on itself, which is the only test the me
 });
 
 test('a missing hook and missing settings are both named, with what to do', (t) => {
-  const findings = adapterFindings(repository(t, 'adapter-bare-'));
+  const findings = adapterFindings(repository(t, 'adapter-bare'));
 
   assert.equal(findings.length, 6);
   assert.match(findings.join('\n'), /\.claude\/settings\.json is missing/);
@@ -174,8 +173,7 @@ test('a hook added to the reference is checked without editing this file', (t) =
   // The inventories are derived from settings/, not hard-coded: a third hook must be checked the day
   // it is added, or the next rollout is silently optional.
   const repo = whole(t);
-  const reference = fs.mkdtempSync(path.join(os.tmpdir(), 'adapter-ref-'));
-  t.after(() => fs.rmSync(reference, { recursive: true, force: true }));
+  const reference = ownedDir(t, 'adapter-ref');
   fs.cpSync(REFERENCE, reference, { recursive: true });
   fs.writeFileSync(path.join(reference, 'hooks/third.mjs'), '// a future adapter\n');
   const settings = JSON.parse(fs.readFileSync(path.join(reference, 'settings.json'), 'utf8'));
@@ -230,8 +228,7 @@ test('sessionStartCommands reads every entry and ignores what is not a command',
 test('a directory that is not a repository is refused, not checked', (t) => {
   // The checker builds every path from git's answer rather than from what a caller typed, so there
   // is nothing sensible to report about a directory git does not know.
-  const loose = fs.mkdtempSync(path.join(os.tmpdir(), 'adapter-loose-'));
-  t.after(() => fs.rmSync(loose, { recursive: true, force: true }));
+  const loose = ownedDir(t, 'adapter-loose');
 
   assert.throws(() => adapterFindings(loose), /is not inside a git repository/);
 });

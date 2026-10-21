@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { ensureEffort } from '../settings/hooks/ensure-user-guard.mjs';
 import { applyEffort, convergeEffort, effortProblems, targets } from '../settings/hooks/lib/user-guard-install.mjs';
+import { ownedDir } from './lib/owned.mjs';
 
 const TOOLS = path.dirname(fileURLToPath(import.meta.url));
 const ENTRY = path.join(TOOLS, '..', 'settings', 'hooks', 'ensure-user-guard.mjs');
@@ -16,8 +16,7 @@ const HIGH = { effortLevel: 'high' };
 
 /** A temporary home plus a project carrying a source hook. Never os.homedir(). */
 function sandbox(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'effort-converge-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = ownedDir(t, 'effort-converge');
   const home = path.join(root, 'home');
   const project = path.join(root, 'project');
   fs.mkdirSync(home);

@@ -11,15 +11,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 
 import { main, drifted, recordFor } from "./rule-bodies.mjs";
+import { ownedDir } from "./lib/owned.mjs";
 
 /** A repository with two rules and a manifest that matches both. */
 function scene(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rule-bodies-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = ownedDir(t, "rule-bodies");
   fs.mkdirSync(path.join(root, "common"), { recursive: true });
   fs.mkdirSync(path.join(root, "research"), { recursive: true });
 

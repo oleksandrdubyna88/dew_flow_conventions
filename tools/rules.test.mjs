@@ -1,21 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { loadCatalog, selectRules, sha256, TASKS } from "./lib/rule-catalog.mjs";
 import {run} from "./lib/rule-cli.mjs";
 import {bodyOf, sectionsOf} from "./lib/rule-body.mjs";
+import { ownedDir } from "./lib/owned.mjs";
 import {GUARD_MS} from "./lib/startup-ceilings.mjs";
 import {gitWith} from "./lib/git.mjs";
 
 const gitGuarded=gitWith({timeoutMs:GUARD_MS});
 
 function fixture(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rules Unicode пробел "));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = ownedDir(t, "rules Unicode пробел");
   const put = (name, metadata, body = "A complete rule.\n") => {
     const file = path.join(root, name);
     fs.mkdirSync(path.dirname(file), { recursive: true });

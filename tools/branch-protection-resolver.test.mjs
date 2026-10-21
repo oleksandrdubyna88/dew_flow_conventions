@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 
 import { resolved } from '../.github/scripts/lib/resolved.mjs';
+import { ownedDir } from './lib/owned.mjs';
 
 /**
  * The resolver is the family's ONE way for a script in `.github/scripts/` to find `git` or `gh`.
@@ -16,10 +16,10 @@ import { resolved } from '../.github/scripts/lib/resolved.mjs';
  * branch-protection script coupled two unrelated things. Both repositories hold the same module.</p>
  */
 
-test('the resolver is importable, and finds a program on PATH by its absolute path', () => {
+test('the resolver is importable, and finds a program on PATH by its absolute path', (t) => {
   // A PATH this test controls, not the machine's: a node started by absolute path need not have its
   // own directory on PATH, and the case would fail with the resolver working. (CodeRabbit, PR #56.)
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'resolver-'));
+  const dir = ownedDir(t, 'resolver');
   const name = 'coai-resolver-probe';
   const program = path.join(dir, name + (process.platform === 'win32' ? '.exe' : ''));
   const before = process.env.PATH;
@@ -31,7 +31,6 @@ test('the resolver is importable, and finds a program on PATH by its absolute pa
     assert.equal(resolved(name), program, 'the resolver did not answer the program on PATH, absolutely');
   } finally {
     process.env.PATH = before;
-    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 

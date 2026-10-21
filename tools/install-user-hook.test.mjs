@@ -1,20 +1,19 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { ensureUserGuard } from '../settings/hooks/ensure-user-guard.mjs';
 import { drift, findEntries, install, mergeEntry, removeEntry, targets } from '../settings/hooks/lib/user-guard-install.mjs';
+import { ownedDir } from './lib/owned.mjs';
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'install-user-hook.mjs');
 
 /** A fresh home plus a fixture source hook; removed when the test ends. Never os.homedir(). */
 function sandbox(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'install-user-hook-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const root = ownedDir(t, 'install-user-hook');
   const home = path.join(root, 'home');
   fs.mkdirSync(home);
   const source = path.join(root, 'subagent-model.mjs');

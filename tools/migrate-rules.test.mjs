@@ -1,13 +1,13 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {execFileSync,spawnSync} from "node:child_process";
 import {rebaseLinks,migrationPlan,applyMigration} from "./lib/rule-migration.mjs";
 import {gitWith} from "./lib/git.mjs";
 import {smoke} from "./lib/rule-smoke.mjs";
+import {ownedDir} from './lib/owned.mjs';
 import {GUARD_MS} from "./lib/startup-ceilings.mjs";
 
 // Every child this file starts ends on its own and prints nothing before the behaviour under test, so none has a
@@ -35,8 +35,7 @@ test("reference-style Markdown links cannot silently change targets after migrat
 });
 
 test("the existing gate checker recognizes missing neutral mounts and relocated local copies",t=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),"neutral-gate-"));
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const root=ownedDir(t,"neutral-gate");
   const tool=path.join(path.dirname(fileURLToPath(import.meta.url)),"gate-snippet-check.mjs");
   fs.writeFileSync(path.join(root,".gitmodules"),'[submodule "conventions"]\n path = .agents/conventions\n url = https://example.invalid/conventions\n');
   const check=()=>{
@@ -70,10 +69,9 @@ test("the existing gate checker recognizes missing neutral mounts and relocated 
 });
 
 test("real Git migration leaves source work intact and prepares exactly one relocated submodule",async t=>{
-  const temp=fs.mkdtempSync(path.join(os.tmpdir(),"migration пробел "));
+  const temp=ownedDir(t,"migration пробел");
   const repo=path.join(temp,"source"),output=path.join(temp,"prepared");
   const conventions=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
-  t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
   fs.mkdirSync(repo);
   git(repo,"init","-q");
   git(repo,"config","user.name","Migration test");
@@ -94,6 +92,8 @@ test("real Git migration leaves source work intact and prepares exactly one relo
   git(repo,"commit","-qm","fixture");
   const base=git(repo,"rev-parse","HEAD"),sha=git(conventions,"rev-parse","HEAD");
   fs.writeFileSync(path.join(repo,"README.md"),"User's unfinished work.\n");
+  // The branches below (`migrate-test`, `journal-failure`) live in `repo`, nested in the owned folder `temp`
+  // and covered by it: they go with it (common/test-leftovers.md §1).
   const options={repo,conventions,sha,output,branch:"migrate-test",rewrite:["scripts/check.ps1"]};
   assert.throws(()=>migrationPlan({...options,sha:"0000000000000000000000000000000000000000"}));
   assert.throws(()=>migrationPlan({...options,output:repo}),/outside/);
