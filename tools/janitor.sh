@@ -54,12 +54,15 @@
 #     only: one that is no longer a regular file means the folder changed after the capture, and it is kept.
 #   - the clone is carried as its PHYSICAL path (every link resolved at the capture) and is refused when a component of the
 #     path the stranger wrote is a link this user does not own, or when the clone or its worktrees/ is writable by its group
-#     or by everyone; immediately before EACH git call on it the clone is re-proven (still a directory, no link, still mine,
-#     not writable by others, same physical path, same route from the stranger's .git, no FIFO among its entries) and any
-#     change keeps the folder. A clone that cannot be entered is a foreign one: kept and named, never an error.
+#     or by everyone. Every git call on it runs INSIDE it: the call enters the clone by its physical path, proves what it
+#     entered is the clone that was captured (same path, still mine, closed to others, no FIFO among its entries, same route
+#     from the stranger's .git) and runs `git --git-dir=.` there, so a directory above it renamed a moment later cannot
+#     redirect the call. Any change keeps the folder. A clone that cannot be entered is a foreign one: kept and named.
 #   - a read of a stranger's file and every git call on a clone is bounded by `timeout`, else by `perl`'s alarm. With neither,
-#     a file this user does not own is NOT read (its entry is kept and named, `-unbounded`) and one line says so; files this
-#     user owns are read as before.
+#     a file this user does not own, or one inside a folder this user does not own, is NOT read (its entry is kept and named,
+#     `-unbounded`) and one line says so; files this user owns are read as before. Residual: a claim in the shared temp root
+#     is checked for its owner right before it is read, and a root that is not sticky would let a stranger swap it in that
+#     instant.
 set -euo pipefail
 usage() { echo "usage: bash tools/janitor.sh [--dry-run] [--token <t>]   (<t>: 2 to 12 lower-case letters and digits)" >&2; exit 2; }
 DRY=0; TOKEN=""; HAVE_TOKEN=0
@@ -121,7 +124,7 @@ BOUND=none   # how a read or a git call that a stranger's file could block is en
 if timeout 5 true >/dev/null 2>&1; then BOUND=timeout; elif perl -e 'alarm shift; exec @ARGV' 5 true >/dev/null 2>&1; then BOUND=perl; fi
 bounded() { case "$BOUND" in timeout) timeout "$@";; perl) perl -e 'alarm shift; exec @ARGV' "$@";; *) shift; "$@";; esac; }   # $1 = seconds, then the command. With BOUND=none nothing ends it, so callers do not point it at a file another user owns
 owned_by_me() {   # is file or directory $1 owned by the user running the janitor? A false answer (an ownership mapping that cannot say, MSYS for one) only KEEPS a folder
-  case "${JANITOR_TEST_OWNER_CHECK:-}" in foreign) return 1;; esac   # test seam: everything is someone else's
+  case "${JANITOR_TEST_OWNER_CHECK:-}" in foreign) return 1;; "foreign:$1") return 1;; esac   # test seam: everything is someone else's, or just the path after `foreign:`
   [ -O "$1" ]
 }
 owner_ok() { local t="${1%$'\r'}"; if uspace "$t"; then return 1; fi; [[ "$t" =~ ^[^@:[:space:]]+@(linux|macos|windows):[0-9]+(:[0-9]+)?$ ]]; }   # the rule's marker grammar, exactly
@@ -194,6 +197,7 @@ canon() {
 gitdir_of() {   # a folder holding a .git FILE is a linked worktree of SOME clone; a relative gitdir is relative to the worktree
   local g d
   if [ ! -f "$1/.git" ] || [ -L "$1/.git" ]; then return 0; fi   # the ONE read of a stranger's .git: only a regular file, never a link, a FIFO or a device; nothing printed = unreadable
+  if [ "$BOUND" = none ] && { ! owned_by_me "$1" || ! owned_by_me "$1/.git"; }; then return 0; fi   # nothing can end this read, so right before it: the folder AND the file are this user's (a stranger cannot rename or replace inside a folder it does not own)
   g="$(bounded 5 sed -n 's/^gitdir: //p' "$1/.git" 2>/dev/null || true)"
   case "$g" in ""|/*|[A-Za-z]:/*) ;; *)
     g="$1/$g"   # a relative gitdir (a worktree made with relative paths) climbs out through the worktree itself ("<wt>/../<clone>/.git/…"). Once the worktree is removed that path no longer resolves on Linux, and git leaves the registration behind, so the PARENT is resolved now, while the worktree still exists
@@ -211,10 +215,14 @@ clone_ok() {   # a clone carried through a row: an absolute path with no control
   case "$1" in /?*|[A-Za-z]:/?*) return 0;; esac
   return 1
 }
-physical() {   # $1 = a path → its PHYSICAL form (every link resolved), nothing when it cannot be entered. No cache: it is asked again at the removal
+enter_dir() {   # cd -P into $1, the drive form folded first as canon() does; the caller's shell moves, so a caller that must stay put runs this in a subshell
   local q="$1" dl pre
-  case "$q" in [A-Za-z]:/*) dl="${q:0:1}"; case "$dl" in [A-Z]) pre="${ALPHA%%$dl*}"; dl="${alpha:${#pre}:1}";; esac; q="/$dl${q:2}";; esac   # the drive form is folded before the cd, as canon() does
-  ( cd -P -- "$q" 2>/dev/null && { pwd -W 2>/dev/null || pwd -P; } ) || true
+  case "$q" in [A-Za-z]:/*) dl="${q:0:1}"; case "$dl" in [A-Z]) pre="${ALPHA%%$dl*}"; dl="${alpha:${#pre}:1}";; esac; q="/$dl${q:2}";; esac
+  cd -P -- "$q" 2>/dev/null
+}
+here() { pwd -W 2>/dev/null || pwd -P; }   # the current directory, physical, in the spelling physical() gives
+physical() {   # $1 = a path → its PHYSICAL form (every link resolved), nothing when it cannot be entered. No cache: it is asked again at the removal
+  ( enter_dir "$1" && here ) || true
 }
 link_uid() { stat -c %u "$1" 2>/dev/null || stat -f %u "$1" 2>/dev/null || true; }   # the owner of a link ITSELF (stat does not follow it); nothing when unknown
 untrusted_link() {   # $1 = an absolute path: is some component of it a symbolic link that this user does not own? Its owner can re-point it between the capture and the removal
@@ -253,10 +261,11 @@ resolve_clone() {   # $1 = the admin dir a stranger's .git names → the clone's
   if [ -z "$p" ] || ! clone_ok "$p" || ! clone_sound "$p"; then return 0; fi
   printf '%s' "$p"
 }
-clone_still_ok() {   # $1 = the captured physical clone, $2 = the admin dir as captured: everything the capture proved, again, right now
-  if ! clone_sound "$1"; then return 1; fi
-  if [ "$(physical "$1")" != "$1" ]; then return 1; fi   # a component of its path became a link
-  if [ "$(physical "$(clone_of "$2")")" != "$1" ]; then return 1; fi   # the stranger's route no longer ends where it ended
+pin_clone() {   # $1 = the captured physical clone, $2 = the admin dir as captured. Run in a SUBSHELL: it enters the clone and leaves the shell standing in it, so what the caller then runs works on THAT directory, whatever the path is renamed to
+  enter_dir "$1" || return 1
+  if [ "$(here)" != "$1" ]; then return 1; fi   # the path still names the directory just entered
+  if ! clone_sound .; then return 1; fi   # mine, closed to group and world, every entry readable by git: judged on the directory itself, not on a path
+  if [ "$(physical "$(clone_of "$2")")" != "$1" ]; then return 1; fi   # the stranger's route still ends where it ended
   if untrusted_link "$(clone_of "$2")"; then return 1; fi
   return 0
 }
@@ -317,7 +326,7 @@ capture() {   # ONE line per prefixed resource ("-" = an owner nobody can read).
     if [ -f "$d/.git" ]; then
       case "$mine" in *$'\n'"$c"$'\n'*) continue;; esac
       g=""; o=""; k=""; a=""
-      if [ "$BOUND" = none ] && ! owned_by_me "$d/.git"; then o="-unbounded"   # nothing can end a read of a file another user owns: kept, named
+      if [ "$BOUND" = none ] && { ! owned_by_me "$d" || ! owned_by_me "$d/.git"; }; then o="-unbounded"   # nothing can end a read of a file another user owns: kept, named
       else
         g="$(gitdir_of "$d")"
         if [ -z "$g" ] || [ ! -d "$g" ]; then o="-"   # not readable, not a directory, or not enterable (permission denied): a foreign clone, kept
@@ -388,19 +397,27 @@ act() { if [ "$DRY" = 1 ]; then echo "would run: $(clean "$*")"; else "$@" 2>/de
 # A deletion is never fatal. A target that vanished after the capture is a notice; one that is still there after a
 # failed removal is skipped like a live one (named, exit 3). Only a failed LISTING ends the run (above).
 act_g() { if [ "$DRY" = 1 ]; then echo "would run: $(clean "$*")"; else bounded 60 "$@" 2>/dev/null; fi; }   # act for a git call on a clone: where `timeout` exists, a call that cannot finish ends after a minute
+act_c() {   # $1 = the clone, $2 = the admin dir as captured, then the arguments of a git call: it runs INSIDE the pinned clone (exit 97 when the clone is no longer the captured one)
+  local c="$1" a="$2"; shift 2
+  if [ "$DRY" = 1 ]; then echo "would run: $(clean "git --git-dir=$c $*")"; return 0; fi
+  ( pin_clone "$c" "$a" || exit 97; bounded 60 git --git-dir=. "$@" ) 2>/dev/null
+}
+call_git() {   # $1 = the clone, $2 = the admin dir as captured (empty for the swept repository's own), then the git arguments
+  local c="$1" a="$2"; shift 2
+  if [ -z "$a" ]; then act_g git --git-dir="$c" "$@"; else act_c "$c" "$a" "$@"; fi
+}
 vanished() { echo "notice: $(clean "$1") $(clean "$2") — vanished after the capture" >&2; }
 removed() { if [ "$DRY" = 0 ]; then printf 'janitor: removed %s %q\n' "$1" "$(clean "$2")" >&2; fi; return 0; }   # progress, one line per REAL removal; the name goes through clean() like every other captured text (no escape or line end reaches the terminal) and then through %q (a quote or a space inside it cannot pass for text of the line). A dry run says "would run:" instead
 act_rm() { local k="$1" n="$2"; shift 2; act "$@" && removed "$k" "$n"; }   # act, and announce the removal only when the command succeeded
 settle() { local k="$1" n="$2"; shift 2; if "$@" >/dev/null 2>&1; then skip "$k" "$n" "could not be removed"; else vanished "$k" "$n"; fi; }   # $3… = "still there?" test
 WT_GONE=$'\n'   # dry run only: the worktrees the real run would already have removed, canonical, one per line
-guard_clone() { [ -z "$2" ] || clone_still_ok "$1" "$2"; }   # $2 = the admin dir as captured, given when a stranger's .git named the clone: it is proven again before every git call on it
-remove_worktree() {   # $1 = the clone's .git dir, $2 = the worktree path, $3 = the captured admin dir (a stranger's clone): unlock, drop top-level links, remove by exact path
-  local there=0; if [ -d "$2" ]; then there=1; fi   # a registration whose folder is already gone is pruned, not "removed"
-  if ! guard_clone "$1" "${3:-}"; then skip worktree "$2" "its clone changed after the capture — kept"; return 0; fi
-  act_g git --git-dir="$1" worktree unlock "$2" || true
+remove_worktree() {   # $1 = the clone's .git dir, $2 = the worktree path, $3 = the captured admin dir (a stranger's clone; empty for the swept repository's own): unlock, drop top-level links, remove by exact path
+  local there=0 rc=0; if [ -d "$2" ]; then there=1; fi   # a registration whose folder is already gone is pruned, not "removed"
+  call_git "$1" "${3:-}" worktree unlock "$2" || rc=$?
+  if [ "$rc" = 97 ]; then skip worktree "$2" "its clone changed after the capture — kept"; return 0; fi
   if [ -d "$2" ]; then act find "$2" -mindepth 1 -maxdepth 1 -type l -delete || true; fi
-  if ! guard_clone "$1" "${3:-}"; then skip worktree "$2" "its clone changed after the capture — kept"; return 0; fi
-  act_g git --git-dir="$1" worktree remove --force --force "$2" || true
+  rc=0; call_git "$1" "${3:-}" worktree remove --force --force "$2" || rc=$?
+  if [ "$rc" = 97 ]; then skip worktree "$2" "its clone changed after the capture — kept"; return 0; fi
   if [ -d "$2" ] && [ "$DRY" = 0 ]; then rm -rf -- "$2" 2>/dev/null || true; fi
   if [ -d "$2" ] && [ "$DRY" = 0 ]; then skip worktree "$2" "could not be removed"; fi
   if [ "$there" = 1 ] && [ ! -d "$2" ]; then removed worktree "$2"; fi

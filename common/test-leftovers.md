@@ -233,10 +233,11 @@ and what a copy of it must keep:
   user owns, closed to group and world, whose `worktrees/*/gitdir` and `worktrees/*/locked` are regular files; a
   `.git` that points anywhere else, through a link someone else owns, or into a clone that cannot be entered is
   an unreadable owner: kept, named (a wrong "not mine" only keeps). The clone is resolved once, at the capture,
-  to its physical path and carried to the removal, where it is proven again before every git call on it; a
-  stranger's file is read once, only when it is a regular file, never again. Reads and git calls on a clone are
-  bounded by `timeout`, else by `perl`; with neither, a file another user owns is not read (kept, named, one
-  line says so).
+  to its physical path and carried to the removal, where every git call on it enters it, proves it again and runs
+  inside it, so a directory renamed a moment later cannot redirect the call; a stranger's file is read once,
+  only when it is a regular file, never again. Reads and git calls on a clone are bounded by `timeout`, else by
+  `perl`; with neither, a file another user owns, or one inside a folder another user owns, is not read (kept,
+  named, one line says so).
 - **Exact removal.** Top-level links (a junction into a checkout) are unlinked before a worktree or folder is
   removed and `rm -rf` never crosses one; a locked worktree is removed with `git worktree remove --force --force`;
   worktrees go before branches and folders; `docker ps --filter name=`
