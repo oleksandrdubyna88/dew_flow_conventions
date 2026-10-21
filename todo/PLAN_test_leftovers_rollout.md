@@ -75,7 +75,7 @@ epics now wait for ITS release, not for E1's. Named on both sides:
 | Item | Built by | This plan's part |
 |---|---|---|
 | The contract text, helper, sweep, janitor and guard in their owner-scoped form | the merged-core plan | E2–E7 consume its one release; E1's stories document is promoted by it as IMPLEMENTED |
-| The per-consumer rename, port and pin bump | epics E2–E7 here | Each epic's first story becomes "pin bump + rename to the owner form + helper/sweep/guard port, in one commit"; the barrier checklist of the merged-core plan runs per machine before it |
+| The per-consumer rename, port and pin bump | epics E2–E7 here | Each epic splits into a sweep-only stage (its owner-blind sweeps replaced or disabled, no owner-form producer) and a producer stage (pin bump + rename + helper/guard port in one commit); all sweep-only stages land before any producer stage; the barrier checklist of the merged-core plan runs per machine before the first producer |
 
 Order: the merged core first. Disjoint: the merged core edits no consumer repository.
 
