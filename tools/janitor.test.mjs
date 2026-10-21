@@ -1320,3 +1320,68 @@ test("21g. Gate B: a clone that becomes unreadable after the capture is not 'rem
   assert.ok(exists(wt.path), `the folder is kept\n${run.stderr}`);
   assert.ok(run.lines.some((line) => line.includes(named(wt.path)) && line.includes("changed after the capture")), run.stderr);
 });
+
+// --- 22 --------------------------------------------------------------------------------------------------------
+
+test("22a. A directory ABOVE the clone renamed between the check and the git call: git runs in the clone that was entered, never in what the path became", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("renames of a directory in use need a POSIX filesystem");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "pin", { lock: NOBODY() });
+  const admin = git(wt.path, "rev-parse", "--absolute-git-dir"); // <other>/.git/worktrees/<name>
+  const trap = makeClone(w.roots, "trap2");
+  const bait = path.join(trap, ".git", "worktrees", "zz");
+  fs.mkdirSync(bait, { recursive: true });
+  w.scope.after(() => fs.rmSync(bait, { recursive: true, force: true }));
+  plantFifo(w, path.join(bait, "gitdir")); // any git call that lands in the trap blocks on it
+  const aside = path.join(w.roots, "b-aside");
+  w.scope.after(() => { // put the directories back, so the teardown finds them where they were
+    if (!exists(aside)) return;
+    fs.renameSync(w.other, trap);
+    fs.renameSync(aside, w.other);
+  });
+  const mv = spawnSync("sh", ["-c", "command -v mv"], { encoding: "utf8" }).stdout.trim();
+  // the first `git --git-dir=… worktree unlock` swaps the two directories, then runs for real: the path the janitor holds now names the trap
+  const gitStub = {
+    "BASH_FUNC_git%%": '() {  case "$1 $2 $3" in --git-dir=*" worktree unlock") if [ ! -e "$PIN_ASIDE" ]; then ' + mv + ' "$PIN_FROM" "$PIN_ASIDE" && ' + mv + ' "$PIN_TO" "$PIN_FROM"; fi;; esac; command git "$@"\n}',
+    PIN_FROM: w.other, PIN_ASIDE: aside, PIN_TO: trap,
+  };
+
+  const run = runJanitor(w, { tmp, env: gitStub, timeoutMs: 60_000 });
+
+  assert.equal(run.error, undefined, "the run finished instead of blocking on the trap's FIFO");
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(wt.path), `the folder is kept: its clone is no longer where it was\n${run.text}`);
+  assert.ok(mentions(run, named(wt.path), "changed after the capture"), run.text);
+  assert.equal(exists(path.join(aside, ".git", "worktrees", path.basename(admin), "locked")), false, "the unlock ran in the clone that was entered (now moved aside)");
+  assert.ok(exists(path.join(bait, "gitdir")), "and the trap was left alone");
+});
+
+test("22b. Gate A: with nothing to bound a read, a .git inside a folder this user does not own is not read — even when the file itself is this user's", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("the Windows PATH always has the shell's own timeout");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "parent", { lock: undefined });
+  const probe = spawnSync(BASH, ["-c", "command -v timeout || command -v perl"], { env: envFor(w, { tmp, docker: true, minAge: 60, ahead: [], extra: {} }), encoding: "utf8" });
+  assert.notEqual(probe.status, 0, `this PATH holds a timeout or a perl: ${probe.stdout}`);
+
+  const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${wt.path}` } }); // the FOLDER is someone else's, the file in it and everything else is this user's
+
+  assert.equal(kept.status, 3, kept.text);
+  assert.ok(exists(wt.path), `kept\n${kept.text}`);
+  assert.ok(mentions(kept, `${named(wt.path)} — owner '-unbounded' is unreadable`), kept.text);
+  assert.equal(kept.stderr.filter((line) => line.includes("neither timeout nor perl")).length, 1, kept.text);
+
+  const own = runJanitor(w, { tmp });
+
+  assert.equal(own.status, 0, own.text);
+  assert.equal(exists(wt.path), false, `a folder this user owns is read and swept\n${own.text}`);
+});
