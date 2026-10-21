@@ -238,6 +238,13 @@ capture() {   # ONE line per prefixed resource ("-" = an owner nobody can read).
     if [ ! -d "${f%.owner}" ]; then o="$(claim_of "$f")"; row marker "$f" "$f" "$o" "$(mtime_of "$f")"; fi
   done
 }
+unreadable_locks() {   # git itself reads <clone>/worktrees/<name>/locked and blocks forever on a FIFO planted there, so a lock that is not a regular file ends the run BEFORE any git listing
+  local l
+  for l in "$(git rev-parse --git-common-dir)"/worktrees/*/locked; do
+    if { [ -e "$l" ] || [ -L "$l" ]; } && { [ ! -f "$l" ] || [ -L "$l" ]; }; then echo "janitor: $(clean "$l") is not a regular file — git would block reading it; nothing was removed" >&2; return 1; fi
+  done
+}
+unreadable_locks || exit 1
 echo "janitor: looking for testsToDelete resources…" >&2   # progress: the capture can take a while on a busy machine
 CAPTURED="$(capture)" || { echo "janitor: a listing failed — nothing was removed" >&2; exit 1; }
 SKIPPED=0; DEL=""

@@ -621,7 +621,18 @@ test("8c. progress: a removal that failed is not announced as removed", { timeou
 
 // --- 8d --------------------------------------------------------------------------------------------------------
 
-test("8d. A FIFO named `locked` in a worktree's admin folder never hangs the janitor: it is unreadable, so the worktree is kept and named", { timeout: TIMEOUT }, (t) => {
+/** A FIFO named `locked` inside the admin folder of a worktree of `repo`; the teardown removes it first. */
+function plantFifoLock(w, repo, tmp, what) {
+  const wt = worktree(w, repo, tmp, what, { lock: undefined });
+  const admin = git(wt.path, "rev-parse", "--absolute-git-dir");
+  const fifo = path.join(admin, "locked");
+  const made = spawnSync("mkfifo", [fifo], { timeout: 30_000 });
+  assert.equal(made.status, 0, String(made.stderr));
+  w.scope.after(() => fs.rmSync(fifo, { force: true }));
+  return { wt, admin };
+}
+
+test("8d. A FIFO named `locked` in ANOTHER clone's worktree never hangs the janitor: its lock is unreadable, so the worktree is kept and named", { timeout: TIMEOUT }, (t) => {
   if (process.platform === "win32") {
     t.skip("mkfifo: a FIFO needs a POSIX filesystem");
     return;
@@ -629,19 +640,35 @@ test("8d. A FIFO named `locked` in a worktree's admin folder never hangs the jan
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const wt = worktree(w, w.clone, tmp, "fifo", { lock: undefined });
-  const fifo = path.join(git(wt.path, "rev-parse", "--absolute-git-dir"), "locked");
-  const made = spawnSync("mkfifo", [fifo], { timeout: 30_000 });
-  assert.equal(made.status, 0, String(made.stderr));
-  w.scope.after(() => fs.rmSync(fifo, { force: true }));
+  const { wt, admin } = plantFifoLock(w, w.other, tmp, "fifo");
 
   const run = runJanitor(w, { tmp, timeoutMs: 60_000 });
 
   assert.equal(run.error, undefined, "the run finished instead of blocking on the FIFO");
   assert.equal(run.status, 3, run.text);
-  assert.ok(exists(wt.path) && listedIn(w.clone).includes(named(wt.path)), `the worktree is kept, registered
+  assert.ok(exists(wt.path) && exists(admin), `the worktree is kept, registered (its admin folder is still there; git itself would block listing it)
 ${run.text}`);
   assert.ok(mentions(run, named(wt.path), "is unreadable"), run.text);
+});
+
+test("8d. A FIFO named `locked` in the SWEPT clone's own admin folder (git itself would block on it): the run refuses in one line, removes nothing and does not hang", { timeout: TIMEOUT }, (t) => {
+  if (process.platform === "win32") {
+    t.skip("mkfifo: a FIFO needs a POSIX filesystem");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const { wt } = plantFifoLock(w, w.clone, tmp, "fifoown");
+  const dead = folder(w, tmp, "fifobeside", { owner: NOBODY() });
+
+  const run = runJanitor(w, { tmp, timeoutMs: 60_000 });
+
+  assert.equal(run.error, undefined, "the run finished instead of blocking on the FIFO");
+  assert.equal(run.status, 1, run.text);
+  assert.ok(run.stderr.some((line) => line.startsWith("janitor: ") && line.includes("locked") && line.includes("not a regular file") && line.includes("nothing was removed")), run.text);
+  assert.ok(exists(wt.path) && exists(dead), `nothing was removed
+${run.text}`);
 });
 
 // --- 9 ---------------------------------------------------------------------------------------------------------
