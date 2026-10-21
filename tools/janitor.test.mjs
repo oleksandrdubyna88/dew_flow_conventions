@@ -1347,7 +1347,7 @@ test("22a. A directory ABOVE the clone renamed between the check and the git cal
   const mv = spawnSync("sh", ["-c", "command -v mv"], { encoding: "utf8" }).stdout.trim();
   // the first `git --git-dir=… worktree unlock` swaps the two directories, then runs for real: the path the janitor holds now names the trap
   const gitStub = {
-    "BASH_FUNC_git%%": '() {  case "$1 $2 $3" in --git-dir=*" worktree unlock") if [ ! -e "$PIN_ASIDE" ]; then ' + mv + ' "$PIN_FROM" "$PIN_ASIDE" && ' + mv + ' "$PIN_TO" "$PIN_FROM"; fi;; esac; command git "$@"\n}',
+    "BASH_FUNC_git%%": '() {  case "${1:-} ${2:-} ${3:-}" in --git-dir=*" worktree unlock") if [ ! -e "$PIN_ASIDE" ]; then ' + mv + ' "$PIN_FROM" "$PIN_ASIDE" && ' + mv + ' "$PIN_TO" "$PIN_FROM"; fi;; esac; command git "$@"\n}',
     PIN_FROM: w.other, PIN_ASIDE: aside, PIN_TO: trap,
   };
 
