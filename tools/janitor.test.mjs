@@ -29,7 +29,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 
 import { git } from "./lib/git.mjs";
 import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
@@ -48,7 +48,7 @@ const TAB = "\t";
 const COMMIT = ["-c", "user.name=Janitor test", "-c", "user.email=janitor@example.invalid", "-c", "commit.gpgsign=false",
   "commit", "--allow-empty", "-qm", "fixture"];
 // Exactly what the script calls (a private PATH of symlinks proves it; `cut` and `xargs` joined with the one-inspect capture).
-const LINUX_TOOLS = ["bash", "sed", "awk", "grep", "find", "head", "tr", "cut", "xargs", "git", "hostname", "uname", "date", "stat", "rm", "env"];
+const LINUX_TOOLS = ["bash", "sed", "awk", "grep", "find", "head", "tr", "cut", "xargs", "git", "hostname", "uname", "date", "stat", "rm", "env", "sleep"];
 
 // --- bash and PATH ---------------------------------------------------------------------------------------------
 
@@ -561,8 +561,8 @@ test("8c. progress: one line when the capture starts and one per real removal, i
 
   assert.equal(run.status, 3, "the live folder is skipped: " + run.text);
   assert.equal(run.progress.length, 4, run.progress.join(" // "));
-  assert.deepEqual(run.progress.slice(0, 3), [LOOKING, "janitor: removed container \"testsToDelete-conventions-prog\"", `janitor: removed branch "${branch}"`]);
-  assert.ok(run.progress[3].startsWith("janitor: removed folder \"") && run.progress[3].endsWith("\"") && run.progress[3].includes(named(dead)), run.progress.join(" // "));
+  assert.deepEqual(run.progress.slice(0, 3), [LOOKING, "janitor: removed container testsToDelete-conventions-prog", `janitor: removed branch ${branch}`]);
+  assert.ok(run.progress[3].startsWith("janitor: removed folder ") && run.progress[3].includes(named(dead)), run.progress.join(" // "));
   assert.equal(run.progress.some((line) => line.includes(named(live))), false, "a skipped resource is not announced as removed");
   assert.equal(exists(dead), false, "and it really went: " + run.text);
 });
@@ -590,7 +590,7 @@ test("8c. progress: a name is printed through clean() — non-ASCII text never r
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 0, run.text);
-  assert.deepEqual(run.progress, [LOOKING, "janitor: removed container \"testsToDelete-conventions-caf??\""]);
+  assert.deepEqual(run.progress, [LOOKING, "janitor: removed container testsToDelete-conventions-caf\\?\\?"]); // printf %q: the two `?` that clean() made are glob characters, so they are escaped
   assert.equal(/[^ -~]/.test(run.progress[1]), false, "the removed line is printable ASCII only");
 });
 
@@ -603,7 +603,7 @@ test("8c. progress: printable text inside a name cannot pass for a second messag
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 0, run.text);
-  assert.deepEqual(run.progress, [LOOKING, "janitor: removed container \"testsToDelete-conventions-x janitor: removed container fake\""]);
+  assert.deepEqual(run.progress, [LOOKING, "janitor: removed container testsToDelete-conventions-x\\ janitor:\\ removed\\ container\\ fake"]); // every space is escaped: it is ONE word of one line
 });
 
 test("8c. progress: a removal that failed is not announced as removed", { timeout: TIMEOUT }, (t) => {
@@ -794,7 +794,7 @@ test("14. One row per worktree (code gate 2): the swept repository's own tree in
 
   assert.equal(first.status, 0, first.text);
   assert.deepEqual(first.stderr, [], "removed once and silently: a second capture would announce a vanished target");
-  assert.equal(first.progress.filter((line) => line.startsWith("janitor: removed worktree \"") && line.includes(named(dead.path))).length, 1, `one progress line for the worktree\n${first.progress.join("\n")}`);
+  assert.equal(first.progress.filter((line) => line.startsWith("janitor: removed worktree ") && line.includes(named(dead.path))).length, 1, `one progress line for the worktree\n${first.progress.join("\n")}`);
   assert.equal(exists(dead.path), false, `the dead-owned worktree is gone\n${first.text}`);
   assert.equal(listedIn(w.clone).includes(named(dead.path)), false, `and unregistered\n${first.text}`);
 
@@ -935,4 +935,170 @@ test("19. The clone the janitor runs from (opus B) is never a candidate, even wh
   assert.equal(run.status, 0, run.text);
   assert.ok(exists(path.join(clone, ".git")), `the clone it ran from was deleted\n${run.text}`);
   assert.deepEqual(run.stderr, [], "and nothing was reported");
+});
+
+// --- 20 --------------------------------------------------------------------------------------------------------
+// Strangers. Any local user can plant folders, files, FIFOs, symlinks and crafted `.git` files in a shared temp root. They can make
+// the janitor WAIT; they must not be able to. A FIFO needs a POSIX file system, so those scenarios skip on Windows.
+
+/** A FIFO at `fifo`. The teardown first opens it for reading and writing, which lets any process blocked on it go (a janitor killed mid-hang leaves its child there), then removes it. */
+function plantFifo(w, fifo) {
+  const made = spawnSync("mkfifo", [fifo], { timeout: 30_000 });
+  assert.equal(made.status, 0, String(made.stderr));
+  w.scope.after(() => {
+    try {
+      fs.closeSync(fs.openSync(fifo, fs.constants.O_RDWR));
+    } catch {
+      // already gone
+    }
+    fs.rmSync(fifo, { force: true });
+  });
+}
+
+/** The git dir of the clone that owns worktree `wt` (its admin folder is `<common>/worktrees/<name>`). */
+const commonOf = (wt) => path.dirname(path.dirname(git(wt.path, "rev-parse", "--absolute-git-dir")));
+
+test("20a. F-A: a worktree whose .git points into a clone owned by someone else is kept and named — git is never pointed at that clone", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "stranger", { lock: undefined });
+
+  const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: "foreign" } });
+
+  assert.equal(kept.status, 3, kept.text);
+  assert.ok(exists(wt.path) && listedIn(w.other).includes(named(wt.path)), `the worktree of a foreign clone is kept, registered\n${kept.text}`);
+  assert.ok(mentions(kept, `${named(wt.path)} — owner '-' is unreadable`), kept.text);
+  assert.ok(kept.seams.some((line) => line.includes("JANITOR_TEST_OWNER_CHECK")), `the seam is announced: ${kept.seams.join(" // ")}`);
+
+  const mine = runJanitor(w, { tmp });
+
+  assert.equal(mine.status, 0, mine.text);
+  assert.equal(exists(wt.path), false, `the same worktree of a clone this user owns is removed\n${mine.text}`);
+  assert.deepEqual(mine.seams, [], "and no seam was set");
+});
+
+for (const entry of ["zz", ".zz"]) {
+  test(`20b. F-A: a FIFO worktrees/${entry}/gitdir in the clone of a candidate never hangs the janitor — the worktree is kept and named`, { timeout: TIMEOUT }, (t) => {
+    if (win32) {
+      t.skip("mkfifo: a FIFO needs a POSIX filesystem");
+      return;
+    }
+    const w = makeWorld(t);
+    if (w === null) return;
+    const tmp = makeTmp(w);
+    const wt = worktree(w, w.other, tmp, "fifogd", { lock: undefined });
+    const fake = path.join(commonOf(wt), "worktrees", entry);
+    fs.mkdirSync(fake);
+    w.scope.after(() => fs.rmSync(fake, { recursive: true, force: true }));
+    plantFifo(w, path.join(fake, "gitdir"));
+
+    const run = runJanitor(w, { tmp, timeoutMs: 60_000 });
+
+    assert.equal(run.error, undefined, "the run finished instead of blocking on the FIFO");
+    assert.equal(run.status, 3, run.text);
+    assert.ok(exists(wt.path), `the worktree is kept\n${run.text}`);
+    assert.ok(mentions(run, named(wt.path), "is unreadable"), run.text);
+  });
+}
+
+test("20c. F-A: a FIFO worktrees/zz/gitdir in the SWEPT clone (git itself would block listing it): the run refuses in one line, removes nothing and does not hang", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("mkfifo: a FIFO needs a POSIX filesystem");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.clone, tmp, "fifoowngd", { lock: undefined });
+  const fake = path.join(commonOf(wt), "worktrees", "zz");
+  fs.mkdirSync(fake);
+  w.scope.after(() => fs.rmSync(fake, { recursive: true, force: true }));
+  plantFifo(w, path.join(fake, "gitdir"));
+  const dead = folder(w, tmp, "fifogdbeside", { owner: NOBODY() });
+
+  const run = runJanitor(w, { tmp, timeoutMs: 60_000 });
+
+  assert.equal(run.error, undefined, "the run finished instead of blocking on the FIFO");
+  assert.equal(run.status, 1, run.text);
+  assert.ok(run.stderr.some((line) => line.startsWith("janitor: ") && line.includes("gitdir") && line.includes("not a regular file") && line.includes("nothing was removed")), run.text);
+  assert.ok(exists(wt.path) && exists(dead), `nothing was removed\n${run.text}`);
+});
+
+test("20d. F-B: a .git file swapped for a FIFO after the capture is never read again — the folder is kept and named, and the run does not hang", { timeout: TIMEOUT }, async (t) => {
+  if (win32) {
+    t.skip("mkfifo: a FIFO needs a POSIX filesystem");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "swap", { lock: undefined });
+  const dotGit = path.join(wt.path, ".git");
+  const original = fs.readFileSync(dotGit);
+  const release = path.join(w.state, "release");
+  w.scope.after(() => { // back to what git wrote, so the worktree's own teardown can remove it
+    try {
+      fs.closeSync(fs.openSync(dotGit, fs.constants.O_RDWR));
+    } catch {
+      // not a FIFO
+    }
+    fs.rmSync(dotGit, { force: true });
+    fs.writeFileSync(dotGit, original);
+  });
+  const child = spawn(BASH, [slash(SCRIPT)], { cwd: w.clone, env: envFor(w, { tmp, docker: true, minAge: 60, ahead: [], extra: { JANITOR_TEST_PAUSE_FILE: release } }), windowsHide: true });
+  let stderr = "";
+  let paused = false;
+  let hung = false;
+  const timer = setTimeout(() => { hung = true; child.kill("SIGKILL"); }, 60_000);
+  child.stdout.resume();
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk;
+    if (!paused && stderr.includes("paused after the capture")) {
+      paused = true;
+      fs.rmSync(dotGit);
+      const made = spawnSync("mkfifo", [dotGit], { timeout: 30_000 });
+      assert.equal(made.status, 0, String(made.stderr));
+      fs.writeFileSync(release, "");
+    }
+  });
+  const status = await new Promise((resolve) => { child.on("close", (code) => resolve(code)); });
+  clearTimeout(timer);
+
+  assert.equal(paused, true, `the janitor reached the pause after its capture\n${stderr}`);
+  assert.equal(hung, false, `the run finished instead of blocking on the FIFO that replaced the .git file\n${stderr}`);
+  assert.equal(status, 3, stderr);
+  assert.ok(exists(wt.path), `the folder is kept\n${stderr}`);
+  assert.ok(stderr.split("\n").some((line) => line.includes(named(wt.path)) && line.includes("changed after the capture")), stderr);
+});
+
+test("20e. a double quote or a space inside a name cannot forge text of a progress line — it is escaped, so the line stays one word per field", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  setDocker(w, { ps: [["c1", 'testsToDelete-conventions-a" janitor: removed container "fake', "", dockerTime(OLD)]] });
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 0, run.text);
+  assert.deepEqual(run.progress, [LOOKING, 'janitor: removed container testsToDelete-conventions-a\\"\\ janitor:\\ removed\\ container\\ \\"fake']);
+});
+
+test("20f. F-C: where `timeout` exists a claim is read through it and git is called on a clone through it — a swap after the type test cannot block either", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const stubDir = ownedDir(w.scope, "jtimeout");
+  fs.writeFileSync(path.join(stubDir, "timeout"), "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$DSTUB/tlog\"\nshift\nexec \"$@\"\n", { mode: 0o755 });
+  const dead = folder(w, tmp, "tmo", { owner: NOBODY() });
+  const wt = worktree(w, w.other, tmp, "tmow", { lock: NOBODY() });
+
+  const run = runJanitor(w, { tmp, ahead: [stubDir] });
+
+  assert.equal(run.status, 0, run.text);
+  assert.equal(exists(dead) || exists(wt.path), false, `the stub forwards, so the sweep is the same\n${run.text}`);
+  const log = fs.readFileSync(path.join(w.state, "tlog"), "utf8").split("\n").filter(Boolean);
+  assert.ok(log.some((line) => /^5 head -c 513 -- .*\.owner$/.test(line)), `the claim was read through timeout 5\n${log.join("\n")}`);
+  assert.ok(log.some((line) => /^5 sed -n .*\.git$/.test(line)), `the .git file was read through timeout 5\n${log.join("\n")}`);
+  assert.ok(log.some((line) => /^60 git --git-dir=.* worktree remove --force --force /.test(line)), `the git call on the clone ran through timeout 60\n${log.join("\n")}`);
 });
