@@ -217,7 +217,7 @@ the sweep to `testsToDelete-<t>-…` (all three spellings, any case, anchored: `
 it combines with `--dry-run`, and an invalid token or an unknown argument prints the usage line and exits 2 with
 nothing touched. `JANITOR_MIN_AGE_MINUTES` (default 60) is whole minutes, digits only, at least 1; `--token` is 2 to 12 characters of
 `[a-z0-9]`. A name or id holding a control character is refused with a skip line, `--dry-run` prints the same exit
-code the real run would, and every test seam that is set is announced once on stderr. It also says what it is doing, on stderr: one line when the capture starts and one `janitor: removed <kind> "<name>"` line per real removal, the name quoted so text inside it cannot pass for a second message (a dry run prints its `would run:` lines instead). What it guarantees,
+code the real run would, and every test seam that is set is announced once on stderr. It also says what it is doing, on stderr: one line when the capture starts and one `janitor: removed <kind> <name>` line per real removal, the name shell-quoted (`printf %q`) so a quote or a space inside it cannot pass for text of the line (a dry run prints its `would run:` lines instead). What it guarantees,
 and what a copy of it must keep:
 
 - **One capture.** Every prefixed resource is listed ONCE with its identity, owner and age before anything is
@@ -228,6 +228,12 @@ and what a copy of it must keep:
   nobody, or a worktree whose lock it cannot read is **skipped** with one line naming it — never deleted;
   unmarked resources older than the window are nobody's and go. An orphan claim (§2) is judged like any other. A worktree is judged by its lock, read through
   its `.git` file whatever clone owns it (a relative gitdir resolved against the worktree).
+- **A stranger's entry can make it keep, never wait.** Any local user can plant folders, FIFOs and crafted
+  `.git` files in a shared temp root. A worktree is judged and removed only through a clone the janitor's own
+  user owns (a `.git` pointing elsewhere is an unreadable owner: kept, named; a wrong "not mine" only keeps),
+  and only when that clone's `worktrees/*/gitdir` and `worktrees/*/locked` are regular files. The clone is
+  resolved once, at the capture, and carried to the removal: a stranger's file is read once, only when it is a
+  regular file, never again. Where `timeout` exists, those reads and git calls on a clone are bounded.
 - **Exact removal.** Top-level links (a junction into a checkout) are unlinked before a worktree or folder is
   removed and `rm -rf` never crosses one; a locked worktree is removed with `git worktree remove --force --force`;
   worktrees go before branches and folders; `docker ps --filter name=`

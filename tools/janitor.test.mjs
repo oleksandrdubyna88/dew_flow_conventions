@@ -1087,20 +1087,21 @@ test("20e. a double quote or a space inside a name cannot forge text of a progre
   assert.deepEqual(run.progress, [LOOKING, 'janitor: removed container testsToDelete-conventions-a\\"\\ janitor:\\ removed\\ container\\ \\"fake']);
 });
 
+/** A `timeout` that logs its argv and then runs the rest, handed over as an exported bash FUNCTION (see `psStub`: on Windows a stub FILE would never be reached). */
+const timeoutStub = () => ({ "BASH_FUNC_timeout%%": '() {  echo "$*" >> "$DSTUB/timeoutlog"; shift; "$@"\n}' });
+
 test("20f. F-C: where `timeout` exists a claim is read through it and git is called on a clone through it — a swap after the type test cannot block either", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const stubDir = ownedDir(w.scope, "jtimeout");
-  fs.writeFileSync(path.join(stubDir, "timeout"), "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$DSTUB/tlog\"\nshift\nexec \"$@\"\n", { mode: 0o755 });
   const dead = folder(w, tmp, "tmo", { owner: NOBODY() });
   const wt = worktree(w, w.other, tmp, "tmow", { lock: NOBODY() });
 
-  const run = runJanitor(w, { tmp, ahead: [stubDir] });
+  const run = runJanitor(w, { tmp, env: timeoutStub() });
 
   assert.equal(run.status, 0, run.text);
   assert.equal(exists(dead) || exists(wt.path), false, `the stub forwards, so the sweep is the same\n${run.text}`);
-  const log = fs.readFileSync(path.join(w.state, "tlog"), "utf8").split("\n").filter(Boolean);
+  const log = callsOf(w, "timeout");
   assert.ok(log.some((line) => /^5 head -c 513 -- .*\.owner$/.test(line)), `the claim was read through timeout 5\n${log.join("\n")}`);
   assert.ok(log.some((line) => /^5 sed -n .*\.git$/.test(line)), `the .git file was read through timeout 5\n${log.join("\n")}`);
   assert.ok(log.some((line) => /^60 git --git-dir=.* worktree remove --force --force /.test(line)), `the git call on the clone ran through timeout 60\n${log.join("\n")}`);

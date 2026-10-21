@@ -36,9 +36,23 @@
 #         at least 1 — anything else is refused in one line (exit 1, nothing removed).  --dry-run prints `would run: …`
 #         lines on STDOUT (skips and notices stay on stderr) and removes nothing; its exit code is the real run's.
 #         Progress goes to stderr: `janitor: looking for testsToDelete resources…` when the capture starts and one
-#         `janitor: removed <kind> "<name>"` line per real removal (the name printed through clean() and quoted; a dry run has none).
-#         JANITOR_OS, JANITOR_PROC (the /proc root, default /proc) and JANITOR_HOSTNAME (the machine name, default
-#         `hostname`) are test seams only: honoured, and announced once each on stderr when set.
+#         `janitor: removed <kind> <name>` line per real removal (the name printed through clean() and then shell-quoted by
+#         `printf %q`, so a quote or a space inside it cannot pass for text of the line; a dry run has none).
+#         JANITOR_OS, JANITOR_PROC (the /proc root, default /proc), JANITOR_HOSTNAME (the machine name, default
+#         `hostname`), JANITOR_TEST_OWNER_CHECK (`foreign` makes every clone count as owned by someone else) and
+#         JANITOR_TEST_PAUSE_FILE (wait, after the decisions and before the first removal, until that path exists) are
+#         test seams only: honoured, and announced once each on stderr when set.
+#
+# Strangers. Any local user can create `testsToDelete-…` entries in a shared temp root: folders, files, FIFOs, symlinks and
+# crafted `.git` files. Such an entry can make the janitor WAIT, never delete the wrong thing, and the waits are closed:
+#   - a worktree is judged and removed only through a clone the janitor's own user owns (`-O`); a `.git` file that points
+#     into someone else's repository makes the owner unreadable — kept, named. A false negative only KEEPS a folder.
+#   - before git is pointed at a clone, that clone's `worktrees/*/gitdir` and `worktrees/*/locked` must be regular files
+#     (git itself blocks on a FIFO there).
+#   - the clone is resolved ONCE, at the capture, and carried through the row to the removal; a stranger's `.git` file is
+#     read once, never again, and only when it is a regular file that is no link. At removal it is checked for its TYPE
+#     only: one that is no longer a regular file means the folder changed after the capture, and it is kept.
+#   - where `timeout` exists (stock macOS has none) a read of a stranger's file and every git call on a clone is bounded.
 set -euo pipefail
 usage() { echo "usage: bash tools/janitor.sh [--dry-run] [--token <t>]   (<t>: 2 to 12 lower-case letters and digits)" >&2; exit 2; }
 DRY=0; TOKEN=""; HAVE_TOKEN=0
@@ -93,9 +107,15 @@ host_id() {   # $1 = the DNS host name, $2 = the WSL distribution name or "": di
 me="$(host_id "${JANITOR_HOSTNAME:-$(hostname)}" "${WSL_DISTRO_NAME:-}")@$OS"
 lower() { tr '[:upper:]' '[:lower:]'; }
 clean() { printf '%s' "$1" | LC_ALL=C tr -c '\040-\176' '?'; }   # text for a person's terminal: all but printable ASCII (escapes, CR, LF) becomes '?'
-for seam in JANITOR_OS JANITOR_PROC JANITOR_HOSTNAME; do   # a seam changes what the janitor believes: say so, once, every time it is set
+for seam in JANITOR_OS JANITOR_PROC JANITOR_HOSTNAME JANITOR_TEST_OWNER_CHECK JANITOR_TEST_PAUSE_FILE; do   # a seam changes what the janitor believes: say so, once, every time it is set
   if [ -n "${!seam:-}" ]; then echo "janitor: test seam $seam is set ($(clean "${!seam}")) — it exists for tests; a real run does not set it" >&2; fi
 done
+HAVE_TIMEOUT=0; if timeout 5 true >/dev/null 2>&1; then HAVE_TIMEOUT=1; fi   # probed by running it: a `timeout` that is not GNU's (or none, as on stock macOS) is not used
+bounded() { if [ "$HAVE_TIMEOUT" = 1 ]; then timeout "$@"; else shift; "$@"; fi; }   # $1 = seconds, then the command: a read or a git call a stranger's file could block ends by itself where `timeout` exists
+owned_by_me() {   # is directory $1 owned by the user running the janitor? A false answer (an ownership mapping that cannot say, MSYS for one) only KEEPS a folder
+  case "${JANITOR_TEST_OWNER_CHECK:-}" in foreign) return 1;; esac   # test seam: every clone is someone else's
+  [ -O "$1" ]
+}
 owner_ok() { local t="${1%$'\r'}"; if uspace "$t"; then return 1; fi; [[ "$t" =~ ^[^@:[:space:]]+@(linux|macos|windows):[0-9]+(:[0-9]+)?$ ]]; }   # the rule's marker grammar, exactly
 pid_ok() { [[ "$1" =~ ^[1-9][0-9]{0,15}$ ]] && [ "$1" -le 9007199254740991 ]; }   # a process id: positive, no leading zero, a safe integer. Grammar-valid is not enough: 0, 007 or 25 digits name no process, so "no such process" about them would be a lie
 claim_norm() {   # $1 = the RAW text of a claim, line end intact → the claim as ONE line, or "-" when it is not exactly one line or is longer than 512 bytes
@@ -107,7 +127,7 @@ claim_norm() {   # $1 = the RAW text of a claim, line end intact → the claim a
 claim_of() {   # the claim in file $1: 513 bytes are read, so one past the limit is seen. $(...) alone drops EVERY trailing newline, so a sentinel carries them to claim_norm
   local raw
   if [ ! -f "$1" ] || [ -L "$1" ]; then printf -- '-'; return 0; fi   # only a regular file is read: a FIFO (or a device) planted as a claim would block `head` forever; anything else is unreadable, so preserved
-  raw="$(head -c 513 -- "$1" 2>/dev/null; printf x)"; claim_norm "${raw%x}"
+  raw="$(bounded 5 head -c 513 -- "$1" 2>/dev/null; printf x)"; claim_norm "${raw%x}"
 }
 # Liveness is THREE-valued — 0 live, 1 dead, 2 unknown — and only "no process with that pid" is dead. A refused or
 # failed query (a missing `tasklist`, a `ps` that errors, no /proc) is unknown and preserves. `kill -0` is not used:
@@ -163,12 +183,24 @@ canon() {
   CANON="${w:-$q}"; CANON_CACHE="$CANON_CACHE$p$U$CANON"$'\n'
 }
 gitdir_of() {   # a folder holding a .git FILE is a linked worktree of SOME clone; a relative gitdir is relative to the worktree
-  local g d; g="$(sed -n 's/^gitdir: //p' "$1/.git" 2>/dev/null || true)"
+  local g d
+  if [ ! -f "$1/.git" ] || [ -L "$1/.git" ]; then return 0; fi   # the ONE read of a stranger's .git: only a regular file, never a link, a FIFO or a device; nothing printed = unreadable
+  g="$(bounded 5 sed -n 's/^gitdir: //p' "$1/.git" 2>/dev/null || true)"
   case "$g" in ""|/*|[A-Za-z]:/*) ;; *)
     g="$1/$g"   # a relative gitdir (a worktree made with relative paths) climbs out through the worktree itself ("<wt>/../<clone>/.git/…"). Once the worktree is removed that path no longer resolves on Linux, and git leaves the registration behind, so the PARENT is resolved now, while the worktree still exists
     d="$(cd "${g%/*}" 2>/dev/null && { pwd -W 2>/dev/null || pwd -P; })" && g="$d/${g##*/}";;
   esac
   printf '%s' "$g"
+}
+clone_of() {   # $1 = a worktree's admin dir <clone>/worktrees/<name> → the clone's git dir; nothing when it is not that shape
+  case "$1" in */worktrees/?*) ;; *) return 0;; esac
+  case "${1##*/worktrees/}" in */*) return 0;; esac
+  printf '%s' "${1%/worktrees/*}"
+}
+clone_ok() {   # a clone carried through a row: an absolute path with no control byte
+  if has_ctl "$1"; then return 1; fi
+  case "$1" in /?*|[A-Za-z]:/?*) return 0;; esac
+  return 1
 }
 volume_created() {   # $1 = captured volume names, one per line → "name<TAB>CreatedAt" for each that still exists; 1 on a real docker failure
   local batch one n
@@ -189,9 +221,9 @@ LBL='{{printf "%q" (.Label "testsToDelete.owner")}}'
 UQ='function uq(s) { if (s ~ /^".*"$/) s = substr(s, 2, length(s) - 2); return s } function idok(k, i, n,   s) { if (i ~ /^[0-9a-f]+$/) return 1; s = i; gsub(/[^ -~]/, "?", s); print "notice: " k " " n " — id " s " is not a docker id, ignored" > "/dev/stderr"; return 0 } '
 ctlclean() { printf '%s' "$1" | LC_ALL=C tr '\000-\037\177' '?'; }   # every control byte, the field separator included, becomes '?'
 has_ctl() { case "$1" in *[[:cntrl:]]*) return 0;; esac; return 1; }
-row() {   # kind id name owner created — an id, a name or an owner is text a stranger wrote: a newline or \x1f in it would forge or shift a row. One with a control byte becomes an `unsafe` row (named, refused), never a candidate
-  if has_ctl "$2$3"; then printf '%s\n' "unsafe$U$(ctlclean "$2")$U$(ctlclean "$3")$U$U"; return 0; fi
-  printf '%s\n' "$1$U$2$U$3$U$(ctlclean "$4")$U$5"
+row() {   # kind id name owner created [clone] — an id, a name, an owner or a clone path is text a stranger wrote: a newline or \x1f in it would forge or shift a row. One with a control byte becomes an `unsafe` row (named, refused), never a candidate
+  if has_ctl "$2$3${6:-}"; then printf '%s\n' "unsafe$U$(ctlclean "$2")$U$(ctlclean "$3")$U$U"; return 0; fi
+  printf '%s\n' "$1$U$2$U$3$U$(ctlclean "$4")$U$5$U${6:-}"
 }
 capture() {   # ONE line per prefixed resource ("-" = an owner nobody can read). A failing listing fails the run.
   dk ps -a --format '{{.ID}}\t{{printf "%q" .Names}}\t'"$LBL"'\t{{.CreatedAt}}' | awk -F'\t' -v OFS="$U" -v rx="^$RX" "$UQ"'{ n = uq($2); if (tolower(n) !~ rx) next; if (!idok("container", $1, n)) next; print "container", $1, n, uq($3), $4 }' || return 1
@@ -226,9 +258,14 @@ capture() {   # ONE line per prefixed resource ("-" = an owner nobody can read).
     case "$main/" in "$c/"*) continue;; esac
     if [ -f "$d/.git" ]; then
       case "$mine" in *$'\n'"$c"$'\n'*) continue;; esac
-      g="$(gitdir_of "$d")"; o=""
-      if [ -z "$g" ] || [ ! -d "$g" ]; then o="-"; elif [ -e "$g/locked" ]; then o="$(claim_of "$g/locked")"; fi
-      row wt-dir "$d" "$d" "$o" "$(mtime_of "$d")"
+      g="$(gitdir_of "$d")"; o=""; k=""
+      if [ -z "$g" ] || [ ! -d "$g" ]; then o="-"
+      else   # the clone is resolved ONCE, here, and carried to the removal. It must be a clone this user owns and git must be able to read all of its worktree entries; otherwise the owner is unreadable: kept, named
+        k="$(clone_of "$g")"
+        if [ -z "$k" ] || ! owned_by_me "$k" || ! unreadable_locks "$k" 2>/dev/null; then o="-"
+        elif [ -e "$g/locked" ]; then o="$(claim_of "$g/locked")"; fi
+      fi
+      row wt-dir "$d" "$d" "$o" "$(mtime_of "$d")" "$k"
     else o=""; if [ -e "$d.owner" ]; then o="$(claim_of "$d.owner")"; fi
       row folder "$d" "$d" "$o" "$(mtime_of "$d")"
     fi
@@ -238,13 +275,15 @@ capture() {   # ONE line per prefixed resource ("-" = an owner nobody can read).
     if [ ! -d "${f%.owner}" ]; then o="$(claim_of "$f")"; row marker "$f" "$f" "$o" "$(mtime_of "$f")"; fi
   done
 }
-unreadable_locks() {   # git itself reads <clone>/worktrees/<name>/locked and blocks forever on a FIFO planted there, so a lock that is not a regular file ends the run BEFORE any git listing
-  local l
-  for l in "$(git rev-parse --git-common-dir)"/worktrees/*/locked; do
-    if { [ -e "$l" ] || [ -L "$l" ]; } && { [ ! -f "$l" ] || [ -L "$l" ]; }; then echo "janitor: $(clean "$l") is not a regular file — git would block reading it; nothing was removed" >&2; return 1; fi
+unreadable_locks() {   # $1 = a clone's git dir. git itself reads <clone>/worktrees/<name>/gitdir and /locked and blocks forever on a FIFO planted in either, so one that is not a regular file refuses BEFORE any git call on that clone
+  local l bad=0 had=0; if shopt -q dotglob; then had=1; fi; shopt -s dotglob   # git reads every entry of worktrees/, a hidden one included
+  for l in "$1"/worktrees/*/locked "$1"/worktrees/*/gitdir; do
+    if { [ -e "$l" ] || [ -L "$l" ]; } && { [ ! -f "$l" ] || [ -L "$l" ]; }; then echo "janitor: $(clean "$l") is not a regular file — git would block reading it; nothing was removed" >&2; bad=1; break; fi
   done
+  if [ "$had" = 0 ]; then shopt -u dotglob; fi
+  return "$bad"
 }
-unreadable_locks || exit 1
+unreadable_locks "$(git rev-parse --git-common-dir)" || exit 1
 echo "janitor: looking for testsToDelete resources…" >&2   # progress: the capture can take a while on a busy machine
 CAPTURED="$(capture)" || { echo "janitor: a listing failed — nothing was removed" >&2; exit 1; }
 SKIPPED=0; DEL=""
@@ -256,7 +295,7 @@ safe_id() {   # a folder, worktree or claim is removed only when it is exactly O
   if has_ctl "$1"; then return 1; fi
   return 0
 }
-while IFS="$U" read -r kind id name owner created; do
+while IFS="$U" read -r kind id name owner created clone; do
   [ -n "$id" ] || continue
   case "$kind" in
     unsafe) skip folder "$name" "its name holds a control character — refused"; continue;;
@@ -279,21 +318,23 @@ while IFS="$U" read -r kind id name owner created; do
     if [ "$lv" = 0 ]; then skip "$kind" "$name" "owned by live process $p — a run is in flight"; continue; fi
     if [ "$lv" != 1 ]; then skip "$kind" "$name" "liveness unknown for process $p — the query failed or was refused"; continue; fi
   fi
-  DEL="$DEL$kind$U$id$U$name"$'\n'
+  if [ "$kind" = wt-dir ] && ! clone_ok "$clone"; then skip wt-dir "$name" "its clone directory is unreadable"; continue; fi   # the removal uses the captured clone and nothing else
+  DEL="$DEL$kind$U$id$U$name$U$clone"$'\n'
 done <<< "$CAPTURED"
 act() { if [ "$DRY" = 1 ]; then echo "would run: $(clean "$*")"; else "$@" 2>/dev/null; fi; }   # stdout, so a person can pipe it; only the REAL command is silenced
 # A deletion is never fatal. A target that vanished after the capture is a notice; one that is still there after a
 # failed removal is skipped like a live one (named, exit 3). Only a failed LISTING ends the run (above).
+act_g() { if [ "$DRY" = 1 ]; then echo "would run: $(clean "$*")"; else bounded 60 "$@" 2>/dev/null; fi; }   # act for a git call on a clone: where `timeout` exists, a call that cannot finish ends after a minute
 vanished() { echo "notice: $(clean "$1") $(clean "$2") — vanished after the capture" >&2; }
-removed() { if [ "$DRY" = 0 ]; then echo "janitor: removed $1 \"$(clean "$2")\"" >&2; fi; return 0; }   # progress, one line per REAL removal; the name goes through clean() like every other captured text, so no escape or line end reaches the terminal. A dry run says "would run:" instead
+removed() { if [ "$DRY" = 0 ]; then printf 'janitor: removed %s %q\n' "$1" "$(clean "$2")" >&2; fi; return 0; }   # progress, one line per REAL removal; the name goes through clean() like every other captured text (no escape or line end reaches the terminal) and then through %q (a quote or a space inside it cannot pass for text of the line). A dry run says "would run:" instead
 act_rm() { local k="$1" n="$2"; shift 2; act "$@" && removed "$k" "$n"; }   # act, and announce the removal only when the command succeeded
 settle() { local k="$1" n="$2"; shift 2; if "$@" >/dev/null 2>&1; then skip "$k" "$n" "could not be removed"; else vanished "$k" "$n"; fi; }   # $3… = "still there?" test
 WT_GONE=$'\n'   # dry run only: the worktrees the real run would already have removed, canonical, one per line
 remove_worktree() {   # $1 = the clone's .git dir, $2 = the worktree path: unlock, drop top-level links, remove by exact path
   local there=0; if [ -d "$2" ]; then there=1; fi   # a registration whose folder is already gone is pruned, not "removed"
-  act git --git-dir="$1" worktree unlock "$2" || true
+  act_g git --git-dir="$1" worktree unlock "$2" || true
   if [ -d "$2" ]; then act find "$2" -mindepth 1 -maxdepth 1 -type l -delete || true; fi
-  act git --git-dir="$1" worktree remove --force --force "$2" || true
+  act_g git --git-dir="$1" worktree remove --force --force "$2" || true
   if [ -d "$2" ] && [ "$DRY" = 0 ]; then rm -rf -- "$2" 2>/dev/null || true; fi
   if [ -d "$2" ] && [ "$DRY" = 0 ]; then skip worktree "$2" "could not be removed"; fi
   if [ "$there" = 1 ] && [ ! -d "$2" ]; then removed worktree "$2"; fi
@@ -309,15 +350,19 @@ checked_out() {   # is branch $1 checked out in a worktree that STAYS? A dry run
   done < <(git worktree list --porcelain)
   return 1
 }
+if [ -n "${JANITOR_TEST_PAUSE_FILE:-}" ]; then   # test seam: lets a test change the world between the decisions and the removals
+  echo "janitor: test seam paused after the capture — waiting for $(clean "$JANITOR_TEST_PAUSE_FILE")" >&2
+  i=0; while [ ! -e "$JANITOR_TEST_PAUSE_FILE" ] && [ "$i" -lt 600 ]; do sleep 0.1; i=$((i + 1)); done
+fi
 for pass in container volume network wt-git wt-dir prune branch folder marker; do
-  while IFS="$U" read -r kind id name; do
+  while IFS="$U" read -r kind id name clone; do
     [ "$kind" = "$pass" ] || continue
     case "$kind" in
       container) act_rm container "$name" docker rm -f -v "$id" || settle container "$name" dk inspect --type container "$id";;
       volume) act_rm volume "$name" docker volume rm "$id" || settle volume "$name" dk volume inspect "$id";;
       network) act_rm network "$name" docker network rm "$id" || settle network "$name" dk network inspect "$id";;
       wt-git) remove_worktree "$(git rev-parse --git-common-dir)" "$id";;
-      wt-dir) remove_worktree "$(g="$(gitdir_of "$id")"; printf '%s' "${g%/worktrees/*}")" "$id";;
+      wt-dir) if [ -f "$id/.git" ] && [ ! -L "$id/.git" ]; then remove_worktree "$clone" "$id"; else skip wt-dir "$name" "its .git is no longer a regular file — it changed after the capture"; fi;;   # the captured clone; the stranger's .git is never read again, only its type is looked at
       branch) if checked_out "$id"; then skip branch "$id" "checked out in a worktree that was kept"; else act_rm branch "$id" git branch -D "$id" || settle branch "$id" git show-ref --verify -q "refs/heads/$id"; fi;;
       folder) if [ -d "$id" ]; then act find "$id" -mindepth 1 -maxdepth 1 -type l -delete || true; act_rm folder "$id" rm -rf -- "$id" || settle folder "$id" test -d "$id"; else vanished folder "$id"; fi; if [ -e "$id.owner" ]; then act rm -f -- "$id.owner" || true; fi;;
       marker) act_rm marker "$id" rm -f -- "$id" || true;;
