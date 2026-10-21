@@ -165,7 +165,7 @@ matches leaves in shared namespaces only, so a nested prefix is a name nothing e
   is exactly `["new name.txt"]` on a repository rooted at its temp folder; `behaviourSmoke` refuses a worktree
   with any untracked file): **folder** → sibling file `<folder>.owner` in the same parent; **worktree** → the
   lock reason, `git worktree add --detach --lock --reason "<owner>" <path> <ref>` (one command; `--reason` on
-  `add` since git 2.30, confirmed on 2.55; a locked tree is skipped by `prune` and removed with
+  `add` since git 2.33, confirmed on 2.55; a locked tree is skipped by `prune` and removed with
   `remove --force --force`, or `unlock` then `remove --force`). **A folder holding a `.git` FILE is a linked
   worktree of SOME clone** (J1): its owner is read through that file — `gitdir: <path>` → `<gitdir>/locked` —
   by any reader, never from `git worktree list` alone, and never judged as an unmarked folder; a lock that names

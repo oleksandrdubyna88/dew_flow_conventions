@@ -388,3 +388,38 @@ test("within: a parent, a sibling and an absolute path elsewhere are refused by 
     assert.throws(() => within(root, bad, "--artifacts"), /--artifacts .* outside the repository/);
   }
 });
+
+// ---------- leftovers-check.mjs: the three exit codes of the real process ----------
+import { git as gitIn } from "./lib/git.mjs";
+
+function leftoversRepo(t, files) {
+  const repo = ownedDir(t, "leftovers-selftest");
+  gitIn(repo, "init", "-q");
+  for (const [name, text] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(repo, name)), { recursive: true });
+    fs.writeFileSync(path.join(repo, name), text);
+  }
+  return repo;
+}
+
+test("leftovers-check: a clean repository exits 0 and says so", (t) => {
+  const repo = leftoversRepo(t, { "tools/a.test.mjs": "const a = 1;\n" });
+  const { code, out } = runTool("leftovers-check.mjs", ["--repo", repo]);
+  assert.equal(code, 0, out);
+  assert.match(out, /clean \(1 files\)/);
+});
+
+test("leftovers-check: a raw temp folder exits 1 and names the file, the line and the class", (t) => {
+  const fixture = ["const dir = fs.mkd", "tempSync(path.join(os.tm", "pdir(), 'x-'));\n"].join(""); // split, so this file is not itself the finding
+  const repo = leftoversRepo(t, { "tools/a.test.mjs": fixture });
+  const { code, out } = runTool("leftovers-check.mjs", ["--repo", repo]);
+  assert.equal(code, 1, out);
+  assert.match(out, /tools\/a\.test\.mjs:1 — raw-temp/);
+});
+
+test("leftovers-check: a scan that read nothing exits 2, never 0", (t) => {
+  const repo = leftoversRepo(t, { "README.md": "no tests here\n" });
+  const { code, out } = runTool("leftovers-check.mjs", ["--repo", repo]);
+  assert.equal(code, 2, out);
+  assert.match(out, /scanned nothing/);
+});

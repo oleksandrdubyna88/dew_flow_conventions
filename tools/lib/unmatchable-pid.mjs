@@ -40,6 +40,8 @@ export function unmatchablePid(i = 0) {
 export function assertNoSuchProcess(pid) {
   if (win32) {
     assert.equal(pid % 4, 2, `pid ${pid} is not ≡ 2 (mod 4): Windows could hand it out`);
+    // OpenProcess (and so the probe) ignores the two low bits of a pid, so 777770 would answer for a live 777768: ask the way the probe asks
+    assert.throws(() => process.kill(pid, 0), { code: "ESRCH" }, `pid ${pid} answers like a live process: Windows rounds it down to ${pid - (pid % 4)}`);
   } else if (linux) {
     assert.ok(pid > pidMax() && !fs.existsSync(`/proc/${pid}`), `pid ${pid} is within pid_max or alive`);
   } else {

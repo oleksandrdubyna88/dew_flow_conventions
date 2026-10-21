@@ -39,3 +39,13 @@ test("3. the real probe answers `gone` for such a pid, three-named: the state is
 test("4. the premise check has teeth: a live process is refused", () => {
   assert.throws(() => assertNoSuchProcess(process.pid), assert.AssertionError);
 });
+
+test("5. Windows: a pid ≡ 2 (mod 4) that OpenProcess would round down to a LIVE process is refused too", (t) => {
+  if (!win32) {
+    t.skip("OpenProcess rounds a pid down only on Windows");
+    return;
+  }
+  const rounded = process.pid + 2; // this process's pid is a multiple of 4; +2 is ≡ 2 (mod 4) and answers like this process
+  assert.equal(rounded % 4, 2);
+  assert.throws(() => assertNoSuchProcess(rounded), assert.AssertionError, "the shape alone would have passed it");
+});

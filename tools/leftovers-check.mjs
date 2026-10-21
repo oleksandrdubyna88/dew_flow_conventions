@@ -63,6 +63,8 @@ export const CURES = Object.freeze({
 });
 
 const PREFIX_OK = /^teststodelete[-_]/i;
+/** A name the guard may accept: one of the three spellings, or a value an argument array hides from it (never guessed at). */
+const nameOk = (name) => PREFIX_OK.test(name) || name === DYNAMIC;
 const TOKEN_SHAPE = /^[a-z0-9]{2,12}$/;
 const MARKER = /(?:\/\/|#|--|\/\*|\*|<!--)\s*testsToDelete-exempt:(.*)$/;
 const JS_FILE = /\.(?:mjs|js|cjs)$/;
@@ -198,13 +200,46 @@ function commandsIn(lines, from, to) {
     if (isComment(lines[index])) continue;
     let text = lines[index];
     const line = index + 1;
-    while (/\\\s*$/.test(text) && index + 1 < to) {
+    while ((/\\\s*$/.test(text) || OPEN_DOCKER_ARRAY.test(text)) && index + 1 < to) {
       index += 1;
-      text = `${text.replace(/\\\s*$/, " ")}${lines[index].trim()}`;
+      text = `${text.replace(/\\\s*$/, " ")} ${lines[index].trim()}`;
     }
-    commands.push({ line, text });
+    commands.push({ line, text: flattenDockerArrays(text) });
   }
   return commands;
+}
+
+// A JavaScript test starts docker as `execFileSync("docker", ["run", "--rm", …])`: the arguments are an array, not a command line.
+// Each such call is rewritten to the command line it stands for (`docker run --rm …`), so every class below reads one shape. An
+// item that is not a string literal is a value the guard cannot see: it becomes DYNAMIC and is never guessed at.
+const DYNAMIC = "«value»";
+const OPEN_DOCKER_ARRAY = /(["'`])docker\1\s*,\s*\[[^\]]*$/;
+const DOCKER_ARRAY = /(["'`])docker\1\s*,\s*\[([^\]]*)\]/g;
+
+/** The top-level, comma-separated items of an array body (a comma inside quotes or brackets does not split). */
+function arrayItems(body) {
+  const items = [];
+  let item = "";
+  let quote = "";
+  let depth = 0;
+  for (const char of body) {
+    if (quote !== "") quote = char === quote ? "" : quote;
+    else if (/["'`]/.test(char)) quote = char;
+    else if ("([{".includes(char)) depth += 1;
+    else if (")]}".includes(char)) depth -= 1;
+    if (char === "," && quote === "" && depth === 0) {
+      items.push(item);
+      item = "";
+    } else item += char;
+  }
+  return [...items, item].map((entry) => entry.trim()).filter(Boolean);
+}
+
+const itemWord = (item) => /^(["'`])(.*)\1$/s.exec(item)?.[2].replace(/\s+/g, "_") ?? DYNAMIC;
+
+/** `execFileSync("docker", ["run", "--rm", NAME])` → `execFileSync( docker run --rm «value» )`: the words the shell form has. */
+function flattenDockerArrays(text) {
+  return text.replace(DOCKER_ARRAY, (_match, _quote, body) => ` docker ${arrayItems(body).map(itemWord).join(" ")} `);
 }
 
 const words = (text) => text.split(/\s+/).filter(Boolean).map((word) => word.replace(/^["']+|["',;]+$/g, ""));
@@ -268,19 +303,19 @@ function nameFindings(file, command, pushed) {
   const bad = (text) => found.push(finding(file, command.line, "docker-name", text));
   if (/\bdocker\b/.test(command.text)) {
     const arrayForm = [...command.text.matchAll(/["']--name["']\s*,\s*["']([^"']*)["']/g)].map((match) => match[1]);
-    for (const name of [...flagValues(tokens, ["--name"]), ...arrayForm]) if (!PREFIX_OK.test(name)) bad(`\`--name ${name}\` is not a testsToDelete name`);
+    for (const name of [...flagValues(tokens, ["--name"]), ...arrayForm]) if (!nameOk(name)) bad(`\`--name ${name}\` is not a testsToDelete name`);
   }
   for (const match of command.text.matchAll(/\bdocker\s+(volume|network)\s+create\b/g)) {
     const name = createdName(tokens, tokens.indexOf("create", tokens.indexOf(match[1])));
     if (name === "") bad(`\`docker ${match[1]} create\` makes an unnamed ${match[1]}`);
-    else if (!PREFIX_OK.test(name)) bad(`\`docker ${match[1]} create ${name}\` is not a testsToDelete name`);
+    else if (!nameOk(name)) bad(`\`docker ${match[1]} create ${name}\` is not a testsToDelete name`);
   }
   for (const name of composeProjectNames(tokens)) if (!PREFIX_OK.test(name)) bad(`the compose project \`${name}\` is not a testsToDelete name`);
   for (const match of command.text.matchAll(/\bWithName\(\s*"([^"]*)"/g)) if (!PREFIX_OK.test(match[1])) bad(`\`WithName("${match[1]}")\` is not a testsToDelete name`);
   if (/\bdocker\s+build\b/.test(command.text)) {
     for (const tag of flagValues(tokens, ["-t", "--tag"])) {
       const published = [...pushed].some((image) => image === tag || stripTag(image) === stripTag(tag));
-      if (!PREFIX_OK.test(tag) && !published) bad(`the image \`${tag}\` a test builds is not a testsToDelete name`);
+      if (!nameOk(tag) && !published) bad(`the image \`${tag}\` a test builds is not a testsToDelete name`);
     }
   }
   return found;

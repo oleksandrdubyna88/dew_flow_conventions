@@ -98,14 +98,15 @@ inside the resource where a test can see it:
 | Kind | Owner |
 |---|---|
 | folder | a sibling file `<folder>.owner` (inside, a git repository rooted at the folder sees an untracked file — real tests assert their exact status) |
-| worktree | the lock: `git worktree add --detach --lock --reason "<owner>" <path> <ref>` (git ≥ 2.30); `prune` never touches a locked tree. A folder holding a `.git` FILE is a linked worktree of SOME clone, read through that file (`gitdir:` → `<gitdir>/locked`) — never judged as an unmarked folder; a lock that names nobody is unreadable |
+| worktree | the lock: `git worktree add --detach --lock --reason "<owner>" <path> <ref>` (git ≥ 2.33, where `add` learned `--reason`); `prune` never touches a locked tree. A folder holding a `.git` FILE is a linked worktree of SOME clone, read through that file (`gitdir:` → `<gitdir>/locked`) — never judged as an unmarked folder; a lock that names nobody is unreadable |
 | branch | none — it lives inside an owned folder (§1), or is made by that one `worktree add -b` for a prefixed worktree and removed with it |
 | container, volume, network | `--label testsToDelete.owner=<owner>` on `run` / `volume create` / `network create`; a Testcontainers builder adds the same label |
 | database, schema, queue, collection | **lock-owned** where the run holds a session-held named lock (`GET_LOCK`, an advisory lock) — on the store itself, or, for a store that has none (an index, a queue), on ONE lock server every sweeper of that kind consults first, the lock named after the resource —: the run takes the lock named after the resource BEFORE creating it and holds it for its lifetime — the lock is the whole owner, no marker, no age. Otherwise **marker-owned**: `<owner>` plus the creation time, written before the resource into a registry OUTSIDE it (a server-level table or key, a claim record) that no reset of the resource can wipe |
 
 **Liveness, one procedure** → `live` / `gone` / `unknown`. A **lock-owned** resource first, since it carries no
 owner string: lock held → `live`, lock free → `gone` (it was taken before the resource existed and dies with the
-owner's session — no age is needed or read). Everything else: no owner, or one that is not exactly the form above
+owner's session — no age is needed or read). Everything else: no owner at all is *unmarked* — judged by §4 (a
+resource of the new form, old enough, is nobody's), never by this procedure; an owner that is not exactly the form above
 → `unknown`; `<host>@<os>` not this machine's (case-insensitive) → `unknown`; **no process with that pid → `gone`
 — the only other `gone` there is**; the liveness query refused or failed (`EPERM`, access denied, a missing tool)
 → `unknown`; alive, and the owner carries no start or the reader cannot read the live one without spawning →

@@ -484,6 +484,27 @@ test("3a. E: janitor.sh's claim limit is the one number of owned.mjs", () => {
   assert.deepEqual(read, [MAX_CLAIM_BYTES + 1], "claim_of reads one byte past MAX_CLAIM_BYTES, so an over-long claim is seen");
 });
 
+test("7. docker-run and docker-name: the argument-array form of a JavaScript call is read like the command line", (t) => {
+  const code = (body) => one(t, "tools/d.test.mjs", body + "\n");
+  assert.equal(code('execFileSync("docker", ["run", "-d", "--name", "testsToDelete-x-abc123", "img"]);').code, 1, "no --rm");
+  assert.equal(code("spawn('docker', ['run', '-d', 'img']);").code, 1, "no --rm, no name");
+  assert.equal(code('execFileSync("docker", ["run", "--rm", "-d", "img"]);').code, 0, "--rm");
+  assert.equal(code('execFileSync("docker", ["run", "--rm=true", "img"]);').code, 0, "--rm=true");
+  assert.equal(code('execFileSync("docker", ["volume", "create", "data"]);').code, 1, "unprefixed volume");
+  assert.equal(code('execFileSync("docker", ["network", "create", "web"]);').code, 1, "unprefixed network");
+  assert.equal(code('execFileSync("docker", ["volume", "create"]);').code, 1, "unnamed volume");
+  assert.equal(code('execFileSync("docker", ["volume", "create", "-d", "local", "web"]);').code, 1, "an option with a value before the name");
+  assert.equal(code('execFileSync("docker", ["volume", "create", "testsToDelete-x-data-abc123"]);').code, 0, "a prefixed volume");
+  assert.equal(code('execFileSync("docker", ["network", "create", ownedName("net")]);').code, 0, "a name the guard cannot see is not guessed at");
+  assert.equal(code('execFileSync("docker", ["build", "-t", "plain-image", "."]);').code, 1, "an image a test builds");
+  assert.equal(code('execFileSync("docker", ["rm", "-f", "-v", NAME]);').code, 0, "a remover is not a run");
+  const wide = code('execFileSync("docker", [\n  "run",\n  "-d",\n  "img",\n]);');
+  assert.equal(wide.code, 1, "an array spread over lines");
+  assert.match(wide.text, /d\.test\.mjs:1 — docker-run/);
+  const exempt = code('// testsToDelete-exempt: docker-run — a short-lived probe the test removes below\nexecFileSync("docker", ["run", "img"]);');
+  assert.equal(exempt.code, 0, "the exemption still works");
+});
+
 test("2. raw-temp: RUNNER_TEMP is a job-scoped namespace, not a finding", (t) => {
   assert.equal(one(t, "tools/x.test.mjs", "const d = process.env.RUNNER_TEMP;\n").code, 0);
   assert.equal(one(t, "tools/a.sh", "d=\"$RUNNER_TEMP/run\"\n").code, 0);
