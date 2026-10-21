@@ -82,6 +82,8 @@ function pathFor(w) {
   return parts.join(path.delimiter);
 }
 
+const PROGRESS_LINE = /^janitor: (?:looking for testsToDelete resources|removed )/;
+
 /** `tmpdir`: the TMPDIR text, or `null` to leave it UNSET. */
 function runJanitor(w, { cwd, tmpdir, args = [] }) {
   const env = {};
@@ -94,9 +96,11 @@ function runJanitor(w, { cwd, tmpdir, args = [] }) {
   for (let i = 0; i < 5; i += 1) assertNoSuchProcess(unmatchablePid(i));
   const result = spawnSync(BASH, [slash(SCRIPT), ...args], { cwd, env, encoding: "utf8", timeout: 600_000, windowsHide: true });
   for (let i = 0; i < 5; i += 1) assertNoSuchProcess(unmatchablePid(i));
-  const stderr = (result.stderr ?? "").split(/\r?\n/).filter(Boolean);
+  const lines = (result.stderr ?? "").split(/\r?\n/).filter(Boolean);
+  const progress = lines.filter((line) => PROGRESS_LINE.test(line)); // the capture-start line and one line per removal: not findings
+  const stderr = lines.filter((line) => !PROGRESS_LINE.test(line));
   const stdout = (result.stdout ?? "").split(/\r?\n/).filter(Boolean);
-  return { status: result.status, stdout, stderr, text: [...stderr, ...stdout].join("\n"), error: result.error };
+  return { status: result.status, stdout, stderr, progress, text: [...stderr, ...stdout].join("\n"), error: result.error };
 }
 
 // --- the world -------------------------------------------------------------------------------------------------

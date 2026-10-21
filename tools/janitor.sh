@@ -35,6 +35,8 @@
 #         root nor Windows pids).  JANITOR_MIN_AGE_MINUTES (default 60) is the window: whole minutes, digits only,
 #         at least 1 — anything else is refused in one line (exit 1, nothing removed).  --dry-run prints `would run: …`
 #         lines on STDOUT (skips and notices stay on stderr) and removes nothing; its exit code is the real run's.
+#         Progress goes to stderr: `janitor: looking for testsToDelete resources…` when the capture starts and one
+#         `janitor: removed <kind> <name>` line per real removal (the name printed through clean(); a dry run has none).
 #         JANITOR_OS, JANITOR_PROC (the /proc root, default /proc) and JANITOR_HOSTNAME (the machine name, default
 #         `hostname`) are test seams only: honoured, and announced once each on stderr when set.
 set -euo pipefail
@@ -230,6 +232,7 @@ capture() {   # ONE line per prefixed resource ("-" = an owner nobody can read).
     if [ ! -d "${f%.owner}" ]; then o="$(claim_of "$f")"; row marker "$f" "$f" "$o" "$(mtime_of "$f")"; fi
   done
 }
+echo "janitor: looking for testsToDelete resources…" >&2   # progress: the capture can take a while on a busy machine
 CAPTURED="$(capture)" || { echo "janitor: a listing failed — nothing was removed" >&2; exit 1; }
 SKIPPED=0; DEL=""
 skip() { SKIPPED=1; echo "skipped: $(clean "$1") $(clean "$2") — $(clean "$3")" >&2; }   # names and owners come from places any local user can write
@@ -269,14 +272,18 @@ act() { if [ "$DRY" = 1 ]; then echo "would run: $(clean "$*")"; else "$@" 2>/de
 # A deletion is never fatal. A target that vanished after the capture is a notice; one that is still there after a
 # failed removal is skipped like a live one (named, exit 3). Only a failed LISTING ends the run (above).
 vanished() { echo "notice: $(clean "$1") $(clean "$2") — vanished after the capture" >&2; }
+removed() { if [ "$DRY" = 0 ]; then echo "janitor: removed $1 $(clean "$2")" >&2; fi; return 0; }   # progress, one line per REAL removal; the name goes through clean() like every other captured text, so no escape or line end reaches the terminal. A dry run says "would run:" instead
+act_rm() { local k="$1" n="$2"; shift 2; act "$@" && removed "$k" "$n"; }   # act, and announce the removal only when the command succeeded
 settle() { local k="$1" n="$2"; shift 2; if "$@" >/dev/null 2>&1; then skip "$k" "$n" "could not be removed"; else vanished "$k" "$n"; fi; }   # $3… = "still there?" test
 WT_GONE=$'\n'   # dry run only: the worktrees the real run would already have removed, canonical, one per line
 remove_worktree() {   # $1 = the clone's .git dir, $2 = the worktree path: unlock, drop top-level links, remove by exact path
+  local there=0; if [ -d "$2" ]; then there=1; fi   # a registration whose folder is already gone is pruned, not "removed"
   act git --git-dir="$1" worktree unlock "$2" || true
   if [ -d "$2" ]; then act find "$2" -mindepth 1 -maxdepth 1 -type l -delete || true; fi
   act git --git-dir="$1" worktree remove --force --force "$2" || true
   if [ -d "$2" ] && [ "$DRY" = 0 ]; then rm -rf -- "$2" 2>/dev/null || true; fi
   if [ -d "$2" ] && [ "$DRY" = 0 ]; then skip worktree "$2" "could not be removed"; fi
+  if [ "$there" = 1 ] && [ ! -d "$2" ]; then removed worktree "$2"; fi
   if [ "$DRY" = 1 ]; then canon "$2"; WT_GONE="$WT_GONE$CANON"$'\n'; fi
 }
 checked_out() {   # is branch $1 checked out in a worktree that STAYS? A dry run counts the worktrees it announced as already gone, so its exit code is the real run's
@@ -293,14 +300,14 @@ for pass in container volume network wt-git wt-dir prune branch folder marker; d
   while IFS="$U" read -r kind id name; do
     [ "$kind" = "$pass" ] || continue
     case "$kind" in
-      container) act docker rm -f -v "$id" || settle container "$name" dk inspect --type container "$id";;
-      volume) act docker volume rm "$id" || settle volume "$name" dk volume inspect "$id";;
-      network) act docker network rm "$id" || settle network "$name" dk network inspect "$id";;
+      container) act_rm container "$name" docker rm -f -v "$id" || settle container "$name" dk inspect --type container "$id";;
+      volume) act_rm volume "$name" docker volume rm "$id" || settle volume "$name" dk volume inspect "$id";;
+      network) act_rm network "$name" docker network rm "$id" || settle network "$name" dk network inspect "$id";;
       wt-git) remove_worktree "$(git rev-parse --git-common-dir)" "$id";;
       wt-dir) remove_worktree "$(g="$(gitdir_of "$id")"; printf '%s' "${g%/worktrees/*}")" "$id";;
-      branch) if checked_out "$id"; then skip branch "$id" "checked out in a worktree that was kept"; else act git branch -D "$id" || settle branch "$id" git show-ref --verify -q "refs/heads/$id"; fi;;
-      folder) if [ -d "$id" ]; then act find "$id" -mindepth 1 -maxdepth 1 -type l -delete || true; act rm -rf -- "$id" || settle folder "$id" test -d "$id"; else vanished folder "$id"; fi; if [ -e "$id.owner" ]; then act rm -f -- "$id.owner" || true; fi;;
-      marker) act rm -f -- "$id" || true;;
+      branch) if checked_out "$id"; then skip branch "$id" "checked out in a worktree that was kept"; else act_rm branch "$id" git branch -D "$id" || settle branch "$id" git show-ref --verify -q "refs/heads/$id"; fi;;
+      folder) if [ -d "$id" ]; then act find "$id" -mindepth 1 -maxdepth 1 -type l -delete || true; act_rm folder "$id" rm -rf -- "$id" || settle folder "$id" test -d "$id"; else vanished folder "$id"; fi; if [ -e "$id.owner" ]; then act rm -f -- "$id.owner" || true; fi;;
+      marker) act_rm marker "$id" rm -f -- "$id" || true;;
     esac
   done <<< "$DEL"
   if [ "$pass" = prune ]; then act git worktree prune || true; fi

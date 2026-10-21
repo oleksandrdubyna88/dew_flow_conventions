@@ -69,6 +69,8 @@ function pathFor(w) {
 
 /** The one-line announcements of a test seam are split off into `seams`: they are not what a scenario asserts about. */
 const SEAM_LINE = /^janitor: test seam /;
+/** The progress lines (capture start, one per real removal) are split off into `progress`: the scenarios assert about findings. */
+const PROGRESS_LINE = /^janitor: (?:looking for testsToDelete resources|removed )/;
 
 function runJanitor(w, { tmp, args = [], ahead = [], cwd = w.clone, env: extra = {} }) {
   const env = {};
@@ -83,10 +85,11 @@ function runJanitor(w, { tmp, args = [], ahead = [], cwd = w.clone, env: extra =
   for (let i = 0; i < 5; i += 1) assertNoSuchProcess(unmatchablePid(i));
   const lines = (result.stderr ?? "").split(/\r?\n/).filter(Boolean);
   const seams = lines.filter((line) => SEAM_LINE.test(line));
-  const stderr = lines.filter((line) => !SEAM_LINE.test(line));
+  const progress = lines.filter((line) => PROGRESS_LINE.test(line));
+  const stderr = lines.filter((line) => !SEAM_LINE.test(line) && !PROGRESS_LINE.test(line));
   const raw = stderr.length === 0 ? "" : `${stderr.join("\n")}\n`;
   const stdout = (result.stdout ?? "").split(/\r?\n/).filter(Boolean);
-  return { status: result.status, stdout, stderr, seams, raw, text: stderr.join("\n"), error: result.error };
+  return { status: result.status, stdout, stderr, seams, progress, raw, text: stderr.join("\n"), error: result.error };
 }
 
 // --- the stub docker (volumes only: that is all these tests ask of it) ------------------------------------------

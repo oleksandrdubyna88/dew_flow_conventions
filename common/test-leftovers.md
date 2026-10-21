@@ -216,7 +216,7 @@ the sweep to `testsToDelete-<t>-…` (all three spellings, any case, anchored: `
 it combines with `--dry-run`, and an invalid token or an unknown argument prints the usage line and exits 2 with
 nothing touched. `JANITOR_MIN_AGE_MINUTES` (default 60) is whole minutes, digits only, at least 1; `--token` is 2 to 12 characters of
 `[a-z0-9]`. A name or id holding a control character is refused with a skip line, `--dry-run` prints the same exit
-code the real run would, and every test seam that is set is announced once on stderr. What it guarantees,
+code the real run would, and every test seam that is set is announced once on stderr. It also says what it is doing, on stderr: one line when the capture starts and one `janitor: removed <kind> <name>` line per real removal (a dry run prints its `would run:` lines instead). What it guarantees,
 and what a copy of it must keep:
 
 - **One capture.** Every prefixed resource is listed ONCE with its identity, owner and age before anything is

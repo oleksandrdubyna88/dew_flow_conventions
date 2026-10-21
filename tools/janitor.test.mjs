@@ -94,6 +94,8 @@ function envFor(w, { tmp, docker, minAge, ahead, extra }) {
   };
 }
 
+const PROGRESS_LINE = /^janitor: (?:looking for testsToDelete resources|removed )/; // progress, not findings: a scenario asserts about them on purpose, in the tests that name them
+
 function runJanitor(w, { cwd = w.clone, tmp, args = [], docker = true, minAge = 60, ahead = [], env: extra = {} }) {
   const env = envFor(w, { tmp, docker, minAge, ahead, extra });
   if (!docker) { // the no-docker case must PROVE it has no docker, or it proves nothing
@@ -105,9 +107,10 @@ function runJanitor(w, { cwd = w.clone, tmp, args = [], docker = true, minAge = 
   for (let i = 0; i < 5; i += 1) assertNoSuchProcess(unmatchablePid(i)); // and after it
   const lines = (result.stderr ?? "").split(/\r?\n/).filter(Boolean);
   const seams = lines.filter((line) => line.startsWith("janitor: test seam ")); // announced, not asserted about
-  const stderr = lines.filter((line) => !line.startsWith("janitor: test seam "));
+  const progress = lines.filter((line) => PROGRESS_LINE.test(line)); // what the janitor is doing: its own tests, below
+  const stderr = lines.filter((line) => !line.startsWith("janitor: test seam ") && !PROGRESS_LINE.test(line));
   const stdout = (result.stdout ?? "").split(/\r?\n/).filter(Boolean);
-  return { status: result.status, stdout, stderr, seams, text: stderr.join("\n"), error: result.error };
+  return { status: result.status, stdout, stderr, seams, progress, text: stderr.join("\n"), error: result.error };
 }
 
 // --- the stub docker -------------------------------------------------------------------------------------------
@@ -539,6 +542,71 @@ test("8b. --dry-run announces every removal as a `would run:` line on STDOUT and
   assert.deepEqual(rmCalls(w), [], "docker was never asked to remove anything");
 });
 
+// --- 8c --------------------------------------------------------------------------------------------------------
+
+const LOOKING = "janitor: looking for testsToDelete resources…";
+
+test("8c. progress: one line when the capture starts and one per real removal, in removal order — a kept resource has none", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dead = folder(w, tmp, "progd", { owner: NOBODY() });
+  const live = folder(w, tmp, "progl", { owner: LIVE() });
+  const branch = ownedName("progb");
+  git(w.clone, "branch", branch);
+  w.scope.after(() => spawnSync("git", ["-C", w.clone, "branch", "-D", branch], { timeout: 30_000, windowsHide: true }));
+  setDocker(w, { ps: [["c1", "testsToDelete-conventions-prog", "", dockerTime(OLD)]] });
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 3, "the live folder is skipped: " + run.text);
+  assert.equal(run.progress.length, 4, run.progress.join(" // "));
+  assert.deepEqual(run.progress.slice(0, 3), [LOOKING, "janitor: removed container testsToDelete-conventions-prog", `janitor: removed branch ${branch}`]);
+  assert.ok(run.progress[3].startsWith("janitor: removed folder ") && run.progress[3].includes(named(dead)), run.progress.join(" // "));
+  assert.equal(run.progress.some((line) => line.includes(named(live))), false, "a skipped resource is not announced as removed");
+  assert.equal(exists(dead), false, "and it really went: " + run.text);
+});
+
+test("8c. progress: a dry run prints the capture line and the would-run lines, never a removed line", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  folder(w, tmp, "progdry", { owner: NOBODY() });
+  setDocker(w, { ps: [["c1", "testsToDelete-conventions-progdry", "", dockerTime(OLD)]] });
+
+  const run = runJanitor(w, { tmp, args: ["--dry-run"] });
+
+  assert.equal(run.status, 0, run.text);
+  assert.deepEqual(run.progress, [LOOKING]);
+  assert.ok(run.stdout.includes("would run: docker rm -f -v c1"), run.stdout.join(" // "));
+});
+
+test("8c. progress: a name is printed through clean() — non-ASCII text never reaches the terminal as itself", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  setDocker(w, { ps: [["c1", "testsToDelete-conventions-café", "", dockerTime(OLD)]] });
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 0, run.text);
+  assert.deepEqual(run.progress, [LOOKING, "janitor: removed container testsToDelete-conventions-caf??"]);
+  assert.equal(/[^ -~]/.test(run.progress[1]), false, "the removed line is printable ASCII only");
+});
+
+test("8c. progress: a removal that failed is not announced as removed", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  setDocker(w, { ps: [["c1", "testsToDelete-conventions-progfail", "", dockerTime(OLD)]], mode: ["fail-rm:c1:present"] });
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 3, run.text);
+  assert.deepEqual(run.progress, [LOOKING]);
+  assert.ok(run.stderr.some((line) => line.includes("could not be removed")), run.text);
+});
+
 // --- 9 ---------------------------------------------------------------------------------------------------------
 
 test("9. A two-field owner <host>@<os>:<pid>: live is skipped, dead is removed", { timeout: TIMEOUT }, (t) => {
@@ -662,6 +730,7 @@ test("14. One row per worktree (code gate 2): the swept repository's own tree in
 
   assert.equal(first.status, 0, first.text);
   assert.deepEqual(first.stderr, [], "removed once and silently: a second capture would announce a vanished target");
+  assert.equal(first.progress.filter((line) => line.startsWith("janitor: removed worktree ") && line.includes(named(dead.path))).length, 1, `one progress line for the worktree\n${first.progress.join("\n")}`);
   assert.equal(exists(dead.path), false, `the dead-owned worktree is gone\n${first.text}`);
   assert.equal(listedIn(w.clone).includes(named(dead.path)), false, `and unregistered\n${first.text}`);
 
