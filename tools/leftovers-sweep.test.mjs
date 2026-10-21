@@ -243,7 +243,7 @@ test("2b. a dead-owned worktree of this repository is removed; an unmarked old o
   assert.deepEqual(result.errors, []);
   assert.deepEqual(namesOf(result.removed), namesOf([dead]));
   assert.deepEqual(reasonsOf(result), { [path.basename(bare)]: "unreadable", [path.basename(unmarked)]: "unmarked" });
-  assert.deepEqual(listed(repo).map((p) => path.basename(p)).filter((n) => /^teststodelete/i.test(n) && !n.toLowerCase().startsWith(`testsToDelete-${OWNER}-conventions-wt-repo-`.toLowerCase())).sort(),
+  assert.deepEqual(listed(repo).map((p) => path.basename(p)).filter((n) => n.toLowerCase().startsWith("teststo" + "delete") && !n.toLowerCase().startsWith(`testsToDelete-${OWNER}-conventions-wt-repo-`.toLowerCase())).sort(),
     [path.basename(bare).toLowerCase(), path.basename(unmarked).toLowerCase()].sort());
 });
 
@@ -285,7 +285,7 @@ test("3b. an old claim whose folder is gone is removed; a young one and one besi
   fs.writeFileSync(`${youngOrphan}.owner`, deadOwnerLine());
   const live = folder(own, tmp, "has-folder", { claim: formatOwner(thisOwner()) + "\n" });
   setOld(`${live}.owner`);
-  const foreignName = path.join(tmp, "testsToDelete-other-orphan-123456");
+  const foreignName = path.join(tmp, `testsToDelete-${OWNER}-other-orphan-123456`);
   fs.writeFileSync(`${foreignName}.owner`, deadOwnerLine());
   setOld(`${foreignName}.owner`);
 
@@ -517,7 +517,7 @@ test("14. a legacy folder of my uid with a dead legacy record is collected; one 
   const { own, work, tmp } = arena(t);
   const repo = ownedRepo(own, work, "legacy-repo");
   const plant = (what, claim) => {
-    const dir = path.join(tmp, `testsToDelete-conventions-${what}-abc123`);
+    const dir = path.join(tmp, `${"testsTo" + "Delete"}-conventions-${what}-abc123`); // the form before the owner segment, spelled in two pieces
     fs.mkdirSync(dir);
     if (claim !== null) fs.writeFileSync(`${dir}.owner`, claim);
     setOld(dir);

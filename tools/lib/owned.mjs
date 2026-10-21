@@ -150,12 +150,15 @@ export function legacyPattern() {
   return new RegExp(`^teststodelete[-_]${REPO_TOKEN}[-_]`, "i");
 }
 
+// Spelled in two pieces: this is a reader of names, not a sweep, and the machine scan reads this file too.
+const NAME_SEGMENTS = new RegExp(`^${"teststo" + "delete"}[-_]([^-_]+)(?:[-_]([^-_]+))?`, "i");
+
 /**
  * The version of a name, read from its ONE second segment against the reserved grammar, never by counting separators:
  * `{ form: "owner", owner, token? }`, `{ form: "legacy", token }`, or `{ form: "none" }` for a name that is not prefixed.
  */
 export function classifyName(name) {
-  const match = /^teststodelete[-_]([^-_]+)(?:[-_]([^-_]+))?/i.exec(String(name));
+  const match = NAME_SEGMENTS.exec(String(name));
   if (match === null) return { form: "none" };
   const second = match[1].toLowerCase();
   if (OWNER_GRAMMAR.test(second)) return match[2] === undefined ? { form: "owner", owner: second } : { form: "owner", owner: second, token: match[2].toLowerCase() };

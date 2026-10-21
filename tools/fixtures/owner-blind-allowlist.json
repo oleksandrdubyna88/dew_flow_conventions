@@ -1,0 +1,10 @@
+{
+  "about": "The only lines the owner-blind class of tools/leftovers-check.mjs passes: the janitor's inventory line, by file, 1-based line and sha256 of the line's text. Regenerate with: node tools/leftovers-check.mjs --update-allowlist. A reviewer reads the diff of this file beside the script.",
+  "entries": [
+    {
+      "file": "tools/janitor.sh",
+      "line": 56,
+      "sha256": "c1be0e3fbc1d6c5002926ebbbcaa222992c7234d9fda8e61f9eeeebba17bd90b"
+    }
+  ]
+}

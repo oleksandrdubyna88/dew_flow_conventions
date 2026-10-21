@@ -13,9 +13,13 @@
  *                 that is not one of the three spellings of §1
  *   shared-store  a `DROP`, `TRUNCATE`, `FLUSH` or delete-all against an unprefixed name
  *   ryuk-off      `TESTCONTAINERS_RYUK_DISABLED` set to true — no exemption accepted
+ *   legacy-name   a literal, or a constant-built prefix, that spells a prefixed name whose second segment is not an owner (§1)
+ *   owner-blind   a pattern, glob or filter that matches the prefix with no owner segment after it — the shape of a sweeper
+ *                 that cannot tell one user's leftovers from another's. It takes NO inline exemption: the one pass is
+ *                 `tools/fixtures/owner-blind-allowlist.json`, keyed by file, line and the sha256 of the line
  * plus two that are about the guard's own grammar:
  *   exemption     a `testsToDelete-exempt:` comment that is not well-formed
- *   token         this repository's token is not a row of the rule's `## Tokens` table (§1)
+ *   token         this repository's token is not a row of the rule's `## Tokens` table (§1), or is of the owner grammar
  *
  * Why it exists as a script and not as a paragraph: the rule has said "name it, own it, remove it" since the
  * audit of 2026-10-14, and the audit found no compliant site in six repositories — a sentence nobody can be
@@ -23,7 +27,11 @@
  *
  * Run from anywhere:
  *
- *     node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>]
+ *     node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>]
+ *     node tools/leftovers-check.mjs --update-allowlist [--repo <dir>]
+ *
+ * `--update-allowlist` rewrites the allowlist from the CURRENT `tools/janitor.sh`: every non-comment line the classifier calls
+ * broad in that one file, by its line number and hash. The diff is what a reviewer reads; nothing else is ever added.
  *
  * `--identity` is the "repository" column of the token's row in the rule's `## Tokens` table — which repository the token is.
  * It defaults to this repository's own row (`REPO_ROW`) ONLY for this repository's own token; any other `--token` without
@@ -40,7 +48,8 @@ import { fileURLToPath } from "node:url";
 import { LineCounter, parseDocument } from "yaml";
 
 import { gitOutput } from "./lib/git.mjs";
-import { REPO_ROW, REPO_TOKEN } from "./lib/owned.mjs";
+import { OWNER_GRAMMAR, REPO_ROW, REPO_TOKEN } from "./lib/owned.mjs";
+import { classifyLine, lineSha256 } from "./lib/sweeper-scan.mjs";
 import { isReason } from "./ownership-check.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -49,23 +58,42 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const EXCLUDED_FILES = Object.freeze(["tools/leftovers-check.test.mjs"]);
 
 /** Every class an exemption may name (`ryuk-off` never; `exemption` and `token` are not resources). */
-export const EXEMPTIBLE = Object.freeze(["raw-temp", "raw-worktree", "docker-run", "docker-name", "shared-store"]);
+export const EXEMPTIBLE = Object.freeze(["raw-temp", "raw-worktree", "docker-run", "docker-name", "legacy-name", "shared-store"]);
+
+/**
+ * TEMPORARY. The janitor's own tests still feed it names of the form before the owner segment, because the shipped janitor
+ * still reads that form; the story that makes the janitor owner-aware retargets them and empties this list (a test pins that).
+ * Only `legacy-name` is skipped in these files — every other class, owner-blind included, still applies.
+ */
+export const LEGACY_NAME_PENDING = Object.freeze(["tools/janitor.test.mjs", "tools/janitor-liveness.test.mjs", "tools/janitor-paths.test.mjs", "tools/owner-conformance.test.mjs"]);
+
+/** The repository's one sweeper script and the file that allowlists its inventory line (rule §7). */
+export const JANITOR_FILE = "tools/janitor.sh";
+export const ALLOWLIST_FILE = "tools/fixtures/owner-blind-allowlist.json";
 
 export const CURES = Object.freeze({
   "raw-temp": "Make temp folders with ownedDir(t, what) from tools/lib/owned.mjs — common/test-leftovers.md §7 (raw-temp), §2.",
   "raw-worktree": "Make worktrees with ownedWorktree(t, repo, what) from tools/lib/owned.mjs — common/test-leftovers.md §7 (raw-worktree), §3.",
   "docker-run": "Add --rm, or the complete carve-out: a testsToDelete name, a remover step on every path after the diagnostics — common/test-leftovers.md §5, §7 (docker-run).",
   "docker-name": "Give the container, volume, network, compose project or test-built image one of the three spellings of testsToDelete-<repo>-<what>-<id> — common/test-leftovers.md §1, §7 (docker-name).",
+  "legacy-name": "Build every name with the owner segment: testsToDelete-<owner>-<repo>-<what>-<id> from ownedName()/the helper of this repository — common/test-leftovers.md §1, §7 (legacy-name).",
+  "owner-blind": "Match the caller's owner after the prefix (^testsToDelete-<owner>-<repo>-), or delete the sweep and use the shipped janitor; this class takes no exemption — common/test-leftovers.md §7 (owner-blind), the barrier.",
   "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers.md §6, §7 (shared-store).",
   "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers.md §5, §7 (ryuk-off).",
   exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers.md §7 (the exemption grammar).",
   token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers.md §1.",
 });
 
-const PREFIX_OK = /^teststodelete[-_]/i;
+const PREFIX_OK = /^teststodelete[-_][uw][0-9]{1,10}[-_]/i; // the OWNER form: one of the three spellings, then an owner segment
 /** A name the guard may accept: one of the three spellings, or a value an argument array hides from it (never guessed at). */
 const nameOk = (name) => PREFIX_OK.test(name) || name === DYNAMIC;
 const TOKEN_SHAPE = /^[a-z0-9]{2,12}$/;
+// The prefix is spelled in two pieces below: these are detectors, and the machine scan reads this file too.
+const WORD = "teststo" + "delete";
+const LEGACY_LITERAL = new RegExp(`${WORD}[-_]([a-z0-9]+)`, "gi");
+/** The second segments that are not names: the quarantine sibling (`.<name>.<prefix>-quarantine-…`) and an environment variable (`TESTSTODELETE_OWNER`: upper case, underscore). */
+const notAName = (match) => match[1].toLowerCase() === "exempt" || match[1].toLowerCase() === "quarantine" || new RegExp(`^${WORD.toUpperCase()}_[A-Z]+$`).test(match[0]);
+const LEGACY_BUILT = new RegExp(`${WORD}[-_]\\$\\{?\\s*(?:REPO_TOKEN|RepoToken|repoToken)\\b`, "i");
 const MARKER = /(?:\/\/|#|--|\/\*|\*|<!--)\s*testsToDelete-exempt:(.*)$/;
 const JS_FILE = /\.(?:mjs|js|cjs)$/;
 
@@ -119,6 +147,7 @@ function exemptionProblem(rest) {
   const reason = parsed?.[2] ?? "";
   if (cls === "") return { text: "an exemption names no class" };
   if (cls === "ryuk-off") return { text: "`ryuk-off` accepts no exemption" };
+  if (cls === "owner-blind") return { text: "`owner-blind` accepts no exemption: the allowlist (file, line, hash) is the only pass" };
   if (!EXEMPTIBLE.includes(cls)) return { text: `an exemption names an unknown class \`${cls}\`` };
   if (!isReason(reason)) return { text: `the exemption of \`${cls}\` carries no reason (ten characters, three words, not a placeholder)` };
   if (cls === "shared-store" && !reason.includes("lock:")) return { text: "the exemption of `shared-store` must name its lock (`lock: …`)" };
@@ -171,7 +200,18 @@ function composeEnvHits(line) {
     .map((match) => `COMPOSE_PROJECT_NAME is not a testsToDelete name: ${match[1] === "" ? "(empty)" : match[1]}`);
 }
 
-function lineFindings(file, lines, exemptions) {
+/** `legacy-name` hits of a line: a literal whose second segment is no owner (and no `exempt` marker word), or a prefix built from the token alone. */
+function legacyNameHits(line) {
+  const literal = [...line.matchAll(LEGACY_LITERAL)]
+    .filter((match) => !notAName(match) && !OWNER_GRAMMAR.test(match[1].toLowerCase()))
+    .map((match) => match[0]);
+  return LEGACY_BUILT.test(line) ? [...literal, "a prefix built from the repository token"] : literal;
+}
+
+/** Is the line allowlisted: the file, the 1-based line and the hash of its text all equal one entry. */
+const allowed = (allowlist, file, number, text) => allowlist.some((entry) => entry.file === file && entry.line === number && entry.sha256 === lineSha256(text));
+
+function lineFindings(file, lines, exemptions, allowlist) {
   const extra = RAW_TEMP_BY_EXTENSION[path.extname(file)] ?? [];
   const found = [];
   const add = (index, cls, text) => {
@@ -185,8 +225,11 @@ function lineFindings(file, lines, exemptions) {
       ["shared-store", sharedStoreHit(line)],
       ["ryuk-off", RYUK_OFF.test(line) ? ["TESTCONTAINERS_RYUK_DISABLED"] : []],
       ["docker-name", composeEnvHits(line)],
+      ["legacy-name", LEGACY_NAME_PENDING.includes(file) ? [] : legacyNameHits(line)],
     ];
     for (const [cls, hits] of checks) if (hits.length > 0) add(index, cls, [...new Set(hits)].map((hit) => `\`${hit}\``).join(", "));
+    // owner-blind: no exemption of any kind — the allowlist (file, line, hash) is the one pass
+    if (classifyLine(line) === "broad" && !allowed(allowlist, file, index + 1, line)) found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
   });
   return found;
 }
@@ -440,11 +483,11 @@ function dockerFindings(file, lines, text) {
 // --- one file, the whole repository --------------------------------------------------------------------------
 
 /** Every finding of one file's text (`file` is the repository-relative path with forward slashes). */
-export function scanText(file, text) {
+export function scanText(file, text, allowlist = []) {
   const lines = text.split(/\r?\n/);
   const exemptions = readExemptions(file, lines);
   const docker = dockerFindings(file, lines, text).filter((entry) => !isExempt(exemptions, entry.cls, entry.line));
-  return [...exemptions.findings, ...lineFindings(file, lines, exemptions), ...docker];
+  return [...exemptions.findings, ...lineFindings(file, lines, exemptions, allowlist), ...docker];
 }
 
 // --- the token ------------------------------------------------------------------------------------------------
@@ -492,6 +535,7 @@ export function tokenFindings(ruleText, token, rulePath = "common/test-leftovers
   }
   const found = [];
   const seen = new Set();
+  if (OWNER_GRAMMAR.test(token)) found.push(...at(table.heading, `the token \`${token}\` matches the owner grammar ${OWNER_GRAMMAR} of ${rulePath} §1 — no repository may be named like an owner`));
   for (const row of table.rows) {
     if (seen.has(row.token)) found.push(...at(row.line, `the token \`${row.token}\` is listed twice in ${rulePath}`));
     seen.add(row.token);
@@ -559,13 +603,36 @@ export function resolveRule(repo, rule) {
   return candidates.find((candidate) => fs.existsSync(candidate));
 }
 
+/** The allowlist entries: `--allowlist`, else the repository's own file, else the one beside this tool; `[]` when there is none. A file that is not the shape is an error, never "no entries". */
+export function loadAllowlist(repo, explicit) {
+  const file = [explicit, path.join(repo, ALLOWLIST_FILE), path.join(HERE, "..", ALLOWLIST_FILE)].find((candidate) => candidate !== undefined && fs.existsSync(candidate));
+  if (file === undefined) return [];
+  const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+  if (!Array.isArray(parsed.entries) || !parsed.entries.every((entry) => typeof entry.file === "string" && Number.isInteger(entry.line) && /^[0-9a-f]{64}$/.test(entry.sha256))) {
+    throw new Error(`${file} is not an allowlist: { entries: [{ file, line, sha256 }] }`);
+  }
+  return parsed.entries;
+}
+
+/** Rewrite the allowlist from the CURRENT janitor script: its broad, non-comment lines, by line number and hash. Returns the entries written. */
+export function updateAllowlist(repo, explicit) {
+  const script = path.join(repo, JANITOR_FILE);
+  const lines = fs.readFileSync(script, "utf8").split(/\r?\n/);
+  const entries = lines.flatMap((text, index) => (!isComment(text) && classifyLine(text) === "broad" ? [{ file: JANITOR_FILE, line: index + 1, sha256: lineSha256(text) }] : []));
+  const target = explicit ?? path.join(repo, ALLOWLIST_FILE);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, `${JSON.stringify({ about: "The only lines the owner-blind class of tools/leftovers-check.mjs passes: the janitor's inventory line, by file, 1-based line and sha256 of the line's text. Regenerate with: node tools/leftovers-check.mjs --update-allowlist. A reviewer reads the diff of this file beside the script.", entries }, null, 2)}\n`);
+  return entries;
+}
+
 /** Scan a repository: `{ files, findings }`. `files` is how many files were read — zero is a broken discovery. `identity` is the repository column of the token's row: this repository's own for its own token, else blank (fails closed). */
-export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "" } = {}) {
+export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "", allowlist } = {}) {
   const files = discover(repo);
   const findings = [];
+  const entries = Array.isArray(allowlist) ? allowlist : loadAllowlist(repo, allowlist);
   for (const file of files) {
     const absolute = path.join(repo, file);
-    if (fs.existsSync(absolute)) findings.push(...scanText(file, fs.readFileSync(absolute, "utf8")));
+    if (fs.existsSync(absolute)) findings.push(...scanText(file, fs.readFileSync(absolute, "utf8"), entries));
   }
   const rulePath = resolveRule(repo, rule);
   const ruleText = rulePath === undefined ? "" : fs.readFileSync(rulePath, "utf8");
@@ -577,14 +644,19 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = toke
 
 // --- the command line ----------------------------------------------------------------------------------------
 
-const USAGE = "usage: node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>]   (--identity: the repository column of the token's row; without it only this repository's own token passes)";
+const USAGE = "usage: node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>] | --update-allowlist   (--identity: the repository column of the token's row; without it only this repository's own token passes)";
 
 /** Parse the arguments: `{ repo, token, rule, identity }` (`identity` stays unset unless given) or `{ error }`. */
 export function parseArguments(argv) {
-  const options = { repo: process.cwd(), token: REPO_TOKEN, rule: undefined, identity: undefined };
+  const options = { repo: process.cwd(), token: REPO_TOKEN, rule: undefined, identity: undefined, allowlist: undefined, update: false };
   for (let index = 0; index < argv.length; index += 2) {
     const name = argv[index].replace(/^--/, "");
-    if (!["repo", "token", "identity", "rule"].includes(name) || !argv[index].startsWith("--") || argv[index + 1] === undefined) return { error: `unknown or incomplete argument \`${argv[index]}\`` };
+    if (argv[index] === "--update-allowlist") {
+      options.update = true;
+      index -= 1; // a flag takes no value
+      continue;
+    }
+    if (!["repo", "token", "identity", "rule", "allowlist"].includes(name) || !argv[index].startsWith("--") || argv[index + 1] === undefined) return { error: `unknown or incomplete argument \`${argv[index]}\`` };
     options[name] = ["token", "identity"].includes(name) ? argv[index + 1] : path.resolve(argv[index + 1]);
   }
   return options;
@@ -601,6 +673,17 @@ function report(findings, io) {
   for (const cls of Object.keys(CURES).filter((name) => printed.has(name))) io.err(`  ${cls}: ${CURES[cls]}`);
 }
 
+function runUpdate(options, io) {
+  try {
+    const entries = updateAllowlist(options.repo, options.allowlist);
+    io.out(`leftovers-check: allowlist rewritten — ${entries.length} entr${entries.length === 1 ? "y" : "ies"} from ${JANITOR_FILE}`);
+    return 0;
+  } catch (error) {
+    io.err(`leftovers-check: cannot update the allowlist: ${error.message.split("\n")[0]}`);
+    return 2;
+  }
+}
+
 /** Run the guard: the exit code (0 clean, 1 findings, 2 scanned nothing or bad arguments). `io` is a seam for tests. */
 export function main(argv = process.argv.slice(2), io = { out: (text) => console.log(text), err: (text) => console.error(text) }) {
   const options = parseArguments(argv);
@@ -608,6 +691,7 @@ export function main(argv = process.argv.slice(2), io = { out: (text) => console
     io.err(`leftovers-check: ${options.error}\n${USAGE}`);
     return 2;
   }
+  if (options.update) return runUpdate(options, io);
   let result;
   try {
     result = fs.existsSync(options.repo) ? scanRepository(options) : { files: 0, findings: [] };

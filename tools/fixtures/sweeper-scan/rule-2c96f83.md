@@ -3,7 +3,7 @@ id: "common.test-leftovers"
 load: "conditional"
 tasks: ["implement","test","audit","policy","release"]
 ---
-# Test leftovers are named `testsToDelete-…`, owned by their run, and collected (MANDATORY)
+# Test leftovers are named `@@PFX@@-…`, owned by their run, and collected (MANDATORY)
 
 <!-- core:begin -->
 Whatever a test run, a probe or a measurement creates OUTSIDE its own process — a container, a Docker volume
@@ -14,10 +14,10 @@ one text.
 
 ## 1. The name — one form, three spellings
 
-`testsToDelete-<repo>-<what>-<id>`, e.g. `testsToDelete-api-pg-k3f9a1`.
+`@@PFX@@-<repo>-<what>-<id>`, e.g. `@@PFX@@-api-pg-k3f9a1`.
 
 - **`<repo>`** is the repository's token, `[a-z0-9]{2,12}`, written in exactly ONE constant of its helper. A
-  guard and a sweep match `^testsToDelete-<repo>-` anchored and case-insensitively, and **nothing ever parses
+  guard and a sweep match `^@@PFX@@-<repo>-` anchored and case-insensitively, and **nothing ever parses
   past the repo token** — `<what>` may contain the separator. **A token is registered before it is used**: the
   rule repository a repository mounts carries, outside this shared text, a `## Tokens` table — a rule repository
   lists every token that can share a machine with its family; a public one lists only its own, and the private
@@ -29,10 +29,10 @@ one text.
 - **`<id>`** is random (a counter or a timestamp alone collides across two runs): 6 to 12 characters of
   `[A-Za-z0-9]`, lowercase where the namespace folds case. A `mkdtemp`'s six qualify.
 - The whole name is at most **63 characters** — a SQL identifier, a DNS label and a Windows temp path survive.
-- **Three spellings, one prefix.** `testsToDelete-` for containers, volumes, networks, worktrees, branches and
-  folders; `teststodelete-` where a namespace refuses capitals (image names, Kubernetes objects);
-  `teststodelete_` where it refuses `-` (SQL identifiers — then every separator is `_`:
-  `teststodelete_api_pg_k3f9a1`). Every guard, sweep and janitor matches `^teststodelete[-_]`
+- **Three spellings, one prefix.** `@@PFX@@-` for containers, volumes, networks, worktrees, branches and
+  folders; `@@PFX@@-` where a namespace refuses capitals (image names, Kubernetes objects);
+  `@@PFX@@_` where it refuses `-` (SQL identifiers — then every separator is `_`:
+  `@@PFX@@_api_pg_k3f9a1`). Every guard, sweep and janitor matches `^@@PFX@@[-_]`
   case-insensitively; an unanchored or single-case match is a bug.
 - **What dies with its container needs no name of its own.** A branch, clone or worktree INSIDE a repository
   that lives in an owned folder — and a row, key, queue, index, schema or account INSIDE a database, store
@@ -100,7 +100,7 @@ inside the resource where a test can see it:
 | folder | a sibling file `<folder>.owner` (inside, a git repository rooted at the folder sees an untracked file — real tests assert their exact status) |
 | worktree | the lock: `git worktree add --detach --lock --reason "<owner>" <path> <ref>` (git ≥ 2.33, where `add` learned `--reason`); `prune` never touches a locked tree. A folder holding a `.git` FILE is a linked worktree of SOME clone, read through that file (`gitdir:` → `<gitdir>/locked`) — never judged as an unmarked folder; a lock that names nobody is unreadable |
 | branch | none — it lives inside an owned folder (§1), or is made by that one `worktree add -b` for a prefixed worktree and removed with it |
-| container, volume, network | `--label testsToDelete.owner=<owner>` on `run` / `volume create` / `network create`; a Testcontainers builder adds the same label |
+| container, volume, network | `--label @@PFX@@.owner=<owner>` on `run` / `volume create` / `network create`; a Testcontainers builder adds the same label |
 | database, schema, queue, collection | **lock-owned** where the run holds a session-held named lock (`GET_LOCK`, an advisory lock) — on the store itself, or, for a store that has none (an index, a queue), on ONE lock server every sweeper of that kind consults first, the lock named after the resource —: the run takes the lock named after the resource BEFORE creating it and holds it for its lifetime — the lock is the whole owner, no marker, no age. Otherwise **marker-owned**: `<owner>` plus the creation time, written before the resource into a registry OUTSIDE it (a server-level table or key, a claim record) that no reset of the resource can wipe |
 
 **Liveness, one procedure** → `live` / `gone` / `unknown`. A **lock-owned** resource first, since it carries no
@@ -126,7 +126,7 @@ three-valued rule applies.
 resource kind wires a sweep of that kind into the **start** of its test run (the runner's first lines,
 `globalSetup`, a fixture's constructor), and it:
 
-- matches **only its own `^testsToDelete-<repo>-`** — another repository's leftovers are not its business — and
+- matches **only its own `^@@PFX@@-<repo>-`** — another repository's leftovers are not its business — and
   removes only worktrees its own `git worktree list` shows: a prefixed folder with a `.git` file it does not list
   is another clone's, preserved for that clone's sweep or the janitor;
 - considers a resource only when it is at least **10 minutes** old (created or last written; for a marker-owned
@@ -164,7 +164,7 @@ The costliest leftover. Beyond the name and the label:
 
 ## 6. Stores — isolate first, share only under the exact exception
 
-Where a run can own its store it does: a per-run database or schema `teststodelete_<repo>_<what>_<id>`, a
+Where a run can own its store it does: a per-run database or schema `@@PFX@@_<repo>_<what>_<id>`, a
 per-run queue name, a per-run key prefix the application under test honours. A test that would write rows into a
 store it does not own — the developer's database, a shared test database, a deployed environment's — isolates
 instead: the run starts what it tests against on a store of its own. It never "cleans up" there: a row it cannot
@@ -172,7 +172,7 @@ name it cannot sweep, and a sweep that guesses deletes a user's. What a test may
 own is read. Clearing a shared store is the last resort, exempt from the name only in two shapes, written where a guard reads them (§7):
 
 - **(a) A long-lived SHARED store**, only where the place that creates or configures it carries
-  `testsToDelete-exempt: shared-store …` naming the exact endpoint and store name, saying the reuse is
+  `@@PFX@@-exempt: shared-store …` naming the exact endpoint and store name, saying the reuse is
   intentional, and naming after `lock:` the **enforced lock that serializes every reset against concurrent
   runs** — a session-held store lock (`GET_LOCK`, `pg_advisory_lock`), or an OS file lock where every run is on
   one machine. "Documented + truncate per test" without the lock is not exempt (two processes on one database
@@ -183,7 +183,7 @@ own is read. Clearing a shared store is the last resort, exempt from the name on
   container, or a workflow `services:` container, which the runner removes with the job — exempt from the name and
   from its own teardown when its whole lifetime is the container's: a fixture names its container with the prefix,
   keeps the reaper on, never sets reuse and disposes it; a job names the service in the workflow; either carries
-  `testsToDelete-exempt: container-scoped — <what> lives and dies with <fixture or job>`. The per-run path is still
+  `@@PFX@@-exempt: container-scoped — <what> lives and dies with <fixture or job>`. The per-run path is still
   the better one where it exists (one code path for CI and a developer machine).
 
 ## 7. The guard — what every repository's structural check refuses
@@ -201,7 +201,7 @@ red when it **scanned nothing** (exit 2, with a sentence — discovery broke; th
 | `ryuk-off` | `TESTCONTAINERS_RYUK_DISABLED` set to true — no exemption accepted |
 
 **The exemption grammar — inline, one form:** a comment on the line or the line above,
-`testsToDelete-exempt: <class> — <reason>`. The class is one of the table's (not `ryuk-off`); the reason is at
+`@@PFX@@-exempt: <class> — <reason>`. The class is one of the table's (not `ryuk-off`); the reason is at
 least ten characters and three words and not a placeholder (*needed*, *see above*, *todo*); for
 `shared-store` it carries `lock:`. A reason-less, class-less or unknown-class exemption is a finding of class
 `exemption`.
@@ -213,7 +213,7 @@ tested script, not a block to paste: `tools/janitor.sh` in the rule repository, 
 (`bash .agents/conventions/tools/janitor.sh` or `bash .claude/rules/shared/tools/janitor.sh`, `--dry-run` to
 look first) from inside the repository whose worktrees and branches are swept; on Windows from **Git for
 Windows' bash, never WSL's** (which sees neither the Windows temp root nor Windows pids). Run the janitor from the side that owns the resources — never a Git-for-Windows bash launched through WSL interop, which inherits `WSL_DISTRO_NAME` and reads every Windows claim as foreign. `--token <t>` narrows
-the sweep to `testsToDelete-<t>-…` (all three spellings, any case, anchored: `alpha` never matches `alphabet`);
+the sweep to `@@PFX@@-<t>-…` (all three spellings, any case, anchored: `alpha` never matches `alphabet`);
 it combines with `--dry-run`, and an invalid token or an unknown argument prints the usage line and exits 2 with
 nothing touched. `JANITOR_MIN_AGE_MINUTES` (default 60) is whole minutes, digits only, at least 1; `--token` is 2 to 12 characters of
 `[a-z0-9]`. A name or id holding a control character is refused with a skip line, `--dry-run` prints the same exit
@@ -238,7 +238,7 @@ and what a copy of it must keep:
 
 Databases, schemas and queues have no command common to every stack, and **this janitor sweeps no images**: the
 repository that creates them keeps its own prefixed sweep (§4) beside the fixture — for a per-run image tag, by
-the `testsToDelete.owner` label set on `docker build`, under the lowercase spelling.
+the `@@PFX@@.owner` label set on `docker build`, under the lowercase spelling.
 <!-- core:end -->
 
 ## Tokens
@@ -273,7 +273,7 @@ audited 2026-10-14: six repositories, 0 compliant sites, containers up for weeks
 
 ## Definition of Done
 
-- [ ] Everything the run created outside its process is named `testsToDelete-<repo>-<what>-<id>` by the helper, claimed, and removed by the run by its exact name.
+- [ ] Everything the run created outside its process is named `@@PFX@@-<repo>-<what>-<id>` by the helper, claimed, and removed by the run by its exact name.
 - [ ] Every container started by hand ran with `--rm` or under the complete carve-out; Testcontainers' reaper stayed on.
 - [ ] The repository's start-of-run sweep collects its own token's leftovers on owner liveness; its guard is red on every class of §7 and on a scan of nothing.
 - [ ] Every shared store a test clears is per run or carries exemption (a) with its lock; every container-scoped database carries exemption (b).
