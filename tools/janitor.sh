@@ -163,7 +163,7 @@ canon() {
 gitdir_of() {   # a folder holding a .git FILE is a linked worktree of SOME clone; a relative gitdir is relative to the worktree
   local g d; g="$(sed -n 's/^gitdir: //p' "$1/.git" 2>/dev/null || true)"
   case "$g" in ""|/*|[A-Za-z]:/*) ;; *)
-    g="$1/$g"   # a relative gitdir (git worktree add --relative-paths) climbs out through the worktree itself ("<wt>/../<clone>/.git/…"). Once the worktree is removed that path no longer resolves on Linux, and git leaves the registration behind, so the PARENT is resolved now, while the worktree still exists
+    g="$1/$g"   # a relative gitdir (a worktree made with relative paths) climbs out through the worktree itself ("<wt>/../<clone>/.git/…"). Once the worktree is removed that path no longer resolves on Linux, and git leaves the registration behind, so the PARENT is resolved now, while the worktree still exists
     d="$(cd "${g%/*}" 2>/dev/null && { pwd -W 2>/dev/null || pwd -P; })" && g="$d/${g##*/}";;
   esac
   printf '%s' "$g"
