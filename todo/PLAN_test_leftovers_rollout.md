@@ -67,6 +67,18 @@ sweep from the rule is run on a machine after a full suite and must find only pr
 - [ ] The rule refinement (decision 2) is in both rule repos and released.
 - [ ] This plan is promoted to `research/` with its deviations.
 
+## The merged core revises E1 first (2026-10-21)
+
+The plan [PLAN_test_leftovers_merged_core.md](PLAN_test_leftovers_merged_core.md) revises the contract E1 builds, so the consumer
+epics now wait for ITS release, not for E1's. Named on both sides:
+
+| Item | Built by | This plan's part |
+|---|---|---|
+| The contract text, helper, sweep, janitor and guard in their owner-scoped form | the merged-core plan | E2–E7 consume its one release; E1's stories document is promoted by it as IMPLEMENTED |
+| The per-consumer rename, port and pin bump | epics E2–E7 here | Each epic's first story becomes "pin bump + rename to the owner form + helper/sweep/guard port, in one commit"; the barrier checklist of the merged-core plan runs per machine before it |
+
+Order: the merged core first. Disjoint: the merged core edits no consumer repository.
+
 ## Epics
 
 Seven epics, E = 7, so the cornerstone quota is Q = ⌈2·7/5⌉ = 3 ([common/subagent-models.md](../common/subagent-models.md)).
