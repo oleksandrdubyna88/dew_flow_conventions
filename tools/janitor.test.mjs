@@ -1322,7 +1322,7 @@ test("21g. Gate B: a clone that becomes unreadable after the capture is not 'rem
 
 // --- 22 --------------------------------------------------------------------------------------------------------
 
-test("22a. A directory ABOVE the clone renamed in the middle of the git calls: unlock and remove share ONE entered clone and finish there; what the path became is never touched", { timeout: TIMEOUT }, (t) => {
+test("22a. A directory ABOVE the clone renamed in the middle of the git calls: unlock and remove share ONE entered clone; git there finds the worktree no longer points back, says so, and the folder is kept; what the path became is never touched", { timeout: TIMEOUT }, (t) => {
   if (win32) {
     t.skip("renames of a directory in use need a POSIX filesystem");
     return;
@@ -1350,9 +1350,12 @@ test("22a. A directory ABOVE the clone renamed in the middle of the git calls: u
   const run = runJanitor(w, { tmp, ahead: [stubDir], env: { PIN_FROM: w.other, PIN_ASIDE: aside, PIN_TO: trap }, timeoutMs: 60_000 });
 
   assert.equal(run.error, undefined, "the run finished instead of blocking on the trap's FIFO");
-  assert.equal(run.status, 0, run.text);
-  assert.equal(exists(wt.path), false, `the remove ran in the clone that was entered, which still knows the worktree\n${run.text}`);
-  assert.equal(exists(path.join(aside, ".git", "worktrees", path.basename(admin))), false, "and that clone (now moved aside) no longer lists it");
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(wt.path), `kept: the remove ran in the clone that was entered, which no longer matches the worktree's .git, so git refused and the janitor did not delete behind it
+${run.text}`);
+  assert.ok(run.stderr.some((line) => line.startsWith("notice: ") && line.includes("git worktree remove failed")), `the failed step is said
+${run.text}`);
+  assert.ok(exists(path.join(aside, ".git", "worktrees", path.basename(admin))), "the entered clone (now moved aside) was not touched either");
   assert.ok(exists(path.join(w.other, ".git", "worktrees", "zz", "gitdir")), "the trap, which now stands where the clone was, was left alone");
 });
 
@@ -1547,6 +1550,7 @@ test("23h. (h) a .git that names something that is not <clone>/worktrees/<name> 
   const put = (text) => { fs.rmSync(dotGit, { force: true }); fs.writeFileSync(dotGit, text); }; // git leaves .git read-only on Windows
   w.scope.after(() => put(original));
   put(`gitdir: ${slash(path.join(w.other, ".git"))}\n`); // a real directory, but a clone and no worktree entry
+  age(wt.path, OLD); // rewriting the file made the folder young
 
   const run = runJanitor(w, { tmp });
 
