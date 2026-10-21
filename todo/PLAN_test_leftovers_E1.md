@@ -7,6 +7,10 @@
 > with its test, the 34 `mkdtemp` sites and the four worktree sites in `tools/*.test.mjs`, and one release.
 >
 > Split by Opus, 2026-10-15; S1's spec by Fable the same day; models per story below. One cornerstone: S1.
+>
+> Revised by [PLAN_test_leftovers_merged_core.md](PLAN_test_leftovers_merged_core.md) (2026-10-21): the contract this
+> document builds gains an owner segment, kernel ownership and one companion janitor document before its release. That plan
+> owns the revised text and tools and promotes this document when it ships; the stories here keep their first form.
 
 **Committed together with this document** (one commit, [planning-docs.md](../common/planning-docs.md) § *A plan split
 into epics and stories*): its row in [todo/README.md](README.md), and the parent's ledger line replaced by
