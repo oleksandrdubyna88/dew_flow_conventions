@@ -1062,7 +1062,10 @@ test("20d. F-B: a .git file swapped for a FIFO after the capture is never read a
       fs.writeFileSync(release, "");
     }
   });
-  const status = await new Promise((resolve) => { child.on("close", (code) => resolve(code)); });
+  const status = await new Promise((resolve) => { // `close` waits for every holder of the pipes: a killed bash leaves its blocked child holding them, so `exit` arms a fallback
+    child.on("close", (code) => resolve(code));
+    child.on("exit", (code) => { setTimeout(() => resolve(code), 2_000).unref(); });
+  });
   clearTimeout(timer);
 
   assert.equal(paused, true, `the janitor reached the pause after its capture\n${stderr}`);
