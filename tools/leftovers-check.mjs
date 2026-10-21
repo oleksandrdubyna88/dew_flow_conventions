@@ -23,7 +23,11 @@
  *
  * Run from anywhere:
  *
- *     node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--rule <path>]
+ *     node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>]
+ *
+ * `--identity` is the "repository" column of the token's row in the rule's `## Tokens` table — which repository the token is.
+ * It defaults to this repository's own row (`REPO_ROW`) ONLY for this repository's own token; any other `--token` without
+ * an `--identity` fails closed, so a token can never be proven to belong to a repository by accident.
  *
  * Exit 0 clean, 1 with every finding printed (`file:line — <class> — <text>`), 2 when it scanned nothing or its
  * arguments are bad — an empty scan is a broken discovery, never a clean repository.
@@ -431,7 +435,9 @@ const EXPECTED_HEADER = ["token", "family", "repository"];
 /** A registered token must also be THIS repository's: its row's repository column is the one `identity` (`REPO_ROW` in the helper) names. No identity is a finding — the check fails closed. */
 function belongsFindings(row, token, identity, rulePath) {
   const at = (text) => [finding(rulePath, row.line, "token", text)];
-  if (identity.trim() === "") return at(`this repository's identity is unknown, so the token \`${token}\` cannot be proven to belong to it`);
+  if (identity.trim() === "") {
+    return at(`this repository's identity is unknown, so the token \`${token}\` cannot be proven to belong to it — set REPO_ROW in the repository's helper (or pass --identity) to exactly the "repository" column of the row of \`${token}\` in ${rulePath} (## Tokens), which says \`${row.repository}\``);
+  }
   if (row.repository.trim().toLowerCase() === identity.trim().toLowerCase()) return [];
   return at(`the token \`${token}\` belongs to \`${row.repository}\` in ${rulePath}, not to this repository (\`${identity}\`)`);
 }
@@ -462,32 +468,50 @@ export function tokenFindings(ruleText, token, rulePath = "common/test-leftovers
 
 // A repository has one helper per test language (rule §2), each holding the token ONCE. The constants are found by shape, in every
 // tracked source file — the helper itself lives where the scan above does not look — and they must all be the same and a row of the table.
-const TOKEN_CONSTANT = /\b(?:REPO_TOKEN|RepoToken)\b\s*(?::\s*[\w<>[\]]+\s*)?=\s*["']([^"'\n]*)["']/;
+const TOKEN_CONSTANT = /\b(?:REPO_TOKEN|RepoToken)\b\s*(?::\s*[\w<>[\]]+\s*)?=\s*["']([^"'\n]*)["']/g;
 const CONSTANT_FILE = /\.(?:mjs|cjs|js|ts|cs|sh|ps1|py|rs)$/;
+
+/**
+ * The files that can hold a token constant: tracked, or untracked and not ignored (what `ls-files --cached --others --exclude-standard`
+ * lists), narrowed by git itself to the ones that name `REPO_TOKEN` or `RepoToken` — a repository is not read file by file.
+ * `git grep` exits 1 for "no match", which is an empty answer; every other failure is the caller's.
+ */
+function candidateFiles(repo) {
+  try {
+    const listing = gitOutput(repo, ["grep", "-l", "-z", "-I", "-F", "--untracked", "-e", "REPO_TOKEN", "-e", "RepoToken"]);
+    return [...new Set(listing.split("\0").filter(Boolean))].sort();
+  } catch (error) {
+    if (error.status === 1) return [];
+    throw error;
+  }
+}
+
+/** Every token constant of one line, each `{ line, value }` — one declaration may name both spellings, so a line can hold several. A comment line holds none. */
+function lineConstants(text, index) {
+  if (isComment(text)) return [];
+  return [...text.matchAll(TOKEN_CONSTANT)].map((match) => ({ line: index + 1, value: match[1] }));
+}
 
 /** Every token constant of the repository: `[{ file, line, value }]`. */
 export function tokenConstants(repo) {
-  const listing = gitOutput(repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
   const found = [];
-  for (const file of [...new Set(listing.split("\0").filter(Boolean))].sort()) {
+  for (const file of candidateFiles(repo)) {
     if (!CONSTANT_FILE.test(file) || EXCLUDED_FILES.includes(file) || !fs.existsSync(path.join(repo, file))) continue;
-    fs.readFileSync(path.join(repo, file), "utf8").split(/\r?\n/).forEach((line, index) => {
-      const match = isComment(line) ? null : TOKEN_CONSTANT.exec(line);
-      if (match !== null) found.push({ file, line: index + 1, value: match[1] });
-    });
+    const lines = fs.readFileSync(path.join(repo, file), "utf8").split(/\r?\n/);
+    lines.forEach((text, index) => found.push(...lineConstants(text, index).map((entry) => ({ file, ...entry }))));
   }
   return found;
 }
 
 /** Findings (class `token`): constants that differ, and every constant that is not this repository's registered token. */
-export function constantFindings(constants, token, ruleText, rulePath) {
+export function constantFindings(constants, token, ruleText, rulePath, identity = REPO_ROW) {
   const values = [...new Set(constants.map((entry) => entry.value))];
   const found = [];
   if (values.length > 1) {
     const where = constants.map((entry) => `\`${entry.value}\` in ${entry.file}:${entry.line}`).join(", ");
     found.push(finding(constants[0].file, constants[0].line, "token", `token constants differ: ${where} — every helper of a repository holds the same token (§2)`));
   }
-  for (const value of values) if (value !== token) found.push(...tokenFindings(ruleText, value, rulePath));
+  for (const value of values) if (value !== token) found.push(...tokenFindings(ruleText, value, rulePath, identity));
   return found;
 }
 
@@ -497,8 +521,8 @@ export function resolveRule(repo, rule) {
   return candidates.find((candidate) => fs.existsSync(candidate));
 }
 
-/** Scan a repository: `{ files, findings }`. `files` is how many files were read — zero is a broken discovery. */
-export function scanRepository({ repo, token = REPO_TOKEN, rule } = {}) {
+/** Scan a repository: `{ files, findings }`. `files` is how many files were read — zero is a broken discovery. `identity` is the repository column of the token's row: this repository's own for its own token, else blank (fails closed). */
+export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "" } = {}) {
   const files = discover(repo);
   const findings = [];
   for (const file of files) {
@@ -508,22 +532,22 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule } = {}) {
   const rulePath = resolveRule(repo, rule);
   const ruleText = rulePath === undefined ? "" : fs.readFileSync(rulePath, "utf8");
   const ruleName = rulePath === undefined ? "common/test-leftovers.md (not found)" : path.basename(path.dirname(rulePath)) + "/" + path.basename(rulePath);
-  findings.push(...tokenFindings(ruleText, token, ruleName), ...constantFindings(tokenConstants(repo), token, ruleText, ruleName));
+  findings.push(...tokenFindings(ruleText, token, ruleName, identity), ...constantFindings(tokenConstants(repo), token, ruleText, ruleName, identity));
   findings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.cls.localeCompare(b.cls));
   return { files: files.length, findings };
 }
 
 // --- the command line ----------------------------------------------------------------------------------------
 
-const USAGE = "usage: node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--rule <path>]";
+const USAGE = "usage: node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>]   (--identity: the repository column of the token's row; without it only this repository's own token passes)";
 
-/** Parse the arguments: `{ repo, token, rule }` or `{ error }`. */
+/** Parse the arguments: `{ repo, token, rule, identity }` (`identity` stays unset unless given) or `{ error }`. */
 export function parseArguments(argv) {
-  const options = { repo: process.cwd(), token: REPO_TOKEN, rule: undefined };
+  const options = { repo: process.cwd(), token: REPO_TOKEN, rule: undefined, identity: undefined };
   for (let index = 0; index < argv.length; index += 2) {
     const name = argv[index].replace(/^--/, "");
-    if (!["repo", "token", "rule"].includes(name) || !argv[index].startsWith("--") || argv[index + 1] === undefined) return { error: `unknown or incomplete argument \`${argv[index]}\`` };
-    options[name] = name === "token" ? argv[index + 1] : path.resolve(argv[index + 1]);
+    if (!["repo", "token", "identity", "rule"].includes(name) || !argv[index].startsWith("--") || argv[index + 1] === undefined) return { error: `unknown or incomplete argument \`${argv[index]}\`` };
+    options[name] = ["token", "identity"].includes(name) ? argv[index + 1] : path.resolve(argv[index + 1]);
   }
   return options;
 }

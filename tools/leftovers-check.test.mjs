@@ -13,8 +13,8 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { git } from "./lib/git.mjs";
-import { REPO_ROW, REPO_TOKEN, ownedDir } from "./lib/owned.mjs";
-import { EXCLUDED_FILES, main, scanText, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
+import { MAX_CLAIM_BYTES, REPO_ROW, REPO_TOKEN, ownedDir } from "./lib/owned.mjs";
+import { EXCLUDED_FILES, main, scanRepository, scanText, tokenConstants, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RULE = path.join(root, "common", "test-leftovers.md");
@@ -409,6 +409,79 @@ test("3a. one helper per language: every token constant in the repository is the
   assert.match(guard(unregistered, ["--rule", path.join(unregistered, "rule.md")]).text, /zzz/, "an unregistered constant is named");
   const comment = tree(t, files({ "helper/owned.sh": '# REPO_TOKEN="zzz" was the old name\nREPO_TOKEN="conventions"\n' }));
   assert.equal(guard(comment, ["--rule", path.join(comment, "rule.md")]).code, 0, "a comment is not a constant");
+});
+
+test("3a. A: two token constants on ONE line are both read, not only the first", (t) => {
+  const rule = table(["| `conventions` | dew_flow | " + REPO_ROW + " |", "| `other` | dew_flow | another repository |"]);
+  const repo = tree(t, { "tools/x.test.mjs": "const a = 1;", "rule.md": rule, "helper/owned.mjs": 'export const REPO_TOKEN = "conventions", RepoToken = "other";\n' });
+  const result = guard(repo, ["--rule", path.join(repo, "rule.md")]);
+  assert.equal(result.code, 1, "the second constant of the line differs from the first: " + result.text);
+  assert.match(result.text, /token constants differ/);
+  assert.match(result.text, /`conventions` in helper\/owned\.mjs:1/);
+  assert.match(result.text, /`other` in helper\/owned\.mjs:1/);
+  const same = tree(t, { "tools/x.test.mjs": "const a = 1;", "rule.md": rule, "helper/owned.mjs": 'export const REPO_TOKEN = "conventions", RepoToken = "conventions";\n' });
+  assert.equal(guard(same, ["--rule", path.join(same, "rule.md")]).code, 0, "two equal constants on one line are one token");
+});
+
+test("3a. B: tokenConstants reads the tracked and the untracked-not-ignored files that hold a constant, nothing else", (t) => {
+  const repo = tree(t, {
+    ".gitignore": "ignored.mjs\n",
+    "tracked.mjs": 'export const REPO_TOKEN = "t1";\n',
+    "sub dir/пробел.ts": 'const RepoToken: string = "t2";\n',
+    "ignored.mjs": 'export const REPO_TOKEN = "t3";\n',
+    "notes.md": 'REPO_TOKEN = "t4"\n',
+    "plain.mjs": "export const nothing = 1;\n",
+    "commented.sh": '# REPO_TOKEN="t5"\n',
+    "tools/leftovers-check.test.mjs": 'const REPO_TOKEN = "t6";\n',
+  });
+  git(repo, "add", "tracked.mjs");
+  const found = tokenConstants(repo).map((entry) => `${entry.file}:${entry.line}=${entry.value}`);
+  assert.deepEqual(found, ["sub dir/пробел.ts:1=t2", "tracked.mjs:1=t1"]);
+  assert.deepEqual(tokenConstants(tree(t, { "plain.mjs": "export const nothing = 1;\n" })), [], "a repository with no constant at all is an empty answer, not an error");
+});
+
+test("3a. C: another repository's token passes with its own identity, and fails closed without one", (t) => {
+  const rule = table(["| `conventions` | dew_flow | " + REPO_ROW + " |", "| `other` | dew_flow | another repository |"]);
+  const files = { "tools/x.test.mjs": "const a = 1;", "rule.md": rule, "helper/owned.mjs": 'export const REPO_TOKEN = "other";\n' };
+  const repo = tree(t, files);
+  const ruleArgs = ["--rule", path.join(repo, "rule.md"), "--token", "other"];
+
+  const passes = guard(repo, [...ruleArgs, "--identity", "another repository"]);
+  assert.equal(passes.code, 0, passes.text);
+  assert.deepEqual(scanRepository({ repo, token: "other", rule: path.join(repo, "rule.md"), identity: "another repository" }).findings, []);
+
+  const closed = guard(repo, ruleArgs);
+  assert.equal(closed.code, 1, "no identity, no pass");
+  assert.match(closed.text, / — token — .*identity/);
+  assert.equal(scanRepository({ repo, token: "other", rule: path.join(repo, "rule.md"), identity: "" }).findings.length, 1);
+
+  const wrong = guard(repo, [...ruleArgs, "--identity", REPO_ROW]);
+  assert.equal(wrong.code, 1, "another repository's identity does not make the token this one's");
+  assert.match(wrong.text, /belongs to `another repository`/);
+
+  const own = tree(t, { "tools/x.test.mjs": "const a = 1;", "rule.md": rule, "helper/owned.mjs": 'export const REPO_TOKEN = "conventions";\n' });
+  assert.equal(guard(own, ["--rule", path.join(own, "rule.md")]).code, 0, "the default token keeps this repository's own identity");
+  assert.equal(guard(own, ["--rule", path.join(own, "rule.md"), "--identity", "another repository"]).code, 1, "an explicit identity replaces the default one");
+  assert.match(guard(own, ["--identity"]).text, /unknown or incomplete argument/);
+});
+
+test("3a. D: a blank identity says what to set and names the value the token's row expects", () => {
+  const rule = table(["| `other` | dew_flow | another repository |"]);
+  const found = tokenFindings(rule, "other", "rule.md", "");
+  assert.equal(found.length, 1);
+  assert.match(found[0].text, /REPO_ROW/);
+  assert.match(found[0].text, /--identity/);
+  assert.match(found[0].text, /"repository" column/);
+  assert.ok(found[0].text.includes("`another repository`"), "names the expected value: " + found[0].text);
+  assert.ok(found[0].text.includes("`other`"), "names the token: " + found[0].text);
+});
+
+test("3a. E: janitor.sh's claim limit is the one number of owned.mjs", () => {
+  const script = fs.readFileSync(path.join(root, "tools", "janitor.sh"), "utf8");
+  const compared = [...script.matchAll(/"\$\{#raw\}"\s+-gt\s+(\d+)/g)].map((match) => Number(match[1]));
+  const read = [...script.matchAll(/head -c (\d+)/g)].map((match) => Number(match[1]));
+  assert.deepEqual(compared, [MAX_CLAIM_BYTES], "claim_norm refuses a claim longer than MAX_CLAIM_BYTES");
+  assert.deepEqual(read, [MAX_CLAIM_BYTES + 1], "claim_of reads one byte past MAX_CLAIM_BYTES, so an over-long claim is seen");
 });
 
 test("2. raw-temp: RUNNER_TEMP is a job-scoped namespace, not a finding", (t) => {
