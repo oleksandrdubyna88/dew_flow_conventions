@@ -14,7 +14,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import fsDefault from "node:fs";
 import * as fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import * as path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -22,7 +24,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { git } from "./lib/git.mjs";
 import { sweepLeftovers, MIN_AGE_MS } from "./lib/leftovers-sweep.mjs";
 import {
-  cleanupScope, formatOwner, gitdirOf, ownedDir, ownedName, ownedWorktree, processProbe, removeQuietly, thisOwner, thisOwnerToken,
+  cleanupScope, formatLegacyOwner, formatOwner, gitdirOf, ownedDir, ownedName, ownedWorktree, processProbe, removeQuietly, thisOwner, thisOwnerToken,
 } from "./lib/owned.mjs";
 import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import { REPO_ROOT, runWithSweep } from "./run-tests.mjs";
@@ -187,7 +189,7 @@ test("1. a killed run is collected: the folder, its claim and the worktree go, t
 
 // 2 ---------------------------------------------------------------------------------------------------------
 
-test("2. a resource that may belong to a running run survives, with its reason; the unmarked old one goes", (t) => {
+test("2. a resource that may belong to a running run survives, with its reason; the unmarked old one is listed, never removed", (t) => {
   const { own, work, tmp } = arena(t);
   const repo = ownedRepo(own, work, "survive-repo");
   const repo2 = ownedRepo(own, work, "survive-repo-2");
@@ -210,25 +212,26 @@ test("2. a resource that may belong to a running run survives, with its reason; 
   const result = sweepLeftovers({ repo, tmp, probe: deadProbe });
 
   assert.deepEqual(result.errors, []);
-  assert.deepEqual(namesOf(result.removed), namesOf([unmarked, dotGitDir]));
+  assert.deepEqual(result.removed, [], "nothing here is provably abandoned: an unmarked folder is nobody's the helper knows, so it is listed");
   assert.deepEqual(reasonsOf(result), {
     [path.basename(live)]: "live",
     [path.basename(foreign)]: "foreign host",
     [path.basename(unreadable)]: "unreadable",
     [path.basename(young)]: "young",
+    [path.basename(unmarked)]: "unmarked",
+    [path.basename(dotGitDir)]: "unmarked",
     [path.basename(missingGitdir)]: "other clone",
     [path.basename(mine)]: "live",
     [path.basename(other)]: "other clone",
   });
-  for (const kept of [live, foreign, unreadable, young, missingGitdir, mine, other]) assert.ok(fs.existsSync(kept), kept);
-  assert.equal(fs.existsSync(unmarked), false);
-  assert.equal(fs.existsSync(`${unmarked}.owner`), false);
-  assert.equal(fs.existsSync(dotGitDir), false);
+  assert.deepEqual(result.listed.filter((line) => line.startsWith("unmarked:")).sort(),
+    [`unmarked: folder ${path.basename(dotGitDir)}`, `unmarked: folder ${path.basename(unmarked)}`].sort());
+  for (const kept of [live, foreign, unreadable, young, unmarked, dotGitDir, missingGitdir, mine, other]) assert.ok(fs.existsSync(kept), kept);
   assert.ok(listed(repo2).includes(path.resolve(other).toLowerCase()), "the other clone still lists its own tree");
   assert.ok(listed(repo).includes(path.resolve(mine).toLowerCase()));
 });
 
-test("2b. an unmarked old worktree and a dead-owned one of this repository are removed; a bare `locked` is unreadable", (t) => {
+test("2b. a dead-owned worktree of this repository is removed; an unmarked old one is listed and stays; a bare `locked` is unreadable", (t) => {
   const { own, work, tmp } = arena(t);
   const repo = ownedRepo(own, work, "wt-repo");
   const unmarked = worktree(own, repo, tmp, "unmarked", { claim: null });
@@ -238,9 +241,10 @@ test("2b. an unmarked old worktree and a dead-owned one of this repository are r
   const result = sweepLeftovers({ repo, tmp, probe: deadProbe });
 
   assert.deepEqual(result.errors, []);
-  assert.deepEqual(namesOf(result.removed), namesOf([unmarked, dead]));
-  assert.deepEqual(reasonsOf(result), { [path.basename(bare)]: "unreadable" });
-  assert.deepEqual(listed(repo).map((p) => path.basename(p)).filter((n) => /^teststodelete/i.test(n) && !n.toLowerCase().startsWith(`testsToDelete-${OWNER}-conventions-wt-repo-`.toLowerCase())), [path.basename(bare).toLowerCase()]);
+  assert.deepEqual(namesOf(result.removed), namesOf([dead]));
+  assert.deepEqual(reasonsOf(result), { [path.basename(bare)]: "unreadable", [path.basename(unmarked)]: "unmarked" });
+  assert.deepEqual(listed(repo).map((p) => path.basename(p)).filter((n) => /^teststodelete/i.test(n) && !n.toLowerCase().startsWith(`testsToDelete-${OWNER}-conventions-wt-repo-`.toLowerCase())).sort(),
+    [path.basename(bare).toLowerCase(), path.basename(unmarked).toLowerCase()].sort());
 });
 
 // 3 ---------------------------------------------------------------------------------------------------------
@@ -439,4 +443,243 @@ test("10b. sweepRepoRoot is this checkout unless RUN_TESTS_REPO_ROOT names anoth
   assert.equal(out(""), path.resolve(here, ".."), "empty means unset");
   assert.equal(out(path.join(here, "fixtures")), path.join(here, "fixtures"));
   assert.equal(out("fixtures"), path.join(here, "fixtures"), "relative to the working directory");
+});
+
+// 11 --------------------------------------------------------------------------------------------------------
+
+/** A prefixed folder of ANOTHER owner in `tmp`: the name and its claim say `owner`; `claim` overrides the record text. */
+function folderOf(tmp, owner, what, { claim, old = true } = {}) {
+  const dir = path.join(tmp, `testsToDelete-${owner}-conventions-${what}-abc123`);
+  fs.mkdirSync(dir);
+  fs.writeFileSync(`${dir}.owner`, claim ?? `${owner}:${thisOwner().host}:${PRETEND_DEAD}${nsPart}\n`);
+  if (old) setOld(dir);
+  return dir;
+}
+
+test("11. two users, one repository: the other owner's folders are listed as foreign and never touched, even dead", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "two-users-repo");
+  const mine = folder(own, tmp, "mine", { claim: deadOwnerLine() });
+  const theirs = folderOf(tmp, "u424242", "theirs");
+  const theirsToo = folderOf(tmp, "w42", "theirs-too");
+
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe });
+
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(namesOf(result.removed), namesOf([mine]));
+  for (const kept of [theirs, theirsToo]) assert.ok(fs.existsSync(kept) && fs.existsSync(`${kept}.owner`), `${kept} must be untouched`);
+  assert.deepEqual(result.listed.filter((line) => line.startsWith("foreign:")).sort(), [
+    `foreign: folder ${path.basename(theirs)} — owner u424242`,
+    `foreign: folder ${path.basename(theirsToo)} — owner w42`,
+  ].sort());
+  assert.deepEqual(result.preserved, [], "another owner's folder is listed, not judged");
+});
+
+// 12 --------------------------------------------------------------------------------------------------------
+
+test("12. a forged owner segment (my token in the name, another uid on the folder) is preserved `foreign-uid`", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "forged-repo");
+  const forged = folder(own, tmp, "forged", { claim: deadOwnerLine() }); // looks exactly like a dead claim of mine
+  const real = folder(own, tmp, "real", { claim: deadOwnerLine() });
+  const kernel = (target) => path.resolve(target).toLowerCase() !== path.resolve(forged).toLowerCase(); // the kernel says another uid owns `forged`
+
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, mine: kernel });
+
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(namesOf(result.removed), namesOf([real]), "only what the kernel agrees is mine");
+  assert.deepEqual(reasonsOf(result), { [path.basename(forged)]: "foreign-uid" });
+  assert.ok(fs.existsSync(forged) && fs.existsSync(`${forged}.owner`));
+  assert.deepEqual(result.listed, [`foreign: folder ${path.basename(forged)} — owner ${OWNER}`]);
+});
+
+// 13 --------------------------------------------------------------------------------------------------------
+
+test("13. an unmarked owner-form folder older than the window is listed, never removed — age is no authority", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "unmarked-repo");
+  const old = folder(own, tmp, "unmarked-old", { claim: null });
+  const young = folder(own, tmp, "unmarked-young", { claim: null, young: true });
+
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe });
+
+  assert.deepEqual(result.removed, []);
+  assert.ok(fs.existsSync(old) && fs.existsSync(young));
+  assert.deepEqual(result.listed, [`unmarked: folder ${path.basename(old)}`], "a young one is silent: it may be a resource between creation and claim");
+  assert.deepEqual(reasonsOf(result), { [path.basename(old)]: "unmarked", [path.basename(young)]: "young" });
+  const everything = sweepLeftovers({ repo, tmp, probe: deadProbe, minAgeMs: 0 });
+  assert.deepEqual(everything.removed, [], "even with no window at all");
+});
+
+// 14 --------------------------------------------------------------------------------------------------------
+
+test("14. a legacy folder of my uid with a dead legacy record is collected; one of another uid, a live one and an unreadable one are listed with the command", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "legacy-repo");
+  const plant = (what, claim) => {
+    const dir = path.join(tmp, `testsToDelete-conventions-${what}-abc123`);
+    fs.mkdirSync(dir);
+    if (claim !== null) fs.writeFileSync(`${dir}.owner`, claim);
+    setOld(dir);
+    return dir;
+  };
+  const dead = plant("lg-dead", `${thisOwner().host}:${PRETEND_DEAD}\n`);
+  const strangers = plant("lg-stranger", `${thisOwner().host}:${PRETEND_DEAD}\n`);
+  const live = plant("lg-live", `${formatLegacyOwner(thisOwner())}\n`);
+  const garbled = plant("lg-garbled", "not an owner\n");
+  const none = plant("lg-none", null);
+  const kernel = (target) => path.resolve(target).toLowerCase() !== path.resolve(strangers).toLowerCase();
+
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, mine: kernel });
+
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(namesOf(result.removed), namesOf([dead]), "kernel uid = me AND an old-grammar record that is gone");
+  for (const kept of [strangers, live, garbled, none]) assert.ok(fs.existsSync(kept), kept);
+  const lines = result.listed.filter((line) => line.startsWith("legacy:"));
+  assert.equal(lines.length, 4);
+  for (const kept of [strangers, live, garbled, none]) {
+    const line = lines.find((entry) => entry.includes(path.basename(kept)));
+    assert.ok(line !== undefined && line.includes(" — remove with: ") && line.includes(kept), `${path.basename(kept)}: ${JSON.stringify(lines)}`);
+  }
+});
+
+// 15 --------------------------------------------------------------------------------------------------------
+
+test("15. replacement between the verdict and the removal: a folder swapped for another inode is kept and named", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "replace-repo");
+  const victim = folder(own, tmp, "swapped", { claim: deadOwnerLine() });
+  const moved = `${victim}-moved`;
+  let swapped = false;
+  const hooks = {
+    afterVerdict: (target) => {
+      if (swapped || path.resolve(target) !== path.resolve(victim)) return;
+      swapped = true;
+      fs.renameSync(victim, moved); // the original goes away…
+      fs.mkdirSync(victim); // …and a different folder takes its name, under the same claim
+      fs.writeFileSync(path.join(victim, "precious.txt"), "not abandoned\n");
+    },
+  };
+  own.after(() => removeQuietly(moved));
+
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, hooks });
+
+  assert.deepEqual(result.errors, []);
+  assert.equal(swapped, true, "the seam fired");
+  assert.deepEqual(result.removed, []);
+  assert.deepEqual(reasonsOf(result), { [path.basename(victim)]: "replaced" });
+  assert.equal(fs.readFileSync(path.join(victim, "precious.txt"), "utf8"), "not abandoned\n");
+  assert.ok(fs.existsSync(`${victim}.owner`), "the claim stays with what it was claimed for");
+});
+
+test("15b. a folder that changes between the rename and the second look is put back", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "rename-repo");
+  const victim = folder(own, tmp, "renamed", { claim: deadOwnerLine() });
+  const hooks = { afterRename: () => fs.writeFileSync(`${victim}.owner`, `${formatOwner(thisOwner())}\n`) }; // the run came back to life and re-claimed
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, hooks });
+  assert.deepEqual(result.removed, []);
+  assert.deepEqual(reasonsOf(result), { [path.basename(victim)]: "replaced" });
+  assert.ok(fs.existsSync(victim), "renamed back under its own name");
+  assert.equal(fs.readdirSync(tmp).filter((name) => name.startsWith(".")).length, 0, "no quarantine is left behind");
+});
+
+// 16 --------------------------------------------------------------------------------------------------------
+
+test("16. a quarantine left by a killed sweep is restored under its name when free, and reported `quarantine-conflict` when taken — nothing is overwritten", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "quarantine-repo");
+  const quarantineOf = (name) => path.join(tmp, `.${name}.teststodelete-quarantine-${PRETEND_DEAD}-0a1b2c3d`);
+  const freeName = path.basename(folder(own, tmp, "q-free", { claim: formatOwner(thisOwner()) + "\n" }));
+  const free = path.join(tmp, freeName);
+  fs.renameSync(free, quarantineOf(freeName)); // the sweep died after the rename
+  fs.writeFileSync(path.join(quarantineOf(freeName), "kept.txt"), "was in the folder\n");
+  const takenName = path.basename(folder(own, tmp, "q-taken", { claim: formatOwner(thisOwner()) + "\n" }));
+  fs.renameSync(path.join(tmp, takenName), quarantineOf(takenName));
+  fs.mkdirSync(path.join(tmp, takenName)); // somebody made a folder under the name since
+  fs.writeFileSync(path.join(tmp, takenName, "theirs.txt"), "do not overwrite\n");
+  fs.writeFileSync(path.join(quarantineOf(takenName), "mine.txt"), "stays in quarantine\n");
+
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe });
+
+  assert.deepEqual(result.errors, []);
+  assert.equal(fs.readFileSync(path.join(free, "kept.txt"), "utf8"), "was in the folder\n", "restored under its own name");
+  assert.equal(fs.existsSync(quarantineOf(freeName)), false);
+  assert.equal(fs.readFileSync(path.join(tmp, takenName, "theirs.txt"), "utf8"), "do not overwrite\n", "never over an existing folder");
+  assert.equal(fs.readFileSync(path.join(quarantineOf(takenName), "mine.txt"), "utf8"), "stays in quarantine\n");
+  assert.ok(result.preserved.some((entry) => entry.path === quarantineOf(takenName) && entry.reason === "quarantine-conflict"), JSON.stringify(result.preserved));
+});
+
+test("16b. a quarantine whose renamer is still alive is left alone", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "q-alive-repo");
+  const name = path.basename(folder(own, tmp, "q-alive", { claim: formatOwner(thisOwner()) + "\n" }));
+  const quarantine = path.join(tmp, `.${name}.teststodelete-quarantine-${process.pid}-0a1b2c3d`);
+  fs.renameSync(path.join(tmp, name), quarantine);
+  const result = sweepLeftovers({ repo, tmp });
+  assert.ok(fs.existsSync(quarantine), "a sweep in progress owns it");
+  assert.equal(fs.existsSync(path.join(tmp, name)), false);
+  assert.deepEqual(result.errors, []);
+});
+
+// 17 --------------------------------------------------------------------------------------------------------
+
+test("17. a dead-owned WORKTREE is removed through git and its folder is never renamed", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "wt-git-repo");
+  const dead = worktree(own, repo, tmp, "wt-dead", { claim: deadOwnerLine() });
+  const renames = [];
+  const original = fsDefault.renameSync;
+  fsDefault.renameSync = (from, ...rest) => { renames.push(path.resolve(String(from))); return original(from, ...rest); };
+  syncBuiltinESMExports();
+  let gitdirAtVerdict = "";
+  const hooks = { afterVerdict: (target) => { gitdirAtVerdict = gitdirOf(target); } };
+  let result;
+  try {
+    result = sweepLeftovers({ repo, tmp, probe: deadProbe, hooks });
+  } finally {
+    fsDefault.renameSync = original;
+    syncBuiltinESMExports();
+  }
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(namesOf(result.removed), namesOf([dead]));
+  assert.equal(renames.includes(path.resolve(dead)), false, "a worktree is never renamed: a rename breaks its gitdir pointers");
+  assert.ok(gitdirAtVerdict !== "", "its gitdir still resolved at the verdict");
+  assert.equal(listed(repo).includes(path.resolve(dead).toLowerCase()), false);
+  assert.equal(fs.existsSync(dead), false);
+});
+
+test("17b. a worktree swapped for another folder after the verdict is kept", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "wt-swap-repo");
+  const dead = worktree(own, repo, tmp, "wt-swap", { claim: deadOwnerLine() });
+  const aside = `${dead}-aside`;
+  let swapped = false;
+  const hooks = {
+    afterVerdict: (target) => {
+      if (swapped) return;
+      swapped = true;
+      const dotGit = fs.readFileSync(path.join(target, ".git"));
+      fs.renameSync(target, aside); // the judged tree goes away…
+      fs.mkdirSync(target); // …and another folder takes its name, with the same .git words
+      fs.writeFileSync(path.join(target, ".git"), dotGit);
+    },
+  };
+  own.after(() => removeQuietly(aside));
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, hooks });
+  assert.equal(swapped, true);
+  assert.deepEqual(result.removed, []);
+  assert.deepEqual(reasonsOf(result), { [path.basename(dead)]: "replaced", [path.basename(aside)]: "other clone" }, "the judged tree, moved aside, is another clone's worktree to this sweep");
+  assert.ok(fs.existsSync(dead));
+});
+
+test("18. run-tests prints the listed lines after the report line", async () => {
+  const lines = await stderrOf(() => {
+    runWithSweep([], {
+      sweep: () => ({ removed: [], preserved: [{ path: "c", reason: "unmarked" }], listed: ["unmarked: folder c", "foreign: folder d — owner u7"], errors: [] }),
+      spawn: () => ({ status: 0, signal: null }),
+      repo: "REPO",
+    });
+  });
+  assert.deepEqual(lines, ["run-tests: leftovers — removed 0, preserved 1", "run-tests: unmarked: folder c", "run-tests: foreign: folder d — owner u7"]);
 });
