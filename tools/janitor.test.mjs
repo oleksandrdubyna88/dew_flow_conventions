@@ -1244,7 +1244,7 @@ test("21d. Gate A: with neither `timeout` nor `perl` a file another user owns is
   assert.ok(exists(claimed) && exists(marker) && exists(wt.path), `nothing owned by "someone else" was read or removed\n${foreign.text}`);
   assert.equal(foreign.stderr.filter((line) => line.includes("neither timeout nor perl")).length, 1, `one line says why\n${foreign.text}`);
   assert.equal(foreign.stderr.filter((line) => line.includes("owner '-unbounded' is unreadable")).length, 2, `each kept entry whose claim could not be read is named\n${foreign.text}`);
-  assert.equal(foreign.stderr.filter((line) => line.includes("owner '-foreign-entry' is unreadable")).length, 1, `a worktree folder that is not this user's is named for that\n${foreign.text}`);
+  assert.equal(foreign.stderr.filter((line) => line.includes("owner '-unsafe-root' is unreadable")).length, 1, `with the root itself not this user's (the seam says so for everything), the worktree folder is named for that\n${foreign.text}`);
 
   const own = runJanitor(w, { tmp });
 
