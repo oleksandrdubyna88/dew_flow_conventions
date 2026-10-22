@@ -230,13 +230,16 @@ and what a copy of it must keep:
   its `.git` file whatever clone owns it (a relative gitdir resolved against the worktree).
 - **A stranger's entry can make it keep, never wait.** Any local user can plant folders, FIFOs and crafted
   `.git` files in a shared temp root. A worktree folder is judged and removed only when it is a real directory
-  (no link) that the janitor's own user owns, checked at the capture and again right before the removal. Its
+  (no link) whose own owner, read from the folder itself and not from what a link points at, is the janitor's
+  user, checked at the capture and again right before the removal, and only in a temp root that is sticky or
+  that user's own. Its
   clone must be owned by that user too, closed to group and world, with `worktrees/*/gitdir` and
   `worktrees/*/locked` regular files; a `.git` that points anywhere else, through a link neither that user nor
   root owns, or into a clone that cannot be entered is an unreadable owner: kept, named, with the reason (a
   wrong "not mine" only keeps). The clone is judged once per run, resolved to its physical path at the capture
   and carried to the removal, where the git calls for one worktree enter it, prove it again and run inside it,
-  so a directory renamed a moment later cannot redirect them. A git step that failed or timed out is said and
+  so a directory renamed a moment later cannot redirect them. A lock is released only on a worktree that is
+  locked, so a failed unlock is a real failure. A git step that failed or timed out is said and
   the folder kept. A stranger's file is read once, only when it is a regular file, never again, and a read that
   failed is an unreadable claim, not an empty one. Reads and git calls on a clone are bounded by `timeout`, else
   by `perl`; with neither, a file another user owns, or one inside a folder another user owns, is not read

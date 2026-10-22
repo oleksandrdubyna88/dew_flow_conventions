@@ -1633,7 +1633,7 @@ test("24b. I-1: a temp root that is neither this user's nor sticky is not truste
   const first = worktree(w, w.other, tmp, "rootone", { lock: undefined });
   const second = worktree(w, w.other, tmp, "roottwo", { lock: undefined });
 
-  const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${tmp}`, ...timeoutStub() } }); // the ROOT is someone else's (and the test folder is not sticky)
+  const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${posix(tmp)}`, ...timeoutStub() } }); // the ROOT is someone else's (and the test folder is not sticky)
 
   assert.equal(kept.status, 3, kept.text);
   assert.ok(exists(first.path) && exists(second.path), `kept\n${kept.text}`);
