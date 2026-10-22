@@ -225,6 +225,13 @@ test("the three fixtures validate against the shape, in the documented order",()
   for(const name of fixtureNames)assert.equal(validateFixture(loadNamed(name),name).name,name);
   assert.equal(loadFixture(path.resolve("."),"negative").name,"negative");
 });
+test("the held-gate fixture loads only the gate rule, never accepts a self-release, and stays out of the paid default order",()=>{
+  const fixture=validateFixture(loadNamed("held-gate"),"held-gate");
+  assert.deepEqual(fixture.loadOnly,["common.coai-review-gate"]);
+  assert.equal(fixture.expectation.answers.length,4);
+  assert.equal(fixture.expectation.answers.flat().includes("resolve_with_humandecision"),false,"an accepted answer lets the agent release its own hold");
+  assert.equal(BEHAVIOUR_ORDER.includes("held-gate"),false);
+});
 test("a fixture without caps, tools or an expectation is refused with the defect named",()=>{
   const good=loadNamed("negative");
   assert.throws(()=>validateFixture({...good,caps:{maxBudgetUsd:1}}),/caps\.timeoutMs/);
