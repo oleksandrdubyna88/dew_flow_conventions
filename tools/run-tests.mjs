@@ -67,11 +67,15 @@ export function runTests(extra = [], spawn = spawnSync) {
   return exitCodeFor(result.status, result.signal);
 }
 
-/** The sweep's one report line, and one more per error; nothing at all when the sweep found nothing. */
-function reportSweep({ removed, preserved, errors }) {
-  if (removed.length + preserved.length + errors.length === 0) return;
-  process.stderr.write(`run-tests: leftovers — removed ${removed.length}, preserved ${preserved.length}\n`);
-  for (const error of errors) process.stderr.write(`run-tests: leftovers error: ${error}\n`);
+/** The sweep's one report line, then what it lists (`foreign:`, `legacy:`, `unmarked:`), then one line per error; nothing at all when the sweep found nothing. */
+function reportSweep({ removed, preserved, errors, listed = [] }) {
+  if (removed.length + preserved.length + errors.length + listed.length === 0) return;
+  process.stderr.write(`run-tests: leftovers — removed ${removed.length}, preserved ${preserved.length}
+`);
+  for (const line of listed) process.stderr.write(`run-tests: ${line}
+`);
+  for (const error of errors) process.stderr.write(`run-tests: leftovers error: ${error}
+`);
 }
 
 /**

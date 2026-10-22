@@ -14,7 +14,7 @@ import {gitWith} from "./lib/git.mjs";
 const gitGuarded=gitWith({timeoutMs:GUARD_MS});
 
 function fixture(t) {
-  const root = ownedDir(t, "rules Unicode пробел");
+  const root = ownedDir(t, "rules ü пробел");
   const put = (name, metadata, body = "A complete rule.\n") => {
     const file = path.join(root, name);
     fs.mkdirSync(path.dirname(file), { recursive: true });

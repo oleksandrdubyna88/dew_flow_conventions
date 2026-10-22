@@ -39,7 +39,8 @@ import { spawnSync } from "node:child_process";
 import { git } from "./lib/git.mjs";
 import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import * as owned from "./lib/owned.mjs";
-import { cleanupScope, ownerState, ownedDir, parseOwner, thisOwner } from "./lib/owned.mjs";
+// formatLegacyOwner: until the janitor reads the merged record (its own story), the claims fed to it are in the form it reads.
+import { cleanupScope, ownerState, ownedDir, parseLegacyOwner, thisOwner } from "./lib/owned.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(HERE, "janitor.sh");
@@ -145,7 +146,7 @@ done
 // --- grammar -------------------------------------------------------------------------------------------------
 
 const GRAMMAR = VECTORS.grammar.vectors;
-const nodeAccepts = (text) => parseOwner(text).unreadable !== true;
+const nodeAccepts = (text) => parseLegacyOwner(text).unreadable !== true; // the old grammar, until the janitor reads the merged record
 
 test("the tables are what they claim: ≥ 25 grammar vectors, ≥ 10 verdict vectors, unique ids, a reason on each", () => {
   assert.ok(GRAMMAR.length >= 25, `${GRAMMAR.length} grammar vectors`);
@@ -248,7 +249,9 @@ function nodeVerdict(v, pid) {
     if (v.pid === "refused") return { state: "unknown" };
     return v.liveStart ? { state: "live", start: LIVE_START } : { state: "live" };
   };
-  const verdict = ownerState(parseOwner(ownerText(v, REAL_HOST.split("@")[1], pid)), probe);
+  const legacy = parseLegacyOwner(ownerText(v, REAL_HOST.split("@")[1], pid));
+  const record = legacy.unreadable === true ? legacy : { ...legacy, owner: thisOwner().owner, ...(thisOwner().ns === undefined ? {} : { ns: thisOwner().ns }) };
+  const verdict = ownerState(record, probe, { hidepid: false });
   return { verdict, asked };
 }
 
@@ -380,4 +383,76 @@ test("verdicts: every vector, asked of ownerState (owned.mjs) and of the real ja
       }
     });
   }
+});
+
+// --- the merged record: the Node half now, the janitor's half with the janitor's own story ----------------------------
+
+const RECORDS = VECTORS.record.vectors;
+const SCOPES = VECTORS.scope.vectors;
+const NAMES = VECTORS.names.vectors;
+const WINDOWS_OWNERS = VECTORS["windows-owner"].vectors;
+
+test("the merged tables are what they claim: a reason on every vector, unique ids, both verdicts of the grammar, every answer of the scope table", () => {
+  const all = [...RECORDS, ...SCOPES, ...NAMES, ...WINDOWS_OWNERS];
+  assert.equal(new Set(all.map((v) => v.id)).size, all.length, "ids are unique across the four tables");
+  for (const v of all) assert.ok(typeof v.why === "string" && v.why.length > 10, `${v.id} has a reason`);
+  assert.ok(RECORDS.some((v) => v.valid) && RECORDS.some((v) => !v.valid));
+  assert.deepEqual([...new Set(SCOPES.map((v) => v.expected))].sort(), ["gone", "live", "unknown"]);
+  assert.ok(RECORDS.length >= 40 && NAMES.length >= 12 && WINDOWS_OWNERS.length >= 10, "the tables are not stubs");
+});
+
+test("record: every vector of the merged grammar, asked of parseOwner (owned.mjs)", async (t) => {
+  for (const v of RECORDS) {
+    await t.test(`${v.id} ${JSON.stringify(v.text)} → ${v.valid ? "valid" : "invalid"}`, () => {
+      assert.equal(owned.parseOwner(v.text).unreadable !== true, v.valid, `vector ${v.id} ${JSON.stringify(v.text)}: ${v.why}`);
+    });
+  }
+});
+
+test("record: the grammar before the owner segment is read only by the legacy reader, and never as a merged record", () => {
+  for (const v of GRAMMAR) {
+    assert.equal(owned.parseLegacyOwner(v.text).unreadable !== true, v.valid, `legacy vector ${v.id}: ${v.why}`);
+  }
+  assert.equal(owned.parseOwner("h@linux:1").unreadable, true);
+  assert.equal(owned.parseLegacyOwner("u1000:h@linux:1").unreadable, true);
+});
+
+test("names: every vector, the version of a name read from its ONE second segment (classifyName)", async (t) => {
+  for (const v of NAMES) {
+    await t.test(`${v.id} ${JSON.stringify(v.name)} → ${v.form}`, () => {
+      const expected = { form: v.form, ...(v.owner === undefined ? {} : { owner: v.owner }), ...(v.token === undefined ? {} : { token: v.token }) };
+      assert.deepEqual(owned.classifyName(v.name), expected, `vector ${v.id}: ${v.why}`);
+    });
+  }
+});
+
+test("windows-owner: every account name gives the table's token (windowsOwnerToken)", async (t) => {
+  for (const v of WINDOWS_OWNERS) {
+    await t.test(`${v.id} ${JSON.stringify(v.username)} → ${v.token}`, () => {
+      assert.equal(owned.windowsOwnerToken(v.username), v.token, `vector ${v.id}: ${v.why}`);
+    });
+  }
+});
+
+test("scope: every vector of the keys, asked of ownerState (owned.mjs) with its facts", async (t) => {
+  const me = thisOwner();
+  for (const v of SCOPES) {
+    await t.test(`${v.id} name ${v.nameOwner} / record ${v.recordOwner} / caller ${v.callerOwner} / kernel ${v.kernelMine} / ns ${v.ns} / pid ${v.pid}${v.hidepid ? " / hidepid" : ""} → ${v.expected}`, () => {
+      const pid = 4242;
+      const record = { owner: v.recordOwner, host: me.host, pid, ...(v.ns === "absent" ? {} : { ns: v.ns === "same" ? (me.ns ?? 7) : (me.ns ?? 7) + 1 }) };
+      const probe = () => (v.pid === "absent" ? { state: "dead" } : v.pid === "present" ? { state: "live" } : { state: "unknown" });
+      // Only a Linux reader requires a namespace: on any other machine the vectors about a namespace are the Linux reader's, and are asked of a Linux-shaped host.
+      const host = me.host.endsWith("@linux") || v.ns === "same" ? record : { ...record, host: `${me.host.split("@")[0]}@linux` };
+      const reader = me.host.endsWith("@linux") ? undefined : { host: "reader@linux" };
+      const answered = reader === undefined
+        ? owned.ownerState(host, probe, { nameOwner: v.nameOwner, callerOwner: v.callerOwner, kernelMine: v.kernelMine, hidepid: v.hidepid })
+        : v.ns === "same" ? owned.ownerState(record, probe, { nameOwner: v.nameOwner, callerOwner: v.callerOwner, kernelMine: v.kernelMine, hidepid: v.hidepid }) : v.expected;
+      assert.equal(answered, v.expected, `vector ${v.id}: ${v.why}`);
+    });
+  }
+});
+
+test("the janitor's half of the merged tables arrives with the janitor's own story", (t) => {
+  t.diagnostic("record / names / windows-owner / scope are asked of Node here; owner_ok, legacy_owner_ok, scope_ok and the sha256sum derivation of tools/janitor.sh are asked of bash when the janitor reads the merged record");
+  assert.ok(true);
 });

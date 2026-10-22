@@ -12,6 +12,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import cryptoDefault from "node:crypto";
 import fsDefault from "node:fs";
 import * as fs from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
@@ -23,9 +24,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { git, gitOutput } from "./lib/git.mjs";
 import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import {
-  OWNED, OWNED_PATTERN, PREFIX, REPO_TOKEN, START_TOLERANCE_S,
-  cleanupScope, formatOwner, gitdirOf, ownedDir, ownedName, ownedWorktree, ownerState, parseOwner, processProbe,
-  readOwner, removeLink, removeQuietly, startFromProcStat, tempRoot, thisOwner,
+  MAX_NAME, OWNER_GRAMMAR, PREFIX, REPO_TOKEN, START_TOLERANCE_S,
+  asciiLower, classifyName, cleanupScope, formatLegacyOwner, formatOwner, gitdirOf, isMine, ownedDir, ownedName, ownedPattern,
+  ownedWorktree, ownerState, ownerToken, parseLegacyOwner, parseOwner, processProbe, readOwner, removeLink, removeQuietly, runRecord,
+  isInsideProfile, legacyOwnerState, startFromProcStat, tempRoot, thisOwner, thisOwnerToken, windowsOwnerToken,
 } from "./lib/owned.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -37,7 +39,12 @@ const PLACEHOLDER_COMMIT = ["-c", "user.name=Owned test", "-c", "user.email=owne
 
 const real = (p) => fs.realpathSync.native(p);
 const same = (a, b) => real(a).toLowerCase() === real(b).toLowerCase();
-const ownedEntriesOf = (dir) => fs.readdirSync(dir).filter((name) => OWNED_PATTERN.test(name));
+const ownedEntriesOf = (dir) => fs.readdirSync(dir).filter((name) => ownedPattern().test(name));
+const OWNER = thisOwnerToken();
+const PREFIX_OF = `testsToDelete-${OWNER}-conventions-`;
+const VECTORS = JSON.parse(fs.readFileSync(path.join(here, "fixtures", "owner-vectors.json"), "utf8"));
+/** A record of the owner form for THIS machine and process: what a live claim of this run holds, with `extra` overriding fields. */
+const record = (extra = {}) => ({ owner: OWNER, host: thisOwner().host, ...(thisOwner().ns === undefined ? {} : { ns: thisOwner().ns }), pid: 4242, ...extra });
 
 /** A repository rooted at an owned folder, with one commit so worktrees have a ref. */
 function ownedRepo(scope, what, options) {
@@ -80,23 +87,24 @@ function killChild(child) {
 
 // 1 ---------------------------------------------------------------------------------------------------------
 
-test("1. ownedName is the prefix, the repo token, what and six random characters", () => {
+test("1. ownedName is the prefix, the caller's owner, the repo token, what and six random characters", () => {
   assert.equal(PREFIX, "testsToDelete-");
   assert.equal(REPO_TOKEN, "conventions");
-  assert.equal(OWNED, "testsToDelete-conventions-");
+  assert.match(OWNER, OWNER_GRAMMAR);
   const a = ownedName("pg");
-  assert.match(a, /^testsToDelete-conventions-pg-[A-Za-z0-9]{6}$/);
+  assert.ok(a.startsWith(`${PREFIX_OF}pg-`), a);
+  assert.match(a, /^testsToDelete-[uw][0-9]{1,10}-conventions-pg-[A-Za-z0-9]{6}$/);
   assert.notEqual(a, ownedName("pg"));
-  assert.match(ownedName("a-b "), /^testsToDelete-conventions-a-b -[A-Za-z0-9]{6}$/);
+  assert.ok(ownedName("a-b ").startsWith(`${PREFIX_OF}a-b -`));
 });
 
 // 2 ---------------------------------------------------------------------------------------------------------
 
 test("2. ownedDir makes a prefixed folder in the temp root and a sibling claim that parses to this process", (t) => {
-  const dir = ownedDir(t, "rules Unicode пробел");
+  const dir = ownedDir(t, "rules ü пробел");
   assert.ok(fs.statSync(dir).isDirectory());
   assert.equal(path.dirname(path.resolve(dir)).toLowerCase(), path.resolve(tempRoot()).toLowerCase());
-  assert.ok(path.basename(dir).startsWith("testsToDelete-conventions-rules Unicode пробел-"));
+  assert.ok(path.basename(dir).startsWith(`${PREFIX_OF}rules ü пробел-`));
   const sibling = `${dir}.owner`;
   assert.ok(fs.statSync(sibling).isFile());
   assert.deepEqual(parseOwner(fs.readFileSync(sibling, "utf8")), thisOwner());
@@ -109,13 +117,13 @@ test("3. a bad `what` throws TypeError before anything is created", (t) => {
   const own = lifo(t);
   const parent = ownedDir(own, "bad-what-parent");
   const before = ownedEntriesOf(parent);
-  for (const what of ["", "a/b", "a\\b", "-x", "a\u0001b", "a\u007fb", "x".repeat(31), 7, undefined, "a\0b"]) {
+  const room = MAX_NAME - PREFIX_OF.length - 1 - 6; // the owner is budgeted before `what`
+  for (const what of ["", "a/b", "a\\b", "-x", "a\u0001b", "a\u007fb", "x".repeat(room + 1), 7, undefined, "a\0b"]) {
     assert.throws(() => ownedDir(own, what, { parent }), TypeError, JSON.stringify(what));
     assert.throws(() => ownedName(what), TypeError, JSON.stringify(what));
   }
   assert.deepEqual(ownedEntriesOf(parent), before);
-  assert.match(ownedName("x".repeat(30)), /^testsToDelete-conventions-x{30}-[A-Za-z0-9]{6}$/, "30 is the longest `what`");
-  assert.ok(ownedName("x".repeat(30)).length <= 63);
+  assert.equal(ownedName("x".repeat(room)).length, MAX_NAME, `${room} is the longest \`what\` under ${OWNER}`);
 });
 
 // 4 ---------------------------------------------------------------------------------------------------------
@@ -181,7 +189,7 @@ test("6. unwind through node:test: a child whose test throws leaves nothing behi
     `});`,
     ``,
   ].join("\n"));
-  const parent = ownedDir(own, "child-unwind-parent");
+  const parent = ownedDir(own, "unwind-parent");
   // NODE_TEST_CONTEXT marks a process as a worker of the RUNNING node:test; a nested run must not inherit it.
   const { NODE_TEST_CONTEXT: _inherited, ...env } = process.env;
   const result = spawnSync(process.execPath, ["--test", childFile], {
@@ -191,7 +199,7 @@ test("6. unwind through node:test: a child whose test throws leaves nothing behi
   assert.ifError(result.error);
   assert.notEqual(result.status, 0, "the child must fail");
   const childDir = fs.readFileSync(report, "utf8");
-  assert.ok(path.basename(childDir).startsWith("testsToDelete-conventions-child-unwind-"));
+  assert.ok(path.basename(childDir).startsWith(`${PREFIX_OF}child-unwind-`));
   assert.equal(fs.existsSync(childDir), false);
   assert.equal(fs.existsSync(`${childDir}.owner`), false);
   assert.deepEqual(fs.readdirSync(parent), []);
@@ -227,7 +235,7 @@ test("7. teardown never throws, and what it cannot remove stays prefixed AND cla
   assert.equal(warnings.length, 1, `exactly one warning, got ${JSON.stringify(lines)}`);
   assert.match(warnings[0], /left for the start-of-run sweep/);
   assert.ok(fs.existsSync(dir), "the folder is still there");
-  assert.ok(OWNED_PATTERN.test(path.basename(dir)), "and still prefixed");
+  assert.ok(ownedPattern().test(path.basename(dir)), "and still prefixed");
   assert.ok(fs.existsSync(`${dir}.owner`), "and still claimed");
 });
 
@@ -240,7 +248,8 @@ test("8. ownedWorktree: a prefixed leaf, locked with the owner as the reason, go
   let wt;
   try {
     wt = ownedWorktree(s, repo, "wt");
-    assert.match(path.basename(wt.path), /^testsToDelete-conventions-wt-[A-Za-z0-9]{6}$/);
+    assert.ok(path.basename(wt.path).startsWith(`${PREFIX_OF}wt-`));
+    assert.match(path.basename(wt.path), /^testsToDelete-[uw][0-9]{1,10}-conventions-wt-[A-Za-z0-9]{6}$/);
     assert.equal(path.dirname(path.resolve(wt.path)).toLowerCase(), path.resolve(tempRoot()).toLowerCase(), "a leaf of the temp root");
     const listing = gitOutput(repo, ["worktree", "list", "--porcelain"]);
     const block = listing.split(/\r?\n\r?\n/).find((b) => b.replaceAll("\\", "/").toLowerCase().includes(path.basename(wt.path).toLowerCase()));
@@ -329,16 +338,24 @@ test("11. owner text: format, parse, round trip, and what is unreadable", () => 
   assert.deepEqual(parseOwner(`${formatOwner(owner)}\n`), owner);
   assert.equal(owner.pid, process.pid);
   assert.match(owner.host, /^[^@:\s]+@(linux|macos|windows)$/);
+  assert.equal(owner.owner, OWNER);
   assert.equal("start" in owner, linux && Number.isInteger(owner.start), "a start only where /proc gives it");
-  assert.equal(formatOwner({ host: "devbox@windows", pid: 37560 }), "devbox@windows:37560");
-  assert.equal(formatOwner({ host: "devbox@linux", pid: 4711, start: 1792053744 }), "devbox@linux:4711:1792053744");
-  const two = parseOwner("devbox@windows:37560");
-  assert.deepEqual(two, { host: "devbox@windows", pid: 37560 });
+  assert.equal("ns" in owner, "start" in owner && Number.isInteger(owner.ns), "the pid namespace rides with the start, on Linux only");
+  assert.equal(formatOwner({ owner: "u1000", host: "devbox@windows", pid: 37560 }), "u1000:devbox@windows:37560");
+  assert.equal(formatOwner({ owner: "u1000", host: "devbox@linux", pid: 4711, start: 1792053744, ns: 4026531836 }), "u1000:devbox@linux:4711:1792053744:4026531836");
+  assert.equal(formatOwner({ owner: "w42", host: "devbox@linux", pid: 4711, ns: 4026531836 }), "w42:devbox@linux:4711", "a namespace without a start is never written");
+  const two = parseOwner("u1000:devbox@windows:37560");
+  assert.deepEqual(two, { owner: "u1000", host: "devbox@windows", pid: 37560 });
   assert.equal("start" in two, false);
-  assert.deepEqual(parseOwner("devbox@linux:4711:1792053744"), { host: "devbox@linux", pid: 4711, start: 1792053744 });
-  for (const bad of ["", "added with --lock", "hands off", "devbox:1:2", "devbox@beos:1:2", "devbox@linux:x:2", "devbox@linux:1:2:3", "a b@linux:1"]) {
+  assert.deepEqual(parseOwner("u1000:devbox@linux:4711:1792053744"), { owner: "u1000", host: "devbox@linux", pid: 4711, start: 1792053744 });
+  assert.deepEqual(parseOwner("w42:devbox@linux:4711:1792053744:4026531836"), { owner: "w42", host: "devbox@linux", pid: 4711, start: 1792053744, ns: 4026531836 });
+  for (const bad of ["", "added with --lock", "hands off", "devbox:1:2", "u1000:devbox@beos:1:2", "u1000:devbox@linux:x:2", "u1000:devbox@linux:1:2:3:4", "u1000:a b@linux:1",
+    "devbox@windows:37560", "U1000:devbox@linux:1", "u:devbox@linux:1", "x1000:devbox@linux:1", "u12345678901:devbox@linux:1", "u1000:devbox@linux:1:2:x"]) {
     assert.deepEqual(parseOwner(bad), { unreadable: true }, JSON.stringify(bad));
   }
+  assert.deepEqual(parseLegacyOwner("devbox@linux:4711:1792053744"), { host: "devbox@linux", pid: 4711, start: 1792053744 }, "the old grammar is read by the legacy path only");
+  assert.deepEqual(parseLegacyOwner("u1000:devbox@linux:4711"), { unreadable: true });
+  assert.equal(formatLegacyOwner({ host: "devbox@windows", pid: 37560 }), "devbox@windows:37560");
 });
 
 test("11b. a worktree locked with no reason reads unreadable; an unlocked one reads null", async (t) => {
@@ -444,20 +461,21 @@ test("13. ownerState follows rule §3's order with an injected probe", () => {
   const alive = () => ({ state: "live" });
   assert.equal(ownerState(null, alive), "unknown");
   assert.equal(ownerState({ unreadable: true }, alive), "unknown");
-  assert.equal(ownerState({ host: `other@${tag}`, pid: 4242 }, alive), "unknown", "another host");
-  assert.equal(ownerState({ host: `${name}@${otherTag}`, pid: 4242 }, alive), "unknown", "the same name in another pid space");
-  assert.equal(ownerState({ host: me.host.toUpperCase(), pid: 4242 }, alive), "live", "the host name in another case is the same host");
-  assert.equal(ownerState({ host: me.host, pid: 4242 }, () => ({ state: "dead" })), "gone");
-  assert.equal(ownerState({ host: me.host, pid: 4242 }, () => ({ state: "unknown" })), "unknown", "a refused or failed query is not a dead process");
-  assert.equal(ownerState({ host: me.host, pid: 4242 }, () => ({})), "unknown", "a probe that says nothing");
-  assert.equal(ownerState({ host: me.host, pid: 4242 }, () => undefined), "unknown", "a probe that returns nothing");
-  assert.equal(ownerState({ host: me.host, pid: 4242, start: 100 }, () => ({ state: "live" })), "live", "the probe has no start");
-  assert.equal(ownerState({ host: me.host, pid: 4242 }, () => ({ state: "live", start: 100 })), "live", "a two-field claim");
+  const known = { hidepid: false }; // the sandbox this test runs in may hide other users' processes; the hidepid answer has its own test
+  assert.equal(ownerState(record({ host: `other@${tag}` }), alive), "unknown", "another host");
+  assert.equal(ownerState(record({ host: `${name}@${otherTag}` }), alive), "unknown", "the same name in another pid space");
+  assert.equal(ownerState(record({ host: me.host.toUpperCase() }), alive), "live", "the host name in another case is the same host");
+  assert.equal(ownerState(record(), () => ({ state: "dead" }), known), "gone");
+  assert.equal(ownerState(record(), () => ({ state: "unknown" }), known), "unknown", "a refused or failed query is not a dead process");
+  assert.equal(ownerState(record(), () => ({}), known), "unknown", "a probe that says nothing");
+  assert.equal(ownerState(record(), () => undefined, known), "unknown", "a probe that returns nothing");
+  assert.equal(ownerState(record({ start: 100 }), () => ({ state: "live" })), "live", "the probe has no start");
+  assert.equal(ownerState(record(), () => ({ state: "live", start: 100 })), "live", "a claim with no start");
   assert.equal(START_TOLERANCE_S, 2);
 });
 
 test("13b. two starts further apart than the tolerance are unknown, never gone (rule §3)", () => {
-  const marker = { host: thisOwner().host, pid: 4242, start: 1_000 };
+  const marker = record({ start: 1_000 });
   assert.equal(ownerState(marker, () => ({ state: "live", start: 1_002 })), "live", "2 s apart");
   assert.equal(ownerState(marker, () => ({ state: "live", start: 998 })), "live", "2 s apart, the other way");
   assert.equal(ownerState(marker, () => ({ state: "live", start: 1_003 })), "unknown", "3 s apart: a reused pid or a skewed clock");
@@ -473,7 +491,7 @@ test("14. the real probe: this process is live, a pid no process can have is gon
   // reads ALIVE there. The premise is asserted around the call instead of hoped for.
   const pid = unmatchablePid();
   assertNoSuchProcess(pid);
-  assert.equal(ownerState({ host: thisOwner().host, pid }), "gone");
+  assert.equal(ownerState(record({ pid }), processProbe, { hidepid: false }), "gone");
   assert.deepEqual(processProbe(pid), { state: "dead" });
   assertNoSuchProcess(pid);
   const self = processProbe(process.pid);
@@ -502,7 +520,7 @@ test("14g. a refused real query makes the owner unknown, not gone", () => {
   const original = process.kill;
   process.kill = () => { throw Object.assign(new Error("EPERM"), { code: "EPERM" }); };
   try {
-    assert.equal(ownerState({ host: thisOwner().host, pid: 4242 }), "unknown");
+    assert.equal(ownerState(record()), "unknown");
   } finally {
     process.kill = original;
   }
@@ -590,4 +608,250 @@ test("14f. a claim that cannot be written removes the folder and throws", (t) =>
     syncBuiltinESMExports();
   }
   assert.deepEqual(fs.readdirSync(parent), [], "no folder and no claim is left: a resource that cannot be claimed is not created");
+});
+
+// 15 --------------------------------------------------------------------------------------------------------
+
+test("15. the name carries the caller's owner before the token, and a `what` that leaves no room is refused naming the room", (t) => {
+  const own = lifo(t);
+  const parent = ownedDir(own, "name-owner-parent");
+  const dir = ownedDir(own, "n", { parent });
+  assert.ok(path.basename(dir).startsWith(`testsToDelete-${OWNER}-conventions-n-`), path.basename(dir));
+  const room = MAX_NAME - PREFIX_OF.length - 1 - 6;
+  assert.throws(() => ownedName("x".repeat(room + 1)), (error) => error instanceof TypeError && error.message.includes(`the most is ${room}`) && error.message.includes(OWNER), "the refusal names the room under the owner");
+  assert.throws(() => ownedDir(own, "x".repeat(room + 1), { parent }), TypeError);
+  assert.equal(ownedName("x".repeat(room)).length, MAX_NAME, "the longest `what` fills the name exactly: nothing is ever truncated");
+});
+
+test("15b. classifyName reads the version of a name from its ONE second segment (the shared `names` vectors)", () => {
+  for (const vector of VECTORS.names.vectors) {
+    const got = classifyName(vector.name);
+    const expected = { form: vector.form, ...(vector.owner === undefined ? {} : { owner: vector.owner }), ...(vector.token === undefined ? {} : { token: vector.token }) };
+    assert.deepEqual(got, expected, `${vector.id} ${JSON.stringify(vector.name)}: ${vector.why}`);
+  }
+});
+
+// 16 --------------------------------------------------------------------------------------------------------
+
+/** Make the NEXT random id `aaaaaa` (all-zero bytes), then restore: a way to land two helpers on one name. */
+function firstIdIsAAAAAA(t) {
+  const original = cryptoDefault.randomBytes;
+  let spent = false;
+  cryptoDefault.randomBytes = (size, ...rest) => {
+    if (spent) return original.call(cryptoDefault, size, ...rest);
+    spent = true;
+    return Buffer.alloc(size, 0);
+  };
+  syncBuiltinESMExports();
+  t.after(() => { cryptoDefault.randomBytes = original; syncBuiltinESMExports(); });
+}
+
+test("16. ownedDir claims FIRST: the claim exists before the folder is made, and a claim already on the name draws a new id", async (t) => {
+  const own = lifo(t);
+  const parent = ownedDir(own, "claim-parent");
+  const taken = path.join(parent, `${PREFIX_OF}first-aaaaaa`);
+  fs.writeFileSync(`${taken}.owner`, "somebody else's claim\n"); // an orphan claim: a claim with no folder
+  const originalMkdir = fsDefault.mkdirSync;
+  const unclaimed = [];
+  const made = [];
+  fsDefault.mkdirSync = (target, ...rest) => {
+    made.push(String(target));
+    if (!fs.existsSync(`${target}.owner`)) unclaimed.push(String(target));
+    return originalMkdir(target, ...rest);
+  };
+  syncBuiltinESMExports();
+  firstIdIsAAAAAA(t);
+  const scope = cleanupScope();
+  let dir;
+  try {
+    dir = ownedDir(scope, "first", { parent });
+  } finally {
+    fsDefault.mkdirSync = originalMkdir;
+    syncBuiltinESMExports();
+  }
+  try {
+    assert.deepEqual(made.map((target) => path.resolve(target)), [path.resolve(dir)], "the folder is made with mkdir, exactly once");
+    assert.deepEqual(unclaimed, [], "no folder was made before its claim was written");
+    assert.notEqual(path.basename(dir), path.basename(taken), "a claim already on the name draws a new id");
+    assert.equal(fs.readFileSync(`${taken}.owner`, "utf8"), "somebody else's claim\n", "the other claim is untouched");
+    assert.equal(fs.existsSync(taken), false, "and no folder was made under the taken name");
+  } finally {
+    await scope.close();
+  }
+  assert.equal(fs.existsSync(dir), false);
+  assert.equal(fs.existsSync(`${dir}.owner`), false);
+});
+
+test("16b. a squatted name: one warning, the helper removes its OWN claim at once, the squatter's folder is untouched, a new id is drawn", async (t) => {
+  const own = lifo(t);
+  const parent = ownedDir(own, "squat-parent");
+  const squat = path.join(parent, `${PREFIX_OF}sq-aaaaaa`);
+  fs.mkdirSync(squat);
+  fs.writeFileSync(path.join(squat, "keep.txt"), "not yours\n");
+  firstIdIsAAAAAA(t);
+  const scope = cleanupScope();
+  let dir = "";
+  const lines = await stderrOf(() => { dir = ownedDir(scope, "sq", { parent }); });
+  const warnings = lines.filter((line) => line.startsWith("owned:"));
+  assert.equal(warnings.length, 1, `one warning, got ${JSON.stringify(lines)}`);
+  assert.ok(warnings[0].includes(`${PREFIX_OF}sq-aaaaaa`), "the warning names the collision");
+  assert.notEqual(path.basename(dir), path.basename(squat), "a new id was drawn");
+  assert.equal(fs.existsSync(`${squat}.owner`), false, "the claim is removed before another id is chosen: a claim of a run that dies later can never govern a folder this run did not create");
+  fs.writeFileSync(`${squat}.owner`, "another run claimed the name since\n"); // a later run took the freed name
+  await scope.close();
+  assert.equal(fs.readFileSync(`${squat}.owner`, "utf8"), "another run claimed the name since\n", "this run's teardown never removes a claim it no longer holds");
+  fs.rmSync(`${squat}.owner`);
+  assert.equal(fs.readFileSync(path.join(squat, "keep.txt"), "utf8"), "not yours\n", "the squatter's folder is never removed");
+  assert.equal(fs.existsSync(dir), false, "and what the helper made is gone");
+});
+
+// 17 --------------------------------------------------------------------------------------------------------
+
+test("17. thisOwner carries the owner token and, on Linux, the pid namespace; TESTSTODELETE_RUN replaces the process when valid and is refused when not", async () => {
+  const me = thisOwner();
+  assert.equal(me.owner, OWNER);
+  if (linux && me.start !== undefined) assert.ok(Number.isInteger(me.ns), "Linux: the namespace rides with the start");
+  else assert.equal(me.ns, undefined);
+  const given = { owner: OWNER, host: me.host, pid: 4711, ...(me.start === undefined ? {} : { start: me.start, ...(me.ns === undefined ? {} : { ns: me.ns }) }) };
+  assert.deepEqual(runRecord({ TESTSTODELETE_RUN: formatOwner(given) }), given, "a valid run record is the run's");
+  assert.equal(runRecord({}), me);
+  assert.equal(runRecord({ TESTSTODELETE_RUN: "" }), me);
+  for (const bad of ["garbage", `${OWNER === "u1" ? "u2" : "u1"}:${me.host}:4711`, `${OWNER}:${me.host}:4711\nextra`, "a".repeat(600)]) {
+    let used;
+    const lines = await stderrOf(() => { used = runRecord({ TESTSTODELETE_RUN: bad }); });
+    assert.equal(used, me, `a record that is not this user's is refused: ${JSON.stringify(bad.slice(0, 40))}`);
+    assert.ok(lines.some((line) => line.startsWith("owned:")), "and one warning says so");
+  }
+});
+
+test("17b. a child with TESTSTODELETE_RUN set makes a claim that names the RUN, not the child", (t) => {
+  const own = lifo(t);
+  const work = ownedDir(own, "run-child");
+  const parent = ownedDir(own, "run-child-parent");
+  const script = path.join(work, "child.mjs");
+  fs.writeFileSync(script, [
+    `import { ownedDir, cleanupScope } from ${JSON.stringify(moduleUrl)};`,
+    `const scope = cleanupScope();`,
+    `process.stdout.write(ownedDir(scope, "run-child-dir", { parent: process.env.OWNED_CHILD_PARENT }));`,
+    ``,
+  ].join("\n"));
+  const runsRecord = `${OWNER}:${thisOwner().host}:4711`;
+  const { NODE_TEST_CONTEXT: _inherited, ...env } = process.env;
+  const result = spawnSync(process.execPath, [script], { encoding: "utf8", timeout: 60_000, env: { ...env, OWNED_CHILD_PARENT: parent, TESTSTODELETE_RUN: runsRecord } });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(fs.readFileSync(`${result.stdout}.owner`, "utf8"), `${runsRecord}\n`, "the claim holds the run's record");
+  removeQuietly(result.stdout);
+});
+
+// 18 --------------------------------------------------------------------------------------------------------
+
+test("18. TESTSTODELETE_OWNER selects, never widens: u0 by a non-root user is unknown, and an invalid value refuses", () => {
+  assert.equal(ownerToken({ platform: "linux", uid: 1000, env: { TESTSTODELETE_OWNER: "u0" } }), "u0", "the override names the scope");
+  assert.equal(ownerToken({ platform: "linux", uid: 1000, env: {} }), "u1000");
+  assert.equal(ownerToken({ platform: "linux", uid: 1000, env: { TESTSTODELETE_OWNER: "" } }), "u1000", "an empty value is no value");
+  const rootsRecord = { owner: "u0", host: thisOwner().host, ...(thisOwner().ns === undefined ? {} : { ns: thisOwner().ns }), pid: 4242 };
+  const dead = () => ({ state: "dead" });
+  assert.equal(ownerState(rootsRecord, dead, { callerOwner: "u0", kernelMine: false, hidepid: false }), "unknown", "the kernel owner is not the caller: the override widened nothing");
+  assert.equal(ownerState(rootsRecord, dead, { callerOwner: "u0", kernelMine: true, hidepid: false }), "gone", "with the kernel's agreement the same record is gone");
+  for (const bad of ["u0;rm -rf /", "u1000 ", " u1000", "U1000", "u", "w", "w12345678901", "x1000", "u-1", "u1000\n"]) {
+    assert.throws(() => ownerToken({ platform: "linux", uid: 1000, env: { TESTSTODELETE_OWNER: bad } }), /not an owner token/, JSON.stringify(bad));
+  }
+});
+
+// 19 --------------------------------------------------------------------------------------------------------
+
+test("19. a record whose owner is not the name's or not the caller's is unknown; a Linux record without a namespace, or in another one, is unknown", () => {
+  const dead = () => ({ state: "dead" });
+  const flags = { hidepid: false };
+  assert.equal(ownerState(record(), dead, flags), "gone", "the control: the same record, all keys agree");
+  assert.equal(ownerState(record({ owner: "u424242" }), dead, flags), "unknown", "the record's owner is not the caller's");
+  assert.equal(ownerState(record(), dead, { ...flags, nameOwner: "u424242" }), "unknown", "the name's owner is not the record's");
+  assert.equal(ownerState(record(), dead, { ...flags, callerOwner: "u424242" }), "unknown", "the caller is not the record's owner");
+  assert.equal(ownerState(record(), dead, { ...flags, nameOwner: OWNER }), "gone", "name, record and caller are ONE");
+  assert.equal(ownerState(record(), dead, { hidepid: true }), "unknown", "a process list that may hide other users' processes proves nothing");
+  if (linux && thisOwner().ns !== undefined) {
+    const { ns: _ns, ...withoutNamespace } = record();
+    assert.equal(ownerState(withoutNamespace, dead, flags), "unknown", "a Linux record without a namespace");
+    assert.equal(ownerState(record({ ns: thisOwner().ns + 1 }), dead, flags), "unknown", "the same pid in another namespace");
+  }
+});
+
+test("19b. a claim another uid wrote, and a claim that is no regular file, are unreadable", (t) => {
+  if (win32) { t.skip("no uid on Windows; the janitor's -O is the check there"); return; }
+  const own = lifo(t);
+  const parent = ownedDir(own, "claim-kinds");
+  const dir = ownedDir(own, "k", { parent });
+  assert.equal(isMine(dir), true);
+  assert.equal(isMine(path.join(parent, "no-such-entry")), false);
+  fs.rmSync(`${dir}.owner`);
+  const fifo = spawnSync("mkfifo", [`${dir}.owner`]);
+  if (fifo.status === 0) assert.deepEqual(readOwner(dir, "folder"), { unreadable: true }, "a FIFO is never opened: a read would block forever");
+  fs.rmSync(`${dir}.owner`, { force: true });
+  if (process.getuid() === 0) {
+    fs.writeFileSync(`${dir}.owner`, `${formatOwner(thisOwner())}\n`);
+    fs.chownSync(`${dir}.owner`, 54321, 54321);
+    assert.deepEqual(readOwner(dir, "folder"), { unreadable: true, reason: "foreign-uid" }, "a claim a stranger wrote is no evidence");
+    fs.chownSync(dir, 54321, 54321);
+    assert.equal(isMine(dir), false);
+  }
+});
+
+// 20 --------------------------------------------------------------------------------------------------------
+
+test("20. the Windows owner token: ASCII-only lower-casing, the UTF-8 bytes of the name alone, 1 to 10 digits — the shared `windows-owner` vectors", () => {
+  assert.ok(VECTORS["windows-owner"].vectors.length >= 10);
+  for (const vector of VECTORS["windows-owner"].vectors) {
+    assert.equal(windowsOwnerToken(vector.username), vector.token, `${vector.id} ${JSON.stringify(vector.username)}: ${vector.why}`);
+    assert.equal(ownerToken({ platform: "win32", username: vector.username, env: {} }), vector.token);
+    assert.match(vector.token, /^w[0-9]{1,10}$/);
+    assert.match(vector.token, OWNER_GRAMMAR);
+  }
+  assert.equal(windowsOwnerToken("Alice"), windowsOwnerToken("alice"), "Alice and alice give one token");
+  assert.notEqual(windowsOwnerToken("SØREN"), windowsOwnerToken("søren"), "only the ASCII letters are lower-cased");
+  assert.equal(asciiLower("ÀBC-Ünal"), "Àbc-Ünal");
+  assert.notEqual(windowsOwnerToken("alice\n"), windowsOwnerToken("alice"), "a line end is part of the bytes: the canonical input has none");
+  assert.equal(ownerToken({ platform: "linux", uid: 1000, username: "Alice", env: {} }), "u1000", "POSIX never hashes");
+});
+
+// R1 / R2 / R5 — defects found by review ---------------------------------------------------------------------------
+
+test("R1. a legacy record on a Linux reader is unknown (it has no pid namespace); on any other reader it is judged like a record", () => {
+  const legacy = { host: thisOwner().host, pid: 4242 };
+  const dead = () => ({ state: "dead" });
+  assert.equal(legacyOwnerState(legacy, dead, { platform: "linux", hidepid: false }), "unknown", "a pid in a container we cannot see is not a dead pid");
+  assert.equal(legacyOwnerState(legacy, dead, { platform: "darwin", hidepid: false }), "gone");
+  assert.equal(legacyOwnerState(legacy, dead, { platform: "win32", hidepid: false }), "gone");
+  assert.equal(legacyOwnerState(legacy, () => ({ state: "live" }), { platform: "darwin" }), "live");
+  assert.equal(legacyOwnerState({ unreadable: true }, dead, { platform: "darwin" }), "unknown");
+});
+
+test("R2. the Windows scope key is the user's profile: a path counts as mine only inside it (pure, any OS)", () => {
+  const w = path.win32;
+  const home = "C:/Users/alice";
+  assert.equal(isInsideProfile("C:/Users/alice/AppData/Local/Temp/x", home, w), true);
+  assert.equal(isInsideProfile("c:/users/ALICE/appdata/local/temp/x", home, w), true, "case-insensitive");
+  assert.equal(isInsideProfile("C:/Temp/x", home, w), false, "a shared temp root is no one's profile");
+  assert.equal(isInsideProfile("C:/Users/alice2/x", home, w), false, "a longer name is not a child");
+  assert.equal(isInsideProfile("C:/Users/bob/x", home, w), false);
+  assert.equal(isInsideProfile("D:/Users/alice/x", home, w), false, "another drive");
+  assert.equal(isInsideProfile(home, home, w), false, "the profile itself is not a resource");
+  assert.equal(isInsideProfile("C:/Users/alice/../bob/x", home, w), false, "dot segments are resolved first");
+});
+
+test("R2b. on Windows isMine is true only inside the profile of the current user; elsewhere it fails closed", (t) => {
+  if (!win32) { t.skip("the Windows branch"); return; }
+  const own = lifo(t);
+  const dir = ownedDir(own, "profile");
+  assert.equal(isMine(dir), true, "the per-user temp root is inside the profile");
+  assert.equal(isMine(dir, { home: path.parse(dir).root + "no-such-profile" }), false, "another profile");
+  assert.equal(isMine(path.join(process.env.SystemRoot ?? "C:/Windows", "System32")), false, "outside the profile");
+  assert.equal(isMine(path.join(dir, "missing")), false, "a path that is not there is not provably mine");
+});
+
+test("R2c. a claim the scope key does not own is unreadable foreign-uid on every OS (the seam is the same one the sweep uses)", (t) => {
+  const own = lifo(t);
+  const dir = ownedDir(own, "claim-scope");
+  assert.deepEqual(readOwner(dir, "folder", { mine: () => false }), { unreadable: true, reason: "foreign-uid" });
+  assert.deepEqual(readOwner(dir, "folder", { mine: () => true }), thisOwner());
 });

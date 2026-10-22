@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 import { git } from "./lib/git.mjs";
 import { MAX_CLAIM_BYTES, REPO_ROW, REPO_TOKEN, ownedDir } from "./lib/owned.mjs";
-import { EXCLUDED_FILES, main, scanRepository, scanText, tokenConstants, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
+import { EXCLUDED_FILES, LEGACY_NAME_PENDING, main, scanRepository, scanText, tokenConstants, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RULE = path.join(root, "common", "test-leftovers.md");
@@ -42,8 +42,8 @@ const FOOT = "\n";
 
 // the workflow shapes of the docker carve-out -----------------------------------------------------------------
 
-const NAME = "testsToDelete-x-abc123";
-const VOLUME = "testsToDelete-x-data-abc123";
+const NAME = "testsToDelete-u1000-x-abc123";
+const VOLUME = "testsToDelete-u1000-x-data-abc123";
 
 function workflow({ run = `docker run -d --name ${NAME} img`, steps = [] } = {}) {
   const body = [
@@ -130,7 +130,7 @@ test("2. docker-run: a named run with no remover is `permits dropping --rm`", (t
 
 test("2. docker-run: --rm is complete by itself", (t) => {
   assert.equal(one(t, ".github/workflows/w.yml", workflow({ run: "docker run --rm img" })).code, 0);
-  assert.equal(one(t, "tools/r.sh", "docker run -d --rm --name testsToDelete-x-abc123 img\n").code, 0);
+  assert.equal(one(t, "tools/r.sh", "docker run -d --rm --name testsToDelete-u1000-x-abc123 img\n").code, 0);
 });
 
 test("2. docker-run: the carve-out — a later always() + continue-on-error step AFTER the readers is clean", (t) => {
@@ -179,12 +179,12 @@ test("2. docker-name: volume create / network create / --name / WithName without
   assert.equal(one(t, "tools/n.sh", "docker network create net\n").code, 1);
   assert.equal(one(t, "tools/c.sh", "docker run --rm --name web img\n").code, 1);
   assert.equal(one(t, "tools/w.test.mjs", 'new ContainerBuilder().WithName("db");\n').code, 1);
-  assert.equal(one(t, "tools/ok.sh", "docker volume create testsToDelete-x-cache-abc123\n").code, 0);
-  assert.equal(one(t, "tools/ok2.test.mjs", 'new ContainerBuilder().WithName("testsToDelete-x-db-abc123");\n').code, 0);
+  assert.equal(one(t, "tools/ok.sh", "docker volume create testsToDelete-u1000-x-cache-abc123\n").code, 0);
+  assert.equal(one(t, "tools/ok2.test.mjs", 'new ContainerBuilder().WithName("testsToDelete-u1000-x-db-abc123");\n').code, 0);
 });
 
 test("2. docker-name: a compose project name — -p, --project-name, COMPOSE_PROJECT_NAME — needs a spelling", (t) => {
-  const GOOD = "testsToDelete-x-stack-abc123";
+  const GOOD = "testsToDelete-u1000-x-stack-abc123";
   for (const command of [
     "docker compose -p web up -d",
     "docker compose --project-name web up -d",
@@ -204,7 +204,7 @@ test("2. docker-name: a compose project name — -p, --project-name, COMPOSE_PRO
   for (const command of [
     `docker compose -p ${GOOD} up -d`,
     `docker compose --project-name ${GOOD} up -d`,
-    `docker-compose -f a.yml -p teststodelete-x-s-abc123 up -d`,
+    `docker-compose -f a.yml -p teststodelete-u1000-x-s-abc123 up -d`,
     `COMPOSE_PROJECT_NAME=${GOOD} docker compose up -d`,
     "docker compose up -d",
     "docker compose run -p 8080:80 svc",
@@ -217,7 +217,7 @@ test("2. docker-name: a compose project name — -p, --project-name, COMPOSE_PRO
 test("2. docker-name: a test-built image tag; a pushed one is the publish and out of scope", (t) => {
   assert.equal(one(t, "tools/b.sh", "docker build -t app .\n").code, 1);
   assert.equal(one(t, "tools/b.sh", "docker build -t app .\ndocker push app\n").code, 0);
-  assert.equal(one(t, "tools/b.sh", "docker build -t testsToDelete-x-img-abc123 .\n").code, 0);
+  assert.equal(one(t, "tools/b.sh", "docker build -t testsToDelete-u1000-x-img-abc123 .\n").code, 0);
   const published = [
     "name: x", "on: push", "jobs:", "  publish:", "    runs-on: ubuntu-latest", "    steps:",
     "      - run: docker build -t reg/app:1 .", "      - run: docker push reg/app:1",
@@ -243,7 +243,7 @@ test("2. shared-store: the other shapes, a prefixed target, and prose never matc
   assert.equal(one(t, "tools/d.sh", 'psql -c "DROP DATABASE prod"\n').code, 1);
   assert.equal(one(t, "tools/d.sh", "redis-cli FLUSHALL\n").code, 1);
   assert.equal(one(t, "tools/d.test.mjs", "await users.deleteMany({});\n").code, 1);
-  assert.equal(one(t, "tools/d.sh", 'psql -c "DROP DATABASE testsToDelete-x-db-abc123"\n').code, 0);
+  assert.equal(one(t, "tools/d.sh", 'psql -c "DROP DATABASE testsToDelete-u1000-x-db-abc123"\n').code, 0);
   assert.equal(one(t, "tools/d.sh", "# the table was truncated\necho truncated rows\n").code, 0);
   assert.equal(one(t, "tools/d.sh", "-- TRUNCATE TABLE users\n").code, 0, "a SQL comment line");
 });
@@ -486,7 +486,7 @@ test("3a. E: janitor.sh's claim limit is the one number of owned.mjs", () => {
 
 test("7. docker-run and docker-name: the argument-array form of a JavaScript call is read like the command line", (t) => {
   const code = (body) => one(t, "tools/d.test.mjs", body + "\n");
-  assert.equal(code('execFileSync("docker", ["run", "-d", "--name", "testsToDelete-x-abc123", "img"]);').code, 1, "no --rm");
+  assert.equal(code('execFileSync("docker", ["run", "-d", "--name", "testsToDelete-u1000-x-abc123", "img"]);').code, 1, "no --rm");
   assert.equal(code("spawn('docker', ['run', '-d', 'img']);").code, 1, "no --rm, no name");
   assert.equal(code('execFileSync("docker", ["run", "--rm", "-d", "img"]);').code, 0, "--rm");
   assert.equal(code('execFileSync("docker", ["run", "--rm=true", "img"]);').code, 0, "--rm=true");
@@ -494,7 +494,7 @@ test("7. docker-run and docker-name: the argument-array form of a JavaScript cal
   assert.equal(code('execFileSync("docker", ["network", "create", "web"]);').code, 1, "unprefixed network");
   assert.equal(code('execFileSync("docker", ["volume", "create"]);').code, 1, "unnamed volume");
   assert.equal(code('execFileSync("docker", ["volume", "create", "-d", "local", "web"]);').code, 1, "an option with a value before the name");
-  assert.equal(code('execFileSync("docker", ["volume", "create", "testsToDelete-x-data-abc123"]);').code, 0, "a prefixed volume");
+  assert.equal(code('execFileSync("docker", ["volume", "create", "testsToDelete-u1000-x-data-abc123"]);').code, 0, "a prefixed volume");
   assert.equal(code('execFileSync("docker", ["network", "create", ownedName("net")]);').code, 0, "a name the guard cannot see is not guessed at");
   assert.equal(code('execFileSync("docker", ["build", "-t", "plain-image", "."]);').code, 1, "an image a test builds");
   assert.equal(code('execFileSync("docker", ["rm", "-f", "-v", NAME]);').code, 0, "a remover is not a run");
@@ -519,7 +519,122 @@ test("4. the exclusion list is exactly one file", () => {
 
 test("5. spaces and Unicode survive the migration: the three tests still make such paths", () => {
   const source = (name) => fs.readFileSync(path.join(root, "tools", name), "utf8");
-  assert.match(source("rules.test.mjs"), /ownedDir\(t,\s*"rules Unicode пробел"\)/);
+  assert.match(source("rules.test.mjs"), /ownedDir\(t,\s*"rules ü пробел"\)/);
   assert.match(source("migrate-rules.test.mjs"), /ownedDir\(t,\s*"migration пробел"\)/);
   assert.match(source("plan-lifecycle.test.mjs"), /ownedDir\(t,\s*"plan-lifecycle "\)/);
+});
+
+// 3b / merged core: owner grammar, legacy-name, owner-blind, the allowlist ----------------------------------------------
+
+// The prefix is spelled in two pieces so that this file, which the guard does not read but the machine scan does, holds no
+// line the shared classifier calls broad.
+const Q = "testsTo" + "Delete";
+const P = "teststo" + "delete";
+const JANITOR = "tools/janitor.sh";
+const ALLOWLIST = path.join(root, "tools", "fixtures", "owner-blind-allowlist.json");
+
+test("3b. a token of the owner grammar is a `token` finding: no repository may be named like an owner", () => {
+  const rule = fs.readFileSync(RULE, "utf8").replace("| `qln` | dew_flow |", "| `u1000` | dew_flow |");
+  const found = tokenFindings(rule, "u1000");
+  assert.ok(found.some((entry) => entry.cls === "token" && /owner grammar/.test(entry.text)), JSON.stringify(found));
+  assert.ok(tokenFindings(rule, "w42").some((entry) => /owner grammar/.test(entry.text)));
+  assert.ok(tokenFindings(rule, "u12345678901").every((entry) => !/owner grammar/.test(entry.text)), "eleven digits are not the grammar");
+  assert.deepEqual(tokenFindings(fs.readFileSync(RULE, "utf8"), "conventions"), []);
+});
+
+test("2. legacy-name: a literal in any of the three spellings with no owner segment, and a REPO_TOKEN-built prefix", (t) => {
+  for (const line of [
+    `const n = "${Q}-api-pg-k3f9a1";`,
+    `const n = "${P}-api-pg-k3f9a1";`,
+    `const n = "${P}_api_pg_k3f9a1";`,
+    "const n = `" + Q + "-${REPO_TOKEN}-pg-${id}`;",
+  ]) {
+    const result = one(t, "tools/x.test.mjs", `${line}\n`);
+    assert.equal(result.code, 1, line);
+    assert.match(result.text, /x\.test\.mjs:1 — legacy-name/, line);
+  }
+  assert.equal(one(t, "tools/ok.test.mjs", `const n = "${Q}-u1000-api-pg-k3f9a1";\nconst m = "${Q}-w42-api-x";\n`).code, 0, "the owner form is the form");
+  assert.equal(one(t, "tools/ok2.test.mjs", `// ${Q}-api-pg-k3f9a1 is what the old rule said\n`).code, 0, "a comment names it");
+});
+
+test("2. legacy-name is exemptible with a reason; the exemption of an unknown class is not accepted", (t) => {
+  const reason = "a fixture that proves the old form is still refused";
+  assert.equal(one(t, "tools/x.test.mjs", `// ${Q}-exempt: legacy-name — ${reason}\nconst n = "${Q}-api-pg-k3f9a1";\n`).code, 0);
+});
+
+test("2. owner-blind: a prefix-only regex, glob and docker filter are findings", (t) => {
+  for (const [file, line] of [
+    ["tools/a.sh", `docker ps -a --format '{{.Names}}' | grep -i '^${Q}-' | xargs -r docker rm -f`],
+    ["tools/b.sh", `find "$TMPDIR" -iname '${Q}-*' -mmin +60 -exec rm -rf {} +`],
+    ["tools/c.sh", `docker ps -a --filter "name=${P}"`],
+    ["tools/d.test.mjs", `const rx = /^${P}[-_]/i;`],
+  ]) {
+    const result = one(t, file, `${line}\n`);
+    assert.equal(result.code, 1, line);
+    assert.match(result.text, new RegExp(`${file.replace(".", "\.")}:1 — owner-blind`), line);
+  }
+  assert.equal(one(t, "tools/e.sh", `grep -i '^${P}[-_]u1000[-_]' list\n`).code, 0, "an owner after the prefix is not blind");
+});
+
+test("2. owner-blind takes NO inline exemption: an annotated arbitrary rm -rf sweep is still a finding", (t) => {
+  const reason = "inventory only, deletion is gated per row by something";
+  const annotated = one(t, "tools/s.sh", `# ${Q}-exempt: owner-blind — ${reason}\nfind /tmp -iname '${Q}-*' -exec rm -rf {} +\n`);
+  assert.equal(annotated.code, 1);
+  assert.match(annotated.text, /s\.sh:2 — owner-blind/, "the sweep itself is the finding");
+  assert.match(annotated.text, /s\.sh:1 — exemption — .*owner-blind/, "and the annotation says it clears nothing");
+  const trailing = one(t, "tools/s2.sh", `docker ps -a | grep -i '^${Q}-' | xargs docker rm -f # ${Q}-exempt: owner-blind — ${reason}\n`);
+  assert.equal(trailing.code, 1);
+  assert.match(trailing.text, /owner-blind/);
+});
+
+test("2. the allowlist clears the janitor's inventory line and not the same text in another file or at another line", (t) => {
+  const line = `RX='${P}[-_]'; GLOB='${P}[-_]*'`;
+  const text = `#!/usr/bin/env bash\n${line}\n`;
+  const repo = tree(t, { [JANITOR]: text });
+  const entry = (extra = {}) => ({ file: JANITOR, line: 2, sha256: sha(line), ...extra });
+  const cleared = scanRepository({ repo, allowlist: [entry()] });
+  assert.deepEqual(cleared.findings.filter((found) => found.cls === "owner-blind"), []);
+  const hit = (list) => scanRepository({ repo, allowlist: list }).findings.filter((found) => found.cls === "owner-blind").length;
+  assert.equal(hit([]), 1);
+  assert.equal(hit([entry({ file: "tools/other.sh" })]), 1, "another file");
+  assert.equal(hit([entry({ line: 3 })]), 1, "another line");
+  assert.equal(hit([entry({ sha256: sha(`${line} `)})]), 1, "one byte of difference");
+  const elsewhere = tree(t, { "tools/other.sh": text });
+  assert.equal(scanRepository({ repo: elsewhere, allowlist: [entry()] }).findings.filter((found) => found.cls === "owner-blind").length, 1, "the same text in another file is not cleared");
+});
+
+import { createHash } from "node:crypto";
+const sha = (text) => createHash("sha256").update(text, "utf8").digest("hex");
+
+test("2. the shipped allowlist is exactly the janitor's inventory line, and pins the shipped script", () => {
+  const list = JSON.parse(fs.readFileSync(ALLOWLIST, "utf8"));
+  assert.equal(list.entries.length, 1, "ONE entry");
+  const [entry] = list.entries;
+  assert.equal(entry.file, JANITOR);
+  const lines = fs.readFileSync(path.join(root, JANITOR), "utf8").split(/\r?\n/);
+  assert.equal(sha(lines[entry.line - 1]), entry.sha256, `tools/janitor.sh:${entry.line} is not the line the allowlist pins`);
+});
+
+test("2. break-it: one byte changed on the janitor's inventory line makes the guard red until --update-allowlist", (t) => {
+  const repo = tree(t, {});
+  fs.mkdirSync(path.join(repo, "tools", "fixtures"), { recursive: true });
+  const script = fs.readFileSync(path.join(root, JANITOR), "utf8").replace(/\r\n/g, "\n");
+  fs.writeFileSync(path.join(repo, JANITOR), script);
+  fs.copyFileSync(ALLOWLIST, path.join(repo, "tools", "fixtures", "owner-blind-allowlist.json"));
+  fs.writeFileSync(path.join(repo, "tools", "x.test.mjs"), "const a = 1;\n");
+  assert.equal(guard(repo).code, 0, guard(repo).text);
+  fs.writeFileSync(path.join(repo, JANITOR), script.replace(`GLOB='${P}[-_]*'`, `GLOB='${P}[-_]**'`));
+  const red = guard(repo);
+  assert.equal(red.code, 1, red.text);
+  assert.match(red.text, /janitor\.sh:\d+ — owner-blind/);
+  assert.equal(guard(repo, ["--update-allowlist"]).code, 0);
+  assert.equal(guard(repo).code, 0, "regenerated from the current file");
+});
+
+test("2. the pending list of legacy-name exemptions is exactly the janitor's own tests and skips ONLY that class", (t) => {
+  assert.deepEqual([...LEGACY_NAME_PENDING], ["tools/janitor.test.mjs", "tools/janitor-liveness.test.mjs", "tools/janitor-paths.test.mjs", "tools/owner-conformance.test.mjs"]);
+  const legacy = `const n = "${Q}-api-pg-k3f9a1";\n`;
+  assert.equal(one(t, "tools/janitor.test.mjs", legacy).code, 0, "a legacy literal in a janitor test is not yet a finding");
+  assert.equal(one(t, "tools/janitor.test.mjs", `find /tmp -iname '${Q}-*'\n`).code, 1, "an owner-blind sweep there still is");
+  assert.equal(one(t, "tools/janitor.test.mjs", "const d = os.tmpdir();\n").code, 1, "and so is every other class");
 });
