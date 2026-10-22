@@ -193,11 +193,11 @@ function allMatches(patterns, line) {
   });
 }
 
-/** `COMPOSE_PROJECT_NAME=x` or `: x` on a line: one hit when x is not a testsToDelete name — a compose project's containers carry the project's name. */
+/** `COMPOSE_PROJECT_NAME=x` or `: x` on a line: one hit when x is not an owner-form leftover name — a compose project's containers carry the project's name. */
 function composeEnvHits(line) {
   return [...line.matchAll(/COMPOSE_PROJECT_NAME["']?\s*[:=]\s*["']?([^\s"';,}]*)/g)]
     .filter((match) => !PREFIX_OK.test(match[1]))
-    .map((match) => `COMPOSE_PROJECT_NAME is not a testsToDelete name: ${match[1] === "" ? "(empty)" : match[1]}`);
+    .map((match) => `COMPOSE_PROJECT_NAME is not an owner-form leftover name: ${match[1] === "" ? "(empty)" : match[1]}`);
 }
 
 /** `legacy-name` hits of a line: a literal whose second segment is no owner (and no `exempt` marker word), or a prefix built from the token alone. */
@@ -346,19 +346,19 @@ function nameFindings(file, command, pushed) {
   const bad = (text) => found.push(finding(file, command.line, "docker-name", text));
   if (/\bdocker\b/.test(command.text)) {
     const arrayForm = [...command.text.matchAll(/["']--name["']\s*,\s*["']([^"']*)["']/g)].map((match) => match[1]);
-    for (const name of [...flagValues(tokens, ["--name"]), ...arrayForm]) if (!nameOk(name)) bad(`\`--name ${name}\` is not a testsToDelete name`);
+    for (const name of [...flagValues(tokens, ["--name"]), ...arrayForm]) if (!nameOk(name)) bad(`\`--name ${name}\` is not an owner-form leftover name`);
   }
   for (const match of command.text.matchAll(/\bdocker\s+(volume|network)\s+create\b/g)) {
     const name = createdName(tokens, tokens.indexOf("create", tokens.indexOf(match[1])));
     if (name === "") bad(`\`docker ${match[1]} create\` makes an unnamed ${match[1]}`);
-    else if (!nameOk(name)) bad(`\`docker ${match[1]} create ${name}\` is not a testsToDelete name`);
+    else if (!nameOk(name)) bad(`\`docker ${match[1]} create ${name}\` is not an owner-form leftover name`);
   }
-  for (const name of composeProjectNames(tokens)) if (!PREFIX_OK.test(name)) bad(`the compose project \`${name}\` is not a testsToDelete name`);
-  for (const match of command.text.matchAll(/\bWithName\(\s*"([^"]*)"/g)) if (!PREFIX_OK.test(match[1])) bad(`\`WithName("${match[1]}")\` is not a testsToDelete name`);
+  for (const name of composeProjectNames(tokens)) if (!PREFIX_OK.test(name)) bad(`the compose project \`${name}\` is not an owner-form leftover name`);
+  for (const match of command.text.matchAll(/\bWithName\(\s*"([^"]*)"/g)) if (!PREFIX_OK.test(match[1])) bad(`\`WithName("${match[1]}")\` is not an owner-form leftover name`);
   if (/\bdocker\s+build\b/.test(command.text)) {
     for (const tag of flagValues(tokens, ["-t", "--tag"])) {
       const published = [...pushed].some((image) => image === tag || stripTag(image) === stripTag(tag));
-      if (!nameOk(tag) && !published) bad(`the image \`${tag}\` a test builds is not a testsToDelete name`);
+      if (!nameOk(tag) && !published) bad(`the image \`${tag}\` a test builds is not an owner-form leftover name`);
     }
   }
   return found;

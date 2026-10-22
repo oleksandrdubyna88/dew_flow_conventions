@@ -513,7 +513,7 @@ test("13. an unmarked owner-form folder older than the window is listed, never r
 
 // 14 --------------------------------------------------------------------------------------------------------
 
-test("14. a legacy folder of my uid with a dead legacy record is collected; one of another uid, a live one and an unreadable one are listed with the command", (t) => {
+test("14. (macOS, Windows reader) a legacy folder of my uid with a dead legacy record is collected; one of another uid, a live one and an unreadable one are listed with the command", (t) => {
   const { own, work, tmp } = arena(t);
   const repo = ownedRepo(own, work, "legacy-repo");
   const plant = (what, claim) => {
@@ -530,7 +530,7 @@ test("14. a legacy folder of my uid with a dead legacy record is collected; one 
   const none = plant("lg-none", null);
   const kernel = (target) => path.resolve(target).toLowerCase() !== path.resolve(strangers).toLowerCase();
 
-  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, mine: kernel });
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, mine: kernel, platform: "darwin" }); // a reader whose records carry no pid namespace
 
   assert.deepEqual(result.errors, []);
   assert.deepEqual(namesOf(result.removed), namesOf([dead]), "kernel uid = me AND an old-grammar record that is gone");
@@ -541,6 +541,55 @@ test("14. a legacy folder of my uid with a dead legacy record is collected; one 
     const line = lines.find((entry) => entry.includes(path.basename(kept)));
     assert.ok(line !== undefined && line.includes(" — remove with: ") && line.includes(kept), `${path.basename(kept)}: ${JSON.stringify(lines)}`);
   }
+});
+
+test("14L. (Linux reader) a legacy record has no pid namespace, so it is unknown: a dead-looking legacy folder is LISTED, never removed", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "legacy-linux-repo");
+  const dir = path.join(tmp, `${"testsTo" + "Delete"}-conventions-lg-linux-abc123`);
+  fs.mkdirSync(dir);
+  fs.writeFileSync(`${dir}.owner`, `${thisOwner().host}:${PRETEND_DEAD}
+`); // a pid that may live in a container whose pid space we cannot see
+  setOld(dir);
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, platform: "linux" });
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.removed, []);
+  assert.ok(fs.existsSync(dir) && fs.existsSync(`${dir}.owner`));
+  assert.deepEqual(reasonsOf(result), { [path.basename(dir)]: "legacy" });
+  assert.equal(result.listed.filter((line) => line.startsWith("legacy:")).length, 1);
+});
+
+test("14F. a legacy claim another uid wrote is no evidence: the folder is listed, never removed (Linux and macOS and Windows alike)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "legacy-fgn-repo");
+  const dir = path.join(tmp, `${"testsTo" + "Delete"}-conventions-lg-forged-abc123`);
+  fs.mkdirSync(dir);
+  fs.writeFileSync(`${dir}.owner`, `${thisOwner().host}:${PRETEND_DEAD}
+`);
+  setOld(dir);
+  const claimIsStrangers = (target) => !target.endsWith(".owner");
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, mine: claimIsStrangers, platform: "darwin" });
+  assert.deepEqual(result.removed, []);
+  assert.ok(fs.existsSync(dir));
+  assert.deepEqual(reasonsOf(result), { [path.basename(dir)]: "legacy" });
+});
+
+test("14G. a claim that is a FIFO is never opened: the sweep does not hang and the folder is kept", { timeout: 120_000, skip: win32 ? "no FIFO on Windows" : false }, (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "fifo-repo");
+  const dir = path.join(tmp, `${"testsTo" + "Delete"}-conventions-lg-fifo-abc123`);
+  fs.mkdirSync(dir);
+  const made = spawnSync("mkfifo", [`${dir}.owner`]);
+  if (made.status !== 0) { t.skip("mkfifo is not available"); return; }
+  setOld(dir);
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, platform: "darwin" });
+  assert.deepEqual(result.removed, []);
+  assert.ok(fs.existsSync(dir));
+  const ownerForm = path.join(tmp, ownedName("fifo-own"));
+  fs.mkdirSync(ownerForm);
+  spawnSync("mkfifo", [`${ownerForm}.owner`]);
+  setOld(ownerForm);
+  assert.deepEqual(sweepLeftovers({ repo, tmp, probe: deadProbe }).removed, [], "an owner-form claim that is a FIFO is unreadable too");
 });
 
 // 15 --------------------------------------------------------------------------------------------------------
@@ -570,6 +619,29 @@ test("15. replacement between the verdict and the removal: a folder swapped for 
   assert.deepEqual(reasonsOf(result), { [path.basename(victim)]: "replaced" });
   assert.equal(fs.readFileSync(path.join(victim, "precious.txt"), "utf8"), "not abandoned\n");
   assert.ok(fs.existsSync(`${victim}.owner`), "the claim stays with what it was claimed for");
+});
+
+test("15a. the identity is captured BEFORE the verdict: a folder swapped after the capture is kept even though the new one reads as abandoned too", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "capture-repo");
+  const victim = folder(own, tmp, "captured", { claim: deadOwnerLine() });
+  const moved = `${victim}-moved`;
+  let swapped = false;
+  const hooks = {
+    afterCapture: (target) => {
+      if (swapped || path.resolve(target) !== path.resolve(victim)) return;
+      swapped = true;
+      fs.renameSync(victim, moved);
+      fs.mkdirSync(victim); // another folder under the same name and the same (dead) claim: the verdict reads the same text
+      setOld(victim);
+    },
+  };
+  own.after(() => removeQuietly(moved));
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, hooks });
+  assert.equal(swapped, true);
+  assert.deepEqual(result.removed, []);
+  assert.deepEqual(reasonsOf(result), { [path.basename(victim)]: "replaced" });
+  assert.ok(fs.existsSync(victim));
 });
 
 test("15b. a folder that changes between the rename and the second look is put back", (t) => {

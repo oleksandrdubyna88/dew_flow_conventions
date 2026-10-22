@@ -70,8 +70,9 @@ teardown pair is registered first, never at module load: a runner that filters e
 the file's hooks, and a resource made at import time then has no remover — · then **create** the resource under
 that name, exclusively too (`mkdir`, never a create that succeeds on an existing folder): a resource already
 there under the claimed name is somebody else's and is never adopted, never removed — the helper writes ONE
-warning naming the collision, leaves its own claim where it is (its run owns it; §4 collects it when the run is
-gone, and judges the squatter's folder by the normal rules) and draws a new id. So nothing the helper made ever
+warning naming the collision, removes its own claim — only while it still holds exactly what the helper wrote,
+so a claim of a run that dies later can never govern a folder this run did not create; §4 judges the squatter's
+folder by the normal rules — and draws a new id. So nothing the helper made ever
 exists unclaimed: an **unmarked** resource of the owner form is nobody's the helper knows, and §4 lists it, never
 collects it. A claim whose resource does not exist — an **orphan claim**, left by a run that died between the
 two — is judged by its owner like any claim under §4's two keys (`gone` removes it; `live` and `unknown` keep it);

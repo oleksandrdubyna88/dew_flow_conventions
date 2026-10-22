@@ -90,9 +90,9 @@ Order: this plan first, then the consumer epics. Disjoint: nothing here edits a 
    sweep) AND abandonment (`gone`, or a free store lock held through the drop). A stricter implementation may refuse its
    whole run while any own record is live. *Loses:* "unmarked and old is nobody's"; age as authority anywhere.
 5. **Claim first** (exclusive claim write → register → exclusive create). An existing claim ⇒ a new id. A **squatted name**
-   (`mkdir` finds a folder under the claimed name) ⇒ ONE warning naming the collision, the helper's own claim stays (its run
-   owns it; the sweep collects it under the two keys when the run is gone and judges the squatter's folder by the normal
-   rules), a new id is drawn; the squatter's folder is never adopted and never removed by the helper. An **orphan claim**
+   (`mkdir` finds a folder under the claimed name) ⇒ ONE warning naming the collision, the helper removes its own claim (only while
+   it still holds exactly what it wrote, so a claim of a run that dies later never governs a folder this run did not
+   create; the squatter's folder is judged by the normal rules), a new id is drawn; the squatter's folder is never adopted and never removed by the helper. An **orphan claim**
    (claim without a folder) is collected under the two keys when its owner is `gone`; two live runs never share a name,
    because the claim is exclusive. *Loses:* `mkdtemp` in the helper; "remove the claim and draw again" on a collision.
 6. **Legacy names** (second segment not of the owner grammar): listed with the exact command; collected only with kernel
@@ -176,7 +176,7 @@ S7 is the release step.
   `ownerState` with `nameOwner`/`callerOwner`/`kernelMine` and the namespace step; `hidepid`.
 - **Tests (RED first, `tools/owned.test.mjs`):** 15 the name carries the caller's owner before the token and refuses a
   `what` that leaves no room (`checkWhat` names the room); 16 `ownedDir` claims FIRST — an existing claim draws a new id;
-  16b a squatted name: the helper warns once, its claim stays and is removed by the scope's teardown, the squatter's folder
+  16b a squatted name: the helper warns once, removes its own claim at once (and its teardown never removes a claim it no longer holds), the squatter's folder
   is untouched, a new id is drawn (RED: today `mkdtemp` never collides, so the test first proves the seam); 16c an orphan
   claim with a `gone` owner is collected by the sweep and one with a live owner stays, and a second helper never obtains
   the same name while the first's claim exists; 17 `thisOwner` carries the owner token and, on Linux, the pid namespace;

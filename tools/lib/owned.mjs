@@ -6,8 +6,8 @@
 //
 // The order is the whole safety: claim → register → create. A claim that already exists is somebody else's name, so a
 // new id is drawn. A folder that already exists under the claimed name is a squatter's: it is never adopted and
-// never removed — one warning names it, the helper's own claim stays (its run owns it, and the sweep collects it when
-// the run is gone), and a new id is drawn. So nothing the helper made ever exists unclaimed, and an UNMARKED
+// never removed — one warning names it, the helper REMOVES its own claim (only while it still holds exactly what the helper
+// wrote: a claim of a run that dies later must never govern a folder this run did not create), and a new id is drawn. So nothing the helper made ever exists unclaimed, and an UNMARKED
 // resource of the owner form is nobody's the helper knows: the sweep lists it and never collects it.
 //
 // Why teardown never throws. It runs inside `t.after` / `finally`, where a throw would replace the test's own
@@ -180,9 +180,26 @@ export function ownedName(what) {
   return ownedPrefix(what) + randomId();
 }
 
-/** Does the caller's real uid own `target`? POSIX: the uid of the entry itself (a link is not followed). Windows has no uid: the janitor's `-O` is the check there, and this answers true. */
-export function isMine(target) {
-  if (process.platform === "win32") return true;
+/** Is `child` strictly inside `parent`? Both already resolved; compared case-insensitively with `pathApi` (the Windows one on Windows). A longer sibling name is not a child. */
+export function isInsideProfile(child, parent, pathApi = path) {
+  const relative = pathApi.relative(pathApi.resolve(parent).toLowerCase(), pathApi.resolve(child).toLowerCase());
+  return relative !== "" && !relative.startsWith("..") && !pathApi.isAbsolute(relative);
+}
+
+/**
+ * Is `target` the caller's? POSIX: the real uid owns the entry itself (a link is not followed). Windows has no uid and a shared
+ * temp root (`TEMP=C:\Temp`, CI accounts sharing one) would erase the scope key, so it FAILS CLOSED: only a path inside the current
+ * user's profile (a per-user `%TEMP%` lives there), compared on resolved real paths, is the caller's — anything else, and anything
+ * that cannot be resolved, is listed and never touched. The janitor's `-O` is the file-owner check on that side.
+ */
+export function isMine(target, { platform = process.platform, home } = {}) {
+  if (platform === "win32") {
+    try {
+      return isInsideProfile(fs.realpathSync.native(target), fs.realpathSync.native(home ?? os.userInfo().homedir), path.win32);
+    } catch {
+      return false;
+    }
+  }
   try {
     return fs.lstatSync(target).uid === process.getuid();
   } catch {
@@ -347,9 +364,20 @@ export function runRecord(env = process.env) {
   return parsed;
 }
 
-/** Write the claim beside `dir` (never inside it). `wx`: a claim that is already there is somebody else's. */
+/** Write the claim beside `dir` (never inside it). `wx`: a claim that is already there is somebody else's. Returns the text written. */
 export function writeOwner(dir) {
-  fs.writeFileSync(`${dir}.owner`, `${formatOwner(runRecord())}\n`, { flag: "wx" });
+  const text = `${formatOwner(runRecord())}\n`;
+  fs.writeFileSync(`${dir}.owner`, text, { flag: "wx" });
+  return text;
+}
+
+/** Remove the claim beside `dir` only while it still holds exactly `written` — a claim another run put there since is not ours to remove. Never throws. */
+export function removeClaimIfStill(dir, written) {
+  try {
+    if (fs.readFileSync(`${dir}.owner`, "utf8") === written) fs.rmSync(`${dir}.owner`, { force: true });
+  } catch (error) {
+    if (error?.code !== "ENOENT") warn(`could not remove the claim ${dir}.owner (${messageOf(error)}) — left for the start-of-run sweep`);
+  }
 }
 
 /** The absolute gitdir of a linked worktree at `dir` (its `.git` FILE says `gitdir: <g>`), or "". Never throws. */
@@ -365,11 +393,11 @@ export function gitdirOf(dir) {
 }
 
 /**
- * The record in `file`: `null` when there is none, `{ unreadable: true }` when it is no regular file (a FIFO would block a read
- * forever), is longer than a claim may be, or is not the grammar, and `{ unreadable: true, reason: "foreign-uid" }` when another
- * uid wrote it — a stranger's claim is no evidence.
+ * The raw text of a claim or lock file, through the ONE safe read: `null` when there is no file, `{ unreadable: true }` when it is
+ * no regular file (a FIFO would block a read forever) or cannot be read, `{ unreadable: true, reason: "foreign-uid" }` when the
+ * scope key (`mine`) says the caller does not own it — a stranger's claim is no evidence. At most `MAX_CLAIM_BYTES + 1` bytes are read.
  */
-function readRecordFile(file) {
+export function readClaimText(file, mine = isMine, { checkOwner = true } = {}) {
   let stat;
   try {
     stat = fs.lstatSync(file);
@@ -377,13 +405,13 @@ function readRecordFile(file) {
     return error?.code === "ENOENT" ? null : { unreadable: true };
   }
   if (!stat.isFile()) return { unreadable: true };
-  if (process.platform !== "win32" && stat.uid !== process.getuid()) return { unreadable: true, reason: "foreign-uid" };
+  if (checkOwner && !mine(file)) return { unreadable: true, reason: "foreign-uid" };
   try {
     const fd = fs.openSync(file, "r");
     try {
       const buffer = Buffer.alloc(MAX_CLAIM_BYTES + 1);
       const read = fs.readSync(fd, buffer, 0, buffer.length, 0);
-      return parseOwner(buffer.toString("utf8", 0, read));
+      return buffer.toString("utf8", 0, read);
     } finally {
       fs.closeSync(fd);
     }
@@ -392,11 +420,17 @@ function readRecordFile(file) {
   }
 }
 
-function readFolderOwner(target) {
-  return readRecordFile(`${target}.owner`);
+/** The record in `file`: the text of `readClaimText` parsed, or its `null` / `{ unreadable }` answer as it is. */
+function readRecordFile(file, mine, options) {
+  const read = readClaimText(file, mine, options);
+  return typeof read === "string" ? parseOwner(read) : read;
 }
 
-function readWorktreeOwner(target) {
+function readFolderOwner(target, mine) {
+  return readRecordFile(`${target}.owner`, mine);
+}
+
+function readWorktreeOwner(target, mine) {
   try {
     if (!fs.statSync(path.join(target, ".git")).isFile()) return null; // a repository rooted here, not a linked worktree
   } catch {
@@ -404,13 +438,15 @@ function readWorktreeOwner(target) {
   }
   const gitdir = gitdirOf(target);
   if (gitdir === "" || !fs.existsSync(gitdir)) return { unreadable: true }; // a deleted clone: fail closed, never "unmarked"
-  return readRecordFile(path.join(gitdir, "locked"));
+  // The lock lives in the clone, which is the caller's own repository (the sweep reads it from the caller's `git worktree list`) and
+  // may sit outside the profile on Windows; POSIX still requires the caller's uid on the file, and the worktree FOLDER is judged by `mine`.
+  return readRecordFile(path.join(gitdir, "locked"), mine, { checkOwner: process.platform !== "win32" });
 }
 
 /** `null` (unmarked), an owner, or `{ unreadable: true }`. `kind` is "folder" (sibling claim) or "worktree" (lock reason). */
-export function readOwner(target, kind) {
-  if (kind === "folder") return readFolderOwner(target);
-  if (kind === "worktree") return readWorktreeOwner(target);
+export function readOwner(target, kind, { mine = isMine } = {}) {
+  if (kind === "folder") return readFolderOwner(target, mine);
+  if (kind === "worktree") return readWorktreeOwner(target, mine);
   throw new TypeError(`owned: unknown kind ${JSON.stringify(kind)}`);
 }
 
@@ -447,6 +483,9 @@ export function ownerState(owner, probe = processProbe, facts = {}) {
 /** The legacy record's liveness, for a LEGACY name the caller owns: the same procedure on `{ host, pid, start? }` (no owner, no namespace). */
 export function legacyOwnerState(owner, probe = processProbe, facts = {}) {
   if (owner === null || owner === undefined || owner.unreadable === true) return "unknown";
+  // §3: on a Linux reader a record without a pid namespace is unknown. A legacy record never has one, so on Linux it is ALWAYS unknown —
+  // its pid may live in a container whose pid space this process cannot see. Substituting our own namespace would erase that rule.
+  if ((facts.platform ?? process.platform) === "linux") return "unknown";
   const me = thisOwner();
   return ownerState({ ...owner, owner: me.owner, ns: me.ns }, probe, { ...facts, callerOwner: me.owner });
 }
@@ -496,27 +535,33 @@ export function removeClaim(dir) {
  * is rule §2's: the claim is written FIRST with an exclusive create (a claim already there is somebody else's name — draw a new
  * id), the cleanup is registered as the very next statement, and only then is the folder made, exclusively (`mkdir`, never a
  * create that succeeds on an existing folder). A folder already there under the claimed name is a squatter's: never adopted,
- * never removed — one warning names it, this run's claim stays (the scope's teardown removes it, the sweep collects it when the
- * run is gone) and a new id is drawn.
+ * never removed — one warning names it, this run's claim is removed again at once (only while it still holds exactly what was
+ * written), and a new id is drawn.
  */
 export function ownedDir(scope, what, { parent = tempRoot() } = {}) {
   checkScope(scope);
   const prefix = ownedPrefix(what);
   for (let draw = 0; draw < MAX_DRAWS; draw += 1) {
     const dir = path.resolve(parent, prefix + randomId());
+    let written;
     try {
-      writeOwner(dir);
+      written = writeOwner(dir);
     } catch (error) {
       if (error?.code === "EEXIST") continue; // somebody else's claim on this name
       throw new Error(`owned: could not claim ${dir}: ${messageOf(error)}`, { cause: error });
     }
-    const made = { folder: false };
-    scope.after(() => (made.folder ? removeQuietly(dir) : removeClaim(dir))); // the very next statement: claim → register → create
+    const made = { folder: false, claimed: true };
+    scope.after(() => { // the very next statement: claim → register → create
+      if (made.folder) removeQuietly(dir);
+      else if (made.claimed) removeClaim(dir);
+    });
     try {
       fs.mkdirSync(dir);
     } catch (error) {
       if (error?.code !== "EEXIST") throw new Error(`owned: could not create ${dir}: ${messageOf(error)}`, { cause: error });
       warn(`${dir} already exists under the name this run claimed — it is not this run's and is left alone; drawing another name`);
+      made.claimed = false; // the claim goes before another id is drawn, so a claim of a run that dies later can never govern a folder this run did not create
+      removeClaimIfStill(dir, written);
       continue;
     }
     made.folder = true;

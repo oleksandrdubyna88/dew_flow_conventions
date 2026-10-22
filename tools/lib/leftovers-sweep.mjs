@@ -32,7 +32,7 @@ import * as path from "node:path";
 
 import { git } from "./git.mjs";
 import {
-  REPO_TOKEN, classifyName, isMine, legacyOwnerState, ownerState, parseLegacyOwner, parseOwner, processProbe, readOwner,
+  REPO_TOKEN, classifyName, gitdirOf, isMine, legacyOwnerState, ownerState, parseLegacyOwner, parseOwner, processProbe, readClaimText, readOwner,
   removeLink, removeQuietly, tempRoot, thisOwner, thisOwnerToken,
 } from "./owned.mjs";
 
@@ -125,25 +125,25 @@ function identityOf(target) {
 const sameIdentity = (a, b) => a !== undefined && b !== undefined && a.dev === b.dev && a.ino === b.ino && a.directory === b.directory;
 
 /** The text of a folder's claim or a worktree's lock reason now, or `null` (none) — what "the claim is still the one I judged" compares. */
-function claimTextOf(target, kind) {
-  try {
-    if (kind !== "worktree") return fs.readFileSync(`${target}${OWNER_SUFFIX}`, "utf8");
-    const dotGit = fs.readFileSync(path.join(target, ".git"), "utf8").split(/\r?\n/)[0];
-    const gitdir = /^gitdir:[ \t]*(.*?)[ \t]*$/.exec(dotGit)?.[1];
-    return gitdir === undefined ? null : fs.readFileSync(path.join(path.resolve(target, gitdir), "locked"), "utf8");
-  } catch {
-    return null;
-  }
+const UNREADABLE = "\0unreadable"; // what a claim that is no regular file, is another uid's, or cannot be read compares as
+
+function claimTextOf(target, kind, mine = isMine) {
+  const read = kind === "worktree"
+    ? readClaimText(path.join(gitdirOf(target) || path.join(target, ".no-gitdir"), "locked"), mine, { checkOwner: process.platform !== "win32" })
+    : readClaimText(`${target}${OWNER_SUFFIX}`, mine); // the ONE safe read: lstat, regular file, the caller's, at most 513 bytes — never a FIFO, never a stranger's claim
+  if (typeof read === "string") return read;
+  return read === null ? null : UNREADABLE;
 }
 
-/** What identifies a candidate at the moment it was judged: its device and inode and its claim text. */
-function capture(target, kind) {
-  return { identity: identityOf(target), claim: claimTextOf(target, kind) };
+/** What identifies a candidate at the moment BEFORE it is judged: its device and inode, then its claim text. */
+function capture(target, kind, mine = isMine) {
+  const identity = identityOf(target);
+  return { identity, claim: claimTextOf(target, kind, mine), mine };
 }
 
 /** Is what is at `target` still what was judged? */
 function unchanged(target, kind, captured) {
-  return sameIdentity(identityOf(target), captured.identity) && claimTextOf(target, kind) === captured.claim;
+  return sameIdentity(identityOf(target), captured.identity) && claimTextOf(target, kind, captured.mine) === captured.claim;
 }
 
 function quarantineName(dir) {
@@ -176,7 +176,7 @@ function removeFolderByIdentity(dir, captured, hooks) {
   const quarantine = quarantineName(dir);
   fs.renameSync(dir, quarantine);
   hooks.afterRename?.(dir, quarantine);
-  if (!sameIdentity(identityOf(quarantine), captured.identity) || claimTextOf(dir, "folder") !== captured.claim) {
+  if (!sameIdentity(identityOf(quarantine), captured.identity) || claimTextOf(dir, "folder", captured.mine) !== captured.claim) {
     if (!restoreOnto(quarantine, dir)) return { removed: false, reason: "quarantine-conflict", path: quarantine };
     return { removed: false, reason: "replaced" };
   }
@@ -238,23 +238,23 @@ function reporter(result) {
 // --- the passes -------------------------------------------------------------------------------------------------
 
 /** The legacy verdict of a folder or worktree: the old-grammar record and its liveness, kernel owner first. */
-function decideLegacy({ kind, target, locked, ageMs, minAgeMs, probe, mine }) {
+function decideLegacy({ kind, target, locked, ageMs, minAgeMs, probe, mine, platform }) {
   if (ageMs < minAgeMs) return { remove: false, reason: "young" };
   if (!mine(target)) return { remove: false, reason: "legacy" };
-  const text = kind === "worktree" ? (claimTextOf(target, "worktree") ?? locked ?? null) : claimTextOf(target, "folder");
-  if (text === null) return { remove: false, reason: "legacy" };
+  const text = kind === "worktree" ? (claimTextOf(target, "worktree", mine) ?? locked ?? null) : claimTextOf(target, "folder", mine);
+  if (text === null || text === UNREADABLE) return { remove: false, reason: "legacy" };
   const old = parseLegacyOwner(text);
   if (old.unreadable === true) return { remove: false, reason: "legacy" };
-  return legacyOwnerState(old, probe) === "gone" ? { remove: true } : { remove: false, reason: "legacy" };
+  return legacyOwnerState(old, probe, { platform }) === "gone" ? { remove: true } : { remove: false, reason: "legacy" };
 }
 
 function judge(context, entry) {
   const { now, minAgeMs, state, mine } = context;
   const { target, kind, relation, nameOwner } = entry;
   if (relation === "legacy") {
-    return decideLegacy({ kind, target, locked: entry.locked, ageMs: ageOf(target, now), minAgeMs, probe: context.probe, mine });
+    return decideLegacy({ kind, target, locked: entry.locked, ageMs: ageOf(target, now), minAgeMs, probe: context.probe, mine, platform: context.platform });
   }
-  const owner = fs.existsSync(target) ? readOwner(target, kind) : ownerFromLock(entry.locked);
+  const owner = fs.existsSync(target) ? readOwner(target, kind, { mine }) : ownerFromLock(entry.locked);
   return decide({ owner, ageMs: ageOf(target, now), minAgeMs, state, mine: mine(target), nameOwner });
 }
 
@@ -280,6 +280,8 @@ function sweepWorktrees(context, listing) {
       continue;
     }
     const entry = { ...related, kind: "worktree", target: listed.path, locked: listed.locked };
+    const captured = capture(listed.path, "worktree", context.mine); // identity first, BEFORE the claim is read and the verdict made
+    context.hooks.afterCapture?.(listed.path);
     const verdict = judge(context, entry);
     if (!verdict.remove) {
       record(context, entry, verdict);
@@ -287,7 +289,7 @@ function sweepWorktrees(context, listing) {
     }
     acted = true;
     try {
-      const done = removeWorktree(repo, listed.path, capture(listed.path, "worktree"), context.hooks);
+      const done = removeWorktree(repo, listed.path, captured, context.hooks);
       if (done.removed) result.removed.push(listed.path);
       else context.report.keep(listed.path, done.reason);
     } catch (error) {
@@ -318,18 +320,20 @@ function sweepFolders(context, listedPaths) {
       continue;
     }
     const entry = { ...related, kind: "folder", target: dir };
+    const captured = capture(dir, "folder", context.mine); // identity first, BEFORE the claim is read and the verdict made
+    context.hooks.afterCapture?.(dir);
     const verdict = judge(context, entry);
     if (!verdict.remove) {
       record(context, entry, verdict);
       continue;
     }
-    removeFolder(context, dir, result);
+    removeFolder(context, dir, result, captured);
   }
 }
 
-function removeFolder(context, dir, result) {
+function removeFolder(context, dir, result, captured) {
   try {
-    const done = removeFolderByIdentity(dir, capture(dir, "folder"), context.hooks);
+    const done = removeFolderByIdentity(dir, captured, context.hooks);
     if (done.removed) result.removed.push(dir);
     else context.report.keep(done.path ?? dir, done.reason);
   } catch (error) {
@@ -352,8 +356,8 @@ function sweepOrphanClaims(context) {
     // A claim with no folder is what a helper that claims FIRST leaves when it dies between the claim and the create. It is a
     // claim like any other: its owner decides — gone removes it; live, foreign, unknown and unreadable keep it.
     const verdict = related.relation === "legacy"
-      ? decideLegacy({ kind: "claim", target: folderPath, ageMs: Infinity, minAgeMs, probe: context.probe, mine: () => mine(claim) })
-      : decide({ owner: readOwner(folderPath, "folder"), ageMs: Infinity, minAgeMs, state, mine: mine(claim), nameOwner: related.nameOwner });
+      ? decideLegacy({ kind: "claim", target: folderPath, ageMs: Infinity, minAgeMs, probe: context.probe, mine: () => mine(claim), platform: context.platform })
+      : decide({ owner: readOwner(folderPath, "folder", { mine }), ageMs: Infinity, minAgeMs, state, mine: mine(claim), nameOwner: related.nameOwner });
     if (!verdict.remove) {
       record(context, { ...related, kind: "claim", target: claim }, verdict);
       continue;
@@ -394,10 +398,10 @@ function step(result, label, run) {
 /**
  * Collect what a killed run left behind. `repo` is the repository whose worktrees this sweep may remove; `tmp` the
  * temp root; `probe` the liveness query (a seam for tests), asked at most once per pid; `mine` the kernel-owner question
- * (a seam: a second uid cannot be had in a test); `hooks.afterVerdict` / `hooks.afterRename` (seams: a change between the
- * verdict and the removal). Never throws. `result.listed` holds the `foreign:` / `legacy:` / `unmarked:` lines.
+ * (a seam: a second uid cannot be had in a test); `hooks.afterCapture` / `hooks.afterVerdict` / `hooks.afterRename` (seams: a change between the
+ * capture, the verdict and the removal). Never throws. `result.listed` holds the `foreign:` / `legacy:` / `unmarked:` lines.
  */
-export function sweepLeftovers({ repo, tmp = tempRoot(), now = Date.now(), minAgeMs = MIN_AGE_MS, probe = processProbe, mine = isMine, hooks = {} } = {}) {
+export function sweepLeftovers({ repo, tmp = tempRoot(), now = Date.now(), minAgeMs = MIN_AGE_MS, probe = processProbe, mine = isMine, hooks = {}, platform = process.platform } = {}) {
   const result = { removed: [], preserved: [], listed: [], errors: [] };
   const asked = new Map();
   const cached = (pid) => {
@@ -406,7 +410,7 @@ export function sweepLeftovers({ repo, tmp = tempRoot(), now = Date.now(), minAg
   };
   const owner = thisOwnerToken();
   const state = (record, nameOwner) => ownerState(record, cached, { nameOwner, callerOwner: owner, kernelMine: true });
-  const context = { repo, tmp, now, minAgeMs, result, owner, mine, hooks, probe: cached, state, report: reporter(result) };
+  const context = { repo, tmp, now, minAgeMs, result, owner, mine, hooks, platform, probe: cached, state, report: reporter(result) };
   step(result, "quarantines", () => restoreQuarantines(context));
   const listing = step(result, "worktree list", () => listWorktrees(repo));
   if (listing !== undefined) step(result, "worktrees", () => sweepWorktrees(context, listing));

@@ -27,7 +27,7 @@ import {
   MAX_NAME, OWNER_GRAMMAR, PREFIX, REPO_TOKEN, START_TOLERANCE_S,
   asciiLower, classifyName, cleanupScope, formatLegacyOwner, formatOwner, gitdirOf, isMine, ownedDir, ownedName, ownedPattern,
   ownedWorktree, ownerState, ownerToken, parseLegacyOwner, parseOwner, processProbe, readOwner, removeLink, removeQuietly, runRecord,
-  startFromProcStat, tempRoot, thisOwner, thisOwnerToken, windowsOwnerToken,
+  isInsideProfile, legacyOwnerState, startFromProcStat, tempRoot, thisOwner, thisOwnerToken, windowsOwnerToken,
 } from "./lib/owned.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -682,7 +682,7 @@ test("16. ownedDir claims FIRST: the claim exists before the folder is made, and
   assert.equal(fs.existsSync(`${dir}.owner`), false);
 });
 
-test("16b. a squatted name: one warning, the helper's claim stays until the scope ends, the squatter's folder is untouched, a new id is drawn", async (t) => {
+test("16b. a squatted name: one warning, the helper removes its OWN claim at once, the squatter's folder is untouched, a new id is drawn", async (t) => {
   const own = lifo(t);
   const parent = ownedDir(own, "squat-parent");
   const squat = path.join(parent, `${PREFIX_OF}sq-aaaaaa`);
@@ -696,10 +696,11 @@ test("16b. a squatted name: one warning, the helper's claim stays until the scop
   assert.equal(warnings.length, 1, `one warning, got ${JSON.stringify(lines)}`);
   assert.ok(warnings[0].includes(`${PREFIX_OF}sq-aaaaaa`), "the warning names the collision");
   assert.notEqual(path.basename(dir), path.basename(squat), "a new id was drawn");
-  assert.ok(fs.existsSync(`${squat}.owner`), "the helper's own claim stays: its run owns the name");
-  assert.deepEqual(parseOwner(fs.readFileSync(`${squat}.owner`, "utf8")), thisOwner());
+  assert.equal(fs.existsSync(`${squat}.owner`), false, "the claim is removed before another id is chosen: a claim of a run that dies later can never govern a folder this run did not create");
+  fs.writeFileSync(`${squat}.owner`, "another run claimed the name since\n"); // a later run took the freed name
   await scope.close();
-  assert.equal(fs.existsSync(`${squat}.owner`), false, "the scope's teardown removes the claim");
+  assert.equal(fs.readFileSync(`${squat}.owner`, "utf8"), "another run claimed the name since\n", "this run's teardown never removes a claim it no longer holds");
+  fs.rmSync(`${squat}.owner`);
   assert.equal(fs.readFileSync(path.join(squat, "keep.txt"), "utf8"), "not yours\n", "the squatter's folder is never removed");
   assert.equal(fs.existsSync(dir), false, "and what the helper made is gone");
 });
@@ -811,4 +812,46 @@ test("20. the Windows owner token: ASCII-only lower-casing, the UTF-8 bytes of t
   assert.equal(asciiLower("ÀBC-Ünal"), "Àbc-Ünal");
   assert.notEqual(windowsOwnerToken("alice\n"), windowsOwnerToken("alice"), "a line end is part of the bytes: the canonical input has none");
   assert.equal(ownerToken({ platform: "linux", uid: 1000, username: "Alice", env: {} }), "u1000", "POSIX never hashes");
+});
+
+// R1 / R2 / R5 — defects found by review ---------------------------------------------------------------------------
+
+test("R1. a legacy record on a Linux reader is unknown (it has no pid namespace); on any other reader it is judged like a record", () => {
+  const legacy = { host: thisOwner().host, pid: 4242 };
+  const dead = () => ({ state: "dead" });
+  assert.equal(legacyOwnerState(legacy, dead, { platform: "linux", hidepid: false }), "unknown", "a pid in a container we cannot see is not a dead pid");
+  assert.equal(legacyOwnerState(legacy, dead, { platform: "darwin", hidepid: false }), "gone");
+  assert.equal(legacyOwnerState(legacy, dead, { platform: "win32", hidepid: false }), "gone");
+  assert.equal(legacyOwnerState(legacy, () => ({ state: "live" }), { platform: "darwin" }), "live");
+  assert.equal(legacyOwnerState({ unreadable: true }, dead, { platform: "darwin" }), "unknown");
+});
+
+test("R2. the Windows scope key is the user's profile: a path counts as mine only inside it (pure, any OS)", () => {
+  const w = path.win32;
+  const home = "C:/Users/alice";
+  assert.equal(isInsideProfile("C:/Users/alice/AppData/Local/Temp/x", home, w), true);
+  assert.equal(isInsideProfile("c:/users/ALICE/appdata/local/temp/x", home, w), true, "case-insensitive");
+  assert.equal(isInsideProfile("C:/Temp/x", home, w), false, "a shared temp root is no one's profile");
+  assert.equal(isInsideProfile("C:/Users/alice2/x", home, w), false, "a longer name is not a child");
+  assert.equal(isInsideProfile("C:/Users/bob/x", home, w), false);
+  assert.equal(isInsideProfile("D:/Users/alice/x", home, w), false, "another drive");
+  assert.equal(isInsideProfile(home, home, w), false, "the profile itself is not a resource");
+  assert.equal(isInsideProfile("C:/Users/alice/../bob/x", home, w), false, "dot segments are resolved first");
+});
+
+test("R2b. on Windows isMine is true only inside the profile of the current user; elsewhere it fails closed", (t) => {
+  if (!win32) { t.skip("the Windows branch"); return; }
+  const own = lifo(t);
+  const dir = ownedDir(own, "profile");
+  assert.equal(isMine(dir), true, "the per-user temp root is inside the profile");
+  assert.equal(isMine(dir, { home: path.parse(dir).root + "no-such-profile" }), false, "another profile");
+  assert.equal(isMine(path.join(process.env.SystemRoot ?? "C:/Windows", "System32")), false, "outside the profile");
+  assert.equal(isMine(path.join(dir, "missing")), false, "a path that is not there is not provably mine");
+});
+
+test("R2c. a claim the scope key does not own is unreadable foreign-uid on every OS (the seam is the same one the sweep uses)", (t) => {
+  const own = lifo(t);
+  const dir = ownedDir(own, "claim-scope");
+  assert.deepEqual(readOwner(dir, "folder", { mine: () => false }), { unreadable: true, reason: "foreign-uid" });
+  assert.deepEqual(readOwner(dir, "folder", { mine: () => true }), thisOwner());
 });

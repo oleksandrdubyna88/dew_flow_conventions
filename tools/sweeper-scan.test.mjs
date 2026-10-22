@@ -214,7 +214,10 @@ test("S5b 7 --system reads /etc-style job files and every home; the user scope d
 test("S5b 8 a scheduled job that calls a janitor or a sweep by name is a finding; a comment is not a job", (t) => {
   const host = ownedDir(lifoScope(t), "scan jobs");
   fs.mkdirSync(path.join(host, "etc"), { recursive: true });
-  fs.writeFileSync(path.join(host, "etc", "crontab"), "# bash /opt/rules/tools/janitor.sh in a comment\n0 3 * * * u bash /opt/rules/tools/janitor.sh\n");
+  const janitor = path.join(host, "opt", "rules", "tools", "janitor.sh");
+  fs.mkdirSync(path.dirname(janitor), { recursive: true });
+  fs.writeFileSync(janitor, "#!/bin/sh\necho a janitor\n");
+  fs.writeFileSync(path.join(host, "etc", "crontab"), `# bash ${janitor} in a comment\n0 3 * * * u bash "${janitor}"\n`);
   const result = runScan(["--root", checkout(t, { "x.sh": "echo\n" }), "--system"], { hostRoot: host, platform: "linux" });
   assert.equal(result.code, 1);
   assert.match(result.out, /crontab:2 — calls-a-sweep/);
@@ -223,11 +226,13 @@ test("S5b 8 a scheduled job that calls a janitor or a sweep by name is a finding
 
 test("S5b 9 Windows: the Task Scheduler is read directly; a failing schtasks falls back to PowerShell; both failing is exit 2", (t) => {
   const dir = checkout(t, { "x.sh": "echo\n" });
-  const csv = '"HostName","TaskName","Task To Run"\r\n"BOX","\\Nightly","C:\\tools\\bash.exe /opt/rules/tools/janitor.sh --dry-run"\r\n"BOX","\\Other","C:\\x\\y.exe"\r\n';
+  const janitor = path.join(ownedDir(lifoScope(t), "scan tasks"), "janitor.sh");
+  fs.writeFileSync(janitor, "#!/bin/sh\necho a janitor\n");
+  const csv = `"HostName","TaskName","Task To Run"\r\n"BOX","\\Nightly","bash.exe ""${janitor}"" --dry-run"\r\n"BOX","\\Other","cmd.exe /c echo"\r\n`;
   const found = runScan(["--root", dir], { run: withGit((command) => (command === "schtasks" ? reply(csv) : failed())), platform: "win32" });
   assert.equal(found.code, 1, found.err);
   assert.match(found.out, /scheduled task \\Nightly:1 — calls-a-sweep/);
-  const fallback = runScan(["--root", dir], { run: withGit((command) => (command === "schtasks" ? failed("ERROR") : reply("Nightly\tbash.exe tools/janitor.sh\n"))), platform: "win32" });
+  const fallback = runScan(["--root", dir], { run: withGit((command) => (command === "schtasks" ? failed("ERROR") : reply(`Nightly\tbash.exe "${janitor}"\n`))), platform: "win32" });
   assert.equal(fallback.code, 1, "the PowerShell fallback is read");
   const closed = runScan(["--root", dir], { run: withGit(() => failed()), platform: "win32" });
   assert.equal(closed.code, 2, "an unqueryable Task Scheduler is unreadable evidence");
@@ -253,4 +258,98 @@ test("S5b 12 a bad argument is exit 2 with the usage line, and scanSweepers is e
   assert.equal(result.code, 2);
   assert.match(result.err, /usage: node tools\/sweeper-scan\.mjs/);
   assert.equal(typeof scanSweepers, "function");
+});
+
+// --- review round: unanchored sweepers, and the scripts a job runs ----------------------------------------------------
+
+test("R3 unanchored sweepers: a prefix with no owner after it, beside a deletion verb or as the argument of a matcher, is broad", () => {
+  const W = P; // the prefix in lower case; the upper-case spelling is Q
+  const broad = [
+    `ls /tmp | grep ${Q} | xargs rm -rf`,
+    `docker ps -a --format '{{.Names}}' | grep ${Q} | xargs docker rm -f`,
+    `/${Q}-/i.test(n)`,
+    `if (n.includes("${Q}-")) fs.rmSync(n, { recursive: true })`,
+    `n.includes("${Q}-")`,
+    `if re.match(r"${Q}-", n): shutil.rmtree(n)`,
+    `re.match(r"${Q}-", n)`,
+    `Get-ChildItem $env:TEMP | Where-Object { $_.Name -match '${Q}' } | Remove-Item -Recurse -Force`,
+    `$_.Name -match '${Q}'`,
+    `if name.startswith("${Q}"): os.remove(name)`,
+    `name.startswith("${Q}")`,
+    `find /tmp -maxdepth 1 -name '*${W}*' -delete`,
+    `rm -rf /tmp/${W}*`,
+    `grep -i ${W} list.txt`,
+  ];
+  for (const line of broad) assert.equal(classifyLine(line), "broad", line);
+  const fine = [
+    `grep ${Q}-u1000- list.txt`,
+    `ls /tmp | grep '${Q}-u1000-' | xargs rm -rf`,
+    `n.includes("${Q}-u1000-")`,
+    `rm -rf "/tmp/${Q}-u1000-api-x-abc123"`,
+    `echo "the prefix ${Q} is a promise" # rm is not run`,
+    `const PREFIX = "${Q}-";`,
+    `docker rm -f ${Q}-u1000-api-pg-k3f9a1`,
+    `grep ${Q}-conventions- legacy.txt`,
+  ];
+  for (const line of fine) assert.notEqual(classifyLine(line), "broad", line);
+});
+
+test("R4a a home folder that cannot be listed is unreadable evidence; only a missing one is nothing", (t) => {
+  const host = ownedDir(lifoScope(t), "scan homes");
+  const dir = checkout(t, { "x.sh": "echo\n" });
+  const unreadableHome = runScan(["--root", dir, "--system"], { hostRoot: host, platform: "linux", readDir: (target) => { if (target.endsWith("home")) throw Object.assign(new Error("denied"), { code: "EACCES" }); return fs.readdirSync(target, { withFileTypes: true }); } });
+  assert.equal(unreadableHome.code, 2, unreadableHome.err);
+  assert.match(unreadableHome.err, /unreadable: .*home — EACCES/);
+  const noHomes = runScan(["--root", dir, "--system"], { hostRoot: host, platform: "linux" });
+  assert.equal(noHomes.code, 0, `no /home at all is nothing to read: ${noHomes.out}\n${noHomes.err}`);
+});
+
+test("R4b a cron line's script is READ and classified; a missing script is unreadable, never clean", (t) => {
+  const host = ownedDir(lifoScope(t), "scan scripts");
+  const home = path.join(host, "home", "alice");
+  fs.mkdirSync(path.join(home, "bin"), { recursive: true });
+  fs.writeFileSync(path.join(home, "bin", "clean-tmp.sh"), `#!/bin/sh\nrm -rf /tmp/${P}*\n`);
+  const crontab = (text) => ({ run: withGit((command) => (command === "crontab" ? reply(text) : failed())), home, hostRoot: host, platform: "linux" });
+  const dir = checkout(t, { "x.sh": "echo\n" });
+  const found = runScan(["--root", dir], crontab("@hourly ~/bin/clean-tmp.sh\n"));
+  assert.equal(found.code, 1, `${found.out}\n${found.err}`);
+  assert.match(found.out, /clean-tmp\.sh:2 — owner-blind/);
+  const missing = runScan(["--root", dir], crontab("@hourly ~/bin/gone.sh\n"));
+  assert.equal(missing.code, 2, missing.err);
+  assert.match(missing.err, /unreadable: crontab -l: .*gone\.sh — script not found/);
+  const relative = runScan(["--root", dir], crontab("0 3 * * * cd /srv && ./sweep.sh\n"));
+  assert.equal(relative.code, 2, "a relative script cannot be resolved: unreadable");
+  const interpreter = runScan(["--root", dir], crontab(`30 2 * * * bash "${path.join(home, "bin", "clean-tmp.sh")}" --quiet\n`));
+  assert.equal(interpreter.code, 1, "the script an interpreter runs");
+  const harmless = runScan(["--root", dir], crontab("MAILTO=me\n0 3 * * * /usr/bin/env true\n# @hourly ~/bin/gone.sh\n"));
+  assert.equal(harmless.code, 0, `${harmless.out}\n${harmless.err}`);
+});
+
+test("R4c systemd ExecStart= and drop-in *.conf files, and Windows task actions (quoted, with %VAR%), are followed to their script", (t) => {
+  const host = ownedDir(lifoScope(t), "scan units");
+  const sweep = path.join(host, "opt", "sweep.sh");
+  fs.mkdirSync(path.dirname(sweep), { recursive: true });
+  fs.writeFileSync(sweep, `#!/bin/sh\nfind /tmp -name '${Q}-*' -delete\n`);
+  const unitDir = path.join(host, "etc", "systemd", "system");
+  fs.mkdirSync(path.join(unitDir, "tidy.service.d"), { recursive: true });
+  fs.writeFileSync(path.join(unitDir, "tidy.service"), "[Service]\nExecStart=/usr/bin/true\n");
+  fs.writeFileSync(path.join(unitDir, "tidy.service.d", "override.conf"), `[Service]\nExecStartPre=-"${sweep}" now\n`);
+  const dir = checkout(t, { "x.sh": "echo\n" });
+  const system = runScan(["--root", dir, "--system"], { hostRoot: host, platform: "linux" });
+  assert.equal(system.code, 1, `${system.out}\n${system.err}`);
+  assert.match(system.out, /sweep\.sh:2 — owner-blind/);
+  fs.writeFileSync(path.join(unitDir, "tidy.service.d", "override.conf"), "[Service]\nExecStart=\nExecStart=/opt/missing/run.sh\n");
+  const missing = runScan(["--root", dir, "--system"], { hostRoot: host, platform: "linux" });
+  assert.equal(missing.code, 2);
+  assert.match(missing.err, /run\.sh — script not found/);
+  const script = path.join(host, "scripts", "my sweep.ps1");
+  fs.mkdirSync(path.dirname(script), { recursive: true });
+  fs.writeFileSync(script, `Get-ChildItem $env:TEMP | Where-Object { $_.Name -match '${Q}' } | Remove-Item -Recurse -Force\n`);
+  const csv = `"HostName","TaskName","Task To Run"\r\n"BOX","\\Tidy","powershell.exe -File ""%SWEEPHOME%\\my sweep.ps1"""\r\n`;
+  const previous = process.env.SWEEPHOME;
+  process.env.SWEEPHOME = path.dirname(script);
+  t.after(() => { if (previous === undefined) delete process.env.SWEEPHOME; else process.env.SWEEPHOME = previous; });
+  const task = runScan(["--root", dir], { run: withGit((command) => (command === "schtasks" ? reply(csv) : failed())), platform: "win32" });
+  assert.equal(task.code, 1, `${task.out}\n${task.err}`);
+  assert.match(task.out, /my sweep\.ps1:1 — owner-blind/);
 });

@@ -43,6 +43,25 @@ const FILTER_RE = /(?:--filter(?:\s+|=)|-f\s+)["']?name=["']?(?!\^)teststodelete
 // A prefix test written as a method call: `startsWith("<prefix>-")`.
 const STARTS_WITH_RE = /startswith\(\s*["'`]teststodelete(?=[-_])/g;
 
+// An UNANCHORED use of the prefix is a sweep too when the line deletes something or the prefix is what a matcher is given:
+// `ls | grep <prefix> | xargs rm -rf`, `n.includes("<prefix>-")`, `re.match(r"<prefix>-", n)`, `$_.Name -match '<prefix>'`.
+const DELETION_RE = /(?:^|[^a-z0-9_-])(?:rm|rmdir|unlink|del|erase)(?=\s|$)|remove-item|docker\s+(?:(?:container|volume|network|image)\s+)?(?:rm|rmi|prune)\b|rmsync|rmtree|xargs|-delete\b|os\.remove|\.unlink\(|\.rmdir\(/;
+const MATCHER_RE = /(?:\bgrep\b|\bfindstr\b|-i?match\b|-i?like\b|\.test\(|\.includes\(|\.match\(|\.search\(|\bre\.\w+\(|startswith\(|endswith\(|-iname\b|(?<![-\w])-name\b|-regex\b)[^|;]*$/;
+const PREFIX_WORD_RE = new RegExp("teststo" + "delete", "g"); // spelled in two pieces: this file is read by the machine scan too
+
+/** The verdicts of the unanchored occurrences of the prefix, when the line deletes or the prefix is a matcher's argument. */
+function looseVerdicts(lower) {
+  const verdicts = [];
+  const deletes = DELETION_RE.test(lower.replace(/\s#.*$/, "")); // a trailing shell comment deletes nothing
+  for (const match of lower.matchAll(PREFIX_WORD_RE)) {
+    const before = lower.slice(0, match.index);
+    const rest = lower.slice(match.index + match[0].length);
+    if (/[a-z0-9_.]$/.test(before) || rest.startsWith(".owner")) continue; // a longer word, or the label key
+    if (deletes || MATCHER_RE.test(before)) verdicts.push(SEPARATOR_RE.test(rest) ? verdictAfter(rest) : "broad");
+  }
+  return verdicts;
+}
+
 /** What the text after the prefix says: an owner segment, a narrow literal name, or (anything else) every owner. */
 function verdictAfter(rest) {
   const separator = SEPARATOR_RE.exec(rest);
@@ -69,6 +88,7 @@ function occurrenceVerdicts(lower) {
   for (const match of lower.matchAll(STARTS_WITH_RE)) {
     verdicts.push(verdictAfter(lower.slice(match.index + match[0].length)));
   }
+  verdicts.push(...looseVerdicts(lower));
   return verdicts;
 }
 
@@ -149,13 +169,20 @@ function readTextFile(file, sink) {
     return undefined;
   }
   if (!stat.isFile()) return null;
-  if (stat.size > MAX_FILE_BYTES) {
-    sink.unreadable(file, `larger than ${MAX_FILE_BYTES} bytes`);
-    return undefined;
-  }
   try {
-    const buffer = fs.readFileSync(file);
-    return buffer.subarray(0, 8192).includes(0) ? null : buffer.toString("utf8"); // binary: no line of it is a command
+    const head = Buffer.alloc(Math.min(8192, stat.size));
+    const fd = fs.openSync(file, "r");
+    try {
+      fs.readSync(fd, head, 0, head.length, 0);
+    } finally {
+      fs.closeSync(fd);
+    }
+    if (head.includes(0)) return null; // binary (a program): no line of it is a command, whatever its size
+    if (stat.size > MAX_FILE_BYTES) {
+      sink.unreadable(file, `larger than ${MAX_FILE_BYTES} bytes`);
+      return undefined;
+    }
+    return fs.readFileSync(file).toString("utf8");
   } catch (error) {
     sink.unreadable(file, error?.code ?? "unreadable");
     return undefined;
@@ -165,9 +192,11 @@ function readTextFile(file, sink) {
 const passes = (allowlist, relative, number, line) => relative !== undefined
   && allowlist.some((entry) => entry.file === relative && entry.line === number && entry.sha256 === lineSha256(line));
 
-function classifyText(sink, display, text, { allowlist, relative, honourMarker, jobs }) {
+function classifyText(sink, display, text, options) {
+  const { allowlist, relative, honourMarker, jobs, kind } = options;
   sink.read.files += 1;
-  text.split(/\r?\n/).forEach((line, index) => {
+  const lines = text.split(/\r?\n/);
+  lines.forEach((line, index) => {
     const number = index + 1;
     if (classifyLine(line, { honourMarker }) === "broad") {
       if (!passes(allowlist, relative, number, line)) sink.found({ path: display, line: number, reason: SCAN_REASONS.OWNER_BLIND });
@@ -175,6 +204,120 @@ function classifyText(sink, display, text, { allowlist, relative, honourMarker, 
       sink.found({ path: display, line: number, reason: SCAN_REASONS.CALLS_A_SWEEP });
     }
   });
+  if (jobs && kind !== undefined) followScripts(sink, display, lines, options);
+}
+
+// --- following a job to the script it runs ---------------------------------------------------------------------------
+// A job line often only NAMES a script (`@hourly ~/bin/clean-tmp.sh`, `ExecStart=/opt/sweep.sh`, a task's action). The script
+// is what sweeps, so it is read and classified like any file; one that cannot be found or resolved is unreadable evidence, never
+// "clean". One level only: what the script itself calls is not followed.
+
+const INTERPRETERS = new Set(["bash", "sh", "dash", "zsh", "ksh", "node", "nodejs", "python", "python3", "perl", "ruby", "pwsh", "powershell", "powershell.exe", "pwsh.exe", "cmd", "cmd.exe", "bash.exe", "sh.exe", "env", "nice", "ionice", "flock", "timeout", "sudo", "xargs"]);
+const SYSTEM_BIN = /^\/(?:usr\/)?s?bin\//;
+const EXEC_KEYS = /^\s*Exec(?:Start|StartPre|StartPost|Stop|StopPost|Reload|Condition)\s*=\s*(.*)$/;
+
+/** Split a command into words, quote-aware; a backslash escapes only on POSIX (a Windows path is full of them). */
+export function splitCommand(text, { windows = false } = {}) {
+  const words = [];
+  let word = "";
+  let quote = "";
+  let any = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (quote !== "") {
+      if (char === quote) quote = "";
+      else if (char === "\\" && !windows && quote === '"' && /[$`"\\]/.test(text[index + 1] ?? "")) word += text[(index += 1)]; // inside double quotes a backslash escapes only these
+      else word += char;
+    } else if (char === '"' || char === "'") {
+      quote = char;
+      any = true;
+    } else if (char === "\\" && !windows && index + 1 < text.length) {
+      word += text[(index += 1)];
+      any = true;
+    } else if (/\s/.test(char)) {
+      if (word !== "" || any) words.push(word);
+      word = "";
+      any = false;
+    } else word += char;
+  }
+  if (word !== "" || any) words.push(word);
+  return words;
+}
+
+/** The words of a scheduled task's action. The Task Scheduler prints the program UNQUOTED even when its path holds spaces, so the program is taken up to its executable extension. */
+function taskWords(action) {
+  const unquoted = /^([^"'].*?\.(?:exe|bat|cmd|com|ps1|vbs|msc))(?=\s|$)(.*)$/i.exec(action);
+  return unquoted === null ? splitCommand(action, { windows: true }) : [unquoted[1], ...splitCommand(unquoted[2], { windows: true })];
+}
+
+/** The command words of one job line, by kind of job, or `undefined` when the line is not a command. */
+function commandOf(line, kind, windows) {
+  const trimmed = line.trim();
+  if (trimmed === "" || isCommentLine(trimmed)) return undefined;
+  if (kind === "systemd") {
+    const exec = EXEC_KEYS.exec(trimmed)?.[1].trim();
+    return exec === undefined || exec === "" ? undefined : splitCommand(exec.replace(/^[-@:+!]+/, ""), { windows });
+  }
+  if (kind === "task") return taskWords(trimmed);
+  if (/^[A-Za-z_][A-Za-z0-9_]*\s*=/.test(trimmed)) return undefined; // MAILTO=…, PATH=…
+  const rest = splitCommand(trimmed, { windows }).slice(trimmed.startsWith("@") ? 1 : 5);
+  return kind === "cron-system" ? rest.slice(1) : rest;
+}
+
+/** `%VAR%`, `~`, `$HOME`, `${HOME}` and `$VAR` expanded; a word still holding `$` or `%…%` is unresolved. */
+function expandWord(word, { home, windows, env }) {
+  const lookup = (name) => (windows ? Object.entries(env).find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1] : env[name]);
+  const expanded = word
+    .replace(/%([A-Za-z0-9_]+)%/g, (all, name) => lookup(name) ?? all)
+    .replace(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g, (all, name) => (name === "HOME" ? home : (lookup(name) ?? all)));
+  return expanded === "~" || expanded.startsWith("~/") || expanded.startsWith("~\\") ? home + expanded.slice(1) : expanded;
+}
+
+/** The words of a command that name a script: a path-like command, an interpreter's script, and any word with a script extension. */
+export function scriptWords(words, { windows = false } = {}) {
+  const found = [];
+  const baseOf = (word) => path.basename(word.replaceAll("\\", "/")).toLowerCase();
+  const pathLike = (word) => /[\\/]|^~|^\$|^%/.test(word);
+  const option = (word) => word.startsWith("-") || (windows && /^\/[A-Za-z]$/.test(word)) || word.includes("=");
+  words.forEach((word, index) => {
+    const previous = words[index - 1] ?? "";
+    if (/^\d*>/.test(word) || /^\d*>>?$/.test(previous) || option(word) || /^[a-z]+:\/\//i.test(word)) return; // a redirection target or an option
+    const interpreter = index === 0 && INTERPRETERS.has(baseOf(word)); // the interpreter is a program; what it runs is the script
+    if (!interpreter && (SCRIPT_EXTENSION.test(word) || (index === 0 && pathLike(word)))) found.push(word);
+  });
+  const executable = baseOf(words[0] ?? "");
+  if (INTERPRETERS.has(executable)) {
+    const inline = words.findIndex((word, index) => index > 0 && /^(?:-c|-command|-encodedcommand|-e|\/c|\/k)$/i.test(word)); // what follows is code, not a script
+    const script = words.slice(1, inline < 0 ? undefined : inline).find((word) => !option(word) && pathLike(word));
+    if (script !== undefined && !found.includes(script)) found.push(script);
+  }
+  return found;
+}
+
+function followScripts(sink, label, lines, options) {
+  const windows = options.platform === "win32";
+  for (const line of lines) {
+    const words = commandOf(line, options.kind, windows);
+    if (words === undefined) continue;
+    for (const word of scriptWords(words, { windows })) followOne(sink, label, word, options, windows);
+  }
+}
+
+function followOne(sink, label, word, options, windows) {
+  let expanded = expandWord(word, { home: options.home, windows, env: options.env });
+  if (windows && path.sep === "/") expanded = expanded.replaceAll("\\", "/"); // a Windows path read on a POSIX host (only a test does that)
+  const absolute = path.isAbsolute(expanded) || /^[A-Za-z]:[\\/]/.test(expanded);
+  if (!absolute || /[$%]/.test(expanded)) {
+    sink.unreadable(`${label}: ${word}`, "script not found");
+    return;
+  }
+  if (!SCRIPT_EXTENSION.test(expanded) && SYSTEM_BIN.test(expanded.replaceAll("\\", "/"))) return; // a system binary that is not here is nobody's script
+  if (!fs.existsSync(expanded)) {
+    sink.unreadable(`${label}: ${word}`, "script not found");
+    return;
+  }
+  const text = readTextFile(expanded, sink);
+  if (typeof text === "string") classifyText(sink, expanded, text, { ...options, relative: undefined, jobs: false, kind: undefined });
 }
 
 // --- checkouts ---------------------------------------------------------------------------------------------------
@@ -219,9 +362,9 @@ function scanCheckout(checkout, sink, context, run) {
 
 // --- scheduled jobs ----------------------------------------------------------------------------------------------
 
-function scanJobFile(file, sink, context) {
+function scanJobFile(file, sink, context, kind) {
   const text = readTextFile(file, sink);
-  if (typeof text === "string") classifyText(sink, file, text, { ...context, relative: undefined, jobs: true });
+  if (typeof text === "string") classifyText(sink, file, text, { ...context, relative: undefined, jobs: true, kind });
 }
 
 /** Files of a folder: one level, or the tree to a few levels (systemd units). A folder that cannot be read is unreadable, one that is absent is nothing. */
@@ -255,7 +398,7 @@ function scanUserCrontab(sink, context, run) {
     if (!/no crontab/i.test(listing.stderr)) sink.unreadable("crontab -l", `exit ${listing.status}`);
     return;
   }
-  classifyText(sink, "crontab -l", listing.stdout, { ...context, relative: undefined, jobs: true });
+  classifyText(sink, "crontab -l", listing.stdout, { ...context, relative: undefined, jobs: true, kind: "cron" });
 }
 
 /** CSV text → rows of cells; a quoted comma or line end stays in its cell. */
@@ -304,40 +447,47 @@ function scanScheduledTasks(sink, context, run) {
     return;
   }
   for (const { name, action } of tasks) {
-    classifyText(sink, `scheduled task ${name}`, action, { ...context, relative: undefined, jobs: true });
-    for (const token of action.split(/[\s"']+/).filter((word) => SCRIPT_EXTENSION.test(word))) scanJobFile(token, sink, context); // the script the task runs
+    classifyText(sink, `scheduled task ${name}`, action, { ...context, relative: undefined, jobs: true, kind: "task" }); // followed to the script it runs
   }
 }
 
 // --- homes and system folders -------------------------------------------------------------------------------------
 
-function homesOf(platform, hostRoot) {
+/** The home folders of the machine. A base folder that is not there is nothing; one that cannot be listed is unreadable evidence, never "no homes". */
+function homesOf(platform, hostRoot, sink, readDir) {
   const base = platform === "win32" ? path.join(process.env.SystemDrive ?? "C:", "Users") : path.join(hostRoot, platform === "darwin" ? "Users" : "home");
   let names = [];
   try {
-    names = fs.readdirSync(base, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => path.join(base, entry.name));
-  } catch { /* no home folders to list: the scan names what it read, not what is missing */ }
+    names = readDir(base).filter((entry) => entry.isDirectory()).map((entry) => path.join(base, entry.name));
+  } catch (error) {
+    if (error?.code !== "ENOENT" && error?.code !== "ENOTDIR") sink.unreadable(base, error?.code ?? "unreadable");
+  }
   return platform === "win32" ? names : [path.join(hostRoot, "root"), ...names];
 }
 
+/** A systemd unit, or a drop-in `*.conf` inside a `<unit>.d` folder: the files whose Exec lines run something. */
+const isUnitFile = (file) => /\.(?:service|timer)$/.test(file) || /\.d[\\/][^\\/]+\.conf$/.test(file);
+
 function scanSystemdUser(home, sink, context) {
   for (const file of jobFilesUnder(path.join(home, ".config", "systemd", "user"), sink, { recursive: true })) {
-    if (/\.(?:service|timer)$/.test(file)) scanJobFile(file, sink, context);
+    if (isUnitFile(file)) scanJobFile(file, sink, context, "systemd");
   }
 }
 
 function scanSystemScope(sink, context, platform, hostRoot) {
   const at = (...parts) => path.join(hostRoot, ...parts);
   if (platform !== "win32") {
-    scanJobFile(at("etc", "crontab"), sink, context);
-    for (const dir of [at("etc", "cron.d"), at("etc", "cron.hourly"), at("etc", "cron.daily"), at("etc", "cron.weekly"), at("etc", "cron.monthly"), at("var", "spool", "cron"), at("var", "spool", "cron", "crontabs")]) {
-      for (const file of jobFilesUnder(dir, sink, { recursive: false })) scanJobFile(file, sink, context);
+    scanJobFile(at("etc", "crontab"), sink, context, "cron-system");
+    const folders = [[at("etc", "cron.d"), "cron-system"], [at("etc", "cron.hourly"), undefined], [at("etc", "cron.daily"), undefined], [at("etc", "cron.weekly"), undefined],
+      [at("etc", "cron.monthly"), undefined], [at("var", "spool", "cron"), "cron"], [at("var", "spool", "cron", "crontabs"), "cron"]];
+    for (const [dir, kind] of folders) {
+      for (const file of jobFilesUnder(dir, sink, { recursive: false })) scanJobFile(file, sink, context, kind);
     }
     for (const file of jobFilesUnder(at("etc", "systemd", "system"), sink, { recursive: true })) {
-      if (/\.(?:service|timer)$/.test(file)) scanJobFile(file, sink, context);
+      if (isUnitFile(file)) scanJobFile(file, sink, context, "systemd");
     }
   }
-  for (const home of homesOf(platform, hostRoot)) scanSystemdUser(home, sink, context);
+  for (const home of homesOf(platform, hostRoot, sink, context.readDir)) scanSystemdUser(home, sink, context);
 }
 
 /**
@@ -345,9 +495,9 @@ function scanSystemScope(sink, context, platform, hostRoot) {
  * `findings` are `{ path, line, reason }`; `unreadable` are `{ path, why }`; `files` counts what was read. `run(command, args)` is a
  * seam (`{ status, stdout, stderr, error }`). Never deletes, never throws for a unit it cannot read — that unit is `unreadable`.
  */
-export function scanSweepers({ root, system = false, allowlist = [], honourMarker = false, platform = process.platform, run = defaultRun, home = os.homedir(), hostRoot = path.parse(process.cwd()).root } = {}) {
+export function scanSweepers({ root, system = false, allowlist = [], honourMarker = false, platform = process.platform, run = defaultRun, home = os.homedir(), hostRoot = path.parse(process.cwd()).root, env = process.env, readDir = (dir) => fs.readdirSync(dir, { withFileTypes: true }) } = {}) {
   const sink = collector();
-  const context = { allowlist, honourMarker };
+  const context = { allowlist, honourMarker, platform, home, env, readDir };
   const guarded = (unit, work) => {
     try { work(); } catch (error) { sink.unreadable(unit, error?.code ?? error?.message ?? "failed"); }
   };
