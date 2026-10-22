@@ -1701,3 +1701,76 @@ test("24e. gate 6/10: an UNLOCKED worktree is not unlocked at all — there is n
   assert.equal(log.some((line) => line.includes("worktree unlock")), false, `unlock was not asked for\n${log.join("\n")}`);
   assert.equal(log.some((line) => line.includes("worktree remove")), true, `remove was\n${log.join("\n")}`);
 });
+
+// --- 25 --------------------------------------------------------------------------------------------------------
+// Round 5. A registered worktree of the swept repository whose path a stranger took over is not even offered to git; a worktree
+// name of '.' or '..' is no worktree name.
+
+test("25a. wt-git symmetry: a registered worktree whose folder is no longer this user's own is kept, 'changed after the capture' — git is not asked", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("a stub tool must come first on PATH");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.clone, tmp, "gitown", { lock: NOBODY() });
+  const stat = toolStub(w, "stat", `if [ "$1" = "-c" ] && [ "$2" = "%u" ] && [ "$3" = "$STAT_FOREIGN" ]; then echo 4242; exit 0; fi`);
+  const stubGit = toolStub(w, "git", `echo "$*" >> "$DSTUB/gitlog"`);
+
+  const run = runJanitor(w, { tmp, ahead: [stat, stubGit], env: { STAT_FOREIGN: wt.path } });
+
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(wt.path) && listedIn(w.clone).includes(named(wt.path)), `kept, registered\n${run.text}`);
+  assert.ok(mentions(run, named(wt.path), "changed after the capture", "its own owner is no longer this user"), run.text);
+  assert.equal(callsOf(w, "git").some((line) => line.includes("worktree remove") || line.includes("worktree unlock")), false, "git was not asked to unlock or remove it");
+});
+
+test("25b. wt-git symmetry: a registered worktree path swapped AFTER the capture for a link to another registered worktree — that worktree survives", { timeout: TIMEOUT }, async (t) => {
+  if (win32) {
+    t.skip("symlinks need a POSIX filesystem");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.clone, tmp, "gitswap", { lock: undefined });
+  const victim = worktree(w, w.clone, tmp, "gitvictim", { lock: undefined, ageMs: 0 }); // young: never a candidate itself
+  const aside = path.join(w.state, "aside-git");
+  w.scope.after(() => {
+    if (!exists(aside)) return;
+    fs.rmSync(wt.path, { force: true });
+    fs.renameSync(aside, wt.path);
+  });
+
+  const run = await runPaused(w, tmp, () => {
+    fs.renameSync(wt.path, aside);
+    fs.symlinkSync(victim.path, wt.path);
+  });
+
+  assert.equal(run.paused, true, run.stderr);
+  assert.equal(run.status, 3, run.stderr);
+  assert.ok(exists(path.join(victim.path, ".git")) && listedIn(w.clone).includes(named(victim.path)), `the real worktree the link points at survives, registered\n${run.stderr}`);
+  assert.ok(run.lines.some((line) => line.includes(named(wt.path)) && line.includes("changed after the capture")), run.stderr);
+});
+
+for (const leaf of ["..", "."]) {
+  test(`25c. a worktree name of '${leaf}' in a .git is malformed — the 'clone' it would name is not trusted`, { timeout: TIMEOUT }, (t) => {
+    const w = makeWorld(t);
+    if (w === null) return;
+    const tmp = makeTmp(w);
+    const wt = worktree(w, w.other, tmp, "dotname", { lock: undefined });
+    const dotGit = path.join(wt.path, ".git");
+    const original = fs.readFileSync(dotGit);
+    const put = (text) => { fs.rmSync(dotGit, { force: true }); fs.writeFileSync(dotGit, text); };
+    w.scope.after(() => put(original));
+    put(`gitdir: ${slash(path.join(w.other, ".git", "worktrees"))}/${leaf}\n`); // <clone>/worktrees/.. is the clone's own git dir
+    age(wt.path, OLD);
+
+    const run = runJanitor(w, { tmp });
+
+    assert.equal(run.status, 3, run.text);
+    assert.ok(exists(wt.path), run.text);
+    assert.ok(mentions(run, `${named(wt.path)} — owner '-malformed-gitdir' is unreadable`), run.text);
+  });
+}
