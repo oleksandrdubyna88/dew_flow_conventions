@@ -68,9 +68,10 @@
 #     captured (same path, still mine, closed to others, no FIFO among its entries, same route from the stranger's .git) and
 #     runs `git --git-dir=.` there with git's own environment variables unset, so a directory above it renamed a moment later
 #     cannot redirect the call. Any change keeps the folder. A clone that cannot be entered is a foreign one: kept and named.
-#   - `worktree unlock` runs only for a worktree that IS locked (the lock file is looked at inside the entered clone), so any
-#     failure of it is real. A clone's admin state is read once per run at the capture (the cache above); the entered clone is
-#     deliberately read again for each worktree: that re-reading is the security check.
+#   - `worktree unlock` runs only for a worktree that IS locked, so any failure of it is real. The lock file is looked at again
+#     inside the entered clone, but only to decide whether to run unlock and whether its failure counts: what PROTECTS a lock is
+#     the judgement at the capture (a live or unreadable owner is never a candidate). A clone's admin state is read once per run
+#     at the capture (the cache above); the entered clone is read again for each worktree, which is the security check.
 #   - a git step that failed or timed out is SAID (one notice with the step and the exit status) and the folder is kept, never
 #     deleted behind git's back; a claim read that failed or timed out is an unreadable claim, never an empty one.
 #   - a read of a stranger's file and every git call on a clone is bounded by `timeout`, else by `perl`'s alarm. With neither,
@@ -256,7 +257,7 @@ gitdir_of() {   # a folder holding a .git FILE is a linked worktree of SOME clon
 }
 clone_of() {   # $1 = a worktree's admin dir <clone>/worktrees/<name> → the clone's git dir; nothing when it is not that shape
   case "$1" in */worktrees/?*) ;; *) return 0;; esac
-  case "${1##*/worktrees/}" in */*) return 0;; esac
+  case "${1##*/worktrees/}" in */*|.|..) return 0;; esac   # one component, and not '.' or '..': <clone>/worktrees/.. would be the clone itself
   printf '%s' "${1%/worktrees/*}"
 }
 clone_ok() {   # a clone carried through a row: an absolute path with no control byte
@@ -482,7 +483,7 @@ remove_steps() {   # THE BODY OF A SUBSHELL. $1 = the clone's git dir, $2 = the 
   local gd="$1" rc=0 locked="${4:-0}"
   if [ -n "$3" ]; then
     pin_clone "$1" "$3" || exit "$EXIT_CLONE_CHANGED"
-    gd=.; locked=0; if [ -e "worktrees/${3##*/}/locked" ]; then locked=1; fi   # inside the entered clone: its lock file, looked at now
+    gd=.; locked=0; if [ -e "worktrees/${3##*/}/locked" ]; then locked=1; fi   # inside the entered clone: only decides whether unlock runs (the lock itself was judged at the capture)
   fi
   if [ "$locked" = 1 ]; then   # unlock only what is locked, so a failure of it is a real one
     git_run "$gd" worktree unlock "$2" || rc=$?
@@ -532,7 +533,7 @@ for pass in container volume network wt-git wt-dir prune branch folder marker; d
       container) act_rm container "$name" docker rm -f -v "$id" || settle container "$name" dk inspect --type container "$id";;
       volume) act_rm volume "$name" docker volume rm "$id" || settle volume "$name" dk volume inspect "$id";;
       network) act_rm network "$name" docker network rm "$id" || settle network "$name" dk network inspect "$id";;
-      wt-git) remove_worktree "$(git rev-parse --git-common-dir)" "$id" "" "$lk";;
+      wt-git) if [ -d "$id" ] && ! entry_mine "$id"; then skip worktree "$name" "changed after the capture — $(if [ -L "$id" ]; then echo 'it is now a link'; else echo 'its own owner is no longer this user'; fi)"; else remove_worktree "$(git rev-parse --git-common-dir)" "$id" "" "$lk"; fi;;   # a path a stranger took over after the capture is not even offered to git
       wt-dir) why="$(entry_change "$id")"; if [ -z "$why" ]; then remove_worktree "$clone" "$id" "$adm" "$lk"; else skip wt-dir "$name" "changed after the capture — $why"; fi;;   # the captured clone; the stranger's .git is never read again, only its type is looked at
       branch) if checked_out "$id"; then skip branch "$id" "checked out in a worktree that was kept"; else act_rm branch "$id" git branch -D "$id" || settle branch "$id" git show-ref --verify -q "refs/heads/$id"; fi;;
       folder) if [ -d "$id" ]; then act find "$id" -mindepth 1 -maxdepth 1 -type l -delete || true; act_rm folder "$id" rm -rf -- "$id" || settle folder "$id" test -d "$id"; else vanished folder "$id"; fi; if [ -e "$id.owner" ]; then act rm -f -- "$id.owner" || true; fi;;
