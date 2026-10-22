@@ -217,7 +217,7 @@ the sweep to `testsToDelete-<t>-…` (all three spellings, any case, anchored: `
 it combines with `--dry-run`, and an invalid token or an unknown argument prints the usage line and exits 2 with
 nothing touched. `JANITOR_MIN_AGE_MINUTES` (default 60) is whole minutes, digits only, at least 1; `--token` is 2 to 12 characters of
 `[a-z0-9]`. A name or id holding a control character is refused with a skip line, `--dry-run` prints the same exit
-code the real run would, and every test seam that is set is announced once on stderr. It also says what it is doing, on stderr: one line when the capture starts and one `janitor: removed <kind> "<name>"` line per real removal, the name quoted so text inside it cannot pass for a second message (a dry run prints its `would run:` lines instead). What it guarantees,
+code the real run would, and every test seam that is set is announced once on stderr. It also says what it is doing, on stderr: one line when the capture starts and one `janitor: removed <kind> <name>` line per real removal, the name shell-quoted (`printf %q`) so a quote or a space inside it cannot pass for text of the line (a dry run prints its `would run:` lines instead). What it guarantees,
 and what a copy of it must keep:
 
 - **One capture.** Every prefixed resource is listed ONCE with its identity, owner and age before anything is
@@ -228,6 +228,22 @@ and what a copy of it must keep:
   nobody, or a worktree whose lock it cannot read is **skipped** with one line naming it — never deleted;
   unmarked resources older than the window are nobody's and go. An orphan claim (§2) is judged like any other. A worktree is judged by its lock, read through
   its `.git` file whatever clone owns it (a relative gitdir resolved against the worktree).
+- **A stranger's entry can make it keep, never wait.** Any local user can plant folders, FIFOs and crafted
+  `.git` files in a shared temp root. A worktree folder is judged and removed only when it is a real directory
+  (no link) whose own owner, read from the folder itself and not from what a link points at, is the janitor's
+  user, checked at the capture and again right before the removal, and only in a temp root that is sticky or
+  that user's own. Its
+  clone must be owned by that user too, closed to group and world, with every `worktrees/*/gitdir` and every
+  `worktrees/*/locked` that exists a regular file (an unlocked worktree has no `locked`); a `.git` that points anywhere else, through a link neither that user nor
+  root owns, or into a clone that cannot be entered is an unreadable owner: kept, named, with the reason (a
+  wrong "not mine" only keeps). The clone is judged once per run, resolved to its physical path at the capture
+  and carried to the removal, where the git calls for one worktree enter it, prove it again and run inside it,
+  so a directory renamed a moment later cannot redirect them. A lock is released only on a worktree that is
+  locked, so a failed unlock is a real failure. A git step that failed or timed out is said and
+  the folder kept. A stranger's file is read once, only when it is a regular file, never again, and a read that
+  failed is an unreadable claim, not an empty one. Reads and git calls on a clone are bounded by `timeout`, else
+  by `perl`; with neither, a file another user owns, or one inside a folder another user owns, is not read
+  (kept, named, one line says so).
 - **Exact removal.** Top-level links (a junction into a checkout) are unlinked before a worktree or folder is
   removed and `rm -rf` never crosses one; a locked worktree is removed with `git worktree remove --force --force`;
   worktrees go before branches and folders; `docker ps --filter name=`
