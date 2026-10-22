@@ -233,8 +233,8 @@ and what a copy of it must keep:
   (no link) whose own owner, read from the folder itself and not from what a link points at, is the janitor's
   user, checked at the capture and again right before the removal, and only in a temp root that is sticky or
   that user's own. Its
-  clone must be owned by that user too, closed to group and world, with `worktrees/*/gitdir` and
-  `worktrees/*/locked` regular files; a `.git` that points anywhere else, through a link neither that user nor
+  clone must be owned by that user too, closed to group and world, with every `worktrees/*/gitdir` and every
+  `worktrees/*/locked` that exists a regular file (an unlocked worktree has no `locked`); a `.git` that points anywhere else, through a link neither that user nor
   root owns, or into a clone that cannot be entered is an unreadable owner: kept, named, with the reason (a
   wrong "not mine" only keeps). The clone is judged once per run, resolved to its physical path at the capture
   and carried to the removal, where the git calls for one worktree enter it, prove it again and run inside it,
