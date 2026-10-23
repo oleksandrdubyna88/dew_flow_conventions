@@ -1,6 +1,7 @@
 # PLAN — Test leftovers, the merged core: the owner segment scopes, the kernel authorises, liveness decides
 
-> Status: **plan only, nothing implemented yet, 2026-10-21.** Scope: `common/test-leftovers.md`, a new
+> Status: **in progress, 2026-10-23** — draft PR #82 carries S5a, S1, S2, S3, S5b, S6 and their review round; S4, S0
+> and S7 are open (see [Progress and hand-off](#progress-and-hand-off-2026-10-23) at the end). Scope: `common/test-leftovers.md`, a new
 > `common/test-leftovers-janitor.md`, `tools/lib/owned.mjs`, `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`,
 > `tools/leftovers-check.mjs`, `tools/fixtures/owner-vectors.json`, a new `tools/fixtures/owner-blind-allowlist.json`,
 > `tools/owner-conformance.test.mjs`, a new `tools/sweeper-scan.mjs`, a new `research/security/` verdict file, their tests,
@@ -331,3 +332,24 @@ numbered test quoted in the PR.
 | C6 (shared core) the Windows dependency and the end-to-end check | decision 8; S4 test 28; the DoD |
 | C9 (shared core) orphan claims | decision 5; S2 test 16c |
 | C13 (shared core) a squatted name | decision 5; S2 test 16b |
+
+## Progress and hand-off (2026-10-23)
+
+State of the work, so a session on another machine can continue without this repository's history in its head.
+
+| Story | State | Where |
+|---|---|---|
+| S5a classifier | done | `tools/lib/sweeper-scan.mjs` (`classifyLine`), commit 2fb413c |
+| S1 rule texts | done | `common/test-leftovers.md` (29 655 B body, cap 32 768) + `common/test-leftovers-janitor.md`, a993bde |
+| S2 owned helper | done | `tools/lib/owned.mjs`: owner grammar, Windows token, record, claim first, squatting and orphan claims, a7ad5ce |
+| S3 sweep | done | `tools/lib/leftovers-sweep.mjs`: two keys, quarantine for plain folders only, worktrees via git, 5571756 |
+| S5b guard + barrier scan | done | `tools/leftovers-check.mjs` classes `owner-blind`/`legacy-name`, `tools/fixtures/owner-blind-allowlist.json`, `tools/sweeper-scan.mjs`, a4fc637 |
+| S6 conformance (Node half) | done | `tools/fixtures/owner-vectors.json` tables record/names/windows-owner/scope, 93cabc6 |
+| Review round (Opus) | done | 540237b: a legacy record on a Linux reader is `unknown`; win32 scope is fail-closed outside the per-user profile; unanchored sweepers are broad; job scripts are followed and an unreadable one is exit 2; legacy claims are read through the safe reader; identity is captured before judging; a squatting helper removes its own claim |
+| S4 janitor + companion | **open** | first `git merge origin/main` — it brings the hardened janitor of #80 (491aab9); build S4 ON TOP of it and keep every defence: the entry's owner by lstat at capture and before removal, a sticky or own temp root, the pinned clone with a clean git environment, bounded reads with a fail-closed fallback, `worktree unlock` only for a locked worktree, `rm -rf` only after every git step returned 0, `%q` output, no arithmetic or eval on captured text. No inline `owner-blind` marker on the inventory line — the allowlist entry is the only pass (re-run `--update-allowlist`). Then the janitor half of the conformance vectors and an empty `LEGACY_NAME_PENDING` list in `tools/leftovers-check.mjs`. |
+| Gates after S4 | open | coai code gate on the whole PR, Opus review, a Fable security pass recorded in `research/security/test-leftovers-merged-core.md` |
+| S0 barrier | open | run `node tools/sweeper-scan.mjs` (and `--system` by an admin) plus the manual checklist above on every machine that builds or tests this repository, before the PR merges |
+| S7 release | open | ONE promotion of `release`; warn the other sessions that own open consumer PRs first (a promotion turns `pin-check` red everywhere); then the two-stage consumer migration — sweep-only stages everywhere before any producer stage |
+
+Test counts at 540237b's parent 93cabc6: WSL Linux 920 pass / 0 fail / 3 skipped; Windows Git Bash 917 pass, one
+known slow test (`migrate-rules`, passes alone).
