@@ -1,0 +1,29 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../dew_flow_benchmark"
+		},
+		{
+			"path": "../dew_flow_connect_other_ais"
+		},
+		{
+			"path": "../dew_flow_creds_for_devs"
+		},
+		{
+			"path": "../dew_flow_rag_qln"
+		},
+		{
+			"path": "../dew_flow_sidecar_rust"
+		},
+		{
+			"path": "../dew_flow_vscode_kit"
+		},
+		{
+			"path": "../wsl_care"
+		}
+	],
+	"settings": {}
+}
