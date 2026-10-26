@@ -155,6 +155,14 @@ S7 is the release step.
   adds its record in the same commit.
 - **Out of scope:** a GitHub-hosted runner — one job's, discarded with it (rule §3), never shared by two OS users; this
   repository's CI runs only there. A persistent self-hosted runner is a machine like any other and is in the inventory.
+- The merge check requires each record and its fields, NOT a scan exit 0: a part the user-scope scan could not read
+  (exit 2 — another user's cron spool, an unreadable task scheduler) is attested by name in the record, and `--system` is
+  an administrator's run recorded as prose (plan gate round 2).
+- **The order with the consumers** (plan gate round 2): a consumer's SWEEP-ONLY stage emits no owner-form name and does
+  not depend on this release, so it may be prepared and merged BEFORE this PR merges — which is what lets a shared
+  machine's barrier open. Until a machine's barrier is open, that machine builds or tests this repository only with
+  `TMPDIR`, `TEMP` and `TMP` set to a private folder (mode 0700) under the user's own home, where no other user's
+  sweeper reaches, and its record says so.
 - **Scenario:** the PR's merge is blocked (a required check reads the folder) until a file exists for every machine named in
   `research/security/machines.md`, each with the fields above; RED: one machine missing, or a record without the scan
   commit → the check names it.
@@ -227,7 +235,12 @@ S7 is the release step.
   removal; a plain folder `mv`ed into the sibling quarantine, its device, inode and re-read claim checked AGAIN in the
   quarantine, then `rm -rf` — a mismatch is renamed back and skipped (plan gate 2026-10-26; the Node sweep does the same); a worktree NEVER `mv`ed — `git worktree remove
   --force --force` on the captured clone; a quarantine of the caller's uid with a dead renamer restored onto a free name
-  only, else a notice — as the FIRST step of every run, before the capture (plan gate 2026-10-26); the captured clone dir carried through `DEL`; `timeout` on claim/`.git` reads and git calls;
+  only, else a notice — as the FIRST step of every run, before the capture (plan gate 2026-10-26). The restore
+  primitive (plan gate round 2): an exclusive `mkdir` of the original name reserves it, then `rename(2)` of the
+  quarantine onto that EMPTY directory — rename replaces only an empty directory, so a name another process populated in
+  between fails (`ENOTEMPTY`/`EEXIST`) and the quarantine stays with a notice, and in a sticky temp root another user's
+  entry cannot be replaced at all; where a rename onto an existing directory is refused (Windows), the restore is a
+  notice only, never a delete; the captured clone dir carried through `DEL`; `timeout` on claim/`.git` reads and git calls;
   `foreign:`/`legacy:`/`unmarked:` lines; exit 3 only for the caller's scope; `TESTSTODELETE_OWNER` validated or exit 2;
   no `--owner`; the inventory line is the ONE entry of `tools/fixtures/owner-blind-allowlist.json`.
 - **Tests (RED first, `tools/janitor.test.mjs` / `tools/janitor-liveness.test.mjs`):** 21 root (a `JANITOR_TEST_UID` seam
