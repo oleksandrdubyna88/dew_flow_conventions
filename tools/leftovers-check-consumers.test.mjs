@@ -127,3 +127,96 @@ test("S8 review 1. the exclusion list is two files: the guard's own tests", () =
   assert.deepEqual([...EXCLUDED_FILES], ["tools/leftovers-check.test.mjs", "tools/leftovers-check-consumers.test.mjs"]);
   assert.equal(isScanned("tools/leftovers-check-consumers.test.mjs"), false);
 });
+
+// 2 — a dynamic shell name with a literal default is judged on the default ---------------------------------------------------------
+
+const GOOD = "testsToDelete-u1000-x-abc123";
+const sh = (t, line) => guard(tree(t, { "scripts/a.sh": `${line}\n` }));
+
+test("S8 review 2. ${V:-w}, ${V-w}, ${V:=w} and ${V=w}: a default with no `$` is the name the command gets when V is unset, and is judged as a name", (t) => {
+  for (const operator of [":-", "-", ":=", "="]) {
+    const fixed = sh(t, `docker run --rm --name "\${PG${operator}pg-test}" img`);
+    assert.equal(fixed.code, 1, `\${PG${operator}pg-test}: ${fixed.text}`);
+    assert.match(fixed.text, /scripts\/a\.sh:1 — docker-name — `--name \$\{PG\S+pg-test\}` is not an owner-form/);
+    assert.equal(sh(t, `docker run --rm --name "\${PG${operator}${GOOD}}" img`).code, 0, `\${PG${operator}<owner form>}: a default in the owner form passes`);
+  }
+  assert.equal(sh(t, "docker run --rm --name ${PG:-pg-test} img").code, 1, "unquoted");
+  assert.equal(sh(t, 'docker run --rm --name="${PG:-pg-test}" img').code, 1, "--name=");
+  assert.equal(sh(t, 'docker volume create "${V:-cache}"').code, 1, "a volume");
+  assert.equal(sh(t, 'docker network create "${N:-web}"').code, 1, "a network");
+  assert.equal(sh(t, 'docker build -t "${TAG:-img:dev}" .').code, 1, "an image a test builds");
+});
+
+test("S8 review 2. a compose project name: -p, --project-name and COMPOSE_PROJECT_NAME with a literal default are judged on it", (t) => {
+  for (const line of [
+    'docker compose -p "${PROJECT:-myproj}" up -d',
+    'docker compose --project-name "${PROJECT:-myproj}" up -d',
+    'docker compose --project-name="${PROJECT:-myproj}" up -d',
+    'docker-compose -p ${PROJECT:-myproj} up -d',
+    "COMPOSE_PROJECT_NAME=${X:-fixed} docker compose up -d",
+    'COMPOSE_PROJECT_NAME="${X:-fixed}" docker compose up -d',
+    "export COMPOSE_PROJECT_NAME=${X:-fixed}",
+    "COMPOSE_PROJECT_NAME: ${X:-fixed}",
+    "COMPOSE_PROJECT_NAME=${X-fixed}",
+  ]) {
+    const result = sh(t, line);
+    assert.equal(result.code, 1, `${line}: ${result.text}`);
+    assert.match(result.text, /docker-name/, line);
+  }
+  for (const line of [
+    `docker compose -p "\${PROJECT:-${GOOD}}" up -d`,
+    `COMPOSE_PROJECT_NAME="\${X:-${GOOD}}" docker compose up -d`,
+    `export COMPOSE_PROJECT_NAME=\${X:-${GOOD}}`,
+  ]) assert.equal(sh(t, line).code, 0, line);
+});
+
+test("S8 review 2. still dynamic: a default that holds a `$`, an empty default, an alternate-value operator, a bare variable, `$(…)`", (t) => {
+  for (const line of [
+    'docker run --rm --name "${PG:-$OTHER}" img',
+    'docker run --rm --name "${PG:-${OTHER:-x}}" img',
+    'docker run --rm --name "${PG:-$(mk pg)}" img',
+    'docker run --rm --name "${PG:-}" img',
+    'docker run --rm --name "${PG:+fixed}" img',
+    'docker run --rm --name "$PG" img',
+    'docker run --rm --name "$(mk pg)" img',
+    'docker compose -p "${PROJECT:-$USER}" up -d',
+    "COMPOSE_PROJECT_NAME=${X:-$Y}",
+  ]) assert.equal(sh(t, line).code, 0, line);
+});
+
+test("S8 review 2. a default plus more text is judged as text, as it always was", (t) => {
+  assert.equal(sh(t, 'docker run --rm --name "${PG:-pg}-x" img').code, 1);
+  assert.equal(sh(t, `docker run --rm --name "\${PG:-pg}-\${id}" img`).code, 1);
+  assert.equal(sh(t, `docker run --rm --name "${GOOD}-\${id}" img`).code, 0);
+});
+
+test("S8 review 2. a single-quoted '${x}' is a shell literal: the name is the text `${x}`, a finding; double quotes and no quotes stay dynamic", (t) => {
+  for (const line of [
+    "docker run --rm --name '${name}' img",
+    "docker run --rm --name='${name}' img",
+    "docker run --rm --name '$name' img",
+    "docker volume create '${volume}'",
+    "docker compose -p '${project}' up -d",
+    "COMPOSE_PROJECT_NAME='${project}' docker compose up -d",
+    "export COMPOSE_PROJECT_NAME='$project'",
+  ]) {
+    const result = sh(t, line);
+    assert.equal(result.code, 1, `${line}: ${result.text}`);
+    assert.match(result.text, /docker-name/, line);
+  }
+  const shown = sh(t, "docker run --rm --name '${name}' img").text;
+  assert.ok(shown.includes("`--name ${name}`"), "the finding names the text as written, not a masked one: " + shown);
+  for (const line of [
+    'docker run --rm --name "${name}" img',
+    'docker run --rm --name "it\'s ${name}" img',
+    "docker run --rm --name ${name} img",
+    `docker run --rm --name '${GOOD}' img`,
+  ]) assert.equal(sh(t, line).code, line.includes("it's") ? 1 : 0, line);
+});
+
+test("S8 review 2. the header says that a `$(…)` is dynamic because a text scan cannot know it", () => {
+  const header = read("tools", "leftovers-check.mjs").slice(0, 6000);
+  assert.match(header, /\$\(…\)/);
+  assert.match(header, /known limit/i);
+  assert.match(header, /default/);
+});

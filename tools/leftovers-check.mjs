@@ -42,7 +42,10 @@
  * `*.test.<ext>` and `*.spec.<ext>` files (ext: ts, tsx, mts, cts, js, mjs, cjs) and the source and shell files under `scripts/`, `test/` and `tests/` to the scan, and never reads
  * `node_modules/` or the mount paths `.claude/rules/shared/` and `.agents/conventions/` — for the scan AND for the token constants. Without it the scan is exactly this repository's own. The token
  * check reads the `## Tokens` table of the rule beside the guard (or `--rule`) whatever families it lists, and needs the `--token` row to name `--identity`.
- * A `docker-name` value that is wholly a shell expansion (`"${name}"`, `"$(f a)"`) is dynamic, never a finding: a text scan cannot know what it builds.
+ * A `docker-name` value that is wholly a shell expansion (`"${name}"`, `"$(f a)"`) is dynamic, never a finding: a text scan cannot know what it builds — a
+ * known limit of a text scan, since `$(…)` runs a command and a variable reads the environment. Two things the text itself says are judged: a literal DEFAULT
+ * (`${V:-w}`, `${V-w}`, `${V:=w}`, `${V=w}`, `w` with no `$`) is the name the command gets when V is unset, so `w` must be in the owner form; and a single-quoted
+ * `'${name}'` is no expansion in a shell, so it is the literal text `${name}`.
  * Workflows are read with `yaml@2`: this guard's own copy first, then the scanned repository's (`node_modules` of the consumer), else exit 2 with the one
  * sentence that says to add `yaml@2` as a devDependency — and only when the repository has a workflow. Not here: a `module-load` class (needs a parser).
  *
@@ -95,7 +98,7 @@ export const CURES = Object.freeze({
 
 const PREFIX_OK = /^teststodelete[-_][uw][0-9]{1,10}[-_]/i; // the OWNER form: one of the three spellings, then an owner segment
 /** A name the guard may accept: one of the three spellings, a value an argument array hides from it, or a value that is wholly a shell expansion (never guessed at). */
-const nameOk = (name) => PREFIX_OK.test(name) || name === DYNAMIC || isWholeExpansion(name);
+const nameOk = (name) => PREFIX_OK.test(name) || name === DYNAMIC || isDynamicName(name);
 const TOKEN_SHAPE = /^[a-z0-9]{2,12}$/;
 // The prefix is spelled in two pieces below: these are detectors, and the machine scan reads this file too.
 const WORD = "teststo" + "delete";
@@ -263,11 +266,45 @@ function allMatches(patterns, line) {
   });
 }
 
-// A value that is wholly a shell expansion — `"${x}"`, `${x:-d}`, `$x`, `"$(f a b)"` — is dynamic: a text scan cannot know what it builds, the way it cannot
+// A value that is wholly a shell expansion — `"${x}"`, `$x`, `"$(f a b)"` — is dynamic: a text scan cannot know what it builds, the way it cannot
 // know a JavaScript array item that is no literal. The consumer's own tests cover the helper that builds it. A value that MIXES literal text and an
-// expansion is not wholly one, and is judged as it always was, on the text it has.
+// expansion is not wholly one, and is judged as it always was, on the text it has. Two exceptions, both about what the text itself says:
+//   * `${V:-w}`, `${V-w}`, `${V:=w}`, `${V=w}` with a default `w` that holds no `$` and is not empty names `w` whenever V is unset, so `w` is judged as a name
+//     (a default in the owner form passes; any other default is a finding). `$(…)`, a default with a `$` in it and `${V:+w}` stay dynamic:
+//     a known limit of a text scan, which cannot run the command or know the environment.
+//   * a single-quoted `'${x}'` is no expansion to the shell: it is the literal text `${x}` and is judged as text.
 const SIMPLE_VARIABLE = /^\$[A-Za-z_][A-Za-z0-9_]*$/;
+const LITERAL_DEFAULT = /^\$\{[A-Za-z_][A-Za-z0-9_]*:?[-=]([^${}]+)\}$/;
 const MASK = "\u0001";
+const LITERAL_DOLLAR = "\u0002";
+
+/** `text` with the `$` inside every single-quoted span made `LITERAL_DOLLAR` — the shell does not expand there. A quote inside double quotes opens nothing. */
+function literalizeSingleQuoted(text) {
+  let out = "";
+  let quote = "";
+  for (const char of text) {
+    if (quote === "") {
+      if (char === "'" || char === '"') quote = char;
+      out += char;
+    } else if (char === quote) {
+      quote = "";
+      out += char;
+    } else out += quote === "'" && char === "$" ? LITERAL_DOLLAR : char;
+  }
+  return out;
+}
+
+const restoreDollar = (text) => text.replaceAll(LITERAL_DOLLAR, "$");
+
+/** The literal default of an expansion (`${V:-w}` → `w`), or undefined when it has none, an empty one, or one that holds a `$`. */
+const literalDefault = (expansion) => LITERAL_DEFAULT.exec(expansion)?.[1];
+
+/** Is `value` a whole expansion that may stay unjudged: a default it has is in the owner form. */
+function isDynamicName(value) {
+  if (!isWholeExpansion(value)) return false;
+  const fallback = literalDefault(value.replace(/^["']+|["']+$/g, ""));
+  return fallback === undefined || PREFIX_OK.test(fallback);
+}
 
 /** The index of the bracket that closes the one at `open` (`(` or `{`), nesting counted, or -1 when it never closes. */
 function closingOf(text, open) {
@@ -311,10 +348,14 @@ function leadingExpansion(rest) {
 /** `COMPOSE_PROJECT_NAME=x` or `: x` on a line: one hit when x is not an owner-form leftover name — a compose project's containers carry the project's name. */
 function composeEnvHits(line) {
   return [...line.matchAll(/COMPOSE_PROJECT_NAME["']?\s*[:=]\s*["']?/g)].flatMap((match) => {
-    const rest = line.slice(match.index + match[0].length);
-    if (leadingExpansion(rest) > 0) return [];
+    const rest = literalizeSingleQuoted(line).slice(match.index + match[0].length);
+    const length = leadingExpansion(rest);
+    if (length > 0) {
+      const fallback = literalDefault(rest.slice(0, length));
+      return fallback === undefined || PREFIX_OK.test(fallback) ? [] : [`COMPOSE_PROJECT_NAME defaults to a name that is not an owner-form leftover name: ${fallback}`];
+    }
     const value = /^[^\s"';,}]*/.exec(rest)[0];
-    return PREFIX_OK.test(value) ? [] : [`COMPOSE_PROJECT_NAME is not an owner-form leftover name: ${value === "" ? "(empty)" : value}`];
+    return PREFIX_OK.test(value) ? [] : [`COMPOSE_PROJECT_NAME is not an owner-form leftover name: ${value === "" ? "(empty)" : restoreDollar(value)}`];
   });
 }
 
@@ -463,9 +504,9 @@ function composeProjectNames(tokens) {
 
 /** `docker-name` findings of one command; `pushed` is the set of images the scope publishes. */
 function nameFindings(file, command, pushed) {
-  const tokens = words(maskExpansions(command.text)).map((word) => word.replaceAll(MASK, " "));
+  const tokens = words(maskExpansions(literalizeSingleQuoted(command.text))).map((word) => word.replaceAll(MASK, " "));
   const found = [];
-  const bad = (text) => found.push(finding(file, command.line, "docker-name", text));
+  const bad = (text) => found.push(finding(file, command.line, "docker-name", restoreDollar(text)));
   if (/\bdocker\b/.test(command.text)) {
     const arrayForm = [...command.text.matchAll(/["']--name["']\s*,\s*["']([^"']*)["']/g)].map((match) => match[1]);
     for (const name of [...flagValues(tokens, ["--name"]), ...arrayForm]) if (!nameOk(name)) bad(`\`--name ${name}\` is not an owner-form leftover name`);
@@ -475,7 +516,7 @@ function nameFindings(file, command, pushed) {
     if (name === "") bad(`\`docker ${match[1]} create\` makes an unnamed ${match[1]}`);
     else if (!nameOk(name)) bad(`\`docker ${match[1]} create ${name}\` is not an owner-form leftover name`);
   }
-  for (const name of composeProjectNames(tokens)) if (!PREFIX_OK.test(name) && !isWholeExpansion(name)) bad(`the compose project \`${name}\` is not an owner-form leftover name`);
+  for (const name of composeProjectNames(tokens)) if (!PREFIX_OK.test(name) && !isDynamicName(name)) bad(`the compose project \`${name}\` is not an owner-form leftover name`);
   for (const match of command.text.matchAll(/\bWithName\(\s*"([^"]*)"/g)) if (!PREFIX_OK.test(match[1])) bad(`\`WithName("${match[1]}")\` is not an owner-form leftover name`);
   if (/\bdocker\s+build\b/.test(command.text)) {
     for (const tag of flagValues(tokens, ["-t", "--tag"])) {
