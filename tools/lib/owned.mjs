@@ -1,7 +1,7 @@
 // Owned test resources: the Node encoding of `common/test-leftovers.md` §1–§3 for this repository.
 //
 // What it owns. Every temp folder or git worktree a test here makes goes through `ownedDir` / `ownedWorktree`:
-// the name comes from one constant (`REPO_TOKEN`, rule §1) behind the caller's owner token (`u<uid>`, or `w<digits>`
+// the name comes from one constant (`REPO_TOKEN`, rule §1; a consumer binds its own with `ownedFor`) behind the caller's owner token (`u<uid>`, or `w<digits>`
 // on Windows), and the claim is written FIRST, under that name, with an exclusive create (rule §2).
 //
 // The order is the whole safety: claim → register → create. A claim that already exists is somebody else's name, so a
@@ -41,13 +41,14 @@ import * as path from "node:path";
 import { git } from "./git.mjs";
 
 export const PREFIX = "testsToDelete-";                              // rule §1
-export const REPO_TOKEN = "conventions";                             // rule §1 — the ONLY place the token is written
+export const REPO_TOKEN = "conventions";                             // rule §1 — the ONLY place this repository's token is written (a consumer's is the `token` of its own `ownedFor`)
 export const REPO_ROW = "the shared-rules repository";                // rule §1 — the `## Tokens` row (its repository column) that names THIS repository: a token is only this repository's if its row says so
 export const OWNER_GRAMMAR = /^[uw][0-9]{1,10}$/;                    // rule §1 — reserved: no repo token matches it
 export const MAX_NAME = 63;                                          // rule §1
 export const ID_LENGTH = 6;                                          // mkdtemp's six (D1)
 export const START_TOLERANCE_S = 2;                                  // rule §3
 export const MAX_CLAIM_BYTES = 512;                                  // rule §3: one line, line end included. `janitor.sh` reads 513 bytes of a claim file to see one past it.
+export const TOKEN_SHAPE = /^[a-z0-9]{2,12}$/;                       // rule §1 — the shape of a repository token
 const MAX_DRAWS = 3;                                                 // rule §2: a taken claim or a squatted name draws a new id, a few times
 
 const ID_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -113,16 +114,16 @@ export function thisOwnerToken() {
 
 // --- names (rule §1) -----------------------------------------------------------------------------------------------
 
-/** `testsToDelete-<owner>-<repo>-` — the part of every name of this repository that is not `<what>` or the id. */
-function nameBase(owner = thisOwnerToken()) {
-  return `${PREFIX}${owner}-${REPO_TOKEN}-`;
+/** `testsToDelete-<owner>-<token>-` — the part of every name of the repository that owns `token` that is not `<what>` or the id. */
+function nameBase(token, owner = thisOwnerToken()) {
+  return `${PREFIX}${owner}-${token}-`;
 }
 
-function checkWhat(what) {
+function checkWhat(what, token) {
   if (typeof what !== "string" || what === "") throw new TypeError(`owned: \`what\` must be a non-empty string, got ${JSON.stringify(what)}`);
   if (/[/\\]/.test(what) || CONTROL.test(what)) throw new TypeError(`owned: \`what\` may not hold a path separator or a control character: ${JSON.stringify(what)}`);
   if (what.startsWith("-")) throw new TypeError(`owned: \`what\` may not start with "-": ${JSON.stringify(what)}`);
-  const base = nameBase();
+  const base = nameBase(token);
   const room = MAX_NAME - base.length - 1 - ID_LENGTH; // the owner is budgeted BEFORE `what` (rule §1): never truncate a finished name
   if (what.length > room) {
     throw new TypeError(`owned: the whole name would pass ${MAX_NAME} characters — \`what\` is ${what.length}, the most is ${room} under the owner \`${thisOwnerToken()}\`: ${JSON.stringify(what)}`);
@@ -133,21 +134,31 @@ function checkScope(scope) {
   if (typeof scope?.after !== "function") throw new TypeError("owned: `scope` must have an `after(fn)` method (a node:test context or a cleanupScope())");
 }
 
+function prefixFor(token, what) {
+  checkWhat(what, token);
+  return `${nameBase(token)}${what}-`;
+}
+
+function patternFor(token, owner = thisOwnerToken()) {
+  if (!OWNER_GRAMMAR.test(owner)) throw new TypeError(`owned: ${JSON.stringify(owner)} is not an owner token`);
+  return new RegExp(`^teststodelete[-_]${owner}[-_]${token}[-_]`, "i");
+}
+
+const legacyPatternFor = (token) => new RegExp(`^teststodelete[-_]${token}[-_]`, "i");
+
 /** `testsToDelete-<owner>-<repo>-<what>-` — the part of the name before the random id. */
 export function ownedPrefix(what) {
-  checkWhat(what);
-  return `${nameBase()}${what}-`;
+  return prefixFor(REPO_TOKEN, what);
 }
 
 /** What this repository's sweep matches for ONE owner: `^testsToDelete-<owner>-<repo>-`, all three spellings, case-insensitive (rule §1, §4). */
 export function ownedPattern(owner = thisOwnerToken()) {
-  if (!OWNER_GRAMMAR.test(owner)) throw new TypeError(`owned: ${JSON.stringify(owner)} is not an owner token`);
-  return new RegExp(`^teststodelete[-_]${owner}[-_]${REPO_TOKEN}[-_]`, "i");
+  return patternFor(REPO_TOKEN, owner);
 }
 
 /** What the sweep LISTS as legacy: this repository's token straight after the prefix, the form from before the owner segment. */
 export function legacyPattern() {
-  return new RegExp(`^teststodelete[-_]${REPO_TOKEN}[-_]`, "i");
+  return legacyPatternFor(REPO_TOKEN);
 }
 
 // Spelled in two pieces: this is a reader of names, not a sweep, and the machine scan reads this file too.
@@ -175,9 +186,13 @@ function randomId() {
   return id;
 }
 
+function nameFor(token, what) {
+  return prefixFor(token, what) + randomId();
+}
+
 /** A fresh, unused name: the prefix, the caller's owner, this repository's token, `what` and six random characters of [A-Za-z0-9]. */
 export function ownedName(what) {
-  return ownedPrefix(what) + randomId();
+  return nameFor(REPO_TOKEN, what);
 }
 
 /** Is `child` strictly inside `parent`? Both already resolved; compared case-insensitively with `pathApi` (the Windows one on Windows). A longer sibling name is not a child. */
@@ -538,9 +553,13 @@ export function removeClaim(dir) {
  * never removed — one warning names it, this run's claim is removed again at once (only while it still holds exactly what was
  * written), and a new id is drawn.
  */
-export function ownedDir(scope, what, { parent = tempRoot() } = {}) {
+export function ownedDir(scope, what, options) {
+  return dirFor(REPO_TOKEN, scope, what, options);
+}
+
+function dirFor(token, scope, what, { parent = tempRoot() } = {}) {
   checkScope(scope);
-  const prefix = ownedPrefix(what);
+  const prefix = prefixFor(token, what);
   for (let draw = 0; draw < MAX_DRAWS; draw += 1) {
     const dir = path.resolve(parent, prefix + randomId());
     let written;
@@ -601,12 +620,64 @@ function tearDownWorktree(repo, worktree, hooks) {
  * nothing is adopted). `beforeRemove(fn)` adds a step that must succeed before the directory is removed — the junction
  * unlink; if one fails the directory is left alone.
  */
-export function ownedWorktree(scope, repo, what, { ref = "HEAD", parent = tempRoot() } = {}) {
+export function ownedWorktree(scope, repo, what, options) {
+  return worktreeFor(REPO_TOKEN, scope, repo, what, options);
+}
+
+function worktreeFor(token, scope, repo, what, { ref = "HEAD", parent = tempRoot() } = {}) {
   checkScope(scope);
   const reason = formatOwner(runRecord());
-  const worktree = path.resolve(parent, ownedName(what));
+  const worktree = path.resolve(parent, nameFor(token, what));
   git(repo, "worktree", "add", "--detach", "--lock", "--reason", reason, worktree, ref);
   const hooks = [];
   scope.after(() => tearDownWorktree(repo, worktree, hooks)); // the very next statement
   return { path: worktree, beforeRemove: (fn) => { hooks.push(fn); } };
+}
+
+// --- a consumer's token (decision 11) ----------------------------------------------------------------------------
+
+// The functions that do not depend on the token: a name's version, the owner record, liveness, removal. `ownedFor` hands them on as they are.
+// A test enumerates the module's own exports against this list and the six bound ones, so a function added above and forgotten here is red.
+const TOKEN_FREE = {
+  tempRoot, asciiLower, windowsOwnerToken, ownerToken, thisOwnerToken, classifyName, isInsideProfile, isMine, cleanupScope, startFromProcStat,
+  readPidNamespace, isProcessId, processProbe, hidepidActive, hostName, hostId, thisOwner, formatOwner, formatLegacyOwner, parseOwner,
+  parseLegacyOwner, runRecord, writeOwner, removeClaimIfStill, gitdirOf, readClaimText, readOwner, ownerState, legacyOwnerState, removeLink,
+  removeQuietly, removeClaim,
+};
+
+/** `token` or a TypeError naming the legal shape: `[a-z0-9]{2,12}`, and never of the owner grammar (a token that read as an owner would make every name ambiguous, rule §1). */
+function checkToken(token) {
+  if (typeof token !== "string" || !TOKEN_SHAPE.test(token) || OWNER_GRAMMAR.test(token)) {
+    throw new TypeError(`owned: \`token\` must match ${TOKEN_SHAPE} and must not be of the owner grammar ${OWNER_GRAMMAR}, got ${JSON.stringify(token)}`);
+  }
+}
+
+/** `row` is the "repository" column of the token's row in the rule's `## Tokens` table: one non-blank line, or absent. */
+function checkRow(row) {
+  if (row !== undefined && (typeof row !== "string" || row.trim() === "" || CONTROL.test(row))) {
+    throw new TypeError(`owned: \`row\` must be one non-blank line of text (the "repository" column of the token's row), got ${JSON.stringify(row)}`);
+  }
+}
+
+/**
+ * This helper bound to ANOTHER repository's token — what a consumer wraps, instead of porting the file. `token` is that repository's
+ * row of the rule's `## Tokens` table (`[a-z0-9]{2,12}`, not of the owner grammar); `row` is its "repository" column, which the
+ * guard takes as `--identity`. The result holds every function of this module: the six whose behaviour depends on the token
+ * (`ownedPrefix`, `ownedPattern`, `legacyPattern`, `ownedName`, `ownedDir`, `ownedWorktree`) are bound to `token`, the others
+ * are this module's own, so one object is the whole API. The plain exports stay bound to `REPO_TOKEN`: nothing here changes them.
+ */
+export function ownedFor({ token, row } = {}) {
+  checkToken(token);
+  checkRow(row);
+  return Object.freeze({
+    token,
+    row,
+    ownedPrefix: (what) => prefixFor(token, what),
+    ownedPattern: (owner) => patternFor(token, owner),
+    legacyPattern: () => legacyPatternFor(token),
+    ownedName: (what) => nameFor(token, what),
+    ownedDir: (scope, what, options) => dirFor(token, scope, what, options),
+    ownedWorktree: (scope, repo, what, options) => worktreeFor(token, scope, repo, what, options),
+    ...TOKEN_FREE,
+  });
 }
