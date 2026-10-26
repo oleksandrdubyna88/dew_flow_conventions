@@ -712,8 +712,9 @@ test("17. thisOwner carries the owner token and, on Linux, the pid namespace; TE
   assert.equal(me.owner, OWNER);
   if (linux && me.start !== undefined) assert.ok(Number.isInteger(me.ns), "Linux: the namespace rides with the start");
   else assert.equal(me.ns, undefined);
-  const given = { owner: OWNER, host: me.host, pid: 4711, ...(me.start === undefined ? {} : { start: me.start, ...(me.ns === undefined ? {} : { ns: me.ns }) }) };
-  assert.deepEqual(runRecord({ TESTSTODELETE_RUN: formatOwner(given) }), given, "a valid run record is the run's");
+  const parentStart = processProbe(process.ppid).start; // the parent runs this test: a LIVE run, not this process
+  const given = { owner: OWNER, host: me.host, pid: process.ppid, ...(me.start === undefined || parentStart === undefined ? {} : { start: parentStart, ...(me.ns === undefined ? {} : { ns: me.ns }) }) };
+  assert.deepEqual(runRecord({ TESTSTODELETE_RUN: formatOwner(given) }), given, "a valid run record of a live process is the run's");
   assert.equal(runRecord({}), me);
   assert.equal(runRecord({ TESTSTODELETE_RUN: "" }), me);
   for (const bad of ["garbage", `${OWNER === "u1" ? "u2" : "u1"}:${me.host}:4711`, `${OWNER}:${me.host}:4711\nextra`, "a".repeat(600)]) {
@@ -735,13 +736,34 @@ test("17b. a child with TESTSTODELETE_RUN set makes a claim that names the RUN, 
     `process.stdout.write(ownedDir(scope, "run-child-dir", { parent: process.env.OWNED_CHILD_PARENT }));`,
     ``,
   ].join("\n"));
-  const runsRecord = `${OWNER}:${thisOwner().host}:4711`;
+  const runsRecord = formatOwner(thisOwner()); // this test process is the live run that spawns the child
   const { NODE_TEST_CONTEXT: _inherited, ...env } = process.env;
   const result = spawnSync(process.execPath, [script], { encoding: "utf8", timeout: 60_000, env: { ...env, OWNED_CHILD_PARENT: parent, TESTSTODELETE_RUN: runsRecord } });
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(fs.readFileSync(`${result.stdout}.owner`, "utf8"), `${runsRecord}\n`, "the claim holds the run's record");
   removeQuietly(result.stdout);
+});
+
+test("17c. a TESTSTODELETE_RUN naming a process that is gone, or one of another host or namespace, is refused with ONE warning and the process's own record is used", async () => {
+  const me = thisOwner();
+  const exited = spawnSync(process.execPath, ["-e", ""], { encoding: "utf8" });
+  assert.ifError(exited.error);
+  const withNs = (record) => (me.start === undefined || me.ns === undefined ? record : `${record}:${me.start}:${me.ns}`);
+  const gone = `${me.owner}:${me.host}:${exited.pid}`;
+  assert.equal(processProbe(exited.pid).state, "dead", "the fixture: that pid has no process");
+  const cases = {
+    "a pid with no process": withNs(gone),
+    "a pid nothing can have": withNs(`${me.owner}:${me.host}:4194300`),
+    "another host": withNs(`${me.owner}:some-other-host@${me.host.split("@")[1]}:${process.ppid}`),
+    ...(me.ns === undefined ? {} : { "another pid namespace": `${me.owner}:${me.host}:${process.ppid}:${processProbe(process.ppid).start}:${me.ns + 1}` }),
+  };
+  for (const [what, record] of Object.entries(cases)) {
+    let used;
+    const lines = await stderrOf(() => { used = runRecord({ TESTSTODELETE_RUN: record }); });
+    assert.equal(used, me, `${what}: refused, the process's own record is used`);
+    assert.equal(lines.filter((line) => line.startsWith("owned:")).length, 1, `${what}: ONE warning`);
+  }
 });
 
 // 18 --------------------------------------------------------------------------------------------------------

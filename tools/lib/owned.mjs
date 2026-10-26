@@ -374,16 +374,18 @@ export function parseLegacyOwner(text) {
 }
 
 /**
- * The record a helper writes: the run's own, handed down in `TESTSTODELETE_RUN` when that is set and valid (so what a child
- * makes belongs to the run, not to a helper that exits), else this process's. A value that is not the grammar, or whose owner
- * is not the caller's, is refused — the process's own record is used and one warning says so.
+ * The record a helper writes: the run's own, handed down in `TESTSTODELETE_RUN` when that is set and names a LIVE run of the caller (so what a child
+ * makes belongs to the run, not to a helper that exits), else this process's. A value that is not the grammar, whose owner is not the caller's, or
+ * whose liveness is anything but `live` — a pid with no process, another host or namespace, a leading zero, a process that cannot be asked — is
+ * refused: a claim of a run that is already gone is dead at birth, and the caller's own sweep would remove what the run is still using. The process's
+ * own record is used and one warning says so.
  */
 export function runRecord(env = process.env) {
   const given = env.TESTSTODELETE_RUN;
   if (given === undefined || given === "") return thisOwner();
   const parsed = parseOwner(given);
-  if (parsed.unreadable === true || parsed.nonCanonical === true || parsed.owner !== thisOwner().owner) {
-    warn("TESTSTODELETE_RUN is not a record of this user — ignored, this process's own record is used");
+  if (parsed.unreadable === true || parsed.owner !== thisOwner().owner || ownerState(parsed, processProbe, { callerOwner: thisOwner().owner }) !== "live") {
+    warn("TESTSTODELETE_RUN is not the record of a live run of this user — ignored, this process's own record is used");
     return thisOwner();
   }
   return parsed;
