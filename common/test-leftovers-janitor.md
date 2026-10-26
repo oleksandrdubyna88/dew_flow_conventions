@@ -40,10 +40,11 @@ Everything a person reads goes to stderr, through one cleaner that turns every b
 - `janitor: looking for testsToDelete resources…` when the capture starts; `janitor: removed <kind> <name>` per
   REAL removal, the name quoted (`%q`) so text inside it cannot pass for a second message;
 - `skipped: <kind> <name> — <reason>` for a resource of the caller's own scope it would not remove (live owner, a
-  foreign host, an owner it cannot read, a lock that names nobody, a worktree whose lock it cannot read, a kernel
-  owner that is not the caller, a pid it cannot judge, an identity that changed after the capture, a failed
-  removal) — these set the exit code;
-- `foreign: <kind> <name> — owner <o>`, `legacy: <kind> <name> — remove with: <exact command>`,
+  foreign host, an owner it cannot read, a lock that names nobody, a worktree whose lock it cannot read, a clone that
+  is not the caller's, a pid it cannot judge, an identity — its owner included — that changed after the capture, a
+  failed removal) — these set the exit code;
+- `foreign: <kind> <name> — owner <o>` for another owner's name, record or label, AND for an entry or claim another
+  user owns whatever its name says (a forged owner segment), `legacy: <kind> <name> — remove with: <exact command>`,
   `unmarked: <kind> <name>` for what is not the caller's to remove — listed, never touched, never an exit code;
 - `notice: …` for a target that vanished after the capture, a docker id that is not lower-case hex, a label that
   could not be read, a quarantine left by an earlier killed run;
@@ -53,8 +54,8 @@ Everything a person reads goes to stderr, through one cleaner that turns every b
 ## Exit codes
 
 **0** nothing in the caller's scope was skipped; **3** something was (named on stderr); **1** a listing failed, a
-refused environment value, or a lock that is not a regular file in the swept clone (git itself would block on it)
-— nothing was removed; **2** usage. A stopped Docker daemon is a failure (`pipefail`; a failed listing removes
+refused `JANITOR_MIN_AGE_MINUTES`, or a lock that is not a regular file in the swept clone (git itself would block on
+it) — nothing was removed; **2** usage, or a `TESTSTODELETE_OWNER` that is not of the owner grammar — nothing listed. A stopped Docker daemon is a failure (`pipefail`; a failed listing removes
 nothing), not a clean machine; a machine with no `docker` binary says so once and still sweeps git and the temp root.
 
 ## What a copy must keep
