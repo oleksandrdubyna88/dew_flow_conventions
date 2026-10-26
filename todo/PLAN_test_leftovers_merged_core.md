@@ -147,9 +147,17 @@ S7 is the release step.
 
 - For every machine that builds or tests this repository: `node tools/sweeper-scan.mjs --root <checkout parent>` as the
   developer; `--system` once by an administrator; the manual items of the checklist; the result in
-  `research/security/barrier-<machine>.md` (date, scan output, the attestation line for anything the scan could not read).
+  `research/security/barrier-<machine>.md`. **The scan ships in this PR (S5b), so each machine runs it from a checkout of
+  the PR branch, before the merge** — never from `main`, which does not have it yet (plan gate 2026-10-26).
+- Each record carries: the machine's identity (host name, OS, the OS users that build or test here), the date, the commit
+  of the scan it ran, the scan's outcome, and each attestation by name for what the scan could not read. A person reviews
+  the records; `research/security/machines.md` is the inventory, and adding a machine that builds or tests this repository
+  adds its record in the same commit.
+- **Out of scope:** a GitHub-hosted runner — one job's, discarded with it (rule §3), never shared by two OS users; this
+  repository's CI runs only there. A persistent self-hosted runner is a machine like any other and is in the inventory.
 - **Scenario:** the PR's merge is blocked (a required check reads the folder) until a file exists for every machine named in
-  `research/security/machines.md`; RED: one machine missing → the check names it.
+  `research/security/machines.md`, each with the fields above; RED: one machine missing, or a record without the scan
+  commit → the check names it.
 
 ### S1 — The two rule texts — **cornerstone (1 of 2), `model: fable`** (the spec is written; a Sonnet coder lands it, Opus reviews)
 
@@ -216,9 +224,10 @@ S7 is the release step.
 - The capture keeps its breadth and gains `form`/`nameowner` columns; `ME_OWNER` (Linux/macOS `id -u`; Windows
   `printf '%s' "$(id -un | LC_ALL=C tr 'A-Z' 'a-z')" | sha256sum | cut -c1-8` → `$(( 16#… ))`); `scope_ok` with `-O` on folder,
   claim and the worktree's clone; `owner_ok` merged grammar + `legacy_owner_ok`; `ns_ok`; the identity re-check before every
-  removal; a plain folder `mv`ed into the sibling quarantine then `rm -rf`; a worktree NEVER `mv`ed — `git worktree remove
+  removal; a plain folder `mv`ed into the sibling quarantine, its device, inode and re-read claim checked AGAIN in the
+  quarantine, then `rm -rf` — a mismatch is renamed back and skipped (plan gate 2026-10-26; the Node sweep does the same); a worktree NEVER `mv`ed — `git worktree remove
   --force --force` on the captured clone; a quarantine of the caller's uid with a dead renamer restored onto a free name
-  only, else a notice; the captured clone dir carried through `DEL`; `timeout` on claim/`.git` reads and git calls;
+  only, else a notice — as the FIRST step of every run, before the capture (plan gate 2026-10-26); the captured clone dir carried through `DEL`; `timeout` on claim/`.git` reads and git calls;
   `foreign:`/`legacy:`/`unmarked:` lines; exit 3 only for the caller's scope; `TESTSTODELETE_OWNER` validated or exit 2;
   no `--owner`; the inventory line is the ONE entry of `tools/fixtures/owner-blind-allowlist.json`.
 - **Tests (RED first, `tools/janitor.test.mjs` / `tools/janitor-liveness.test.mjs`):** 21 root (a `JANITOR_TEST_UID` seam
@@ -232,7 +241,7 @@ S7 is the release step.
   Windows machine with Git for Windows' bash, skipped elsewhere with a diagnostic): an owned dead leftover folder is
   deleted, a live one and a foreign-owner one are kept — the check gate C6 asks for before the sibling withdraws its
   listing-only path; 29 a dead-owned worktree goes through `git worktree remove`, never a rename, and a quarantine orphan
-  is restored only onto a free name; 20a–20f from the hardening branch stay green; 1–19 and L1–S13 re-targeted (3: the
+  is restored only onto a free name; **30** a folder swapped between the pre-rename check and the rename is caught by the re-check in the quarantine, renamed back and skipped, nothing removed; **31** a run killed after the rename (a quarantine left behind) has it restored by the NEXT run before that run's capture (plan gate 2026-10-26); 20a–20f from the hardening branch stay green; 1–19 and L1–S13 re-targeted (3: the
   "dead old unmarked" folder is now listed, not removed).
 - **The security verdict is a file** (gate P8): `research/security/test-leftovers-merged-core.md` — the reviewed commit
   hash and one line per scenario of the spec's §6 (SHIP, or FIX + the fix commit); the Fable pass writes it, the DoD reads it.
@@ -265,7 +274,8 @@ S7 is the release step.
 ### S6 — The shared vectors and the conformance test (`model: sonnet`, Opus review)
 
 - `tools/fixtures/owner-vectors.json`: grammar vectors on the merged record; the new `names` table; `verdicts` with
-  `nameOwner`/`recordOwner`/`callerOwner`/`kernelMine`/`ns`; the `windows-owner` table (upper case, a space, multi-byte
+  `nameOwner`/`recordOwner`/`callerOwner`/`kernelMine`/`ns`; the `windows-owner` table (at least one name whose token is
+  ≥ 2^31 — the digest's high bit set — asked of bash `$(( 16#… ))` and Node `readUInt32BE` alike, plan gate 2026-10-26; upper case, a space, multi-byte
   names, the canonical input stated in `about`); `hostnames` unchanged. The file is copied byte for byte by the private
   sibling, so every vector carries its reason and no family fact.
 - `tools/owner-conformance.test.mjs`: the new tables asked of bash (`owner_ok`, `legacy_owner_ok`, `scope_ok`'s pure half,
@@ -283,7 +293,8 @@ S7 is the release step.
   `.agents/conventions/` excluded) to today's set; without it the scan is today's. (b) A `docker-name` value that is
   wholly a shell expansion (`"${x}"`, `"$(f …)"`) is dynamic, as a JS array item already is: not a finding — a text scan
   cannot know it; the consumer's helper tests cover what it builds. (c) `yaml` is resolved from the scanned repository
-  (`createRequire(<repo>/package.json)`) when the guard's own resolution fails; neither → exit 2 with the sentence to add
+  (`createRequire(path.join(<repo>, "noop.js"))`, which walks up from the repository root whether or not a
+  `package.json` sits there) when the guard's own resolution fails; neither → exit 2 with the sentence to add
   `yaml@2` as a devDependency. (d) The token check reads the mounted rule's `## Tokens` table whatever families it lists
   and requires the `--token` row to name `--identity`; "this public copy lists only `dew_flow`" moves from the guard into
   `tools/rules.test.mjs`. **Not in S8:** a `module-load` class (rule §2) — it needs a JS/TS parser the guard does not

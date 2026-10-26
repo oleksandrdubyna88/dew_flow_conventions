@@ -81,9 +81,10 @@ nothing), not a clean machine; a machine with no `docker` binary says so once an
 3. **Exact removal, by identity.** Before a folder, worktree or claim goes, its device and inode and its re-read
    claim must equal the captured ones — a mismatch is `skipped … changed after the capture`. A plain folder is then
    renamed to the sibling `.<name>.teststodelete-quarantine-<pid>-<hex>` (same parent: atomic, never across a file
-   system; the leading `.` keeps it out of every prefix match) and removed from there; a quarantine an earlier
-   killed run left is restored under its name when that is free and reported as a notice when it is taken — never
-   over an existing folder. A worktree is **never renamed** (a rename breaks its gitdir pointers): it goes with
+   system; the leading `.` keeps it out of every prefix match), checked AGAIN there — the same device, inode and
+   claim, else it is renamed back and skipped — and only then removed; a quarantine an earlier killed run left is
+   restored, as the first step of every run and before its capture, under its name when that is free and reported
+   as a notice when it is taken — never over an existing folder. A worktree is **never renamed** (a rename breaks its gitdir pointers): it goes with
    `git worktree remove --force --force`, called on the captured clone through `timeout`, after its top-level links
    (a junction into a checkout) are unlinked; `rm -rf` never crosses a link; a folder, worktree or claim is removed
    only when it is exactly one component below the temp root; worktrees go before branches (a branch checked out in
