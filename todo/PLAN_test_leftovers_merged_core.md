@@ -300,12 +300,15 @@ S7 is the release step.
 - **`tools/lib/owned.mjs`:** `ownedFor({ token, row })` returns the same API bound to that token (`ownedPrefix`,
   `ownedPattern`, `ownedName`, `ownedDir`, `ownedWorktree`, `classifyName`, `runRecord`, `formatOwner`, `cleanupScope`,
   …); `token` is validated (`[a-z0-9]{2,12}`, not of the owner grammar) or it throws. The module's own exports stay bound
-  to this repository's `REPO_TOKEN`, so nothing here changes behaviour. `tools/lib/git.mjs` (which it imports) ships with it.
+  to this repository's `REPO_TOKEN`, so nothing here changes behaviour. `tools/lib/git.mjs` (which it imports) ships with it. The shipped
+  `owned.mjs` holds NO token (review fix, 2026-10-26): `REPO_TOKEN` and `REPO_ROW` live in `tools/lib/owned-token.mjs`, which each repository
+  writes itself, so a byte copy is the same bytes everywhere; the guard finds the constant there and reports a copied `owned.mjs` with no such file.
 - **`tools/leftovers-check.mjs`:** (a) `--profile node` adds a consumer's tracked `**/*.{test,spec}.{ts,tsx,mts,cts,js,mjs,cjs}`,
-  `scripts/**`, `test/**`, `tests/**` files (`node_modules` and the mount paths `.claude/rules/shared/`,
-  `.agents/conventions/` excluded) to today's set; without it the scan is today's. (b) A `docker-name` value that is
+  every text file of `scripts/`, `test/` and `tests/` (binary ones skipped; `node_modules` and the mount paths `.claude/rules/shared/`,
+  `.agents/conventions/` excluded, for the token constants too) to today's set; without it the scan is today's. (b) A `docker-name` value that is
   wholly a shell expansion (`"${x}"`, `"$(f …)"`) is dynamic, as a JS array item already is: not a finding — a text scan
-  cannot know it; the consumer's helper tests cover what it builds. (c) `yaml` is resolved from the scanned repository
+  cannot know it; the consumer's helper tests cover what it builds. A literal default (`${V:-w}`, `-`, `:=`, `=`, no `$` in `w`) is judged as
+  the name it gives when V is unset, and a single-quoted `'${x}'` is a literal. (c) `yaml` is resolved from the scanned repository
   (`createRequire(path.join(<repo>, "noop.js"))`, which walks up from the repository root whether or not a
   `package.json` sits there) when the guard's own resolution fails; neither → exit 2 with the sentence to add
   `yaml@2` as a devDependency. (d) The token check reads the mounted rule's `## Tokens` table whatever families it lists

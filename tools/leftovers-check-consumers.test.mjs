@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 import { git } from "./lib/git.mjs";
 import { ownedDir } from "./lib/owned.mjs";
-import { CURES, EXCLUDED_FILES, isScanned, main, tokenConstants } from "./leftovers-check.mjs";
+import { CURES, EXCLUDED_FILES, isScanned, loadYaml, main, scanRepository, tokenConstants, YamlMissingError } from "./leftovers-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -130,7 +130,8 @@ test("S8 review 1. the exclusion list is two files: the guard's own tests", () =
 
 // 2 — a dynamic shell name with a literal default is judged on the default ---------------------------------------------------------
 
-const GOOD = "testsToDelete-u1000-x-abc123";
+const Q = "testsTo" + "Delete"; // spelled in two pieces: the machine scan reads this file and must find no line that matches the prefix with no owner after it
+const GOOD = `${Q}-u1000-x-abc123`;
 const sh = (t, line) => guard(tree(t, { "scripts/a.sh": `${line}\n` }));
 
 test("S8 review 2. ${V:-w}, ${V-w}, ${V:=w} and ${V=w}: a default with no `$` is the name the command gets when V is unset, and is judged as a name", (t) => {
@@ -219,4 +220,76 @@ test("S8 review 2. the header says that a `$(…)` is dynamic because a text sca
   assert.match(header, /\$\(…\)/);
   assert.match(header, /known limit/i);
   assert.match(header, /default/);
+});
+
+// 4 — the profile's scripts and tests, the cure texts, the yaml version ------------------------------------------------------------
+
+const COMMIT = ["-c", "user.name=Guard test", "-c", "user.email=guard@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "consumer"];
+
+test("S8 review 4a. under --profile node every TEXT file of scripts/, test/ and tests/ is read, extensionless ones included", (t) => {
+  const repo = tree(t, {
+    "scripts/start-db": '#!/bin/sh\ndocker run --rm --name fixed img\n',
+    "test/fixtures/run": "docker run --rm --name fixed2 img\n",
+    "tests/helpers/up.cmd": "docker run --rm --name fixed3 img\n",
+    "src/a.test.ts": "const a = 1;\n",
+  });
+  const profiled = guard(repo, ["--profile", "node"]);
+  assert.equal(profiled.code, 1, profiled.text);
+  for (const file of ["scripts/start-db:2", "test/fixtures/run:1", "tests/helpers/up.cmd:1"]) assert.match(profiled.text, new RegExp(`${file} — docker-name`), file);
+  assert.equal(guard(tree(t, { "scripts/start-db": "docker run --rm --name fixed img\n", "tools/x.test.mjs": "const a = 1;\n" })).code, 0, "without the profile the extensionless file is not read, as today");
+  for (const file of ["scripts/start-db", "scripts/deep/run", "test/Makefile", "tests/data.json", "tests/e2e/up.cmd"]) assert.equal(isScanned(file, "node"), true, `${file} is read under the profile`);
+  for (const file of ["scripts/start-db", "test/Makefile", "tests/data.json"]) assert.equal(isScanned(file), false, `${file} is not read without it`);
+  for (const file of ["scripts/logo.png", "test/fixtures/photo.JPG", "tests/a.zip", "scripts/fonts/x.woff2", "test/data.sqlite", "scripts/tool.exe", "test/lib.wasm", "tests/a.pdf", "scripts/node_modules/p/x", "src/start-db", "docs/scripts/x.sh.bak"]) {
+    assert.equal(isScanned(file, "node"), false, `${file} is never read under the profile`);
+  }
+});
+
+test("S8 review 4a. a file with a NUL byte in its first 8 KiB is binary and skipped; one with a NUL later is text", (t) => {
+  const line = "docker run --rm --name fixed img\n";
+  const repo = tree(t, { "src/a.test.ts": "const a = 1;\n" });
+  fs.mkdirSync(path.join(repo, "scripts"));
+  fs.writeFileSync(path.join(repo, "scripts", "blob"), Buffer.concat([Buffer.from([0x7f, 0x45, 0x00, 0x01]), Buffer.from(line)]));
+  fs.writeFileSync(path.join(repo, "scripts", "late"), Buffer.concat([Buffer.from(line), Buffer.alloc(8192, 0x20), Buffer.from([0])]));
+  const result = scanRepository({ repo, profile: "node", rule: path.join(root, "common", "test-leftovers.md") });
+  const where = result.findings.filter((entry) => entry.cls === "docker-name").map((entry) => entry.file);
+  assert.deepEqual(where, ["scripts/late"], "blob is binary (a NUL at byte 2); late holds its first NUL after 8 KiB and is read");
+  assert.equal(result.files, 2, "the skipped binary is not counted as scanned: a.test.ts and late");
+  const onlyBinary = tree(t, {});
+  fs.mkdirSync(path.join(onlyBinary, "scripts"));
+  fs.writeFileSync(path.join(onlyBinary, "scripts", "blob"), Buffer.from([0, 1, 2]));
+  assert.equal(guard(onlyBinary, ["--profile", "node"]).code, 2, "a profile that read only binaries scanned nothing");
+});
+
+test("S8 review 4a. the header says which files the profile reads", () => {
+  const header = read("tools", "leftovers-check.mjs").slice(0, 6500);
+  assert.match(header, /every text file/i);
+  assert.match(header, /NUL/);
+});
+
+test("S8 review 4b. no cure text names the legacy form: a name is testsToDelete-<owner>-<repo>-<what>-<id>", () => {
+  for (const [cls, text] of Object.entries(CURES)) {
+    assert.doesNotMatch(text, new RegExp(`${Q}-<(?!owner>)`), `${cls}: ${text}`);
+    assert.doesNotMatch(text, new RegExp(`${Q}-<repo>`), `${cls} names the form before the owner segment`);
+  }
+  assert.ok(CURES["docker-name"].includes(`${Q}-<owner>-<repo>-<what>-<id>`));
+  assert.ok(CURES["docker-run"].includes(`${Q}-<owner>-`));
+});
+
+test("S8 review 4c. a yaml of another version is reported as the wrong version, not as missing", (t) => {
+  const missing = () => { throw Object.assign(new Error("Cannot find module 'yaml'"), { code: "MODULE_NOT_FOUND" }); };
+  const v1 = { parseDocument: () => ({}), stringify: () => "" }; // yaml@1 has parseDocument and no LineCounter
+  assert.throws(() => loadYaml(undefined, { own: () => v1 }), (error) => error instanceof YamlMissingError && /not version 2/.test(error.message) && /yaml@2/.test(error.message) && !/cannot be found/.test(error.message));
+  assert.throws(() => loadYaml("/repo", { own: missing, scanned: () => v1 }), /not version 2/);
+  assert.throws(() => loadYaml("/repo", { own: missing, scanned: missing }), /cannot be found/, "nothing found stays 'cannot be found'");
+  assert.throws(() => loadYaml("/repo", { own: () => v1, scanned: missing }), /not version 2/, "a v1 found first still says so when the other resolver finds nothing");
+  const real = loadYaml(undefined);
+  assert.equal(loadYaml("/repo", { own: () => v1, scanned: () => real }), real, "a version 2 anywhere wins");
+  const repo = tree(t, { ".github/workflows/w.yaml": ["name: x", "on: push", "jobs:", "  j:", "    runs-on: ubuntu-latest", "    steps:", "      - run: echo ok"].join("\n") + "\n", "tools/x.test.mjs": "const a = 1;\n" });
+  git(repo, "add", ".");
+  git(repo, ...COMMIT);
+  const lines = [];
+  const code = main(["--repo", repo], { out: (line) => lines.push(line), err: (line) => lines.push(line) }, { own: () => v1, scanned: () => v1 });
+  assert.equal(code, 2);
+  assert.equal(lines.length, 1, "one sentence: " + lines.join("\n"));
+  assert.match(lines[0], /not version 2/);
 });
