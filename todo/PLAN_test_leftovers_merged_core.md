@@ -119,6 +119,11 @@ Order: this plan first, then the consumer epics. Disjoint: nothing here edits a 
 10. **Guard**: two classes, `legacy-name` (exemptible) and `owner-blind` (NOT exemptible by comment: the only pass is the
     allowlist `tools/fixtures/owner-blind-allowlist.json` keyed by file path + line number + sha256 of the line, holding
     exactly the janitor's inventory line; an annotated arbitrary `rm -rf`/docker sweep is still a finding).
+11. **The helper and the guard serve consumers as shipped files** (owner decision 2026-10-26, from the private sibling's
+    rollout: Node consumers wrap and run them, never port them). `owned.mjs` takes the repository token as a parameter;
+    `leftovers-check.mjs` reads a consumer's tree; the private sibling copies both byte for byte and pins their sha256, like
+    the janitor. *Loses:* "each consumer ports the helper and the guard"; this repository's token as the only one the
+    helper knows. S8.
 
 ## Build order
 
@@ -130,7 +135,7 @@ Order: this plan first, then the consumer epics. Disjoint: nothing here edits a 
 2. S5a — `tools/lib/sweeper-scan.mjs` (`classifyLine`) lands FIRST inside the PR, so S1's scan checks have something to run
    (gate P7). 3. S1 — the two rule texts (cornerstone). 4. S2 — `owned.mjs`. 5. S3 — the sweep. 6. S4 — the janitor + its
    companion (cornerstone, security). 7. S5b — the guard, the allowlist, the scan CLI. 8. S6 — the shared vectors and the
-   conformance test. 9. S7 — docs, the promotion of the E1 plan, the one release (held until S1–S6 are merged, the pre-merge
+   conformance test. 8b. S8 — the helper and the guard for consumers (decision 11). 9. S7 — docs, the promotion of the E1 plan, the one release (held until S1–S6 are merged, the pre-merge
    gate is recorded, and the private sibling's rebuild has its text).
 
 One PR for S0–S6 (the spans and the tools must land together: the guard goes red on the old form the day the text changes);
@@ -267,6 +272,29 @@ S7 is the release step.
   the Windows derivation through `sha256sum` with `printf '%s'`) and Node; the janitor verdict run gains `kernelMine`
   through the `-O` seam.
 
+### S8 — The helper and the guard for consumers (decision 11; Opus brief, `model: sonnet`, Opus review)
+
+- **`tools/lib/owned.mjs`:** `ownedFor({ token, row })` returns the same API bound to that token (`ownedPrefix`,
+  `ownedPattern`, `ownedName`, `ownedDir`, `ownedWorktree`, `classifyName`, `runRecord`, `formatOwner`, `cleanupScope`,
+  …); `token` is validated (`[a-z0-9]{2,12}`, not of the owner grammar) or it throws. The module's own exports stay bound
+  to this repository's `REPO_TOKEN`, so nothing here changes behaviour. `tools/lib/git.mjs` (which it imports) ships with it.
+- **`tools/leftovers-check.mjs`:** (a) `--profile node` adds a consumer's tracked `**/*.{test,spec}.{ts,tsx,mts,cts,js,mjs,cjs}`,
+  `scripts/**`, `test/**`, `tests/**` files (`node_modules` and the mount paths `.claude/rules/shared/`,
+  `.agents/conventions/` excluded) to today's set; without it the scan is today's. (b) A `docker-name` value that is
+  wholly a shell expansion (`"${x}"`, `"$(f …)"`) is dynamic, as a JS array item already is: not a finding — a text scan
+  cannot know it; the consumer's helper tests cover what it builds. (c) `yaml` is resolved from the scanned repository
+  (`createRequire(<repo>/package.json)`) when the guard's own resolution fails; neither → exit 2 with the sentence to add
+  `yaml@2` as a devDependency. (d) The token check reads the mounted rule's `## Tokens` table whatever families it lists
+  and requires the `--token` row to name `--identity`; "this public copy lists only `dew_flow`" moves from the guard into
+  `tools/rules.test.mjs`. **Not in S8:** a `module-load` class (rule §2) — it needs a JS/TS parser the guard does not
+  have; consumers keep a local check with their own TypeScript until one is chosen (a tracked follow-up).
+- **Tests (RED first):** `ownedFor({ token: "sso" })` names `testsToDelete-<owner>-sso-…` and its pattern refuses
+  `conventions`; a bad token throws; this repository's exports unchanged (the existing suite is the proof). The guard over
+  a scratch Node consumer (`git init`, a `*.test.ts` with `mkdtempSync`, a `scripts/x.sh` with `docker run --name
+  "${name}" --rm`, a workflow): `--profile node` reports the `raw-temp` and nothing for the dynamic name; without the
+  profile it does not see the `.ts`; no `yaml` anywhere → exit 2 with the sentence; a Tokens table with a second family's
+  rows passes when the `--token` row names `--identity`.
+
 ### S7 — Docs, the E1 promotion, the release (`model: sonnet`)
 
 - `README.md:259-260` + the mounted-tools table (`sweeper-scan`, the companion, the allowlist); `todo/PLAN_test_leftovers_E1.md`
@@ -311,6 +339,8 @@ numbered test quoted in the PR.
 - [ ] The pre-merge barrier gate (S0) is recorded for every machine in `research/security/machines.md` before the PR merged.
 - [ ] `README.md`, `rule-bodies.json`, the E1 promotion and the rollout plan's two-stage rule are updated; the release was
       promoted once, after the sibling's confirmation.
+- [ ] S8: a Node consumer runs the shipped guard with `--profile node` and wraps the shipped helper with its own token;
+      the private sibling copies both byte for byte and pins their sha256.
 - [ ] Cornerstones of this plan: **2 of 2 — S1 (the merged core text, model: fable), S4 (the one janitor and its companion,
       the security pass, model: fable)**.
 
@@ -349,6 +379,7 @@ State of the work, so a session on another machine can continue without this rep
 | S4 janitor + companion | **open** | first `git merge origin/main` — it brings the hardened janitor of #80 (491aab9); build S4 ON TOP of it and keep every defence: the entry's owner by lstat at capture and before removal, a sticky or own temp root, the pinned clone with a clean git environment, bounded reads with a fail-closed fallback, `worktree unlock` only for a locked worktree, `rm -rf` only after every git step returned 0, `%q` output, no arithmetic or eval on captured text. No inline `owner-blind` marker on the inventory line — the allowlist entry is the only pass (re-run `--update-allowlist`). Then the janitor half of the conformance vectors and an empty `LEGACY_NAME_PENDING` list in `tools/leftovers-check.mjs`. |
 | Gates after S4 | open | coai code gate on the whole PR, Opus review, a Fable security pass recorded in `research/security/test-leftovers-merged-core.md` |
 | S0 barrier | open | run `node tools/sweeper-scan.mjs` (and `--system` by an admin) plus the manual checklist above on every machine that builds or tests this repository, before the PR merges |
+| S8 consumer helper + guard | open — added 2026-10-26 (decision 11) | `tools/lib/owned.mjs` `ownedFor`, `tools/leftovers-check.mjs` `--profile node`, dynamic shell names, `yaml` from the scanned repository, any family's rows |
 | S7 release | open | ONE promotion of `release`; warn the other sessions that own open consumer PRs first (a promotion turns `pin-check` red everywhere); then the two-stage consumer migration — sweep-only stages everywhere before any producer stage |
 
 Test counts at 540237b's parent 93cabc6: WSL Linux 920 pass / 0 fail / 3 skipped; Windows Git Bash 917 pass, one
