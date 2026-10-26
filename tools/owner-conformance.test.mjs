@@ -491,7 +491,9 @@ test("scope: every vector of the keys, asked of ownerState (owned.mjs) with its 
   for (const v of SCOPES) {
     await t.test(`${v.id} name ${v.nameOwner} / record ${v.recordOwner} / caller ${v.callerOwner} / kernel ${v.kernelMine} / ns ${v.ns} / pid ${v.pid}${v.hidepid ? " / hidepid" : ""} → ${v.expected}`, () => {
       const pid = 4242;
-      const record = { owner: v.recordOwner, host: me.host, pid, ...(v.ns === "absent" ? {} : { ns: v.ns === "same" ? (me.ns ?? 7) : (me.ns ?? 7) + 1 }) };
+      const record = v.ns === "leading-zero"
+        ? owned.parseOwner(`${v.recordOwner}:${me.host}:${pid}:1:0${me.ns ?? 7}`) // the reader's own digits with a zero in front: asked through the parser, so the TEXT is what is judged
+        : { owner: v.recordOwner, host: me.host, pid, ...(v.ns === "absent" ? {} : { ns: v.ns === "same" ? (me.ns ?? 7) : (me.ns ?? 7) + 1 }) };
       const probe = () => (v.pid === "absent" ? { state: "dead" } : v.pid === "present" ? { state: "live" } : { state: "unknown" });
       // Only a Linux reader requires a namespace: on any other machine the vectors about a namespace are the Linux reader's, and are asked of a Linux-shaped host.
       const host = me.host.endsWith("@linux") || v.ns === "same" ? record : { ...record, host: `${me.host.split("@")[0]}@linux` };
@@ -509,7 +511,7 @@ test("scope, the pure half in bash: scope_ok and ns_ok answer 'not the caller's'
     t.diagnostic("bash not found: the bash half of the scope vectors is skipped");
     return;
   }
-  const NS = { same: ["4242", "4242"], absent: ["", "4242"], other: ["4243", "4242"] };
+  const NS = { same: ["4242", "4242"], absent: ["", "4242"], other: ["4243", "4242"], "leading-zero": ["04242", "4242"] };
   const lines = bashFunctionAnswers(t, {
     root: "scope_ok", extra: ["ns_ok"],
     inputs: SCOPES.map((v) => [v.nameOwner, v.recordOwner, v.callerOwner, v.kernelMine ? "1" : "0", ...NS[v.ns]]),
@@ -553,7 +555,7 @@ test("scope: every vector, asked of the real janitor — the name owner, the rec
     const dir = path.join(tmp, `${["tests", "ToDelete"].join("")}-${v.nameOwner}-conventions-${v.id}-abc123`);
     fs.mkdirSync(dir);
     const pid = v.pid === "present" ? 5555 : unmatchablePid(0);
-    const ns = v.ns === "absent" ? "" : `:1:${v.ns === "same" ? 4242 : 4243}`;
+    const ns = v.ns === "absent" ? "" : `:1:${{ same: "4242", other: "4243", "leading-zero": "04242" }[v.ns]}`;
     fs.writeFileSync(`${dir}.owner`, `${v.recordOwner}:${thisOwner().host.split("@")[0]}@linux:${pid}${ns}\n`);
     const when = new Date(Date.now() - OLD);
     fs.utimesSync(dir, when, when);
