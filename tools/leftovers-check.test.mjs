@@ -10,11 +10,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 import { git } from "./lib/git.mjs";
 import { MAX_CLAIM_BYTES, REPO_ROW, REPO_TOKEN, ownedDir } from "./lib/owned.mjs";
-import { EXCLUDED_FILES, LEGACY_NAME_PENDING, main, scanRepository, scanText, tokenConstants, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
+import { EXCLUDED_FILES, LEGACY_NAME_PENDING, isScanned, main, parseArguments, scanRepository, scanText, tokenConstants, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RULE = path.join(root, "common", "test-leftovers.md");
@@ -335,7 +336,6 @@ test("3a. the repository's token is a row of the rule's table; the table is the 
   assert.equal(new Set(table.rows.map((row) => row.token)).size, 7);
   for (const row of table.rows) {
     assert.match(row.token, /^[a-z0-9]{2,12}$/);
-    assert.equal(row.family, "dew_flow");
   }
   assert.ok(table.rows.some((row) => row.token === REPO_TOKEN));
   assert.deepEqual(tokenFindings(fs.readFileSync(RULE, "utf8"), "conventions"), []);
@@ -374,12 +374,12 @@ test("3a. break-it: an unregistered, upper-case or one-character token is exit 1
 
 const table = (rows, header = "| token | family | repository |") => ["# Rule", "", "## Tokens", "", header, header.includes("repository") ? "|---|---|---|" : "|---|---|", ...rows, "", "## Never", ""].join("\n");
 
-test("3a. tokenFindings: no section, no table, two columns, a duplicate, a foreign family, token only in the wrong column", () => {
+test("3a. tokenFindings: no section, no table, two columns, a duplicate, a second family, token only in the wrong column", () => {
   assert.equal(tokenFindings("# Rule\n\n## Never\n", "conventions").length, 1, "no ## Tokens section");
   assert.equal(tokenFindings("# Rule\n\n## Tokens\n\nprose only\n", "conventions").length, 1, "no table");
   assert.equal(tokenFindings(table(["| `conventions` | dew_flow |"], "| token | family |"), "conventions").length, 1, "two columns");
   assert.equal(tokenFindings(table(["| `conventions` | dew_flow | the shared-rules repository |", "| `conventions` | dew_flow | the shared-rules repository |"]), "conventions").length, 1, "duplicate");
-  assert.equal(tokenFindings(table(["| `conventions` | dew_flow | the shared-rules repository |", "| `other` | elsewhere | b |"]), "conventions").length, 1, "foreign family");
+  assert.equal(tokenFindings(table(["| `conventions` | dew_flow | the shared-rules repository |", "| `other` | elsewhere | b |"]), "conventions").length, 0, "a second family's rows are read, not refused (a consumer's rule lists its own beside this one's)");
   assert.equal(tokenFindings(table(["| `creds` | dew_flow | conventions |"]), "conventions").length, 1, "only in the repository column");
   assert.equal(tokenFindings(table(["| `conventions` | dew_flow | the shared-rules repository |"]), "conventions").length, 0, "the happy path");
 });
@@ -637,4 +637,184 @@ test("2. the pending list of legacy-name exemptions is exactly the janitor's own
   assert.equal(one(t, "tools/janitor.test.mjs", legacy).code, 0, "a legacy literal in a janitor test is not yet a finding");
   assert.equal(one(t, "tools/janitor.test.mjs", `find /tmp -iname '${Q}-*'\n`).code, 1, "an owner-blind sweep there still is");
   assert.equal(one(t, "tools/janitor.test.mjs", "const d = os.tmpdir();\n").code, 1, "and so is every other class");
+});
+
+// S8 — a consumer's tree: --profile node, dynamic shell names, yaml from the scanned repository, any family's rows ------------------
+
+const CONSUMER_RULE = table(["| `conventions` | dew_flow | the shared-rules repository |", "| `sso` | org | the sso service |"]);
+const CONSUMER_ROW = "the sso service";
+const COMMIT = ["-c", "user.name=Guard test", "-c", "user.email=guard@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "consumer"];
+const WORKFLOW = ["name: x", "on: push", "jobs:", "  j:", "    runs-on: ubuntu-latest", "    steps:", "      - run: echo ok"].join("\n") + FOOT;
+
+/** A Node consumer of the shared rules: a committed git repository (a scratch of this test, not this checkout) with the rule beside it. */
+function consumer(t, files = {}) {
+  const files0 = {
+    "src/a.test.ts": 'import { mkdtempSync } from "node:fs";\nconst d = mkdtempSync(join(tmpdir(), "x-"));\n',
+    "scripts/x.sh": '#!/usr/bin/env bash\ndocker run --rm --name "${name}" img\n',
+    ".github/workflows/w.yaml": WORKFLOW,
+    "src/owned.ts": 'export const REPO_TOKEN = "sso";\n',
+    "rule.md": CONSUMER_RULE,
+    ...files,
+  };
+  const repo = tree(t, Object.fromEntries(Object.entries(files0).filter(([, text]) => text !== undefined))); // `undefined` drops a default file
+  git(repo, "add", ".");
+  git(repo, ...COMMIT);
+  return repo;
+}
+
+const asConsumer = (repo, extra = []) => ["--rule", path.join(repo, "rule.md"), "--token", "sso", "--identity", CONSUMER_ROW, ...extra];
+
+test("S8 (a). --profile node adds the consumer's test files; without it the scan is today's and does not see the .ts", (t) => {
+  const repo = consumer(t);
+  const profiled = guard(repo, asConsumer(repo, ["--profile", "node"]));
+  assert.equal(profiled.code, 1, profiled.text);
+  const found = profiled.text.split("\n").filter((line) => /^\s+\S+:\d+ — /.test(line));
+  assert.equal(found.length, 1, "exactly the raw-temp, nothing for the dynamic name: " + profiled.text);
+  assert.match(found[0], /^\s+src\/a\.test\.ts:2 — raw-temp/);
+  const plain = guard(repo, asConsumer(repo));
+  assert.equal(plain.code, 0, plain.text);
+  assert.match(plain.text, /clean \(2 files\)/, "the .sh and the workflow, as today");
+  assert.deepEqual(scanRepository({ repo, token: "sso", identity: CONSUMER_ROW, rule: path.join(repo, "rule.md"), profile: "node" }).files, 3);
+});
+
+test("S8 (a). a profile that scans nothing is still exit 2; an unknown profile is an argument error naming the legal value", (t) => {
+  const bare = consumer(t, { "src/a.test.ts": "const a = 1;\n", "scripts/x.sh": undefined, ".github/workflows/w.yaml": undefined });
+  assert.equal(guard(bare, asConsumer(bare)).code, 2);
+  const none = tree(t, { "README.md": "# nothing\n" });
+  const result = guard(none, ["--profile", "node"]);
+  assert.equal(result.code, 2);
+  assert.match(result.text, /scanned nothing/);
+  assert.equal(parseArguments(["--profile", "node"]).profile, "node");
+  assert.equal(parseArguments([]).profile, undefined);
+  const unknown = guard(none, ["--profile", "python"]);
+  assert.equal(unknown.code, 2);
+  assert.match(unknown.text, /unknown profile `python`.*node/);
+});
+
+test("S8 (a). isScanned: the profile adds the test and script shapes, drops node_modules and the mount paths, and changes nothing without it", () => {
+  const yes = ["src/a.test.ts", "a.spec.tsx", "deep/er/b.test.mts", "c.spec.cts", "x.test.js", "y.test.mjs", "z.test.cjs", "scripts/build.ts", "scripts/deep/x.mjs",
+    "test/helpers/db.ts", "tests/e2e/a.ts", "test/setup.sh", "tools/a.test.mjs", ".github/workflows/w.yml", "deep/x.sh"];
+  const no = ["node_modules/pkg/a.test.js", "packages/x/node_modules/p/a.test.js", ".claude/rules/shared/tools/a.test.mjs", ".claude/rules/shared/scripts/x.sh",
+    ".agents/conventions/tools/a.test.mjs", ".agents/conventions/x.sh", "src/app.ts", "README.md", "scripts/logo.png", "tools/lib/x.test.ts", "tools/leftovers-check.test.mjs"];
+  for (const file of yes) assert.equal(isScanned(file, "node"), true, `${file} is read under the profile`);
+  for (const file of no) assert.equal(isScanned(file, "node"), false, `${file} is never read under the profile`);
+  for (const file of ["src/a.test.ts", "a.spec.tsx", "scripts/build.ts", "test/helpers/db.ts", "tests/e2e/a.ts", "src/app.ts"]) assert.equal(isScanned(file), false, `${file} is not read without it`);
+  for (const file of ["tools/a.test.mjs", "deep/x.sh", ".claude/rules/shared/scripts/x.sh", "node_modules/p/x.sh"]) assert.equal(isScanned(file), true, `${file}: today's set is unchanged`);
+});
+
+test("S8 (a). the classes that read text work the same on .ts, .tsx, .mts and .cts as on .mjs", () => {
+  const snippets = {
+    "raw-temp": 'const d: string = mkdtempSync(join(tmpdir(), "x-"));',
+    "raw-worktree": 'git(repo as string, "worktree", "add", p);',
+    "docker-run": 'execFileSync("docker", ["run", "-d", "img"] as string[]);',
+    "docker-name": 'execFileSync("docker", ["volume", "create", "data"]);',
+    "legacy-name": `const n: string = "${Q}-api-pg-k3f9a1";`,
+    "owner-blind": `const rx: RegExp = /^${P}[-_]/i;`,
+    "shared-store": 'await db.query("TRUNCATE TABLE users");',
+    "ryuk-off": 'process.env.TESTCONTAINERS_RYUK_DISABLED = "true";',
+    exemption: `// ${Q}-exempt: docker-run`,
+  };
+  for (const [cls, snippet] of Object.entries(snippets)) {
+    const baseline = scanText("tools/a.test.mjs", `${snippet}\n`).map((entry) => entry.cls);
+    assert.ok(baseline.includes(cls), `${cls} is found in .mjs: ${JSON.stringify(baseline)}`);
+    for (const file of ["src/a.test.ts", "src/a.test.tsx", "src/a.test.mts", "src/a.spec.cts"]) {
+      assert.deepEqual(scanText(file, `${snippet}\n`).map((entry) => entry.cls), baseline, `${cls} in ${file}`);
+    }
+  }
+  const exempt = `// ${Q}-exempt: raw-temp — a probe the test removes below\nconst d = mkdtempSync(join(tmpdir(), "x-"));\n`;
+  assert.deepEqual(scanText("src/a.test.ts", exempt), [], "an exemption works in a .ts file");
+});
+
+test("S8 (b). a docker-name that is wholly a shell expansion is dynamic; one that mixes text and an expansion is judged as today", (t) => {
+  const GOOD = "testsToDelete-u1000-x-abc123";
+  const sh = (line) => one(t, "scripts/a.sh", `${line}\n`).code;
+  for (const line of [
+    'docker run --rm --name "${name}" img',
+    "docker run --rm --name ${name} img",
+    'docker run --rm --name "$name" img',
+    'docker run --rm --name="${name}" img',
+    'docker run --rm --name "$(mk pg data)" img',
+    'docker volume create "${volume}"',
+    'docker network create "$(netname web)"',
+    'docker compose -p "${project}" up -d',
+    'docker build -t "${tag}" .',
+    'COMPOSE_PROJECT_NAME="${project}" docker compose up -d',
+    "export COMPOSE_PROJECT_NAME=${project}",
+    "export COMPOSE_PROJECT_NAME=$(mk stack)",
+    `docker run --rm --name "\${name:-${GOOD}}" img`,
+  ]) assert.equal(sh(line), 0, line);
+  for (const line of [
+    'docker run --rm --name "web-${id}" img',
+    'docker run --rm --name "${prefix}-web" img',
+    'docker run --rm --name "$(mk pg)-x" img',
+    'docker run --rm --name "${name" img',
+    'docker run --rm --name "$(mk pg" img',
+    'docker run --rm --name web img',
+    'docker volume create "cache-${id}"',
+    'docker compose -p "web-${id}" up -d',
+    'COMPOSE_PROJECT_NAME="web-${id}" docker compose up -d',
+    'docker run --rm --name "testsToDelete-${owner}-x-${id}" img',
+  ]) assert.equal(sh(line), 1, line);
+  assert.equal(sh(`docker run --rm --name "${GOOD}-\${id}" img`), 0, "a literal prefix that is a name, then an expansion: as today");
+  assert.equal(sh('docker run -d --name "${name}" img'), 1, "dynamic is about the NAME: a run with no --rm is still a docker-run finding");
+  const ts = (line) => one(t, "tools/a.test.mjs", `${line}\n`).code;
+  assert.equal(ts('execFileSync("docker", ["run", "--rm", "--name", `${name}`, "img"]);'), 0, "an array item that is wholly an interpolation");
+  assert.equal(ts('execFileSync("docker", ["run", "--rm", "--name", `web-${id}`, "img"]);'), 1, "an array item that mixes text and an interpolation");
+});
+
+test("S8 (c). yaml: the guard's own resolution first, then the scanned repository's, else exit 2 with one sentence", (t) => {
+  const ownMissing = () => { throw Object.assign(new Error("Cannot find module 'yaml'"), { code: "MODULE_NOT_FOUND" }); };
+  const real = createRequire(import.meta.url)("yaml");
+  const lines = [];
+  const run = (repo, resolvers, extra = []) => {
+    lines.length = 0;
+    const code = main(["--repo", repo, ...asConsumer(repo, extra)], { out: (line) => lines.push(line), err: (line) => lines.push(line) }, resolvers);
+    return { code, text: lines.join("\n") };
+  };
+  const broken = consumer(t, { ".github/workflows/w.yaml": WORKFLOW.replace("echo ok", "docker run -d img") });
+  assert.equal(run(broken, { own: () => real, scanned: ownMissing }).code, 1, "the guard's own yaml is enough, and the workflow's docker-run is found");
+  const viaRepo = run(broken, { own: ownMissing, scanned: () => real });
+  assert.equal(viaRepo.code, 1, "the scanned repository's yaml parses the workflow: " + viaRepo.text);
+  assert.match(viaRepo.text, /w\.yaml:\d+ — docker-run/);
+
+  const missing = run(broken, { own: ownMissing, scanned: ownMissing });
+  assert.equal(missing.code, 2);
+  assert.equal(missing.text.split("\n").length, 1, "ONE sentence: " + missing.text);
+  assert.match(missing.text, /yaml@2/);
+  assert.match(missing.text, /devDependency/);
+  assert.doesNotMatch(missing.text, /ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND|at /);
+  assert.equal(run(broken, { own: ownMissing, scanned: () => ({}) }).code, 2, "a yaml that is not version 2 (no parseDocument) is no yaml");
+  const other = run(broken, { own: () => { throw new RangeError("not a missing module"); }, scanned: () => real });
+  assert.equal(other.code, 2);
+  assert.match(other.text, /cannot read .*not a missing module/);
+  assert.doesNotMatch(other.text, /yaml@2/, "only a missing module is a missing yaml");
+
+  const noWorkflows = consumer(t, { ".github/workflows/w.yaml": undefined });
+  assert.equal(run(noWorkflows, { own: ownMissing, scanned: ownMissing }).code, 0, "yaml is read only when a workflow is: a consumer with none needs none");
+});
+
+test("S8 (c). yaml found by createRequire from the scanned repository when the guard's own resolution fails", (t) => {
+  const repo = consumer(t, { ".github/workflows/w.yaml": WORKFLOW.replace("echo ok", "docker run -d img"), ".gitignore": "node_modules/\n" });
+  fs.mkdirSync(path.join(repo, "node_modules"));
+  fs.symlinkSync(path.dirname(createRequire(import.meta.url).resolve("yaml/package.json")), path.join(repo, "node_modules", "yaml"), "dir");
+  const lines = [];
+  const code = main(["--repo", repo, ...asConsumer(repo)], { out: (line) => lines.push(line), err: (line) => lines.push(line) },
+    { own: () => { throw Object.assign(new Error("Cannot find module 'yaml'"), { code: "MODULE_NOT_FOUND" }); } });
+  assert.equal(code, 1, lines.join("\n"));
+  assert.match(lines.join("\n"), /w\.yaml:\d+ — docker-run/);
+});
+
+test("S8 (d). the token check reads whatever families the table lists and requires the --token row to name --identity", (t) => {
+  const repo = consumer(t);
+  const ok = guard(repo, asConsumer(repo));
+  assert.equal(ok.code, 0, "a table with a second family passes: " + ok.text);
+  const other = guard(repo, ["--rule", path.join(repo, "rule.md"), "--token", "sso", "--identity", "the shared-rules repository"]);
+  assert.equal(other.code, 1);
+  assert.match(other.text, / — token — the token `sso` belongs to `the sso service` in .*, not to this repository/);
+  const none = guard(repo, ["--rule", path.join(repo, "rule.md"), "--token", "sso"]);
+  assert.equal(none.code, 1, "no identity is no pass");
+  assert.match(none.text, / — token — .*identity/);
+  const unregistered = guard(repo, ["--rule", path.join(repo, "rule.md"), "--token", "zzz", "--identity", CONSUMER_ROW]);
+  assert.equal(unregistered.code, 1);
+  assert.match(unregistered.text, /not a row of the `## Tokens` table/);
 });

@@ -8,6 +8,7 @@ import { loadCatalog, selectRules, sha256, TASKS } from "./lib/rule-catalog.mjs"
 import {run} from "./lib/rule-cli.mjs";
 import {bodyOf, sectionsOf} from "./lib/rule-body.mjs";
 import { ownedDir } from "./lib/owned.mjs";
+import { parseTokenTable } from "./leftovers-check.mjs";
 import {GUARD_MS} from "./lib/startup-ceilings.mjs";
 import {gitWith} from "./lib/git.mjs";
 
@@ -313,4 +314,12 @@ test("real CLI loads from nested directories, bounds reads and reports missing/o
   const noDependencies=cli(["check"]);
   assert.equal(noDependencies.status,1);
   assert.match(noDependencies.stderr,/rules check: INCOMPLETE.*npm ci --ignore-scripts/s);
+});
+
+test("the rule's `## Tokens` table in THIS public repository lists only the dew_flow family and at least one row",()=>{
+  // The guard (tools/leftovers-check.mjs) reads whatever families a consumer's table lists; the promise that this copy holds one family is a fact about
+  // this file, and it is kept here, beside the other facts about the shipped rules, not inside the shipped guard.
+  const table=parseTokenTable(fs.readFileSync(path.join(sourceRoot,"common","test-leftovers.md"),"utf8"));
+  assert.ok(table.rows.length>0,"the table has rows");
+  assert.deepEqual([...new Set(table.rows.map(row=>row.family))],["dew_flow"]);
 });

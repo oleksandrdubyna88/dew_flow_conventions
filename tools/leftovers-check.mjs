@@ -27,7 +27,7 @@
  *
  * Run from anywhere:
  *
- *     node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>]
+ *     node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>] [--profile node]
  *     node tools/leftovers-check.mjs --update-allowlist [--repo <dir>]
  *
  * `--update-allowlist` rewrites the allowlist from the CURRENT `tools/janitor.sh`: every non-comment line the classifier calls
@@ -37,15 +37,22 @@
  * It defaults to this repository's own row (`REPO_ROW`) ONLY for this repository's own token; any other `--token` without
  * an `--identity` fails closed, so a token can never be proven to belong to a repository by accident.
  *
+ * `--profile node` is for a Node CONSUMER that mounts this repository and runs this file instead of porting it: it adds the consumer's tracked
+ * `*.test.<ext>` and `*.spec.<ext>` files (ext: ts, tsx, mts, cts, js, mjs, cjs) and the source and shell files under `scripts/`, `test/` and `tests/` to the scan, and never reads
+ * `node_modules/` or the mount paths `.claude/rules/shared/` and `.agents/conventions/`. Without it the scan is exactly this repository's own. The token
+ * check reads the `## Tokens` table of the rule beside the guard (or `--rule`) whatever families it lists, and needs the `--token` row to name `--identity`.
+ * A `docker-name` value that is wholly a shell expansion (`"${name}"`, `"$(f a)"`) is dynamic, never a finding: a text scan cannot know what it builds.
+ * Workflows are read with `yaml@2`: this guard's own copy first, then the scanned repository's (`node_modules` of the consumer), else exit 2 with the one
+ * sentence that says to add `yaml@2` as a devDependency — and only when the repository has a workflow. Not here: a `module-load` class (needs a parser).
+ *
  * Exit 0 clean, 1 with every finding printed (`file:line — <class> — <text>`), 2 when it scanned nothing or its
  * arguments are bad — an empty scan is a broken discovery, never a clean repository.
  */
 
 import * as fs from "node:fs";
+import { createRequire } from "node:module";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-
-import { LineCounter, parseDocument } from "yaml";
 
 import { gitOutput } from "./lib/git.mjs";
 import { OWNER_GRAMMAR, REPO_ROW, REPO_TOKEN } from "./lib/owned.mjs";
@@ -85,8 +92,8 @@ export const CURES = Object.freeze({
 });
 
 const PREFIX_OK = /^teststodelete[-_][uw][0-9]{1,10}[-_]/i; // the OWNER form: one of the three spellings, then an owner segment
-/** A name the guard may accept: one of the three spellings, or a value an argument array hides from it (never guessed at). */
-const nameOk = (name) => PREFIX_OK.test(name) || name === DYNAMIC;
+/** A name the guard may accept: one of the three spellings, a value an argument array hides from it, or a value that is wholly a shell expansion (never guessed at). */
+const nameOk = (name) => PREFIX_OK.test(name) || name === DYNAMIC || isWholeExpansion(name);
 const TOKEN_SHAPE = /^[a-z0-9]{2,12}$/;
 // The prefix is spelled in two pieces below: these are detectors, and the machine scan reads this file too.
 const WORD = "teststo" + "delete";
@@ -97,17 +104,72 @@ const LEGACY_BUILT = new RegExp(`${WORD}[-_]\\$\\{?\\s*(?:REPO_TOKEN|RepoToken|r
 const MARKER = /(?:\/\/|#|--|\/\*|\*|<!--)\s*testsToDelete-exempt:(.*)$/;
 const JS_FILE = /\.(?:mjs|js|cjs)$/;
 
+// --- the yaml package -----------------------------------------------------------------------------------------
+
+/** `yaml@2` cannot be found: the one thing a consumer must do about it. Never an `ERR_MODULE_NOT_FOUND` stack. */
+export class YamlMissingError extends Error {
+  constructor() {
+    super("leftovers-check: the `yaml` package (version 2) is needed to read workflows and cannot be found — add `yaml@2` as a devDependency of the repository being scanned (npm install --save-dev yaml@2).");
+    this.name = "YamlMissingError";
+  }
+}
+
+/**
+ * Where `yaml` is looked for, in order: this guard's own resolution (the repository the guard lives in), then the scanned repository's — from its root,
+ * which `createRequire` walks up whether or not a `package.json` sits there. Test seam: `main`, `scanRepository` and `loadYaml` take replacements.
+ */
+export const YAML_RESOLVERS = Object.freeze({
+  own: () => createRequire(import.meta.url)("yaml"),
+  scanned: (repo) => createRequire(path.join(repo, "noop.js"))("yaml"),
+});
+
+const isYamlTwo = (module) => typeof module?.parseDocument === "function" && typeof module?.LineCounter === "function";
+
+/** The `yaml` module of version 2, or a `YamlMissingError`. Only a MISSING module is "not found": any other failure of a resolver is the caller's. */
+export function loadYaml(repo, resolvers = {}) {
+  const { own, scanned } = { ...YAML_RESOLVERS, ...resolvers }; // a seam may replace one of the two
+  for (const resolve of [() => own(), ...(repo === undefined ? [] : [() => scanned(repo)])]) {
+    try {
+      const module = resolve();
+      if (isYamlTwo(module)) return module;
+    } catch (error) {
+      if (error?.code !== "MODULE_NOT_FOUND" && error?.code !== "ERR_MODULE_NOT_FOUND") throw error;
+    }
+  }
+  throw new YamlMissingError();
+}
+
 // --- discovery -----------------------------------------------------------------------------------------------
 
-/** Whether a repository-relative path (forward slashes) is one the guard reads. `tools/lib/**` is product code, never scanned. */
-export function isScanned(file) {
+/** The profiles of `--profile`: what a consumer's tree adds to the scan. `node` is the Node consumers of this family. */
+export const PROFILES = Object.freeze(["node"]);
+
+// The `node` profile: a consumer's tests and scripts, wherever they sit. `node_modules` and the two places the shared rules are mounted
+// are never read under it — a mount holds this repository's own scripts, which are not the consumer's to be judged.
+const NODE_EXTENSIONS = "ts|tsx|mts|cts|js|mjs|cjs";
+const NODE_TEST = new RegExp(`\\.(?:test|spec)\\.(?:${NODE_EXTENSIONS})$`);
+const NODE_TREE = new RegExp(`^(?:scripts|test|tests)/.+\\.(?:${NODE_EXTENSIONS}|sh|ps1)$`);
+const NODE_NEVER = /^(?:\.claude\/rules\/shared\/|\.agents\/conventions\/)|(?:^|\/)node_modules\//;
+
+function checkProfile(profile) {
+  if (profile !== undefined && !PROFILES.includes(profile)) throw new TypeError(`unknown profile \`${profile}\` (the profiles are: ${PROFILES.map((name) => `\`${name}\``).join(", ")})`);
+}
+
+/**
+ * Whether a repository-relative path (forward slashes) is one the guard reads. `tools/lib/**` is product code, never scanned.
+ * `profile` adds a consumer's files (`node`); without one the set is exactly this repository's own.
+ */
+export function isScanned(file, profile) {
+  checkProfile(profile);
+  if (profile === "node" && NODE_NEVER.test(file)) return false;
   if (EXCLUDED_FILES.includes(file) || file.startsWith("tools/lib/")) return false;
   return (
     (file.startsWith("tools/") && file.endsWith(".test.mjs")) ||
     (file.startsWith("tools/fixtures/") && JS_FILE.test(file)) ||
     /^\.github\/workflows\/[^/]+\.ya?ml$/.test(file) ||
     (file.startsWith(".github/scripts/") && /\.(?:mjs|js|sh)$/.test(file)) ||
-    /\.(?:sh|ps1)$/.test(file)
+    /\.(?:sh|ps1)$/.test(file) ||
+    (profile === "node" && (NODE_TEST.test(file) || NODE_TREE.test(file)))
   );
 }
 
@@ -115,9 +177,10 @@ export function isScanned(file) {
 const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
 /** The files to read, from git's own idea of the tree (tracked plus untracked-not-ignored). Throws when `repo` is not a repository. */
-export function discover(repo) {
+export function discover(repo, profile) {
+  checkProfile(profile);
   const listing = gitOutput(repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
-  return [...new Set(listing.split("\0").filter(Boolean))].filter(isScanned).sort(byCodeUnit);
+  return [...new Set(listing.split("\0").filter(Boolean))].filter((file) => isScanned(file, profile)).sort(byCodeUnit);
 }
 
 // --- lines, comments, exemptions -----------------------------------------------------------------------------
@@ -193,11 +256,59 @@ function allMatches(patterns, line) {
   });
 }
 
+// A value that is wholly a shell expansion — `"${x}"`, `${x:-d}`, `$x`, `"$(f a b)"` — is dynamic: a text scan cannot know what it builds, the way it cannot
+// know a JavaScript array item that is no literal. The consumer's own tests cover the helper that builds it. A value that MIXES literal text and an
+// expansion is not wholly one, and is judged as it always was, on the text it has.
+const SIMPLE_VARIABLE = /^\$[A-Za-z_][A-Za-z0-9_]*$/;
+const MASK = "\u0001";
+
+/** The index of the bracket that closes the one at `open` (`(` or `{`), nesting counted, or -1 when it never closes. */
+function closingOf(text, open) {
+  const up = text[open];
+  const down = up === "(" ? ")" : "}";
+  let depth = 0;
+  for (let index = open; index < text.length; index += 1) {
+    if (text[index] === up) depth += 1;
+    else if (text[index] === down && (depth -= 1) === 0) return index;
+  }
+  return -1;
+}
+
+/** Is `value` (outer quotes ignored) ONE shell expansion from its first character to its last? An expansion that never closes is not. */
+function isWholeExpansion(value) {
+  const bare = value.replace(/^["']+|["']+$/g, "");
+  if (SIMPLE_VARIABLE.test(bare)) return true;
+  return /^\$[({]/.test(bare) && closingOf(bare, 1) === bare.length - 1;
+}
+
+/** `text` with the whitespace inside every balanced `$(…)` and `${…}` made `MASK`, so that splitting on whitespace keeps an expansion in one word. */
+function maskExpansions(text) {
+  let masked = "";
+  for (let index = 0; index < text.length; index += 1) {
+    const end = text[index] === "$" && (text[index + 1] === "(" || text[index + 1] === "{") ? closingOf(text, index + 1) : -1;
+    if (end < 0) masked += text[index];
+    else {
+      masked += text.slice(index, end + 1).replace(/\s/g, MASK);
+      index = end;
+    }
+  }
+  return masked;
+}
+
+/** How many characters at the start of `rest` are a whole expansion that ends the value (a quote, a space, `;` `,` `}` or the end follows). 0 when none. */
+function leadingExpansion(rest) {
+  const end = /^\$[({]/.test(rest) ? closingOf(rest, 1) + 1 : /^\$[A-Za-z_][A-Za-z0-9_]*/.exec(rest)?.[0].length ?? 0;
+  return end > 0 && /^(?:[\s"';,}]|$)/.test(rest.slice(end)) ? end : 0;
+}
+
 /** `COMPOSE_PROJECT_NAME=x` or `: x` on a line: one hit when x is not an owner-form leftover name — a compose project's containers carry the project's name. */
 function composeEnvHits(line) {
-  return [...line.matchAll(/COMPOSE_PROJECT_NAME["']?\s*[:=]\s*["']?([^\s"';,}]*)/g)]
-    .filter((match) => !PREFIX_OK.test(match[1]))
-    .map((match) => `COMPOSE_PROJECT_NAME is not an owner-form leftover name: ${match[1] === "" ? "(empty)" : match[1]}`);
+  return [...line.matchAll(/COMPOSE_PROJECT_NAME["']?\s*[:=]\s*["']?/g)].flatMap((match) => {
+    const rest = line.slice(match.index + match[0].length);
+    if (leadingExpansion(rest) > 0) return [];
+    const value = /^[^\s"';,}]*/.exec(rest)[0];
+    return PREFIX_OK.test(value) ? [] : [`COMPOSE_PROJECT_NAME is not an owner-form leftover name: ${value === "" ? "(empty)" : value}`];
+  });
 }
 
 /** `legacy-name` hits of a line: a literal whose second segment is no owner (and no `exempt` marker word), or a prefix built from the token alone. */
@@ -278,7 +389,11 @@ function arrayItems(body) {
   return [...items, item].map((entry) => entry.trim()).filter(Boolean);
 }
 
-const itemWord = (item) => /^(["'`])(.*)\1$/s.exec(item)?.[2].replace(/\s+/g, "_") ?? DYNAMIC;
+const itemWord = (item) => {
+  const literal = /^(["'`])(.*)\1$/s.exec(item);
+  if (literal === null || (literal[1] === "`" && /^\$\{[^]*\}$/.test(literal[2]) && closingOf(literal[2], 1) === literal[2].length - 1)) return DYNAMIC; // a template that is wholly one `${…}` is a value, not a literal
+  return literal[2].replace(/\s+/g, "_");
+};
 
 /** `execFileSync("docker", ["run", "--rm", NAME])` → `execFileSync( docker run --rm «value» )`: the words the shell form has. */
 function flattenDockerArrays(text) {
@@ -341,7 +456,7 @@ function composeProjectNames(tokens) {
 
 /** `docker-name` findings of one command; `pushed` is the set of images the scope publishes. */
 function nameFindings(file, command, pushed) {
-  const tokens = words(command.text);
+  const tokens = words(maskExpansions(command.text)).map((word) => word.replaceAll(MASK, " "));
   const found = [];
   const bad = (text) => found.push(finding(file, command.line, "docker-name", text));
   if (/\bdocker\b/.test(command.text)) {
@@ -353,7 +468,7 @@ function nameFindings(file, command, pushed) {
     if (name === "") bad(`\`docker ${match[1]} create\` makes an unnamed ${match[1]}`);
     else if (!nameOk(name)) bad(`\`docker ${match[1]} create ${name}\` is not an owner-form leftover name`);
   }
-  for (const name of composeProjectNames(tokens)) if (!PREFIX_OK.test(name)) bad(`the compose project \`${name}\` is not an owner-form leftover name`);
+  for (const name of composeProjectNames(tokens)) if (!PREFIX_OK.test(name) && !isWholeExpansion(name)) bad(`the compose project \`${name}\` is not an owner-form leftover name`);
   for (const match of command.text.matchAll(/\bWithName\(\s*"([^"]*)"/g)) if (!PREFIX_OK.test(match[1])) bad(`\`WithName("${match[1]}")\` is not an owner-form leftover name`);
   if (/\bdocker\s+build\b/.test(command.text)) {
     for (const tag of flagValues(tokens, ["-t", "--tag"])) {
@@ -448,7 +563,8 @@ function jobRunFindings(file, steps, commands) {
     });
 }
 
-function workflowJobs(file, lines, text) {
+function workflowJobs(file, lines, text, yaml) {
+  const { LineCounter, parseDocument } = yaml();
   const lineCounter = new LineCounter();
   const document = parseDocument(text, { lineCounter });
   if (document.errors.length > 0) return undefined;
@@ -465,9 +581,9 @@ function workflowJobs(file, lines, text) {
   return found;
 }
 
-function dockerFindings(file, lines, text) {
+function dockerFindings(file, lines, text, yaml) {
   const isWorkflow = /^\.github\/workflows\//.test(file);
-  const jobs = isWorkflow ? workflowJobs(file, lines, text) : undefined;
+  const jobs = isWorkflow ? workflowJobs(file, lines, text, yaml) : undefined;
   if (jobs === undefined) {
     const commands = commandsIn(lines, 0, lines.length);
     const pushed = pushedImages(commands);
@@ -482,11 +598,14 @@ function dockerFindings(file, lines, text) {
 
 // --- one file, the whole repository --------------------------------------------------------------------------
 
-/** Every finding of one file's text (`file` is the repository-relative path with forward slashes). */
-export function scanText(file, text, allowlist = []) {
+/**
+ * Every finding of one file's text (`file` is the repository-relative path with forward slashes). `yaml` returns the yaml module and is called only
+ * for a workflow: by default the guard's own resolution, which throws a `YamlMissingError` when there is none.
+ */
+export function scanText(file, text, allowlist = [], yaml = () => loadYaml(undefined)) {
   const lines = text.split(/\r?\n/);
   const exemptions = readExemptions(file, lines);
-  const docker = dockerFindings(file, lines, text).filter((entry) => !isExempt(exemptions, entry.cls, entry.line));
+  const docker = dockerFindings(file, lines, text, yaml).filter((entry) => !isExempt(exemptions, entry.cls, entry.line));
   return [...exemptions.findings, ...lineFindings(file, lines, exemptions, allowlist), ...docker];
 }
 
@@ -539,7 +658,6 @@ export function tokenFindings(ruleText, token, rulePath = "common/test-leftovers
   for (const row of table.rows) {
     if (seen.has(row.token)) found.push(...at(row.line, `the token \`${row.token}\` is listed twice in ${rulePath}`));
     seen.add(row.token);
-    if (row.family !== "dew_flow") found.push(...at(row.line, `the row \`${row.token}\` of ${rulePath} has family \`${row.family}\`; this public copy lists only \`dew_flow\``));
   }
   if (!seen.has(token)) found.push(...at(table.heading, `the token \`${token}\` is not a row of the \`## Tokens\` table of ${rulePath}`));
   else found.push(...belongsFindings(table.rows.find((row) => row.token === token), token, identity, rulePath));
@@ -625,14 +743,19 @@ export function updateAllowlist(repo, explicit) {
   return entries;
 }
 
-/** Scan a repository: `{ files, findings }`. `files` is how many files were read — zero is a broken discovery. `identity` is the repository column of the token's row: this repository's own for its own token, else blank (fails closed). */
-export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "", allowlist } = {}) {
-  const files = discover(repo);
+/**
+ * Scan a repository: `{ files, findings }`. `files` is how many files were read — zero is a broken discovery. `identity` is the repository column of the token's
+ * row: this repository's own for its own token, else blank (fails closed). `profile` is a `--profile` (`node`). `resolvers` is the yaml seam of `loadYaml`.
+ */
+export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "", allowlist, profile, resolvers } = {}) {
+  const files = discover(repo, profile);
   const findings = [];
   const entries = Array.isArray(allowlist) ? allowlist : loadAllowlist(repo, allowlist);
+  let yamlModule;
+  const yaml = () => (yamlModule ??= loadYaml(repo, resolvers)); // read at the first workflow, so a repository with none needs none
   for (const file of files) {
     const absolute = path.join(repo, file);
-    if (fs.existsSync(absolute)) findings.push(...scanText(file, fs.readFileSync(absolute, "utf8"), entries));
+    if (fs.existsSync(absolute)) findings.push(...scanText(file, fs.readFileSync(absolute, "utf8"), entries, yaml));
   }
   const rulePath = resolveRule(repo, rule);
   const ruleText = rulePath === undefined ? "" : fs.readFileSync(rulePath, "utf8");
@@ -644,11 +767,11 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = toke
 
 // --- the command line ----------------------------------------------------------------------------------------
 
-const USAGE = "usage: node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>] | --update-allowlist   (--identity: the repository column of the token's row; without it only this repository's own token passes)";
+const USAGE = "usage: node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>] [--profile node] | --update-allowlist   (--identity: the repository column of the token's row; without it only this repository's own token passes; --profile node: a Node consumer's tests and scripts too)";
 
-/** Parse the arguments: `{ repo, token, rule, identity }` (`identity` stays unset unless given) or `{ error }`. */
+/** Parse the arguments: `{ repo, token, rule, identity, profile }` (`identity` and `profile` stay unset unless given) or `{ error }`. */
 export function parseArguments(argv) {
-  const options = { repo: process.cwd(), token: REPO_TOKEN, rule: undefined, identity: undefined, allowlist: undefined, update: false };
+  const options = { repo: process.cwd(), token: REPO_TOKEN, rule: undefined, identity: undefined, allowlist: undefined, profile: undefined, update: false };
   for (let index = 0; index < argv.length; index += 2) {
     const name = argv[index].replace(/^--/, "");
     if (argv[index] === "--update-allowlist") {
@@ -656,9 +779,10 @@ export function parseArguments(argv) {
       index -= 1; // a flag takes no value
       continue;
     }
-    if (!["repo", "token", "identity", "rule", "allowlist"].includes(name) || !argv[index].startsWith("--") || argv[index + 1] === undefined) return { error: `unknown or incomplete argument \`${argv[index]}\`` };
-    options[name] = ["token", "identity"].includes(name) ? argv[index + 1] : path.resolve(argv[index + 1]);
+    if (!["repo", "token", "identity", "rule", "allowlist", "profile"].includes(name) || !argv[index].startsWith("--") || argv[index + 1] === undefined) return { error: `unknown or incomplete argument \`${argv[index]}\`` };
+    options[name] = ["token", "identity", "profile"].includes(name) ? argv[index + 1] : path.resolve(argv[index + 1]);
   }
+  if (options.profile !== undefined && !PROFILES.includes(options.profile)) return { error: `unknown profile \`${options.profile}\` (the only profile is \`${PROFILES.join("`, `")}\`)` };
   return options;
 }
 
@@ -684,8 +808,8 @@ function runUpdate(options, io) {
   }
 }
 
-/** Run the guard: the exit code (0 clean, 1 findings, 2 scanned nothing or bad arguments). `io` is a seam for tests. */
-export function main(argv = process.argv.slice(2), io = { out: (text) => console.log(text), err: (text) => console.error(text) }) {
+/** Run the guard: the exit code (0 clean, 1 findings, 2 scanned nothing, no yaml or bad arguments). `io` and `resolvers` (where `yaml` is looked for) are seams for tests. */
+export function main(argv = process.argv.slice(2), io = { out: (text) => console.log(text), err: (text) => console.error(text) }, resolvers = undefined) {
   const options = parseArguments(argv);
   if (options.error !== undefined) {
     io.err(`leftovers-check: ${options.error}\n${USAGE}`);
@@ -694,8 +818,12 @@ export function main(argv = process.argv.slice(2), io = { out: (text) => console
   if (options.update) return runUpdate(options, io);
   let result;
   try {
-    result = fs.existsSync(options.repo) ? scanRepository(options) : { files: 0, findings: [] };
+    result = fs.existsSync(options.repo) ? scanRepository({ ...options, resolvers }) : { files: 0, findings: [] };
   } catch (error) {
+    if (error instanceof YamlMissingError) {
+      io.err(error.message);
+      return 2;
+    }
     io.err(`leftovers-check: cannot read ${options.repo}: ${error.message.split("\n")[0]}`);
     return 2;
   }
