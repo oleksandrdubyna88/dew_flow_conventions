@@ -27,6 +27,8 @@ import { git } from "./lib/git.mjs";
 import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import { cleanupScope, formatOwner, ownedDir, ownedWorktree, thisOwner, thisOwnerToken } from "./lib/owned.mjs";
 
+if (process.platform !== "win32") process.umask(0o022); // the janitor trusts a clone only when it is closed to group and world (the swept one too): the fixtures are made that way whatever the machine's umask
+
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "janitor.sh");
 const win32 = process.platform === "win32";
 const HOUR = 3_600_000;
@@ -914,6 +916,7 @@ test("S9. A dry run and the real run exit alike when a branch is checked out in 
   assert.equal(exists(tree), false, `the real run removed the worktree\n${real.text}`);
   assert.equal(real.status, 0, real.text);
   assert.equal(dry.status, real.status, `a dry run must predict the exit code\n${dry.text}`);
+  assert.equal(git(w.clone, "branch", "--format=%(refname:short)").split(/\r?\n/).includes(owned("conventions-m4branch")), false, `the branch went with the worktree this run removed\n${real.text}`);
 });
 
 test("S10. `would run:` lines are printable ASCII (m5)", { timeout: TIMEOUT }, (t) => {

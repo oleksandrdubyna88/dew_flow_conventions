@@ -23,18 +23,24 @@
 #      included), a Linux record without a pid namespace or with another one, a lock that names nobody, a worktree whose lock cannot
 #      be read, a pid no process can have, or — on Windows — process id 1 is SKIPPED with one line naming it — never deleted; only
 #      "no process has that pid" removes. A worktree is judged by its lock, read through its `.git` file whatever clone owns it (a
-#      relative gitdir is resolved against the worktree). The worktree the janitor runs from is never a candidate. A legacy row is
+#      relative gitdir is resolved against the worktree) and read like any claim: the caller's own regular file, at most 512 bytes. A
+#      clone — the swept one too — must be the caller's and closed to group and world, else its worktrees are kept. A registration
+#      whose folder is gone is a `notice:` and kept: nothing here prunes. The worktree the janitor runs from is never a candidate. A legacy row is
 #      removed only when the caller owns it and its old-grammar record `<host>@<os>:<pid>[:<start>]` is gone (never on a Linux
 #      reader: such a record has no namespace); a legacy container, volume or network is a line and nothing else.
 #   3. Exact removal, by identity. A folder, worktree or claim goes only when its device and inode and its re-read claim equal the
 #      captured ones and it is exactly one component below the temp root. A plain folder is first renamed to the sibling
 #      `.<name>.teststodelete-quarantine-<pid>-<hex>` (same parent, so atomic; the leading dot keeps it out of every prefix match),
 #      checked AGAIN there (device, inode, claim; a mismatch is renamed back and skipped), and only then removed; a quarantine an
-#      earlier killed run left is restored, as the first step of every run and before the capture, onto a FREE name only (an exclusive
-#      mkdir, then rename onto that empty directory) and reported as a notice otherwise. A worktree is NEVER renamed (a rename breaks
+#      earlier killed run left (a legacy name's too) is restored, as the first step of every run and before the capture, when its
+#      renamer is dead and its ctime and mtime are past the window, onto a FREE name only (an exclusive mkdir of mode 700, then rename
+#      onto that empty directory) and reported as a notice otherwise; the rename INTO quarantine is `mv -T`-style too, never into a
+#      directory that appeared there. A worktree is NEVER renamed (a rename breaks
 #      its gitdir pointers): top-level links (a junction into a checkout) are unlinked, then `git worktree remove --force --force`
-#      runs on the captured clone. `rm -rf` never crosses a link. Worktrees go before branches, and before folders; a branch goes by
-#      its captured tip. A deletion is never fatal: a target that vanished after the capture is a notice, one that survives a failed
+#      runs on the captured clone. `rm -rf` never crosses a link. Worktrees go before branches, and before folders. A branch has no owner
+#      record: it is removed ONLY together with the worktree it was checked out in when THIS run removed that worktree because its
+#      owner was `gone` (rule §3's "removed with it"), and then by its captured tip; every other prefixed branch is an `unmarked:`
+#      line, never removed. A deletion is never fatal: a target that vanished after the capture is a notice, one that survives a failed
 #      removal is skipped.
 #   4. Honest exit. 0 when nothing in the caller's scope was skipped; 3 when something was (it is named on stderr); any other code
 #      is a docker/git failure — a stopped Docker daemon is a failure, not a clean machine. A machine with no `docker` binary says
@@ -99,6 +105,7 @@
 #     is checked for its owner right before it is read, and a root that is neither sticky nor this user's would let a
 #     stranger swap it in that instant.
 set -euo pipefail
+unset CDPATH   # a `cd` below must never print a directory or resolve through the caller's search path
 LC_ALL=C; export LC_ALL   # bytewise: under en_US.UTF-8 a bash range such as [0-9] matches other scripts' digits, and an owner record holding them would pass
 usage() { echo "usage: bash tools/janitor.sh [--dry-run] [--token <t>]   (<t>: 2 to 12 lower-case letters and digits, not an owner token)" >&2; exit 2; }
 DRY=0; TOKEN=""; HAVE_TOKEN=0
@@ -451,23 +458,38 @@ capture() {   # ONE line per prefixed resource of EVERY owner ("-" = an owner no
       awk -F'\t' -v OFS="$U" "$UQ"'$1=="C"{c[$2]=$3; next} $1=="V"{ $3 = uq($3); gsub(/[[:cntrl:]]/, "?", $3); if ($2 in c) print "volume",$2,$2,$3,c[$2]; else print "notice: volume " $2 " — vanished after the capture" > "/dev/stderr" }' | tag
   fi
   dk network ls --format '{{.ID}}\t{{printf "%q" .Name}}\t'"$LBL"'\t{{.CreatedAt}}' | awk -F'\t' -v OFS="$U" -v rx="^$RX" "$UQ"'{ n = uq($2); if (tolower(n) !~ rx) next; if (!idok("network", $1, n)) next; print "network", $1, n, uq($3), $4 }' | tag || return 1
-  local wts top; wts="$(git worktree list --porcelain)" || return 1
+  local wts top swept swept_rc=0; wts="$(git worktree list --porcelain)" || return 1
   canon "$(git rev-parse --show-toplevel)"; top="$CANON"   # the clone this runs from and the MAIN checkout are never candidates, nor is a folder holding either
-  # a registered worktree: the first block is the MAIN worktree (never a candidate); a path with a control byte becomes an `unsafe` row; the one the janitor runs from becomes a `self` row
+  # the swept clone is judged like any clone, ONCE: the caller's own, closed to group and world, every worktree entry readable by git. A worktree registered in one that is not is kept
+  swept="$(physical "$(git rev-parse --git-common-dir)")"
+  if [ -n "$swept" ] && clone_ok "$swept"; then clone_sound "$swept" || swept_rc=$?; else swept_rc=1; fi
+  # a registered worktree: the first block is the MAIN worktree (never a candidate); a path with a control byte becomes an `unsafe` row; the one the janitor runs from becomes a `self` row. Its lock is NOT read here: it is read below like any claim
   printf '%s\n' "$wts" | awk -v OFS="$U" '
-    function emit(   q) { if (p != "" && n > 1) { q = p; if (q ~ /[[:cntrl:]]/) { gsub(/[[:cntrl:]]/, "?", q); print "unsafe", q, q, "", "" } else print "wt-git", p, p, o, "" } }
-    /^worktree /{ emit(); p = substr($0, 10); o = ""; n++ }
-    /^locked/{ o = substr($0, 8); if (o == "") o = "-"; gsub(/[[:cntrl:]]/, "?", o) }
+    function emit(   q) { if (p != "" && n > 1) { q = p; if (q ~ /[[:cntrl:]]/) { gsub(/[[:cntrl:]]/, "?", q); print "unsafe", q, q, "", "" } else print "wt-git", p, p, "", "" } }
+    /^worktree /{ emit(); p = substr($0, 10); n++ }
     END { emit() }' | awk -F"$U" -v rx="/${RX}[^/]*\$" 'tolower($3) ~ rx' | while IFS="$U" read -r k id name owner created; do
-      ident=""
+      ident=""; g=""; a=""; gc=""
       if [ "$k" = wt-git ]; then
         canon "$id"; if [ "$CANON" = "$top" ]; then row self "$id" "$id" "" ""; continue; fi
         name_form "${id##*/}"
         if [ "$NF_FORM" != owner ] || [ "$NF_OWNER" = "$ME_OWNER" ]; then   # another owner's registration is never entered or measured
-          if [ -d "$id" ]; then ident="$(ident_of "$id")"; if ! entry_mine "$id"; then owner="-foreign-entry"; fi; fi   # a folder another user owns under a name of this user's scope: foreign
+          if [ -d "$id" ]; then
+            ident="$(ident_of "$id")"
+            if ! entry_mine "$id"; then owner="-foreign-entry"   # a folder another user owns under a name of this user's scope: foreign
+            elif [ "$swept_rc" = 3 ]; then owner="-group-or-world-writable"
+            elif [ "$swept_rc" != 0 ]; then owner="-"
+            elif [ "$BOUND" = none ] && ! owned_by_me "$id/.git"; then owner="-unbounded"; note_unbounded
+            else
+              g="$(gitdir_of "$id")"; gc=""   # the lock is judged through the worktree's own .git file, as for any worktree, and must lie in the swept clone
+              if [ -n "$g" ]; then gc="$(clone_of "$g")"; fi
+              if [ -z "$g" ] || [ ! -d "$g" ]; then owner="-"
+              elif [ -z "$gc" ] || [ "$(physical "$gc")" != "$swept" ]; then owner="-malformed-gitdir"
+              else a="$g"; if [ -e "$g/locked" ]; then read_claim "$g/locked"; owner="$O"; fi; fi
+            fi
+          fi
         fi
       fi
-      row "$k" "$id" "$name" "$owner" "$created" "" "" "$ident"
+      row "$k" "$id" "$name" "$owner" "$created" "" "$a" "$ident"
     done
   local mine=$'\n' main="" wp c   # this repo's trees, canonical, one per line: not captured twice from the temp root; the first is the MAIN checkout
   while IFS= read -r wp; do canon "$wp"; mine="$mine$CANON"$'\n'; if [ -z "$main" ]; then main="$CANON"; fi; done <<< "$(printf '%s\n' "$wts" | sed -n 's/^worktree //p')"
@@ -475,13 +497,22 @@ capture() {   # ONE line per prefixed resource of EVERY owner ("-" = an owner no
   # -H: a TMPDIR that is itself a symlink (macOS: /tmp) is followed; -print0: a name may hold a newline
   find -H "$T" -mindepth 1 -maxdepth 1 -type d -iname "$GLOB" -print0 | while IFS= read -r -d '' d; do
     if has_ctl "$d"; then row folder "$d" "$d" "" ""; continue; fi
+    name_form "${d##*/}"
+    if [ "$NF_FORM" = owner ] && [ "$NF_OWNER" != "$ME_OWNER" ]; then   # another owner's: listed, never entered or read — so before canon, which would cd into it. Its place is spelled from its PARENT, which is the temp root
+      canon "$T"; c="$CANON/${d##*/}"; if [ "$OS" = windows ]; then c="$CANON/$(printf '%s' "${d##*/}" | lower)"; fi
+      case "$top/" in "$c/"*) continue;; esac
+      case "$main/" in "$c/"*) continue;; esac
+      if [ -f "$d/.git" ]; then   # a stat of the entry, never a read
+        case "$mine" in *$'\n'"$c"$'\n'*) continue;; esac
+        row wt-dir "$d" "$d" "" ""
+      else row folder "$d" "$d" "" ""; fi
+      continue
+    fi
     canon "$d"; c="$CANON"   # once per candidate
     case "$top/" in "$c/"*) continue;; esac
     case "$main/" in "$c/"*) continue;; esac
-    name_form "${d##*/}"
     if [ -f "$d/.git" ]; then
       case "$mine" in *$'\n'"$c"$'\n'*) continue;; esac
-      if [ "$NF_FORM" = owner ] && [ "$NF_OWNER" != "$ME_OWNER" ]; then row wt-dir "$d" "$d" "" ""; continue; fi   # another owner's: listed, never entered or read
       g=""; o=""; k=""; a=""
       if [ "$ROOT_OK" = 0 ]; then o="-unsafe-root"; note_unsafe_root   # a temp root that is neither sticky nor this user's lets a stranger replace any folder in it: nothing in it is trusted
       elif ! entry_mine "$d"; then o="-foreign-entry"   # a worktree FOLDER whose own owner is another user can be swapped for a link to a real worktree after the capture, and `git worktree remove` would delete THAT: never touched, whatever else can be read
@@ -497,7 +528,6 @@ capture() {   # ONE line per prefixed resource of EVERY owner ("-" = an owner no
       fi
       row wt-dir "$d" "$d" "$o" "$(mtime_of "$d")" "$k" "$a" "$(ident_of "$d")"
     else
-      if [ "$NF_FORM" = owner ] && [ "$NF_OWNER" != "$ME_OWNER" ]; then row folder "$d" "$d" "" ""; continue; fi   # another owner's: listed, never entered or read
       o=""
       if [ "$ROOT_OK" = 0 ]; then o="-unsafe-root"; note_unsafe_root
       elif ! entry_mine "$d"; then o="-foreign-entry"   # a folder another user owns under a name of this user's scope (or a link, or no directory at all): foreign, whatever its claim says
@@ -528,15 +558,16 @@ rename_onto() {   # rename(2) of directory $1 onto $2: it replaces only an EMPTY
   if mv -T -- "$1" "$2" 2>/dev/null; then return 0; fi
   perl -e 'rename($ARGV[0], $ARGV[1]) or exit 1' -- "$1" "$2" 2>/dev/null
 }
-restore_dir() {   # $1 = a quarantine, $2 = the name it had. An exclusive mkdir reserves the name, then the quarantine is renamed onto that EMPTY directory: a name another process populated in between fails, and nothing is ever overwritten. Windows refuses a rename onto an existing directory: there a restore is a notice, never a delete. 0 = restored
+restore_dir() {   # $1 = a quarantine, $2 = the name it had. An exclusive mkdir (mode 700: only this user can enter the reservation) reserves the name, then the quarantine is renamed onto that EMPTY directory: a name another process populated in between fails, and nothing is ever overwritten. Windows refuses a rename onto an existing directory: there a restore is a notice, never a delete. 0 = restored
   if [ "$OS" = windows ]; then return 1; fi
-  mkdir -- "$2" 2>/dev/null || return 1
+  mkdir -m 700 -- "$2" 2>/dev/null || return 1
   if rename_onto "$1" "$2"; then return 0; fi
-  rmdir -- "$2" 2>/dev/null || true   # the placeholder this made, only while it is still empty
+  if entry_mine "$2" && [ -z "$(shopt -s dotglob nullglob; for f in "$2"/*; do echo x; break; done)" ]; then rmdir -- "$2" 2>/dev/null || true; fi   # the placeholder this made, only while it is still a real directory of this user's AND empty: a name taken over in between is never touched
   return 1
 }
+ctime_of() { stat -c %Z -- "$1" 2>/dev/null || stat -f %c "$1" 2>/dev/null || true; }   # the inode change time (a rename sets it): when the quarantine was made, as far as the kernel says
 restore_quarantines() {   # the FIRST step of every run, before the capture: a quarantine this user's killed run left is put back under its name when that is free, and listed (a notice) when it is not
-  local q leaf orig qpid had=0 lv
+  local q leaf orig qpid had=0 lv qc qm
   if [ "$ROOT_OK" = 0 ]; then return 0; fi   # in a root a stranger can write to, nothing is renamed
   if shopt -q nocasematch; then had=1; fi; shopt -s nocasematch
   while IFS= read -r -d '' q; do
@@ -545,11 +576,19 @@ restore_quarantines() {   # the FIRST step of every run, before the capture: a q
     [[ "$leaf" =~ ^\.(.+)\.teststodelete-quarantine-([0-9]+)-([0-9a-f]+)$ ]] || continue
     orig="$T/${BASH_REMATCH[1]}"; qpid="${BASH_REMATCH[2]}"
     name_form "${orig##*/}"
-    if [ "$NF_FORM" != owner ] || [ "$NF_OWNER" != "$ME_OWNER" ]; then continue; fi   # another user's, or a legacy name: not this janitor's to put back
+    case "$NF_FORM" in
+      owner) if [ "$NF_OWNER" != "$ME_OWNER" ]; then continue; fi;;   # another user's: not this janitor's to put back
+      legacy) ;;   # a name from before the owner segment can have been quarantined too (a legacy row whose old-grammar record was gone): put back like any other, by the same checks
+      *) continue;;
+    esac
     if ! entry_mine "$q"; then continue; fi   # a real directory this user owns, never a link, never a stranger's
     if ! pid_ok "$qpid"; then continue; fi
     liveness "$qpid" && lv=0 || lv=$?
     if [ "$lv" != 1 ]; then continue; fi   # its renamer may still be working: only "no process" puts it back
+    qc="$(ctime_of "$q")"; qm="$(mtime_of "$q")"   # ... and not YET: a janitor in another pid namespace (a container that shares this temp root) has a pid this one cannot see. Its quarantine is as young as its rename (ctime) or its last deletion (mtime): both must be past the window
+    case "$qc" in ""|*[!0-9]*) continue;; esac
+    case "$qm" in ""|*[!0-9]*) continue;; esac
+    if [ $(( NOW - qc )) -lt "$MIN_AGE" ] || [ $(( NOW - qm )) -lt "$MIN_AGE" ]; then continue; fi
     if [ "$DRY" = 1 ]; then echo "would run: $(clean "mv -- $q $orig")"; continue; fi
     if restore_dir "$q" "$orig"; then echo "notice: $(clean "$leaf") — restored as $(clean "${orig##*/}"); a run that was killed after the rename left it" >&2
     else echo "notice: $(clean "$leaf") — kept: its name $(clean "${orig##*/}") is taken or the rename cannot be made here; nothing was overwritten" >&2; fi
@@ -563,7 +602,7 @@ case "$CAPTURED" in "unbounded$U"*|*$'\n'"unbounded$U"*) echo "janitor: neither 
 case "$CAPTURED" in "unsafe-root$U"*|*$'\n'"unsafe-root$U"*) echo "janitor: the temp root $(clean "$T") is neither sticky nor owned by this user — a stranger there could replace a folder after the capture, so folders and worktree folders in it are kept" >&2;; esac
 SKIPPED=0; DEL=""
 skip() { SKIPPED=1; echo "skipped: $(clean "$1") $(clean "$2") — $(clean "$3")" >&2; }   # names and owners come from places any local user can write. Only the caller's own scope is ever skipped: it sets the exit code
-kw() { case "$1" in wt-dir|wt-git) printf 'worktree';; *) printf '%s' "$1";; esac; }   # the kind as a person reads it
+kw() { case "$1" in wt-dir|wt-git|self) printf 'worktree';; *) printf '%s' "$1";; esac; }   # the kind as a person reads it
 say_foreign() { printf '%s\n' "foreign: $(clean "$(kw "$1")") $(clean "$2") — owner $(clean "$3")" >&2; }   # another owner's resource, or an entry this user does not own: listed, never touched, never an exit code
 say_unmarked() { printf '%s\n' "unmarked: $(clean "$(kw "$1")") $(clean "$2")" >&2; }   # an owner-form resource with no record: nobody's the helper knows
 legacy_cmd() {   # $1 = kind, $2 = id, $3 = name or path, $4 = the clone → the exact command a person would run, printable ASCII only (names went through clean())
@@ -620,16 +659,21 @@ while IFS="$U" read -r kind id name owner created clone adm form nown ident; do
     else say_legacy entry "$leaf" "" "$name" ""; fi   # a name from before the owner segment (or no name form at all): listed, never an exit code
     continue
   fi
-  if [ "$kind" != self ] && [ "$form" = owner ] && [ "$nown" != "$ME_OWNER" ]; then say_foreign "$kind" "$leaf" "$nown"; continue; fi   # another owner's: whatever its age, whatever its claim says, it is not this user's to judge
+  if [ "$form" = owner ] && [ "$nown" != "$ME_OWNER" ]; then say_foreign "$kind" "$leaf" "$nown"; continue; fi   # another owner's: whatever its age, whatever its claim says, it is not this user's to judge
   case "$kind" in
     container|network|volume) e="$(epoch_of "$created")";;
-    wt-git|self) e="$(mtime_of "$id")"; [ -n "$e" ] || e=0;;   # a registration whose folder is gone is old by definition; prune takes it
-    branch) e=0;;
+    wt-git|self) e="$(mtime_of "$id")"; [ -n "$e" ] || e=0;;   # a registration whose folder is gone has no age: it is old, and then listed and kept below
+    branch) e=0;;   # a branch has no age and no record: the branch pass decides, by the worktree it was checked out in
     *) e="$created";;
   esac
   case "$e" in ''|*[!0-9]*) continue;; esac   # an age that is not digits is no age: left alone, and never reaches arithmetic
   if [ $(( NOW - e )) -lt "$MIN_AGE" ]; then continue; fi   # young: left alone, silently
-  if [ "$kind" = self ]; then skip worktree "$name" "the janitor runs from it"; continue; fi   # old enough to be a candidate, and it is the tree this runs from: named, never removed
+  if [ "$kind" = self ]; then   # old enough to be a candidate, and it is the tree this runs from: named, never removed
+    if [ "$form" = owner ]; then skip worktree "$name" "the janitor runs from it"   # this user's scope: it sets the exit code
+    else echo "notice: worktree $(clean "$leaf") — the janitor runs from it; kept (a name from before the owner segment is only listed)" >&2; fi   # a legacy name: a listed line, never an exit code
+    continue
+  fi
+  if [ "$kind" = wt-git ] && [ ! -d "$id" ]; then echo "notice: worktree $(clean "$leaf") — its folder is gone; the registration is kept (nothing here prunes: git worktree prune is the caller's call)" >&2; continue; fi
   case "$kind" in folder|wt-dir|marker) if ! safe_id "$id"; then skip "$kind" "$name" "not exactly one component below the temp root"; continue; fi;; esac
   if [ "$form" != owner ]; then   # a LEGACY name (from before the owner segment): collected only where this user owns it and its old-grammar record is gone; a daemon's object is never collected
     case "$kind" in container|network|volume|branch) say_legacy "$kind" "$leaf" "$id" "$name" ""; continue;; esac
@@ -669,7 +713,7 @@ vanished() { echo "notice: $(clean "$1") $(clean "$2") — vanished after the ca
 removed() { if [ "$DRY" = 0 ]; then printf 'janitor: removed %s %q\n' "$1" "$(clean "$2")" >&2; fi; return 0; }   # progress, one line per REAL removal; the name goes through clean() like every other captured text (no escape or line end reaches the terminal) and then through %q (a quote or a space inside it cannot pass for text of the line). A dry run says "would run:" instead
 act_rm() { local k="$1" n="$2"; shift 2; act "$@" && removed "$k" "$n"; }   # act, and announce the removal only when the command succeeded
 settle() { local k="$1" n="$2"; shift 2; if "$@" >/dev/null 2>&1; then skip "$k" "$n" "could not be removed"; else vanished "$k" "$n"; fi; }   # $3… = "still there?" test
-WT_GONE=$'\n'   # dry run only: the worktrees the real run would already have removed, canonical, one per line
+WT_GONE=$'\n'   # the worktrees this run removed (a dry run: would remove) because their owner was gone, canonical, one per line
 EXIT_CLONE_CHANGED=97; EXIT_GIT_STEP_FAILED=98
 claim_text() { if [ -e "$1" ] || [ -L "$1" ]; then claim_of "$1" || true; fi; }   # the claim in file $1 as the capture read it ("" when there is none)
 folder_change() {   # $1 = a folder (the captured one, or its quarantine), $2 = its captured device:inode, $3 = its captured claim text, $4 = the claim file → in words, what changed since the capture; nothing when nothing did
@@ -686,9 +730,6 @@ entry_change() {   # $1 = a captured worktree folder, $2 = its captured device:i
   if ! entry_mine "$1"; then echo "its own owner is no longer this user"; return 0; fi
   if [ "$(ident_of "$1")" != "$2" ]; then echo "it is no longer the folder that was captured (device or inode changed)"; return 0; fi
   if [ "$3" = wt-dir ] && { [ ! -f "$1/.git" ] || [ -L "$1/.git" ]; }; then echo "its .git is no longer a regular file"; return 0; fi
-}
-porcelain_lock() {   # $1 = a worktree path as `git worktree list --porcelain` prints it → its lock reason now: nothing when unlocked, "-" for a lock with no reason, control bytes made '?' (the capture's own reading)
-  git worktree list --porcelain 2>/dev/null | P="$1" awk '/^worktree /{ f = ($0 == "worktree " ENVIRON["P"]) } f && /^locked/ { o = substr($0, 8); if (o == "") o = "-"; gsub(/[[:cntrl:]]/, "?", o) } END { printf "%s", o }'
 }
 volume_state() {   # $1 = a volume's name, $2 = its captured CreatedAt, $3 = its captured label → 0 when the volume is still that one (same creation time, same label), 1 when it changed, 2 when it is gone or docker cannot say
   local out ct lb
@@ -712,7 +753,7 @@ remove_folder() {   # $1 = the folder, $2 = its name, $3 = captured device:inode
   if [ -n "$why" ]; then skip folder "$2" "changed after the capture — $why"; return 0; fi
   q="$(quarantine_name "$d")"
   if [ -e "$q" ] || [ -L "$q" ]; then skip folder "$2" "its quarantine name is taken — kept"; return 0; fi
-  mv -- "$d" "$q" 2>/dev/null || rc=$?
+  rename_onto "$d" "$q" || rc=$?   # never `mv d q` alone: were q a directory by now, that would move d INTO it
   if [ "$rc" != 0 ]; then skip folder "$2" "could not be renamed into quarantine — kept"; return 0; fi
   why="$(folder_change "$q" "$3" "$4" "$d.owner")"   # the same folder, in the quarantine: a swap between the check above and the rename is caught HERE
   if [ -n "$why" ]; then
@@ -720,8 +761,13 @@ remove_folder() {   # $1 = the folder, $2 = its name, $3 = captured device:inode
     return 0
   fi
   find "$q" -mindepth 1 -maxdepth 1 -type l -delete 2>/dev/null || true   # a junction into a checkout: unlinked, never followed
+  if [ ! -e "$q" ] && [ ! -L "$q" ]; then vanished folder "$q"; return 0; fi   # someone else took the quarantine away: this run removed nothing, so the claim stays and nothing is announced as removed
   rm -rf -- "$q" 2>/dev/null || true
-  if [ -e "$q" ] || [ -L "$q" ]; then skip folder "$2" "could not be removed — it stays as $(clean "$q"), which the next run puts back"; return 0; fi
+  if [ -e "$q" ] || [ -L "$q" ]; then
+    if [ "$OS" = windows ]; then skip folder "$2" "could not be removed — it stays as $(clean "$q"); nothing puts it back on Windows: remove it by hand"
+    else skip folder "$2" "could not be removed — it stays as $(clean "$q"), which the next run puts back once it is older than the window"; fi
+    return 0
+  fi
   rm -f -- "$d.owner" 2>/dev/null || true   # the folder first, its claim last: a half-removed, unclaimed folder is the one outcome never produced
   removed folder "$d"
 }
@@ -750,17 +796,14 @@ remove_steps() {   # THE BODY OF A SUBSHELL. $1 = the clone's git dir, $2 = the 
   if [ "$rc" != 0 ] && [ -d "$2" ]; then step_note "worktree remove" "$2" "$rc"; exit "$EXIT_GIT_STEP_FAILED"; fi
   exit 0
 }
-remove_worktree() {   # $1 = the clone's .git dir, $2 = the worktree path, $3 = the captured admin dir (a stranger's clone; empty for the swept repository's own), $4 = 1 when it was locked at the capture, $5 = the lock reason that was judged: unlock (if locked), drop top-level links, remove by exact path. A worktree is NEVER renamed. rm -rf runs only when every git step returned 0
-  local there=0 rc=0 now; if [ -d "$2" ]; then there=1; fi   # a registration whose folder is already gone is pruned, not "removed"
+remove_worktree() {   # $1 = the clone's .git dir, $2 = the worktree path, $3 = the captured admin dir (a stranger's clone; empty for the swept repository's own, whose lock the caller re-read), $4 = 1 when it was locked at the capture, $5 = the lock reason that was judged: unlock (if locked), drop top-level links, remove by exact path. A worktree is NEVER renamed. rm -rf runs only when every git step returned 0. Every worktree this removes (a dry run: would remove) is remembered in WT_GONE, by its canonical path taken BEFORE the removal, for the branch pass
+  local there=0 rc=0 cw; if [ -d "$2" ]; then there=1; fi
+  canon "$2"; cw="$CANON"
   if [ "$DRY" = 1 ]; then
     if [ "${4:-0}" = 1 ]; then echo "would run: $(clean "git --git-dir=$1 worktree unlock $2")"; fi
     if [ -d "$2" ]; then echo "would run: $(clean "find $2 -mindepth 1 -maxdepth 1 -type l -delete")"; fi
     echo "would run: $(clean "git --git-dir=$1 worktree remove --force --force $2")"
-    canon "$2"; WT_GONE="$WT_GONE$CANON"$'\n'; return 0
-  fi
-  if [ -z "${3:-}" ] && [ "${4:-0}" = 1 ]; then   # the swept repository's own worktree: its lock must still say what was judged
-    now="$(porcelain_lock "$2")"
-    if [ "$now" != "${5:-}" ]; then skip worktree "$2" "its lock changed after the capture — kept"; return 0; fi
+    WT_GONE="$WT_GONE$cw"$'\n'; return 0
   fi
   ( remove_steps "$1" "$2" "${3:-}" "${4:-0}" "${5:-}" ) || rc=$?
   case "$rc" in
@@ -770,23 +813,31 @@ remove_worktree() {   # $1 = the clone's .git dir, $2 = the worktree path, $3 = 
   esac
   if [ -d "$2" ]; then rm -rf -- "$2" 2>/dev/null || true; fi
   if [ -d "$2" ]; then skip worktree "$2" "could not be removed"; fi
+  if [ ! -d "$2" ]; then WT_GONE="$WT_GONE$cw"$'\n'; fi
   if [ "$there" = 1 ] && [ ! -d "$2" ]; then removed worktree "$2"; fi
 }
-checked_out() {   # is branch $1 checked out in a worktree that STAYS? A dry run counts the worktrees it announced as already gone, so its exit code is the real run's
-  local line wp=""
+BR_WT=$'\n'   # branch → the canonical path of the worktree that had it checked out, as `git worktree list` said ONCE, before the first removal: a worktree registered later (its creating command still running) is not in it, so its branch is never taken
+branch_worktrees() { local line wp=""
   while IFS= read -r line; do
     case "$line" in
-      "worktree "*) wp="${line#worktree }";;
-      "branch refs/heads/$1") canon "$wp"; case "$WT_GONE" in *$'\n'"$CANON"$'\n'*) ;; *) return 0;; esac;;
+      "worktree "*) canon "${line#worktree }"; wp="$CANON";;
+      "branch refs/heads/"*) BR_WT="$BR_WT${line#branch refs/heads/}$U$wp"$'\n';;
     esac
-  done < <(git worktree list --porcelain)
+  done < <(git worktree list --porcelain 2>/dev/null)
+}
+removed_with_worktree() {   # $1 = a branch → 0 only when it was checked out in a worktree this run removed (a dry run: would remove) because its owner was gone
+  local hit
+  case "$BR_WT" in *$'\n'"$1$U"*) hit="${BR_WT#*$'\n'"$1$U"}"; hit="${hit%%$'\n'*}";; *) return 1;; esac
+  [ -n "$hit" ] || return 1
+  case "$WT_GONE" in *$'\n'"$hit"$'\n'*) return 0;; esac
   return 1
 }
 if [ -n "${JANITOR_TEST_PAUSE_FILE:-}" ]; then   # test seam: lets a test change the world between the decisions and the removals
   echo "janitor: test seam paused after the capture — waiting for $(clean "$JANITOR_TEST_PAUSE_FILE")" >&2
   i=0; while [ ! -e "$JANITOR_TEST_PAUSE_FILE" ] && [ "$i" -lt 600 ]; do sleep 0.1; i=$((i + 1)); done
 fi
-for pass in container volume network wt-git wt-dir prune branch folder marker; do
+branch_worktrees
+for pass in container volume network wt-git wt-dir branch folder marker; do
   while IFS="$U" read -r kind id name clone adm lk ident claim; do
     [ "$kind" = "$pass" ] || continue
     case "$kind" in
@@ -799,10 +850,14 @@ for pass in container volume network wt-git wt-dir prune branch folder marker; d
           *) vanished volume "$name";;
         esac;;
       network) act_rm network "$name" docker network rm "$id" || settle network "$name" dk network inspect "$id";;
-      wt-git) why="$(entry_change "$id" "$ident" wt-git)"; if [ -z "$why" ]; then remove_worktree "$(git rev-parse --git-common-dir)" "$id" "" "$lk" "$claim"; else skip worktree "$name" "changed after the capture — $why"; fi;;   # a path a stranger took over after the capture is not even offered to git
+      wt-git)
+        why="$(entry_change "$id" "$ident" wt-git)"
+        if [ -n "$why" ]; then skip worktree "$name" "changed after the capture — $why"   # a path a stranger took over after the capture is not even offered to git
+        elif [ "$DRY" = 0 ] && [ "$lk" = 1 ] && [ "$(claim_text "$adm/locked")" != "$claim" ]; then skip worktree "$name" "its lock changed after the capture — kept"   # the lock, read again like a claim, must still say what was judged
+        else remove_worktree "$(git rev-parse --git-common-dir)" "$id" "" "$lk" "$claim"; fi;;
       wt-dir) why="$(entry_change "$id" "$ident" wt-dir)"; if [ -z "$why" ]; then remove_worktree "$clone" "$id" "$adm" "$lk" "$claim"; else skip wt-dir "$name" "changed after the capture — $why"; fi;;   # the captured clone; the stranger's .git is never read again, only its type is looked at
       branch)
-        if checked_out "$id"; then skip branch "$id" "checked out in a worktree that was kept"
+        if ! removed_with_worktree "$id"; then say_unmarked branch "$id"   # no owner record: only the worktree it was checked out in, removed by THIS run, takes it along. A live run's branch, or one whose worktree stays, is listed
         elif [ "$DRY" = 0 ] && [ "$(git rev-parse -q --verify "refs/heads/$id" 2>/dev/null || true)" != "$ident" ]; then
           if git show-ref --verify -q "refs/heads/$id" 2>/dev/null; then skip branch "$id" "changed after the capture — its tip moved"; else vanished branch "$id"; fi
         else act_rm branch "$id" git update-ref -d "refs/heads/$id" "$ident" || settle branch "$id" git show-ref --verify -q "refs/heads/$id"; fi;;   # by its captured tip: a branch that moved since is kept
@@ -810,6 +865,5 @@ for pass in container volume network wt-git wt-dir prune branch folder marker; d
       marker) remove_marker "$id" "$name" "$ident" "$claim";;
     esac
   done <<< "$DEL"
-  if [ "$pass" = prune ]; then act git worktree prune || true; fi
 done
 [ "$SKIPPED" = 0 ] || exit 3

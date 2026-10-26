@@ -31,6 +31,8 @@ import {
   cleanupScope, formatOwner, ownedDir, ownedWorktree, processProbe, tempRoot, thisOwner, thisOwnerToken,
 } from "./lib/owned.mjs";
 
+if (process.platform !== "win32") process.umask(0o022); // the janitor trusts a clone only when it is closed to group and world (the swept one too): the fixtures are made that way whatever the machine's umask
+
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "janitor.sh");
 const win32 = process.platform === "win32";
 const linux = process.platform === "linux";

@@ -126,6 +126,7 @@ S="$DSTUB"
 printf '%s\\n' "$*" >> "$S/log"
 last=""; for a in "$@"; do last="$a"; done
 emit() { [ -f "$1" ] || return 0; while IFS= read -r l || [ -n "$l" ]; do printf '%s\\n' "$l"; done < "$1"; }
+emitq() { [ -f "$1" ] || return 0; while IFS= read -r l || [ -n "$l" ]; do n="\${l%%"$TAB"*}"; r="\${l#*"$TAB"}"; printf '"%s"\\t"%s"\\n' "$n" "$r"; done < "$1"; }
 has() { [ -f "$S/mode" ] || return 1; while IFS= read -r l || [ -n "$l" ]; do [ "$l" = "$1" ] && return 0; done < "$S/mode"; return 1; }
 failrm() { has "fail-rm:$1" || has "fail-rm:$1:present" || has "fail-rm:$1:absent"; }
 present() { has "fail-rm:$1:present"; }
@@ -140,7 +141,7 @@ case "$1" in
     emit "$S/ps.tsv";;
   volume)
     case "$2" in
-      ls) emit "$S/vol.tsv";;
+      ls) if has quote-ls; then emitq "$S/vol.tsv"; else emit "$S/vol.tsv"; fi;;
       inspect) if [ "$3" = "--format" ]; then fmt="$4"; shift 4; for n in "$@"; do c="$(created "$n")"; case "$fmt" in *Name*) printf '%s\\t%s\\n' "$n" "$c";; *Labels*) printf '%s\\t"%s"\\n' "$c" "$(vlabel "$n")";; *) printf '%s\\n' "$c";; esac; done; else present "$last"; exit $?; fi;;
       rm) if failrm "$last"; then exit 1; fi;;
     esac;;
@@ -481,7 +482,7 @@ test("6. Locks and junctions (J1, J2, J5): a reason-less lock is kept, links are
   assert.equal(run.status, 3, run.text);
   assert.ok(exists(nameless.path) && listedIn(w.clone).includes(named(nameless.path)), `the reason-less lock is kept and still registered\n${run.text}`);
   assert.ok(mentions(run, named(nameless.path)) && mentions(run, "unreadable"), run.text);
-  assert.equal(branchesOf(w.clone).includes(branch), false, `the prefixed branch is deleted\n${run.text}`);
+  assert.ok(branchesOf(w.clone).includes(branch) && mentions(run, `unmarked: branch ${branch}`), `a standalone prefixed branch has no worktree this run removed: listed, kept\n${run.text}`);
   assert.equal(exists(linkedA.path) || exists(linkedB.path), false, `both junction-holding worktrees are gone\n${run.text}`);
   assert.ok(exists(path.join(targetA, "keep.txt")) && exists(path.join(targetB, "keep.txt")), `the junction targets' files are intact\n${run.text}`);
   assert.ok(exists(unlocked.path) && listedIn(w.other).includes(named(unlocked.path)), `an unlocked old worktree has no owner record: listed, never judged, kept\n${run.text}`);
@@ -537,9 +538,6 @@ test("8b. --dry-run announces every removal as a `would run:` line on STDOUT and
   if (w === null) return;
   const tmp = makeTmp(w);
   const dead = folder(w, tmp, "dryb", { owner: NOBODY() });
-  const branch = ownedName("drybb");
-  git(w.clone, "branch", branch);
-  w.scope.after(() => spawnSync("git", ["-C", w.clone, "branch", "-D", branch], { timeout: 30_000, windowsHide: true }));
   setDocker(w, { ps: [["c1", owned("conventions-dry"), NOBODY(), dockerTime(OLD)]] });
 
   const run = runJanitor(w, { tmp, args: ["--dry-run"] });
@@ -549,7 +547,6 @@ test("8b. --dry-run announces every removal as a `would run:` line on STDOUT and
   assert.ok(wouldRun.length >= 3, `expected at least three would-run lines on stdout, got [${run.stdout.join(" // ")}]`);
   assert.ok(wouldRun.includes("would run: docker rm -f -v c1"), run.stdout.join("\n"));
   assert.ok(wouldRun.some((line) => line.startsWith("would run: rm -rf -- ") && line.includes(named(dead))), run.stdout.join("\n"));
-  assert.ok(wouldRun.includes(`would run: git update-ref -d refs/heads/${branch} ${git(w.clone, "rev-parse", branch)}`), `a branch goes by its captured tip\n${run.stdout.join("\n")}`);
   assert.deepEqual(run.stderr, [], "a dry run says nothing on stderr");
   assert.ok(exists(dead) && exists(`${dead}.owner`), `the folder and its sibling are still there\n${run.text}`);
   assert.deepEqual(rmCalls(w), [], "docker was never asked to remove anything");
@@ -565,17 +562,14 @@ test("8c. progress: one line when the capture starts and one per real removal, i
   const tmp = makeTmp(w);
   const dead = folder(w, tmp, "progd", { owner: NOBODY() });
   const live = folder(w, tmp, "progl", { owner: LIVE() });
-  const branch = ownedName("progb");
-  git(w.clone, "branch", branch);
-  w.scope.after(() => spawnSync("git", ["-C", w.clone, "branch", "-D", branch], { timeout: 30_000, windowsHide: true }));
   setDocker(w, { ps: [["c1", owned("conventions-prog"), NOBODY(), dockerTime(OLD)]] });
 
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 3, "the live folder is skipped: " + run.text);
-  assert.equal(run.progress.length, 4, run.progress.join(" // "));
-  assert.deepEqual(run.progress.slice(0, 3), [LOOKING, `janitor: removed container ${owned("conventions-prog")}`, `janitor: removed branch ${branch}`]);
-  assert.ok(run.progress[3].startsWith("janitor: removed folder ") && run.progress[3].includes(named(dead)), run.progress.join(" // "));
+  assert.equal(run.progress.length, 3, run.progress.join(" // "));
+  assert.deepEqual(run.progress.slice(0, 2), [LOOKING, `janitor: removed container ${owned("conventions-prog")}`]);
+  assert.ok(run.progress[2].startsWith("janitor: removed folder ") && run.progress[2].includes(named(dead)), run.progress.join(" // "));
   assert.equal(run.progress.some((line) => line.includes(named(live))), false, "a skipped resource is not announced as removed");
   assert.equal(exists(dead), false, "and it really went: " + run.text);
 });
@@ -756,7 +750,7 @@ test("11. A branch checked out in a kept worktree (J10) is skipped and named whi
   assert.equal(run.status, 3, run.text);
   assert.ok(exists(leaf) && listedIn(w.clone).includes(named(leaf)), `the worktree is kept\n${run.text}`);
   assert.ok(branchesOf(w.clone).includes(branch), `and so is its branch\n${run.text}`);
-  assert.ok(mentions(run, `skipped: branch ${branch} — checked out in a worktree that was kept`), run.text);
+  assert.ok(mentions(run, `unmarked: branch ${branch}`), `a branch is removed only with a worktree this run removed: here it is only listed\n${run.text}`);
   assert.ok(mentions(run, `${named(leaf)} — owned by live process`), run.text);
   assert.equal(exists(dead) || exists(`${dead}.owner`), false, `the dead folder and its claim are gone\n${run.text}`);
   assert.equal(mentions(run, "cannot delete branch"), false);
@@ -1808,6 +1802,8 @@ for (const leaf of ["..", "."]) {
 // caller), legacy and unmarked rows listed, identity re-checked, a plain folder removed through a quarantine, a worktree never renamed.
 // Every scenario names the plan's test (21–31) or the security scenario it holds.
 
+/** A `stat` that says every directory's ctime (`%Z`) is three hours old: a rename sets the ctime of what it moves, and no test can age it. Everything else is the real `stat`. */
+const oldCtime = (w) => toolStub(w, "stat", `if [ "$1" = "-c" ] && [ "$2" = "%Z" ]; then echo $(( $(date +%s) - 10800 )); exit 0; fi`);
 const realTool = (name) => spawnSync("sh", ["-c", `command -v ${name}`], { encoding: "utf8" }).stdout.trim();
 const HOSTNAME = HOST.split("@")[0];
 /** A folder `name` in `tmp` with a claim holding `record` (a string, or `null` for none), aged. Made by hand: the name is NOT necessarily this user's. */
@@ -2133,8 +2129,8 @@ test("S4-30. a folder swapped between the pre-rename check and the rename is cau
   const dir = folder(w, tmp, "raceswap", { owner: NOBODY() });
   const aside = path.join(w.state, "race-aside");
   const realMv = realTool("mv");
-  // the first `mv -- <folder> <quarantine>` finds the folder replaced by another one, the way a stranger's rename between the check and the call would
-  const mv = toolStub(w, "mv", `if [ "$1" = "--" ] && [ "$2" = "$RACE_FROM" ] && [ ! -e "$RACE_ASIDE" ]; then ${realMv} "$RACE_FROM" "$RACE_ASIDE" && mkdir "$RACE_FROM"; fi`);
+  // the first `mv -T -- <folder> <quarantine>` finds the folder replaced by another one, the way a stranger's rename between the check and the call would
+  const mv = toolStub(w, "mv", `if [ "$1" = "-T" ] && [ "$2" = "--" ] && [ "$3" = "$RACE_FROM" ] && [ ! -e "$RACE_ASIDE" ]; then ${realMv} "$RACE_FROM" "$RACE_ASIDE" && mkdir "$RACE_FROM"; fi`);
   w.scope.after(() => { if (exists(aside)) { fs.rmSync(dir, { recursive: true, force: true }); fs.renameSync(aside, dir); } });
 
   const run = runJanitor(w, { tmp, ahead: [mv], env: { RACE_FROM: dir, RACE_ASIDE: aside } });
@@ -2162,6 +2158,7 @@ test("S4-31. a run killed after the rename left a quarantine: the NEXT run resto
   const taken = folder(w, tmp, "taken", { owner: LIVE() });
   const qTaken = quarantineOf(taken, unmatchablePid(1));
   fs.mkdirSync(qTaken);
+  age(qTaken, OLD); // a made-up quarantine is as young as its mkdir: the window would leave it alone before the name is even looked at
   const running = folder(w, tmp, "running", { owner: LIVE() });
   const qRunning = quarantineOf(running, process.pid); // its renamer is alive: another janitor is working
   fs.renameSync(running, qRunning);
@@ -2169,11 +2166,12 @@ test("S4-31. a run killed after the rename left a quarantine: the NEXT run resto
   const qStrange = quarantineOf(strange, unmatchablePid(2));
   fs.renameSync(strange, qStrange);
 
-  const dry = runJanitor(w, { tmp, args: ["--dry-run"] });
+  const aged = oldCtime(w); // a rename sets a directory's ctime, and no test can age that: the stub says these quarantines are old
+  const dry = runJanitor(w, { tmp, args: ["--dry-run"], ahead: [aged] });
   assert.ok(exists(qKilled) && !exists(killed), `a dry run restores nothing\n${dry.text}`);
   assert.ok(dry.stdout.some((line) => line.startsWith("would run: mv -- ") && line.includes(named(qKilled))), dry.stdout.join("\n"));
 
-  const run = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${posix(qStrange)}` } });
+  const run = runJanitor(w, { tmp, ahead: [aged], env: { JANITOR_TEST_OWNER_CHECK: `foreign:${posix(qStrange)}` } });
 
   assert.ok(exists(killed) && !exists(qKilled), `restored under its name\n${run.text}`);
   assert.ok(mentions(run, "notice:", `restored as ${named(killed)}`), run.text);
@@ -2249,32 +2247,71 @@ test("S4-34. an entry named for another owner is never entered or opened: a FIFO
   assert.ok(mentions(run, `foreign: marker ${named(orphan)} — owner u1000`), `another owner's claim: listed, never opened\n${run.text}`);
 });
 
-test("S4-35. branches: this user's goes by its captured tip (a branch that moved is kept); another owner's is `foreign:`, a legacy name is `legacy:` with its command", { timeout: TIMEOUT }, async (t) => {
+test("S4-35. branches: one goes only WITH the worktree it was checked out in when this run removed that worktree (by its captured tip); every other prefixed branch is an `unmarked:` line — a live run's standalone branch, one whose worktree is kept, another owner's (`foreign:`) and a legacy name (`legacy:`)", { timeout: TIMEOUT }, async (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const mine = ownedName("brmine");
-  const moved = ownedName("brmoved");
+  const [alone, goneBr, movedBr, aliveBr] = ["bralone", "brgone", "brmoved", "bralive"].map((what) => ownedName(what));
   const theirs = `${PREFIX}-u1000-conventions-brtheirs-abc123`;
   const legacy = `${PREFIX}-conventions-brlegacy-abc123`;
-  for (const name of [mine, moved, theirs, legacy]) {
-    git(w.clone, "branch", name);
+  const wtOf = (what, branch, owner) => {
+    const leaf = path.join(tmp, ownedName(what));
+    // testsToDelete-exempt: raw-worktree — a worktree that checks out a prefixed branch, a shape the helper (detached only) never makes
+    const added = rawWorktree(w, w.clone, leaf, ["-b", branch, "--lock", "--reason", owner, leaf, "HEAD"]);
+    assert.equal(added.status, 0, added.stderr);
+    age(leaf, OLD);
+    return leaf;
+  };
+  const goneWt = wtOf("wtgone", goneBr, NOBODY(0));
+  const movedWt = wtOf("wtmoved", movedBr, NOBODY(1));
+  const aliveWt = wtOf("wtalive", aliveBr, LIVE());
+  for (const name of [alone, theirs, legacy]) git(w.clone, "branch", name);
+  for (const name of [alone, goneBr, movedBr, aliveBr, theirs, legacy]) {
     w.scope.after(() => spawnSync("git", ["-C", w.clone, "branch", "-D", name], { timeout: 30_000, windowsHide: true }));
   }
-  const tip = git(w.clone, "rev-parse", mine);
 
   const run = await runPaused(w, tmp, () => {
     git(w.clone, "checkout", "-q", "--detach");
     git(w.clone, ...COMMIT.slice(0, 6), "commit", "--allow-empty", "-qm", "moves a branch later");
-    git(w.clone, "branch", "-f", moved, "HEAD");
+    git(w.clone, "update-ref", `refs/heads/${movedBr}`, "HEAD");
   });
 
   assert.equal(run.paused, true, run.stderr);
-  assert.equal(branchesOf(w.clone).includes(mine), false, `this user's branch went by its captured tip (${tip})\n${run.stderr}`);
-  assert.ok(branchesOf(w.clone).includes(moved), `a branch whose tip moved after the capture is kept\n${run.stderr}`);
-  assert.ok(run.lines.some((line) => line.includes(`skipped: branch ${moved}`) && line.includes("its tip moved")), run.stderr);
+  assert.equal(exists(goneWt) || exists(movedWt), false, `both dead worktrees went\n${run.stderr}`);
+  assert.equal(branchesOf(w.clone).includes(goneBr), false, `the branch of a worktree this run removed went with it\n${run.stderr}`);
+  assert.ok(run.lines.includes(`janitor: removed branch ${goneBr}`), `and was announced\n${run.stderr}`);
+  assert.ok(branchesOf(w.clone).includes(movedBr) && run.lines.some((line) => line.includes(`skipped: branch ${movedBr}`) && line.includes("its tip moved")), `... by its captured tip: one that moved is kept\n${run.stderr}`);
+  assert.ok(branchesOf(w.clone).includes(alone) && run.lines.some((line) => line === `unmarked: branch ${alone}`), `a standalone branch (a live run's, or one whose worktree has not been registered yet) is only listed\n${run.stderr}`);
+  assert.ok(exists(aliveWt) && branchesOf(w.clone).includes(aliveBr) && run.lines.some((line) => line === `unmarked: branch ${aliveBr}`), `the branch of a kept worktree is only listed\n${run.stderr}`);
   assert.ok(branchesOf(w.clone).includes(theirs) && run.lines.some((line) => line === `foreign: branch ${theirs} — owner u1000`), run.stderr);
   assert.ok(branchesOf(w.clone).includes(legacy) && run.lines.some((line) => line.startsWith(`legacy: branch ${legacy} — remove with: git branch -D `)), run.stderr);
+});
+
+test("S4-35b. a branch is never an exit code: a live run's standalone branch alone is `unmarked:` and the run is clean — and a dry run announces the removal of a gone worktree's branch with it", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const alone = ownedName("bralone2");
+  const goneBr = ownedName("brgone2");
+  git(w.clone, "branch", alone);
+  w.scope.after(() => spawnSync("git", ["-C", w.clone, "branch", "-D", alone], { timeout: 30_000, windowsHide: true }));
+  const quiet = runJanitor(w, { tmp });
+  assert.equal(quiet.status, 0, quiet.text);
+  assert.ok(branchesOf(w.clone).includes(alone) && mentions(quiet, `unmarked: branch ${alone}`), quiet.text);
+
+  const leaf = path.join(tmp, ownedName("wtgone2"));
+  // testsToDelete-exempt: raw-worktree — a worktree that checks out a prefixed branch, a shape the helper (detached only) never makes
+  const added = rawWorktree(w, w.clone, leaf, ["-b", goneBr, "--lock", "--reason", NOBODY(), leaf, "HEAD"]);
+  assert.equal(added.status, 0, added.stderr);
+  w.scope.after(() => spawnSync("git", ["-C", w.clone, "branch", "-D", goneBr], { timeout: 30_000, windowsHide: true }));
+  age(leaf, OLD);
+
+  const dry = runJanitor(w, { tmp, args: ["--dry-run"] });
+
+  assert.equal(dry.status, 0, dry.text);
+  assert.ok(dry.stdout.some((line) => line.startsWith("would run: git update-ref -d ") && line.includes(goneBr)), `the dry run announces it\n${dry.stdout.join("\n")}`);
+  assert.ok(dry.stdout.every((line) => !line.includes(alone)), `and not the standalone branch\n${dry.stdout.join("\n")}`);
+  assert.ok(branchesOf(w.clone).includes(goneBr) && exists(leaf), "a dry run removes nothing");
 });
 
 test("S4-36. a worktree's lock that changed after the capture is not the lock that was judged: kept (the swept repository's own and a stranger's clone alike)", { timeout: TIMEOUT }, async (t) => {
@@ -2402,4 +2439,273 @@ test("S4-39. a volume has no id: it is re-inspected just before it is removed, a
   assert.ok(run.lines.some((line) => line.startsWith(`skipped: volume ${recreated}`) && line.includes("changed after the capture")), run.stderr);
   assert.ok(run.lines.some((line) => line.startsWith(`skipped: volume ${relabelled}`) && line.includes("changed after the capture")), run.stderr);
   assert.equal(run.status, 3, run.stderr);
+});
+
+// --- S4 review fixes ---------------------------------------------------------------------------------------------------------
+// The worktree lock of the SWEPT clone is read like any claim, a registration without a folder is kept, a quarantine is restored
+// only when old (legacy ones too), the forward rename never goes INTO a directory, and the volume label means one thing on both paths.
+
+/** The admin dir `<clone>/worktrees/<name>` a worktree's own `.git` file names. */
+const adminOf = (wt) => /^gitdir: (.*)$/m.exec(fs.readFileSync(path.join(wt, ".git"), "utf8"))[1].trim();
+
+test("S4-40a. the lock of a worktree registered in the SWEPT clone is read like a claim: a record longer than 512 bytes is unreadable (as in Node), never read whole from porcelain", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const parts = NOBODY().split(":"); // owner : host@os : pid [: start : ns] — the start is a run of digits of any length in the grammar
+  if (linux) parts[3] = `${parts[3]}${"0".repeat(600)}`;
+  else parts.push(`1${"0".repeat(600)}`);
+  const long = parts.join(":");
+  assert.ok(long.length > 512);
+  const wt = worktree(w, w.clone, tmp, "longlock", { lock: long });
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(wt.path) && listedIn(w.clone).includes(named(wt.path)), `kept, registered\n${run.text}`);
+  assert.ok(mentions(run, `skipped: wt-git`, `${named(wt.path)} — owner '-' is unreadable`), run.text);
+});
+
+test("S4-40b. a lock file another user owns is no evidence: the swept clone's worktree is `foreign:` and kept (the kernel-owner seam names the lock file)", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.clone, tmp, "foreignlock", { lock: NOBODY() });
+
+  const run = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${posix(adminOf(wt.path))}/locked` } });
+
+  assert.equal(run.status, 0, run.text);
+  assert.ok(exists(wt.path) && listedIn(w.clone).includes(named(wt.path)), `kept, registered\n${run.text}`);
+  assert.ok(mentions(run, `foreign: worktree ${named(wt.path)}`), run.text);
+});
+
+test("S4-40c. the swept clone must be sound like any clone: one writable by its group keeps every worktree registered in it (kept, named) — closed again, it is swept", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("POSIX modes");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.clone, tmp, "gwclone", { lock: NOBODY() });
+  const dir = path.join(w.clone, ".git");
+  fs.chmodSync(dir, 0o775);
+  w.scope.after(() => fs.chmodSync(dir, 0o755));
+
+  const open = runJanitor(w, { tmp });
+
+  assert.equal(open.status, 3, open.text);
+  assert.ok(exists(wt.path) && listedIn(w.clone).includes(named(wt.path)), `kept, registered\n${open.text}`);
+  assert.ok(mentions(open, `${named(wt.path)} — owner '-group-or-world-writable' is unreadable`), open.text);
+
+  fs.chmodSync(dir, 0o755);
+  const closed = runJanitor(w, { tmp });
+
+  assert.equal(closed.status, 0, closed.text);
+  assert.equal(exists(wt.path), false, `closed to the group, the worktree goes\n${closed.text}`);
+});
+
+test("S4-40d. a registration whose FOLDER is gone is kept and listed (a notice), never pruned — Node's decide keeps it too", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.clone, tmp, "nofolder", { lock: NOBODY() });
+  const gone = path.join(w.state, "gone-wt");
+  fs.renameSync(wt.path, gone);
+  w.scope.after(() => { if (exists(gone) && !exists(wt.path)) fs.renameSync(gone, wt.path); });
+  fs.rmSync(gone, { recursive: true, force: true });
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 0, run.text);
+  assert.ok(listedIn(w.clone).includes(named(wt.path)), `still registered: nothing pruned it\n${run.text}`);
+  assert.ok(mentions(run, "notice:", `worktree ${named(wt.path)}`, "folder is gone"), run.text);
+  assert.equal(run.progress.some((line) => line.startsWith("janitor: removed worktree")), false, run.text);
+});
+
+test("S4-41. a LEGACY name's quarantine, left by a killed run, is put back like any other (the same owner and dead-renamer checks)", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("restoring onto a name is a POSIX rename (on Windows it is a notice only)");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const legacy = rawFolder(tmp, `${PREFIX}-conventions-legacyq-abc123`, `${HOSTNAME}@linux:${unmatchablePid()}`);
+  const quarantine = path.join(tmp, `.${named(legacy)}.teststodelete-quarantine-${unmatchablePid(1)}-abcd1234`);
+  fs.renameSync(legacy, quarantine);
+  const live = rawFolder(tmp, `${PREFIX}-conventions-legacylive-abc123`, `${HOSTNAME}@linux:${unmatchablePid()}`);
+  const qLive = path.join(tmp, `.${named(live)}.teststodelete-quarantine-${process.pid}-abcd1234`); // its renamer is alive
+  fs.renameSync(live, qLive);
+
+  const run = runJanitor(w, { tmp, ahead: [oldCtime(w)] });
+
+  assert.ok(exists(legacy) && !exists(quarantine), `restored under its legacy name\n${run.text}`);
+  assert.ok(mentions(run, "notice:", `restored as ${named(legacy)}`), run.text);
+  assert.ok(exists(qLive) && !exists(live), `a live renamer's is left\n${run.text}`);
+  assert.equal(run.status, 0, run.text);
+});
+
+test("S4-42. the forward rename never goes INTO a directory: a quarantine name that is taken between the check and the rename keeps the folder, whole and where it was", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("a stub tool must come first on PATH");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dir = folder(w, tmp, "intoq", { owner: NOBODY() });
+  fs.writeFileSync(path.join(dir, "keep.txt"), "kept\n");
+  age(dir, OLD); // writing a file made it young
+  w.scope.after(() => { for (const q of fs.readdirSync(tmp).filter((entry) => entry.includes("quarantine"))) fs.rmSync(path.join(tmp, q), { recursive: true, force: true }); });
+  // the moment before the forward rename (whatever its spelling: source, then destination, are the last two arguments) a stranger's directory holding a file appears under the quarantine name
+  const mv = toolStub(w, "mv", `src=""; dst=""; for a; do src="$dst"; dst="$a"; done; if [ "$src" = "$RACE_FROM" ]; then mkdir "$dst" && echo x > "$dst/theirs"; fi`);
+
+  const run = runJanitor(w, { tmp, ahead: [mv], env: { RACE_FROM: dir } });
+
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(path.join(dir, "keep.txt")), `the folder is whole, where it was\n${run.text}`);
+  assert.deepEqual(fs.readdirSync(tmp).filter((entry) => entry.includes("quarantine")).flatMap((q) => fs.readdirSync(path.join(tmp, q))), ["theirs"], "and nothing went into the directory that appeared");
+  assert.ok(mentions(run, "skipped: folder ", named(dir), "could not be renamed into quarantine"), run.text);
+  assert.equal(run.progress.some((line) => line.startsWith("janitor: removed folder")), false);
+});
+
+test("S4-43a. a restore reserves the name with a directory only its owner can enter (mode 700), and a rename that fails leaves no placeholder behind", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("POSIX modes");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const killed = folder(w, tmp, "reserve", { owner: LIVE() });
+  const quarantine = path.join(tmp, `.${named(killed)}.teststodelete-quarantine-${unmatchablePid()}-abcd1234`);
+  fs.renameSync(killed, quarantine);
+  w.scope.after(() => fs.rmSync(quarantine, { recursive: true, force: true }));
+  const mv = toolStub(w, "mv", `for last; do :; done; stat -c %a "$last" >> "$DSTUB/mvmode"; exit 1`);
+
+  const run = runJanitor(w, { tmp, ahead: [mv, oldCtime(w)] });
+
+  assert.deepEqual(fs.readFileSync(path.join(w.state, "mvmode"), "utf8").trim().split("\n"), ["700"], `the reserved name, at the moment of the rename\n${run.text}`);
+  assert.equal(exists(killed), false, `no placeholder is left when the rename could not be made\n${run.text}`);
+  assert.ok(exists(quarantine) && mentions(run, "notice:", "kept"), run.text);
+});
+
+test("S4-43b. a quarantine is restored only when OLD (its ctime and mtime past the window): a young one may belong to a janitor in another pid namespace that is still working on it", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("restoring onto a name is a POSIX rename (on Windows it is a notice only)");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const killed = folder(w, tmp, "youngq", { owner: LIVE() });
+  const quarantine = path.join(tmp, `.${named(killed)}.teststodelete-quarantine-${unmatchablePid()}-abcd1234`);
+  fs.renameSync(killed, quarantine); // its ctime is NOW
+
+  const young = runJanitor(w, { tmp });
+  assert.ok(exists(quarantine) && !exists(killed), `a quarantine younger than the window is left alone\n${young.text}`);
+
+  age(quarantine, OLD); // mtime old, ctime still now: still young
+  const half = runJanitor(w, { tmp });
+  assert.ok(exists(quarantine) && !exists(killed), `its ctime is what a rename sets: still young\n${half.text}`);
+
+  const old = runJanitor(w, { tmp, ahead: [oldCtime(w)] });
+  assert.ok(exists(killed) && !exists(quarantine), `old by both clocks, it is restored\n${old.text}`);
+});
+
+test("S4-43c. a quarantine that is already gone before `rm -rf` is a vanished target: a notice, the claim kept, never `removed`", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("a stub tool must come first on PATH");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dir = folder(w, tmp, "qvanish", { owner: NOBODY() });
+  const rm = realTool("rm");
+  const find = toolStub(w, "find", `case "$1" in *.teststodelete-quarantine-*) ${rm} -rf "$1";; esac`); // another run removed it a moment before this one's `rm -rf`
+
+  const run = runJanitor(w, { tmp, ahead: [find] });
+
+  assert.equal(run.status, 0, run.text);
+  assert.ok(mentions(run, "notice:", "vanished after the capture"), run.text);
+  assert.ok(exists(`${dir}.owner`), `the claim is kept: the folder was not removed by this run\n${run.text}`);
+  assert.equal(run.progress.some((line) => line.startsWith("janitor: removed folder")), false, "never announced as removed");
+});
+
+test("S4-44. a volume's label reads the same on both paths: what real docker prints for `volume ls` and for `volume inspect` — the quotes of Go's %q included — is one label, so a dead volume goes", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const [dead, live] = ["vquote", "vquotelive"].map((what) => owned(`conventions-${what}`));
+  const created = volumeTime(OLD);
+  setDocker(w, {
+    vol: [[dead, NOBODY()], [live, LIVE()]],
+    volCreated: [[dead, created], [live, created]],
+    mode: ["quote-ls"], // `volume ls --format '{{printf "%q" .Name}}\t{{printf "%q" (.Label …)}}'` prints "name"<TAB>"label"
+  });
+
+  const run = runJanitor(w, { tmp });
+
+  assert.deepEqual(rmCalls(w), [`volume rm ${dead}`], `the dead volume was removed, not 'changed after the capture'\n${run.text}`);
+  assert.ok(mentions(run, `skipped: volume ${live}`, "owned by live process"), run.text);
+  assert.equal(mentions(run, "changed after the capture"), false, run.text);
+});
+
+test("S4-45. another owner's folder is never ENTERED: its name is read first, so `canon` never changes directory into it (strace sees no chdir to it); a legacy name still is", { timeout: TIMEOUT }, (t) => {
+  const strace = win32 ? "" : realTool("strace");
+  if (strace === "") {
+    t.skip("needs strace (Linux)");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const theirs = rawFolder(tmp, `${PREFIX}-u1000-conventions-noenter-abc123`, null);
+  const theirsWt = rawFolder(tmp, `${PREFIX}-u1000-conventions-noenterwt-abc123`, null);
+  fs.writeFileSync(path.join(theirsWt, ".git"), "gitdir: /nowhere/.git/worktrees/x\n");
+  const mine = rawFolder(tmp, `${PREFIX}-${ME}-conventions-enters-abc123`, null);
+  const log = path.join(w.state, "strace.log");
+  const probe = spawnSync(strace, ["-qq", "-o", log, "-e", "trace=chdir", "true"], { encoding: "utf8" });
+  if (probe.status !== 0) {
+    t.skip(`strace cannot trace here: ${probe.stderr}`);
+    return;
+  }
+
+  const run = spawnSync(strace, ["-f", "-qq", "-o", log, "-e", "trace=chdir", BASH, SCRIPT], { cwd: w.clone, env: envFor(w, { tmp, docker: true, minAge: 60, ahead: [], extra: {} }), encoding: "utf8", timeout: 240_000 });
+
+  const entered = fs.readFileSync(log, "utf8");
+  assert.ok(entered.includes(named(mine)), `the trace works, and this user's own folder is entered: ${run.stderr}`);
+  assert.equal(entered.includes(named(theirs)), false, `another owner's folder was entered\n${entered}`);
+  assert.equal(entered.includes(named(theirsWt)), false, `another owner's worktree folder was entered\n${entered}`);
+  assert.ok(run.stderr.includes(`foreign: folder ${named(theirs)}`) && run.stderr.includes(`foreign: worktree ${named(theirsWt)}`), run.stderr);
+});
+
+test("S4-46. the worktree the janitor runs from: this user's scope is `skipped` (exit 3), but a legacy or foreign name is a listed line and never an exit code", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const legacyLeaf = path.join(tmp, `${PREFIX}-conventions-selfleg-abc123`);
+  const foreignLeaf = path.join(tmp, `${PREFIX}-u1000-conventions-selfforeign-abc123`);
+  const mineLeaf = path.join(tmp, ownedName("selfmine"));
+  for (const leaf of [legacyLeaf, foreignLeaf, mineLeaf]) {
+    // testsToDelete-exempt: raw-worktree — the three names the helper never makes (a legacy one, another owner's) and one of this user's, run FROM
+    const added = rawWorktree(w, w.clone, leaf, ["--detach", leaf, "HEAD"]);
+    assert.equal(added.status, 0, added.stderr);
+    age(leaf, OLD);
+  }
+
+  const legacy = runJanitor(w, { tmp, cwd: legacyLeaf });
+  assert.equal(legacy.status, 0, legacy.text);
+  assert.ok(mentions(legacy, "notice:", "worktree", named(legacyLeaf), "the janitor runs from it"), legacy.text);
+
+  const foreign = runJanitor(w, { tmp, cwd: foreignLeaf });
+  assert.equal(foreign.status, 0, foreign.text);
+  assert.ok(mentions(foreign, `foreign: worktree ${named(foreignLeaf)} — owner u1000`), foreign.text);
+
+  const mine = runJanitor(w, { tmp, cwd: mineLeaf });
+  assert.equal(mine.status, 3, mine.text);
+  assert.ok(mentions(mine, "skipped: worktree", named(mineLeaf), "the janitor runs from it"), mine.text);
+  assert.ok(exists(legacyLeaf) && exists(foreignLeaf) && exists(mineLeaf), "nothing was removed");
 });
