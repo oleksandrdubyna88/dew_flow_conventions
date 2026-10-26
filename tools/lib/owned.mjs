@@ -1,7 +1,7 @@
 // Owned test resources: the Node encoding of `common/test-leftovers.md` §1–§3 for this repository.
 //
 // What it owns. Every temp folder or git worktree a test here makes goes through `ownedDir` / `ownedWorktree`:
-// the name comes from one constant (`REPO_TOKEN`, rule §1; a consumer binds its own with `ownedFor`) behind the caller's owner token (`u<uid>`, or `w<digits>`
+// the name comes from one constant (`REPO_TOKEN`, rule §1, written in the repository's own `owned-token.mjs`; a consumer may bind another with `ownedFor`) behind the caller's owner token (`u<uid>`, or `w<digits>`
 // on Windows), and the claim is written FIRST, under that name, with an exclusive create (rule §2).
 //
 // The order is the whole safety: claim → register → create. A claim that already exists is somebody else's name, so a
@@ -39,10 +39,11 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import { git } from "./git.mjs";
+import { REPO_ROW, REPO_TOKEN } from "./owned-token.mjs"; // each repository writes its own `owned-token.mjs`; this file is the same bytes everywhere and holds no token
+
+export { REPO_ROW, REPO_TOKEN };
 
 export const PREFIX = "testsToDelete-";                              // rule §1
-export const REPO_TOKEN = "conventions";                             // rule §1 — the ONLY place this repository's token is written (a consumer's is the `token` of its own `ownedFor`)
-export const REPO_ROW = "the shared-rules repository";                // rule §1 — the `## Tokens` row (its repository column) that names THIS repository: a token is only this repository's if its row says so
 export const OWNER_GRAMMAR = /^[uw][0-9]{1,10}$/;                    // rule §1 — reserved: no repo token matches it
 export const MAX_NAME = 63;                                          // rule §1
 export const ID_LENGTH = 6;                                          // mkdtemp's six (D1)
@@ -342,7 +343,14 @@ export function formatLegacyOwner(owner) {
   return `${owner.host}:${owner.pid}${owner.start === undefined ? "" : `:${owner.start}`}`;
 }
 
-/** The owner a text names, or `{ unreadable: true }` — git's own `added with --lock` among the latter, and any text longer than `MAX_CLAIM_BYTES`. */
+/** Digit text that is not the canonical decimal of its number (a leading zero): the grammar reads it, but it is not how a reader writes a pid, a start or a namespace. */
+const hasLeadingZero = (digits) => digits !== undefined && digits.length > 1 && digits.startsWith("0");
+
+/**
+ * The owner a text names, or `{ unreadable: true }` — git's own `added with --lock` among the latter, and any text longer than `MAX_CLAIM_BYTES`.
+ * A pid, a start or a namespace written with a leading zero (`007`) is read, and the record carries `nonCanonical: true`: `Number("007")` is 7, which
+ * could be a real process, and the janitor compares the text, so `ownerState` answers `unknown` for it (rule §3: a pid no process can have).
+ */
 export function parseOwner(text) {
   if (typeof text === "string" && Buffer.byteLength(text) > MAX_CLAIM_BYTES) return { unreadable: true };
   const match = OWNER_TEXT.exec(typeof text === "string" ? text.replace(/\r?\n$/, "") : "");
@@ -350,6 +358,7 @@ export function parseOwner(text) {
   const owner = { owner: match[1], host: match[2], pid: Number(match[4]) };
   if (match[5] !== undefined) owner.start = Number(match[5]);
   if (match[6] !== undefined) owner.ns = Number(match[6]);
+  if ([match[4], match[5], match[6]].some(hasLeadingZero)) owner.nonCanonical = true;
   return owner;
 }
 
@@ -360,6 +369,7 @@ export function parseLegacyOwner(text) {
   if (match === null) return { unreadable: true };
   const owner = { host: match[1], pid: Number(match[3]) };
   if (match[4] !== undefined) owner.start = Number(match[4]);
+  if ([match[3], match[4]].some(hasLeadingZero)) owner.nonCanonical = true;
   return owner;
 }
 
@@ -372,7 +382,7 @@ export function runRecord(env = process.env) {
   const given = env.TESTSTODELETE_RUN;
   if (given === undefined || given === "") return thisOwner();
   const parsed = parseOwner(given);
-  if (parsed.unreadable === true || parsed.owner !== thisOwner().owner) {
+  if (parsed.unreadable === true || parsed.nonCanonical === true || parsed.owner !== thisOwner().owner) {
     warn("TESTSTODELETE_RUN is not a record of this user — ignored, this process's own record is used");
     return thisOwner();
   }
@@ -468,13 +478,14 @@ export function readOwner(target, kind, { mine = isMine } = {}) {
 /**
  * Rule §3's order, for a record of the owner form. `facts`: `callerOwner` (default: this process's token), `nameOwner` (the
  * owner segment of the resource's name), `kernelMine` (the kernel owner is the caller — `false` makes it unknown), `hidepid`.
- * Unreadable/unmarked → unknown; the record's owner not the caller's, or not the name's → unknown; the kernel owner another's →
+ * Unreadable/unmarked, or a pid, start or namespace written with a leading zero → unknown; the record's owner not the caller's, or not the name's → unknown; the kernel owner another's →
  * unknown; foreign host → unknown; on a Linux reader a record without a namespace, or in another one → unknown; a pid no process
  * can have → unknown; `state: "dead"` (no such pid) → gone — unless the process list may hide others' → unknown; a refused or
  * failed query → unknown; alive → live, or unknown when both starts differ by more than the tolerance.
  */
 export function ownerState(owner, probe = processProbe, facts = {}) {
   if (owner === null || owner === undefined || owner.unreadable === true) return "unknown";
+  if (owner.nonCanonical === true) return "unknown"; // a pid, a start or a namespace with a leading zero: the janitor compares the text and refuses it, so Node must not read it as the number
   const me = thisOwner();
   if (owner.owner !== (facts.callerOwner ?? me.owner)) return "unknown";
   if (facts.nameOwner !== undefined && facts.nameOwner !== owner.owner) return "unknown";
