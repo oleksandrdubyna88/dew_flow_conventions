@@ -93,9 +93,10 @@ function envFor(w, { tmp, docker, minAge, ahead, extra }) {
     if (!/^(path|git_.*|tmpdir|janitor_.*|dstub)$/i.test(key)) env[key] = value;
   }
   const asWindows = extra.JANITOR_OS === "windows" && extra.TESTSTODELETE_OWNER === undefined ? { TESTSTODELETE_OWNER: ME } : {}; // the Windows branch derives `w<digits>` from the account name; the fixtures are named for this user's own token
+  const armed = (extra.JANITOR_OS === "windows" || win32) && extra.JANITOR_WINDOWS_E2E_GREEN === undefined ? { JANITOR_WINDOWS_E2E_GREEN: "1" } : {}; // a Windows run is --dry-run until the person arms it: the scenarios test the sweep, S4-28b the gate
   return {
     ...env, PATH: [...ahead, pathFor(w, { docker })].join(path.delimiter), TMPDIR: posix(tmp),
-    JANITOR_MIN_AGE_MINUTES: String(minAge), DSTUB: slash(w.state), ...asWindows, ...extra,
+    JANITOR_MIN_AGE_MINUTES: String(minAge), DSTUB: slash(w.state), ...asWindows, ...armed, ...extra,
   };
 }
 
@@ -2083,11 +2084,44 @@ test("S4-28. Windows end-to-end (the check the rule asks for before the janitor 
   const live = folder(w, tmp, "e2elive", { owner: LIVE() });
   const foreign = rawFolder(tmp, `${PREFIX}-w1-conventions-e2eother-abc123`, `w1:${HOSTNAME}@windows:${unmatchablePid()}`);
 
-  const run = runJanitor(w, { tmp, env: { TESTSTODELETE_OWNER: "" } }); // the real account name, the real `tasklist`, the real file owner
+  const run = runJanitor(w, { tmp, env: { TESTSTODELETE_OWNER: "", JANITOR_WINDOWS_E2E_GREEN: "1" } }); // the real account name, the real `tasklist`, the real file owner; the switch that arms a real run on Windows is what this check earns
 
   assert.equal(exists(dead) || exists(`${dead}.owner`), false, `the owned dead leftover is deleted\n${run.text}`);
   assert.ok(exists(live), `a live one is kept\n${run.text}`);
   assert.ok(exists(foreign) && mentions(run, `foreign: folder ${named(foreign)} — owner w1`), `a foreign-owner one is kept and listed\n${run.text}`);
+});
+
+test("S4-28b. Windows fails closed: without JANITOR_WINDOWS_E2E_GREEN a run there is --dry-run (ONE line says so and how to arm it); with it the normal path runs", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("S4-28 is the real Windows check; this one drives the Windows branch through the OS seam");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const token = windowsOwnerToken("Alice");
+  const idStub = ownedDir(w.scope, "jid");
+  fs.writeFileSync(path.join(idStub, "id"), "#!/bin/sh\necho Alice\n", { mode: 0o755 });
+  const task = taskStub(w, "noPid");
+  const dead = unmatchablePid();
+  const mine = rawFolder(tmp, `${PREFIX}-${token}-conventions-wingate-abc123`, `${token}:${HOSTNAME}@windows:${dead}`);
+  const env = (extra) => ({ JANITOR_OS: "windows", TESTSTODELETE_OWNER: "", ...extra });
+  const forced = (run) => run.stderr.filter((line) => /--dry-run/.test(line) && /JANITOR_WINDOWS_E2E_GREEN/.test(line));
+
+  const unarmed = runJanitor(w, { tmp, ahead: [idStub, task], env: env({ JANITOR_WINDOWS_E2E_GREEN: "" }) });
+  assert.equal(unarmed.status, 0, unarmed.text);
+  assert.ok(exists(mine), `nothing is removed on Windows until the end-to-end check is recorded\n${unarmed.text}`);
+  assert.equal(forced(unarmed).length, 1, `ONE line says it ran as --dry-run and names the switch\n${unarmed.text}`);
+  assert.ok(unarmed.stdout.some((line) => line.startsWith("would run:") && line.includes(named(mine))), `it still shows what it would do\n${unarmed.stdout.join("\n")}`);
+
+  const asked = runJanitor(w, { tmp, ahead: [idStub, task], args: ["--dry-run"], env: env({ JANITOR_WINDOWS_E2E_GREEN: "" }) });
+  assert.equal(forced(asked).length, 0, `a dry run that was asked for has nothing to explain\n${asked.text}`);
+  assert.ok(exists(mine));
+
+  const armed = runJanitor(w, { tmp, ahead: [idStub, task], env: env({ JANITOR_WINDOWS_E2E_GREEN: "1" }) });
+  assert.equal(armed.status, 0, armed.text);
+  assert.equal(exists(mine) || exists(`${mine}.owner`), false, `armed, the owned dead folder goes\n${armed.text}`);
+  assert.equal(forced(armed).length, 0);
 });
 
 test("S4-29. a dead-owned worktree goes through `git worktree remove` and is never renamed; a plain folder is the only thing the janitor renames", { timeout: TIMEOUT }, (t) => {

@@ -19,7 +19,9 @@ rule repository; a wrapper may start it, nothing re-implements it.
 temp root nor Windows pids), and from the side that owns the resources — never a Git-for-Windows bash launched
 through WSL interop, which inherits `WSL_DISTRO_NAME` and reads every Windows claim as foreign. Run it as the user
 whose leftovers are meant: an administrator sweeps another user's scope by running as that user (`sudo -u`,
-`runas`), never by naming it — **no option names an owner**.
+`runas`), never by naming it — **no option names an owner**. **On Windows the script runs as `--dry-run` unless the
+environment variable `JANITOR_WINDOWS_E2E_GREEN` is set to a non-empty value** (item 6): it prints one line saying so
+and how to arm it, and removes nothing.
 
 - `--token <t>` narrows the sweep to `testsToDelete-<owner>-<t>-…` (all three spellings, any case, anchored:
   `alpha` never matches `alphabet`); it combines with `--dry-run` in either order; `<t>` is 2 to 12 characters of
@@ -131,8 +133,13 @@ nothing), not a clean machine; a machine with no `docker` binary says so once an
    account name into `sha256sum`); liveness is one `tasklist` snapshot per run, the PID column only; the file owner
    test of an entry is `stat %u` of the entry itself (never through a link) against bash's own `UID` — `-O` only for a
    clone and a `.git` file; the temp root is `TMPDIR`, which Git for Windows sets. Support is proven by the rule repository's
-   Windows end-to-end check — an owned dead leftover deleted, a live one and a foreign one kept — and a machine
-   where that check does not pass runs the janitor with `--dry-run` only.
+   Windows end-to-end check — an owned dead leftover deleted, a live one and a foreign one kept (`tools/janitor.test.mjs`
+   S4-28, which runs only on a Windows machine) — and a machine where that check does not pass runs the janitor with
+   `--dry-run` only. The script enforces it: on Windows it forces `--dry-run` (one line on stderr, exit code and
+   `would run:` lines as a dry run's) unless `JANITOR_WINDOWS_E2E_GREEN` is set to a non-empty value. That variable is an
+   operator switch, not a test seam: a person sets it, in the environment of the account that runs the janitor, only after
+   S4-28 has passed green on THAT machine (S4-28 itself runs with it set, so the check exercises the armed path). An unset
+   or empty variable is the safe state; nothing else arms a Windows run.
 
 ## Never
 

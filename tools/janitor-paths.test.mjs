@@ -95,6 +95,7 @@ function runJanitor(w, { cwd, tmpdir, args = [] }) {
   }
   env.PATH = pathFor(w);
   env.JANITOR_MIN_AGE_MINUTES = "60";
+  if (process.platform === "win32") env.JANITOR_WINDOWS_E2E_GREEN = "1"; // a Windows run is --dry-run until the person arms it; these scenarios are about paths, not that gate
   if (tmpdir !== null) env.TMPDIR = tmpdir;
   for (let i = 0; i < 5; i += 1) assertNoSuchProcess(unmatchablePid(i));
   const result = spawnSync(BASH, [slash(SCRIPT), ...args], { cwd, env, encoding: "utf8", timeout: 600_000, windowsHide: true });

@@ -83,6 +83,7 @@ function runJanitor(w, { tmp, args = [], ahead = [], cwd = w.clone, env: extra =
     if (!/^(path|git_.*|tmpdir|janitor_.*|dstub)$/i.test(key)) env[key] = value;
   }
   if (extra.JANITOR_OS === "windows" && extra.TESTSTODELETE_OWNER === undefined) env.TESTSTODELETE_OWNER = ME; // the Windows branch derives `w<digits>` from the account name; the fixtures are named for this user's own token
+  if ((extra.JANITOR_OS === "windows" || process.platform === "win32") && extra.JANITOR_WINDOWS_E2E_GREEN === undefined) env.JANITOR_WINDOWS_E2E_GREEN = "1"; // a Windows run is --dry-run until the person arms it: these scenarios test the sweep, janitor.test.mjs S4-28b the gate
   Object.assign(env, {
     PATH: [...ahead, pathFor(w)].join(path.delimiter), TMPDIR: posix(tmp), JANITOR_MIN_AGE_MINUTES: "60", DSTUB: slash(w.state), ...extra,
   });

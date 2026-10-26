@@ -59,6 +59,8 @@
 #         Progress goes to stderr: `janitor: looking for testsToDelete resources…` when the capture starts and one
 #         `janitor: removed <kind> <name>` line per real removal (the name printed through clean() and then shell-quoted by
 #         `printf %q`, so a quote or a space inside it cannot pass for text of the line; a dry run has none).
+#         On Windows a run is --dry-run unless JANITOR_WINDOWS_E2E_GREEN is set to a non-empty value (an operator switch: set it after the
+#         end-to-end check, tools/janitor.test.mjs S4-28, has passed on that machine); one line on stderr says so when it forces the dry run.
 #         JANITOR_OS, JANITOR_PROC (the /proc root, default /proc), JANITOR_HOSTNAME (the machine name, default
 #         `hostname`), JANITOR_TEST_UID (the user id this run believes it has: the owner token and every kernel-owner comparison),
 #         JANITOR_TEST_OWNER_CHECK (`foreign`: nothing counts as this user's; `foreign:<path>`: that one path
@@ -128,6 +130,9 @@ T="${TMPDIR:-/tmp}"; T="${T%/}"; MIN_AGE=$(( 10#$AGE_MIN * 60 )); NOW="$(date -u
 TAB=$'\t'
 U=$'\x1f'   # the field separator of the capture: never whitespace, so an EMPTY owner or age keeps its column
 OS="${JANITOR_OS:-$(case "$(uname -s)" in Linux) echo linux;; Darwin) echo macos;; *) echo windows;; esac)}"   # JANITOR_OS: test seam only
+if [ "$OS" = windows ] && [ "$DRY" = 0 ] && [ -z "${JANITOR_WINDOWS_E2E_GREEN:-}" ]; then   # fails closed: nothing is removed on Windows until a person has recorded the end-to-end check (S4-28) green on THIS machine and armed the run. An operator switch, not a test seam
+  DRY=1; echo "janitor: Windows is not armed — running as --dry-run, nothing is removed. After the end-to-end check (tools/janitor.test.mjs S4-28) has passed on this machine, set JANITOR_WINDOWS_E2E_GREEN=1 (any non-empty value) to arm it" >&2
+fi
 lower() { tr '[:upper:]' '[:lower:]'; }
 clean() { printf '%s' "$1" | LC_ALL=C tr -c '\040-\176' '?'; }   # text for a person's terminal: all but printable ASCII (escapes, CR, LF) becomes '?'
 win_token() {   # $1 = an account name (no domain) → its owner token `w<digits>` (rule §1): the ASCII letters A-Z lower-cased and nothing else changed, the bytes of the name ALONE (printf '%s', no line end), SHA-256, the first four digest bytes as one unsigned 32-bit number in decimal. A collision confers no authority: the file's owner decides
