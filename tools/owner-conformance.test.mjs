@@ -298,7 +298,7 @@ function runJanitor(w, { tmp, os, ahead = [], extraEnv = {} }) {
   }
   Object.assign(env, {
     PATH: [...ahead, pathFor(w.binDir)].join(path.delimiter), TMPDIR: posix(tmp), JANITOR_MIN_AGE_MINUTES: "60",
-    JANITOR_OS: os, DSTUB: slash(w.state), TESTSTODELETE_OWNER: ME, ...extraEnv, // ME: the Windows branch derives `w<digits>` from the account name; the fixtures are named for this user's own token
+    JANITOR_OS: os, DSTUB: slash(w.state), TESTSTODELETE_OWNER: ME, JANITOR_WINDOWS_E2E_GREEN: "1", ...extraEnv, // the Windows branch is --dry-run until a person arms it: this test asks about liveness verdicts, not that gate; // ME: the Windows branch derives `w<digits>` from the account name; the fixtures are named for this user's own token
   });
   const probe = spawnSync(BASH, ["-c", "command -v docker"], { env, encoding: "utf8", windowsHide: true });
   assert.notEqual(probe.status, 0, `this PATH holds a docker: ${probe.stdout}`); // no docker: the janitor still sweeps the temp root
