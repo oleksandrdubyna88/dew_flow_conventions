@@ -110,7 +110,8 @@ and `$$` an MSYS pid, never used there: take the step shell's Windows pid from `
 `ParentProcessId` (`Get-CimInstance Win32_Process`) past the `bash.exe` shims — Git's launcher is one — to the
 first process that is not one (measured from a Git Bash started by `pwsh`: that `pwsh`). Windows has no pid 1, so
 `…@windows:1` is `unknown`. The top of a run exports its record ONCE as `TESTSTODELETE_RUN=<record>`; a helper in
-a child process uses it when set and valid, so what it makes belongs to the run, not to a helper that exits. A
+a child process uses it when set, valid and naming a LIVE run of the caller (a stale value would make every claim
+dead at birth), so what it makes belongs to the run, not to a helper that exits. A
 claim is ONE line (an LF or CRLF line end) of at most **512 bytes**: anything else — a second line, a lone CR, a
 longer text — is unreadable. And, **only where the OS gives it without spawning a process** (a `/proc` read, a
 native process API — never a shell or PowerShell child per test process), the process's start time as **integer
