@@ -19,7 +19,8 @@
  *                 `tools/fixtures/owner-blind-allowlist.json`, keyed by file, line and the sha256 of the line
  * plus two that are about the guard's own grammar:
  *   exemption     a `testsToDelete-exempt:` comment that is not well-formed
- *   token         this repository's token is not a row of the rule's `## Tokens` table (§1), or is of the owner grammar
+ *   token         this repository's token is not a row of the rule's `## Tokens` table (§1), or is of the owner grammar, or a copied `owned.mjs` has
+ *                 no `owned-token.mjs` beside it (the shipped helper holds no token: each repository writes its OWN `tools/lib/owned-token.mjs` — `REPO_TOKEN`, `REPO_ROW` — and never copies another's)
  *
  * Why it exists as a script and not as a paragraph: the rule has said "name it, own it, remove it" since the
  * audit of 2026-10-14, and the audit found no compliant site in six repositories — a sentence nobody can be
@@ -39,7 +40,7 @@
  *
  * `--profile node` is for a Node CONSUMER that mounts this repository and runs this file instead of porting it: it adds the consumer's tracked
  * `*.test.<ext>` and `*.spec.<ext>` files (ext: ts, tsx, mts, cts, js, mjs, cjs) and the source and shell files under `scripts/`, `test/` and `tests/` to the scan, and never reads
- * `node_modules/` or the mount paths `.claude/rules/shared/` and `.agents/conventions/`. Without it the scan is exactly this repository's own. The token
+ * `node_modules/` or the mount paths `.claude/rules/shared/` and `.agents/conventions/` — for the scan AND for the token constants. Without it the scan is exactly this repository's own. The token
  * check reads the `## Tokens` table of the rule beside the guard (or `--rule`) whatever families it lists, and needs the `--token` row to name `--identity`.
  * A `docker-name` value that is wholly a shell expansion (`"${name}"`, `"$(f a)"`) is dynamic, never a finding: a text scan cannot know what it builds.
  * Workflows are read with `yaml@2`: this guard's own copy first, then the scanned repository's (`node_modules` of the consumer), else exit 2 with the one
@@ -55,14 +56,15 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { gitOutput } from "./lib/git.mjs";
-import { OWNER_GRAMMAR, REPO_ROW, REPO_TOKEN } from "./lib/owned.mjs";
+import { OWNER_GRAMMAR } from "./lib/owned.mjs";
+import { REPO_ROW, REPO_TOKEN } from "./lib/owned-token.mjs";
 import { classifyLine, lineSha256 } from "./lib/sweeper-scan.mjs";
 import { isReason } from "./ownership-check.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
-/** The files the scan never reads: the guard's own test carries the violations as fixture strings. A test pins this list. */
-export const EXCLUDED_FILES = Object.freeze(["tools/leftovers-check.test.mjs"]);
+/** The files the scan never reads: the guard's own tests carry the violations as fixture strings. A test pins this list. */
+export const EXCLUDED_FILES = Object.freeze(["tools/leftovers-check.test.mjs", "tools/leftovers-check-consumers.test.mjs"]);
 
 /** Every class an exemption may name (`ryuk-off` never; `exemption` and `token` are not resources). */
 export const EXEMPTIBLE = Object.freeze(["raw-temp", "raw-worktree", "docker-run", "docker-name", "legacy-name", "shared-store"]);
@@ -88,7 +90,7 @@ export const CURES = Object.freeze({
   "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers.md §6, §7 (shared-store).",
   "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers.md §5, §7 (ryuk-off).",
   exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers.md §7 (the exemption grammar).",
-  token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers.md §1.",
+  token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers.md §1 — and write it, with its row, in this repository's own tools/lib/owned-token.mjs beside the copied owned.mjs (never copy another repository's).",
 });
 
 const PREFIX_OK = /^teststodelete[-_][uw][0-9]{1,10}[-_]/i; // the OWNER form: one of the three spellings, then an owner segment
@@ -179,8 +181,13 @@ const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 /** The files to read, from git's own idea of the tree (tracked plus untracked-not-ignored). Throws when `repo` is not a repository. */
 export function discover(repo, profile) {
   checkProfile(profile);
+  return listFiles(repo).filter((file) => isScanned(file, profile));
+}
+
+/** Every file git knows in `repo`, tracked or untracked-not-ignored, in code-unit order. */
+function listFiles(repo) {
   const listing = gitOutput(repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
-  return [...new Set(listing.split("\0").filter(Boolean))].filter((file) => isScanned(file, profile)).sort(byCodeUnit);
+  return [...new Set(listing.split("\0").filter(Boolean))].sort(byCodeUnit);
 }
 
 // --- lines, comments, exemptions -----------------------------------------------------------------------------
@@ -692,13 +699,43 @@ function lineConstants(text, index) {
   return [...text.matchAll(TOKEN_CONSTANT)].map((match) => ({ line: index + 1, value: match[1] }));
 }
 
-/** Every token constant of the repository: `[{ file, line, value }]`. */
-export function tokenConstants(repo) {
+/**
+ * Every token constant of the repository: `[{ file, line, value }]`. The shipped helper holds none — `tools/lib/owned.mjs` re-exports the constants
+ * from the `owned-token.mjs` each repository writes, and a re-export is no declaration — so a byte copy of it never adds a second token.
+ * Under a profile the mount paths and `node_modules/` are not the repository's own tree (the same exclusions as `isScanned`).
+ */
+export function tokenConstants(repo, profile) {
+  checkProfile(profile);
   const found = [];
   for (const file of candidateFiles(repo)) {
+    if (profile === "node" && NODE_NEVER.test(file)) continue;
     if (!CONSTANT_FILE.test(file) || EXCLUDED_FILES.includes(file) || !fs.existsSync(path.join(repo, file))) continue;
     const lines = fs.readFileSync(path.join(repo, file), "utf8").split(/\r?\n/);
     lines.forEach((text, index) => found.push(...lineConstants(text, index).map((entry) => ({ file, ...entry }))));
+  }
+  return found;
+}
+
+const HELPER_FILE = "owned.mjs";
+const TOKEN_FILE = "owned-token.mjs";
+const TOKEN_IMPORT = /\bfrom\s+["']\.\/owned-token\.mjs["']/;
+
+/**
+ * Findings (class `token`): a copy of the shipped helper — an `owned.mjs` that imports `./owned-token.mjs` — with no `owned-token.mjs` beside it.
+ * The copy holds no token (it is the same bytes everywhere), so without the file the helper cannot load and the guard would have no constant to check.
+ * A copy under a profile's mount paths or `node_modules/` is not the repository's own.
+ */
+export function tokenFileFindings(repo, profile) {
+  checkProfile(profile);
+  const found = [];
+  for (const file of listFiles(repo)) {
+    if (path.posix.basename(file) !== HELPER_FILE || (profile === "node" && NODE_NEVER.test(file)) || !fs.existsSync(path.join(repo, file))) continue;
+    const dir = path.posix.dirname(file);
+    if (fs.existsSync(path.join(repo, dir, TOKEN_FILE))) continue;
+    const at = fs.readFileSync(path.join(repo, file), "utf8").split(/\r?\n/).findIndex((line) => !isComment(line) && TOKEN_IMPORT.test(line));
+    if (at >= 0) {
+      found.push(finding(file, at + 1, "token", `${file} imports ./${TOKEN_FILE}, which is missing — write ${path.posix.join(dir, TOKEN_FILE)} with this repository's own REPO_TOKEN (its row of the rule's \`## Tokens\` table) and REPO_ROW (that row's repository column), never a copy of another repository's`));
+    }
   }
   return found;
 }
@@ -760,7 +797,7 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = toke
   const rulePath = resolveRule(repo, rule);
   const ruleText = rulePath === undefined ? "" : fs.readFileSync(rulePath, "utf8");
   const ruleName = rulePath === undefined ? "common/test-leftovers.md (not found)" : path.basename(path.dirname(rulePath)) + "/" + path.basename(rulePath);
-  findings.push(...tokenFindings(ruleText, token, ruleName, identity), ...constantFindings(tokenConstants(repo), token, ruleText, ruleName, identity));
+  findings.push(...tokenFindings(ruleText, token, ruleName, identity), ...constantFindings(tokenConstants(repo, profile), token, ruleText, ruleName, identity), ...tokenFileFindings(repo, profile));
   findings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.cls.localeCompare(b.cls));
   return { files: files.length, findings };
 }

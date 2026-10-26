@@ -513,8 +513,8 @@ test("2. raw-temp: RUNNER_TEMP is a job-scoped namespace, not a finding", (t) =>
 
 // 4 / 5 ------------------------------------------------------------------------------------------------------------
 
-test("4. the exclusion list is exactly one file", () => {
-  assert.deepEqual([...EXCLUDED_FILES], ["tools/leftovers-check.test.mjs"]);
+test("4. the exclusion list is exactly the guard's own two test files", () => {
+  assert.deepEqual([...EXCLUDED_FILES], ["tools/leftovers-check.test.mjs", "tools/leftovers-check-consumers.test.mjs"]);
 });
 
 test("5. spaces and Unicode survive the migration: the three tests still make such paths", () => {

@@ -1,7 +1,7 @@
 // Owned test resources: the Node encoding of `common/test-leftovers.md` §1–§3 for this repository.
 //
 // What it owns. Every temp folder or git worktree a test here makes goes through `ownedDir` / `ownedWorktree`:
-// the name comes from one constant (`REPO_TOKEN`, rule §1; a consumer binds its own with `ownedFor`) behind the caller's owner token (`u<uid>`, or `w<digits>`
+// the name comes from one constant (`REPO_TOKEN`, rule §1, written in the repository's own `owned-token.mjs`; a consumer may bind another with `ownedFor`) behind the caller's owner token (`u<uid>`, or `w<digits>`
 // on Windows), and the claim is written FIRST, under that name, with an exclusive create (rule §2).
 //
 // The order is the whole safety: claim → register → create. A claim that already exists is somebody else's name, so a
@@ -39,10 +39,11 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import { git } from "./git.mjs";
+import { REPO_ROW, REPO_TOKEN } from "./owned-token.mjs"; // each repository writes its own `owned-token.mjs`; this file is the same bytes everywhere and holds no token
+
+export { REPO_ROW, REPO_TOKEN };
 
 export const PREFIX = "testsToDelete-";                              // rule §1
-export const REPO_TOKEN = "conventions";                             // rule §1 — the ONLY place this repository's token is written (a consumer's is the `token` of its own `ownedFor`)
-export const REPO_ROW = "the shared-rules repository";                // rule §1 — the `## Tokens` row (its repository column) that names THIS repository: a token is only this repository's if its row says so
 export const OWNER_GRAMMAR = /^[uw][0-9]{1,10}$/;                    // rule §1 — reserved: no repo token matches it
 export const MAX_NAME = 63;                                          // rule §1
 export const ID_LENGTH = 6;                                          // mkdtemp's six (D1)
