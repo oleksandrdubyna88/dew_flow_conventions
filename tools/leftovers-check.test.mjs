@@ -631,10 +631,10 @@ test("2. break-it: one byte changed on the janitor's inventory line makes the gu
   assert.equal(guard(repo).code, 0, "regenerated from the current file");
 });
 
-test("2. the pending list of legacy-name exemptions is exactly the janitor's own tests and skips ONLY that class", (t) => {
-  assert.deepEqual([...LEGACY_NAME_PENDING], ["tools/janitor.test.mjs", "tools/janitor-liveness.test.mjs", "tools/janitor-paths.test.mjs", "tools/owner-conformance.test.mjs"]);
+test("2. no file is exempt from the legacy-name class: the pending list is empty, so a legacy literal in a janitor test is a finding", (t) => {
+  assert.deepEqual([...LEGACY_NAME_PENDING], []);
   const legacy = `const n = "${Q}-api-pg-k3f9a1";\n`;
-  assert.equal(one(t, "tools/janitor.test.mjs", legacy).code, 0, "a legacy literal in a janitor test is not yet a finding");
-  assert.equal(one(t, "tools/janitor.test.mjs", `find /tmp -iname '${Q}-*'\n`).code, 1, "an owner-blind sweep there still is");
+  assert.equal(one(t, "tools/janitor.test.mjs", legacy).code, 1, "a legacy literal in a janitor test is a finding like anywhere else");
+  assert.equal(one(t, "tools/janitor.test.mjs", `find /tmp -iname '${Q}-*'\n`).code, 1, "an owner-blind sweep there is one too");
   assert.equal(one(t, "tools/janitor.test.mjs", "const d = os.tmpdir();\n").code, 1, "and so is every other class");
 });

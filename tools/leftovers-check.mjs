@@ -61,11 +61,11 @@ export const EXCLUDED_FILES = Object.freeze(["tools/leftovers-check.test.mjs"]);
 export const EXEMPTIBLE = Object.freeze(["raw-temp", "raw-worktree", "docker-run", "docker-name", "legacy-name", "shared-store"]);
 
 /**
- * TEMPORARY. The janitor's own tests still feed it names of the form before the owner segment, because the shipped janitor
- * still reads that form; the story that makes the janitor owner-aware retargets them and empties this list (a test pins that).
- * Only `legacy-name` is skipped in these files — every other class, owner-blind included, still applies.
+ * Files whose `legacy-name` findings are skipped. EMPTY since the janitor reads the owner form: its own tests no longer
+ * spell a name of the form before the owner segment (a test that needs one builds it from pieces at run time), so no file
+ * is exempt from the class. A test pins that it stays empty.
  */
-export const LEGACY_NAME_PENDING = Object.freeze(["tools/janitor.test.mjs", "tools/janitor-liveness.test.mjs", "tools/janitor-paths.test.mjs", "tools/owner-conformance.test.mjs"]);
+export const LEGACY_NAME_PENDING = Object.freeze([]);
 
 /** The repository's one sweeper script and the file that allowlists its inventory line (rule §7). */
 export const JANITOR_FILE = "tools/janitor.sh";
