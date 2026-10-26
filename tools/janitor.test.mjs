@@ -29,13 +29,15 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 
 import { git } from "./lib/git.mjs";
 import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import {
   cleanupScope, formatLegacyOwner as formatOwner, ownedDir, ownedName, ownedWorktree, processProbe, removeLink, removeQuietly, thisOwner,
 } from "./lib/owned.mjs";
+
+if (process.platform !== "win32") process.umask(0o022); // the janitor trusts a clone only when it is closed to group and world; the fixtures are made that way whatever the machine's umask
 
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "janitor.sh");
 const win32 = process.platform === "win32";
@@ -48,7 +50,7 @@ const TAB = "\t";
 const COMMIT = ["-c", "user.name=Janitor test", "-c", "user.email=janitor@example.invalid", "-c", "commit.gpgsign=false",
   "commit", "--allow-empty", "-qm", "fixture"];
 // Exactly what the script calls (a private PATH of symlinks proves it; `cut` and `xargs` joined with the one-inspect capture).
-const LINUX_TOOLS = ["bash", "sed", "awk", "grep", "find", "head", "tr", "cut", "xargs", "git", "hostname", "uname", "date", "stat", "rm", "env"];
+const LINUX_TOOLS = ["bash", "sed", "awk", "grep", "find", "head", "tr", "cut", "xargs", "git", "hostname", "uname", "date", "stat", "rm", "env", "sleep"];
 
 // --- bash and PATH ---------------------------------------------------------------------------------------------
 
@@ -561,8 +563,8 @@ test("8c. progress: one line when the capture starts and one per real removal, i
 
   assert.equal(run.status, 3, "the live folder is skipped: " + run.text);
   assert.equal(run.progress.length, 4, run.progress.join(" // "));
-  assert.deepEqual(run.progress.slice(0, 3), [LOOKING, "janitor: removed container \"testsToDelete-conventions-prog\"", `janitor: removed branch "${branch}"`]);
-  assert.ok(run.progress[3].startsWith("janitor: removed folder \"") && run.progress[3].endsWith("\"") && run.progress[3].includes(named(dead)), run.progress.join(" // "));
+  assert.deepEqual(run.progress.slice(0, 3), [LOOKING, "janitor: removed container testsToDelete-conventions-prog", `janitor: removed branch ${branch}`]);
+  assert.ok(run.progress[3].startsWith("janitor: removed folder ") && run.progress[3].includes(named(dead)), run.progress.join(" // "));
   assert.equal(run.progress.some((line) => line.includes(named(live))), false, "a skipped resource is not announced as removed");
   assert.equal(exists(dead), false, "and it really went: " + run.text);
 });
@@ -590,7 +592,7 @@ test("8c. progress: a name is printed through clean() — non-ASCII text never r
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 0, run.text);
-  assert.deepEqual(run.progress, [LOOKING, "janitor: removed container \"testsToDelete-conventions-caf??\""]);
+  assert.deepEqual(run.progress, [LOOKING, "janitor: removed container testsToDelete-conventions-caf\\?\\?"]); // printf %q: the two `?` that clean() made are glob characters, so they are escaped
   assert.equal(/[^ -~]/.test(run.progress[1]), false, "the removed line is printable ASCII only");
 });
 
@@ -603,7 +605,7 @@ test("8c. progress: printable text inside a name cannot pass for a second messag
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 0, run.text);
-  assert.deepEqual(run.progress, [LOOKING, "janitor: removed container \"testsToDelete-conventions-x janitor: removed container fake\""]);
+  assert.deepEqual(run.progress, [LOOKING, "janitor: removed container testsToDelete-conventions-x\\ janitor:\\ removed\\ container\\ fake"]); // every space is escaped: it is ONE word of one line
 });
 
 test("8c. progress: a removal that failed is not announced as removed", { timeout: TIMEOUT }, (t) => {
@@ -794,7 +796,7 @@ test("14. One row per worktree (code gate 2): the swept repository's own tree in
 
   assert.equal(first.status, 0, first.text);
   assert.deepEqual(first.stderr, [], "removed once and silently: a second capture would announce a vanished target");
-  assert.equal(first.progress.filter((line) => line.startsWith("janitor: removed worktree \"") && line.includes(named(dead.path))).length, 1, `one progress line for the worktree\n${first.progress.join("\n")}`);
+  assert.equal(first.progress.filter((line) => line.startsWith("janitor: removed worktree ") && line.includes(named(dead.path))).length, 1, `one progress line for the worktree\n${first.progress.join("\n")}`);
   assert.equal(exists(dead.path), false, `the dead-owned worktree is gone\n${first.text}`);
   assert.equal(listedIn(w.clone).includes(named(dead.path)), false, `and unregistered\n${first.text}`);
 
@@ -936,3 +938,839 @@ test("19. The clone the janitor runs from (opus B) is never a candidate, even wh
   assert.ok(exists(path.join(clone, ".git")), `the clone it ran from was deleted\n${run.text}`);
   assert.deepEqual(run.stderr, [], "and nothing was reported");
 });
+
+// --- 20 --------------------------------------------------------------------------------------------------------
+// Strangers. Any local user can plant folders, files, FIFOs, symlinks and crafted `.git` files in a shared temp root. They can make
+// the janitor WAIT; they must not be able to. A FIFO needs a POSIX file system, so those scenarios skip on Windows.
+
+/** A FIFO at `fifo`. The teardown first opens it for reading and writing, which lets any process blocked on it go (a janitor killed mid-hang leaves its child there), then removes it. */
+function plantFifo(w, fifo) {
+  const made = spawnSync("mkfifo", [fifo], { timeout: 30_000 });
+  assert.equal(made.status, 0, String(made.stderr));
+  w.scope.after(() => {
+    try {
+      fs.closeSync(fs.openSync(fifo, fs.constants.O_RDWR));
+    } catch {
+      // already gone
+    }
+    fs.rmSync(fifo, { force: true });
+  });
+}
+
+/** The git dir of the clone that owns worktree `wt` (its admin folder is `<common>/worktrees/<name>`). */
+const commonOf = (wt) => path.dirname(path.dirname(git(wt.path, "rev-parse", "--absolute-git-dir")));
+
+test("20a. F-A: a worktree whose .git points into a clone owned by someone else is kept and named — git is never pointed at that clone", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "stranger", { lock: undefined });
+
+  const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: "foreign-clone", ...timeoutStub() } }); // only the CLONE is someone else's
+
+  assert.equal(kept.status, 3, kept.text);
+  assert.ok(exists(wt.path) && listedIn(w.other).includes(named(wt.path)), `the worktree of a foreign clone is kept, registered\n${kept.text}`);
+  assert.ok(mentions(kept, `${named(wt.path)} — owner '-' is unreadable`), kept.text);
+  assert.ok(kept.seams.some((line) => line.includes("JANITOR_TEST_OWNER_CHECK")), `the seam is announced: ${kept.seams.join(" // ")}`);
+
+  const mine = runJanitor(w, { tmp });
+
+  assert.equal(mine.status, 0, mine.text);
+  assert.equal(exists(wt.path), false, `the same worktree of a clone this user owns is removed\n${mine.text}`);
+  assert.deepEqual(mine.seams, [], "and no seam was set");
+});
+
+for (const entry of ["zz", ".zz"]) {
+  test(`20b. F-A: a FIFO worktrees/${entry}/gitdir in the clone of a candidate never hangs the janitor — the worktree is kept and named`, { timeout: TIMEOUT }, (t) => {
+    if (win32) {
+      t.skip("mkfifo: a FIFO needs a POSIX filesystem");
+      return;
+    }
+    const w = makeWorld(t);
+    if (w === null) return;
+    const tmp = makeTmp(w);
+    const wt = worktree(w, w.other, tmp, "fifogd", { lock: undefined });
+    const fake = path.join(commonOf(wt), "worktrees", entry);
+    fs.mkdirSync(fake);
+    w.scope.after(() => fs.rmSync(fake, { recursive: true, force: true }));
+    plantFifo(w, path.join(fake, "gitdir"));
+
+    const run = runJanitor(w, { tmp, timeoutMs: 60_000 });
+
+    assert.equal(run.error, undefined, "the run finished instead of blocking on the FIFO");
+    assert.equal(run.status, 3, run.text);
+    assert.ok(exists(wt.path), `the worktree is kept\n${run.text}`);
+    assert.ok(mentions(run, named(wt.path), "is unreadable"), run.text);
+  });
+}
+
+test("20c. F-A: a FIFO worktrees/zz/gitdir in the SWEPT clone (git itself would block listing it): the run refuses in one line, removes nothing and does not hang", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("mkfifo: a FIFO needs a POSIX filesystem");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.clone, tmp, "fifoowngd", { lock: undefined });
+  const fake = path.join(commonOf(wt), "worktrees", "zz");
+  fs.mkdirSync(fake);
+  w.scope.after(() => fs.rmSync(fake, { recursive: true, force: true }));
+  plantFifo(w, path.join(fake, "gitdir"));
+  const dead = folder(w, tmp, "fifogdbeside", { owner: NOBODY() });
+
+  const run = runJanitor(w, { tmp, timeoutMs: 60_000 });
+
+  assert.equal(run.error, undefined, "the run finished instead of blocking on the FIFO");
+  assert.equal(run.status, 1, run.text);
+  assert.ok(run.stderr.some((line) => line.startsWith("janitor: ") && line.includes("gitdir") && line.includes("not a regular file") && line.includes("nothing was removed")), run.text);
+  assert.ok(exists(wt.path) && exists(dead), `nothing was removed\n${run.text}`);
+});
+
+/**
+ * Runs the janitor up to its pause (`JANITOR_TEST_PAUSE_FILE`: after the capture, before the first removal), calls `onPause()` there, lets it go and
+ * waits for it. `hung` is true when it had to be killed after a minute; `close` waits for every holder of the pipes (a killed bash leaves its blocked
+ * child holding them), so `exit` arms a fallback.
+ */
+async function runPaused(w, tmp, onPause, { env: extra = {} } = {}) {
+  const release = path.join(w.state, "release");
+  const child = spawn(BASH, [slash(SCRIPT)], { cwd: w.clone, env: envFor(w, { tmp, docker: true, minAge: 60, ahead: [], extra: { JANITOR_TEST_PAUSE_FILE: release, ...extra } }), windowsHide: true });
+  let stderr = "";
+  let paused = false;
+  let hung = false;
+  const timer = setTimeout(() => { hung = true; child.kill("SIGKILL"); }, 60_000);
+  child.stdout.resume();
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk;
+    if (!paused && stderr.includes("paused after the capture")) {
+      paused = true;
+      onPause();
+      fs.writeFileSync(release, "");
+    }
+  });
+  const status = await new Promise((resolve) => {
+    child.on("close", (code) => resolve(code));
+    child.on("exit", (code) => { setTimeout(() => resolve(code), 2_000).unref(); });
+  });
+  clearTimeout(timer);
+  return { status, stderr, paused, hung, lines: stderr.split(/\r?\n/) };
+}
+
+test("20d. F-B: a .git file swapped for a FIFO after the capture is never read again — the folder is kept and named, and the run does not hang", { timeout: TIMEOUT }, async (t) => {
+  if (win32) {
+    t.skip("mkfifo: a FIFO needs a POSIX filesystem");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "swap", { lock: undefined });
+  const dotGit = path.join(wt.path, ".git");
+  const original = fs.readFileSync(dotGit);
+  w.scope.after(() => { // back to what git wrote, so the worktree's own teardown can remove it
+    try {
+      fs.closeSync(fs.openSync(dotGit, fs.constants.O_RDWR));
+    } catch {
+      // not a FIFO
+    }
+    fs.rmSync(dotGit, { force: true });
+    fs.writeFileSync(dotGit, original);
+  });
+  const run = await runPaused(w, tmp, () => {
+    fs.rmSync(dotGit);
+    const made = spawnSync("mkfifo", [dotGit], { timeout: 30_000 });
+    assert.equal(made.status, 0, String(made.stderr));
+  });
+  const { stderr, paused, hung, status } = run;
+
+  assert.equal(paused, true, `the janitor reached the pause after its capture\n${stderr}`);
+  assert.equal(hung, false, `the run finished instead of blocking on the FIFO that replaced the .git file\n${stderr}`);
+  assert.equal(status, 3, stderr);
+  assert.ok(exists(wt.path), `the folder is kept\n${stderr}`);
+  assert.ok(stderr.split("\n").some((line) => line.includes(named(wt.path)) && line.includes("changed after the capture")), stderr);
+});
+
+test("20e. a double quote or a space inside a name cannot forge text of a progress line — it is escaped, so the line stays one word per field", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  setDocker(w, { ps: [["c1", 'testsToDelete-conventions-a" janitor: removed container "fake', "", dockerTime(OLD)]] });
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 0, run.text);
+  assert.deepEqual(run.progress, [LOOKING, 'janitor: removed container testsToDelete-conventions-a\\"\\ janitor:\\ removed\\ container\\ \\"fake']);
+});
+
+/** A `timeout` that logs its argv and then runs the rest, handed over as an exported bash FUNCTION (see `psStub`: on Windows a stub FILE would never be reached). */
+const timeoutStub = () => ({ "BASH_FUNC_timeout%%": '() {  echo "$*" >> "$DSTUB/timeoutlog"; shift; "$@"\n}' });
+
+test("20f. F-C: where `timeout` exists a claim is read through it and git is called on a clone through it — a swap after the type test cannot block either", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dead = folder(w, tmp, "tmo", { owner: NOBODY() });
+  const wt = worktree(w, w.other, tmp, "tmow", { lock: NOBODY() });
+
+  const run = runJanitor(w, { tmp, env: timeoutStub() });
+
+  assert.equal(run.status, 0, run.text);
+  assert.equal(exists(dead) || exists(wt.path), false, `the stub forwards, so the sweep is the same\n${run.text}`);
+  const log = callsOf(w, "timeout");
+  assert.ok(log.some((line) => /^5 head -c 513 -- .*\.owner$/.test(line)), `the claim was read through timeout 5\n${log.join("\n")}`);
+  assert.ok(log.some((line) => /^5 sed -n .*\.git$/.test(line)), `the .git file was read through timeout 5\n${log.join("\n")}`);
+  assert.ok(log.some((line) => /^60 env -u GIT_COMMON_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_DIR git --git-dir=.* worktree remove --force --force /.test(line)), `the git call on the clone ran through timeout 60, in a clean git environment\n${log.join("\n")}`);
+});
+
+// --- 21 --------------------------------------------------------------------------------------------------------
+// The clone a stranger's .git names is proven at the capture AND again, by its physical path, before every git call on it; a
+// read nothing can bound is not made on a file another user owns; a clone that cannot be entered is a foreign one.
+
+const root = !win32 && process.getuid() === 0;
+
+/** A worktree of `w.other` whose `.git` reaches its clone THROUGH the link `via` (a link in a folder of its own, owned by this user). */
+function worktreeViaLink(w, tmp, what) {
+  const wt = worktree(w, w.other, tmp, what, { lock: undefined });
+  const dotGit = path.join(wt.path, ".git");
+  const original = fs.readFileSync(dotGit);
+  const admin = git(wt.path, "rev-parse", "--absolute-git-dir"); // <other>/.git/worktrees/<name>
+  const via = path.join(w.state, `via-${what}`);
+  fs.symlinkSync(w.other, via);
+  w.scope.after(() => { // back to what git wrote, so the worktree's own teardown can remove it
+    fs.rmSync(via, { force: true });
+    fs.writeFileSync(dotGit, original);
+  });
+  fs.writeFileSync(dotGit, `gitdir: ${path.join(via, ".git", "worktrees", path.basename(admin))}\n`);
+  return { wt, via };
+}
+
+test("21a. F-1: a link inside the stranger's path re-pointed to ANOTHER clone between the capture and the removal — nothing is done through the new target, the folder is kept", { timeout: TIMEOUT }, async (t) => {
+  if (win32) {
+    t.skip("symlinks need a POSIX filesystem");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const { wt, via } = worktreeViaLink(w, tmp, "swaplink");
+  const trap = makeClone(w.roots, "trap");
+  const bait = path.join(trap, ".git", "worktrees", "zz");
+  fs.mkdirSync(bait, { recursive: true });
+  w.scope.after(() => fs.rmSync(bait, { recursive: true, force: true }));
+  plantFifo(w, path.join(bait, "gitdir")); // any git call on the trap blocks on it
+
+  const run = await runPaused(w, tmp, () => {
+    fs.rmSync(via);
+    fs.symlinkSync(trap, via);
+  });
+
+  assert.equal(run.paused, true, `the janitor reached the pause after its capture\n${run.stderr}`);
+  assert.equal(run.hung, false, `git was pointed at the clone the link was moved to and blocked on its FIFO\n${run.stderr}`);
+  assert.equal(run.status, 3, run.stderr);
+  assert.ok(exists(wt.path) && listedIn(w.other).includes(named(wt.path)), `the folder is kept, registered\n${run.stderr}`);
+  assert.ok(run.lines.some((line) => line.includes(named(wt.path)) && line.includes("changed after the capture")), run.stderr);
+  assert.ok(exists(path.join(bait, "gitdir")), "the trap was left alone");
+});
+
+test("21b. F-1: a link in the path to the clone owned by someone else (not this user, not root) refuses the clone (kept, named); a root-owned link is trusted", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("symlinks need a POSIX filesystem");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const { wt } = worktreeViaLink(w, tmp, "foreignlink");
+  // a `stat` that names the owner of every link it is asked about — a real foreign link needs root to make
+  const owning = (uid) => toolStub(w, "stat", `if [ "$1" = "-c" ] && [ "$2" = "%u" ] && [ -L "$3" ]; then echo ${uid}; exit 0; fi`);
+
+  const refused = runJanitor(w, { tmp, ahead: [owning(4242)] });
+
+  assert.equal(refused.status, 3, refused.text);
+  assert.ok(exists(wt.path) && listedIn(w.other).includes(named(wt.path)), `the worktree behind a foreign link is kept, registered\n${refused.text}`);
+  assert.ok(mentions(refused, `${named(wt.path)} — owner '-' is unreadable`), refused.text);
+
+  const trusted = runJanitor(w, { tmp, ahead: [owning(0)] });
+
+  assert.equal(trusted.status, 0, trusted.text);
+  assert.equal(exists(wt.path), false, `root is not a stranger: its link is followed, and the worktree goes\n${trusted.text}`);
+});
+
+for (const target of [".git", path.join(".git", "worktrees")]) {
+  test(`21c. F-1: a clone whose ${target} is writable by its group is refused (kept, named); closed again, it is swept`, { timeout: TIMEOUT }, (t) => {
+    if (win32) {
+      t.skip("POSIX modes");
+      return;
+    }
+    const w = makeWorld(t);
+    if (w === null) return;
+    const tmp = makeTmp(w);
+    const wt = worktree(w, w.other, tmp, "gwrite", { lock: undefined });
+    const dir = path.join(w.other, target);
+    fs.chmodSync(dir, 0o775);
+    w.scope.after(() => fs.chmodSync(dir, 0o755));
+
+    const open = runJanitor(w, { tmp });
+
+    assert.equal(open.status, 3, open.text);
+    assert.ok(exists(wt.path) && listedIn(w.other).includes(named(wt.path)), `kept, registered\n${open.text}`);
+    assert.ok(mentions(open, `${named(wt.path)} — owner '-group-or-world-writable' is unreadable`), open.text);
+
+    fs.chmodSync(dir, 0o755);
+    const closed = runJanitor(w, { tmp });
+
+    assert.equal(closed.status, 0, closed.text);
+    assert.equal(exists(wt.path), false, `closed to the group, the worktree goes\n${closed.text}`);
+  });
+}
+
+test("21d. Gate A: with neither `timeout` nor `perl` a file another user owns is not read — its entries are kept and named, ONE line says why; this user's own entries are swept", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("the Windows PATH always has the shell's own timeout");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const claimed = folder(w, tmp, "unb1", { owner: NOBODY() });
+  const marker = orphanMarker(w, tmp, NOBODY());
+  const wt = worktree(w, w.other, tmp, "unb2", { lock: undefined });
+  const probe = spawnSync(BASH, ["-c", "command -v timeout || command -v perl"], { env: envFor(w, { tmp, docker: true, minAge: 60, ahead: [], extra: {} }), encoding: "utf8" });
+  assert.notEqual(probe.status, 0, `this PATH holds a timeout or a perl: ${probe.stdout}`);
+
+  const foreign = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: "foreign" } });
+
+  assert.equal(foreign.status, 3, foreign.text);
+  assert.ok(exists(claimed) && exists(marker) && exists(wt.path), `nothing owned by "someone else" was read or removed\n${foreign.text}`);
+  assert.equal(foreign.stderr.filter((line) => line.includes("neither timeout nor perl")).length, 1, `one line says why\n${foreign.text}`);
+  assert.equal(foreign.stderr.filter((line) => line.includes("owner '-unbounded' is unreadable")).length, 2, `each kept entry whose claim could not be read is named\n${foreign.text}`);
+  assert.equal(foreign.stderr.filter((line) => line.includes("owner '-unsafe-root' is unreadable")).length, 1, `with the root itself not this user's (the seam says so for everything), the worktree folder is named for that\n${foreign.text}`);
+
+  const own = runJanitor(w, { tmp });
+
+  assert.equal(own.status, 0, own.text);
+  assert.equal(exists(claimed) || exists(marker) || exists(wt.path), false, `this user's own entries are swept without a bound\n${own.text}`);
+  assert.equal(own.stderr.filter((line) => line.includes("neither timeout nor perl")).length, 0, own.text);
+});
+
+test("21e. Gate A: without `timeout`, perl's alarm bounds the reads and the git calls on a clone", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("the Windows PATH always has the shell's own timeout");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dead = folder(w, tmp, "perl1", { owner: NOBODY() });
+  const wt = worktree(w, w.other, tmp, "perl2", { lock: NOBODY() });
+  // `perl -e 'alarm shift; exec @ARGV' <seconds> <command…>`: the stub logs and runs the command
+  const perlStub = { "BASH_FUNC_perl%%": '() {  echo "$*" >> "$DSTUB/perllog"; shift 3; "$@"\n}' };
+
+  const run = runJanitor(w, { tmp, env: perlStub });
+
+  assert.equal(run.status, 0, run.text);
+  assert.equal(exists(dead) || exists(wt.path), false, `the stub forwards, so the sweep is the same\n${run.text}`);
+  const log = callsOf(w, "perl");
+  assert.ok(log.some((line) => /^-e alarm shift; exec @ARGV 5 head -c 513 -- .*\.owner$/.test(line)), `the claim was read under perl's alarm\n${log.join("\n")}`);
+  assert.ok(log.some((line) => /^-e alarm shift; exec @ARGV 60 env -u GIT_COMMON_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_DIR git --git-dir=.* worktree remove --force --force /.test(line)), `the git call on the clone ran under perl's alarm\n${log.join("\n")}`);
+  assert.equal(run.stderr.filter((line) => line.includes("neither timeout nor perl")).length, 0, run.text);
+});
+
+for (const entry of ["worktrees", ""]) {
+  test(`21f. Gate B: a clone whose ${entry === "" ? ".git" : `.git/${entry}`} cannot be entered is a foreign one — kept and named, the run goes on and sweeps the rest`, { timeout: TIMEOUT }, (t) => {
+    if (win32 || root) {
+      t.skip("POSIX modes, and root enters every directory");
+      return;
+    }
+    const w = makeWorld(t);
+    if (w === null) return;
+    const tmp = makeTmp(w);
+    const wt = worktree(w, w.other, tmp, "noenter", { lock: undefined });
+    const dead = folder(w, tmp, "noenterbeside", { owner: NOBODY() });
+    const dir = path.join(w.other, ".git", entry);
+    fs.chmodSync(dir, 0);
+    w.scope.after(() => fs.chmodSync(dir, 0o755));
+
+    const run = runJanitor(w, { tmp });
+
+    assert.equal(run.status, 3, run.text);
+    assert.ok(exists(wt.path), `the worktree of the clone nobody can enter is kept\n${run.text}`);
+    assert.ok(mentions(run, `${named(wt.path)} — owner '-' is unreadable`), run.text);
+    assert.equal(exists(dead), false, `the run did not stop: the dead folder beside it is gone\n${run.text}`);
+  });
+}
+
+test("21g. Gate B: a clone that becomes unreadable after the capture is not 'removed through' — git would fail silently and the folder go anyway; it is kept", { timeout: TIMEOUT }, async (t) => {
+  if (win32 || root) {
+    t.skip("POSIX modes, and root enters every directory");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "lateno", { lock: undefined });
+  const dir = path.join(w.other, ".git", "worktrees");
+  w.scope.after(() => fs.chmodSync(dir, 0o755));
+
+  const run = await runPaused(w, tmp, () => fs.chmodSync(dir, 0));
+
+  assert.equal(run.paused, true, run.stderr);
+  assert.equal(run.status, 3, run.stderr);
+  assert.ok(exists(wt.path), `the folder is kept\n${run.stderr}`);
+  assert.ok(run.lines.some((line) => line.includes(named(wt.path)) && line.includes("changed after the capture")), run.stderr);
+});
+
+// --- 22 --------------------------------------------------------------------------------------------------------
+
+test("22a. A directory ABOVE the clone renamed in the middle of the git calls: unlock and remove share ONE entered clone; git there finds the worktree no longer points back, says so, and the folder is kept; what the path became is never touched", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("renames of a directory in use need a POSIX filesystem");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "pin", { lock: NOBODY() });
+  const admin = git(wt.path, "rev-parse", "--absolute-git-dir"); // <other>/.git/worktrees/<name>
+  const trap = makeClone(w.roots, "trap2");
+  const bait = path.join(trap, ".git", "worktrees", "zz");
+  fs.mkdirSync(bait, { recursive: true });
+  w.scope.after(() => fs.rmSync(bait, { recursive: true, force: true }));
+  plantFifo(w, path.join(bait, "gitdir")); // any git call that lands in the trap blocks on it
+  const aside = path.join(w.roots, "b-aside");
+  w.scope.after(() => { // put the directories back, so the teardown finds them where they were
+    if (!exists(aside)) return;
+    fs.renameSync(w.other, trap);
+    fs.renameSync(aside, w.other);
+  });
+  const mv = spawnSync("sh", ["-c", "command -v mv"], { encoding: "utf8" }).stdout.trim();
+  // the first `git --git-dir=… worktree unlock` swaps the two directories, then runs for real: the path the janitor holds now names the trap
+  const stubDir = toolStub(w, "git", `case "\${1:-} \${2:-} \${3:-}" in --git-dir=*" worktree unlock") if [ ! -e "$PIN_ASIDE" ]; then ${mv} "$PIN_FROM" "$PIN_ASIDE" && ${mv} "$PIN_TO" "$PIN_FROM"; fi;; esac`);
+
+  const run = runJanitor(w, { tmp, ahead: [stubDir], env: { PIN_FROM: w.other, PIN_ASIDE: aside, PIN_TO: trap }, timeoutMs: 60_000 });
+
+  assert.equal(run.error, undefined, "the run finished instead of blocking on the trap's FIFO");
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(wt.path), `kept: the remove ran in the clone that was entered, which no longer matches the worktree's .git, so git refused and the janitor did not delete behind it
+${run.text}`);
+  assert.ok(run.stderr.some((line) => line.startsWith("notice: ") && line.includes("git worktree remove failed")), `the failed step is said
+${run.text}`);
+  assert.ok(exists(path.join(aside, ".git", "worktrees", path.basename(admin))), "the entered clone (now moved aside) was not touched either");
+  assert.ok(exists(path.join(w.other, ".git", "worktrees", "zz", "gitdir")), "the trap, which now stands where the clone was, was left alone");
+});
+
+test("22b. Gate A: with nothing to bound a read, a .git inside a folder this user does not own is never read — the folder is judged first and named", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("the Windows PATH always has the shell's own timeout");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "parent", { lock: undefined });
+  const probe = spawnSync(BASH, ["-c", "command -v timeout || command -v perl"], { env: envFor(w, { tmp, docker: true, minAge: 60, ahead: [], extra: {} }), encoding: "utf8" });
+  assert.notEqual(probe.status, 0, `this PATH holds a timeout or a perl: ${probe.stdout}`);
+
+  const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${wt.path}` } }); // the FOLDER is someone else's, the file in it and everything else is this user's
+
+  assert.equal(kept.status, 3, kept.text);
+  assert.ok(exists(wt.path), `kept\n${kept.text}`);
+  assert.ok(mentions(kept, `${named(wt.path)} — owner '-foreign-entry' is unreadable`), kept.text);
+
+  const own = runJanitor(w, { tmp });
+
+  assert.equal(own.status, 0, own.text);
+  assert.equal(exists(wt.path), false, `a folder this user owns is read and swept\n${own.text}`);
+});
+
+// --- 23 --------------------------------------------------------------------------------------------------------
+// Round 3. A stranger's entry in the sticky temp root can be replaced after the capture by a link to a REAL worktree; a read that
+// failed is no claim; a git step that failed is said, not hidden; a clone is judged once per run and entered once per worktree.
+
+/** A directory with a `name` script that logs nothing and runs the real tool, after `before` (shell text, `$@` are the arguments). */
+function toolStub(w, name, before) {
+  const dir = ownedDir(w.scope, `j${name}`);
+  const real = spawnSync("sh", ["-c", `command -v ${name}`], { encoding: "utf8" }).stdout.trim();
+  fs.writeFileSync(path.join(dir, name), `#!/bin/sh\n${before}\nexec ${real} "$@"\n`, { mode: 0o755 });
+  return dir;
+}
+
+test("23a. C-1: a worktree folder this user does not own is not touched — kept, named, whatever can be read (the seam makes ONE folder foreign)", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "notmine", { lock: undefined });
+
+  const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${posix(wt.path)}`, ...timeoutStub() } });
+
+  assert.equal(kept.status, 3, kept.text);
+  assert.ok(exists(wt.path) && listedIn(w.other).includes(named(wt.path)), `kept, registered\n${kept.text}`);
+  assert.ok(mentions(kept, `${named(wt.path)} — owner '-foreign-entry' is unreadable`, "never owned by this user"), kept.text);
+
+  const mine = runJanitor(w, { tmp });
+
+  assert.equal(mine.status, 0, mine.text);
+  assert.equal(exists(wt.path), false, `owned by this user, it goes\n${mine.text}`);
+});
+
+test("23b. C-1: an entry swapped AFTER the capture for a link to a REAL registered worktree is kept — that worktree survives", { timeout: TIMEOUT }, async (t) => {
+  if (win32) {
+    t.skip("symlinks need a POSIX filesystem");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "swapme", { lock: undefined });
+  const victim = worktree(w, w.other, tmp, "victim", { lock: undefined, ageMs: 0 }); // young: never a candidate itself
+  const aside = path.join(w.state, "aside");
+  w.scope.after(() => { // back where they were, so the teardown finds them
+    if (!exists(aside)) return;
+    fs.rmSync(wt.path, { force: true });
+    fs.renameSync(aside, wt.path);
+  });
+
+  const run = await runPaused(w, tmp, () => {
+    fs.renameSync(wt.path, aside);
+    fs.symlinkSync(victim.path, wt.path);
+  });
+
+  assert.equal(run.paused, true, run.stderr);
+  assert.equal(run.status, 3, run.stderr);
+  assert.ok(exists(path.join(victim.path, ".git")) && listedIn(w.other).includes(named(victim.path)), `the real worktree the link points at survives, registered\n${run.stderr}`);
+  assert.ok(run.lines.some((line) => line.includes(named(wt.path)) && line.includes("changed after the capture") && line.includes("it is now a link")), run.stderr);
+});
+
+test("23c. Gate A (b): with nothing to bound a read, a claim in a folder this user does not own is not read", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("the Windows PATH always has the shell's own timeout");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const claimed = folder(w, tmp, "parentclaim", { owner: NOBODY() });
+
+  const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${tmp}` } }); // the claim file is this user's; the FOLDER it lies in is not
+
+  assert.equal(kept.status, 3, kept.text);
+  assert.ok(exists(claimed), kept.text);
+  assert.ok(mentions(kept, `${named(claimed)} — owner '-unbounded' is unreadable`), kept.text);
+  assert.equal(runJanitor(w, { tmp }).status, 0, "and in a folder this user owns it is read and swept");
+});
+
+test("23d. (c) a control byte in a CLAIM refuses the entry with a line that says so", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dir = folder(w, tmp, "ctlclaim", { owner: "x\x1b[31m" });
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(dir), run.text);
+  assert.ok(run.stderr.some((line) => line.startsWith("skipped: ") && line.includes("control character")), run.text);
+  assert.equal(/[\x00-\x09\x0b-\x1f\x7f]/.test(run.stderr.join("\n")), false, "and no control byte reaches stderr");
+});
+
+for (const exit of [7, 124]) {
+  test(`23e. (d)+(f) a git worktree remove that ends with exit ${exit} is SAID (step and status) and the folder is kept — not deleted behind git's back`, { timeout: TIMEOUT }, (t) => {
+    if (win32) {
+      t.skip("a stub tool must come first on PATH");
+      return;
+    }
+    const w = makeWorld(t);
+    if (w === null) return;
+    const tmp = makeTmp(w);
+    const wt = worktree(w, w.other, tmp, "gitfails", { lock: undefined });
+    const stubDir = toolStub(w, "git", `case " $* " in *" worktree remove "*) exit ${exit};; esac`);
+
+    const run = runJanitor(w, { tmp, ahead: [stubDir] });
+
+    assert.equal(run.status, 3, run.text);
+    assert.ok(exists(wt.path), `kept: git did not remove it, and the janitor does not\n${run.text}`);
+    assert.ok(run.stderr.some((line) => line.startsWith("notice: ") && line.includes("git worktree remove") && line.includes(`exit ${exit}`) && line.includes("timed out") === (exit === 124)), run.text);
+  });
+}
+
+test("23f. (e) a bounded claim read that FAILED (here: killed after a valid-looking prefix) is no claim — kept; so is a claim file nobody can read", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("a stub tool must come first on PATH");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dead = folder(w, tmp, "partial", { owner: NOBODY() });
+  // `timeout` that lets `timeout 5 true` pass and kills every other read after a prefix that is a perfectly good dead owner
+  const cut = { "BASH_FUNC_timeout%%": `() {  if [ "$2" = true ]; then return 0; fi; printf '%s' '${NOBODY()}'; return 124\n}` };
+
+  const run = runJanitor(w, { tmp, env: cut });
+
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(dead), `kept: the read did not finish\n${run.text}`);
+  assert.ok(mentions(run, `${named(dead)} — owner '-' is unreadable`), run.text);
+
+  if (root) return;
+  const silent = folder(w, tmp, "mode000", { owner: NOBODY() });
+  fs.chmodSync(`${silent}.owner`, 0);
+  w.scope.after(() => fs.chmodSync(`${silent}.owner`, 0o644));
+  const unreadable = runJanitor(w, { tmp });
+  assert.ok(exists(silent), `a claim nobody can read is not 'no claim'\n${unreadable.text}`);
+});
+
+test("23g. (g) a clone is judged ONCE per run however many worktrees point at it, and entered once per worktree", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("a stub tool must come first on PATH");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const three = ["one", "two", "three"].map((what) => worktree(w, w.other, tmp, `many${what}`, { lock: undefined }));
+  const stubDir = toolStub(w, "stat", `if [ "$1" = "-c" ] && [ "$2" = "%a" ]; then echo "$3" >> "$DSTUB/statlog"; fi`);
+
+  const run = runJanitor(w, { tmp, ahead: [stubDir] });
+
+  assert.equal(run.status, 0, run.text);
+  assert.equal(three.some((wt) => exists(wt.path)), false, run.text);
+  const log = callsOf(w, "stat");
+  const clone = fs.realpathSync(path.join(w.other, ".git"));
+  assert.equal(log.filter((line) => line === clone).length, 1, `the clone's mode was read once at the capture\n${log.join("\n")}`);
+  assert.equal(log.filter((line) => line === ".").length, 3, `one pin (one look at the clone itself) per worktree: unlock and remove share it\n${log.join("\n")}`);
+});
+
+test("23h. (h) a .git that names something that is not <clone>/worktrees/<name> is MALFORMED, not merely unreadable — the skip line says which", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "malformed", { lock: undefined });
+  const dotGit = path.join(wt.path, ".git");
+  const original = fs.readFileSync(dotGit);
+  const put = (text) => { fs.rmSync(dotGit, { force: true }); fs.writeFileSync(dotGit, text); }; // git leaves .git read-only on Windows
+  w.scope.after(() => put(original));
+  put(`gitdir: ${slash(path.join(w.other, ".git"))}\n`); // a real directory, but a clone and no worktree entry
+  age(wt.path, OLD); // rewriting the file made the folder young
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(wt.path), run.text);
+  assert.ok(mentions(run, `${named(wt.path)} — owner '-malformed-gitdir' is unreadable`), run.text);
+});
+
+test("23i. (l) git inherits nothing from the environment: a stray GIT_WORK_TREE or GIT_INDEX_FILE cannot change what unlock and remove do from inside the .git directory", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "envdirty", { lock: NOBODY() });
+  const elsewhere = ownedDir(w.scope, "jwt");
+
+  const run = runJanitor(w, { tmp, env: { GIT_WORK_TREE: slash(elsewhere), GIT_INDEX_FILE: slash(path.join(elsewhere, "no-such-index")) } });
+
+  assert.equal(run.status, 0, run.text);
+  assert.equal(exists(wt.path), false, `removed from inside the clone\n${run.text}`);
+  assert.equal(listedIn(w.other).includes(named(wt.path)), false, `and unregistered\n${run.text}`);
+});
+
+test("23j. (m) a claim that happens to read '-unbounded' is an unreadable claim like any other — it does not make the janitor claim a missing tool", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("the Windows PATH always has the shell's own timeout");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dir = folder(w, tmp, "liar", { owner: "-unbounded" });
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(dir), run.text);
+  assert.equal(run.stderr.filter((line) => line.includes("neither timeout nor perl")).length, 0, run.text);
+});
+
+test("23k. (n) the ownership seam reaches the pin: a clone that turns foreign AFTER the capture keeps the folder", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "turnsforeign", { lock: undefined });
+
+  const run = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: "foreign-late", ...timeoutStub() } });
+
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(wt.path) && listedIn(w.other).includes(named(wt.path)), `kept, registered\n${run.text}`);
+  assert.ok(mentions(run, named(wt.path), "changed after the capture"), run.text);
+});
+
+// --- 24 --------------------------------------------------------------------------------------------------------
+// Round 4. `[ -O ]` follows a link, so ownership of an ENTRY is read from the entry itself (lstat first); the temp root must be safe
+// before any folder in it is trusted; a git step that failed is said; "never owned" and "changed" are told apart.
+
+test("24a. C-1b: the owner of a worktree FOLDER is the folder's own (lstat), not its link target's — a folder whose own owner is someone else is kept, named 'never owned by this user'", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("a stub tool must come first on PATH");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "lstat", { lock: undefined });
+  // `stat` that says someone else owns exactly this folder, as lstat would for a folder a stranger made; `-O` (stat, through links) would still say "mine"
+  const stubDir = toolStub(w, "stat", `if [ "$1" = "-c" ] && [ "$2" = "%u" ] && [ "$3" = "$STAT_FOREIGN" ]; then echo 4242; exit 0; fi`);
+
+  const run = runJanitor(w, { tmp, ahead: [stubDir], env: { STAT_FOREIGN: wt.path, ...timeoutStub() } });
+
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(wt.path) && listedIn(w.other).includes(named(wt.path)), `kept, registered\n${run.text}`);
+  assert.ok(run.stderr.some((line) => line.includes(named(wt.path)) && line.includes("owner '-foreign-entry' is unreadable") && line.includes("never owned by this user")), run.text);
+});
+
+test("24b. I-1: a temp root that is neither this user's nor sticky is not trusted — its worktree folders are kept ('-unsafe-root') and ONE line says so", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const first = worktree(w, w.other, tmp, "rootone", { lock: undefined });
+  const second = worktree(w, w.other, tmp, "roottwo", { lock: undefined });
+
+  const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${posix(tmp)}`, ...timeoutStub() } }); // the ROOT is someone else's (and the test folder is not sticky)
+
+  assert.equal(kept.status, 3, kept.text);
+  assert.ok(exists(first.path) && exists(second.path), `kept\n${kept.text}`);
+  assert.equal(kept.stderr.filter((line) => line.includes("owner '-unsafe-root' is unreadable")).length, 2, kept.text);
+  assert.equal(kept.stderr.filter((line) => line.includes("temp root") && line.includes("sticky")).length, 1, `one line says why\n${kept.text}`);
+
+  const own = runJanitor(w, { tmp });
+
+  assert.equal(own.status, 0, own.text);
+  assert.equal(exists(first.path) || exists(second.path), false, `a root this user owns is trusted\n${own.text}`);
+});
+
+test("24c. gate 4: safe_id accepts a folder exactly one component below the temp root and refuses a nested one, a sibling root and a bare root", { timeout: TIMEOUT }, (t) => {
+  if (BASH === "") {
+    t.skip("Git for Windows bash not found");
+    return;
+  }
+  const script = fs.readFileSync(SCRIPT, "utf8").replaceAll("\r\n", "\n");
+  const fn = script.slice(script.indexOf("safe_id() {"), script.indexOf("\n}\n", script.indexOf("safe_id() {")) + 3);
+  const hasCtl = script.slice(script.indexOf("has_ctl() {"), script.indexOf("\n", script.indexOf("has_ctl() {")));
+  const probe = (id) => spawnSync(BASH, ["-c", `T=/tmp/root; ${hasCtl}\n${fn}\nsafe_id "$1"`, "bash", id], { encoding: "utf8", windowsHide: true }).status;
+
+  assert.equal(probe("/tmp/root/testsToDelete-x-1"), 0, "one component below the root is accepted");
+  assert.equal(probe("/tmp/root/a/testsToDelete-x-1"), 1, "a nested path is refused");
+  assert.equal(probe("/tmp/root/"), 1, "the root itself (empty leaf) is refused");
+  assert.equal(probe("/tmp/rootx/testsToDelete-x-1"), 1, "a sibling that merely starts with the root's name is refused");
+  assert.equal(probe("/tmp/root/a\u0001b"), 1, "a control byte is refused");
+});
+
+test("24d. gate 6/10: a LOCKED worktree whose `git worktree unlock` fails with anything is said (step, status) and kept — git remove never runs", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("a stub tool must come first on PATH");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "unlockfails", { lock: NOBODY() });
+  const stubDir = toolStub(w, "git", `echo "$*" >> "$DSTUB/gitlog"; case " $* " in *" worktree unlock "*) exit 9;; esac`);
+
+  const run = runJanitor(w, { tmp, ahead: [stubDir] });
+
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(wt.path), `kept\n${run.text}`);
+  assert.ok(run.stderr.some((line) => line.startsWith("notice: ") && line.includes("git worktree unlock") && line.includes("exit 9")), run.text);
+  assert.equal(callsOf(w, "git").some((line) => line.includes("worktree remove")), false, "remove never ran");
+});
+
+test("24e. gate 6/10: an UNLOCKED worktree is not unlocked at all — there is no 'not locked' failure to tell from a real one", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("a stub tool must come first on PATH");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.other, tmp, "nounlock", { lock: undefined });
+  const stubDir = toolStub(w, "git", `echo "$*" >> "$DSTUB/gitlog"`);
+
+  const run = runJanitor(w, { tmp, ahead: [stubDir] });
+
+  assert.equal(run.status, 0, run.text);
+  assert.equal(exists(wt.path), false, run.text);
+  const log = callsOf(w, "git");
+  assert.equal(log.some((line) => line.includes("worktree unlock")), false, `unlock was not asked for\n${log.join("\n")}`);
+  assert.equal(log.some((line) => line.includes("worktree remove")), true, `remove was\n${log.join("\n")}`);
+});
+
+// --- 25 --------------------------------------------------------------------------------------------------------
+// Round 5. A registered worktree of the swept repository whose path a stranger took over is not even offered to git; a worktree
+// name of '.' or '..' is no worktree name.
+
+test("25a. wt-git symmetry: a registered worktree whose folder is no longer this user's own is kept, 'changed after the capture' — git is not asked", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("a stub tool must come first on PATH");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.clone, tmp, "gitown", { lock: NOBODY() });
+  const stat = toolStub(w, "stat", `if [ "$1" = "-c" ] && [ "$2" = "%u" ] && [ "$3" = "$STAT_FOREIGN" ]; then echo 4242; exit 0; fi`);
+  const stubGit = toolStub(w, "git", `echo "$*" >> "$DSTUB/gitlog"`);
+
+  const run = runJanitor(w, { tmp, ahead: [stat, stubGit], env: { STAT_FOREIGN: wt.path } });
+
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(wt.path) && listedIn(w.clone).includes(named(wt.path)), `kept, registered\n${run.text}`);
+  assert.ok(mentions(run, named(wt.path), "changed after the capture", "its own owner is no longer this user"), run.text);
+  assert.equal(callsOf(w, "git").some((line) => line.includes("worktree remove") || line.includes("worktree unlock")), false, "git was not asked to unlock or remove it");
+});
+
+test("25b. wt-git symmetry: a registered worktree path swapped AFTER the capture for a link to another registered worktree — that worktree survives", { timeout: TIMEOUT }, async (t) => {
+  if (win32) {
+    t.skip("symlinks need a POSIX filesystem");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const wt = worktree(w, w.clone, tmp, "gitswap", { lock: undefined });
+  const victim = worktree(w, w.clone, tmp, "gitvictim", { lock: undefined, ageMs: 0 }); // young: never a candidate itself
+  const aside = path.join(w.state, "aside-git");
+  w.scope.after(() => {
+    if (!exists(aside)) return;
+    fs.rmSync(wt.path, { force: true });
+    fs.renameSync(aside, wt.path);
+  });
+
+  const run = await runPaused(w, tmp, () => {
+    fs.renameSync(wt.path, aside);
+    fs.symlinkSync(victim.path, wt.path);
+  });
+
+  assert.equal(run.paused, true, run.stderr);
+  assert.equal(run.status, 3, run.stderr);
+  assert.ok(exists(path.join(victim.path, ".git")) && listedIn(w.clone).includes(named(victim.path)), `the real worktree the link points at survives, registered\n${run.stderr}`);
+  assert.ok(run.lines.some((line) => line.includes(named(wt.path)) && line.includes("changed after the capture")), run.stderr);
+});
+
+for (const leaf of ["..", "."]) {
+  test(`25c. a worktree name of '${leaf}' in a .git is malformed — the 'clone' it would name is not trusted`, { timeout: TIMEOUT }, (t) => {
+    const w = makeWorld(t);
+    if (w === null) return;
+    const tmp = makeTmp(w);
+    const wt = worktree(w, w.other, tmp, "dotname", { lock: undefined });
+    const dotGit = path.join(wt.path, ".git");
+    const original = fs.readFileSync(dotGit);
+    const put = (text) => { fs.rmSync(dotGit, { force: true }); fs.writeFileSync(dotGit, text); };
+    w.scope.after(() => put(original));
+    put(`gitdir: ${slash(path.join(w.other, ".git", "worktrees"))}/${leaf}\n`); // <clone>/worktrees/.. is the clone's own git dir
+    age(wt.path, OLD);
+
+    const run = runJanitor(w, { tmp });
+
+    assert.equal(run.status, 3, run.text);
+    assert.ok(exists(wt.path), run.text);
+    assert.ok(mentions(run, `${named(wt.path)} — owner '-malformed-gitdir' is unreadable`), run.text);
+  });
+}

@@ -69,7 +69,7 @@ nothing), not a clean machine; a machine with no `docker` binary says so once an
    a clone's lock that is not a regular file ends the run before any git listing.
 2. **Every scope inventoried, one scope swept.** A row is the caller's only when the name's owner, the record's
    owner and the caller's token are one AND — for a folder, a worktree, a claim and the clone a worktree belongs
-   to — the caller owns it (`-O`). Everything else is a `foreign:`, `legacy:` or `unmarked:` line. In the caller's
+   to — the caller owns it (the entry's own owner, never through a link: item 4). Everything else is a `foreign:`, `legacy:` or `unmarked:` line. In the caller's
    scope: age selects (younger than the window, or of unknown age: left alone silently); then the liveness
    procedure of the rule's §3 — three answers, only "no process with that pid" removes; a Linux record without a
    pid namespace, a `hidepid` process list, a failed `tasklist`, a pid no process can have, `windows:1`, a start
@@ -90,9 +90,23 @@ nothing), not a clean machine; a machine with no `docker` binary says so once an
    a kept worktree is skipped), and before folders; a branch goes by its captured tip; a container or network by its
    captured id; a volume after a re-inspect; `docker ps --filter name=` (a substring match) is never used. A deletion
    is never fatal: a target that vanished is a notice, one that survives a failed removal is skipped.
-4. **Honest exit**, as above; `--dry-run` reports the same code; the clone the janitor runs from and the main
+4. **A stranger's entry can make it keep, never wait.** Any local user can plant folders, FIFOs, links and crafted
+   `.git` files in a shared temp root. A folder or worktree is judged and removed only when it is a real directory
+   (no link) whose OWN owner — read from the entry itself, never from what a link points at (`-O` follows links) —
+   is the caller, checked at the capture and again right before the removal, and only in a temp root that is
+   sticky or the caller's own. A worktree's clone must be the caller's too, closed to group and world, with every
+   `worktrees/*/gitdir` and every existing `worktrees/*/locked` a regular file; a `.git` that points anywhere else,
+   through a link neither the caller nor root owns, or into a clone that cannot be entered is an unreadable owner:
+   kept, named, with the reason. The clone is judged once per run, resolved to its physical path at the capture and
+   carried to the removal, where the git calls for one worktree enter it, prove it again and run inside it, so a
+   directory renamed a moment later cannot redirect them. A lock is released only on a worktree that is locked; a
+   git step that failed or timed out is said and the folder kept, and `rm -rf` runs only after every git step
+   succeeded. A stranger's file is read once, only when it is a regular file, and a failed read is an unreadable
+   claim, not an empty one. Reads and git calls on a clone are bounded by `timeout`, else by `perl`; with neither, a
+   file another user owns, or one inside a folder another user owns, is not read (kept, named, one line says so).
+5. **Honest exit**, as above; `--dry-run` reports the same code; the clone the janitor runs from and the main
    checkout are never candidates, nor is any folder holding either.
-5. **Windows.** The dependency is Git for Windows' bash with its `sha256sum`, `tasklist`, `stat` and `find`; nothing
+6. **Windows.** The dependency is Git for Windows' bash with its `sha256sum`, `tasklist`, `stat` and `find`; nothing
    else is supported. `w<digits>` is the caller's token as the rule's §1 derives it (`printf '%s'` of the lower-cased
    account name into `sha256sum`); liveness is one `tasklist` snapshot per run, the PID column only; the file owner
    test is `-O`; the temp root is `TMPDIR`, which Git for Windows sets. Support is proven by the rule repository's
