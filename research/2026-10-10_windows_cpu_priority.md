@@ -160,8 +160,10 @@ lowering; none failed here.
 
 ## M3 — the shared-rules repository's own suite, lowered, at concurrency 8
 
-The suite has 249 tests, many with 5–30 s wall-clock deadlines: process supervision, real git
-migrations, a resolver run bounded at 10 s.
+The suite grew while this work was done: 239 tests before the change that added this record, 262 at its
+merge (counted afterwards, at `791b25e^` and `791b25e`). Each run below counted the suite as it was then
+(238 at the baseline, 247 later), so compare the runs by their failures, not by their totals. Many tests
+have 5–30 s wall-clock deadlines: process supervision, real git migrations, a resolver run bounded at 10 s.
 
 | Run | Priority | Machine busy | Wall | Pass / fail |
 |---|---|---|---|---|
