@@ -89,6 +89,16 @@ function ageOf(target, now) {
   }
 }
 
+/** Is the quarantine as old as the window by BOTH stamps — its rename (ctime) and its last deletion (mtime)? What cannot be stat-ed is not old. */
+function pastWindow(target, now, minAgeMs) {
+  try {
+    const stat = fs.lstatSync(target);
+    return now - stat.ctimeMs >= minAgeMs && now - stat.mtimeMs >= minAgeMs;
+  } catch {
+    return false;
+  }
+}
+
 /** Unlink every top-level symbolic link (a junction included) and never what it points at. */
 function unlinkTopLevelLinks(dir) {
   for (const entry of fs.readdirSync(dir)) {
@@ -150,19 +160,40 @@ function quarantineName(dir) {
   return path.join(path.dirname(dir), `.${path.basename(dir)}.teststodelete-quarantine-${process.pid}-${crypto.randomBytes(4).toString("hex")}`);
 }
 
-/** Put a quarantined folder back under `original` only if that name is FREE; `false` when it is taken (or cannot be had). */
-function restoreOnto(quarantined, original) {
-  try {
-    if (process.platform === "win32") {
+/**
+ * Put a quarantined folder back under `original` only if that name is FREE; `false` when it is taken (or cannot be had). Where the
+ * name was reserved with an empty folder and the rename then failed, the placeholder is removed — only while it is still a real folder
+ * of the caller's AND empty (`rmdir` refuses a folder that has anything in it): a name taken over in between is never touched, and the
+ * quarantine stays, listed, instead of being orphaned behind a claim nobody can read.
+ */
+function restoreOnto(quarantined, original, mine, hooks = {}) {
+  if (process.platform === "win32") {
+    try {
       fs.renameSync(quarantined, original); // a directory rename onto an existing one fails here: the move is exclusive by itself
-    } else {
-      fs.mkdirSync(original); // exclusive: an existing folder or file under the name refuses
-      fs.renameSync(quarantined, original);
+      return true;
+    } catch {
+      return false;
     }
-    return true;
+  }
+  try {
+    fs.mkdirSync(original, { mode: 0o700 }); // exclusive: an existing folder or file under the name refuses
   } catch {
     return false;
   }
+  try {
+    hooks.afterReserve?.(original, quarantined);
+    fs.renameSync(quarantined, original);
+    return true;
+  } catch {
+    removeOwnEmptyPlaceholder(original, mine);
+    return false;
+  }
+}
+
+function removeOwnEmptyPlaceholder(placeholder, mine) {
+  try {
+    if (fs.lstatSync(placeholder).isDirectory() && mine(placeholder)) fs.rmdirSync(placeholder);
+  } catch { /* gone, or not empty, or not ours: leave it */ }
 }
 
 /**
@@ -177,7 +208,7 @@ function removeFolderByIdentity(dir, captured, hooks) {
   fs.renameSync(dir, quarantine);
   hooks.afterRename?.(dir, quarantine);
   if (!sameIdentity(identityOf(quarantine), captured.identity) || claimTextOf(dir, "folder", captured.mine) !== captured.claim) {
-    if (!restoreOnto(quarantine, dir)) return { removed: false, reason: "quarantine-conflict", path: quarantine };
+    if (!restoreOnto(quarantine, dir, captured.mine, hooks)) return { removed: false, reason: "quarantine-conflict", path: quarantine };
     return { removed: false, reason: "replaced" };
   }
   unlinkTopLevelLinks(quarantine);
@@ -379,8 +410,9 @@ function restoreQuarantines(context) {
     if (found === null || !dirent.isDirectory() || relationOf(found[1], context.owner).relation === "other") continue;
     const quarantined = path.join(tmp, dirent.name);
     if (!mine(quarantined) || context.probe(Number(found[2]))?.state !== "dead") continue; // another uid's, or its renamer may still be working
+    if (!pastWindow(quarantined, context.now, context.minAgeMs)) continue; // a renamer in another pid namespace has a pid this process cannot see: it is "dead" here and may be mid-delete
     const original = path.join(tmp, found[1]);
-    if (restoreOnto(quarantined, original)) result.listed.push(`notice: restored ${found[1]} from a quarantine a killed sweep left`);
+    if (restoreOnto(quarantined, original, mine, context.hooks)) result.listed.push(`notice: restored ${found[1]} from a quarantine a killed sweep left`);
     else context.report.keep(quarantined, "quarantine-conflict");
   }
 }
@@ -398,7 +430,7 @@ function step(result, label, run) {
 /**
  * Collect what a killed run left behind. `repo` is the repository whose worktrees this sweep may remove; `tmp` the
  * temp root; `probe` the liveness query (a seam for tests), asked at most once per pid; `mine` the kernel-owner question
- * (a seam: a second uid cannot be had in a test); `hooks.afterCapture` / `hooks.afterVerdict` / `hooks.afterRename` (seams: a change between the
+ * (a seam: a second uid cannot be had in a test); `hooks.afterCapture` / `hooks.afterVerdict` / `hooks.afterRename` / `hooks.afterReserve` (seams: a change between the
  * capture, the verdict and the removal). Never throws. `result.listed` holds the `foreign:` / `legacy:` / `unmarked:` lines.
  */
 export function sweepLeftovers({ repo, tmp = tempRoot(), now = Date.now(), minAgeMs = MIN_AGE_MS, probe = processProbe, mine = isMine, hooks = {}, platform = process.platform } = {}) {

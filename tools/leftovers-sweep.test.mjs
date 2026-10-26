@@ -672,7 +672,7 @@ test("16. a quarantine left by a killed sweep is restored under its name when fr
   fs.writeFileSync(path.join(tmp, takenName, "theirs.txt"), "do not overwrite\n");
   fs.writeFileSync(path.join(quarantineOf(takenName), "mine.txt"), "stays in quarantine\n");
 
-  const result = sweepLeftovers({ repo, tmp, probe: deadProbe });
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, now: Date.now() + 2 * MIN_AGE_MS }); // both stamps of the quarantine are past the window
 
   assert.deepEqual(result.errors, []);
   assert.equal(fs.readFileSync(path.join(free, "kept.txt"), "utf8"), "was in the folder\n", "restored under its own name");
@@ -692,6 +692,43 @@ test("16b. a quarantine whose renamer is still alive is left alone", (t) => {
   assert.ok(fs.existsSync(quarantine), "a sweep in progress owns it");
   assert.equal(fs.existsSync(path.join(tmp, name)), false);
   assert.deepEqual(result.errors, []);
+});
+
+test("16c. a YOUNG quarantine is not restored although its renamer looks dead (a janitor in another pid namespace has a pid this process cannot see); an old one is", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "q-young-repo");
+  const name = path.basename(folder(own, tmp, "q-young", { claim: formatOwner(thisOwner()) + "\n" }));
+  const quarantine = path.join(tmp, `.${name}.teststodelete-quarantine-${PRETEND_DEAD}-0a1b2c3d`);
+  fs.renameSync(path.join(tmp, name), quarantine); // renamed just now: ctime and mtime are now
+  const young = sweepLeftovers({ repo, tmp, probe: deadProbe });
+  assert.ok(fs.existsSync(quarantine), "a rename younger than the window may be another janitor's, still deleting");
+  assert.equal(fs.existsSync(path.join(tmp, name)), false, "nothing was put back");
+  assert.deepEqual(young.errors, []);
+  const stale = sweepLeftovers({ repo, tmp, probe: deadProbe, now: Date.now() + 2 * MIN_AGE_MS });
+  assert.equal(fs.existsSync(path.join(tmp, name)), true, "past the window the same quarantine is put back");
+  assert.equal(fs.existsSync(quarantine), false);
+  assert.deepEqual(stale.errors, []);
+});
+
+test("16d. a restore that fails after the name was reserved removes its own empty placeholder and keeps the quarantine listed; a placeholder somebody filled stays", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "q-placeholder-repo");
+  const quarantineOf = (name) => path.join(tmp, `.${name}.teststodelete-quarantine-${PRETEND_DEAD}-0a1b2c3d`);
+  const names = ["q-ph-empty", "q-ph-filled"].map((what) => path.basename(folder(own, tmp, what, { claim: formatOwner(thisOwner()) + "\n" })));
+  for (const name of names) fs.renameSync(path.join(tmp, name), quarantineOf(name));
+  const hooks = {
+    afterReserve: (original, quarantined) => {
+      if (original.endsWith(names[0])) { fs.rmSync(quarantined, { recursive: true }); fs.writeFileSync(quarantined, "not a folder\n"); } // the rename onto the placeholder now fails (ENOTDIR)
+      else fs.writeFileSync(path.join(original, "theirs.txt"), "put there since\n"); // the placeholder is not empty any more (ENOTEMPTY)
+    },
+  };
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, now: Date.now() + 2 * MIN_AGE_MS, hooks });
+  assert.deepEqual(result.errors, []);
+  assert.equal(fs.existsSync(path.join(tmp, names[0])), false, "the placeholder this restore made is removed while it is its own and empty");
+  assert.ok(fs.existsSync(quarantineOf(names[0])), "and the quarantine is still there");
+  assert.equal(fs.readFileSync(path.join(tmp, names[1], "theirs.txt"), "utf8"), "put there since\n", "a placeholder with something in it is never touched");
+  assert.ok(fs.existsSync(quarantineOf(names[1])));
+  for (const name of names) assert.ok(result.preserved.some((entry) => entry.path === quarantineOf(name) && entry.reason === "quarantine-conflict"), `${name} stays listed: ${JSON.stringify(result.preserved)}`);
 });
 
 // 17 --------------------------------------------------------------------------------------------------------
