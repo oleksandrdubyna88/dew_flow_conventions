@@ -11,6 +11,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 import { broadLines, classifyLine } from "./lib/sweeper-scan.mjs";
@@ -352,4 +353,34 @@ test("R4c systemd ExecStart= and drop-in *.conf files, and Windows task actions 
   const task = runScan(["--root", dir], { run: withGit((command) => (command === "schtasks" ? reply(csv) : failed())), platform: "win32" });
   assert.equal(task.code, 1, `${task.out}\n${task.err}`);
   assert.match(task.out, /my sweep\.ps1:1 — owner-blind/);
+});
+
+// Security pass (PR #82, M-2): the machine scan reads only the allowlist shipped beside the tool, pinned to the janitor's file ---------
+
+const SWEEP_LINE = `find "\${TMPDIR:-/tmp}" -maxdepth 1 -name '${Q}-*' -mmin +60 -exec rm -rf {} +`;
+const ownAllowlist = () => JSON.stringify({ entries: [{ file: "scripts/sweep.sh", line: 2, sha256: createHash("sha256").update(SWEEP_LINE, "utf8").digest("hex") }] });
+
+test("M-2. a checkout's own allowlist never silences its sweeper — with --root <checkout> and with --root <parent>", (t) => {
+  const consumerFiles = { "scripts/sweep.sh": `#!/usr/bin/env bash\n${SWEEP_LINE}\n`, "tools/fixtures/owner-blind-allowlist.json": ownAllowlist() };
+  const direct = runScan(["--root", checkout(t, consumerFiles)]);
+  assert.equal(direct.code, 1, `${direct.out}\n${direct.err}`);
+  assert.match(direct.out, /sweep\.sh:2 — owner-blind/, "--root <consumer>: the consumer's own entry did not clear its sweeper");
+  const parent = ownedDir(lifoScope(t), "scan parent");
+  const inner = path.join(parent, "consumer");
+  fs.mkdirSync(inner);
+  git(inner, "init", "-q");
+  for (const [name, text] of Object.entries(consumerFiles)) {
+    fs.mkdirSync(path.dirname(path.join(inner, name)), { recursive: true });
+    fs.writeFileSync(path.join(inner, name), text);
+  }
+  const above = runScan(["--root", parent]);
+  assert.equal(above.code, 1, `${above.out}\n${above.err}`);
+  assert.match(above.out, /sweep\.sh:2 — owner-blind/, "--root <parent>: found too");
+});
+
+test("M-2. an entry is read only when it names tools/janitor.sh: the shipped file's entry does not clear the same text elsewhere or under another name", (t) => {
+  const script = fs.readFileSync(path.join(here, "janitor.sh"), "utf8");
+  assert.equal(runScan(["--root", checkout(t, { "tools/janitor.sh": script })]).code, 0, "the shipped janitor, with no allowlist of its own in the tree");
+  assert.equal(runScan(["--root", checkout(t, { "tools/janitor.sh": script, "tools/fixtures/owner-blind-allowlist.json": JSON.stringify({ entries: [] }) })]).code, 0, "an empty allowlist in the tree removes nothing");
+  assert.equal(runScan(["--root", checkout(t, { "scripts/janitor.sh": script })]).code, 1, "the janitor text under another path");
 });

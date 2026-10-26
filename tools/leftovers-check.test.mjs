@@ -620,7 +620,8 @@ test("2. break-it: one byte changed on the janitor's inventory line makes the gu
   fs.mkdirSync(path.join(repo, "tools", "fixtures"), { recursive: true });
   const script = fs.readFileSync(path.join(root, JANITOR), "utf8").replace(/\r\n/g, "\n");
   fs.writeFileSync(path.join(repo, JANITOR), script);
-  fs.copyFileSync(ALLOWLIST, path.join(repo, "tools", "fixtures", "owner-blind-allowlist.json"));
+  const named = path.join(repo, "tools", "fixtures", "owner-blind-allowlist.json");
+  fs.copyFileSync(ALLOWLIST, named);
   fs.writeFileSync(path.join(repo, "tools", "x.test.mjs"), "const a = 1;\n");
   assert.equal(guard(repo).code, 0, guard(repo).text);
   fs.writeFileSync(path.join(repo, JANITOR), script.replace(`GLOB='${P}[-_]*'`, `GLOB='${P}[-_]**'`));
@@ -628,7 +629,8 @@ test("2. break-it: one byte changed on the janitor's inventory line makes the gu
   assert.equal(red.code, 1, red.text);
   assert.match(red.text, /janitor\.sh:\d+ — owner-blind/);
   assert.equal(guard(repo, ["--update-allowlist"]).code, 0);
-  assert.equal(guard(repo).code, 0, "regenerated from the current file");
+  assert.equal(guard(repo).code, 1, "the scanned tree's own allowlist is never read: the shipped one still pins the old line");
+  assert.equal(guard(repo, ["--allowlist", named]).code, 0, "regenerated from the current file, named by the operator");
 });
 
 test("2. no file is exempt from the legacy-name class: the pending list is empty, so a legacy literal in a janitor test is a finding", (t) => {
@@ -817,4 +819,38 @@ test("S8 (d). the token check reads whatever families the table lists and requir
   const unregistered = guard(repo, ["--rule", path.join(repo, "rule.md"), "--token", "zzz", "--identity", CONSUMER_ROW]);
   assert.equal(unregistered.code, 1);
   assert.match(unregistered.text, /not a row of the `## Tokens` table/);
+});
+
+// Security pass (PR #82, M-1): the allowlist is the one shipped beside the tool and pins the janitor's file ---------------------
+
+const SWEEP_LINE = `find "\${TMPDIR:-/tmp}" -maxdepth 1 -name '${Q}-*' -mmin +60 -exec rm -rf {} +`;
+const blindIn = (result, file) => result.text.split("\n").filter((line) => line.includes(`${file}:`) && /owner-blind/.test(line));
+
+test("M-1. a scanned repository's own allowlist never clears its own sweeper: the entry names another file than the janitor", (t) => {
+  const own = JSON.stringify({ entries: [{ file: "scripts/sweep.sh", line: 2, sha256: sha(SWEEP_LINE) }] });
+  const repo = consumer(t, { "scripts/sweep.sh": `#!/usr/bin/env bash\n${SWEEP_LINE}\n`, "tools/fixtures/owner-blind-allowlist.json": own });
+  const found = guard(repo, asConsumer(repo, ["--profile", "node"]));
+  assert.equal(blindIn(found, "scripts/sweep.sh").length, 1, `the consumer's own allowlist cleared its sweeper: ${found.text}`);
+});
+
+test("M-1. an entry for another file in an allowlist the operator names is ignored: only the janitor's file can pass", (t) => {
+  const repo = consumer(t, { "scripts/sweep.sh": `#!/usr/bin/env bash\n${SWEEP_LINE}\n` });
+  const named = path.join(ownedDir(t, "allowlist"), "list.json");
+  fs.writeFileSync(named, JSON.stringify({ entries: [{ file: "scripts/sweep.sh", line: 2, sha256: sha(SWEEP_LINE) }] }));
+  const found = guard(repo, asConsumer(repo, ["--profile", "node", "--allowlist", named]));
+  assert.equal(blindIn(found, "scripts/sweep.sh").length, 1, found.text);
+  assert.equal(scanRepository({ repo, token: "sso", identity: CONSUMER_ROW, rule: path.join(repo, "rule.md"), profile: "node", allowlist: [{ file: "scripts/sweep.sh", line: 2, sha256: sha(SWEEP_LINE) }] })
+    .findings.filter((entry) => entry.cls === "owner-blind").length, 1, "the same through the programmatic seam");
+});
+
+test("M-1. the shipped allowlist, read from beside the tool, still passes this repository's own janitor line — whatever the scanned tree holds", (t) => {
+  const real = guard(root);
+  assert.equal(real.code, 0, real.text);
+  const repo = tree(t, {});
+  fs.mkdirSync(path.join(repo, "tools", "fixtures"), { recursive: true });
+  fs.writeFileSync(path.join(repo, JANITOR), fs.readFileSync(path.join(root, JANITOR), "utf8").replace(/\r\n/g, "\n"));
+  fs.writeFileSync(path.join(repo, "tools", "x.test.mjs"), "const a = 1;\n");
+  assert.equal(guard(repo).code, 0, "no allowlist in the scanned tree: the shipped one passes the identical janitor line");
+  fs.writeFileSync(path.join(repo, "tools", "fixtures", "owner-blind-allowlist.json"), JSON.stringify({ entries: [] }));
+  assert.equal(guard(repo).code, 0, "an empty allowlist in the scanned tree does not remove the shipped pass");
 });

@@ -62,7 +62,7 @@ import { fileURLToPath } from "node:url";
 import { gitOutput } from "./lib/git.mjs";
 import { OWNER_GRAMMAR } from "./lib/owned.mjs";
 import { REPO_ROW, REPO_TOKEN } from "./lib/owned-token.mjs";
-import { classifyLine, lineSha256 } from "./lib/sweeper-scan.mjs";
+import { JANITOR_FILE, classifyLine, lineSha256 } from "./lib/sweeper-scan.mjs";
 import { isReason } from "./ownership-check.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -81,7 +81,7 @@ export const EXEMPTIBLE = Object.freeze(["raw-temp", "raw-worktree", "docker-run
 export const LEGACY_NAME_PENDING = Object.freeze([]);
 
 /** The repository's one sweeper script and the file that allowlists its inventory line (rule §7). */
-export const JANITOR_FILE = "tools/janitor.sh";
+export { JANITOR_FILE };
 export const ALLOWLIST_FILE = "tools/fixtures/owner-blind-allowlist.json";
 
 export const CURES = Object.freeze({
@@ -380,8 +380,8 @@ function legacyNameHits(line) {
   return LEGACY_BUILT.test(line) ? [...literal, "a prefix built from the repository token"] : literal;
 }
 
-/** Is the line allowlisted: the file, the 1-based line and the hash of its text all equal one entry. */
-const allowed = (allowlist, file, number, text) => allowlist.some((entry) => entry.file === file && entry.line === number && entry.sha256 === lineSha256(text));
+/** Is the line allowlisted: the entry names the shipped janitor (and no other file), and its file, 1-based line and the hash of the line's text all match. */
+const allowed = (allowlist, file, number, text) => allowlist.some((entry) => entry.file === JANITOR_FILE && entry.file === file && entry.line === number && entry.sha256 === lineSha256(text));
 
 function lineFindings(file, lines, exemptions, allowlist) {
   const extra = RAW_TEMP_BY_EXTENSION[path.extname(file)] ?? [];
@@ -812,9 +812,13 @@ export function resolveRule(repo, rule) {
   return candidates.find((candidate) => fs.existsSync(candidate));
 }
 
-/** The allowlist entries: `--allowlist`, else the repository's own file, else the one beside this tool; `[]` when there is none. A file that is not the shape is an error, never "no entries". */
-export function loadAllowlist(repo, explicit) {
-  const file = [explicit, path.join(repo, ALLOWLIST_FILE), path.join(HERE, "..", ALLOWLIST_FILE)].find((candidate) => candidate !== undefined && fs.existsSync(candidate));
+/**
+ * The allowlist entries: the file the operator names with `--allowlist`, else the one shipped beside this tool — NEVER a file of the scanned
+ * repository (a scanned tree must not configure the control that judges it: §7 `owner-blind`). `[]` when there is none. A file that is not the
+ * shape is an error, never "no entries". Whatever the file holds, `allowed` passes only an entry that names the janitor's own file.
+ */
+export function loadAllowlist(explicit) {
+  const file = [explicit, path.join(HERE, "..", ALLOWLIST_FILE)].find((candidate) => candidate !== undefined && fs.existsSync(candidate));
   if (file === undefined) return [];
   const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
   if (!Array.isArray(parsed.entries) || !parsed.entries.every((entry) => typeof entry.file === "string" && Number.isInteger(entry.line) && /^[0-9a-f]{64}$/.test(entry.sha256))) {
@@ -841,7 +845,7 @@ export function updateAllowlist(repo, explicit) {
 export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "", allowlist, profile, resolvers } = {}) {
   const files = discover(repo, profile);
   const findings = [];
-  const entries = Array.isArray(allowlist) ? allowlist : loadAllowlist(repo, allowlist);
+  const entries = Array.isArray(allowlist) ? allowlist : loadAllowlist(allowlist);
   let yamlModule;
   const yaml = () => (yamlModule ??= loadYaml(repo, resolvers)); // read at the first workflow, so a repository with none needs none
   let read = 0;

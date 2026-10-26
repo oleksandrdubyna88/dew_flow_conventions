@@ -189,8 +189,11 @@ function readTextFile(file, sink) {
   }
 }
 
-const passes = (allowlist, relative, number, line) => relative !== undefined
-  && allowlist.some((entry) => entry.file === relative && entry.line === number && entry.sha256 === lineSha256(line));
+/** The repository's one sweeper script: the only file an allowlist entry can name (rule §7 `owner-blind`). */
+export const JANITOR_FILE = "tools/janitor.sh";
+
+const passes = (allowlist, relative, number, line) => relative === JANITOR_FILE
+  && allowlist.some((entry) => entry.file === JANITOR_FILE && entry.file === relative && entry.line === number && entry.sha256 === lineSha256(line));
 
 function classifyText(sink, display, text, options) {
   const { allowlist, relative, honourMarker, jobs, kind } = options;

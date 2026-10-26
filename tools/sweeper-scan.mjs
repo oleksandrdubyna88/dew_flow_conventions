@@ -22,7 +22,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ALLOWLIST_FILE, loadAllowlist } from "./leftovers-check.mjs";
+import { loadAllowlist } from "./leftovers-check.mjs";
 import { scanSweepers } from "./lib/sweeper-scan.mjs";
 
 const USAGE = "usage: node tools/sweeper-scan.mjs [--root <dir>] [--system] [--honour-marker]";
@@ -40,11 +40,8 @@ export function parseArguments(argv) {
   return options;
 }
 
-/** The allowlist beside the scanned root, else the one beside this tool. */
-function allowlistFor(root) {
-  const own = path.join(root, ALLOWLIST_FILE);
-  return loadAllowlist(fs.existsSync(own) ? root : path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
-}
+/** The allowlist shipped beside this tool and no other: nothing inside the scanned evidence configures a machine-wide control. */
+const allowlistFor = () => loadAllowlist();
 
 /** The exit code. `deps` (`run`, `platform`, `home`) are seams for tests. */
 export function main(argv = process.argv.slice(2), io = { out: (text) => console.log(text), err: (text) => console.error(text) }, deps = {}) {
@@ -55,7 +52,7 @@ export function main(argv = process.argv.slice(2), io = { out: (text) => console
   }
   let allowlist;
   try {
-    allowlist = allowlistFor(options.root);
+    allowlist = allowlistFor();
   } catch (error) {
     io.err(`sweeper-scan: ${clean(error.message)}`);
     return 2;
