@@ -3,8 +3,8 @@
   "entries": [
     {
       "file": "tools/janitor.sh",
-      "line": 56,
-      "sha256": "c1be0e3fbc1d6c5002926ebbbcaa222992c7234d9fda8e61f9eeeebba17bd90b"
+      "line": 144,
+      "sha256": "5494f827d0c0f234a8fc98c8c0045c4b4856590e22f966aae7948c0a5d6ddc9d"
     }
   ]
 }

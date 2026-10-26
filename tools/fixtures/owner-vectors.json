@@ -102,12 +102,13 @@
       { "id": "v19", "host": "same", "pid": "absent", "startDelta": null, "liveStart": false, "ownerText": "added with --lock", "expected": "unknown", "why": "git's default lock reason names nobody: unreadable, so unknown" },
       { "id": "v20", "host": "same", "pid": "absent", "startDelta": null, "liveStart": false, "ownerText": "{HOST}:12:x", "expected": "unknown", "why": "a malformed start makes the whole owner unreadable even for a matching host and an absent pid" },
       { "id": "v21", "host": "same", "pid": "absent", "startDelta": null, "liveStart": false, "ownerText": "{NAME}@beos:1", "expected": "unknown", "why": "an unknown os tag is not this machine's, and not the form" },
-      { "id": "v22", "host": "same", "pid": "absent", "startDelta": null, "liveStart": false, "ownerText": "{HOST}:1:2:3", "expected": "unknown", "why": "four fields are not the form" },
+      { "id": "v22", "host": "same", "pid": "absent", "startDelta": null, "liveStart": false, "ownerText": "{HOST}:1:2:3:4", "expected": "unknown", "why": "too many fields are not the form: after the host a record has a pid and at most a start and a namespace (the text is read both as the form before the owner segment and behind an owner field)" },
       { "id": "v23", "host": "same", "pid": "absent", "pidText": "0", "startDelta": null, "liveStart": false, "expected": "unknown", "why": "pid 0 is digits (the grammar takes it) but names no process; a pid that cannot be a process says nothing, so it is never 'gone' (the 'no such process' answer is about a real pid that nothing holds). The stub ps answers 'no such process' for it, as ps -p 0 does on Linux" },
       { "id": "v25", "tasklist": true, "host": "same", "pid": "absent", "pidText": "1", "startDelta": null, "liveStart": false, "ownerText": "{NAME}@windows:1", "expected": "unknown", "why": "on Windows a bash started by a native process reports pid 1 for itself and its parent, and Windows has no pid 1: the process list has no row and process.kill says ESRCH, so a live CI job whose owner pid was taken from $PPID would read as gone. Pid 1 on a windows owner is unknown. (On any other machine this owner is another host's.)" },
       { "id": "v24", "host": "same", "pid": "absent", "pidText": "1234567890123456789012345", "startDelta": null, "liveStart": false, "expected": "unknown", "why": "a 25-digit pid cannot name a process and is not a safe integer; same reasoning as v23" }
     ]
-  },
+  }
+,
   "names": {
     "about": "name is a resource name as the rule's section 1 reads it: form is owner when the ONE segment after the prefix is of the owner grammar ^[uw][0-9]{1,10}$, legacy when it is any other segment, none when the name does not start with the prefix. owner and token are what the name carries (token: the segment after the owner, or after the prefix for a legacy name). Data only.",
     "vectors": [
@@ -143,7 +144,8 @@
       { "id": "w09", "username": "Ünal", "token": "w3565888966", "why": "the capital Ü stays: ASCII-only lower-casing" },
       { "id": "w10", "username": "ünal", "token": "w4000935336", "why": "a different token from Ünal, for the same reason" },
       { "id": "w11", "username": "Dev.User-1", "token": "w3432688411", "why": "dots and hyphens are part of the name" },
-      { "id": "w12", "username": "a", "token": "w3398926610", "why": "the shortest name" }
+      { "id": "w12", "username": "a", "token": "w3398926610", "why": "the shortest name" },
+      { "id": "w13", "username": "bob", "token": "w2176202712", "why": "a plain name whose digest starts with a byte >= 0x80, so the token is >= 2^31: a signed 32-bit read would print a negative number, a 64-bit unsigned one the table's value (bash `$(( 16#… ))` and Node `readUInt32BE` must both give it)" }
     ]
   },
   "record": {

@@ -34,7 +34,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { git } from "./lib/git.mjs";
 import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import {
-  cleanupScope, formatLegacyOwner as formatOwner, ownedDir, ownedName, ownedWorktree, processProbe, removeLink, removeQuietly, thisOwner,
+  cleanupScope, formatOwner, ownedDir, ownedName, ownedWorktree, processProbe, removeLink, removeQuietly, thisOwner, thisOwnerToken, windowsOwnerToken,
 } from "./lib/owned.mjs";
 
 if (process.platform !== "win32") process.umask(0o022); // the janitor trusts a clone only when it is closed to group and world; the fixtures are made that way whatever the machine's umask
@@ -50,7 +50,9 @@ const TAB = "\t";
 const COMMIT = ["-c", "user.name=Janitor test", "-c", "user.email=janitor@example.invalid", "-c", "commit.gpgsign=false",
   "commit", "--allow-empty", "-qm", "fixture"];
 // Exactly what the script calls (a private PATH of symlinks proves it; `cut` and `xargs` joined with the one-inspect capture).
-const LINUX_TOOLS = ["bash", "sed", "awk", "grep", "find", "head", "tr", "cut", "xargs", "git", "hostname", "uname", "date", "stat", "rm", "env", "sleep"];
+const LINUX_TOOLS = ["bash", "sed", "awk", "grep", "find", "head", "tr", "cut", "xargs", "git", "hostname", "uname", "date", "stat", "rm", "env", "sleep", "readlink", "mv", "mkdir", "rmdir", "id", "sha256sum"];
+const ME = thisOwnerToken(); // the caller's owner token: the janitor under test derives the same one from its own uid
+const PREFIX = ["tests", "ToDelete"].join(""); // a name of the form before the owner segment is built from pieces: this file never spells one
 
 // --- bash and PATH ---------------------------------------------------------------------------------------------
 
@@ -90,9 +92,10 @@ function envFor(w, { tmp, docker, minAge, ahead, extra }) {
   for (const [key, value] of Object.entries(process.env)) {
     if (!/^(path|git_.*|tmpdir|janitor_.*|dstub)$/i.test(key)) env[key] = value;
   }
+  const asWindows = extra.JANITOR_OS === "windows" && extra.TESTSTODELETE_OWNER === undefined ? { TESTSTODELETE_OWNER: ME } : {}; // the Windows branch derives `w<digits>` from the account name; the fixtures are named for this user's own token
   return {
     ...env, PATH: [...ahead, pathFor(w, { docker })].join(path.delimiter), TMPDIR: posix(tmp),
-    JANITOR_MIN_AGE_MINUTES: String(minAge), DSTUB: slash(w.state), ...extra,
+    JANITOR_MIN_AGE_MINUTES: String(minAge), DSTUB: slash(w.state), ...asWindows, ...extra,
   };
 }
 
@@ -127,6 +130,7 @@ has() { [ -f "$S/mode" ] || return 1; while IFS= read -r l || [ -n "$l" ]; do [ 
 failrm() { has "fail-rm:$1" || has "fail-rm:$1:present" || has "fail-rm:$1:absent"; }
 present() { has "fail-rm:$1:present"; }
 TAB=$(printf '\\t')
+vlabel() { [ -f "$S/vol.tsv" ] || return 0; while IFS= read -r l || [ -n "$l" ]; do case "$l" in "$1$TAB"*) printf '%s' "\${l#*"$TAB"}";; esac; done < "$S/vol.tsv"; }
 created() { [ -f "$S/volcreated.tsv" ] || return 0; while IFS= read -r l || [ -n "$l" ]; do case "$l" in "$1$TAB"*) printf '%s\\n' "\${l#*"$TAB"}";; esac; done < "$S/volcreated.tsv"; }
 case "$1" in
   ps)
@@ -137,7 +141,7 @@ case "$1" in
   volume)
     case "$2" in
       ls) emit "$S/vol.tsv";;
-      inspect) if [ "$3" = "--format" ]; then fmt="$4"; shift 4; for n in "$@"; do c="$(created "$n")"; case "$fmt" in *Name*) printf '%s\\t%s\\n' "$n" "$c";; *) printf '%s\\n' "$c";; esac; done; else present "$last"; exit $?; fi;;
+      inspect) if [ "$3" = "--format" ]; then fmt="$4"; shift 4; for n in "$@"; do c="$(created "$n")"; case "$fmt" in *Name*) printf '%s\\t%s\\n' "$n" "$c";; *Labels*) printf '%s\\t"%s"\\n' "$c" "$(vlabel "$n")";; *) printf '%s\\n' "$c";; esac; done; else present "$last"; exit $?; fi;;
       rm) if failrm "$last"; then exit 1; fi;;
     esac;;
   network)
@@ -232,11 +236,14 @@ const makeTmp = (w, what = "jtmp") => ownedDir(w.scope, what);
 
 const HOST = thisOwner().host;
 
-/** The owner text of `pid`: three fields on Linux, two elsewhere — or two everywhere when `twoField`. */
-function ownerOf(pid, { twoField = false } = {}) {
-  const owner = { host: HOST, pid };
-  if (linux && !twoField) owner.start = pid === process.pid ? (processProbe(pid).start ?? 1) : 1;
-  return formatOwner(owner);
+/** The record of `pid`: owner, host, pid, and on Linux the start and the pid namespace — or the smallest form (no start, no namespace) when `twoField`. */
+function ownerOf(pid, { twoField = false, owner = ME } = {}) {
+  const record = { owner, host: HOST, pid };
+  if (linux && !twoField) {
+    record.start = pid === process.pid ? (processProbe(pid).start ?? 1) : 1;
+    record.ns = thisOwner().ns;
+  }
+  return formatOwner(record);
 }
 
 const LIVE = () => ownerOf(process.pid);
@@ -331,7 +338,7 @@ test("1. TOCTOU: a container that shows up after the capture is never listed aga
   if (w === null) return;
   const tmp = makeTmp(w);
   setDocker(w, {
-    ps: [["c9", "testsToDelete-conventions-late", LIVE(), dockerTime(OLD)]],
+    ps: [["c9", owned("conventions-late"), LIVE(), dockerTime(OLD)]],
     mode: ["toctou"],
   });
 
@@ -345,37 +352,40 @@ test("1. TOCTOU: a container that shows up after the capture is never listed aga
 
 // --- 2 ---------------------------------------------------------------------------------------------------------
 
-test("2. Docker: age selects, the owner authorises, and the prefix is anchored", { timeout: TIMEOUT }, (t) => {
+test("2. Docker: age selects, the owner record authorises, a resource without one is only listed, and the prefix is anchored", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
   const dead = NOBODY();
   setDocker(w, {
     ps: [
-      ["c1", "testsToDelete-conventions-old", "", dockerTime(OLD)],
-      ["c2", "testsToDelete-conventions-young", "", dockerTime(YOUNG)],
-      ["c3", "testsToDelete-conventions-live", LIVE(), dockerTime(OLD)],
-      ["c4", "testsToDelete-conventions-dead", dead, dockerTime(OLD)],
-      ["c5", "prod-testsToDelete-b", "", dockerTime(OLD)],
+      ["c1", owned("conventions-old"), dead, dockerTime(OLD)],
+      ["c2", owned("conventions-young"), dead, dockerTime(YOUNG)],
+      ["c3", owned("conventions-live"), LIVE(), dockerTime(OLD)],
+      ["c4", owned("conventions-dead"), dead, dockerTime(OLD)],
+      ["c5", `prod-${owned("b")}`, "", dockerTime(OLD)],
+      ["c6", owned("conventions-nolabel"), "", dockerTime(OLD)],
     ],
-    vol: [["testsToDelete-v-old", ""], ["testsToDelete-v-young", ""]],
-    volCreated: [["testsToDelete-v-old", volumeTime(OLD)], ["testsToDelete-v-young", volumeTime(YOUNG)]],
-    net: [["a1", "testsToDelete-n-old", dead, dockerTime(OLD)]],
+    vol: [[owned("v-old"), dead], [owned("v-young"), dead]],
+    volCreated: [[owned("v-old"), volumeTime(OLD)], [owned("v-young"), volumeTime(YOUNG)]],
+    net: [["a1", owned("n-old"), dead, dockerTime(OLD)]],
   });
 
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 3, run.text);
-  assert.deepEqual(rmCalls(w), ["rm -f -v c1", "rm -f -v c4", "volume rm testsToDelete-v-old", "network rm a1"]);
+  assert.deepEqual(rmCalls(w), ["rm -f -v c1", "rm -f -v c4", `volume rm ${owned("v-old")}`, "network rm a1"]);
   assert.equal(run.stderr.filter((line) => line.startsWith("skipped:")).length, 1, run.text);
-  assert.ok(mentions(run, "skipped: container testsToDelete-conventions-live — owned by live process"), run.text);
+  assert.ok(mentions(run, `skipped: container ${owned("conventions-live")} — owned by live process`), run.text);
   assert.equal(mentions(run, "young"), false, `a young resource is left alone silently\n${run.text}`);
-  assert.equal(mentions(run, "prod-testsToDelete-b") || dockerLog(w).some((line) => line.includes("c5")), false, `an unanchored name is never named or touched\n${run.text}`);
+  assert.ok(mentions(run, `unmarked: container ${owned("conventions-nolabel")}`), `an old container of this scope with no owner label is listed, never judged\n${run.text}`);
+  assert.equal(dockerLog(w).some((line) => line.includes("c6")), false, "and never touched");
+  assert.equal(mentions(run, `prod-${owned("b")}`) || dockerLog(w).some((line) => line.includes("c5")), false, `an unanchored name is never named or touched\n${run.text}`);
 });
 
 // --- 3 ---------------------------------------------------------------------------------------------------------
 
-test("3. Per resource: a live-owned folder beside a dead old one — the dead one, its claim and an orphan claim go", { timeout: TIMEOUT }, (t) => {
+test("3. Per resource: a live-owned folder beside a dead old one — the dead one, its claim and an orphan claim go; an unmarked one is listed and kept", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
@@ -390,7 +400,8 @@ test("3. Per resource: a live-owned folder beside a dead old one — the dead on
   assert.ok(exists(live) && exists(`${live}.owner`), `the live-owned folder and its claim stay\n${run.text}`);
   assert.ok(mentions(run, "skipped: folder ", named(live), "owned by live process"), run.text);
   assert.equal(exists(dead) || exists(`${dead}.owner`), false, `the dead-owned folder and its sibling are gone\n${run.text}`);
-  assert.equal(exists(nobody), false, `an unclaimed old folder is nobody's and goes\n${run.text}`);
+  assert.ok(exists(nobody), `an unclaimed old folder is nobody's the helper knows: it is listed and kept, however old\n${run.text}`);
+  assert.ok(mentions(run, `unmarked: folder ${named(nobody)}`), run.text);
   assert.equal(exists(orphan), false, `an old claim with no folder is removed\n${run.text}`);
 });
 
@@ -473,8 +484,8 @@ test("6. Locks and junctions (J1, J2, J5): a reason-less lock is kept, links are
   assert.equal(branchesOf(w.clone).includes(branch), false, `the prefixed branch is deleted\n${run.text}`);
   assert.equal(exists(linkedA.path) || exists(linkedB.path), false, `both junction-holding worktrees are gone\n${run.text}`);
   assert.ok(exists(path.join(targetA, "keep.txt")) && exists(path.join(targetB, "keep.txt")), `the junction targets' files are intact\n${run.text}`);
-  assert.equal(exists(unlocked.path), false, `an unlocked old worktree of the other clone is gone\n${run.text}`);
-  assert.equal(listedIn(w.other).includes(named(unlocked.path)), false);
+  assert.ok(exists(unlocked.path) && listedIn(w.other).includes(named(unlocked.path)), `an unlocked old worktree has no owner record: listed, never judged, kept\n${run.text}`);
+  assert.ok(mentions(run, `unmarked: worktree ${named(unlocked.path)}`), run.text);
   assert.ok(exists(young.path) && listedIn(w.other).includes(named(young.path)), `a young dead-owned one is kept\n${run.text}`);
 });
 
@@ -484,7 +495,7 @@ test("7. A foreign host is skipped (exit 3); a tree holding only a young worktre
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const foreign = folder(w, tmp, "foreign", { owner: "elsewhere@linux:4242" });
+  const foreign = folder(w, tmp, "foreign", { owner: `${ME}:elsewhere@linux:4242:1:5` });
 
   const first = runJanitor(w, { tmp });
 
@@ -511,7 +522,7 @@ test("8. --dry-run removes nothing, in any pass, and leaves the exit code alone"
   const branch = ownedName("drybr");
   git(w.clone, "branch", branch);
   w.scope.after(() => spawnSync("git", ["-C", w.clone, "branch", "-D", branch], { timeout: 30_000, windowsHide: true }));
-  setDocker(w, { ps: [["c1", "testsToDelete-conventions-dry", "", dockerTime(OLD)]] });
+  setDocker(w, { ps: [["c1", owned("conventions-dry"), NOBODY(), dockerTime(OLD)]] });
 
   const run = runJanitor(w, { tmp, args: ["--dry-run"] });
 
@@ -529,7 +540,7 @@ test("8b. --dry-run announces every removal as a `would run:` line on STDOUT and
   const branch = ownedName("drybb");
   git(w.clone, "branch", branch);
   w.scope.after(() => spawnSync("git", ["-C", w.clone, "branch", "-D", branch], { timeout: 30_000, windowsHide: true }));
-  setDocker(w, { ps: [["c1", "testsToDelete-conventions-dry", "", dockerTime(OLD)]] });
+  setDocker(w, { ps: [["c1", owned("conventions-dry"), NOBODY(), dockerTime(OLD)]] });
 
   const run = runJanitor(w, { tmp, args: ["--dry-run"] });
 
@@ -538,7 +549,7 @@ test("8b. --dry-run announces every removal as a `would run:` line on STDOUT and
   assert.ok(wouldRun.length >= 3, `expected at least three would-run lines on stdout, got [${run.stdout.join(" // ")}]`);
   assert.ok(wouldRun.includes("would run: docker rm -f -v c1"), run.stdout.join("\n"));
   assert.ok(wouldRun.some((line) => line.startsWith("would run: rm -rf -- ") && line.includes(named(dead))), run.stdout.join("\n"));
-  assert.ok(wouldRun.includes(`would run: git branch -D ${branch}`), run.stdout.join("\n"));
+  assert.ok(wouldRun.includes(`would run: git update-ref -d refs/heads/${branch} ${git(w.clone, "rev-parse", branch)}`), `a branch goes by its captured tip\n${run.stdout.join("\n")}`);
   assert.deepEqual(run.stderr, [], "a dry run says nothing on stderr");
   assert.ok(exists(dead) && exists(`${dead}.owner`), `the folder and its sibling are still there\n${run.text}`);
   assert.deepEqual(rmCalls(w), [], "docker was never asked to remove anything");
@@ -557,13 +568,13 @@ test("8c. progress: one line when the capture starts and one per real removal, i
   const branch = ownedName("progb");
   git(w.clone, "branch", branch);
   w.scope.after(() => spawnSync("git", ["-C", w.clone, "branch", "-D", branch], { timeout: 30_000, windowsHide: true }));
-  setDocker(w, { ps: [["c1", "testsToDelete-conventions-prog", "", dockerTime(OLD)]] });
+  setDocker(w, { ps: [["c1", owned("conventions-prog"), NOBODY(), dockerTime(OLD)]] });
 
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 3, "the live folder is skipped: " + run.text);
   assert.equal(run.progress.length, 4, run.progress.join(" // "));
-  assert.deepEqual(run.progress.slice(0, 3), [LOOKING, "janitor: removed container testsToDelete-conventions-prog", `janitor: removed branch ${branch}`]);
+  assert.deepEqual(run.progress.slice(0, 3), [LOOKING, `janitor: removed container ${owned("conventions-prog")}`, `janitor: removed branch ${branch}`]);
   assert.ok(run.progress[3].startsWith("janitor: removed folder ") && run.progress[3].includes(named(dead)), run.progress.join(" // "));
   assert.equal(run.progress.some((line) => line.includes(named(live))), false, "a skipped resource is not announced as removed");
   assert.equal(exists(dead), false, "and it really went: " + run.text);
@@ -574,7 +585,7 @@ test("8c. progress: a dry run prints the capture line and the would-run lines, n
   if (w === null) return;
   const tmp = makeTmp(w);
   folder(w, tmp, "progdry", { owner: NOBODY() });
-  setDocker(w, { ps: [["c1", "testsToDelete-conventions-progdry", "", dockerTime(OLD)]] });
+  setDocker(w, { ps: [["c1", owned("conventions-progdry"), NOBODY(), dockerTime(OLD)]] });
 
   const run = runJanitor(w, { tmp, args: ["--dry-run"] });
 
@@ -587,12 +598,12 @@ test("8c. progress: a name is printed through clean() — non-ASCII text never r
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  setDocker(w, { ps: [["c1", "testsToDelete-conventions-café", "", dockerTime(OLD)]] });
+  setDocker(w, { ps: [["c1", owned("conventions-café"), NOBODY(), dockerTime(OLD)]] });
 
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 0, run.text);
-  assert.deepEqual(run.progress, [LOOKING, "janitor: removed container testsToDelete-conventions-caf\\?\\?"]); // printf %q: the two `?` that clean() made are glob characters, so they are escaped
+  assert.deepEqual(run.progress, [LOOKING, `janitor: removed container ${owned("conventions-caf")}\\?\\?`]); // printf %q: the two `?` that clean() made are glob characters, so they are escaped
   assert.equal(/[^ -~]/.test(run.progress[1]), false, "the removed line is printable ASCII only");
 });
 
@@ -600,19 +611,19 @@ test("8c. progress: printable text inside a name cannot pass for a second messag
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  setDocker(w, { ps: [["c1", "testsToDelete-conventions-x janitor: removed container fake", "", dockerTime(OLD)]] });
+  setDocker(w, { ps: [["c1", owned("conventions-x janitor: removed container fake"), NOBODY(), dockerTime(OLD)]] });
 
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 0, run.text);
-  assert.deepEqual(run.progress, [LOOKING, "janitor: removed container testsToDelete-conventions-x\\ janitor:\\ removed\\ container\\ fake"]); // every space is escaped: it is ONE word of one line
+  assert.deepEqual(run.progress, [LOOKING, `janitor: removed container ${owned("conventions-x")}\\ janitor:\\ removed\\ container\\ fake`]); // every space is escaped: it is ONE word of one line
 });
 
 test("8c. progress: a removal that failed is not announced as removed", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  setDocker(w, { ps: [["c1", "testsToDelete-conventions-progfail", "", dockerTime(OLD)]], mode: ["fail-rm:c1:present"] });
+  setDocker(w, { ps: [["c1", owned("conventions-progfail"), NOBODY(), dockerTime(OLD)]], mode: ["fail-rm:c1:present"] });
 
   const run = runJanitor(w, { tmp });
 
@@ -675,20 +686,30 @@ ${run.text}`);
 
 // --- 9 ---------------------------------------------------------------------------------------------------------
 
-test("9. A two-field owner <host>@<os>:<pid>: live is skipped, dead is removed", { timeout: TIMEOUT }, (t) => {
+test("9. The smallest record <owner>:<host>@<os>:<pid> (no start, no namespace): a reader that needs no namespace judges it — live is skipped, dead is removed; a Linux reader keeps it, named", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const live = folder(w, tmp, "twolive", { owner: ownerOf(process.pid, { twoField: true }) });
-  const dead = folder(w, tmp, "twodead", { owner: ownerOf(unmatchablePid(), { twoField: true }) });
-  assert.doesNotMatch(fs.readFileSync(`${live}.owner`, "utf8").trim(), /:\d+:\d+$/, "the fixture is the two-field form");
+  const judge = (what, pid, rc) => {
+    const dir = folder(w, tmp, what, { owner: OWNER_AS("macos", pid) });
+    assert.doesNotMatch(fs.readFileSync(`${dir}.owner`, "utf8").trim(), /:\d+:\d+$/, "the fixture is the two-field form");
+    return { dir, run: runJanitor(w, { tmp, env: { JANITOR_OS: "macos", ...psStub(rc) } }) };
+  };
 
-  const run = runJanitor(w, { tmp });
+  const live = judge("twolive", process.pid, 0);
+  assert.equal(live.run.status, 3, live.run.text);
+  assert.ok(exists(live.dir));
+  assert.ok(mentions(live.run, `${named(live.dir)} — owned by live process ${process.pid}`), live.run.text);
 
-  assert.equal(run.status, 3, run.text);
-  assert.ok(exists(live));
-  assert.ok(mentions(run, `${named(live)} — owned by live process ${process.pid}`), run.text);
-  assert.equal(exists(dead) || exists(`${dead}.owner`), false);
+  const dead = judge("twodead", unmatchablePid(), 1);
+  assert.equal(exists(dead.dir) || exists(`${dead.dir}.owner`), false, dead.run.text);
+
+  if (!linux) return;
+  const linuxKept = folder(w, tmp, "twolinux", { owner: ownerOf(unmatchablePid(), { twoField: true }) });
+  const kept = runJanitor(w, { tmp });
+  assert.equal(kept.status, 3, kept.text);
+  assert.ok(exists(linuxKept) && exists(`${linuxKept}.owner`), `a Linux reader does not judge a record without a pid namespace\n${kept.text}`);
+  assert.ok(mentions(kept, `${named(linuxKept)} — liveness unknown for process ${unmatchablePid()}`, "pid namespace"), kept.text);
 });
 
 // --- 10 --------------------------------------------------------------------------------------------------------
@@ -750,8 +771,8 @@ test("12. A vanished target is a notice, not an abort: a failed removal is judge
   const dead = folder(w, tmp, "after", { owner: NOBODY() });
   setDocker(w, {
     ps: [
-      ["ce", "testsToDelete-conventions-vanish", "", dockerTime(OLD)],
-      ["cb", "testsToDelete-conventions-stuck", "", dockerTime(OLD)],
+      ["ce", owned("conventions-vanish"), NOBODY(), dockerTime(OLD)],
+      ["cb", owned("conventions-stuck"), NOBODY(), dockerTime(OLD)],
     ],
     mode: ["fail-rm:ce:absent", "fail-rm:cb:present"],
   });
@@ -759,8 +780,8 @@ test("12. A vanished target is a notice, not an abort: a failed removal is judge
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 3, run.text);
-  assert.ok(mentions(run, "notice: container testsToDelete-conventions-vanish — vanished after the capture"), run.text);
-  assert.ok(mentions(run, "skipped: container testsToDelete-conventions-stuck — could not be removed"), run.text);
+  assert.ok(mentions(run, `notice: container ${owned("conventions-vanish")} — vanished after the capture`), run.text);
+  assert.ok(mentions(run, `skipped: container ${owned("conventions-stuck")} — could not be removed`), run.text);
   assert.deepEqual(rmCalls(w), ["rm -f -v ce", "rm -f -v cb"], "both removals were attempted, by captured id");
   assert.equal(exists(dead) || exists(`${dead}.owner`), false, `a later pass still ran\n${run.text}`);
 });
@@ -815,14 +836,15 @@ test("15. One volume inspect for N volumes (code gate 3/4)", { timeout: TIMEOUT 
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const names = ["testsToDelete-v-a", "testsToDelete-v-b", "testsToDelete-v-c"];
-  setDocker(w, { vol: names.map((name) => [name, ""]), volCreated: names.map((name) => [name, volumeTime(OLD)]) });
+  const names = [owned("v-a"), owned("v-b"), owned("v-c")];
+  setDocker(w, { vol: names.map((name) => [name, NOBODY()]), volCreated: names.map((name) => [name, volumeTime(OLD)]) });
 
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 0, run.text);
-  const inspects = dockerLog(w).filter((line) => line.startsWith("volume inspect"));
-  assert.equal(inspects.length, 1, `one inspect for three volumes, got [${inspects.join(" // ")}]\n${run.text}`);
+  const inspects = dockerLog(w).filter((line) => line.startsWith("volume inspect") && line.includes(".Name"));
+  assert.equal(inspects.length, 1, `one capture inspect for three volumes, got [${inspects.join(" // ")}]\n${run.text}`);
+  assert.equal(dockerLog(w).filter((line) => line.startsWith("volume inspect") && line.includes(".Labels")).length, 3, "and one re-inspect of each, just before it is removed (same creation time, same label)");
   assert.deepEqual(rmCalls(w), names.map((name) => `volume rm ${name}`), run.text);
 });
 
@@ -853,7 +875,8 @@ const callsOf = (w, name) => {
     return [];
   }
 };
-const OWNER_AS = (os, pid) => `${HOST.split("@")[0]}@${os}:${pid}`;
+const OWNER_AS = (os, pid) => `${ME}:${HOST.split("@")[0]}@${os}:${pid}`;
+const owned = (rest) => `${PREFIX}-${ME}-${rest}`; // a name of the CALLER's scope, as docker prints it
 
 test("16. One tasklist per run (code gate 5): N Windows-owned folders cost one snapshot", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
@@ -923,11 +946,11 @@ test("18. The non-Windows branch (opus A), through JANITOR_OS=macos and a ps stu
 
 // --- 19 --------------------------------------------------------------------------------------------------------
 
-test("19. The clone the janitor runs from (opus B) is never a candidate, even when it is old, unclaimed and prefixed in the temp root", { timeout: TIMEOUT }, (t) => {
+test("19. The clone the janitor runs from (opus B) is never a candidate, even when it is old, dead-owned and prefixed in the temp root", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const clone = folder(w, tmp, "self", { owner: null, ageMs: 0 });
+  const clone = folder(w, tmp, "self", { owner: NOBODY(), ageMs: 0 }); // dead-owned: it would go were it not the clone the janitor runs from
   git(clone, "init", "-q");
   git(clone, ...COMMIT);
   age(clone, OLD);
@@ -964,7 +987,7 @@ test("20a. F-A: a worktree whose .git points into a clone owned by someone else 
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const wt = worktree(w, w.other, tmp, "stranger", { lock: undefined });
+  const wt = worktree(w, w.other, tmp, "stranger", { lock: NOBODY() });
 
   const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: "foreign-clone", ...timeoutStub() } }); // only the CLONE is someone else's
 
@@ -989,7 +1012,7 @@ for (const entry of ["zz", ".zz"]) {
     const w = makeWorld(t);
     if (w === null) return;
     const tmp = makeTmp(w);
-    const wt = worktree(w, w.other, tmp, "fifogd", { lock: undefined });
+    const wt = worktree(w, w.other, tmp, "fifogd", { lock: NOBODY() });
     const fake = path.join(commonOf(wt), "worktrees", entry);
     fs.mkdirSync(fake);
     w.scope.after(() => fs.rmSync(fake, { recursive: true, force: true }));
@@ -1012,7 +1035,7 @@ test("20c. F-A: a FIFO worktrees/zz/gitdir in the SWEPT clone (git itself would 
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const wt = worktree(w, w.clone, tmp, "fifoowngd", { lock: undefined });
+  const wt = worktree(w, w.clone, tmp, "fifoowngd", { lock: NOBODY() });
   const fake = path.join(commonOf(wt), "worktrees", "zz");
   fs.mkdirSync(fake);
   w.scope.after(() => fs.rmSync(fake, { recursive: true, force: true }));
@@ -1032,9 +1055,10 @@ test("20c. F-A: a FIFO worktrees/zz/gitdir in the SWEPT clone (git itself would 
  * waits for it. `hung` is true when it had to be killed after a minute; `close` waits for every holder of the pipes (a killed bash leaves its blocked
  * child holding them), so `exit` arms a fallback.
  */
-async function runPaused(w, tmp, onPause, { env: extra = {} } = {}) {
+async function runPaused(w, tmp, onPause, { env: extra = {}, ahead = [] } = {}) {
   const release = path.join(w.state, "release");
-  const child = spawn(BASH, [slash(SCRIPT)], { cwd: w.clone, env: envFor(w, { tmp, docker: true, minAge: 60, ahead: [], extra: { JANITOR_TEST_PAUSE_FILE: release, ...extra } }), windowsHide: true });
+  fs.rmSync(release, { force: true }); // a second paused run in one world starts from an unreleased pause
+  const child = spawn(BASH, [slash(SCRIPT)], { cwd: w.clone, env: envFor(w, { tmp, docker: true, minAge: 60, ahead, extra: { JANITOR_TEST_PAUSE_FILE: release, ...extra } }), windowsHide: true });
   let stderr = "";
   let paused = false;
   let hung = false;
@@ -1064,7 +1088,7 @@ test("20d. F-B: a .git file swapped for a FIFO after the capture is never read a
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const wt = worktree(w, w.other, tmp, "swap", { lock: undefined });
+  const wt = worktree(w, w.other, tmp, "swap", { lock: NOBODY() });
   const dotGit = path.join(wt.path, ".git");
   const original = fs.readFileSync(dotGit);
   w.scope.after(() => { // back to what git wrote, so the worktree's own teardown can remove it
@@ -1094,12 +1118,12 @@ test("20e. a double quote or a space inside a name cannot forge text of a progre
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  setDocker(w, { ps: [["c1", 'testsToDelete-conventions-a" janitor: removed container "fake', "", dockerTime(OLD)]] });
+  setDocker(w, { ps: [["c1", owned('conventions-a" janitor: removed container "fake'), NOBODY(), dockerTime(OLD)]] });
 
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 0, run.text);
-  assert.deepEqual(run.progress, [LOOKING, 'janitor: removed container testsToDelete-conventions-a\\"\\ janitor:\\ removed\\ container\\ \\"fake']);
+  assert.deepEqual(run.progress, [LOOKING, `janitor: removed container ${owned("conventions-a")}\\"\\ janitor:\\ removed\\ container\\ \\"fake`]);
 });
 
 /** A `timeout` that logs its argv and then runs the rest, handed over as an exported bash FUNCTION (see `psStub`: on Windows a stub FILE would never be reached). */
@@ -1130,7 +1154,7 @@ const root = !win32 && process.getuid() === 0;
 
 /** A worktree of `w.other` whose `.git` reaches its clone THROUGH the link `via` (a link in a folder of its own, owned by this user). */
 function worktreeViaLink(w, tmp, what) {
-  const wt = worktree(w, w.other, tmp, what, { lock: undefined });
+  const wt = worktree(w, w.other, tmp, what, { lock: NOBODY() });
   const dotGit = path.join(wt.path, ".git");
   const original = fs.readFileSync(dotGit);
   const admin = git(wt.path, "rev-parse", "--absolute-git-dir"); // <other>/.git/worktrees/<name>
@@ -1205,7 +1229,7 @@ for (const target of [".git", path.join(".git", "worktrees")]) {
     const w = makeWorld(t);
     if (w === null) return;
     const tmp = makeTmp(w);
-    const wt = worktree(w, w.other, tmp, "gwrite", { lock: undefined });
+    const wt = worktree(w, w.other, tmp, "gwrite", { lock: NOBODY() });
     const dir = path.join(w.other, target);
     fs.chmodSync(dir, 0o775);
     w.scope.after(() => fs.chmodSync(dir, 0o755));
@@ -1224,7 +1248,7 @@ for (const target of [".git", path.join(".git", "worktrees")]) {
   });
 }
 
-test("21d. Gate A: with neither `timeout` nor `perl` a file another user owns is not read — its entries are kept and named, ONE line says why; this user's own entries are swept", { timeout: TIMEOUT }, (t) => {
+test("21d. Gate A: with neither `timeout` nor `perl` a claim another user owns is never opened — `foreign:`; this user's own entries are swept without a bound", { timeout: TIMEOUT }, (t) => {
   if (win32) {
     t.skip("the Windows PATH always has the shell's own timeout");
     return;
@@ -1234,23 +1258,17 @@ test("21d. Gate A: with neither `timeout` nor `perl` a file another user owns is
   const tmp = makeTmp(w);
   const claimed = folder(w, tmp, "unb1", { owner: NOBODY() });
   const marker = orphanMarker(w, tmp, NOBODY());
-  const wt = worktree(w, w.other, tmp, "unb2", { lock: undefined });
+  const wt = worktree(w, w.other, tmp, "unb2", { lock: NOBODY() });
   const probe = spawnSync(BASH, ["-c", "command -v timeout || command -v perl"], { env: envFor(w, { tmp, docker: true, minAge: 60, ahead: [], extra: {} }), encoding: "utf8" });
   assert.notEqual(probe.status, 0, `this PATH holds a timeout or a perl: ${probe.stdout}`);
 
-  const foreign = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: "foreign" } });
+  const foreign = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${posix(marker)}` } }); // the claim file is a stranger's: lstat says so before anything opens it
 
-  assert.equal(foreign.status, 3, foreign.text);
-  assert.ok(exists(claimed) && exists(marker) && exists(wt.path), `nothing owned by "someone else" was read or removed\n${foreign.text}`);
-  assert.equal(foreign.stderr.filter((line) => line.includes("neither timeout nor perl")).length, 1, `one line says why\n${foreign.text}`);
-  assert.equal(foreign.stderr.filter((line) => line.includes("owner '-unbounded' is unreadable")).length, 2, `each kept entry whose claim could not be read is named\n${foreign.text}`);
-  assert.equal(foreign.stderr.filter((line) => line.includes("owner '-unsafe-root' is unreadable")).length, 1, `with the root itself not this user's (the seam says so for everything), the worktree folder is named for that\n${foreign.text}`);
-
-  const own = runJanitor(w, { tmp });
-
-  assert.equal(own.status, 0, own.text);
-  assert.equal(exists(claimed) || exists(marker) || exists(wt.path), false, `this user's own entries are swept without a bound\n${own.text}`);
-  assert.equal(own.stderr.filter((line) => line.includes("neither timeout nor perl")).length, 0, own.text);
+  assert.equal(foreign.status, 0, foreign.text);
+  assert.ok(exists(marker), `a claim this user does not own is no evidence: kept\n${foreign.text}`);
+  assert.ok(mentions(foreign, `foreign: marker ${named(marker)}`), `listed, not skipped: it never changes the exit code\n${foreign.text}`);
+  assert.equal(exists(claimed) || exists(wt.path), false, `this user's own entries are swept without a bound\n${foreign.text}`);
+  assert.equal(foreign.stderr.filter((line) => line.includes("neither timeout nor perl")).length, 0, foreign.text);
 });
 
 test("21e. Gate A: without `timeout`, perl's alarm bounds the reads and the git calls on a clone", { timeout: TIMEOUT }, (t) => {
@@ -1285,7 +1303,7 @@ for (const entry of ["worktrees", ""]) {
     const w = makeWorld(t);
     if (w === null) return;
     const tmp = makeTmp(w);
-    const wt = worktree(w, w.other, tmp, "noenter", { lock: undefined });
+    const wt = worktree(w, w.other, tmp, "noenter", { lock: NOBODY() });
     const dead = folder(w, tmp, "noenterbeside", { owner: NOBODY() });
     const dir = path.join(w.other, ".git", entry);
     fs.chmodSync(dir, 0);
@@ -1308,7 +1326,7 @@ test("21g. Gate B: a clone that becomes unreadable after the capture is not 'rem
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const wt = worktree(w, w.other, tmp, "lateno", { lock: undefined });
+  const wt = worktree(w, w.other, tmp, "lateno", { lock: NOBODY() });
   const dir = path.join(w.other, ".git", "worktrees");
   w.scope.after(() => fs.chmodSync(dir, 0o755));
 
@@ -1367,15 +1385,15 @@ test("22b. Gate A: with nothing to bound a read, a .git inside a folder this use
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const wt = worktree(w, w.other, tmp, "parent", { lock: undefined });
+  const wt = worktree(w, w.other, tmp, "parent", { lock: NOBODY() });
   const probe = spawnSync(BASH, ["-c", "command -v timeout || command -v perl"], { env: envFor(w, { tmp, docker: true, minAge: 60, ahead: [], extra: {} }), encoding: "utf8" });
   assert.notEqual(probe.status, 0, `this PATH holds a timeout or a perl: ${probe.stdout}`);
 
   const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${wt.path}` } }); // the FOLDER is someone else's, the file in it and everything else is this user's
 
-  assert.equal(kept.status, 3, kept.text);
+  assert.equal(kept.status, 0, kept.text);
   assert.ok(exists(wt.path), `kept\n${kept.text}`);
-  assert.ok(mentions(kept, `${named(wt.path)} — owner '-foreign-entry' is unreadable`), kept.text);
+  assert.ok(mentions(kept, `foreign: worktree ${named(wt.path)}`), `a folder that is not this user's is another scope: listed, never read\n${kept.text}`);
 
   const own = runJanitor(w, { tmp });
 
@@ -1399,13 +1417,13 @@ test("23a. C-1: a worktree folder this user does not own is not touched — kept
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const wt = worktree(w, w.other, tmp, "notmine", { lock: undefined });
+  const wt = worktree(w, w.other, tmp, "notmine", { lock: NOBODY() });
 
   const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${posix(wt.path)}`, ...timeoutStub() } });
 
-  assert.equal(kept.status, 3, kept.text);
+  assert.equal(kept.status, 0, kept.text);
   assert.ok(exists(wt.path) && listedIn(w.other).includes(named(wt.path)), `kept, registered\n${kept.text}`);
-  assert.ok(mentions(kept, `${named(wt.path)} — owner '-foreign-entry' is unreadable`, "never owned by this user"), kept.text);
+  assert.ok(mentions(kept, `foreign: worktree ${named(wt.path)}`), `not this user's: listed, never an exit code\n${kept.text}`);
 
   const mine = runJanitor(w, { tmp });
 
@@ -1421,7 +1439,7 @@ test("23b. C-1: an entry swapped AFTER the capture for a link to a REAL register
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const wt = worktree(w, w.other, tmp, "swapme", { lock: undefined });
+  const wt = worktree(w, w.other, tmp, "swapme", { lock: NOBODY() });
   const victim = worktree(w, w.other, tmp, "victim", { lock: undefined, ageMs: 0 }); // young: never a candidate itself
   const aside = path.join(w.state, "aside");
   w.scope.after(() => { // back where they were, so the teardown finds them
@@ -1441,7 +1459,7 @@ test("23b. C-1: an entry swapped AFTER the capture for a link to a REAL register
   assert.ok(run.lines.some((line) => line.includes(named(wt.path)) && line.includes("changed after the capture") && line.includes("it is now a link")), run.stderr);
 });
 
-test("23c. Gate A (b): with nothing to bound a read, a claim in a folder this user does not own is not read", { timeout: TIMEOUT }, (t) => {
+test("23c. Gate A (b): with nothing to bound a read, a claim in a folder this user does not own is not read — and a folder in that temp root is not trusted", { timeout: TIMEOUT }, (t) => {
   if (win32) {
     t.skip("the Windows PATH always has the shell's own timeout");
     return;
@@ -1450,12 +1468,14 @@ test("23c. Gate A (b): with nothing to bound a read, a claim in a folder this us
   if (w === null) return;
   const tmp = makeTmp(w);
   const claimed = folder(w, tmp, "parentclaim", { owner: NOBODY() });
+  const marker = orphanMarker(w, tmp, NOBODY());
 
-  const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${tmp}` } }); // the claim file is this user's; the FOLDER it lies in is not
+  const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${tmp}` } }); // the claim files are this user's; the FOLDER they lie in is not
 
   assert.equal(kept.status, 3, kept.text);
-  assert.ok(exists(claimed), kept.text);
-  assert.ok(mentions(kept, `${named(claimed)} — owner '-unbounded' is unreadable`), kept.text);
+  assert.ok(exists(claimed) && exists(marker), kept.text);
+  assert.ok(mentions(kept, `${named(marker)} — owner '-unbounded' is unreadable`), `the orphan claim could not be read under a bound: kept, named\n${kept.text}`);
+  assert.ok(mentions(kept, `${named(claimed)} — owner '-unsafe-root' is unreadable`), `a plain folder in a root a stranger could write to is not trusted either\n${kept.text}`);
   assert.equal(runJanitor(w, { tmp }).status, 0, "and in a folder this user owns it is read and swept");
 });
 
@@ -1482,7 +1502,7 @@ for (const exit of [7, 124]) {
     const w = makeWorld(t);
     if (w === null) return;
     const tmp = makeTmp(w);
-    const wt = worktree(w, w.other, tmp, "gitfails", { lock: undefined });
+    const wt = worktree(w, w.other, tmp, "gitfails", { lock: NOBODY() });
     const stubDir = toolStub(w, "git", `case " $* " in *" worktree remove "*) exit ${exit};; esac`);
 
     const run = runJanitor(w, { tmp, ahead: [stubDir] });
@@ -1527,7 +1547,7 @@ test("23g. (g) a clone is judged ONCE per run however many worktrees point at it
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const three = ["one", "two", "three"].map((what) => worktree(w, w.other, tmp, `many${what}`, { lock: undefined }));
+  const three = ["one", "two", "three"].map((what) => worktree(w, w.other, tmp, `many${what}`, { lock: NOBODY() }));
   const stubDir = toolStub(w, "stat", `if [ "$1" = "-c" ] && [ "$2" = "%a" ]; then echo "$3" >> "$DSTUB/statlog"; fi`);
 
   const run = runJanitor(w, { tmp, ahead: [stubDir] });
@@ -1544,7 +1564,7 @@ test("23h. (h) a .git that names something that is not <clone>/worktrees/<name> 
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const wt = worktree(w, w.other, tmp, "malformed", { lock: undefined });
+  const wt = worktree(w, w.other, tmp, "malformed", { lock: NOBODY() });
   const dotGit = path.join(wt.path, ".git");
   const original = fs.readFileSync(dotGit);
   const put = (text) => { fs.rmSync(dotGit, { force: true }); fs.writeFileSync(dotGit, text); }; // git leaves .git read-only on Windows
@@ -1594,7 +1614,7 @@ test("23k. (n) the ownership seam reaches the pin: a clone that turns foreign AF
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const wt = worktree(w, w.other, tmp, "turnsforeign", { lock: undefined });
+  const wt = worktree(w, w.other, tmp, "turnsforeign", { lock: NOBODY() });
 
   const run = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: "foreign-late", ...timeoutStub() } });
 
@@ -1607,7 +1627,7 @@ test("23k. (n) the ownership seam reaches the pin: a clone that turns foreign AF
 // Round 4. `[ -O ]` follows a link, so ownership of an ENTRY is read from the entry itself (lstat first); the temp root must be safe
 // before any folder in it is trusted; a git step that failed is said; "never owned" and "changed" are told apart.
 
-test("24a. C-1b: the owner of a worktree FOLDER is the folder's own (lstat), not its link target's — a folder whose own owner is someone else is kept, named 'never owned by this user'", { timeout: TIMEOUT }, (t) => {
+test("24a. C-1b: the owner of a worktree FOLDER is the folder's own (lstat), not its link target's — a folder whose own owner is someone else is another scope: `foreign:`, kept", { timeout: TIMEOUT }, (t) => {
   if (win32) {
     t.skip("a stub tool must come first on PATH");
     return;
@@ -1615,23 +1635,23 @@ test("24a. C-1b: the owner of a worktree FOLDER is the folder's own (lstat), not
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const wt = worktree(w, w.other, tmp, "lstat", { lock: undefined });
+  const wt = worktree(w, w.other, tmp, "lstat", { lock: NOBODY() });
   // `stat` that says someone else owns exactly this folder, as lstat would for a folder a stranger made; `-O` (stat, through links) would still say "mine"
   const stubDir = toolStub(w, "stat", `if [ "$1" = "-c" ] && [ "$2" = "%u" ] && [ "$3" = "$STAT_FOREIGN" ]; then echo 4242; exit 0; fi`);
 
   const run = runJanitor(w, { tmp, ahead: [stubDir], env: { STAT_FOREIGN: wt.path, ...timeoutStub() } });
 
-  assert.equal(run.status, 3, run.text);
+  assert.equal(run.status, 0, run.text);
   assert.ok(exists(wt.path) && listedIn(w.other).includes(named(wt.path)), `kept, registered\n${run.text}`);
-  assert.ok(run.stderr.some((line) => line.includes(named(wt.path)) && line.includes("owner '-foreign-entry' is unreadable") && line.includes("never owned by this user")), run.text);
+  assert.ok(mentions(run, `foreign: worktree ${named(wt.path)}`), run.text);
 });
 
 test("24b. I-1: a temp root that is neither this user's nor sticky is not trusted — its worktree folders are kept ('-unsafe-root') and ONE line says so", { timeout: TIMEOUT }, (t) => {
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const first = worktree(w, w.other, tmp, "rootone", { lock: undefined });
-  const second = worktree(w, w.other, tmp, "roottwo", { lock: undefined });
+  const first = worktree(w, w.other, tmp, "rootone", { lock: NOBODY() });
+  const second = worktree(w, w.other, tmp, "roottwo", { lock: NOBODY() });
 
   const kept = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${posix(tmp)}`, ...timeoutStub() } }); // the ROOT is someone else's (and the test folder is not sticky)
 
@@ -1656,10 +1676,10 @@ test("24c. gate 4: safe_id accepts a folder exactly one component below the temp
   const hasCtl = script.slice(script.indexOf("has_ctl() {"), script.indexOf("\n", script.indexOf("has_ctl() {")));
   const probe = (id) => spawnSync(BASH, ["-c", `T=/tmp/root; ${hasCtl}\n${fn}\nsafe_id "$1"`, "bash", id], { encoding: "utf8", windowsHide: true }).status;
 
-  assert.equal(probe("/tmp/root/testsToDelete-x-1"), 0, "one component below the root is accepted");
-  assert.equal(probe("/tmp/root/a/testsToDelete-x-1"), 1, "a nested path is refused");
+  assert.equal(probe(`/tmp/root/${owned("x-1")}`), 0, "one component below the root is accepted");
+  assert.equal(probe(`/tmp/root/a/${owned("x-1")}`), 1, "a nested path is refused");
   assert.equal(probe("/tmp/root/"), 1, "the root itself (empty leaf) is refused");
-  assert.equal(probe("/tmp/rootx/testsToDelete-x-1"), 1, "a sibling that merely starts with the root's name is refused");
+  assert.equal(probe(`/tmp/rootx/${owned("x-1")}`), 1, "a sibling that merely starts with the root's name is refused");
   assert.equal(probe("/tmp/root/a\u0001b"), 1, "a control byte is refused");
 });
 
@@ -1682,7 +1702,7 @@ test("24d. gate 6/10: a LOCKED worktree whose `git worktree unlock` fails with a
   assert.equal(callsOf(w, "git").some((line) => line.includes("worktree remove")), false, "remove never ran");
 });
 
-test("24e. gate 6/10: an UNLOCKED worktree is not unlocked at all — there is no 'not locked' failure to tell from a real one", { timeout: TIMEOUT }, (t) => {
+test("24e. gate 6/10: an UNLOCKED worktree has no record — listed, kept, git is not asked; a LOCKED dead one is unlocked once and removed", { timeout: TIMEOUT }, (t) => {
   if (win32) {
     t.skip("a stub tool must come first on PATH");
     return;
@@ -1690,23 +1710,31 @@ test("24e. gate 6/10: an UNLOCKED worktree is not unlocked at all — there is n
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const wt = worktree(w, w.other, tmp, "nounlock", { lock: undefined });
+  const bare = worktree(w, w.other, tmp, "nounlock", { lock: undefined });
   const stubDir = toolStub(w, "git", `echo "$*" >> "$DSTUB/gitlog"`);
 
-  const run = runJanitor(w, { tmp, ahead: [stubDir] });
+  const first = runJanitor(w, { tmp, ahead: [stubDir] });
 
-  assert.equal(run.status, 0, run.text);
-  assert.equal(exists(wt.path), false, run.text);
+  assert.equal(first.status, 0, first.text);
+  assert.ok(exists(bare.path), `kept: nobody's the helper knows\n${first.text}`);
+  assert.ok(mentions(first, `unmarked: worktree ${named(bare.path)}`), first.text);
+  assert.equal(callsOf(w, "git").some((line) => line.includes("worktree unlock") || line.includes("worktree remove")), false, "git was not asked to unlock or remove it");
+
+  const locked = worktree(w, w.other, tmp, "dolock", { lock: NOBODY() });
+  const second = runJanitor(w, { tmp, ahead: [stubDir] });
+
+  assert.equal(second.status, 0, second.text);
+  assert.equal(exists(locked.path), false, second.text);
   const log = callsOf(w, "git");
-  assert.equal(log.some((line) => line.includes("worktree unlock")), false, `unlock was not asked for\n${log.join("\n")}`);
-  assert.equal(log.some((line) => line.includes("worktree remove")), true, `remove was\n${log.join("\n")}`);
+  assert.equal(log.filter((line) => line.includes("worktree unlock")).length, 1, `unlock was asked once, for the locked one\n${log.join("\n")}`);
+  assert.equal(log.filter((line) => line.includes("worktree remove")).length, 1, `and remove once\n${log.join("\n")}`);
 });
 
 // --- 25 --------------------------------------------------------------------------------------------------------
 // Round 5. A registered worktree of the swept repository whose path a stranger took over is not even offered to git; a worktree
 // name of '.' or '..' is no worktree name.
 
-test("25a. wt-git symmetry: a registered worktree whose folder is no longer this user's own is kept, 'changed after the capture' — git is not asked", { timeout: TIMEOUT }, (t) => {
+test("25a. wt-git symmetry: a registered worktree whose folder is not this user's own is `foreign:` — git is not asked", { timeout: TIMEOUT }, (t) => {
   if (win32) {
     t.skip("a stub tool must come first on PATH");
     return;
@@ -1720,9 +1748,9 @@ test("25a. wt-git symmetry: a registered worktree whose folder is no longer this
 
   const run = runJanitor(w, { tmp, ahead: [stat, stubGit], env: { STAT_FOREIGN: wt.path } });
 
-  assert.equal(run.status, 3, run.text);
+  assert.equal(run.status, 0, run.text);
   assert.ok(exists(wt.path) && listedIn(w.clone).includes(named(wt.path)), `kept, registered\n${run.text}`);
-  assert.ok(mentions(run, named(wt.path), "changed after the capture", "its own owner is no longer this user"), run.text);
+  assert.ok(mentions(run, `foreign: worktree ${named(wt.path)}`), run.text);
   assert.equal(callsOf(w, "git").some((line) => line.includes("worktree remove") || line.includes("worktree unlock")), false, "git was not asked to unlock or remove it");
 });
 
@@ -1734,7 +1762,7 @@ test("25b. wt-git symmetry: a registered worktree path swapped AFTER the capture
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const wt = worktree(w, w.clone, tmp, "gitswap", { lock: undefined });
+  const wt = worktree(w, w.clone, tmp, "gitswap", { lock: NOBODY() });
   const victim = worktree(w, w.clone, tmp, "gitvictim", { lock: undefined, ageMs: 0 }); // young: never a candidate itself
   const aside = path.join(w.state, "aside-git");
   w.scope.after(() => {
@@ -1759,7 +1787,7 @@ for (const leaf of ["..", "."]) {
     const w = makeWorld(t);
     if (w === null) return;
     const tmp = makeTmp(w);
-    const wt = worktree(w, w.other, tmp, "dotname", { lock: undefined });
+    const wt = worktree(w, w.other, tmp, "dotname", { lock: NOBODY() });
     const dotGit = path.join(wt.path, ".git");
     const original = fs.readFileSync(dotGit);
     const put = (text) => { fs.rmSync(dotGit, { force: true }); fs.writeFileSync(dotGit, text); };
@@ -1774,3 +1802,604 @@ for (const leaf of ["..", "."]) {
     assert.ok(mentions(run, `${named(wt.path)} — owner '-malformed-gitdir' is unreadable`), run.text);
   });
 }
+
+// --- S4: the merged contract ---------------------------------------------------------------------------------------------
+// Scope by owner (the name's owner segment, the record's owner and the caller's token are ONE, and the entry's own kernel owner is the
+// caller), legacy and unmarked rows listed, identity re-checked, a plain folder removed through a quarantine, a worktree never renamed.
+// Every scenario names the plan's test (21–31) or the security scenario it holds.
+
+const realTool = (name) => spawnSync("sh", ["-c", `command -v ${name}`], { encoding: "utf8" }).stdout.trim();
+const HOSTNAME = HOST.split("@")[0];
+/** A folder `name` in `tmp` with a claim holding `record` (a string, or `null` for none), aged. Made by hand: the name is NOT necessarily this user's. */
+function rawFolder(tmp, name, record, ageMs = OLD) {
+  const dir = path.join(tmp, name);
+  fs.mkdirSync(dir);
+  if (record !== null) fs.writeFileSync(`${dir}.owner`, `${record}\n`);
+  age(dir, ageMs);
+  return dir;
+}
+/** A stand-in /proc: `entries` are pid folders, `self/ns/pid` says the reader's pid namespace is 4242. */
+function fakeProc(w, entries, { ns = 4242 } = {}) {
+  const dir = ownedDir(w.scope, "jproc");
+  for (const entry of entries) fs.mkdirSync(path.join(dir, String(entry)));
+  fs.mkdirSync(path.join(dir, "self", "ns"), { recursive: true });
+  fs.symlinkSync(`pid:[${ns}]`, path.join(dir, "self", "ns", "pid"));
+  return dir;
+}
+const recordIn = (pid, ns, owner = ME) => `${owner}:${HOSTNAME}@linux:${pid}:1:${ns}`;
+
+test("S4-21. root is a scope like any other: every owner is inventoried, only u0's own rows go (the uid seam — a forged u0 name on another user's folder stays)", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("the uid seam stands for a POSIX uid");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dead = unmatchablePid();
+  const mine = rawFolder(tmp, `${PREFIX}-u0-conventions-rootown-abc123`, ownerOf(dead, { owner: "u0" }));
+  const other = rawFolder(tmp, `${PREFIX}-u1000-conventions-alice-abc123`, ownerOf(dead, { owner: "u1000" }));
+  const forged = rawFolder(tmp, `${PREFIX}-u0-conventions-forged-abc123`, ownerOf(dead, { owner: "u0" }));
+  // `stat` that says root owns u0's entries (and the temp root), and someone else owns the forged one: the real files are this test user's
+  const stat = toolStub(w, "stat", `if [ "$1" = "-c" ] && [ "$2" = "%u" ]; then case "$3" in *-u0-conventions-forged*) echo 4242; exit 0;; "$STUB_ROOT"|*-u0-*) echo 0; exit 0;; esac; fi`);
+
+  const run = runJanitor(w, { tmp, ahead: [stat], env: { JANITOR_TEST_UID: "0", STUB_ROOT: tmp } });
+
+  assert.equal(run.status, 0, run.text);
+  assert.equal(exists(mine) || exists(`${mine}.owner`), false, `u0's own dead folder goes\n${run.text}`);
+  assert.ok(exists(other) && exists(`${other}.owner`), `u1000's folder is another scope: root deletes nothing of it\n${run.text}`);
+  assert.ok(mentions(run, `foreign: folder ${named(other)} — owner u1000`), `inventoried, listed, never an exit code\n${run.text}`);
+  assert.ok(exists(forged), `a u0 name on a folder another uid owns is a forgery: kept\n${run.text}`);
+  assert.ok(mentions(run, `foreign: folder ${named(forged)} — owner u0`), run.text);
+  assert.ok(run.seams.some((line) => line.includes("JANITOR_TEST_UID")), `the seam is announced: ${run.seams.join(" // ")}`);
+});
+
+test("S4-21b. run as root (the suite runs as uid 0 in CI): u0's own folder goes, u1000's is listed and kept", { timeout: TIMEOUT }, (t) => {
+  if (!root) {
+    t.skip("this run is not uid 0; the uid seam in S4-21 stands for it");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const mine = folder(w, tmp, "rootreal", { owner: NOBODY() });
+  const other = rawFolder(tmp, `${PREFIX}-u1000-conventions-alice-abc123`, ownerOf(unmatchablePid(), { owner: "u1000" }));
+  fs.chownSync(other, 1000, 1000);
+  fs.chownSync(`${other}.owner`, 1000, 1000);
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 0, run.text);
+  assert.equal(exists(mine), false, run.text);
+  assert.ok(exists(other) && mentions(run, `foreign: folder ${named(other)} — owner u1000`), run.text);
+});
+
+test("S4-22. both name versions side by side: the owner-form row is judged, the legacy row prints its command and is kept — exit stays 0", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const judged = folder(w, tmp, "bothnew", { owner: NOBODY() });
+  const legacy = rawFolder(tmp, `${PREFIX}-conventions-bothold-abc123`, `${HOSTNAME}@linux:${unmatchablePid()}`);
+  setDocker(w, { ps: [["c9", `${PREFIX}-conventions-oldbox`, NOBODY(), dockerTime(OLD)]] }); // a dead-looking label on a legacy name changes nothing: a daemon's legacy object is never collected
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 0, `a legacy row never changes the exit code\n${run.text}`);
+  assert.equal(exists(judged) || exists(`${judged}.owner`), false, `the owner-form row is judged and goes\n${run.text}`);
+  assert.ok(exists(legacy) && exists(`${legacy}.owner`), `the legacy folder is kept: on a Linux reader its old-grammar record has no pid namespace\n${run.text}`);
+  assert.ok(mentions(run, `legacy: folder ${named(legacy)} — remove with: rm -rf -- `, `${named(legacy)}.owner`), `the exact command a person would run\n${run.text}`);
+  assert.ok(mentions(run, `legacy: container ${PREFIX}-conventions-oldbox — remove with: docker rm -f -v c9`), run.text);
+  assert.deepEqual(rmCalls(w), [], "docker was never asked to remove it");
+});
+
+test("S4-22b. a legacy folder goes only where its OLD-grammar record is gone and this user owns it (a reader that needs no namespace); live, foreign and unmarked ones are listed", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("a ps stub and the uid seam need a POSIX machine");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const record = (pid) => `${HOSTNAME}@macos:${pid}`;
+  const gone = rawFolder(tmp, `${PREFIX}-conventions-legacygone-abc123`, record(unmatchablePid(0)));
+  const unmarked = rawFolder(tmp, `${PREFIX}-conventions-legacynone-abc123`, null);
+  const strangers = rawFolder(tmp, `${PREFIX}-conventions-legacyforeign-abc123`, record(unmatchablePid(1)));
+
+  const dead = runJanitor(w, { tmp, env: { JANITOR_OS: "macos", JANITOR_TEST_OWNER_CHECK: `foreign:${posix(strangers)}`, ...psStub(1) } });
+
+  assert.equal(dead.status, 0, dead.text);
+  assert.equal(exists(gone) || exists(`${gone}.owner`), false, `mine and gone: removed\n${dead.text}`);
+  assert.ok(exists(unmarked) && mentions(dead, `legacy: folder ${named(unmarked)}`), `no record: listed with its command, kept\n${dead.text}`);
+  assert.ok(exists(strangers) && mentions(dead, `legacy: folder ${named(strangers)}`), `not owned by this user: listed, kept\n${dead.text}`);
+
+  const live = rawFolder(tmp, `${PREFIX}-conventions-legacylive-abc123`, record(process.pid));
+  const alive = runJanitor(w, { tmp, env: { JANITOR_OS: "macos", ...psStub(0) } });
+  assert.equal(alive.status, 0, alive.text);
+  assert.ok(exists(live) && mentions(alive, `legacy: folder ${named(live)}`), `a live old-grammar owner: kept, listed\n${alive.text}`);
+});
+
+test("S4-23. a forged owner is never believed: a folder or a claim another user owns, a record or a name that disagrees — foreign, kept, never read, exit 0", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("the seam makes a path someone else's; a stub tool must come first on PATH");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const stranger = rawFolder(tmp, owned("conventions-stranger-abc123"), NOBODY()); // this user's name, a dead record — on a folder the seam says another uid owns
+  const planted = folder(w, tmp, "plantedclaim", { owner: NOBODY() }); // a good folder whose CLAIM file another uid wrote
+  const wrongRecord = folder(w, tmp, "wrongrecord", { owner: ownerOf(unmatchablePid(), { owner: "u1000" }) }); // this user's name, another owner's record
+  const wrongName = rawFolder(tmp, `${PREFIX}-u1000-conventions-wrongname-abc123`, NOBODY()); // another owner's name, this user's record
+
+  const first = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${posix(stranger)}`, ...timeoutStub() } });
+
+  assert.equal(first.status, 0, `foreign lines never change the exit code\n${first.text}`);
+  assert.ok(exists(stranger), first.text);
+  assert.ok(mentions(first, `foreign: folder ${named(stranger)}`), first.text);
+  assert.ok(exists(wrongRecord) && mentions(first, `foreign: folder ${named(wrongRecord)} — owner u1000`), `a record naming another owner is a forgery: listed with the owner it claims, kept\n${first.text}`);
+  assert.ok(exists(wrongName) && mentions(first, `foreign: folder ${named(wrongName)} — owner u1000`), first.text);
+  assert.equal(exists(planted) || exists(`${planted}.owner`), false, "control: the ordinary dead folder beside them goes");
+  const reads = callsOf(w, "timeout").filter((line) => line.includes(named(stranger)) || line.includes(named(wrongName)));
+  assert.deepEqual(reads, [], `neither the forged folder nor the other owner's name was entered or read\n${reads.join("\n")}`);
+
+  const again = folder(w, tmp, "plantedclaim2", { owner: NOBODY() });
+  const second = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${posix(`${again}.owner`)}` } }); // the claim file's own uid is not this user's
+  assert.equal(second.status, 0, second.text);
+  assert.ok(exists(again) && exists(`${again}.owner`), `a claim another user wrote is no evidence: the folder is kept\n${second.text}`);
+  assert.ok(mentions(second, `foreign: folder ${named(again)}`), second.text);
+});
+
+test("S4-24. inaccessible or mismatching process evidence keeps the resource: a record without a namespace, another namespace, a hidden process list — and the matching one goes", { timeout: TIMEOUT }, (t) => {
+  if (!linux) {
+    t.skip("the pid namespace is a Linux fact");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dead = unmatchablePid();
+  const noNs = rawFolder(tmp, owned("conventions-nons-abc123"), `${ME}:${HOSTNAME}@linux:${dead}`);
+  const otherNs = rawFolder(tmp, owned("conventions-otherns-abc123"), recordIn(dead, 4243));
+  const same = rawFolder(tmp, owned("conventions-samens-abc123"), recordIn(dead, 4242));
+  const env = { JANITOR_OS: "linux", JANITOR_PROC: posix(fakeProc(w, [1])) };
+
+  const run = runJanitor(w, { tmp, env });
+
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(noNs) && exists(otherNs), `kept\n${run.text}`);
+  assert.equal(run.stderr.filter((line) => line.startsWith("skipped: folder") && line.includes("pid namespace")).length, 2, `each one named, with the reason\n${run.text}`);
+  assert.equal(exists(same) || exists(`${same}.owner`), false, `the record of THIS namespace with no such pid is the one that goes\n${run.text}`);
+
+  const sameAgain = rawFolder(tmp, owned("conventions-samens2-abc123"), recordIn(dead, 4242));
+  const hidden = runJanitor(w, { tmp, env: { ...env, JANITOR_PROC: posix(fakeProc(w, [])) } }); // pid 1 invisible: the process list may hide other users' processes (hidepid)
+  assert.equal(hidden.status, 3, hidden.text);
+  assert.ok(exists(sameAgain), `a hidden process list proves nothing: the matching record stays too\n${hidden.text}`);
+});
+
+test("S4-25. the identity re-check: a folder replaced AFTER the capture by another inode with a copied claim is skipped 'changed after the capture' — nothing is removed", { timeout: TIMEOUT }, async (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const swapped = folder(w, tmp, "inode", { owner: NOBODY() });
+  const aside = path.join(w.state, "aside-inode");
+
+  const run = await runPaused(w, tmp, () => {
+    fs.renameSync(swapped, aside);
+    fs.mkdirSync(swapped); // another inode, the SAME name, the same sibling claim
+  });
+
+  assert.equal(run.paused, true, run.stderr);
+  assert.equal(run.status, 3, run.stderr);
+  assert.ok(exists(swapped) && exists(aside), `the new folder and the original are both still there\n${run.stderr}`);
+  assert.ok(run.lines.some((line) => line.includes(named(swapped)) && line.includes("changed after the capture") && line.includes("device or inode")), run.stderr);
+});
+
+test("S4-25c. ... or by a link into a checkout (a junction on Windows): the link is not followed, the target is untouched", { timeout: TIMEOUT }, async (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const linked = folder(w, tmp, "linkswap", { owner: NOBODY() });
+  const target = path.join(w.targets, "checkout");
+  fs.mkdirSync(target);
+  fs.writeFileSync(path.join(target, "keep.txt"), "kept\n");
+  const aside = path.join(w.state, "aside-link");
+
+  const run = await runPaused(w, tmp, () => {
+    fs.renameSync(linked, aside);
+    fs.symlinkSync(target, linked, "junction"); // a junction on Windows (no privilege needed), a plain symlink elsewhere
+  });
+
+  assert.equal(run.paused, true, run.stderr);
+  assert.equal(run.status, 3, run.stderr);
+  assert.ok(exists(path.join(target, "keep.txt")), `what the link points at is untouched\n${run.stderr}`);
+  assert.ok(run.lines.some((line) => line.includes(named(linked)) && line.includes("changed after the capture") && line.includes("it is now a link")), run.stderr);
+});
+
+test("S4-25b. a claim that changed after the capture is not the claim that was judged: kept, 'changed after the capture'", { timeout: TIMEOUT }, async (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dir = folder(w, tmp, "claimswap", { owner: NOBODY() });
+
+  const run = await runPaused(w, tmp, () => fs.writeFileSync(`${dir}.owner`, `${LIVE()}\n`)); // a live owner appears after the verdict
+
+  assert.equal(run.paused, true, run.stderr);
+  assert.equal(run.status, 3, run.stderr);
+  assert.ok(exists(dir), `a run that came alive after the verdict is not removed\n${run.stderr}`);
+  assert.ok(run.lines.some((line) => line.includes(named(dir)) && line.includes("changed after the capture") && line.includes("claim")), run.stderr);
+});
+
+test("S4-26. Windows: w<digits> from the account name through sha256sum equals the Node derivation, and the file owner (-O), not the token, decides", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("S4-28 is the real Windows check; this one stands in for the account name with an `id` stub");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const token = windowsOwnerToken("Alice"); // the account name as `id -un` prints it; the derivation lower-cases it
+  assert.equal(token, "w735577801");
+  const idStub = ownedDir(w.scope, "jid");
+  fs.writeFileSync(path.join(idStub, "id"), "#!/bin/sh\necho Alice\n", { mode: 0o755 });
+  const dead = unmatchablePid();
+  const task = taskStub(w, "noPid");
+  const record = (owner, pid) => `${owner}:${HOSTNAME}@windows:${pid}`;
+  const mine = rawFolder(tmp, `${PREFIX}-${token}-conventions-winmine-abc123`, record(token, dead));
+  const collision = rawFolder(tmp, `${PREFIX}-${token}-conventions-wincollide-abc123`, record(token, dead)); // another account whose token collides: the file's owner decides
+  const stranger = rawFolder(tmp, `${PREFIX}-w1-conventions-winother-abc123`, record("w1", dead));
+
+  const run = runJanitor(w, { tmp, ahead: [idStub, task], env: { JANITOR_OS: "windows", TESTSTODELETE_OWNER: "", JANITOR_TEST_OWNER_CHECK: `foreign:${posix(collision)}` } });
+
+  assert.equal(run.status, 0, run.text);
+  assert.equal(exists(mine) || exists(`${mine}.owner`), false, `this account's own dead folder goes\n${run.text}`);
+  assert.ok(exists(collision) && mentions(run, `foreign: folder ${named(collision)}`), `an equal token confers no authority: -O says another account owns it\n${run.text}`);
+  assert.ok(exists(stranger) && mentions(run, `foreign: folder ${named(stranger)} — owner w1`), run.text);
+});
+
+test("S4-27. a legacy container, volume or network is a `legacy:` line and is never removed, whatever its label says", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const legacy = (rest) => `${PREFIX}-conventions-${rest}`;
+  setDocker(w, {
+    ps: [["c1", legacy("lbox"), NOBODY(), dockerTime(OLD)]], net: [["a1", legacy("lnet"), NOBODY(), dockerTime(OLD)]],
+    vol: [[legacy("lvol"), NOBODY()]], volCreated: [[legacy("lvol"), volumeTime(OLD)]],
+  });
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 0, run.text);
+  assert.deepEqual(rmCalls(w), [], "nothing was removed");
+  assert.ok(mentions(run, `legacy: container ${legacy("lbox")} — remove with: docker rm -f -v c1`), run.text);
+  assert.ok(mentions(run, `legacy: network ${legacy("lnet")} — remove with: docker network rm a1`), run.text);
+  assert.ok(mentions(run, `legacy: volume ${legacy("lvol")} — remove with: docker volume rm ${legacy("lvol")}`), run.text);
+});
+
+test("S4-28. Windows end-to-end (the check the rule asks for before the janitor sweeps there): an owned dead folder goes, a live one and a foreign-owner one stay", { timeout: TIMEOUT }, (t) => {
+  if (!win32) {
+    t.skip("runs only on a Windows machine with Git for Windows' bash: the janitor there is --dry-run only until this passes");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dead = folder(w, tmp, "e2edead", { owner: NOBODY() });
+  const live = folder(w, tmp, "e2elive", { owner: LIVE() });
+  const foreign = rawFolder(tmp, `${PREFIX}-w1-conventions-e2eother-abc123`, `w1:${HOSTNAME}@windows:${unmatchablePid()}`);
+
+  const run = runJanitor(w, { tmp, env: { TESTSTODELETE_OWNER: "" } }); // the real account name, the real `tasklist`, the real file owner
+
+  assert.equal(exists(dead) || exists(`${dead}.owner`), false, `the owned dead leftover is deleted\n${run.text}`);
+  assert.ok(exists(live), `a live one is kept\n${run.text}`);
+  assert.ok(exists(foreign) && mentions(run, `foreign: folder ${named(foreign)} — owner w1`), `a foreign-owner one is kept and listed\n${run.text}`);
+});
+
+test("S4-29. a dead-owned worktree goes through `git worktree remove` and is never renamed; a plain folder is the only thing the janitor renames", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("a stub tool must come first on PATH");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const registered = worktree(w, w.clone, tmp, "norename1", { lock: NOBODY() });
+  const strangers = worktree(w, w.other, tmp, "norename2", { lock: NOBODY() });
+  const plain = folder(w, tmp, "renamed", { owner: NOBODY() });
+  const mv = toolStub(w, "mv", `echo "$*" >> "$DSTUB/mvlog"`);
+  const gitStub = toolStub(w, "git", `echo "$*" >> "$DSTUB/gitlog"`);
+
+  const dry = runJanitor(w, { tmp, ahead: [mv, gitStub], args: ["--dry-run"] });
+  assert.equal(dry.stdout.some((line) => line.startsWith("would run: mv --") && (line.includes(named(registered.path)) || line.includes(named(strangers.path)))), false, `a dry run never announces a rename of a worktree\n${dry.stdout.join("\n")}`);
+  assert.ok(dry.stdout.some((line) => line.startsWith("would run: mv --") && line.includes(named(plain))), `but it does announce the plain folder's\n${dry.stdout.join("\n")}`);
+
+  const run = runJanitor(w, { tmp, ahead: [mv, gitStub] });
+
+  assert.equal(run.status, 0, run.text);
+  assert.equal(exists(registered.path) || exists(strangers.path) || exists(plain), false, `all three are gone\n${run.text}`);
+  const moves = callsOf(w, "mv");
+  assert.equal(moves.some((line) => line.includes(named(registered.path)) || line.includes(named(strangers.path))), false, `no worktree was renamed\n${moves.join("\n")}`);
+  assert.equal(moves.filter((line) => line.includes(named(plain))).length, 1, `the plain folder was renamed once, into its quarantine\n${moves.join("\n")}`);
+  assert.equal(callsOf(w, "git").filter((line) => line.includes("worktree remove --force --force")).length, 2, `both worktrees went through git\n${callsOf(w, "git").join("\n")}`);
+});
+
+test("S4-30. a folder swapped between the pre-rename check and the rename is caught by the re-check in the quarantine, renamed back and skipped — nothing is removed", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("a stub tool must come first on PATH");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dir = folder(w, tmp, "raceswap", { owner: NOBODY() });
+  const aside = path.join(w.state, "race-aside");
+  const realMv = realTool("mv");
+  // the first `mv -- <folder> <quarantine>` finds the folder replaced by another one, the way a stranger's rename between the check and the call would
+  const mv = toolStub(w, "mv", `if [ "$1" = "--" ] && [ "$2" = "$RACE_FROM" ] && [ ! -e "$RACE_ASIDE" ]; then ${realMv} "$RACE_FROM" "$RACE_ASIDE" && mkdir "$RACE_FROM"; fi`);
+  w.scope.after(() => { if (exists(aside)) { fs.rmSync(dir, { recursive: true, force: true }); fs.renameSync(aside, dir); } });
+
+  const run = runJanitor(w, { tmp, ahead: [mv], env: { RACE_FROM: dir, RACE_ASIDE: aside } });
+
+  assert.equal(run.status, 3, run.text);
+  assert.ok(exists(aside), `the original folder was never removed\n${run.text}`);
+  assert.ok(exists(dir) && fs.readdirSync(dir).length === 0, `the folder that took its place was renamed BACK onto the name\n${run.text}`);
+  assert.ok(mentions(run, "skipped: folder ", named(dir), "changed after the capture", "renamed back"), run.text);
+  assert.deepEqual(fs.readdirSync(tmp).filter((entry) => entry.includes("quarantine")), [], "and no quarantine is left");
+  assert.equal(run.progress.some((line) => line.startsWith("janitor: removed folder")), false, "nothing was announced as removed");
+});
+
+test("S4-31. a run killed after the rename left a quarantine: the NEXT run restores it onto its free name before its capture — and only then; a taken name, a live renamer and another user's quarantine are left", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("restoring onto a name is a POSIX rename (on Windows it is a notice only)");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const quarantineOf = (dir, pid) => path.join(tmp, `.${named(dir)}.teststodelete-quarantine-${pid}-abcd1234`);
+  const killed = folder(w, tmp, "killed", { owner: LIVE() }); // a live owner: once restored it is judged and KEPT, so the restore is what the test sees
+  const qKilled = quarantineOf(killed, unmatchablePid());
+  fs.renameSync(killed, qKilled);
+  const taken = folder(w, tmp, "taken", { owner: LIVE() });
+  const qTaken = quarantineOf(taken, unmatchablePid(1));
+  fs.mkdirSync(qTaken);
+  const running = folder(w, tmp, "running", { owner: LIVE() });
+  const qRunning = quarantineOf(running, process.pid); // its renamer is alive: another janitor is working
+  fs.renameSync(running, qRunning);
+  const strange = folder(w, tmp, "strange", { owner: LIVE() });
+  const qStrange = quarantineOf(strange, unmatchablePid(2));
+  fs.renameSync(strange, qStrange);
+
+  const dry = runJanitor(w, { tmp, args: ["--dry-run"] });
+  assert.ok(exists(qKilled) && !exists(killed), `a dry run restores nothing\n${dry.text}`);
+  assert.ok(dry.stdout.some((line) => line.startsWith("would run: mv -- ") && line.includes(named(qKilled))), dry.stdout.join("\n"));
+
+  const run = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${posix(qStrange)}` } });
+
+  assert.ok(exists(killed) && !exists(qKilled), `restored under its name\n${run.text}`);
+  assert.ok(mentions(run, "notice:", `restored as ${named(killed)}`), run.text);
+  assert.ok(mentions(run, `skipped: folder ${killed}`, "owned by live process"), `and the capture of the SAME run saw it\n${run.text}`);
+  assert.ok(exists(qTaken) && mentions(run, "notice:", "taken", named(taken)), `a quarantine whose name is taken is reported, never put over it\n${run.text}`);
+  assert.ok(exists(qRunning) && !exists(running), `a live renamer's quarantine is not touched\n${run.text}`);
+  assert.ok(exists(qStrange) && !exists(strange), `a quarantine another uid owns is not restored\n${run.text}`);
+});
+
+test("S4-32. TESTSTODELETE_OWNER is validated against ^[uw][0-9]{1,10}$ or the run exits 2 before anything is listed — and a valid one never widens what the kernel owner allows", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const mine = folder(w, tmp, "override", { owner: NOBODY() });
+  for (const bad of ["u0;rm -rf /", "u1000 ", " u1000", "U1000", "x1000", "u", "w", "u12345678901", "u-1", "u1000\n"]) {
+    const run = runJanitor(w, { tmp, env: { TESTSTODELETE_OWNER: bad } });
+
+    assert.equal(run.status, 2, `${JSON.stringify(bad)}\n${run.text}`);
+    assert.equal(run.stderr.length, 1, `one line: ${JSON.stringify(run.stderr)}`);
+    assert.match(run.stderr[0], /TESTSTODELETE_OWNER .* is not an owner token/, run.text);
+    assert.equal(/[\x00-\x1f\x7f]/.test(run.stderr[0]), false, "no control byte of the value reaches the terminal");
+    assert.ok(exists(mine) && dockerLog(w).length === 0, `${JSON.stringify(bad)}: nothing was listed or touched`);
+  }
+  const root0 = rawFolder(tmp, `${PREFIX}-u0-conventions-rootowned-abc123`, ownerOf(unmatchablePid(), { owner: "u0" }));
+  const asRoot = runJanitor(w, { tmp, env: { TESTSTODELETE_OWNER: "u0", JANITOR_TEST_OWNER_CHECK: `foreign:${posix(root0)}` } }); // the override says u0; the folder's kernel owner is not this user
+  assert.equal(asRoot.status, 0, asRoot.text);
+  assert.ok(exists(root0) && mentions(asRoot, `foreign: folder ${named(root0)}`), `the override never widens: root's folder, which this user does not own, stays\n${asRoot.text}`);
+  assert.ok(exists(mine) && mentions(asRoot, `foreign: folder ${named(mine)}`), `and this user's own scope is not the override's: listed as foreign\n${asRoot.text}`);
+  const unset = runJanitor(w, { tmp, env: { TESTSTODELETE_OWNER: "" } });
+  assert.equal(exists(mine), false, `an empty value is no value: the caller's own token applies\n${unset.text}`);
+});
+
+test("S4-33. no option names an owner and no token is an owner: --owner, --token u1000, --token w5 are usage, exit 2, nothing touched", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const mine = folder(w, tmp, "usage", { owner: NOBODY() });
+  for (const args of [["--owner", "u1000"], ["--owner"], ["--token", "u1000"], ["--token", "w5"], ["--token", "w4294967295"]]) {
+    const run = runJanitor(w, { tmp, args });
+
+    assert.equal(run.status, 2, `${JSON.stringify(args)}\n${run.text}`);
+    assert.ok(run.stderr.some((line) => line.startsWith("usage:")), run.text);
+    assert.ok(exists(mine), `${JSON.stringify(args)} touched something`);
+  }
+});
+
+test("S4-34. an entry named for another owner is never entered or opened: a FIFO as its claim, its .git or its folder name cannot make the janitor wait", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("mkfifo: a FIFO needs a POSIX filesystem");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const strangerClaim = rawFolder(tmp, `${PREFIX}-u1000-conventions-fifoclaim-abc123`, null);
+  plantFifo(w, `${strangerClaim}.owner`);
+  const strangerGit = rawFolder(tmp, `${PREFIX}-u1000-conventions-fifogit-abc123`, null);
+  plantFifo(w, path.join(strangerGit, ".git"));
+  const strangerWt = rawFolder(tmp, `${PREFIX}-u1000-conventions-gitfile-abc123`, null);
+  fs.writeFileSync(path.join(strangerWt, ".git"), "gitdir: /nonexistent/clone/.git/worktrees/x\n");
+  const orphan = path.join(tmp, `${PREFIX}-u1000-conventions-orphanclaim-abc123.owner`);
+  fs.writeFileSync(orphan, `${NOBODY()}\n`);
+  age(orphan, OLD);
+  plantFifo(w, path.join(tmp, `${PREFIX}-u1000-conventions-orphanfifo-abc123.owner`)); // not even a regular file: never listed, never opened
+
+  const run = runJanitor(w, { tmp, timeoutMs: 60_000 });
+
+  assert.equal(run.error, undefined, "the run finished instead of blocking on a FIFO");
+  assert.equal(run.status, 0, run.text);
+  assert.ok(mentions(run, `foreign: folder ${named(strangerClaim)} — owner u1000`), run.text);
+  assert.ok(mentions(run, `foreign: folder ${named(strangerGit)} — owner u1000`), run.text);
+  assert.ok(mentions(run, `foreign: worktree ${named(strangerWt)} — owner u1000`), `a foreign folder holding a .git FILE is a foreign worktree: its .git is not read\n${run.text}`);
+  assert.ok(mentions(run, `foreign: marker ${named(orphan)} — owner u1000`), `another owner's claim: listed, never opened\n${run.text}`);
+});
+
+test("S4-35. branches: this user's goes by its captured tip (a branch that moved is kept); another owner's is `foreign:`, a legacy name is `legacy:` with its command", { timeout: TIMEOUT }, async (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const mine = ownedName("brmine");
+  const moved = ownedName("brmoved");
+  const theirs = `${PREFIX}-u1000-conventions-brtheirs-abc123`;
+  const legacy = `${PREFIX}-conventions-brlegacy-abc123`;
+  for (const name of [mine, moved, theirs, legacy]) {
+    git(w.clone, "branch", name);
+    w.scope.after(() => spawnSync("git", ["-C", w.clone, "branch", "-D", name], { timeout: 30_000, windowsHide: true }));
+  }
+  const tip = git(w.clone, "rev-parse", mine);
+
+  const run = await runPaused(w, tmp, () => {
+    git(w.clone, "checkout", "-q", "--detach");
+    git(w.clone, ...COMMIT.slice(0, 6), "commit", "--allow-empty", "-qm", "moves a branch later");
+    git(w.clone, "branch", "-f", moved, "HEAD");
+  });
+
+  assert.equal(run.paused, true, run.stderr);
+  assert.equal(branchesOf(w.clone).includes(mine), false, `this user's branch went by its captured tip (${tip})\n${run.stderr}`);
+  assert.ok(branchesOf(w.clone).includes(moved), `a branch whose tip moved after the capture is kept\n${run.stderr}`);
+  assert.ok(run.lines.some((line) => line.includes(`skipped: branch ${moved}`) && line.includes("its tip moved")), run.stderr);
+  assert.ok(branchesOf(w.clone).includes(theirs) && run.lines.some((line) => line === `foreign: branch ${theirs} — owner u1000`), run.stderr);
+  assert.ok(branchesOf(w.clone).includes(legacy) && run.lines.some((line) => line.startsWith(`legacy: branch ${legacy} — remove with: git branch -D `)), run.stderr);
+});
+
+test("S4-36. a worktree's lock that changed after the capture is not the lock that was judged: kept (the swept repository's own and a stranger's clone alike)", { timeout: TIMEOUT }, async (t) => {
+  if (win32) {
+    t.skip("a paused run needs a POSIX filesystem");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const own = worktree(w, w.clone, tmp, "lockown", { lock: NOBODY() });
+  const other = worktree(w, w.other, tmp, "lockother", { lock: NOBODY() });
+
+  const run = await runPaused(w, tmp, () => {
+    git(w.clone, "worktree", "unlock", own.path);
+    git(w.clone, "worktree", "lock", "--reason", LIVE(), own.path);
+    git(w.other, "worktree", "unlock", other.path);
+    git(w.other, "worktree", "lock", "--reason", LIVE(), other.path);
+  });
+
+  assert.equal(run.paused, true, run.stderr);
+  assert.equal(run.status, 3, run.stderr);
+  assert.ok(exists(own.path) && exists(other.path), `a worktree that came alive after the verdict is kept\n${run.stderr}`);
+  assert.ok(run.lines.some((line) => line.includes(named(own.path)) && line.includes("lock changed after the capture")), run.stderr);
+  assert.ok(run.lines.some((line) => line.includes(named(other.path)) && line.includes("changed after the capture")), run.stderr);
+});
+
+test("S4-37. a name with a control character: this user's scope is refused (exit 3), another owner's is `foreign:` and a legacy name is `legacy:` — no exit code from a stranger's name", { timeout: TIMEOUT, skip: win32 ? "Windows file names cannot hold control characters" : false }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const stranger = rawFolder(tmp, `${PREFIX}-u1000-conventions-ctl\nline-abc123`, null);
+  const legacy = rawFolder(tmp, `${PREFIX}-conventions-ctl\nline-abc123`, null);
+
+  const quiet = runJanitor(w, { tmp });
+
+  assert.equal(quiet.status, 0, `another owner's and a legacy name never change the exit code\n${quiet.text}`);
+  assert.ok(exists(stranger) && exists(legacy), "both kept");
+  assert.ok(mentions(quiet, "foreign: entry", "owner u1000"), quiet.text);
+  assert.ok(mentions(quiet, "legacy: entry"), quiet.text);
+  assert.equal(/[\x00-\x09\x0b-\x1f\x7f]/.test(quiet.stderr.join("\n")), false, "no control byte reaches stderr");
+  const own = rawFolder(tmp, `${owned("conventions-ctl")}\nline-abc123`, null);
+  const refused = runJanitor(w, { tmp });
+  assert.equal(refused.status, 3, refused.text);
+  assert.ok(exists(own) && refused.stderr.some((line) => line.startsWith("skipped: ") && line.includes("control character")), refused.text);
+});
+
+test("S4-22c. a legacy WORKTREE (registered here, or in another clone) goes only when its lock names an old-grammar owner that is gone; a dead-looking Linux reader keeps it listed", { timeout: TIMEOUT }, (t) => {
+  if (win32) {
+    t.skip("a ps stub must come first on PATH");
+    return;
+  }
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const record = `${HOSTNAME}@macos:${unmatchablePid()}`;
+  const here = path.join(tmp, `${PREFIX}-conventions-legacywt1-abc123`);
+  const there = path.join(tmp, `${PREFIX}-conventions-legacywt2-abc123`);
+  // testsToDelete-exempt: raw-worktree — a worktree named in the form before the owner segment, which the helper never makes
+  const first = rawWorktree(w, w.clone, here, ["--detach", "--lock", "--reason", record, here, "HEAD"]);
+  assert.equal(first.status, 0, first.stderr);
+  // testsToDelete-exempt: raw-worktree — the same legacy shape in another clone
+  const second = rawWorktree(w, w.other, there, ["--detach", "--lock", "--reason", record, there, "HEAD"]);
+  assert.equal(second.status, 0, second.stderr);
+  age(here, OLD);
+  age(there, OLD);
+
+  const linuxReader = runJanitor(w, { tmp });
+  assert.equal(linuxReader.status, 0, linuxReader.text);
+  assert.ok(exists(here) && exists(there), `a Linux reader cannot place an old-grammar pid: both are kept\n${linuxReader.text}`);
+  assert.ok(mentions(linuxReader, `legacy: worktree ${named(here)} — remove with: git worktree remove --force --force `), linuxReader.text);
+  assert.ok(mentions(linuxReader, `legacy: worktree ${named(there)} — remove with: git --git-dir=`), linuxReader.text);
+
+  const macReader = runJanitor(w, { tmp, env: { JANITOR_OS: "macos", ...psStub(1) } });
+  assert.equal(macReader.status, 0, macReader.text);
+  assert.equal(exists(here) || exists(there), false, `on a reader that needs no namespace the gone old-grammar owner is the second key\n${macReader.text}`);
+  assert.equal(listedIn(w.clone).includes(named(here)) || listedIn(w.other).includes(named(there)), false, "and both are unregistered");
+});
+
+test("S4-38. two users, one daemon: a daemon object has no kernel owner, so the label's owner is the evidence — another owner's container is `foreign:` (never removed), a label naming someone else under this user's name is `foreign:` too, this user's dead one goes", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dead = unmatchablePid();
+  setDocker(w, {
+    ps: [
+      ["c1", `${PREFIX}-u1000-conventions-bobs-abc123`, ownerOf(dead, { owner: "u1000" }), dockerTime(OLD)], // another user's, dead: theirs to remove
+      ["c2", owned("conventions-forged"), ownerOf(dead, { owner: "u1000" }), dockerTime(OLD)], // this user's name, another owner's label
+      ["c3", owned("conventions-mine"), NOBODY(), dockerTime(OLD)],
+    ],
+    net: [["a1", `${PREFIX}-u1000-conventions-bobnet-abc123`, ownerOf(dead, { owner: "u1000" }), dockerTime(OLD)]],
+    vol: [[`${PREFIX}-u1000-conventions-bobvol-abc123`, ownerOf(dead, { owner: "u1000" })]], volCreated: [[`${PREFIX}-u1000-conventions-bobvol-abc123`, volumeTime(OLD)]],
+  });
+
+  const run = runJanitor(w, { tmp });
+
+  assert.equal(run.status, 0, `foreign lines never change the exit code\n${run.text}`);
+  assert.deepEqual(rmCalls(w), ["rm -f -v c3"], `only this user's own dead container was removed\n${run.text}`);
+  assert.ok(mentions(run, `foreign: container ${PREFIX}-u1000-conventions-bobs-abc123 — owner u1000`), run.text);
+  assert.ok(mentions(run, `foreign: container ${owned("conventions-forged")} — owner u1000`), `a label that names another owner under this user's name is unknown: kept, listed with the owner it claims\n${run.text}`);
+  assert.ok(mentions(run, "foreign: network ", "owner u1000") && mentions(run, "foreign: volume ", "owner u1000"), run.text);
+});
+
+test("S4-39. a volume has no id: it is re-inspected just before it is removed, and one whose creation time or label changed since the capture is kept", { timeout: TIMEOUT }, async (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const [same, recreated, relabelled] = ["vsame", "vnew", "vlabel"].map((what) => owned(`conventions-${what}`));
+  const dead = NOBODY();
+  const created = volumeTime(OLD); // ONE instant: docker prints whole seconds, and two calls can straddle a second
+  setDocker(w, {
+    vol: [[same, dead], [recreated, dead], [relabelled, dead]],
+    volCreated: [same, recreated, relabelled].map((name) => [name, created]),
+  });
+
+  const run = await runPaused(w, tmp, () => {
+    setDocker(w, { // what a re-created volume of the same name, and a relabelled one, would answer
+      vol: [[same, dead], [recreated, dead], [relabelled, LIVE()]],
+      volCreated: [[same, created], [recreated, volumeTime(60_000)], [relabelled, created]],
+    });
+  });
+
+  assert.equal(run.paused, true, run.stderr);
+  assert.deepEqual(rmCalls(w), [`volume rm ${same}`], `only the unchanged volume was removed\n${run.stderr}`);
+  assert.ok(run.lines.some((line) => line.startsWith(`skipped: volume ${recreated}`) && line.includes("changed after the capture")), run.stderr);
+  assert.ok(run.lines.some((line) => line.startsWith(`skipped: volume ${relabelled}`) && line.includes("changed after the capture")), run.stderr);
+  assert.equal(run.status, 3, run.stderr);
+});

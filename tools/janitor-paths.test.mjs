@@ -28,7 +28,7 @@ import { spawnSync } from "node:child_process";
 import { git } from "./lib/git.mjs";
 import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import {
-  cleanupScope, formatLegacyOwner as formatOwner, ownedDir, ownedWorktree, processProbe, tempRoot, thisOwner,
+  cleanupScope, formatOwner, ownedDir, ownedWorktree, processProbe, tempRoot, thisOwner, thisOwnerToken,
 } from "./lib/owned.mjs";
 
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "janitor.sh");
@@ -39,7 +39,8 @@ const OLD = 3 * HOUR;
 const TIMEOUT = 1_500_000; // a janitor run is slow on Windows (tens of seconds, minutes under load)
 const COMMIT = ["-c", "user.name=Janitor test", "-c", "user.email=janitor@example.invalid", "-c", "commit.gpgsign=false",
   "commit", "--allow-empty", "-qm", "fixture"];
-const LINUX_TOOLS = ["bash", "sed", "awk", "grep", "find", "head", "tr", "cut", "xargs", "git", "hostname", "uname", "date", "stat", "rm", "env"];
+const LINUX_TOOLS = ["bash", "sed", "awk", "grep", "find", "head", "tr", "cut", "xargs", "git", "hostname", "uname", "date", "stat", "rm", "env", "readlink", "mv", "mkdir", "rmdir", "id", "sha256sum"];
+const ME = thisOwnerToken(); // the caller's owner token: the janitor under test derives the same one from its own uid
 
 // --- bash and PATH ---------------------------------------------------------------------------------------------
 
@@ -138,8 +139,11 @@ function makeWorld(t) {
 const HOST = thisOwner().host;
 
 function ownerOf(pid) {
-  const owner = { host: HOST, pid };
-  if (linux) owner.start = pid === process.pid ? (processProbe(pid).start ?? 1) : 1;
+  const owner = { owner: ME, host: HOST, pid };
+  if (linux) {
+    owner.start = pid === process.pid ? (processProbe(pid).start ?? 1) : 1;
+    owner.ns = thisOwner().ns;
+  }
   return formatOwner(owner);
 }
 
@@ -151,7 +155,7 @@ function age(target, msAgo) {
   fs.utimesSync(target, when, when);
 }
 
-/** A prefixed, claimed folder in `parent` that is a git clone; `owner: null` removes the claim (an unmarked folder is nobody's). */
+/** A prefixed, claimed folder in `parent` that is a git clone; `owner: null` removes the claim. The scenarios below give it a DEAD owner: a folder the janitor would remove were it not protected. */
 function oldClone(w, parent, what, { owner = null } = {}) {
   const dir = ownedDir(w.scope, what, { parent });
   if (owner === null) fs.rmSync(`${dir}.owner`);
@@ -203,11 +207,11 @@ for (const spelling of SPELLINGS) {
 // --- 2: the clone the janitor runs from is never deleted, in every spelling -------------------------------------
 
 for (const spelling of SPELLINGS) {
-  test(`B [${spelling}]. The clone the janitor runs from is never a candidate, though it is old, unclaimed and prefixed under the temp root`, { timeout: TIMEOUT }, (t) => {
+  test(`B [${spelling}]. The clone the janitor runs from is never a candidate, though it is old, dead-owned and prefixed under the temp root`, { timeout: TIMEOUT }, (t) => {
     const w = makeWorld(t);
     if (w === null) return;
     const tmp = ownedDir(w.scope, "ptmp");
-    const self = oldClone(w, tmp, "self");
+    const self = oldClone(w, tmp, "self", { owner: NOBODY() });
 
     const run = runJanitor(w, { cwd: self, tmpdir: spell(tmp, spelling) });
 
@@ -220,12 +224,12 @@ for (const spelling of SPELLINGS) {
 // --- 3: finding 20 — run from a LINKED worktree, the MAIN checkout is protected too -------------------------------
 
 for (const spelling of SPELLINGS) {
-  test(`D [${spelling}]. Run from a linked worktree: the repository's MAIN checkout (old, unclaimed, prefixed under the temp root) is never deleted`, { timeout: TIMEOUT }, (t) => {
+  test(`D [${spelling}]. Run from a linked worktree: the repository's MAIN checkout (old, dead-owned, prefixed under the temp root) is never deleted`, { timeout: TIMEOUT }, (t) => {
     const w = makeWorld(t);
     if (w === null) return;
     const tmp = ownedDir(w.scope, "ptmp");
     const elsewhere = ownedDir(w.scope, "pelse");
-    const main = oldClone(w, tmp, "main");
+    const main = oldClone(w, tmp, "main", { owner: NOBODY() });
     const linked = ownedWorktree(w.scope, main, "linked", { parent: elsewhere });
     age(main, OLD);
 
@@ -242,7 +246,7 @@ for (const spelling of SPELLINGS) {
     const tmp = ownedDir(w.scope, "ptmp");
     const elsewhere = ownedDir(w.scope, "pelse");
     const box = ownedDir(w.scope, "box", { parent: tmp });
-    fs.rmSync(`${box}.owner`);
+    fs.writeFileSync(`${box}.owner`, `${NOBODY()}\n`); // a dead owner: the folder would go were it not protected
     const main = makeClone(path.join(box, "repo"));
     const linked = ownedWorktree(w.scope, main, "linked", { parent: elsewhere });
     age(box, OLD);
