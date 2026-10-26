@@ -447,7 +447,7 @@
     {
       "id": "common.test-leftovers-janitor",
       "source": "common/test-leftovers-janitor.md",
-      "bodySha256": "5282b17a8a0d8310d23b5354ddeda27620b2c2e0380bbcb495abc2e2ebe49141",
+      "bodySha256": "8bac2d54047c0b83fb1b73feabe04057859011f4d88bfde63b118cf61aff5613",
       "sections": [
         "# The leftover janitor — `tools/janitor.sh`, the one host-wide sweep (MANDATORY where it runs)",
         "## Running it",
