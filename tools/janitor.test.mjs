@@ -134,6 +134,21 @@ present() { has "fail-rm:$1:present"; }
 TAB=$(printf '\\t')
 vlabel() { [ -f "$S/vol.tsv" ] || return 0; while IFS= read -r l || [ -n "$l" ]; do case "$l" in "$1$TAB"*) printf '%s' "\${l#*"$TAB"}";; esac; done < "$S/vol.tsv"; }
 created() { [ -f "$S/volcreated.tsv" ] || return 0; while IFS= read -r l || [ -n "$l" ]; do case "$l" in "$1$TAB"*) printf '%s\\n' "\${l#*"$TAB"}";; esac; done < "$S/volcreated.tsv"; }
+# Like docker, a removal that works prints the id (or the name) it removed on STDOUT: the janitor must not let that through.
+# A faithful \`volume inspect --format\`: docker renders a Go template, so ONLY the actions are replaced and every other byte is copied as it is — a literal backslash-t stays a backslash and a t (measured on Docker 29.9.1: \`docker volume inspect\` does NOT turn \`\\t\` into a tab, unlike \`docker ps\`), and \`{{"\\t"}}\` is a Go string literal that prints a real tab.
+render() {
+  f="$1"; o=""
+  while [ -n "$f" ]; do
+    case "$f" in
+      '{{.Name}}'*) o="$o$2"; f="\${f#'{{.Name}}'}";;
+      '{{.CreatedAt}}'*) o="$o$(created "$2")"; f="\${f#'{{.CreatedAt}}'}";;
+      '{{"\\t"}}'*) o="$o$TAB"; f="\${f#'{{"\\t"}}'}";;
+      '{{printf "%q" (index .Labels "testsToDelete.owner")}}'*) o="$o\"$(vlabel "$2")\""; f="\${f#'{{printf "%q" (index .Labels "testsToDelete.owner")}}'}";;
+      *) r="\${f#?}"; o="$o\${f%"$r"}"; f="$r";;
+    esac
+  done
+  printf '%s\\n' "$o"
+}
 case "$1" in
   ps)
     if has fail-ps; then echo "stub: docker ps failed" >&2; exit 1; fi
@@ -143,16 +158,16 @@ case "$1" in
   volume)
     case "$2" in
       ls) if has quote-ls; then emitq "$S/vol.tsv"; else emit "$S/vol.tsv"; fi;;
-      inspect) if [ "$3" = "--format" ]; then fmt="$4"; shift 4; for n in "$@"; do c="$(created "$n")"; case "$fmt" in *Name*) printf '%s\\t%s\\n' "$n" "$c";; *Labels*) printf '%s\\t"%s"\\n' "$c" "$(vlabel "$n")";; *) printf '%s\\n' "$c";; esac; done; else present "$last"; exit $?; fi;;
-      rm) if failrm "$last"; then exit 1; fi;;
+      inspect) if [ "$3" = "--format" ]; then fmt="$4"; shift 4; for n in "$@"; do render "$fmt" "$n"; done; else present "$last"; exit $?; fi;;
+      rm) if failrm "$last"; then exit 1; fi; printf '%s\\n' "$last";;
     esac;;
   network)
     case "$2" in
       ls) emit "$S/net.tsv";;
       inspect) present "$last"; exit $?;;
-      rm) if failrm "$last"; then exit 1; fi;;
+      rm) if failrm "$last"; then exit 1; fi; printf '%s\\n' "$last";;
     esac;;
-  rm) if failrm "$last"; then exit 1; fi;;
+  rm) if failrm "$last"; then exit 1; fi; printf '%s\\n' "$last";;
   inspect) present "$last"; exit $?;;
 esac
 exit 0
@@ -2742,4 +2757,53 @@ test("S4-46. the worktree the janitor runs from: this user's scope is `skipped` 
   assert.equal(mine.status, 3, mine.text);
   assert.ok(mentions(mine, "skipped: worktree", named(mineLeaf), "the janitor runs from it"), mine.text);
   assert.ok(exists(legacyLeaf) && exists(foreignLeaf) && exists(mineLeaf), "nothing was removed");
+});
+
+// --- the words a person reads, and what the removals print --------------------------------------------------------
+
+/** The reason literals of the script that reach `clean()` — `RS_WHY="…"` and the last argument of every `skip <kind> <name> "…"` call — plus the one `owner_why` appends to a reason. */
+function reasonLiterals(text) {
+  const why = [...text.matchAll(/RS_WHY="([^"]+)"/g)].map((match) => match[1]);
+  const skipped = [...text.matchAll(/\bskip\s+(?:"[^"]*"|[\w-]+)\s+(?:"[^"]*"|[\w-]+)\s+"([^"]*)"/g)].map((match) => match[1]);
+  const appended = [...text.matchAll(/owner_why\(\) \{[^\n]*?printf '([^']*)'/g)].map((match) => match[1]);
+  return { why, skipped, appended };
+}
+
+const KNOWN_WHY = 8; // RS_WHY literals in judge_record when this was written
+const KNOWN_SKIPPED = 24; // `skip` calls with a reason literal (one is the "$RS_WHY" pass-through)
+
+test("S5-1. every reason literal that reaches clean() is printable ASCII — clean() turns a dash into ???, so the person would read `process 1743312 ??? a run is in flight`", () => {
+  const { why, skipped, appended } = reasonLiterals(fs.readFileSync(SCRIPT, "utf8"));
+  assert.ok(why.length >= KNOWN_WHY, `the scan found ${why.length} RS_WHY literals, expected at least ${KNOWN_WHY}: its pattern no longer matches the script`);
+  assert.ok(skipped.length >= KNOWN_SKIPPED, `the scan found ${skipped.length} skip reasons, expected at least ${KNOWN_SKIPPED}`);
+  assert.equal(appended.length, 1, "the scan found the owner_why text");
+  const offenders = [...why, ...skipped, ...appended].filter((literal) => /[^\x20-\x7e]/.test(literal));
+  assert.deepEqual(offenders, [], "these reasons hold a byte outside printable ASCII");
+});
+
+test("S5-2. a skipped line for a live owner is readable: the reason prints as words, not as question marks", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  setDocker(w, { ps: [["c3", owned("conventions-live"), LIVE(), dockerTime(OLD)]] });
+  const run = runJanitor(w, { tmp });
+  assert.equal(run.status, 3, run.text);
+  assert.ok(mentions(run, `skipped: container ${owned("conventions-live")} — owned by live process`, "a run is in flight"), run.text);
+  assert.equal(run.text.includes("???"), false, `no reason is cut to question marks\n${run.text}`);
+});
+
+test("S5-3. a REAL removal is silent on stdout: the id docker prints for `rm` and `network rm` is not the janitor's output", { timeout: TIMEOUT }, (t) => {
+  const w = makeWorld(t);
+  if (w === null) return;
+  const tmp = makeTmp(w);
+  const dead = NOBODY();
+  setDocker(w, {
+    ps: [["c1abc", owned("conventions-old"), dead, dockerTime(OLD)]],
+    vol: [[owned("v-old"), dead]], volCreated: [[owned("v-old"), volumeTime(OLD)]],
+    net: [["a1def", owned("n-old"), dead, dockerTime(OLD)]],
+  });
+  const run = runJanitor(w, { tmp });
+  assert.equal(run.status, 0, run.text);
+  assert.deepEqual(rmCalls(w), ["rm -f -v c1abc", `volume rm ${owned("v-old")}`, "network rm a1def"], "the removals ran");
+  assert.deepEqual(run.stdout, [], `nothing the removal commands print reaches stdout\n${run.stdout.join(" // ")}`);
 });

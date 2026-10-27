@@ -422,14 +422,14 @@ pin_clone() {   # $1 = the captured physical clone, $2 = the admin dir as captur
   if untrusted_link "$(clone_of "$2")"; then return 1; fi
   return 0
 }
-volume_created() {   # $1 = captured volume names, one per line → "name<TAB>CreatedAt" for each that still exists; 1 on a real docker failure
+volume_created() {   # $1 = captured volume names, one per line → "name<TAB>CreatedAt" for each that still exists; 1 on a real docker failure. The tab is the Go string literal {{"\t"}}: `docker volume inspect` prints a bare \t as a backslash and a t (measured 2026-10-27, Docker 29.9.1), unlike `ps` and `network ls`
   local batch one n
-  if batch="$(printf '%s\n' "$1" | xargs docker volume inspect --format '{{.Name}}\t{{.CreatedAt}}' 2>/dev/null)"; then printf '%s\n' "$batch"; return 0; fi
+  if batch="$(printf '%s\n' "$1" | xargs docker volume inspect --format '{{.Name}}{{"\t"}}{{.CreatedAt}}' 2>/dev/null)"; then printf '%s\n' "$batch"; return 0; fi
   # the batch failed — most likely ONE volume vanished between `ls` and here, and docker refuses the whole call. Ask per name:
   # a missing volume is simply absent from the answer (the caller reports it); any other failure is a failed listing.
   while IFS= read -r n; do
     [ -n "$n" ] || continue
-    if one="$(docker volume inspect --format '{{.Name}}\t{{.CreatedAt}}' "$n" 2>&1)"; then printf '%s\n' "$one"
+    if one="$(docker volume inspect --format '{{.Name}}{{"\t"}}{{.CreatedAt}}' "$n" 2>&1)"; then printf '%s\n' "$one"
     elif ! printf '%s\n' "$one" | grep -qi 'no such volume'; then echo "janitor: docker volume inspect failed: $(clean "$(printf '%s\n' "$one" | head -n 1)")" >&2; return 1; fi
   done <<< "$1"
 }
@@ -624,7 +624,7 @@ legacy_cmd() {   # $1 = kind, $2 = id, $3 = name or path, $4 = the clone → the
   esac
 }
 say_legacy() { printf '%s\n' "legacy: $(clean "$(kw "$1")") $(clean "$2") — remove with: $(legacy_cmd "$1" "$3" "$4" "$5")" >&2; }   # kind, leaf, id, path, clone: a name from before the owner segment, listed with its command
-owner_why() { case "$1" in -unsafe-root) printf ' — the temp root is not trusted';; esac; }   # what an owner marker of ours means, for a person
+owner_why() { case "$1" in -unsafe-root) printf '; the temp root is not trusted';; esac; }   # what an owner marker of ours means, for a person
 safe_id() {   # a folder, worktree or claim is removed only when it is exactly ONE component below the temp root, and holds no control byte
   local rest
   case "$1" in "$T"/?*) rest="${1#"$T"/}";; *) return 1;; esac
@@ -646,20 +646,20 @@ judge_record() {   # $1 = the record text, $2 = merged | legacy (the grammar of 
     if ! scope_ok "$3" "$R_OWNER" "$ME_OWNER" 1; then RS=foreign; return 0; fi   # the record's owner is not the name's, or not the caller's: another scope (a forged name or record keeps the resource and says whose it claims to be)
   fi
   if [ "$(printf '%s' "$R_HOST" | lower)" != "$(printf '%s' "$me" | lower)" ]; then RS_WHY="belongs to $R_HOST, not this host"; return 0; fi
-  if [ "$2" = merged ] && ! ns_ok "$OS" "$R_NS" "$MY_NS"; then RS_WHY="liveness unknown for process $R_PID — the record names no pid namespace, or another one than this reader's"; return 0; fi
+  if [ "$2" = merged ] && ! ns_ok "$OS" "$R_NS" "$MY_NS"; then RS_WHY="liveness unknown for process $R_PID; the record names no pid namespace, or another one than this reader's"; return 0; fi
   p="$R_PID"
-  if ! pid_ok "$p"; then RS_WHY="liveness unknown for process $p — not a process id"; return 0; fi   # grammar-valid, but no process can have it: never asked, never gone
-  if [ "$OS" = windows ] && [ "$p" = 1 ]; then RS_WHY="liveness unknown for process 1 — Windows has no pid 1; a bash started by a native process reports it"; return 0; fi
+  if ! pid_ok "$p"; then RS_WHY="liveness unknown for process $p; not a process id"; return 0; fi   # grammar-valid, but no process can have it: never asked, never gone
+  if [ "$OS" = windows ] && [ "$p" = 1 ]; then RS_WHY="liveness unknown for process 1; Windows has no pid 1; a bash started by a native process reports it"; return 0; fi
   liveness "$p" && lv=0 || lv=$?
-  if [ "$lv" = 0 ]; then RS_WHY="owned by live process $p — a run is in flight"; return 0; fi
-  if [ "$lv" != 1 ]; then RS_WHY="liveness unknown for process $p — the query failed or was refused"; return 0; fi
+  if [ "$lv" = 0 ]; then RS_WHY="owned by live process $p; a run is in flight"; return 0; fi
+  if [ "$lv" != 1 ]; then RS_WHY="liveness unknown for process $p; the query failed or was refused"; return 0; fi
   RS=gone
 }
 while IFS="$U" read -r kind id name owner created clone adm form nown ident; do
   [ -n "$id" ] || continue
   leaf="${name##*/}"; case "$kind" in branch|container|volume|network) leaf="$name";; esac
   if [ "$kind" = unsafe ]; then   # a control character in a name or a claim: refused. Another owner's name is only listed
-    if [ "$form" = owner ] && [ "$nown" = "$ME_OWNER" ]; then skip folder "$name" "its name or its claim holds a control character — refused"   # this user's scope: refused, and it sets the exit code
+    if [ "$form" = owner ] && [ "$nown" = "$ME_OWNER" ]; then skip folder "$name" "its name or its claim holds a control character; refused"   # this user's scope: refused, and it sets the exit code
     elif [ "$form" = owner ]; then say_foreign entry "$leaf" "$nown"
     else say_legacy entry "$leaf" "" "$name" ""; fi   # a name from before the owner segment (or no name form at all): listed, never an exit code
     continue
@@ -696,16 +696,16 @@ while IFS="$U" read -r kind id name owner created clone adm form nown ident; do
       skip) skip "$kind" "$name" "$RS_WHY"; continue;;
     esac
   fi
-  if [ "$kind" = wt-dir ] && { ! clone_ok "$clone" || ! clone_ok "$adm"; }; then skip wt-dir "$name" "the clone path carried with it is malformed (not an absolute path, or it holds a control byte) — kept"; continue; fi   # the removal uses the captured clone and nothing else
+  if [ "$kind" = wt-dir ] && { ! clone_ok "$clone" || ! clone_ok "$adm"; }; then skip wt-dir "$name" "the clone path carried with it is malformed (not an absolute path, or it holds a control byte); kept"; continue; fi   # the removal uses the captured clone and nothing else
   case "$kind" in
-    folder|marker|wt-dir) if [ -z "$ident" ]; then skip "$kind" "$name" "its device and inode cannot be read — kept"; continue; fi;;   # nothing to re-check the removal against
-    branch) if ! [[ "$ident" =~ ^[0-9a-f]{40,64}$ ]]; then skip branch "$name" "its tip cannot be read — kept"; continue; fi;;
+    folder|marker|wt-dir) if [ -z "$ident" ]; then skip "$kind" "$name" "its device and inode cannot be read; kept"; continue; fi;;   # nothing to re-check the removal against
+    branch) if ! [[ "$ident" =~ ^[0-9a-f]{40,64}$ ]]; then skip branch "$name" "its tip cannot be read; kept"; continue; fi;;
     volume) ident="$created";;   # a volume has no id: what identifies it at the removal is its creation time and its label (re-inspected just before)
   esac
   lk=0; if [ -n "$owner" ]; then lk=1; fi   # locked when the capture found a lock (a valid owner here is a dead lock owner)
   DEL="$DEL$kind$U$id$U$name$U$clone$U$adm$U$lk$U$ident$U$owner"$'\n'
 done <<< "$CAPTURED"
-act() { if [ "$DRY" = 1 ]; then echo "would run: $(clean "$*")"; else "$@" 2>/dev/null; fi; }   # stdout, so a person can pipe it; only the REAL command is silenced
+act() { if [ "$DRY" = 1 ]; then echo "would run: $(clean "$*")"; else "$@" >/dev/null 2>&1; fi; }   # a dry run's "would run:" goes to stdout, so a person can pipe it; the REAL command is silenced on both streams (docker prints the id it removed, and that is not the janitor's output); no caller reads act's stdout
 # A deletion is never fatal. A target that vanished after the capture is a notice; one that is still there after a
 # failed removal is skipped like a live one (named, exit 3). Only a failed LISTING ends the run (above).
 git_run() {   # $1 = the git dir (`.` inside a pinned clone), then the git arguments: bounded, in git's own clean environment (a stray GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE or GIT_COMMON_DIR cannot change what it does)
@@ -755,22 +755,22 @@ remove_folder() {   # $1 = the folder, $2 = its name, $3 = captured device:inode
   fi
   if [ ! -e "$d" ] && [ ! -L "$d" ]; then vanished folder "$d"; return 0; fi
   why="$(folder_change "$d" "$3" "$4" "$d.owner")"
-  if [ -n "$why" ]; then skip folder "$2" "changed after the capture — $why"; return 0; fi
+  if [ -n "$why" ]; then skip folder "$2" "changed after the capture; $why"; return 0; fi
   q="$(quarantine_name "$d")"
-  if [ -e "$q" ] || [ -L "$q" ]; then skip folder "$2" "its quarantine name is taken — kept"; return 0; fi
+  if [ -e "$q" ] || [ -L "$q" ]; then skip folder "$2" "its quarantine name is taken; kept"; return 0; fi
   rename_onto "$d" "$q" || rc=$?   # never `mv d q` alone: were q a directory by now, that would move d INTO it
-  if [ "$rc" != 0 ]; then skip folder "$2" "could not be renamed into quarantine — kept"; return 0; fi
+  if [ "$rc" != 0 ]; then skip folder "$2" "could not be renamed into quarantine; kept"; return 0; fi
   why="$(folder_change "$q" "$3" "$4" "$d.owner")"   # the same folder, in the quarantine: a swap between the check above and the rename is caught HERE
   if [ -n "$why" ]; then
-    if restore_dir "$q" "$d"; then skip folder "$2" "changed after the capture — $why (renamed back)"; else skip folder "$2" "changed after the capture — $why; it could not be renamed back and is kept as $(clean "$q")"; fi
+    if restore_dir "$q" "$d"; then skip folder "$2" "changed after the capture; $why (renamed back)"; else skip folder "$2" "changed after the capture; $why; it could not be renamed back and is kept as $(clean "$q")"; fi
     return 0
   fi
   find "$q" -mindepth 1 -maxdepth 1 -type l -delete 2>/dev/null || true   # a junction into a checkout: unlinked, never followed
   if [ ! -e "$q" ] && [ ! -L "$q" ]; then vanished folder "$q"; return 0; fi   # someone else took the quarantine away: this run removed nothing, so the claim stays and nothing is announced as removed
   rm -rf -- "$q" 2>/dev/null || true
   if [ -e "$q" ] || [ -L "$q" ]; then
-    if [ "$OS" = windows ]; then skip folder "$2" "could not be removed — it stays as $(clean "$q"); nothing puts it back on Windows: remove it by hand"
-    else skip folder "$2" "could not be removed — it stays as $(clean "$q"), which the next run puts back once it is older than the window"; fi
+    if [ "$OS" = windows ]; then skip folder "$2" "could not be removed; it stays as $(clean "$q"); nothing puts it back on Windows: remove it by hand"
+    else skip folder "$2" "could not be removed; it stays as $(clean "$q"), which the next run puts back once it is older than the window"; fi
     return 0
   fi
   rm -f -- "$d.owner" 2>/dev/null || true   # the folder first, its claim last: a half-removed, unclaimed folder is the one outcome never produced
@@ -779,7 +779,7 @@ remove_folder() {   # $1 = the folder, $2 = its name, $3 = captured device:inode
 remove_marker() {   # $1 = an orphan claim, $2 = its name, $3 = captured device:inode, $4 = captured claim text
   if [ "$DRY" = 1 ]; then echo "would run: $(clean "rm -f -- $1")"; return 0; fi
   if [ ! -e "$1" ] && [ ! -L "$1" ]; then vanished marker "$1"; return 0; fi
-  if [ "$(ident_of "$1")" != "$3" ] || [ "$(claim_text "$1")" != "$4" ]; then skip marker "$2" "changed after the capture — it is no longer the claim that was judged"; return 0; fi
+  if [ "$(ident_of "$1")" != "$3" ] || [ "$(claim_text "$1")" != "$4" ]; then skip marker "$2" "changed after the capture; it is no longer the claim that was judged"; return 0; fi
   act_rm marker "$1" rm -f -- "$1" || true
 }
 remove_steps() {   # THE BODY OF A SUBSHELL. $1 = the clone's git dir, $2 = the worktree, $3 = the captured admin dir (a stranger's clone: the clone is entered and proven ONCE, here, for both git calls; empty for the swept repository's own), $4 = 1 when the capture found the worktree locked, $5 = the lock reason that was judged. Exits 0, EXIT_CLONE_CHANGED or EXIT_GIT_STEP_FAILED (the step was said)
@@ -813,8 +813,8 @@ remove_worktree() {   # $1 = the clone's .git dir, $2 = the worktree path, $3 = 
   ( remove_steps "$1" "$2" "${3:-}" "${4:-0}" "${5:-}" ) || rc=$?
   case "$rc" in
     0) ;;
-    "$EXIT_CLONE_CHANGED") skip worktree "$2" "its clone or its lock changed after the capture — kept"; return 0;;
-    *) skip worktree "$2" "a git step did not finish — kept"; return 0;;
+    "$EXIT_CLONE_CHANGED") skip worktree "$2" "its clone or its lock changed after the capture; kept"; return 0;;
+    *) skip worktree "$2" "a git step did not finish; kept"; return 0;;
   esac
   if [ -d "$2" ]; then rm -rf -- "$2" 2>/dev/null || true; fi
   if [ -d "$2" ]; then skip worktree "$2" "could not be removed"; fi
@@ -851,20 +851,20 @@ for pass in container volume network wt-git wt-dir branch folder marker; do
         vs=0; if [ "$DRY" = 0 ]; then volume_state "$name" "$ident" "$claim" || vs=$?; fi
         case "$vs" in
           0) act_rm volume "$name" docker volume rm "$id" || settle volume "$name" dk volume inspect "$id";;
-          1) skip volume "$name" "changed after the capture — its creation time or its label is not what was judged";;
+          1) skip volume "$name" "changed after the capture; its creation time or its label is not what was judged";;
           *) vanished volume "$name";;
         esac;;
       network) act_rm network "$name" docker network rm "$id" || settle network "$name" dk network inspect "$id";;
       wt-git)
         why="$(entry_change "$id" "$ident" wt-git)"
-        if [ -n "$why" ]; then skip worktree "$name" "changed after the capture — $why"   # a path a stranger took over after the capture is not even offered to git
-        elif [ "$DRY" = 0 ] && [ "$lk" = 1 ] && [ "$(claim_text "$adm/locked")" != "$claim" ]; then skip worktree "$name" "its lock changed after the capture — kept"   # the lock, read again like a claim, must still say what was judged
+        if [ -n "$why" ]; then skip worktree "$name" "changed after the capture; $why"   # a path a stranger took over after the capture is not even offered to git
+        elif [ "$DRY" = 0 ] && [ "$lk" = 1 ] && [ "$(claim_text "$adm/locked")" != "$claim" ]; then skip worktree "$name" "its lock changed after the capture; kept"   # the lock, read again like a claim, must still say what was judged
         else remove_worktree "$(git rev-parse --git-common-dir)" "$id" "" "$lk" "$claim"; fi;;
-      wt-dir) why="$(entry_change "$id" "$ident" wt-dir)"; if [ -z "$why" ]; then remove_worktree "$clone" "$id" "$adm" "$lk" "$claim"; else skip wt-dir "$name" "changed after the capture — $why"; fi;;   # the captured clone; the stranger's .git is never read again, only its type is looked at
+      wt-dir) why="$(entry_change "$id" "$ident" wt-dir)"; if [ -z "$why" ]; then remove_worktree "$clone" "$id" "$adm" "$lk" "$claim"; else skip wt-dir "$name" "changed after the capture; $why"; fi;;   # the captured clone; the stranger's .git is never read again, only its type is looked at
       branch)
         if ! removed_with_worktree "$id"; then say_unmarked branch "$id"   # no owner record: only the worktree it was checked out in, removed by THIS run, takes it along. A live run's branch, or one whose worktree stays, is listed
         elif [ "$DRY" = 0 ] && [ "$(git rev-parse -q --verify "refs/heads/$id" 2>/dev/null || true)" != "$ident" ]; then
-          if git show-ref --verify -q "refs/heads/$id" 2>/dev/null; then skip branch "$id" "changed after the capture — its tip moved"; else vanished branch "$id"; fi
+          if git show-ref --verify -q "refs/heads/$id" 2>/dev/null; then skip branch "$id" "changed after the capture; its tip moved"; else vanished branch "$id"; fi
         else act_rm branch "$id" git update-ref -d "refs/heads/$id" "$ident" || settle branch "$id" git show-ref --verify -q "refs/heads/$id"; fi;;   # by its captured tip: a branch that moved since is kept
       folder) remove_folder "$id" "$name" "$ident" "$claim";;
       marker) remove_marker "$id" "$name" "$ident" "$claim";;
