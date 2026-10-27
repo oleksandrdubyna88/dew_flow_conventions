@@ -1,7 +1,8 @@
 # PLAN — Test leftovers, the merged core: the owner segment scopes, the kernel authorises, liveness decides
 
-> Status: **in progress, 2026-10-23** — draft PR #82 carries S5a, S1, S2, S3, S5b, S6 and their review round; S4, S0
-> and S7 are open (see [Progress and hand-off](#progress-and-hand-off-2026-10-23) at the end). Scope: `common/test-leftovers.md`, a new
+> Status: **in progress, 2026-10-27** — draft PR #82 carries S5a, S1, S2, S3, S5b, S6, S4, S8, their reviews and the
+> security pass (SHIP); S0 and S7 are open, and the Windows run is follow-up F9, not a merge condition (see
+> [Progress and hand-off](#progress-and-hand-off-2026-10-23) at the end). Scope: `common/test-leftovers.md`, a new
 > `common/test-leftovers-janitor.md`, `tools/lib/owned.mjs`, `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`,
 > `tools/leftovers-check.mjs`, `tools/fixtures/owner-vectors.json`, a new `tools/fixtures/owner-blind-allowlist.json`,
 > `tools/owner-conformance.test.mjs`, a new `tools/sweeper-scan.mjs`, a new `research/security/` verdict file, their tests,
@@ -406,11 +407,17 @@ State of the work, so a session on another machine can continue without this rep
 | S5b guard + barrier scan | done | `tools/leftovers-check.mjs` classes `owner-blind`/`legacy-name`, `tools/fixtures/owner-blind-allowlist.json`, `tools/sweeper-scan.mjs`, a4fc637 |
 | S6 conformance (Node half) | done | `tools/fixtures/owner-vectors.json` tables record/names/windows-owner/scope, 93cabc6 |
 | Review round (Opus) | done | 540237b: a legacy record on a Linux reader is `unknown`; win32 scope is fail-closed outside the per-user profile; unanchored sweepers are broad; job scripts are followed and an unreadable one is exit 2; legacy claims are read through the safe reader; identity is captured before judging; a squatting helper removes its own claim |
-| S4 janitor + companion | **open** | first `git merge origin/main` — it brings the hardened janitor of #80 (491aab9); build S4 ON TOP of it and keep every defence: the entry's owner by lstat at capture and before removal, a sticky or own temp root, the pinned clone with a clean git environment, bounded reads with a fail-closed fallback, `worktree unlock` only for a locked worktree, `rm -rf` only after every git step returned 0, `%q` output, no arithmetic or eval on captured text. No inline `owner-blind` marker on the inventory line — the allowlist entry is the only pass (re-run `--update-allowlist`). Then the janitor half of the conformance vectors and an empty `LEGACY_NAME_PENDING` list in `tools/leftovers-check.mjs`. |
-| Gates after S4 | open | coai code gate on the whole PR, Opus review, a Fable security pass recorded in `research/security/test-leftovers-merged-core.md` |
-| S0 barrier | open | run `node tools/sweeper-scan.mjs` (and `--system` by an admin) plus the manual checklist above on every machine that builds or tests this repository, before the PR merges |
-| S8 consumer helper + guard | open — added 2026-10-26 (decision 11) | `tools/lib/owned.mjs` `ownedFor`, `tools/leftovers-check.mjs` `--profile node`, dynamic shell names, `yaml` from the scanned repository, any family's rows |
+| S4 janitor + companion | done 2026-10-26 | 04c5884 (merge of #80), 561a157, b2df09c, 95e4db2, fb0ee1e; the real-daemon volume fix 9b62ba3 and a72f8e5 (2026-10-27). The brief it was built to: first `git merge origin/main` — it brings the hardened janitor of #80 (491aab9); build S4 ON TOP of it and keep every defence: the entry's owner by lstat at capture and before removal, a sticky or own temp root, the pinned clone with a clean git environment, bounded reads with a fail-closed fallback, `worktree unlock` only for a locked worktree, `rm -rf` only after every git step returned 0, `%q` output, no arithmetic or eval on captured text. No inline `owner-blind` marker on the inventory line — the allowlist entry is the only pass (re-run `--update-allowlist`). Then the janitor half of the conformance vectors and an empty `LEGACY_NAME_PENDING` list in `tools/leftovers-check.mjs`. |
+| Gates after S4 | done 2026-10-26, again 2026-10-27 | coai code round over f122729: `proceed`, 8 of 8 reviewers (4 accepted, 6 rejected with reasons); Opus review, every finding fixed (95e4db2, e7ef1aa, f2f7aeb, e14efb1, 0f7beab); Fable security pass SHIP at 3548691, recorded in `research/security/test-leftovers-merged-core.md` (b2ecbdc), its low findings parked in [the follow-ups](PLAN_test_leftovers_merged_core_followups.md). 2026-10-27, the volume fix over b2ecbdc: code round `again`, `proceed`, 8 of 8 (2 findings rejected with reasons); Opus review L1 fixed (a72f8e5), L2 and L3 parked as F7 and F8 |
+| S0 barrier | open — CLOSED on the Ubuntu dev VM (scan of 2026-10-27: 443 owner-blind lines under `/home/git` in other repositories' checkouts, 23 files it could not read; `--system` not run, it needs an administrator) | run `node tools/sweeper-scan.mjs` (and `--system` by an admin) plus the manual checklist above on every machine that builds or tests this repository, before the PR merges |
+| S8 consumer helper + guard | done 2026-10-26 (decision 11) — 7375cfb, b6a3872, merged 1f1c029; review fixes merged 8ee8b7d | `tools/lib/owned.mjs` `ownedFor`, `tools/leftovers-check.mjs` `--profile node`, dynamic shell names, `yaml` from the scanned repository, any family's rows |
 | S7 release | open | ONE promotion of `release`; warn the other sessions that own open consumer PRs first (a promotion turns `pin-check` red everywhere); then the two-stage consumer migration — sweep-only stages everywhere before any producer stage |
 
 Test counts at 540237b's parent 93cabc6: WSL Linux 920 pass / 0 fail / 3 skipped; Windows Git Bash 917 pass, one
 known slow test (`migrate-rules`, passes alone).
+
+Test counts at 9b62ba3 (2026-10-27, Ubuntu dev VM, lowered, private TMPDIR, non-root): 1099 tests, 1093 pass, 0 fail,
+6 skipped (S4-21b real uid 0, S4-28 Windows end-to-end, and four Windows-only or opt-in tests); the live check
+`tools/janitor-docker-live.test.mjs` ran against Docker 29.9.1 and passed. A real-daemon smoke of `tools/janitor.sh`
+(`--token`, dry run then real) removed the dead-owned container, network and volume, kept the live-owned container and
+did not touch a foreign owner's. Windows was not run (follow-up F9).
