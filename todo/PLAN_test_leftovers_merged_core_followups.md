@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27.** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -24,9 +24,12 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   (`tools/janitor.sh:212` `shared_dir_ok`, used at `:522` and `:537`, `-unsafe-root`).
 - **Why.** In a world-writable, non-sticky `TMPDIR` a stranger can swap an entry between the identity capture and the removal.
   Needs a misconfigured root; no deletion of a live resource of the caller's, but a stranger's folder could be removed in its place.
-- **Fix when re-opened.** One gate at the top of the folder and quarantine passes: `statSync(tmp)` is sticky (`mode & 0o1000`)
-  or its uid is the caller's, else keep, list `-unsafe-root` and say it once. A RED test with a non-sticky, other-owned root
-  (a seam for the uid, like `mine`).
+  The janitor's own gate has the same gap one step narrower (CodeRabbit on PR #82, 2026-10-27): `shared_dir_ok` trusts a root
+  that is the caller's own even when its group or others can write to it, so a caller-owned `0777` root passes.
+- **Fix when re-opened.** One gate, the same on both sides: the root is sticky (`mode & 0o1000`), or it is the caller's own AND
+  neither its group nor others can write to it (`writable_by_others` in the janitor); else keep, list `-unsafe-root` and say it
+  once. Node: at the top of the folder and quarantine passes. RED tests first: a non-sticky, other-owned root (a seam for the
+  uid, like `mine`), and a non-sticky, caller-owned, group- or world-writable root, in both the Node sweep and the janitor.
 - **When.** Before a consumer runs the Node sweep against a shared temp root it does not own (shared dev VM), or with the first
   report of a swapped entry.
 
@@ -119,8 +122,13 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
 - **Why it is safe to wait.** The janitor fails closed on Windows: without `JANITOR_WINDOWS_E2E_GREEN` it forces `--dry-run`
   (`common/test-leftovers-janitor.md` item 6; tested by `S4-28b`), so an unverified machine lists and removes nothing. What is
   missing is the evidence that the Windows branch (the `w<digits>` token, `tasklist` liveness, `stat %u` ownership, the temp
-  root) removes the right things on a real machine.
-- **Fix when re-opened.** On a Windows machine with Git for Windows and Node 20+, from a checkout of `main`: a private
+  root) removes the right things on a real machine. S4-28 as written proves only the NAME key: its foreign folder carries
+  another owner segment (`w1`) but is made by the caller, so the janitor refuses it on the token and never consults `stat %u`
+  (CodeRabbit on PR #82, 2026-10-27). Whether Git for Windows' bash reports a stranger's file as a stranger's depends on its
+  mount options, so the kernel-owner key on Windows is unmeasured.
+- **Fix when re-opened.** First extend S4-28: a folder with the CALLER's owner segment and a dead record, created by ANOTHER
+  Windows account (or given to it with `icacls /setowner` by an administrator), must be kept and listed as `foreign:` on its
+  file owner. RED first; arming needs this case green too. Then, on a Windows machine with Git for Windows and Node 20+, from a checkout of `main`: a private
   `TEMP`/`TMP`/`TMPDIR` under the user's home, `npm ci`, `npm test` (fail 0), then
   `node --test --test-name-pattern="S4-28" tools/janitor.test.mjs` — the line must read `ok`, not `# SKIP` (a skip saying
   "Git for Windows bash not found" is not a pass). Record the machine, the date, the commit and both outputs; only then may

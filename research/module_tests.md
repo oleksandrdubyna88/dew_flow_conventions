@@ -1147,7 +1147,9 @@ release — is `todo/PLAN_test_leftovers_merged_core_release.md`.
 - **The owner record.** `<owner>:<host>@<os>:<pid>[:<start>[:<ns>]]` — one grammar for a claim file and for a worktree's lock reason. The start is
   written only where no process must be spawned (a `/proc` read on Linux), and on Linux the pid namespace rides with it. A resource of the
   caller is judged by TWO keys: its name's owner, its record's owner and the caller's token are one, AND the entry's own kernel owner (read
-  without following a link) is the caller; then liveness decides. Only "no process has that pid" is `gone`; a refused or failed query, two
+  without following a link) is the caller; then liveness decides. On Windows the Node side (`isMine`) reads no file owner: it fails
+  closed to a path inside the caller's profile, compared on resolved real paths, and keeps everything else; the janitor reads the owner
+  there with `stat %u`. Only "no process has that pid" is `gone`; a refused or failed query, two
   starts that disagree by more than 2 s, a record of another owner, host or namespace, a legacy record on a Linux reader, and a resource another uid
   owns are all `unknown` — kept and named. A legacy name (from before the owner segment) is a `legacy:` line, never a removal on a Linux
   reader; an owner-form resource with no claim is `unmarked`, listed and never collected, however old.
