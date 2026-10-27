@@ -423,3 +423,14 @@ test("leftovers-check: a scan that read nothing exits 2, never 0", (t) => {
   assert.equal(code, 2, out);
   assert.match(out, /scanned nothing/);
 });
+
+// ---------- sweeper-scan.mjs: the real process ----------
+// Only the usage exit is the same on every machine: any other run also reads the caller's real crontab and systemd user units,
+// so 0 and 1 are asserted through `main` and its seams in sweeper-scan.test.mjs.
+
+test("sweeper-scan: an unknown argument exits 2 with the usage line and scans nothing", () => {
+  const { code, out } = runTool("sweeper-scan.mjs", ["--no-such-option"]);
+  assert.equal(code, 2, out);
+  assert.match(out, /unknown or incomplete argument `--no-such-option`/);
+  assert.match(out, /usage: node tools\/sweeper-scan\.mjs/);
+});
