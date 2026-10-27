@@ -7,7 +7,8 @@
 > `common/test-leftovers-janitor.md`. Not one of them blocks the release of the merged core (the verdict: "none a reason to
 > hold the release").
 >
-> Related docs: [PLAN_test_leftovers_merged_core.md](PLAN_test_leftovers_merged_core.md) (the plan these findings belong to),
+> Related docs: [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) (the plan these findings belong to; promoted 2026-10-27),
+> [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md) (the remainder plan: S0, the merge, the sibling's side, the release; none of F1–F9 blocks it),
 > `common/recheck-followups.md` of the consumers' rule set (the format of this file; this repository does not carry that rule).
 
 ## Goal

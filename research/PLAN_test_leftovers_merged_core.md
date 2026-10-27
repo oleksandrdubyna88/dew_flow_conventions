@@ -1,16 +1,19 @@
 # PLAN — Test leftovers, the merged core: the owner segment scopes, the kernel authorises, liveness decides
 
-> Status: **in progress, 2026-10-27** — draft PR #82 carries S5a, S1, S2, S3, S5b, S6, S4, S8, their reviews and the
-> security pass (SHIP); S0 and S7 are open, and the Windows run is follow-up F9, not a merge condition (see
-> [Progress and hand-off](#progress-and-hand-off-2026-10-23) at the end). Scope: `common/test-leftovers.md`, a new
+> Status: **IMPLEMENTED, 2026-10-27** — on PR #82 (merges after S0 of [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md));
+> deviations in [Deviations](#deviations-from-the-plan-recorded-2026-10-27). What is NOT done — S0 on every machine, S7 (the
+> one `release` promotion and the consumer migration), the private sibling's side and the merge itself — moved to that
+> remainder plan; the Windows run is follow-up F9. Scope: `common/test-leftovers.md`, a new
 > `common/test-leftovers-janitor.md`, `tools/lib/owned.mjs`, `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`,
 > `tools/leftovers-check.mjs`, `tools/fixtures/owner-vectors.json`, a new `tools/fixtures/owner-blind-allowlist.json`,
 > `tools/owner-conformance.test.mjs`, a new `tools/sweeper-scan.mjs`, a new `research/security/` verdict file, their tests,
 > `README.md`, `research/rule-bodies.json`. Plan-gate round 1 passed (good_enough); its findings are applied below.
 >
 > Related docs: [PLAN_test_leftovers_E1.md](PLAN_test_leftovers_E1.md) (the contract this one revises — promoted to
-> `research/` by this plan's last story), [PLAN_test_leftovers_rollout.md](PLAN_test_leftovers_rollout.md) (the consumer
-> epics, which now wait for THIS release and split into two stages), [rule-ownership.md](../common/rule-ownership.md).
+> `research/` together with this plan, 2026-10-27), [PLAN_test_leftovers_merged_core_release.md](../todo/PLAN_test_leftovers_merged_core_release.md)
+> (the remainder plan: what this one left open), [PLAN_test_leftovers_merged_core_followups.md](../todo/PLAN_test_leftovers_merged_core_followups.md)
+> (the findings parked by the security pass), [PLAN_test_leftovers_rollout.md](../todo/PLAN_test_leftovers_rollout.md) (the consumer
+> epics, which now wait for THE RELEASE and split into two stages), [rule-ownership.md](../common/rule-ownership.md).
 >
 > This rule text is shared byte for byte with a private sibling rule repository that serves a second family of
 > repositories on machines several OS users share. The sibling is never named in this file; where it matters it is
@@ -43,11 +46,13 @@ first producer. The tools of this repository are the reference every consumer po
 
 | Item | Built by | The other plan's part |
 |---|---|---|
-| The rule text, the owned-resource helper, the sweep, the janitor and the guard (the contract itself) | [PLAN_test_leftovers_E1.md](PLAN_test_leftovers_E1.md) built the first version; **this plan revises it** | E1's stories keep their first form; this plan's S7 promotes that document to `research/` as IMPLEMENTED with this plan as its revision |
-| Renaming each consumer's resources, ports of the helper, sweep and guard, consumer pin bumps | [PLAN_test_leftovers_rollout.md](PLAN_test_leftovers_rollout.md) epics E2–E7 | They wait for the ONE release this plan ends with; each epic splits into a sweep-only stage and a producer stage (pin bump + rename + helper/guard port in one commit), all sweep-only stages before any producer stage |
-| The machine barrier before the first owner-form producer | this plan (§ *Barrier checklist*) | Each consumer epic runs it per machine before its first owner-form producer |
+| The rule text, the owned-resource helper, the sweep, the janitor and the guard (the contract itself) | [PLAN_test_leftovers_E1.md](PLAN_test_leftovers_E1.md) built the first version; **this plan revises it** | E1's stories keep their first form; both documents were promoted to `research/` together on 2026-10-27, this one recorded as E1's revision |
+| Renaming each consumer's resources, ports of the helper, sweep and guard, consumer pin bumps | [PLAN_test_leftovers_rollout.md](../todo/PLAN_test_leftovers_rollout.md) epics E2–E7 | They wait for the ONE release the remainder plan ends with (its R5); each epic splits into a sweep-only stage and a producer stage (pin bump + rename + helper/guard port in one commit), all sweep-only stages before any producer stage (its R6) |
+| The machine barrier before the first owner-form producer | this plan built the scan and the checklist (§ *Barrier checklist*); [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md) runs it (R1, R2) | Each consumer epic runs it per machine before its first owner-form producer |
+| S0 on every machine, the PR's merge, the private sibling's side of the Definition of Done, S7 (the one promotion of `release`) | [PLAN_test_leftovers_merged_core_release.md](../todo/PLAN_test_leftovers_merged_core_release.md) R1–R5 | This plan keeps the build and its reviews; it records the machine it has and points at the remainder for every other item. Nothing is built twice: the remainder plan edits no tool |
+| The findings the security pass parked, the stub-docker gaps, the Windows run | [PLAN_test_leftovers_merged_core_followups.md](../todo/PLAN_test_leftovers_merged_core_followups.md) F1–F9 | None of them blocks the release |
 
-Order: this plan first, then the consumer epics. Disjoint: nothing here edits a consumer repository.
+Order: this plan first, then [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md), then the consumer epics. Disjoint: nothing here edits a consumer repository.
 
 ## Facts the plan rests on (read on `origin/main` `2c96f83`, 2026-10-21)
 
@@ -145,6 +150,9 @@ S7 is the release step.
 ## Stories
 
 ### S0 — The pre-merge barrier gate for this repository (`model: sonnet` records; a person attests)
+
+> **State 2026-10-27: recorded for ONE machine, open for the rest — moved to [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md) (R1, R2).**
+> The record is one SECTION per machine in `research/security/machines.md`, not a file per machine as the text below says.
 
 - For every machine that builds or tests this repository: `node tools/sweeper-scan.mjs --root <checkout parent>` as the
   developer; `--system` once by an administrator; the manual items of the checklist; the result in
@@ -325,6 +333,9 @@ S7 is the release step.
 
 ### S7 — Docs, the E1 promotion, the release (`model: sonnet`)
 
+> **State 2026-10-27: the README row of the scan and the E1 promotion are done (the promotion commit of this document); the release and
+> the consumer migration moved to [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md) (R5, R6).**
+
 - `README.md:259-260` + the mounted-tools table (`sweeper-scan`, the companion, the allowlist); `todo/PLAN_test_leftovers_E1.md`
   → `research/` as IMPLEMENTED with this plan recorded as its revision; `todo/PLAN_test_leftovers_rollout.md`: every
   consumer epic splits into a **sweep-only stage** (its owner-blind sweeps replaced or disabled, no owner-form producer) and
@@ -356,24 +367,50 @@ test and S4 test 28 under Git for Windows' bash) is follow-up F9 since 2026-10-2
 
 ## Definition of Done
 
-- [ ] The two rule texts are the spec's companions byte for byte; both bodies under the cap (the inflated-copy RED
-      observed); no owner-blind line; the sibling's rebuild reports both spans byte-identical.
-- [ ] `owned.mjs`, the sweep, the janitor, the guard, the allowlist, the scan and the vectors implement decisions 1–10;
+State 2026-10-27. An unticked item names the remainder-plan item that owns it
+([PLAN_test_leftovers_merged_core_release.md](../todo/PLAN_test_leftovers_merged_core_release.md), R1–R6).
+
+- [x] The two rule texts are the spec's companions byte for byte; both bodies under the cap (the inflated-copy RED
+      observed); no owner-blind line.
+- [ ] The private sibling's rebuild reports both spans byte-identical. → remainder plan, R4.
+- [x] `owned.mjs`, the sweep, the janitor, the guard, the allowlist, the scan and the vectors implement decisions 1–10;
       every new test was RED first with its real symptom, then green; the full suite green on Linux. The Windows run and the
       Windows end-to-end check (S4 test 28) are NOT a merge condition since 2026-10-27 (owner decision): they are follow-up
-      F9 of [the follow-ups plan](PLAN_test_leftovers_merged_core_followups.md), and the janitor stays `--dry-run` on
+      F9 of [the follow-ups plan](../todo/PLAN_test_leftovers_merged_core_followups.md), and the janitor stays `--dry-run` on
       Windows until a machine records them.
-- [ ] The hardening branch is merged first and its tests stay green.
-- [ ] `research/security/test-leftovers-merged-core.md` exists for the merged commit with a SHIP line per scenario of the
+- [x] The hardening branch is merged first and its tests stay green (#80, merged into this branch as 04c5884).
+- [x] `research/security/test-leftovers-merged-core.md` exists for the merged commit with a SHIP line per scenario of the
       spec's §6 (forged owner, forged claim, root, replacement after capture, inaccessible evidence, hostile names, two
       users one daemon, the override's reach, the Windows token, the scan's blind spots).
 - [ ] The pre-merge barrier gate (S0) is recorded for every machine in `research/security/machines.md` before the PR merged.
-- [ ] `README.md`, `rule-bodies.json`, the E1 promotion and the rollout plan's two-stage rule are updated; the release was
-      promoted once, after the sibling's confirmation.
-- [ ] S8: a Node consumer runs the shipped guard with `--profile node` and wraps the shipped helper with its own token;
-      the private sibling copies both byte for byte and pins their sha256.
-- [ ] Cornerstones of this plan: **2 of 2 — S1 (the merged core text, model: fable), S4 (the one janitor and its companion,
+      One machine is recorded, with three root-only places open; the owner's Windows machine has no record. → remainder plan, R1, R2, R3.
+- [x] `README.md`, `rule-bodies.json`, the E1 promotion and the rollout plan's two-stage rule are updated.
+- [ ] The release was promoted once, after the sibling's confirmation. → remainder plan, R4, R5.
+- [x] S8: a Node consumer runs the shipped guard with `--profile node` and wraps the shipped helper with its own token.
+- [ ] S8: the private sibling copies both byte for byte and pins their sha256. → remainder plan, R4.
+- [x] Cornerstones of this plan: **2 of 2 — S1 (the merged core text, model: fable), S4 (the one janitor and its companion,
       the security pass, model: fable)**.
+
+## Deviations from the plan (recorded 2026-10-27)
+
+What shipped differently from the text above — the part a later reader needs most. Commits are on PR #82.
+
+1. **S8 was added after the plan gate (decision 11, 2026-10-26).** The helper and the guard serve consumers as shipped
+   files; the token left the shipped helper into `tools/lib/owned-token.mjs` (0f7beab), so a copy of `owned.mjs` never
+   carries another repository's token.
+2. **The Windows run and S4 test 28 are not a merge condition (owner decision, 2026-10-27)** — follow-up F9. The janitor
+   forces `--dry-run` on Windows unless `JANITOR_WINDOWS_E2E_GREEN` is set (2390c7e, tested by S4-28b). The machine that ran
+   the suite on Windows on 2026-10-23 has no barrier record.
+3. **The security pass found four findings that needed a fix, M-1 to M-4, fixed in the PR** (62d06ce, 91e1b40, 4d6925a, 2390c7e). Its
+   low findings are parked in [the follow-ups plan](../todo/PLAN_test_leftovers_merged_core_followups.md).
+4. **A real Docker 29.9.1 run on 2026-10-27 found that the stub-docker suite hid a defect.** `docker volume inspect --format`
+   does not turn a bare `\t` into a tab, so no volume was ever swept on a real daemon while the suite was green. Fixed with the
+   Go literal `{{"\t"}}` (9b62ba3) and a live check, `tools/janitor-docker-live.test.mjs` (a72f8e5); reason texts became ASCII
+   (`; ` instead of ` — `) in the same fix. The two stub gaps that remain are F7 and F8.
+5. **The barrier record is one section per machine in `research/security/machines.md`**, not a file `barrier-<machine>.md` per
+   machine as S0 says.
+6. **S0 and S7 were not done inside this plan.** They moved to the remainder plan, with the sibling's side of the
+   Definition of Done and the PR's merge, because each needs a person or a machine this build did not have.
 
 ## Plan-gate round 1 (2026-10-21) — findings and what changed
 
@@ -408,10 +445,10 @@ State of the work, so a session on another machine can continue without this rep
 | S6 conformance (Node half) | done | `tools/fixtures/owner-vectors.json` tables record/names/windows-owner/scope, 93cabc6 |
 | Review round (Opus) | done | 540237b: a legacy record on a Linux reader is `unknown`; win32 scope is fail-closed outside the per-user profile; unanchored sweepers are broad; job scripts are followed and an unreadable one is exit 2; legacy claims are read through the safe reader; identity is captured before judging; a squatting helper removes its own claim |
 | S4 janitor + companion | done 2026-10-26 | 04c5884 (merge of #80), 561a157, b2df09c, 95e4db2, fb0ee1e; the real-daemon volume fix 9b62ba3 and a72f8e5 (2026-10-27). The brief it was built to: first `git merge origin/main` — it brings the hardened janitor of #80 (491aab9); build S4 ON TOP of it and keep every defence: the entry's owner by lstat at capture and before removal, a sticky or own temp root, the pinned clone with a clean git environment, bounded reads with a fail-closed fallback, `worktree unlock` only for a locked worktree, `rm -rf` only after every git step returned 0, `%q` output, no arithmetic or eval on captured text. No inline `owner-blind` marker on the inventory line — the allowlist entry is the only pass (re-run `--update-allowlist`). Then the janitor half of the conformance vectors and an empty `LEGACY_NAME_PENDING` list in `tools/leftovers-check.mjs`. |
-| Gates after S4 | done 2026-10-26, again 2026-10-27 | coai code round over f122729: `proceed`, 8 of 8 reviewers (4 accepted, 6 rejected with reasons); Opus review, every finding fixed (95e4db2, e7ef1aa, f2f7aeb, e14efb1, 0f7beab); Fable security pass SHIP at 3548691, recorded in `research/security/test-leftovers-merged-core.md` (b2ecbdc), its low findings parked in [the follow-ups](PLAN_test_leftovers_merged_core_followups.md). 2026-10-27, the volume fix over b2ecbdc: code round `again`, `proceed`, 8 of 8 (2 findings rejected with reasons); Opus review L1 fixed (a72f8e5), L2 and L3 parked as F7 and F8 |
-| S0 barrier | open — CLOSED on the Ubuntu dev VM (scan of 2026-10-27: 443 owner-blind lines under `/home/git` in other repositories' checkouts, 23 files it could not read; `--system` not run, it needs an administrator) | run `node tools/sweeper-scan.mjs` (and `--system` by an admin) plus the manual checklist above on every machine that builds or tests this repository, before the PR merges |
+| Gates after S4 | done 2026-10-26, again 2026-10-27 | coai code round over f122729: `proceed`, 8 of 8 reviewers (4 accepted, 6 rejected with reasons); Opus review, every finding fixed (95e4db2, e7ef1aa, f2f7aeb, e14efb1, 0f7beab); Fable security pass SHIP at 3548691, recorded in `research/security/test-leftovers-merged-core.md` (b2ecbdc), its low findings parked in [the follow-ups](../todo/PLAN_test_leftovers_merged_core_followups.md). 2026-10-27, the volume fix over b2ecbdc: code round `again`, `proceed`, 8 of 8 (2 findings rejected with reasons); Opus review L1 fixed (a72f8e5), L2 and L3 parked as F7 and F8 |
+| S0 barrier | recorded for ONE machine, open for the rest — moved to the remainder plan (R1, R2) | the Ubuntu dev VM is in `research/security/machines.md` (scan of 2026-10-27 at 8948ff7: 486 owner-blind lines in 38 checkouts of other repositories, each read and classified, 23 unreadable files checked by hand; three root-only places still open for `--system`). Every other machine that builds or tests this repository still needs its own section |
 | S8 consumer helper + guard | done 2026-10-26 (decision 11) — 7375cfb, b6a3872, merged 1f1c029; review fixes merged 8ee8b7d | `tools/lib/owned.mjs` `ownedFor`, `tools/leftovers-check.mjs` `--profile node`, dynamic shell names, `yaml` from the scanned repository, any family's rows |
-| S7 release | open | ONE promotion of `release`; warn the other sessions that own open consumer PRs first (a promotion turns `pin-check` red everywhere); then the two-stage consumer migration — sweep-only stages everywhere before any producer stage |
+| S7 release | moved to the remainder plan (R5, R6) | ONE promotion of `release`; warn the other sessions that own open consumer PRs first (a promotion turns `pin-check` red everywhere); then the two-stage consumer migration — sweep-only stages everywhere before any producer stage. The README row of the scan and the E1 promotion are done |
 
 Test counts at 540237b's parent 93cabc6: WSL Linux 920 pass / 0 fail / 3 skipped; Windows Git Bash 917 pass, one
 known slow test (`migrate-rules`, passes alone).

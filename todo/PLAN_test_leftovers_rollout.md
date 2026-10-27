@@ -69,15 +69,17 @@ sweep from the rule is run on a machine after a full suite and must find only pr
 
 ## The merged core revises E1 first (2026-10-21)
 
-The plan [PLAN_test_leftovers_merged_core.md](PLAN_test_leftovers_merged_core.md) revises the contract E1 builds, so the consumer
-epics now wait for ITS release, not for E1's. Named on both sides:
+The plan [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) (IMPLEMENTED 2026-10-27, promoted to `research/`) revises the contract E1 builds, so the consumer
+epics now wait for ITS release, not for E1's. What it left open — S0 on every machine, the merge of PR #82, the private sibling's side and the ONE release —
+is in [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md); its R5 is the release and its R6 is the two-stage migration below. Named on both sides:
 
 | Item | Built by | This plan's part |
 |---|---|---|
-| The contract text, helper, sweep, janitor and guard in their owner-scoped form | the merged-core plan | E2–E7 consume its one release; E1's stories document is promoted by it as IMPLEMENTED |
+| The contract text, helper, sweep, janitor and guard in their owner-scoped form | the merged-core plan | E2–E7 consume its one release (R5 of the remainder plan); E1's stories document was promoted by it as IMPLEMENTED on 2026-10-27 |
+| The machine barrier, the merge of PR #82, the private sibling's side and the ONE release | [the remainder plan](PLAN_test_leftovers_merged_core_release.md) R1–R5 | E2–E7 start no producer stage before R5; their sweep-only stages need no release |
 | The per-consumer rename, port and pin bump | epics E2–E7 here | Each epic splits into a sweep-only stage (its owner-blind sweeps replaced or disabled, no owner-form producer) and a producer stage (pin bump + rename + helper/guard port in one commit); all sweep-only stages land before any producer stage; the barrier checklist of the merged-core plan runs per machine before the first producer |
 
-Order: the merged core first. Disjoint: the merged core edits no consumer repository.
+Order: the merged core first, then R1–R5 of the remainder plan, then the epics below. Disjoint: neither edits a consumer repository.
 
 ## Epics
 
@@ -88,7 +90,7 @@ E1 — and E2's C# helper story also on E3, which writes the family's C# helper 
 2026-10-15); otherwise E2–E7 are ordered by what leaks most, and may run in parallel once E1 is released.
 
 Each epic's stories are one document, written when that epic starts, in the repository the work lands in:
-`todo/PLAN_test_leftovers_E<n>.md` there. E1's document is a sibling of this plan; the six consumer
+`todo/PLAN_test_leftovers_E<n>.md` there. E1's document was a sibling of this plan and is in `research/` since 2026-10-27; the six consumer
 documents are cited as paths, not links ([common/planning-docs.md](../common/planning-docs.md) § *Across
 repositories*), and each names this plan as its parent in return.
 
@@ -132,7 +134,7 @@ spends 78 855 of coai's 80 000-byte budget, `src_mcp/tests/StageRulesTests.cs:14
 
 ### E1 — the contract, the refinement, and this repository's own tools
 
-- **Repository:** `dew_flow_conventions`. **Stories:** [todo/PLAN_test_leftovers_E1.md](PLAN_test_leftovers_E1.md).
+- **Repository:** `dew_flow_conventions`. **Stories:** [research/PLAN_test_leftovers_E1.md](../research/PLAN_test_leftovers_E1.md) (IMPLEMENTED).
 - **Goal.** `common/test-leftovers.md` says what every consumer's helper, guard and tests must do; it carries
   decision 2 (shared stores exempt only when named where configured, reuse intentional, reset serialized;
   databases inside a disposable Testcontainers container exempt for the container's lifetime), the

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `ownedFor({ token, row })` of `lib/owned.mjs` (story S8, decision 11 of `todo/PLAN_test_leftovers_merged_core.md`): the helper of
+ * `ownedFor({ token, row })` of `lib/owned.mjs` (story S8, decision 11 of `research/PLAN_test_leftovers_merged_core.md`): the helper of
  * `common/test-leftovers.md` §2 bound to ANOTHER repository's token, so a consumer wraps the shipped file instead of porting it.
  *
  * What these tests prove, and what they do not: the names, the sweep pattern and the room a `what` has are asked of the bound API

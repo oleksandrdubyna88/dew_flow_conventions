@@ -1128,9 +1128,81 @@ the fixture, the disposable-worktree refusal (and the refusal of a dirty one), t
 run by explicit path, so `npm test` never runs it. The paid fixtures are run by hand and recorded in
 `research/RESULTS_subagent_model_tiers.md`, never in CI.
 
-## Test leftovers (`tools/lib/owned.mjs`, `tools/lib/leftovers-sweep.mjs`, `tools/leftovers-check.mjs`, `tools/janitor.sh`; epic E1, 2026-10-15)
+## Test leftovers (the merged core: owner segment, kernel owner, liveness — `tools/lib/owned.mjs`, `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/sweeper-scan.mjs`; first built as epic E1, 2026-10-15; merged core on PR #82, 2026-10-27)
 
-This repository's own tests obey `common/test-leftovers.md`, in four pieces that each answer one clause of it.
+This repository's own tests obey `common/test-leftovers.md` and its companion `common/test-leftovers-janitor.md`. The merged core
+(`research/PLAN_test_leftovers_merged_core.md`, IMPLEMENTED 2026-10-27, deviations in that document) rebuilt what epic E1 shipped on
+2026-10-15. The first subsection is the code as it is on the branch of PR #82 (read from the files on 2026-10-27); the second is E1's
+record as it was written. What is not done — the machine barrier on every machine, the merge, the private sibling's side and the
+release — is `todo/PLAN_test_leftovers_merged_core_release.md`.
+
+### The code as it is (2026-10-27)
+
+- **The name and the owner.** Every resource a run creates outside its process is named `testsToDelete-<owner>-<repo>-<what>-<id>`
+  (at most 63 characters; the owner is budgeted before `<what>`; the id is six characters). The owner is `u<uid>` on POSIX (`u0` is root's own
+  scope, not every scope) and `w<digits>` on Windows: the account name without its domain, `A`-`Z` lower-cased, UTF-8, SHA-256, the first
+  four bytes as one unsigned number in decimal (`windowsOwnerToken`; a collision confers no authority, the kernel owner decides).
+  `TESTSTODELETE_OWNER` overrides it only when it matches `^[uw][0-9]{1,10}$`; anything else throws in Node and exits 2 in the janitor. The
+  repository's token is `conventions`, written in ONE file, `tools/lib/owned-token.mjs` (`REPO_TOKEN`, `REPO_ROW`).
+- **The owner record.** `<owner>:<host>@<os>:<pid>[:<start>[:<ns>]]` — one grammar for a claim file and for a worktree's lock reason. The start is
+  written only where no process must be spawned (a `/proc` read on Linux), and on Linux the pid namespace rides with it. A resource of the
+  caller is judged by TWO keys: its name's owner, its record's owner and the caller's token are one, AND the entry's own kernel owner (read
+  without following a link) is the caller; then liveness decides. Only "no process has that pid" is `gone`; a refused or failed query, two
+  starts that disagree by more than 2 s, a record of another owner, host or namespace, a legacy record on a Linux reader, and a resource another uid
+  owns are all `unknown` — kept and named. A legacy name (from before the owner segment) is a `legacy:` line, never a removal on a Linux
+  reader; an owner-form resource with no claim is `unmarked`, listed and never collected, however old.
+- **`tools/lib/owned.mjs`** (the shipped helper; it holds no token) — `ownedDir(scope, what)` and `ownedWorktree(scope, repo, what)`: the claim
+  is written FIRST, with an exclusive create; a claim that already exists, or a folder that already exists under the claimed name, draws a new id
+  (a squatter's folder is never adopted and never removed, and the helper removes its own claim in that case); teardown never throws and removes
+  the folder before its claim. `cleanupScope()`, `ownerState`, `legacyOwnerState`, `processProbe`, `parseOwner`, `readOwner`, `classifyName` and
+  `runRecord` (an inherited `TESTSTODELETE_RUN` is accepted only for a live run of the caller) are the rest of the surface. `ownedFor({ token, row })`
+  binds the same API to ANOTHER repository's token, so a Node consumer wraps the shipped file instead of porting it (story S8, decision 11).
+- **`tools/lib/leftovers-sweep.mjs`** (the start-of-run sweep, called by `tools/run-tests.mjs` before `node --test`; it never changes the exit code)
+  removes this repository's own prefixed folders, worktrees and orphaned claims only on both keys; a resource younger than ten minutes is kept
+  (age selects, it never authorises). A plain folder is renamed to a hidden sibling quarantine, checked again there by device, inode and claim, then
+  removed; a worktree is never renamed and goes through `git worktree remove --force --force`; a quarantine a killed sweep left is restored onto a
+  free name only. The result lists `removed`, `preserved`, `listed` (`foreign:`, `legacy:`, `unmarked:`) and `errors`.
+- **`tools/janitor.sh`** (874 lines, 78 060 bytes, sha256 `842386b8…aa02f0c5`, measured with `wc -l`, `wc -c` and `sha256sum` on 2026-10-27; last changed
+  in 9b62ba3, so re-measure before quoting; LF through `.gitattributes`, mode 100755) is the host-wide tool of the rule's `## The janitor`, its contract the
+  companion `common/test-leftovers-janitor.md`. Usage: `bash tools/janitor.sh [--dry-run] [--token <t>]` from inside the repository whose worktrees and
+  branches are swept; `JANITOR_MIN_AGE_MINUTES` (default 60, digits only, at least 1) is the window. One capture of every prefixed resource of every user
+  (containers, volumes, networks, worktrees, branches, temp folders); only the caller's scope is swept, only captured and authorised items, by identity
+  (device and inode, claim re-read). Exit 0: nothing in the caller's scope was skipped. Exit 3: something was skipped, named on stderr. Exit 1: a listing or a
+  docker or git step failed, or the age setting is refused (nothing removed). Exit 2: bad arguments or an invalid owner override (nothing touched).
+  `--dry-run` prints `would run:` lines on stdout and removes nothing; its exit code is the real run's. **On Windows the run is forced to `--dry-run`**
+  unless `JANITOR_WINDOWS_E2E_GREEN` is set to a non-empty value (an operator switch, to be set only after the end-to-end check S4-28 has passed on that
+  machine; the Windows run is follow-up F9). **The volume template:** `docker volume inspect --format` does not turn a bare `\t` into a tab (measured 2026-10-27
+  on Docker 29.9.1; `ps` and `network ls` do), so the script uses the Go literal `{{"\t"}}`; the stub-docker suite had stayed green while no volume
+  was swept on a real daemon, and `tools/janitor-docker-live.test.mjs` is the live check. Its reason texts are ASCII (`; `, not an em dash).
+- **`tools/leftovers-check.mjs`** (the guard, `common/test-leftovers.md` §7; `node tools/leftovers-check.mjs`, also run by `npm test`) refuses the classes
+  `raw-temp`, `raw-worktree`, `docker-run`, `docker-name`, `shared-store`, `ryuk-off` (never exemptible), `legacy-name`, `owner-blind` (no inline exemption: the one
+  pass is `tools/fixtures/owner-blind-allowlist.json`, keyed by file, line and the sha256 of the line, regenerated with `--update-allowlist`), `exemption` and
+  `token`; exit 0 clean, 1 with findings, 2 when it scanned nothing. `--profile node` is for a Node consumer that mounts it: it adds the consumer's tracked
+  `*.test.<ext>` / `*.spec.<ext>` files and every text file under `scripts/`, `test/` and `tests/`, reads workflows with `yaml@2`, treats a wholly dynamic shell
+  name as dynamic, and takes the token's row with `--token` and `--identity`.
+- **`tools/sweeper-scan.mjs`** (the barrier's scan; `node tools/sweeper-scan.mjs [--root <dir>] [--system] [--honour-marker]`) lists the owner-blind sweepers still
+  enabled on a machine: the caller's checkouts under `--root`, crontab, systemd user units and, on Windows, scheduled tasks; `--system` adds the system places.
+  It deletes nothing. Exit 0: nothing found and everything read. Exit 1: owner-blind lines found. Exit 2: something in the requested scope could not be read, or
+  nothing was scanned (2 outranks 1). The classifier is `tools/lib/sweeper-scan.mjs` (`classifyLine`), the only implementation: the guard and the scan both call it.
+  The barrier records are in `research/security/machines.md`; the security pass is `research/security/test-leftovers-merged-core.md`.
+- **The vectors.** `tools/fixtures/owner-vectors.json` holds seven tables (grammar, hostnames, verdicts, names, windows-owner, record, scope — 204 vectors on
+  2026-10-27, counted from the file) and `tools/owner-conformance.test.mjs` asks each of both implementations of the rule, `owned.mjs` and `janitor.sh`
+  (cut out by function name, or run for real over a private temp root); a disagreement names the vector and both answers.
+- **The test files** (`ls tools/*.test.mjs`): `owned.test.mjs`, `owned-liveness.test.mjs`, `owned-for.test.mjs`, `leftovers-sweep.test.mjs`, `leftovers-check.test.mjs`,
+  `leftovers-check-consumers.test.mjs`, `janitor.test.mjs`, `janitor-liveness.test.mjs`, `janitor-paths.test.mjs`, `janitor-docker-live.test.mjs`,
+  `owner-conformance.test.mjs`, `sweeper-scan.test.mjs`, `test-leftovers-rule.test.mjs`, `unmatchable-pid.test.mjs`. `sweeper-scan.test.mjs` also reads
+  the E1 rule text kept as a fixture (`tools/fixtures/sweeper-scan/rule-2c96f83.md`).
+- **The latest suite** (9b62ba3, 2026-10-27, Ubuntu, non-root, lowered, private `TMPDIR`): 1099 tests, 1093 pass, 0 fail, 6 skipped (S4-21b needs real uid 0, S4-28 is the
+  Windows end-to-end check, four are Windows-only or opt-in). Windows was not run (F9). `janitor-docker-live.test.mjs` ran against Docker 29.9.1 and passed; a real-daemon
+  smoke of `tools/janitor.sh` removed the dead-owned container, network and volume, kept the live-owned container and did not touch another owner's.
+
+### The first version (epic E1, merged in #77, 2c96f83, 2026-10-15) — history
+
+Everything below is the record of E1 as it was written. A file size, a line count, a hash, a test count or a behaviour named here is the figure AT E1 (2026-10-15),
+not the code now: the merged core replaced the janitor, the owner record's grammar, the unmarked-folder rule of the sweep and the place of the token constant (see the
+list above and `research/PLAN_test_leftovers_E1.md`, § Deviations). The reasons the paragraphs give still hold.
+
+At E1 this repository's own tests obeyed `common/test-leftovers.md` in four pieces that each answered one clause of it.
 
 - **The helper.** `tools/lib/owned.mjs` is the only way a test makes a temp folder or a worktree: `ownedDir(scope, what)` and
   `ownedWorktree(scope, repo, what)` name the resource with the repository's token, write its owner (this process, with its
@@ -1143,21 +1215,21 @@ This repository's own tests obey `common/test-leftovers.md`, in four pieces that
 - **The start-of-run sweep.** `run-tests.mjs` calls `tools/lib/leftovers-sweep.mjs` before `node --test`: it removes
   what a killed earlier run left (owner gone, or unmarked and older than ten minutes), preserves with a reason what is
   live, foreign, unreadable, young or another clone's, prints one report line, and never changes the exit code even
-  when the sweep itself throws. `leftovers-sweep.test.mjs` pins the ten scenarios plus `2b`, `3b` and `10b` (thirteen tests). The entry-point
+  when the sweep itself throws. At E1 (2026-10-15) `leftovers-sweep.test.mjs` pinned the ten scenarios plus `2b`, `3b` and `10b` (thirteen tests). The entry-point
   scenario (10) sweeps a disposable repository: `run-tests.mjs` reads `RUN_TESTS_REPO_ROOT` (documented in its header) so the child process
   never lists this checkout's worktrees, which every concurrently running test shares.
 - **The guard.** `tools/leftovers-check.mjs` is rule §7 as code, and `leftovers-check.test.mjs` runs it over the real
   repository (test 1) and asserts no `mkdtemp` / `tmpdir` / `TEMP` read remains in any `tools/*.test.mjs` (test 1b). Its
   classes are `raw-temp`, `raw-worktree`, `docker-run`, `docker-name`, `shared-store`, `ryuk-off` (never exemptible) and
-  `exemption` (a malformed exemption). Observed RED over the unmigrated repository: **38 findings** (34 `mkdtemp` lines,
+  `exemption` (a malformed exemption). At E1 (2026-10-15), observed RED over the unmigrated repository: **38 findings** (34 `mkdtemp` lines,
   `selftest.test.mjs:291`'s `process.env.TEMP`, 4 worktree creations), then green after the migration. The one place that
   legitimately makes worktrees the helper cannot (a `--relative-paths` worktree, a `-b <branch>` worktree) is
   `janitor.test.mjs`'s `rawWorktree`, under one inline `testsToDelete-exempt: raw-worktree` exemption. When the three
   story branches were first combined, the guard reddened on that file (**4 findings**: two in prose, two in the
   helper) and, through 1b, on one comment in `leftovers-sweep.test.mjs`; both were fixed in the integration and the guard
-  reports `clean (42 files)`.
-- **The janitor.** `tools/janitor.sh` (308 lines, 25 644 B, sha256 `bf9f0c64…9ed8e1`, LF through `.gitattributes`, mode 100755) is the
-  host-wide tool of the rule's `## The janitor` heading — a shipped file, not a block to paste. `janitor.test.mjs` holds
+  reported `clean (42 files)` at E1 (2026-10-15).
+- **The janitor.** `tools/janitor.sh` (at E1, 2026-10-15: 308 lines, 25 644 B, sha256 `bf9f0c64…9ed8e1`, LF through `.gitattributes`, mode 100755; replaced by the janitor of the merged core above) was the
+  host-wide tool of the rule's `## The janitor` heading — a shipped file, not a block to paste. At E1 `janitor.test.mjs` held
   its twelve verdicts, `8b` (the `--dry-run` announcement) and `13`–`19` (the code gate and the Opus review: malformed owners, one row per
   worktree, one volume inspect, one `tasklist` snapshot, three-valued liveness on both branches, the running clone) as `node:test`: a stub
   `docker` first on `PATH`, two disposable clones, a private temp root, Git for Windows' bash located from `git --exec-path`, owners from
@@ -1177,15 +1249,15 @@ and `janitor.test.mjs` asserts that premise before and after every run; the Node
 that runs in a child process (10) uses the unmatchable pid. Every assertion that follows a janitor run now prints the run's
 stderr, so the next survivor explains itself.
 
-**Wall time of the suite before and after the helper (S2's DoD).** The whole suite, run from temporary worktrees on a 24-thread Windows machine at `--test-concurrency=8`, took 260.0 s at `3f6acf1^` (the helper present, the tests still on raw `mkdtemp`) and 265.8 s at `3f6acf1` (every site on the helper), and 221.8 s on a second run of the latter — a difference well inside the run-to-run spread, so adopting the helper has no measurable cost (7 and 6 tests failed in those two trees, a worktree in the temp root being a place some tests do not expect — the guard's repository scan, two real-CLI tests, a real-Git test and sweep case 10, which the new repository seam fixes; the same kind of failures on both sides). `owned.test.mjs` alone: 12.6 s at its first commit (25 tests), 9.0 s now (28). The full `npm test` at the tip of this branch: 540 tests, 536 pass, 4 skipped, 0 fail, 798 s — 15 more tests than the trees above, 7 of them the janitor's, whose file alone takes about 8.5 minutes on Windows.
+**Wall time of the suite before and after the helper (S2's DoD).** The whole suite, run from temporary worktrees on a 24-thread Windows machine at `--test-concurrency=8`, took 260.0 s at `3f6acf1^` (the helper present, the tests still on raw `mkdtemp`) and 265.8 s at `3f6acf1` (every site on the helper), and 221.8 s on a second run of the latter — a difference well inside the run-to-run spread, so adopting the helper has no measurable cost (7 and 6 tests failed in those two trees, a worktree in the temp root being a place some tests do not expect — the guard's repository scan, two real-CLI tests, a real-Git test and sweep case 10, which the new repository seam fixes; the same kind of failures on both sides). `owned.test.mjs` alone: 12.6 s at its first commit (25 tests), 9.0 s now (28). The full `npm test` at the tip of E1's branch (2026-10-15): 540 tests, 536 pass, 4 skipped, 0 fail, 798 s — 15 more tests than the trees above, 7 of them the janitor's, whose file alone takes about 8.5 minutes on Windows.
 
-**On Linux (WSL 2, Node 20.20.2, git 2.43).** `owned`, `leftovers-sweep`, `janitor`, `leftovers-check` and `unmatchable-pid` tests,
+**On Linux at E1, 2026-10-15 (WSL 2, Node 20.20.2, git 2.43).** `owned`, `leftovers-sweep`, `janitor`, `leftovers-check` and `unmatchable-pid` tests,
 serial: 97 tests, 95 pass, 0 fail, 2 skipped (this git has no `--relative-paths` for a worktree: janitor case 5 and owned case 12 skip with that reason, and 12b covers the same read with a hand-made relative gitdir) in 20 s — the janitor file takes seconds there against about eight minutes on Windows. The
 first Linux run found what Windows could not: the private `PATH` of the janitor test lacked `cut` and `xargs`, which the one-inspect
 capture added, so cases 2 and 15 failed with `cut: command not found`; the tool list now names them. The run was made in a WSL-native
 copy of the tree (`git archive` into a scratch repository), because a worktree's `.git` file names a Windows path that WSL's git cannot read.
 
-**Round 3 of the code gate (the janitor, owner and guard hardening).** Four branches were merged into the epic, and one integration pass added the rest. The janitor is now 308 lines, 25 644 B (sha in § The janitor above); new test files, each runnable alone with `node --test --test-concurrency=1 <file>`:
+**Round 3 of the code gate (the janitor, owner and guard hardening).** Four branches were merged into the epic, and one integration pass added the rest. At E1 (2026-10-15) the janitor was 308 lines, 25 644 B (sha in the janitor bullet above); new test files, each runnable alone with `node --test --test-concurrency=1 <file>`:
 
 - `tools/owned-liveness.test.mjs` — `processProbe` answers a named `state`; a pid that is not a positive safe integer is `unknown` and the OS is never asked; `sweepRepoRoot(env)` keeps the real repository root.
 - `tools/owner-conformance.test.mjs` over `tools/fixtures/owner-vectors.json` — ONE table of vectors (owner grammar, verdicts, host names) asked of both `owned.mjs` and `janitor.sh`; a disagreement names the vector and both answers. The harness feeds the janitor's `owner_ok` the raw claim text through `claim_norm` (command substitution alone drops trailing newlines, which made the multi-line vector i29 look valid to bash only because of the harness). The Linux run found one more disagreement, vector i30 (a no-break space in the host): Node's whitespace class knows it, bash's `[[:space:]]` is ASCII-only in a C locale, so `owner_ok` now names the Unicode spaces explicitly (`uspace`).

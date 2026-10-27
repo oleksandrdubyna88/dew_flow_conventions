@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The guard (`leftovers-check.mjs`) and the helper (`lib/owned.mjs`) as SHIPPED FILES for consumers (S8, decision 11 of
- * `todo/PLAN_test_leftovers_merged_core.md`; the review fixes of PR #82): where a repository's token lives, which shell names are
+ * `research/PLAN_test_leftovers_merged_core.md`; the review fixes of PR #82): where a repository's token lives, which shell names are
  * dynamic, which files a profile reads, what the cure texts say. Like `leftovers-check.test.mjs`, this file carries the violations
  * as fixture strings, so the guard does not read it (`EXCLUDED_FILES`). Every scratch repository is an owned folder.
  */
