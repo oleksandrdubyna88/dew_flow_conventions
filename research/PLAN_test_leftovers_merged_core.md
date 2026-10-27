@@ -1,14 +1,19 @@
 # PLAN — Test leftovers, the merged core: the owner segment scopes, the kernel authorises, liveness decides
 
-> Status: **plan only, nothing implemented yet, 2026-10-21.** Scope: `common/test-leftovers.md`, a new
+> Status: **IMPLEMENTED, 2026-10-27** — on PR #82 (merges after S0 of [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md));
+> deviations in [Deviations](#deviations-from-the-plan-recorded-2026-10-27). What is NOT done — S0 on every machine, S7 (the
+> one `release` promotion and the consumer migration), the private sibling's side and the merge itself — moved to that
+> remainder plan; the Windows run is follow-up F9. Scope: `common/test-leftovers.md`, a new
 > `common/test-leftovers-janitor.md`, `tools/lib/owned.mjs`, `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`,
 > `tools/leftovers-check.mjs`, `tools/fixtures/owner-vectors.json`, a new `tools/fixtures/owner-blind-allowlist.json`,
 > `tools/owner-conformance.test.mjs`, a new `tools/sweeper-scan.mjs`, a new `research/security/` verdict file, their tests,
 > `README.md`, `research/rule-bodies.json`. Plan-gate round 1 passed (good_enough); its findings are applied below.
 >
 > Related docs: [PLAN_test_leftovers_E1.md](PLAN_test_leftovers_E1.md) (the contract this one revises — promoted to
-> `research/` by this plan's last story), [PLAN_test_leftovers_rollout.md](PLAN_test_leftovers_rollout.md) (the consumer
-> epics, which now wait for THIS release and split into two stages), [rule-ownership.md](../common/rule-ownership.md).
+> `research/` together with this plan, 2026-10-27), [PLAN_test_leftovers_merged_core_release.md](../todo/PLAN_test_leftovers_merged_core_release.md)
+> (the remainder plan: what this one left open), [PLAN_test_leftovers_merged_core_followups.md](../todo/PLAN_test_leftovers_merged_core_followups.md)
+> (the findings parked by the security pass), [PLAN_test_leftovers_rollout.md](../todo/PLAN_test_leftovers_rollout.md) (the consumer
+> epics, which now wait for THE RELEASE and split into two stages), [rule-ownership.md](../common/rule-ownership.md).
 >
 > This rule text is shared byte for byte with a private sibling rule repository that serves a second family of
 > repositories on machines several OS users share. The sibling is never named in this file; where it matters it is
@@ -41,11 +46,13 @@ first producer. The tools of this repository are the reference every consumer po
 
 | Item | Built by | The other plan's part |
 |---|---|---|
-| The rule text, the owned-resource helper, the sweep, the janitor and the guard (the contract itself) | [PLAN_test_leftovers_E1.md](PLAN_test_leftovers_E1.md) built the first version; **this plan revises it** | E1's stories keep their first form; this plan's S7 promotes that document to `research/` as IMPLEMENTED with this plan as its revision |
-| Renaming each consumer's resources, ports of the helper, sweep and guard, consumer pin bumps | [PLAN_test_leftovers_rollout.md](PLAN_test_leftovers_rollout.md) epics E2–E7 | They wait for the ONE release this plan ends with; each epic splits into a sweep-only stage and a producer stage (pin bump + rename + helper/guard port in one commit), all sweep-only stages before any producer stage |
-| The machine barrier before the first owner-form producer | this plan (§ *Barrier checklist*) | Each consumer epic runs it per machine before its first owner-form producer |
+| The rule text, the owned-resource helper, the sweep, the janitor and the guard (the contract itself) | [PLAN_test_leftovers_E1.md](PLAN_test_leftovers_E1.md) built the first version; **this plan revises it** | E1's stories keep their first form; both documents were promoted to `research/` together on 2026-10-27, this one recorded as E1's revision |
+| Renaming each consumer's resources, ports of the helper, sweep and guard, consumer pin bumps | [PLAN_test_leftovers_rollout.md](../todo/PLAN_test_leftovers_rollout.md) epics E2–E7 | They wait for the ONE release the remainder plan ends with (its R5); each epic splits into a sweep-only stage and a producer stage (pin bump + rename + helper/guard port in one commit), all sweep-only stages before any producer stage (its R6) |
+| The machine barrier before the first owner-form producer | this plan built the scan and the checklist (§ *Barrier checklist*); [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md) runs it (R1, R2) | Each consumer epic runs it per machine before its first owner-form producer |
+| S0 on every machine, the PR's merge, the private sibling's side of the Definition of Done, S7 (the one promotion of `release`) | [PLAN_test_leftovers_merged_core_release.md](../todo/PLAN_test_leftovers_merged_core_release.md) R1–R5 | This plan keeps the build and its reviews; it records the machine it has and points at the remainder for every other item. Nothing is built twice: the remainder plan edits no tool |
+| The findings the security pass parked, the stub-docker gaps, the Windows run | [PLAN_test_leftovers_merged_core_followups.md](../todo/PLAN_test_leftovers_merged_core_followups.md) F1–F9 | None of them blocks the release |
 
-Order: this plan first, then the consumer epics. Disjoint: nothing here edits a consumer repository.
+Order: this plan first, then [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md), then the consumer epics. Disjoint: nothing here edits a consumer repository.
 
 ## Facts the plan rests on (read on `origin/main` `2c96f83`, 2026-10-21)
 
@@ -90,9 +97,9 @@ Order: this plan first, then the consumer epics. Disjoint: nothing here edits a 
    sweep) AND abandonment (`gone`, or a free store lock held through the drop). A stricter implementation may refuse its
    whole run while any own record is live. *Loses:* "unmarked and old is nobody's"; age as authority anywhere.
 5. **Claim first** (exclusive claim write → register → exclusive create). An existing claim ⇒ a new id. A **squatted name**
-   (`mkdir` finds a folder under the claimed name) ⇒ ONE warning naming the collision, the helper's own claim stays (its run
-   owns it; the sweep collects it under the two keys when the run is gone and judges the squatter's folder by the normal
-   rules), a new id is drawn; the squatter's folder is never adopted and never removed by the helper. An **orphan claim**
+   (`mkdir` finds a folder under the claimed name) ⇒ ONE warning naming the collision, the helper removes its own claim (only while
+   it still holds exactly what it wrote, so a claim of a run that dies later never governs a folder this run did not
+   create; the squatter's folder is judged by the normal rules), a new id is drawn; the squatter's folder is never adopted and never removed by the helper. An **orphan claim**
    (claim without a folder) is collected under the two keys when its owner is `gone`; two live runs never share a name,
    because the claim is exclusive. *Loses:* `mkdtemp` in the helper; "remove the claim and draw again" on a collision.
 6. **Legacy names** (second segment not of the owner grammar): listed with the exact command; collected only with kernel
@@ -118,6 +125,11 @@ Order: this plan first, then the consumer epics. Disjoint: nothing here edits a 
 10. **Guard**: two classes, `legacy-name` (exemptible) and `owner-blind` (NOT exemptible by comment: the only pass is the
     allowlist `tools/fixtures/owner-blind-allowlist.json` keyed by file path + line number + sha256 of the line, holding
     exactly the janitor's inventory line; an annotated arbitrary `rm -rf`/docker sweep is still a finding).
+11. **The helper and the guard serve consumers as shipped files** (owner decision 2026-10-26, from the private sibling's
+    rollout: Node consumers wrap and run them, never port them). `owned.mjs` takes the repository token as a parameter;
+    `leftovers-check.mjs` reads a consumer's tree; the private sibling copies both byte for byte and pins their sha256, like
+    the janitor. *Loses:* "each consumer ports the helper and the guard"; this repository's token as the only one the
+    helper knows. S8.
 
 ## Build order
 
@@ -129,7 +141,7 @@ Order: this plan first, then the consumer epics. Disjoint: nothing here edits a 
 2. S5a — `tools/lib/sweeper-scan.mjs` (`classifyLine`) lands FIRST inside the PR, so S1's scan checks have something to run
    (gate P7). 3. S1 — the two rule texts (cornerstone). 4. S2 — `owned.mjs`. 5. S3 — the sweep. 6. S4 — the janitor + its
    companion (cornerstone, security). 7. S5b — the guard, the allowlist, the scan CLI. 8. S6 — the shared vectors and the
-   conformance test. 9. S7 — docs, the promotion of the E1 plan, the one release (held until S1–S6 are merged, the pre-merge
+   conformance test. 8b. S8 — the helper and the guard for consumers (decision 11). 9. S7 — docs, the promotion of the E1 plan, the one release (held until S1–S6 are merged, the pre-merge
    gate is recorded, and the private sibling's rebuild has its text).
 
 One PR for S0–S6 (the spans and the tools must land together: the guard goes red on the old form the day the text changes);
@@ -139,11 +151,30 @@ S7 is the release step.
 
 ### S0 — The pre-merge barrier gate for this repository (`model: sonnet` records; a person attests)
 
+> **State 2026-10-27: recorded for ONE machine, open for the rest — moved to [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md) (R1, R2).**
+> The record is one SECTION per machine in `research/security/machines.md`, not a file per machine as the text below says.
+
 - For every machine that builds or tests this repository: `node tools/sweeper-scan.mjs --root <checkout parent>` as the
   developer; `--system` once by an administrator; the manual items of the checklist; the result in
-  `research/security/barrier-<machine>.md` (date, scan output, the attestation line for anything the scan could not read).
+  `research/security/barrier-<machine>.md`. **The scan ships in this PR (S5b), so each machine runs it from a checkout of
+  the PR branch, before the merge** — never from `main`, which does not have it yet (plan gate 2026-10-26).
+- Each record carries: the machine's identity (host name, OS, the OS users that build or test here), the date, the commit
+  of the scan it ran, the scan's outcome, and each attestation by name for what the scan could not read. A person reviews
+  the records; `research/security/machines.md` is the inventory, and adding a machine that builds or tests this repository
+  adds its record in the same commit.
+- **Out of scope:** a GitHub-hosted runner — one job's, discarded with it (rule §3), never shared by two OS users; this
+  repository's CI runs only there. A persistent self-hosted runner is a machine like any other and is in the inventory.
+- The merge check requires each record and its fields, NOT a scan exit 0: a part the user-scope scan could not read
+  (exit 2 — another user's cron spool, an unreadable task scheduler) is attested by name in the record, and `--system` is
+  an administrator's run recorded as prose (plan gate round 2).
+- **The order with the consumers** (plan gate round 2): a consumer's SWEEP-ONLY stage emits no owner-form name and does
+  not depend on this release, so it may be prepared and merged BEFORE this PR merges — which is what lets a shared
+  machine's barrier open. Until a machine's barrier is open, that machine builds or tests this repository only with
+  `TMPDIR`, `TEMP` and `TMP` set to a private folder (mode 0700) under the user's own home, where no other user's
+  sweeper reaches, and its record says so.
 - **Scenario:** the PR's merge is blocked (a required check reads the folder) until a file exists for every machine named in
-  `research/security/machines.md`; RED: one machine missing → the check names it.
+  `research/security/machines.md`, each with the fields above; RED: one machine missing, or a record without the scan
+  commit → the check names it.
 
 ### S1 — The two rule texts — **cornerstone (1 of 2), `model: fable`** (the spec is written; a Sonnet coder lands it, Opus reviews)
 
@@ -176,7 +207,7 @@ S7 is the release step.
   `ownerState` with `nameOwner`/`callerOwner`/`kernelMine` and the namespace step; `hidepid`.
 - **Tests (RED first, `tools/owned.test.mjs`):** 15 the name carries the caller's owner before the token and refuses a
   `what` that leaves no room (`checkWhat` names the room); 16 `ownedDir` claims FIRST — an existing claim draws a new id;
-  16b a squatted name: the helper warns once, its claim stays and is removed by the scope's teardown, the squatter's folder
+  16b a squatted name: the helper warns once, removes its own claim at once (and its teardown never removes a claim it no longer holds), the squatter's folder
   is untouched, a new id is drawn (RED: today `mkdtemp` never collides, so the test first proves the seam); 16c an orphan
   claim with a `gone` owner is collected by the sweep and one with a live owner stays, and a second helper never obtains
   the same name while the first's claim exists; 17 `thisOwner` carries the owner token and, on Linux, the pid namespace;
@@ -210,9 +241,15 @@ S7 is the release step.
 - The capture keeps its breadth and gains `form`/`nameowner` columns; `ME_OWNER` (Linux/macOS `id -u`; Windows
   `printf '%s' "$(id -un | LC_ALL=C tr 'A-Z' 'a-z')" | sha256sum | cut -c1-8` → `$(( 16#… ))`); `scope_ok` with `-O` on folder,
   claim and the worktree's clone; `owner_ok` merged grammar + `legacy_owner_ok`; `ns_ok`; the identity re-check before every
-  removal; a plain folder `mv`ed into the sibling quarantine then `rm -rf`; a worktree NEVER `mv`ed — `git worktree remove
+  removal; a plain folder `mv`ed into the sibling quarantine, its device, inode and re-read claim checked AGAIN in the
+  quarantine, then `rm -rf` — a mismatch is renamed back and skipped (plan gate 2026-10-26; the Node sweep does the same); a worktree NEVER `mv`ed — `git worktree remove
   --force --force` on the captured clone; a quarantine of the caller's uid with a dead renamer restored onto a free name
-  only, else a notice; the captured clone dir carried through `DEL`; `timeout` on claim/`.git` reads and git calls;
+  only, else a notice — as the FIRST step of every run, before the capture (plan gate 2026-10-26). The restore
+  primitive (plan gate round 2): an exclusive `mkdir` of the original name reserves it, then `rename(2)` of the
+  quarantine onto that EMPTY directory — rename replaces only an empty directory, so a name another process populated in
+  between fails (`ENOTEMPTY`/`EEXIST`) and the quarantine stays with a notice, and in a sticky temp root another user's
+  entry cannot be replaced at all; where a rename onto an existing directory is refused (Windows), the restore is a
+  notice only, never a delete; the captured clone dir carried through `DEL`; `timeout` on claim/`.git` reads and git calls;
   `foreign:`/`legacy:`/`unmarked:` lines; exit 3 only for the caller's scope; `TESTSTODELETE_OWNER` validated or exit 2;
   no `--owner`; the inventory line is the ONE entry of `tools/fixtures/owner-blind-allowlist.json`.
 - **Tests (RED first, `tools/janitor.test.mjs` / `tools/janitor-liveness.test.mjs`):** 21 root (a `JANITOR_TEST_UID` seam
@@ -226,7 +263,7 @@ S7 is the release step.
   Windows machine with Git for Windows' bash, skipped elsewhere with a diagnostic): an owned dead leftover folder is
   deleted, a live one and a foreign-owner one are kept — the check gate C6 asks for before the sibling withdraws its
   listing-only path; 29 a dead-owned worktree goes through `git worktree remove`, never a rename, and a quarantine orphan
-  is restored only onto a free name; 20a–20f from the hardening branch stay green; 1–19 and L1–S13 re-targeted (3: the
+  is restored only onto a free name; **30** a folder swapped between the pre-rename check and the rename is caught by the re-check in the quarantine, renamed back and skipped, nothing removed; **31** a run killed after the rename (a quarantine left behind) has it restored by the NEXT run before that run's capture (plan gate 2026-10-26); 20a–20f from the hardening branch stay green; 1–19 and L1–S13 re-targeted (3: the
   "dead old unmarked" folder is now listed, not removed).
 - **The security verdict is a file** (gate P8): `research/security/test-leftovers-merged-core.md` — the reviewed commit
   hash and one line per scenario of the spec's §6 (SHIP, or FIX + the fix commit); the Fable pass writes it, the DoD reads it.
@@ -259,14 +296,45 @@ S7 is the release step.
 ### S6 — The shared vectors and the conformance test (`model: sonnet`, Opus review)
 
 - `tools/fixtures/owner-vectors.json`: grammar vectors on the merged record; the new `names` table; `verdicts` with
-  `nameOwner`/`recordOwner`/`callerOwner`/`kernelMine`/`ns`; the `windows-owner` table (upper case, a space, multi-byte
+  `nameOwner`/`recordOwner`/`callerOwner`/`kernelMine`/`ns`; the `windows-owner` table (at least one name whose token is
+  ≥ 2^31 — the digest's high bit set — asked of bash `$(( 16#… ))` and Node `readUInt32BE` alike, plan gate 2026-10-26; upper case, a space, multi-byte
   names, the canonical input stated in `about`); `hostnames` unchanged. The file is copied byte for byte by the private
   sibling, so every vector carries its reason and no family fact.
 - `tools/owner-conformance.test.mjs`: the new tables asked of bash (`owner_ok`, `legacy_owner_ok`, `scope_ok`'s pure half,
   the Windows derivation through `sha256sum` with `printf '%s'`) and Node; the janitor verdict run gains `kernelMine`
   through the `-O` seam.
 
+### S8 — The helper and the guard for consumers (decision 11; Opus brief, `model: sonnet`, Opus review)
+
+- **`tools/lib/owned.mjs`:** `ownedFor({ token, row })` returns the same API bound to that token (`ownedPrefix`,
+  `ownedPattern`, `ownedName`, `ownedDir`, `ownedWorktree`, `classifyName`, `runRecord`, `formatOwner`, `cleanupScope`,
+  …); `token` is validated (`[a-z0-9]{2,12}`, not of the owner grammar) or it throws. The module's own exports stay bound
+  to this repository's `REPO_TOKEN`, so nothing here changes behaviour. `tools/lib/git.mjs` (which it imports) ships with it. The shipped
+  `owned.mjs` holds NO token (review fix, 2026-10-26): `REPO_TOKEN` and `REPO_ROW` live in `tools/lib/owned-token.mjs`, which each repository
+  writes itself, so a byte copy is the same bytes everywhere; the guard finds the constant there and reports a copied `owned.mjs` with no such file.
+- **`tools/leftovers-check.mjs`:** (a) `--profile node` adds a consumer's tracked `**/*.{test,spec}.{ts,tsx,mts,cts,js,mjs,cjs}`,
+  every text file of `scripts/`, `test/` and `tests/` (binary ones skipped; `node_modules` and the mount paths `.claude/rules/shared/`,
+  `.agents/conventions/` excluded, for the token constants too) to today's set; without it the scan is today's. (b) A `docker-name` value that is
+  wholly a shell expansion (`"${x}"`, `"$(f …)"`) is dynamic, as a JS array item already is: not a finding — a text scan
+  cannot know it; the consumer's helper tests cover what it builds. A literal default (`${V:-w}`, `-`, `:=`, `=`, no `$` in `w`) is judged as
+  the name it gives when V is unset, and a single-quoted `'${x}'` is a literal. (c) `yaml` is resolved from the scanned repository
+  (`createRequire(path.join(<repo>, "noop.js"))`, which walks up from the repository root whether or not a
+  `package.json` sits there) when the guard's own resolution fails; neither → exit 2 with the sentence to add
+  `yaml@2` as a devDependency. (d) The token check reads the mounted rule's `## Tokens` table whatever families it lists
+  and requires the `--token` row to name `--identity`; "this public copy lists only `dew_flow`" moves from the guard into
+  `tools/rules.test.mjs`. **Not in S8:** a `module-load` class (rule §2) — it needs a JS/TS parser the guard does not
+  have; consumers keep a local check with their own TypeScript until one is chosen (a tracked follow-up).
+- **Tests (RED first):** `ownedFor({ token: "sso" })` names `testsToDelete-<owner>-sso-…` and its pattern refuses
+  `conventions`; a bad token throws; this repository's exports unchanged (the existing suite is the proof). The guard over
+  a scratch Node consumer (`git init`, a `*.test.ts` with `mkdtempSync`, a `scripts/x.sh` with `docker run --name
+  "${name}" --rm`, a workflow): `--profile node` reports the `raw-temp` and nothing for the dynamic name; without the
+  profile it does not see the `.ts`; no `yaml` anywhere → exit 2 with the sentence; a Tokens table with a second family's
+  rows passes when the `--token` row names `--identity`.
+
 ### S7 — Docs, the E1 promotion, the release (`model: sonnet`)
+
+> **State 2026-10-27: the README row of the scan and the E1 promotion are done (the promotion commit of this document); the release and
+> the consumer migration moved to [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md) (R5, R6).**
 
 - `README.md:259-260` + the mounted-tools table (`sweeper-scan`, the companion, the allowlist); `todo/PLAN_test_leftovers_E1.md`
   → `research/` as IMPLEMENTED with this plan recorded as its revision; `todo/PLAN_test_leftovers_rollout.md`: every
@@ -292,26 +360,57 @@ S7 is the release step.
 ## Test plan
 
 `npm test` (every suite above); `node tools/leftovers-check.mjs` on this repository; `node tools/sweeper-scan.mjs --root .`;
-`node tools/ownership-check.mjs`; `node tools/rule-bodies.mjs`; `npm run check`; the conformance test and S4 test 28 on
-Windows (Git for Windows' bash) and the suite on Linux (CI, once as root for S4 scenario 21); the RED observations of every
-numbered test quoted in the PR.
+`node tools/ownership-check.mjs`; `node tools/rule-bodies.mjs`; `npm run check`; the suite on Linux (CI, once as root for
+S4 scenario 21); the RED observations of every numbered test quoted in the PR. The Windows run (the suite, the conformance
+test and S4 test 28 under Git for Windows' bash) is follow-up F9 since 2026-10-27 (owner decision): the janitor stays
+`--dry-run` on Windows until it is recorded.
 
 ## Definition of Done
 
-- [ ] The two rule texts are the spec's companions byte for byte; both bodies under the cap (the inflated-copy RED
-      observed); no owner-blind line; the sibling's rebuild reports both spans byte-identical.
-- [ ] `owned.mjs`, the sweep, the janitor, the guard, the allowlist, the scan and the vectors implement decisions 1–10;
-      every new test was RED first with its real symptom, then green; the full suite green on Windows and Linux; the Windows
-      end-to-end check (S4 test 28) green on at least one Windows machine, recorded.
-- [ ] The hardening branch is merged first and its tests stay green.
-- [ ] `research/security/test-leftovers-merged-core.md` exists for the merged commit with a SHIP line per scenario of the
+State 2026-10-27. An unticked item names the remainder-plan item that owns it
+([PLAN_test_leftovers_merged_core_release.md](../todo/PLAN_test_leftovers_merged_core_release.md), R1–R6).
+
+- [x] The two rule texts are the spec's companions byte for byte; both bodies under the cap (the inflated-copy RED
+      observed); no owner-blind line.
+- [ ] The private sibling's rebuild reports both spans byte-identical. → remainder plan, R4.
+- [x] `owned.mjs`, the sweep, the janitor, the guard, the allowlist, the scan and the vectors implement decisions 1–10;
+      every new test was RED first with its real symptom, then green; the full suite green on Linux. The Windows run and the
+      Windows end-to-end check (S4 test 28) are NOT a merge condition since 2026-10-27 (owner decision): they are follow-up
+      F9 of [the follow-ups plan](../todo/PLAN_test_leftovers_merged_core_followups.md), and the janitor stays `--dry-run` on
+      Windows until a machine records them.
+- [x] The hardening branch is merged first and its tests stay green (#80, merged into this branch as 04c5884).
+- [x] `research/security/test-leftovers-merged-core.md` exists for the merged commit with a SHIP line per scenario of the
       spec's §6 (forged owner, forged claim, root, replacement after capture, inaccessible evidence, hostile names, two
       users one daemon, the override's reach, the Windows token, the scan's blind spots).
 - [ ] The pre-merge barrier gate (S0) is recorded for every machine in `research/security/machines.md` before the PR merged.
-- [ ] `README.md`, `rule-bodies.json`, the E1 promotion and the rollout plan's two-stage rule are updated; the release was
-      promoted once, after the sibling's confirmation.
-- [ ] Cornerstones of this plan: **2 of 2 — S1 (the merged core text, model: fable), S4 (the one janitor and its companion,
+      One machine is recorded, with three root-only places open; the owner's Windows machine has no record. → remainder plan, R1, R2, R3.
+- [x] `README.md`, `rule-bodies.json`, the E1 promotion and the rollout plan's two-stage rule are updated.
+- [ ] The release was promoted once, after the sibling's confirmation. → remainder plan, R4, R5.
+- [x] S8: a Node consumer runs the shipped guard with `--profile node` and wraps the shipped helper with its own token.
+- [ ] S8: the private sibling copies both byte for byte and pins their sha256. → remainder plan, R4.
+- [x] Cornerstones of this plan: **2 of 2 — S1 (the merged core text, model: fable), S4 (the one janitor and its companion,
       the security pass, model: fable)**.
+
+## Deviations from the plan (recorded 2026-10-27)
+
+What shipped differently from the text above — the part a later reader needs most. Commits are on PR #82.
+
+1. **S8 was added after the plan gate (decision 11, 2026-10-26).** The helper and the guard serve consumers as shipped
+   files; the token left the shipped helper into `tools/lib/owned-token.mjs` (0f7beab), so a copy of `owned.mjs` never
+   carries another repository's token.
+2. **The Windows run and S4 test 28 are not a merge condition (owner decision, 2026-10-27)** — follow-up F9. The janitor
+   forces `--dry-run` on Windows unless `JANITOR_WINDOWS_E2E_GREEN` is set (2390c7e, tested by S4-28b). The machine that ran
+   the suite on Windows on 2026-10-23 has no barrier record.
+3. **The security pass found four findings that needed a fix, M-1 to M-4, fixed in the PR** (62d06ce, 91e1b40, 4d6925a, 2390c7e). Its
+   low findings are parked in [the follow-ups plan](../todo/PLAN_test_leftovers_merged_core_followups.md).
+4. **A real Docker 29.9.1 run on 2026-10-27 found that the stub-docker suite hid a defect.** `docker volume inspect --format`
+   does not turn a bare `\t` into a tab, so no volume was ever swept on a real daemon while the suite was green. Fixed with the
+   Go literal `{{"\t"}}` (9b62ba3) and a live check, `tools/janitor-docker-live.test.mjs` (a72f8e5); reason texts became ASCII
+   (`; ` instead of ` — `) in the same fix. The two stub gaps that remain are F7 and F8.
+5. **The barrier record is one section per machine in `research/security/machines.md`**, not a file `barrier-<machine>.md` per
+   machine as S0 says.
+6. **S0 and S7 were not done inside this plan.** They moved to the remainder plan, with the sibling's side of the
+   Definition of Done and the PR's merge, because each needs a person or a machine this build did not have.
 
 ## Plan-gate round 1 (2026-10-21) — findings and what changed
 
@@ -331,3 +430,31 @@ numbered test quoted in the PR.
 | C6 (shared core) the Windows dependency and the end-to-end check | decision 8; S4 test 28; the DoD |
 | C9 (shared core) orphan claims | decision 5; S2 test 16c |
 | C13 (shared core) a squatted name | decision 5; S2 test 16b |
+
+## Progress and hand-off (2026-10-23)
+
+State of the work, so a session on another machine can continue without this repository's history in its head.
+
+| Story | State | Where |
+|---|---|---|
+| S5a classifier | done | `tools/lib/sweeper-scan.mjs` (`classifyLine`), commit 2fb413c |
+| S1 rule texts | done | `common/test-leftovers.md` (29 655 B body, cap 32 768) + `common/test-leftovers-janitor.md`, a993bde |
+| S2 owned helper | done | `tools/lib/owned.mjs`: owner grammar, Windows token, record, claim first, squatting and orphan claims, a7ad5ce |
+| S3 sweep | done | `tools/lib/leftovers-sweep.mjs`: two keys, quarantine for plain folders only, worktrees via git, 5571756 |
+| S5b guard + barrier scan | done | `tools/leftovers-check.mjs` classes `owner-blind`/`legacy-name`, `tools/fixtures/owner-blind-allowlist.json`, `tools/sweeper-scan.mjs`, a4fc637 |
+| S6 conformance (Node half) | done | `tools/fixtures/owner-vectors.json` tables record/names/windows-owner/scope, 93cabc6 |
+| Review round (Opus) | done | 540237b: a legacy record on a Linux reader is `unknown`; win32 scope is fail-closed outside the per-user profile; unanchored sweepers are broad; job scripts are followed and an unreadable one is exit 2; legacy claims are read through the safe reader; identity is captured before judging; a squatting helper removes its own claim |
+| S4 janitor + companion | done 2026-10-26 | 04c5884 (merge of #80), 561a157, b2df09c, 95e4db2, fb0ee1e; the real-daemon volume fix 9b62ba3 and a72f8e5 (2026-10-27). The brief it was built to: first `git merge origin/main` — it brings the hardened janitor of #80 (491aab9); build S4 ON TOP of it and keep every defence: the entry's owner by lstat at capture and before removal, a sticky or own temp root, the pinned clone with a clean git environment, bounded reads with a fail-closed fallback, `worktree unlock` only for a locked worktree, `rm -rf` only after every git step returned 0, `%q` output, no arithmetic or eval on captured text. No inline `owner-blind` marker on the inventory line — the allowlist entry is the only pass (re-run `--update-allowlist`). Then the janitor half of the conformance vectors and an empty `LEGACY_NAME_PENDING` list in `tools/leftovers-check.mjs`. |
+| Gates after S4 | done 2026-10-26, again 2026-10-27 | coai code round over f122729: `proceed`, 8 of 8 reviewers (4 accepted, 6 rejected with reasons); Opus review, every finding fixed (95e4db2, e7ef1aa, f2f7aeb, e14efb1, 0f7beab); Fable security pass SHIP at 3548691, recorded in `research/security/test-leftovers-merged-core.md` (b2ecbdc), its low findings parked in [the follow-ups](../todo/PLAN_test_leftovers_merged_core_followups.md). 2026-10-27, the volume fix over b2ecbdc: code round `again`, `proceed`, 8 of 8 (2 findings rejected with reasons); Opus review L1 fixed (a72f8e5), L2 and L3 parked as F7 and F8 |
+| S0 barrier | recorded for ONE machine, open for the rest — moved to the remainder plan (R1, R2) | the Ubuntu dev VM is in `research/security/machines.md` (scan of 2026-10-27 at 8948ff7: 486 owner-blind lines in 38 checkouts of other repositories, each read and classified, 23 unreadable files checked by hand; three root-only places still open for `--system`). Every other machine that builds or tests this repository still needs its own section |
+| S8 consumer helper + guard | done 2026-10-26 (decision 11) — 7375cfb, b6a3872, merged 1f1c029; review fixes merged 8ee8b7d | `tools/lib/owned.mjs` `ownedFor`, `tools/leftovers-check.mjs` `--profile node`, dynamic shell names, `yaml` from the scanned repository, any family's rows |
+| S7 release | moved to the remainder plan (R5, R6) | ONE promotion of `release`; warn the other sessions that own open consumer PRs first (a promotion turns `pin-check` red everywhere); then the two-stage consumer migration — sweep-only stages everywhere before any producer stage. The README row of the scan and the E1 promotion are done |
+
+Test counts at 540237b's parent 93cabc6: WSL Linux 920 pass / 0 fail / 3 skipped; Windows Git Bash 917 pass, one
+known slow test (`migrate-rules`, passes alone).
+
+Test counts at 9b62ba3 (2026-10-27, Ubuntu dev VM, lowered, private TMPDIR, non-root): 1099 tests, 1093 pass, 0 fail,
+6 skipped (S4-21b real uid 0, S4-28 Windows end-to-end, and four Windows-only or opt-in tests); the live check
+`tools/janitor-docker-live.test.mjs` ran against Docker 29.9.1 and passed. A real-daemon smoke of `tools/janitor.sh`
+(`--token`, dry run then real) removed the dead-owned container, network and volume, kept the live-owned container and
+did not touch a foreign owner's. Windows was not run (follow-up F9).

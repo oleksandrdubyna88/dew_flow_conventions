@@ -1,7 +1,7 @@
 # PLAN — Test leftovers, E1: the contract, its refinement, and this repository's own tools
 
-> Status: **plan only, nothing implemented yet, 2026-10-15.** Stories of epic E1 of
-> [PLAN_test_leftovers_rollout.md](PLAN_test_leftovers_rollout.md) (§ *Epics*, E1). Scope: `common/test-leftovers.md`
+> Status: **IMPLEMENTED, 2026-10-15** (merged in #77, 2c96f83); promoted 2026-10-27 with the merged core. Stories of epic E1 of
+> [PLAN_test_leftovers_rollout.md](../todo/PLAN_test_leftovers_rollout.md) (§ *Epics*, E1). Scope: `common/test-leftovers.md`
 > (+ its record in `research/rule-bodies.json`), a Node owned-resource helper and a start-of-run sweep under
 > `tools/lib/`, the guard `tools/leftovers-check.mjs`, `tools/run-tests.mjs`, the shipped janitor `tools/janitor.sh`
 > with its test, the 34 `mkdtemp` sites and the four worktree sites in `tools/*.test.mjs`, and one release.
@@ -10,10 +10,11 @@
 >
 > Revised by [PLAN_test_leftovers_merged_core.md](PLAN_test_leftovers_merged_core.md) (2026-10-21): the contract this
 > document builds gains an owner segment, kernel ownership and one companion janitor document before its release. That plan
-> owns the revised text and tools and promotes this document when it ships; the stories here keep their first form.
+> owns the revised text and tools and promoted this document when it shipped; the stories here keep their first form.
+> What it left open is in [PLAN_test_leftovers_merged_core_release.md](../todo/PLAN_test_leftovers_merged_core_release.md).
 
 **Committed together with this document** (one commit, [planning-docs.md](../common/planning-docs.md) § *A plan split
-into epics and stories*): its row in [todo/README.md](README.md), and the parent's ledger line replaced by
+into epics and stories*): its row in [todo/README.md](../todo/README.md), and the parent's ledger line replaced by
 
 ```
 Cornerstones: 1 of 3 — E1.S1 (the contract text in common/test-leftovers.md, model: fable); reserved, not yet marked: E5 (coai's temp sweep), E7 (rag_qln's shared store).
@@ -24,6 +25,32 @@ start-of-run collection, the owner and the three spellings, in words a guard can
 create only owned, prefixed, claimed resources, removed in place and collected at the start of the next run when a
 run was killed (S2–S4); the host-wide janitor ships as a tested script (S3b); the guard is red on every class, on an
 unregistered token and on a scan of nothing (S4); one release carries it all (S5). Consumers bump their pin inside their own epics (E2–E7), never here.
+
+## Deviations (recorded 2026-10-27)
+
+What shipped differently from the text below, and what the merged core superseded. The stories keep their first form; where
+this section and a story differ, this section describes the repository.
+
+- **The one release never happened alone.** S5's `promote-release.yml` dispatch, its Definition of Done (`release` at the
+  merged sha, `release-distance` 0, the private twin holding the spans, our seven token rows and the pinned script) and the
+  parent's "one release carries it all" were overtaken: the contract was revised by the merged core before any release, so
+  the release is now item R5 of [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md), after the merge
+  of PR #82 and the sibling's confirmation.
+- **The merge of E1 was #77 (2c96f83, 2026-10-15)**; `research/module_tests.md` § *Test leftovers* describes it as built.
+- **Superseded by the merged core** (the file or text each one names no longer matches this document):
+  - the owner record `<host>@<os>:<pid>[:<start>]` of S2 is the legacy form; the record is now
+    `<owner>:<host>@<os>:<pid>[:<start>[:<ns>]]` and a legacy record on a Linux reader is `unknown`;
+  - S2's token constants inside `tools/lib/owned.mjs` moved to `tools/lib/owned-token.mjs`, so the helper ships as a file that
+    holds no token;
+  - S3's rule that the start-of-run sweep removes a resource that is "unmarked and older than ten minutes" is gone: an
+    owner-form resource with no claim is `unmarked`, listed and never collected;
+  - S3b's `tools/janitor.sh` (the sha256 `4c0e4f5b…` of the spec, `bf9f0c64…` at E1's merge, 308 lines) was replaced by the
+    one janitor of the merged core's S4 and its companion `common/test-leftovers-janitor.md`; a hash pin of the
+    janitor must now name the new file's sha256;
+  - S1's text was revised into two spans and a companion; S4's guard gained the classes `owner-blind` and `legacy-name`
+    and the `--profile node` mode.
+- **Not superseded:** the helper's claim-first order, the guard's classes of §7 and its scan-of-nothing exit, the
+  `unmatchable-pid` premise, and the migrated sites of S4.
 
 ## Facts the split rests on (read on `origin/main` 2be89ab, 2026-10-15)
 

@@ -44,7 +44,7 @@ function run(cwd, ...args) {
  * `undefined` writes no baseline at all, which is the armed state.
  */
 function baselineScene(t, files) {
-  const root = ownedDir(t, "ownership-baseline");
+  const root = ownedDir(t, "owner-baseline");
   fs.mkdirSync(path.join(root, "common"), { recursive: true });
   fs.mkdirSync(path.join(root, "tools"), { recursive: true });
   fs.writeFileSync(path.join(root, "common", "x.md"), ["# One", "", "Measured in dew_flow_rag_qln today.", ""].join("\n"));

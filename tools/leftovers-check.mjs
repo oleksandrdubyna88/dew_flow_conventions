@@ -13,9 +13,14 @@
  *                 that is not one of the three spellings of §1
  *   shared-store  a `DROP`, `TRUNCATE`, `FLUSH` or delete-all against an unprefixed name
  *   ryuk-off      `TESTCONTAINERS_RYUK_DISABLED` set to true — no exemption accepted
+ *   legacy-name   a literal, or a constant-built prefix, that spells a prefixed name whose second segment is not an owner (§1)
+ *   owner-blind   a pattern, glob or filter that matches the prefix with no owner segment after it — the shape of a sweeper
+ *                 that cannot tell one user's leftovers from another's. It takes NO inline exemption: the one pass is
+ *                 `tools/fixtures/owner-blind-allowlist.json`, keyed by file, line and the sha256 of the line
  * plus two that are about the guard's own grammar:
  *   exemption     a `testsToDelete-exempt:` comment that is not well-formed
- *   token         this repository's token is not a row of the rule's `## Tokens` table (§1)
+ *   token         this repository's token is not a row of the rule's `## Tokens` table (§1), or is of the owner grammar, or a copied `owned.mjs` has
+ *                 no `owned-token.mjs` beside it (the shipped helper holds no token: each repository writes its OWN `tools/lib/owned-token.mjs` — `REPO_TOKEN`, `REPO_ROW` — and never copies another's)
  *
  * Why it exists as a script and not as a paragraph: the rule has said "name it, own it, remove it" since the
  * audit of 2026-10-14, and the audit found no compliant site in six repositories — a sentence nobody can be
@@ -23,73 +28,182 @@
  *
  * Run from anywhere:
  *
- *     node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>]
+ *     node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>] [--profile node]
+ *     node tools/leftovers-check.mjs --update-allowlist [--repo <dir>]
+ *
+ * `--update-allowlist` rewrites the allowlist from the CURRENT `tools/janitor.sh`: every non-comment line the classifier calls
+ * broad in that one file, by its line number and hash. The diff is what a reviewer reads; nothing else is ever added.
  *
  * `--identity` is the "repository" column of the token's row in the rule's `## Tokens` table — which repository the token is.
  * It defaults to this repository's own row (`REPO_ROW`) ONLY for this repository's own token; any other `--token` without
  * an `--identity` fails closed, so a token can never be proven to belong to a repository by accident.
+ *
+ * `--profile node` is for a Node CONSUMER that mounts this repository and runs this file instead of porting it: it adds the consumer's tracked
+ * `*.test.<ext>` and `*.spec.<ext>` files (ext: ts, tsx, mts, cts, js, mjs, cjs) and EVERY text file under the root folders `scripts/`, `test/` and `tests/` — an extensionless
+ * `scripts/start-db` too; a file with a NUL byte in its first 8 KiB, or a known binary or media extension (png, pdf, zip, woff2, …), is binary and is never read — to the scan, and never reads
+ * `node_modules/` or the mount paths `.claude/rules/shared/` and `.agents/conventions/` — for the scan AND for the token constants. Without it the scan is exactly this repository's own. The token
+ * check reads the `## Tokens` table of the rule beside the guard (or `--rule`) whatever families it lists, and needs the `--token` row to name `--identity`.
+ * A `docker-name` value that is wholly a shell expansion (`"${name}"`, `"$(f a)"`) is dynamic, never a finding: a text scan cannot know what it builds — a
+ * known limit of a text scan, since `$(…)` runs a command and a variable reads the environment. Two things the text itself says are judged: a literal DEFAULT
+ * (`${V:-w}`, `${V-w}`, `${V:=w}`, `${V=w}`, `w` with no `$`) is the name the command gets when V is unset, so `w` must be in the owner form; and a single-quoted
+ * `'${name}'` is no expansion in a shell, so it is the literal text `${name}`.
+ * Workflows are read with `yaml@2`: this guard's own copy first, then the scanned repository's (`node_modules` of the consumer), else exit 2 with the one
+ * sentence that says to add `yaml@2` as a devDependency — and only when the repository has a workflow. Not here: a `module-load` class (needs a parser).
  *
  * Exit 0 clean, 1 with every finding printed (`file:line — <class> — <text>`), 2 when it scanned nothing or its
  * arguments are bad — an empty scan is a broken discovery, never a clean repository.
  */
 
 import * as fs from "node:fs";
+import { createRequire } from "node:module";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { LineCounter, parseDocument } from "yaml";
-
 import { gitOutput } from "./lib/git.mjs";
-import { REPO_ROW, REPO_TOKEN } from "./lib/owned.mjs";
+import { OWNER_GRAMMAR } from "./lib/owned.mjs";
+import { REPO_ROW, REPO_TOKEN } from "./lib/owned-token.mjs";
+import { JANITOR_FILE, classifyLine, lineSha256 } from "./lib/sweeper-scan.mjs";
 import { isReason } from "./ownership-check.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
-/** The files the scan never reads: the guard's own test carries the violations as fixture strings. A test pins this list. */
-export const EXCLUDED_FILES = Object.freeze(["tools/leftovers-check.test.mjs"]);
+/** The files the scan never reads: the guard's own tests carry the violations as fixture strings. A test pins this list. */
+export const EXCLUDED_FILES = Object.freeze(["tools/leftovers-check.test.mjs", "tools/leftovers-check-consumers.test.mjs"]);
 
 /** Every class an exemption may name (`ryuk-off` never; `exemption` and `token` are not resources). */
-export const EXEMPTIBLE = Object.freeze(["raw-temp", "raw-worktree", "docker-run", "docker-name", "shared-store"]);
+export const EXEMPTIBLE = Object.freeze(["raw-temp", "raw-worktree", "docker-run", "docker-name", "legacy-name", "shared-store"]);
+
+/**
+ * Files whose `legacy-name` findings are skipped. EMPTY since the janitor reads the owner form: its own tests no longer
+ * spell a name of the form before the owner segment (a test that needs one builds it from pieces at run time), so no file
+ * is exempt from the class. A test pins that it stays empty.
+ */
+export const LEGACY_NAME_PENDING = Object.freeze([]);
+
+/** The repository's one sweeper script and the file that allowlists its inventory line (rule §7). */
+export { JANITOR_FILE };
+export const ALLOWLIST_FILE = "tools/fixtures/owner-blind-allowlist.json";
 
 export const CURES = Object.freeze({
   "raw-temp": "Make temp folders with ownedDir(t, what) from tools/lib/owned.mjs — common/test-leftovers.md §7 (raw-temp), §2.",
   "raw-worktree": "Make worktrees with ownedWorktree(t, repo, what) from tools/lib/owned.mjs — common/test-leftovers.md §7 (raw-worktree), §3.",
-  "docker-run": "Add --rm, or the complete carve-out: a testsToDelete name, a remover step on every path after the diagnostics — common/test-leftovers.md §5, §7 (docker-run).",
-  "docker-name": "Give the container, volume, network, compose project or test-built image one of the three spellings of testsToDelete-<repo>-<what>-<id> — common/test-leftovers.md §1, §7 (docker-name).",
+  "docker-run": "Add --rm, or the complete carve-out: a testsToDelete-<owner>-<repo>-<what>-<id> name, a remover step on every path after the diagnostics — common/test-leftovers.md §5, §7 (docker-run).",
+  "docker-name": "Give the container, volume, network, compose project or test-built image one of the three spellings of testsToDelete-<owner>-<repo>-<what>-<id> — common/test-leftovers.md §1, §7 (docker-name).",
+  "legacy-name": "Build every name with the owner segment: testsToDelete-<owner>-<repo>-<what>-<id> from ownedName()/the helper of this repository — common/test-leftovers.md §1, §7 (legacy-name).",
+  "owner-blind": "Match the caller's owner after the prefix (^testsToDelete-<owner>-<repo>-), or delete the sweep and use the shipped janitor; this class takes no exemption — common/test-leftovers.md §7 (owner-blind), the barrier.",
   "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers.md §6, §7 (shared-store).",
   "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers.md §5, §7 (ryuk-off).",
   exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers.md §7 (the exemption grammar).",
-  token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers.md §1.",
+  token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers.md §1 — and write it, with its row, in this repository's own tools/lib/owned-token.mjs beside the copied owned.mjs (never copy another repository's).",
 });
 
-const PREFIX_OK = /^teststodelete[-_]/i;
-/** A name the guard may accept: one of the three spellings, or a value an argument array hides from it (never guessed at). */
-const nameOk = (name) => PREFIX_OK.test(name) || name === DYNAMIC;
+const PREFIX_OK = /^teststodelete[-_][uw][0-9]{1,10}[-_]/i; // the OWNER form: one of the three spellings, then an owner segment
+/** A name the guard may accept: one of the three spellings, a value an argument array hides from it, or a value that is wholly a shell expansion (never guessed at). */
+const nameOk = (name) => PREFIX_OK.test(name) || name === DYNAMIC || isDynamicName(name);
 const TOKEN_SHAPE = /^[a-z0-9]{2,12}$/;
+// The prefix is spelled in two pieces below: these are detectors, and the machine scan reads this file too.
+const WORD = "teststo" + "delete";
+const LEGACY_LITERAL = new RegExp(`${WORD}[-_]([a-z0-9]+)`, "gi");
+/** The second segments that are not names: the quarantine sibling (`.<name>.<prefix>-quarantine-…`) and an environment variable (`TESTSTODELETE_OWNER`: upper case, underscore). */
+const notAName = (match) => match[1].toLowerCase() === "exempt" || match[1].toLowerCase() === "quarantine" || new RegExp(`^${WORD.toUpperCase()}_[A-Z]+$`).test(match[0]);
+const LEGACY_BUILT = new RegExp(`${WORD}[-_]\\$\\{?\\s*(?:REPO_TOKEN|RepoToken|repoToken)\\b`, "i");
 const MARKER = /(?:\/\/|#|--|\/\*|\*|<!--)\s*testsToDelete-exempt:(.*)$/;
 const JS_FILE = /\.(?:mjs|js|cjs)$/;
 
+// --- the yaml package -----------------------------------------------------------------------------------------
+
+/**
+ * `yaml@2` cannot be used: the one thing a consumer must do about it. Never an `ERR_MODULE_NOT_FOUND` stack. `wrongVersion` is set when a `yaml` WAS found
+ * and it is not version 2 (a repository with `yaml@1` in its tree is told so, not that there is none).
+ */
+export class YamlMissingError extends Error {
+  constructor({ wrongVersion = false } = {}) {
+    super(wrongVersion
+      ? "leftovers-check: the `yaml` package that was found is not version 2 (it lacks `LineCounter`) — add `yaml@2` as a devDependency of the repository being scanned (npm install --save-dev yaml@2)."
+      : "leftovers-check: the `yaml` package (version 2) is needed to read workflows and cannot be found — add `yaml@2` as a devDependency of the repository being scanned (npm install --save-dev yaml@2).");
+    this.name = "YamlMissingError";
+    this.wrongVersion = wrongVersion;
+  }
+}
+
+/**
+ * Where `yaml` is looked for, in order: this guard's own resolution (the repository the guard lives in), then the scanned repository's — from its root,
+ * which `createRequire` walks up whether or not a `package.json` sits there. Test seam: `main`, `scanRepository` and `loadYaml` take replacements.
+ */
+export const YAML_RESOLVERS = Object.freeze({
+  own: () => createRequire(import.meta.url)("yaml"),
+  scanned: (repo) => createRequire(path.join(repo, "noop.js"))("yaml"),
+});
+
+const isYamlTwo = (module) => typeof module?.parseDocument === "function" && typeof module?.LineCounter === "function";
+
+/** The `yaml` module of version 2, or a `YamlMissingError` (`wrongVersion` when one was found and is not version 2). Only a MISSING module is "not found": any other failure of a resolver is the caller's. */
+export function loadYaml(repo, resolvers = {}) {
+  const { own, scanned } = { ...YAML_RESOLVERS, ...resolvers }; // a seam may replace one of the two
+  let wrongVersion = false;
+  for (const resolve of [() => own(), ...(repo === undefined ? [] : [() => scanned(repo)])]) {
+    try {
+      const module = resolve();
+      if (isYamlTwo(module)) return module;
+      wrongVersion = true;
+    } catch (error) {
+      if (error?.code !== "MODULE_NOT_FOUND" && error?.code !== "ERR_MODULE_NOT_FOUND") throw error;
+    }
+  }
+  throw new YamlMissingError({ wrongVersion });
+}
+
 // --- discovery -----------------------------------------------------------------------------------------------
 
-/** Whether a repository-relative path (forward slashes) is one the guard reads. `tools/lib/**` is product code, never scanned. */
-export function isScanned(file) {
+/** The profiles of `--profile`: what a consumer's tree adds to the scan. `node` is the Node consumers of this family. */
+export const PROFILES = Object.freeze(["node"]);
+
+// The `node` profile: a consumer's tests and scripts, wherever they sit. `node_modules` and the two places the shared rules are mounted
+// are never read under it — a mount holds this repository's own scripts, which are not the consumer's to be judged.
+const NODE_EXTENSIONS = "ts|tsx|mts|cts|js|mjs|cjs";
+const NODE_TEST = new RegExp(`\\.(?:test|spec)\\.(?:${NODE_EXTENSIONS})$`);
+const NODE_TREE = /^(?:scripts|test|tests)\/.+/; // EVERY file under these three root folders, whatever its name: a script need not have an extension (`scripts/start-db`)
+const BINARY_EXTENSION = /\.(?:png|jpe?g|gif|webp|avif|ico|bmp|tiff?|pdf|zip|gz|tgz|bz2|xz|7z|tar|jar|woff2?|ttf|otf|eot|mp[34]|mov|webm|wav|ogg|wasm|so|dll|dylib|exe|bin|class|sqlite3?|db)$/i; // known binary and media files: never text, never read
+const NODE_NEVER = /(?:^(?:\.claude\/rules\/shared\/|\.agents\/conventions\/))|(?:(?:^|\/)node_modules\/)/;
+
+function checkProfile(profile) {
+  if (profile !== undefined && !PROFILES.includes(profile)) throw new TypeError(`unknown profile \`${profile}\` (the profiles are: ${PROFILES.map((name) => `\`${name}\``).join(", ")})`);
+}
+
+/**
+ * Whether a repository-relative path (forward slashes) is one the guard reads. `tools/lib/**` is product code, never scanned.
+ * `profile` adds a consumer's files (`node`); without one the set is exactly this repository's own.
+ */
+export function isScanned(file, profile) {
+  checkProfile(profile);
+  if (profile === "node" && NODE_NEVER.test(file)) return false;
   if (EXCLUDED_FILES.includes(file) || file.startsWith("tools/lib/")) return false;
   return (
     (file.startsWith("tools/") && file.endsWith(".test.mjs")) ||
     (file.startsWith("tools/fixtures/") && JS_FILE.test(file)) ||
     /^\.github\/workflows\/[^/]+\.ya?ml$/.test(file) ||
     (file.startsWith(".github/scripts/") && /\.(?:mjs|js|sh)$/.test(file)) ||
-    /\.(?:sh|ps1)$/.test(file)
+    /\.(?:sh|ps1)$/.test(file) ||
+    (profile === "node" && (NODE_TEST.test(file) || (NODE_TREE.test(file) && !BINARY_EXTENSION.test(file))))
   );
 }
+
+/** A file that holds a NUL byte in its first 8 KiB is binary (git's own test, and a UTF-16 text file too): it is not text to be read for names. */
+const isBinary = (bytes) => bytes.subarray(0, 8192).includes(0);
 
 /** Paths in code-unit order — the order a bare `.sort()` gives, stated, so it never depends on the locale. */
 const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
 /** The files to read, from git's own idea of the tree (tracked plus untracked-not-ignored). Throws when `repo` is not a repository. */
-export function discover(repo) {
+export function discover(repo, profile) {
+  checkProfile(profile);
+  return listFiles(repo).filter((file) => isScanned(file, profile));
+}
+
+/** Every file git knows in `repo`, tracked or untracked-not-ignored, in code-unit order. */
+function listFiles(repo) {
   const listing = gitOutput(repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
-  return [...new Set(listing.split("\0").filter(Boolean))].filter(isScanned).sort(byCodeUnit);
+  return [...new Set(listing.split("\0").filter(Boolean))].sort(byCodeUnit);
 }
 
 // --- lines, comments, exemptions -----------------------------------------------------------------------------
@@ -119,6 +233,7 @@ function exemptionProblem(rest) {
   const reason = parsed?.[2] ?? "";
   if (cls === "") return { text: "an exemption names no class" };
   if (cls === "ryuk-off") return { text: "`ryuk-off` accepts no exemption" };
+  if (cls === "owner-blind") return { text: "`owner-blind` accepts no exemption: the allowlist (file, line, hash) is the only pass" };
   if (!EXEMPTIBLE.includes(cls)) return { text: `an exemption names an unknown class \`${cls}\`` };
   if (!isReason(reason)) return { text: `the exemption of \`${cls}\` carries no reason (ten characters, three words, not a placeholder)` };
   if (cls === "shared-store" && !reason.includes("lock:")) return { text: "the exemption of `shared-store` must name its lock (`lock: …`)" };
@@ -164,14 +279,111 @@ function allMatches(patterns, line) {
   });
 }
 
-/** `COMPOSE_PROJECT_NAME=x` or `: x` on a line: one hit when x is not a testsToDelete name — a compose project's containers carry the project's name. */
-function composeEnvHits(line) {
-  return [...line.matchAll(/COMPOSE_PROJECT_NAME["']?\s*[:=]\s*["']?([^\s"';,}]*)/g)]
-    .filter((match) => !PREFIX_OK.test(match[1]))
-    .map((match) => `COMPOSE_PROJECT_NAME is not a testsToDelete name: ${match[1] === "" ? "(empty)" : match[1]}`);
+// A value that is wholly a shell expansion — `"${x}"`, `$x`, `"$(f a b)"` — is dynamic: a text scan cannot know what it builds, the way it cannot
+// know a JavaScript array item that is no literal. The consumer's own tests cover the helper that builds it. A value that MIXES literal text and an
+// expansion is not wholly one, and is judged as it always was, on the text it has. Two exceptions, both about what the text itself says:
+//   * `${V:-w}`, `${V-w}`, `${V:=w}`, `${V=w}` with a default `w` that holds no `$` and is not empty names `w` whenever V is unset, so `w` is judged as a name
+//     (a default in the owner form passes; any other default is a finding). `$(…)`, a default with a `$` in it and `${V:+w}` stay dynamic:
+//     a known limit of a text scan, which cannot run the command or know the environment.
+//   * a single-quoted `'${x}'` is no expansion to the shell: it is the literal text `${x}` and is judged as text.
+const SIMPLE_VARIABLE = /^\$[A-Za-z_][A-Za-z0-9_]*$/;
+const LITERAL_DEFAULT = /^\$\{[A-Za-z_][A-Za-z0-9_]*:?[-=]([^${}]+)\}$/;
+const MASK = "\u0001";
+const LITERAL_DOLLAR = "\u0002";
+
+/** `text` with the `$` inside every single-quoted span made `LITERAL_DOLLAR` — the shell does not expand there. A quote inside double quotes opens nothing. */
+function literalizeSingleQuoted(text) {
+  let out = "";
+  let quote = "";
+  for (const char of text) {
+    if (quote === "") {
+      if (char === "'" || char === '"') quote = char;
+      out += char;
+    } else if (char === quote) {
+      quote = "";
+      out += char;
+    } else out += quote === "'" && char === "$" ? LITERAL_DOLLAR : char;
+  }
+  return out;
 }
 
-function lineFindings(file, lines, exemptions) {
+const restoreDollar = (text) => text.replaceAll(LITERAL_DOLLAR, "$");
+
+/** The literal default of an expansion (`${V:-w}` → `w`), or undefined when it has none, an empty one, or one that holds a `$`. */
+const literalDefault = (expansion) => LITERAL_DEFAULT.exec(expansion)?.[1];
+
+/** Is `value` a whole expansion that may stay unjudged: a default it has is in the owner form. */
+function isDynamicName(value) {
+  if (!isWholeExpansion(value)) return false;
+  const fallback = literalDefault(value.replace(/^["']+|["']+$/g, ""));
+  return fallback === undefined || PREFIX_OK.test(fallback);
+}
+
+/** The index of the bracket that closes the one at `open` (`(` or `{`), nesting counted, or -1 when it never closes. */
+function closingOf(text, open) {
+  const up = text[open];
+  const down = up === "(" ? ")" : "}";
+  let depth = 0;
+  for (let index = open; index < text.length; index += 1) {
+    if (text[index] === up) depth += 1;
+    else if (text[index] === down && (depth -= 1) === 0) return index;
+  }
+  return -1;
+}
+
+/** Is `value` (outer quotes ignored) ONE shell expansion from its first character to its last? An expansion that never closes is not. */
+function isWholeExpansion(value) {
+  const bare = value.replace(/^["']+|["']+$/g, "");
+  if (SIMPLE_VARIABLE.test(bare)) return true;
+  return /^\$[({]/.test(bare) && closingOf(bare, 1) === bare.length - 1;
+}
+
+/** `text` with the whitespace inside every balanced `$(…)` and `${…}` made `MASK`, so that splitting on whitespace keeps an expansion in one word. */
+function maskExpansions(text) {
+  let masked = "";
+  for (let index = 0; index < text.length; index += 1) {
+    const end = text[index] === "$" && (text[index + 1] === "(" || text[index + 1] === "{") ? closingOf(text, index + 1) : -1;
+    if (end < 0) masked += text[index];
+    else {
+      masked += text.slice(index, end + 1).replace(/\s/g, MASK);
+      index = end;
+    }
+  }
+  return masked;
+}
+
+/** How many characters at the start of `rest` are a whole expansion that ends the value (a quote, a space, `;` `,` `}` or the end follows). 0 when none. */
+function leadingExpansion(rest) {
+  const end = /^\$[({]/.test(rest) ? closingOf(rest, 1) + 1 : /^\$[A-Za-z_][A-Za-z0-9_]*/.exec(rest)?.[0].length ?? 0;
+  return end > 0 && /^(?:[\s"';,}]|$)/.test(rest.slice(end)) ? end : 0;
+}
+
+/** `COMPOSE_PROJECT_NAME=x` or `: x` on a line: one hit when x is not an owner-form leftover name — a compose project's containers carry the project's name. */
+function composeEnvHits(line) {
+  return [...line.matchAll(/COMPOSE_PROJECT_NAME["']?\s*[:=]\s*["']?/g)].flatMap((match) => {
+    const rest = literalizeSingleQuoted(line).slice(match.index + match[0].length);
+    const length = leadingExpansion(rest);
+    if (length > 0) {
+      const fallback = literalDefault(rest.slice(0, length));
+      return fallback === undefined || PREFIX_OK.test(fallback) ? [] : [`COMPOSE_PROJECT_NAME defaults to a name that is not an owner-form leftover name: ${fallback}`];
+    }
+    const value = /^[^\s"';,}]*/.exec(rest)[0];
+    return PREFIX_OK.test(value) ? [] : [`COMPOSE_PROJECT_NAME is not an owner-form leftover name: ${value === "" ? "(empty)" : restoreDollar(value)}`];
+  });
+}
+
+/** `legacy-name` hits of a line: a literal whose second segment is no owner (and no `exempt` marker word), or a prefix built from the token alone. */
+function legacyNameHits(line) {
+  const literal = [...line.matchAll(LEGACY_LITERAL)]
+    .filter((match) => !notAName(match) && !OWNER_GRAMMAR.test(match[1].toLowerCase()))
+    .map((match) => match[0]);
+  return LEGACY_BUILT.test(line) ? [...literal, "a prefix built from the repository token"] : literal;
+}
+
+/** Is the line allowlisted: the entry names the shipped janitor (and no other file), and its file, 1-based line and the hash of the line's text all match. */
+const allowed = (allowlist, file, number, text) => allowlist.some((entry) => entry.file === JANITOR_FILE && entry.file === file && entry.line === number && entry.sha256 === lineSha256(text));
+
+function lineFindings(file, lines, exemptions, allowlist) {
   const extra = RAW_TEMP_BY_EXTENSION[path.extname(file)] ?? [];
   const found = [];
   const add = (index, cls, text) => {
@@ -185,8 +397,11 @@ function lineFindings(file, lines, exemptions) {
       ["shared-store", sharedStoreHit(line)],
       ["ryuk-off", RYUK_OFF.test(line) ? ["TESTCONTAINERS_RYUK_DISABLED"] : []],
       ["docker-name", composeEnvHits(line)],
+      ["legacy-name", LEGACY_NAME_PENDING.includes(file) ? [] : legacyNameHits(line)],
     ];
     for (const [cls, hits] of checks) if (hits.length > 0) add(index, cls, [...new Set(hits)].map((hit) => `\`${hit}\``).join(", "));
+    // owner-blind: no exemption of any kind — the allowlist (file, line, hash) is the one pass
+    if (classifyLine(line) === "broad" && !allowed(allowlist, file, index + 1, line)) found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
   });
   return found;
 }
@@ -235,7 +450,11 @@ function arrayItems(body) {
   return [...items, item].map((entry) => entry.trim()).filter(Boolean);
 }
 
-const itemWord = (item) => /^(["'`])(.*)\1$/s.exec(item)?.[2].replace(/\s+/g, "_") ?? DYNAMIC;
+const itemWord = (item) => {
+  const literal = /^(["'`])(.*)\1$/s.exec(item);
+  if (literal === null || (literal[1] === "`" && /^\$\{[^]*\}$/.test(literal[2]) && closingOf(literal[2], 1) === literal[2].length - 1)) return DYNAMIC; // a template that is wholly one `${…}` is a value, not a literal
+  return literal[2].replace(/\s+/g, "_");
+};
 
 /** `execFileSync("docker", ["run", "--rm", NAME])` → `execFileSync( docker run --rm «value» )`: the words the shell form has. */
 function flattenDockerArrays(text) {
@@ -298,24 +517,24 @@ function composeProjectNames(tokens) {
 
 /** `docker-name` findings of one command; `pushed` is the set of images the scope publishes. */
 function nameFindings(file, command, pushed) {
-  const tokens = words(command.text);
+  const tokens = words(maskExpansions(literalizeSingleQuoted(command.text))).map((word) => word.replaceAll(MASK, " "));
   const found = [];
-  const bad = (text) => found.push(finding(file, command.line, "docker-name", text));
+  const bad = (text) => found.push(finding(file, command.line, "docker-name", restoreDollar(text)));
   if (/\bdocker\b/.test(command.text)) {
     const arrayForm = [...command.text.matchAll(/["']--name["']\s*,\s*["']([^"']*)["']/g)].map((match) => match[1]);
-    for (const name of [...flagValues(tokens, ["--name"]), ...arrayForm]) if (!nameOk(name)) bad(`\`--name ${name}\` is not a testsToDelete name`);
+    for (const name of [...flagValues(tokens, ["--name"]), ...arrayForm]) if (!nameOk(name)) bad(`\`--name ${name}\` is not an owner-form leftover name`);
   }
   for (const match of command.text.matchAll(/\bdocker\s+(volume|network)\s+create\b/g)) {
     const name = createdName(tokens, tokens.indexOf("create", tokens.indexOf(match[1])));
     if (name === "") bad(`\`docker ${match[1]} create\` makes an unnamed ${match[1]}`);
-    else if (!nameOk(name)) bad(`\`docker ${match[1]} create ${name}\` is not a testsToDelete name`);
+    else if (!nameOk(name)) bad(`\`docker ${match[1]} create ${name}\` is not an owner-form leftover name`);
   }
-  for (const name of composeProjectNames(tokens)) if (!PREFIX_OK.test(name)) bad(`the compose project \`${name}\` is not a testsToDelete name`);
-  for (const match of command.text.matchAll(/\bWithName\(\s*"([^"]*)"/g)) if (!PREFIX_OK.test(match[1])) bad(`\`WithName("${match[1]}")\` is not a testsToDelete name`);
+  for (const name of composeProjectNames(tokens)) if (!PREFIX_OK.test(name) && !isDynamicName(name)) bad(`the compose project \`${name}\` is not an owner-form leftover name`);
+  for (const match of command.text.matchAll(/\bWithName\(\s*"([^"]*)"/g)) if (!PREFIX_OK.test(match[1])) bad(`\`WithName("${match[1]}")\` is not an owner-form leftover name`);
   if (/\bdocker\s+build\b/.test(command.text)) {
     for (const tag of flagValues(tokens, ["-t", "--tag"])) {
       const published = [...pushed].some((image) => image === tag || stripTag(image) === stripTag(tag));
-      if (!nameOk(tag) && !published) bad(`the image \`${tag}\` a test builds is not a testsToDelete name`);
+      if (!nameOk(tag) && !published) bad(`the image \`${tag}\` a test builds is not an owner-form leftover name`);
     }
   }
   return found;
@@ -405,7 +624,8 @@ function jobRunFindings(file, steps, commands) {
     });
 }
 
-function workflowJobs(file, lines, text) {
+function workflowJobs(file, lines, text, yaml) {
+  const { LineCounter, parseDocument } = yaml();
   const lineCounter = new LineCounter();
   const document = parseDocument(text, { lineCounter });
   if (document.errors.length > 0) return undefined;
@@ -422,9 +642,9 @@ function workflowJobs(file, lines, text) {
   return found;
 }
 
-function dockerFindings(file, lines, text) {
+function dockerFindings(file, lines, text, yaml) {
   const isWorkflow = /^\.github\/workflows\//.test(file);
-  const jobs = isWorkflow ? workflowJobs(file, lines, text) : undefined;
+  const jobs = isWorkflow ? workflowJobs(file, lines, text, yaml) : undefined;
   if (jobs === undefined) {
     const commands = commandsIn(lines, 0, lines.length);
     const pushed = pushedImages(commands);
@@ -439,12 +659,15 @@ function dockerFindings(file, lines, text) {
 
 // --- one file, the whole repository --------------------------------------------------------------------------
 
-/** Every finding of one file's text (`file` is the repository-relative path with forward slashes). */
-export function scanText(file, text) {
+/**
+ * Every finding of one file's text (`file` is the repository-relative path with forward slashes). `yaml` returns the yaml module and is called only
+ * for a workflow: by default the guard's own resolution, which throws a `YamlMissingError` when there is none.
+ */
+export function scanText(file, text, allowlist = [], yaml = () => loadYaml(undefined)) {
   const lines = text.split(/\r?\n/);
   const exemptions = readExemptions(file, lines);
-  const docker = dockerFindings(file, lines, text).filter((entry) => !isExempt(exemptions, entry.cls, entry.line));
-  return [...exemptions.findings, ...lineFindings(file, lines, exemptions), ...docker];
+  const docker = dockerFindings(file, lines, text, yaml).filter((entry) => !isExempt(exemptions, entry.cls, entry.line));
+  return [...exemptions.findings, ...lineFindings(file, lines, exemptions, allowlist), ...docker];
 }
 
 // --- the token ------------------------------------------------------------------------------------------------
@@ -492,10 +715,10 @@ export function tokenFindings(ruleText, token, rulePath = "common/test-leftovers
   }
   const found = [];
   const seen = new Set();
+  if (OWNER_GRAMMAR.test(token)) found.push(...at(table.heading, `the token \`${token}\` matches the owner grammar ${OWNER_GRAMMAR} of ${rulePath} §1 — no repository may be named like an owner`));
   for (const row of table.rows) {
     if (seen.has(row.token)) found.push(...at(row.line, `the token \`${row.token}\` is listed twice in ${rulePath}`));
     seen.add(row.token);
-    if (row.family !== "dew_flow") found.push(...at(row.line, `the row \`${row.token}\` of ${rulePath} has family \`${row.family}\`; this public copy lists only \`dew_flow\``));
   }
   if (!seen.has(token)) found.push(...at(table.heading, `the token \`${token}\` is not a row of the \`## Tokens\` table of ${rulePath}`));
   else found.push(...belongsFindings(table.rows.find((row) => row.token === token), token, identity, rulePath));
@@ -530,13 +753,43 @@ function lineConstants(text, index) {
   return [...text.matchAll(TOKEN_CONSTANT)].map((match) => ({ line: index + 1, value: match[1] }));
 }
 
-/** Every token constant of the repository: `[{ file, line, value }]`. */
-export function tokenConstants(repo) {
+/**
+ * Every token constant of the repository: `[{ file, line, value }]`. The shipped helper holds none — `tools/lib/owned.mjs` re-exports the constants
+ * from the `owned-token.mjs` each repository writes, and a re-export is no declaration — so a byte copy of it never adds a second token.
+ * Under a profile the mount paths and `node_modules/` are not the repository's own tree (the same exclusions as `isScanned`).
+ */
+export function tokenConstants(repo, profile) {
+  checkProfile(profile);
   const found = [];
   for (const file of candidateFiles(repo)) {
+    if (profile === "node" && NODE_NEVER.test(file)) continue;
     if (!CONSTANT_FILE.test(file) || EXCLUDED_FILES.includes(file) || !fs.existsSync(path.join(repo, file))) continue;
     const lines = fs.readFileSync(path.join(repo, file), "utf8").split(/\r?\n/);
     lines.forEach((text, index) => found.push(...lineConstants(text, index).map((entry) => ({ file, ...entry }))));
+  }
+  return found;
+}
+
+const HELPER_FILE = "owned.mjs";
+const TOKEN_FILE = "owned-token.mjs";
+const TOKEN_IMPORT = /\bfrom\s+["']\.\/owned-token\.mjs["']/;
+
+/**
+ * Findings (class `token`): a copy of the shipped helper — an `owned.mjs` that imports `./owned-token.mjs` — with no `owned-token.mjs` beside it.
+ * The copy holds no token (it is the same bytes everywhere), so without the file the helper cannot load and the guard would have no constant to check.
+ * A copy under a profile's mount paths or `node_modules/` is not the repository's own.
+ */
+export function tokenFileFindings(repo, profile) {
+  checkProfile(profile);
+  const found = [];
+  for (const file of listFiles(repo)) {
+    if (path.posix.basename(file) !== HELPER_FILE || (profile === "node" && NODE_NEVER.test(file)) || !fs.existsSync(path.join(repo, file))) continue;
+    const dir = path.posix.dirname(file);
+    if (fs.existsSync(path.join(repo, dir, TOKEN_FILE))) continue;
+    const at = fs.readFileSync(path.join(repo, file), "utf8").split(/\r?\n/).findIndex((line) => !isComment(line) && TOKEN_IMPORT.test(line));
+    if (at >= 0) {
+      found.push(finding(file, at + 1, "token", `${file} imports ./${TOKEN_FILE}, which is missing — write ${path.posix.join(dir, TOKEN_FILE)} with this repository's own REPO_TOKEN (its row of the rule's \`## Tokens\` table) and REPO_ROW (that row's repository column), never a copy of another repository's`));
+    }
   }
   return found;
 }
@@ -559,34 +812,77 @@ export function resolveRule(repo, rule) {
   return candidates.find((candidate) => fs.existsSync(candidate));
 }
 
-/** Scan a repository: `{ files, findings }`. `files` is how many files were read — zero is a broken discovery. `identity` is the repository column of the token's row: this repository's own for its own token, else blank (fails closed). */
-export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "" } = {}) {
-  const files = discover(repo);
+/**
+ * The allowlist entries: the file the operator names with `--allowlist`, else the one shipped beside this tool — NEVER a file of the scanned
+ * repository (a scanned tree must not configure the control that judges it: §7 `owner-blind`). `[]` when there is none. A file that is not the
+ * shape is an error, never "no entries". Whatever the file holds, `allowed` passes only an entry that names the janitor's own file.
+ */
+export function loadAllowlist(explicit) {
+  const file = [explicit, path.join(HERE, "..", ALLOWLIST_FILE)].find((candidate) => candidate !== undefined && fs.existsSync(candidate));
+  if (file === undefined) return [];
+  const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+  if (!Array.isArray(parsed.entries) || !parsed.entries.every((entry) => typeof entry.file === "string" && Number.isInteger(entry.line) && /^[0-9a-f]{64}$/.test(entry.sha256))) {
+    throw new Error(`${file} is not an allowlist: { entries: [{ file, line, sha256 }] }`);
+  }
+  return parsed.entries;
+}
+
+/** Rewrite the allowlist from the CURRENT janitor script: its broad, non-comment lines, by line number and hash. Returns the entries written. */
+export function updateAllowlist(repo, explicit) {
+  const script = path.join(repo, JANITOR_FILE);
+  const lines = fs.readFileSync(script, "utf8").split(/\r?\n/);
+  const entries = lines.flatMap((text, index) => (!isComment(text) && classifyLine(text) === "broad" ? [{ file: JANITOR_FILE, line: index + 1, sha256: lineSha256(text) }] : []));
+  const target = explicit ?? path.join(repo, ALLOWLIST_FILE);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, `${JSON.stringify({ about: "The only lines the owner-blind class of tools/leftovers-check.mjs passes: the janitor's inventory line, by file, 1-based line and sha256 of the line's text. Regenerate with: node tools/leftovers-check.mjs --update-allowlist. A reviewer reads the diff of this file beside the script.", entries }, null, 2)}\n`);
+  return entries;
+}
+
+/**
+ * Scan a repository: `{ files, findings }`. `files` is how many files were read — zero is a broken discovery. `identity` is the repository column of the token's
+ * row: this repository's own for its own token, else blank (fails closed). `profile` is a `--profile` (`node`). `resolvers` is the yaml seam of `loadYaml`.
+ */
+export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "", allowlist, profile, resolvers } = {}) {
+  const files = discover(repo, profile);
   const findings = [];
+  const entries = Array.isArray(allowlist) ? allowlist : loadAllowlist(allowlist);
+  let yamlModule;
+  const yaml = () => (yamlModule ??= loadYaml(repo, resolvers)); // read at the first workflow, so a repository with none needs none
+  let read = 0;
   for (const file of files) {
     const absolute = path.join(repo, file);
-    if (fs.existsSync(absolute)) findings.push(...scanText(file, fs.readFileSync(absolute, "utf8")));
+    if (!fs.existsSync(absolute)) continue;
+    const bytes = fs.readFileSync(absolute);
+    if (isBinary(bytes)) continue;
+    read += 1;
+    findings.push(...scanText(file, bytes.toString("utf8"), entries, yaml));
   }
   const rulePath = resolveRule(repo, rule);
   const ruleText = rulePath === undefined ? "" : fs.readFileSync(rulePath, "utf8");
   const ruleName = rulePath === undefined ? "common/test-leftovers.md (not found)" : path.basename(path.dirname(rulePath)) + "/" + path.basename(rulePath);
-  findings.push(...tokenFindings(ruleText, token, ruleName, identity), ...constantFindings(tokenConstants(repo), token, ruleText, ruleName, identity));
+  findings.push(...tokenFindings(ruleText, token, ruleName, identity), ...constantFindings(tokenConstants(repo, profile), token, ruleText, ruleName, identity), ...tokenFileFindings(repo, profile));
   findings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.cls.localeCompare(b.cls));
-  return { files: files.length, findings };
+  return { files: read, findings };
 }
 
 // --- the command line ----------------------------------------------------------------------------------------
 
-const USAGE = "usage: node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>]   (--identity: the repository column of the token's row; without it only this repository's own token passes)";
+const USAGE = "usage: node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>] [--profile node] | --update-allowlist   (--identity: the repository column of the token's row; without it only this repository's own token passes; --profile node: a Node consumer's tests and scripts too)";
 
-/** Parse the arguments: `{ repo, token, rule, identity }` (`identity` stays unset unless given) or `{ error }`. */
+/** Parse the arguments: `{ repo, token, rule, identity, profile }` (`identity` and `profile` stay unset unless given) or `{ error }`. */
 export function parseArguments(argv) {
-  const options = { repo: process.cwd(), token: REPO_TOKEN, rule: undefined, identity: undefined };
+  const options = { repo: process.cwd(), token: REPO_TOKEN, rule: undefined, identity: undefined, allowlist: undefined, profile: undefined, update: false };
   for (let index = 0; index < argv.length; index += 2) {
     const name = argv[index].replace(/^--/, "");
-    if (!["repo", "token", "identity", "rule"].includes(name) || !argv[index].startsWith("--") || argv[index + 1] === undefined) return { error: `unknown or incomplete argument \`${argv[index]}\`` };
-    options[name] = ["token", "identity"].includes(name) ? argv[index + 1] : path.resolve(argv[index + 1]);
+    if (argv[index] === "--update-allowlist") {
+      options.update = true;
+      index -= 1; // a flag takes no value
+      continue;
+    }
+    if (!["repo", "token", "identity", "rule", "allowlist", "profile"].includes(name) || !argv[index].startsWith("--") || argv[index + 1] === undefined) return { error: `unknown or incomplete argument \`${argv[index]}\`` };
+    options[name] = ["token", "identity", "profile"].includes(name) ? argv[index + 1] : path.resolve(argv[index + 1]);
   }
+  if (options.profile !== undefined && !PROFILES.includes(options.profile)) return { error: `unknown profile \`${options.profile}\` (the only profile is \`${PROFILES.join("`, `")}\`)` };
   return options;
 }
 
@@ -601,17 +897,33 @@ function report(findings, io) {
   for (const cls of Object.keys(CURES).filter((name) => printed.has(name))) io.err(`  ${cls}: ${CURES[cls]}`);
 }
 
-/** Run the guard: the exit code (0 clean, 1 findings, 2 scanned nothing or bad arguments). `io` is a seam for tests. */
-export function main(argv = process.argv.slice(2), io = { out: (text) => console.log(text), err: (text) => console.error(text) }) {
+function runUpdate(options, io) {
+  try {
+    const entries = updateAllowlist(options.repo, options.allowlist);
+    io.out(`leftovers-check: allowlist rewritten — ${entries.length} entr${entries.length === 1 ? "y" : "ies"} from ${JANITOR_FILE}`);
+    return 0;
+  } catch (error) {
+    io.err(`leftovers-check: cannot update the allowlist: ${error.message.split("\n")[0]}`);
+    return 2;
+  }
+}
+
+/** Run the guard: the exit code (0 clean, 1 findings, 2 scanned nothing, no yaml or bad arguments). `io` and `resolvers` (where `yaml` is looked for) are seams for tests. */
+export function main(argv = process.argv.slice(2), io = { out: (text) => console.log(text), err: (text) => console.error(text) }, resolvers = undefined) {
   const options = parseArguments(argv);
   if (options.error !== undefined) {
     io.err(`leftovers-check: ${options.error}\n${USAGE}`);
     return 2;
   }
+  if (options.update) return runUpdate(options, io);
   let result;
   try {
-    result = fs.existsSync(options.repo) ? scanRepository(options) : { files: 0, findings: [] };
+    result = fs.existsSync(options.repo) ? scanRepository({ ...options, resolvers }) : { files: 0, findings: [] };
   } catch (error) {
+    if (error instanceof YamlMissingError) {
+      io.err(error.message);
+      return 2;
+    }
     io.err(`leftovers-check: cannot read ${options.repo}: ${error.message.split("\n")[0]}`);
     return 2;
   }

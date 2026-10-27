@@ -18,11 +18,14 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { sweepLeftovers } from "./lib/leftovers-sweep.mjs";
-import { cleanupScope, formatOwner, ownedDir, ownerState, parseOwner, processProbe, thisOwner } from "./lib/owned.mjs";
+import { cleanupScope, formatOwner, ownedDir, ownerState, parseLegacyOwner, parseOwner, processProbe, runRecord, thisOwner } from "./lib/owned.mjs";
 
 const HOUR = 3_600_000;
 const BAD_PIDS = [0, -1, -4242, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 60, "4242", null, undefined];
 const me = () => thisOwner().host;
+/** A record of the owner form for this machine and process (with the pid namespace a Linux reader requires), `extra` overriding fields. */
+const rec = (extra = {}) => ({ owner: thisOwner().owner, host: me(), ...(thisOwner().ns === undefined ? {} : { ns: thisOwner().ns }), pid: 4242, ...extra });
+const NOT_HIDDEN = { hidepid: false }; // a sandbox may hide other users' processes; that answer has its own test
 
 /** Run `fn` with `process.kill` replaced by one that throws `code`. */
 function withKill(code, fn) {
@@ -60,13 +63,13 @@ test("3. ownerState: an owner whose pid is not a positive safe integer is unknow
   const asked = [];
   const sayingDead = (pid) => { asked.push(pid); return { state: "dead", alive: false }; };
   for (const pid of BAD_PIDS) {
-    assert.equal(ownerState({ host: me(), pid }, sayingDead), "unknown", `pid ${String(pid)}`);
+    assert.equal(ownerState(rec({ pid }), sayingDead, NOT_HIDDEN), "unknown", `pid ${String(pid)}`);
   }
   assert.deepEqual(asked, [], "a bad pid is refused before the probe is asked");
 });
 
 test("4. a claim naming pid 0 or a pid past 2^53 parses, and its owner is unknown with the REAL probe", () => {
-  for (const text of [`${me()}:0\n`, `${me()}:00\n`, `${me()}:99999999999999999999\n`]) {
+  for (const text of [`${thisOwner().owner}:${me()}:0\n`, `${thisOwner().owner}:${me()}:00\n`, `${thisOwner().owner}:${me()}:99999999999999999999\n`]) {
     const owner = parseOwner(text);
     assert.equal(owner.unreadable, undefined, `${text.trim()} is a well-formed claim`);
     assert.equal(ownerState(owner), "unknown", text.trim());
@@ -78,7 +81,7 @@ test("5. the unknown state is visible in JSON: a refused query names 'unknown' (
     withKill(code, () => {
       const probe = processProbe(4242);
       assert.match(JSON.stringify(probe), /"state":"unknown"/, `${code}: ${JSON.stringify(probe)}`);
-      assert.equal(ownerState({ host: me(), pid: 4242 }), "unknown", code);
+      assert.equal(ownerState(rec()), "unknown", code);
     });
   }
 });
@@ -96,14 +99,14 @@ test("7. no field of a probe answer is `undefined` except the Linux-only start",
 });
 
 test("8. ownerState reads the NAMED state: dead → gone, live → live, unknown → unknown", () => {
-  const owner = { host: me(), pid: 4242 };
-  assert.equal(ownerState(owner, () => ({ state: "dead" })), "gone");
+  const owner = rec();
+  assert.equal(ownerState(owner, () => ({ state: "dead" }), NOT_HIDDEN), "gone");
   assert.equal(ownerState(owner, () => ({ state: "live" })), "live");
   assert.equal(ownerState(owner, () => ({ state: "unknown" })), "unknown");
 });
 
 test("9. ownerState never reads a falsy `alive` (or a missing state) as dead", () => {
-  const owner = { host: me(), pid: 4242 };
+  const owner = rec();
   for (const answer of [{ alive: false }, { alive: undefined }, { alive: 0 }, {}, { state: undefined }, { state: "gone" }, { state: "DEAD" }, { state: false }, undefined, null]) {
     assert.equal(ownerState(owner, () => answer), "unknown", JSON.stringify(answer));
   }
@@ -111,7 +114,7 @@ test("9. ownerState never reads a falsy `alive` (or a missing state) as dead", (
 });
 
 test("10. a live answer with a start that disagrees is unknown, with the new shape", () => {
-  const owner = { host: me(), pid: 4242, start: 1_000 };
+  const owner = rec({ start: 1_000 });
   assert.equal(ownerState(owner, () => ({ state: "live", start: 1_001 })), "live");
   assert.equal(ownerState(owner, () => ({ state: "live", start: 2_000 })), "unknown");
 });
@@ -120,7 +123,7 @@ test("11. the sweep keeps a dead-looking folder when its probe answers in the ol
   const own = lifo(t);
   const tmp = ownedDir(own, "liveness-tmp");
   const repo = ownedDir(own, "liveness-repo");
-  const claim = (dir) => fs.writeFileSync(`${dir}.owner`, `${formatOwner({ host: me(), pid: 4242 })}\n`);
+  const claim = (dir) => fs.writeFileSync(`${dir}.owner`, `${formatOwner(rec({ start: 1 }))}\n`);
   const old = (dir) => fs.utimesSync(dir, new Date(Date.now() - HOUR), new Date(Date.now() - HOUR));
   const make = (what) => { const dir = ownedDir(own, what, { parent: tmp }); claim(dir); old(dir); return dir; };
 
@@ -161,14 +164,53 @@ test("12. REPO_ROOT is always this checkout; the test seam changes only the swee
 
 test("L-win1. Windows has no pid 1: an owner `<host>@windows:1` is unknown whatever a probe says, and the real probe never calls it dead", () => {
   const dead = () => ({ state: "dead" });
-  assert.equal(ownerState({ host: "devbox@windows", pid: 1 }, dead), "unknown", "a bash started by a native process reports pid 1; it is no process id there");
-  assert.equal(ownerState({ host: "DEVBOX@WINDOWS", pid: 1 }, dead), "unknown", "in any case");
-  assert.equal(ownerState({ host: thisOwner().host, pid: 4242 }, dead), "gone", "any other pid is still asked");
+  assert.equal(ownerState(rec({ host: "devbox@windows", pid: 1 }), dead, NOT_HIDDEN), "unknown", "a bash started by a native process reports pid 1; it is no process id there");
+  assert.equal(ownerState(rec({ host: "DEVBOX@WINDOWS", pid: 1 }), dead, NOT_HIDDEN), "unknown", "in any case");
+  assert.equal(ownerState(rec(), dead, NOT_HIDDEN), "gone", "any other pid is still asked");
   if (process.platform === "win32") assert.equal(processProbe(1).state, "unknown", "process.kill(1, 0) says ESRCH on Windows, which proves nothing");
 });
 
 test("L-len. A claim longer than 512 bytes is unreadable, one of exactly 512 is not", () => {
-  assert.equal(parseOwner(`${"a".repeat(504)}@linux:1`).unreadable, undefined);
-  assert.equal(parseOwner(`${"a".repeat(505)}@linux:1`).unreadable, true);
-  assert.equal(parseOwner(`${"a".repeat(504)}@linux:1\n`).unreadable, true, "the line end counts: 513 bytes");
+  assert.equal(parseOwner(`u1:${"a".repeat(501)}@linux:1`).unreadable, undefined);
+  assert.equal(parseOwner(`u1:${"a".repeat(502)}@linux:1`).unreadable, true);
+  assert.equal(parseOwner(`u1:${"a".repeat(501)}@linux:1\n`).unreadable, true, "the line end counts: 513 bytes");
+});
+
+test("L-zero. A pid, a start or a namespace written with a leading zero is a record the grammar reads and liveness never trusts: unknown, never asked, never gone", () => {
+  const asked = [];
+  const dead = (pid) => { asked.push(pid); return { state: "dead" }; }; // a probe that would say "no such process" for anything it is asked
+  const here = thisOwner();
+  const ns = here.ns === undefined ? "" : `:${here.ns}`;
+  const text = (pid, start = "1792053744", namespace = ns.slice(1)) => `${here.owner}:${here.host}:${pid}:${start}${namespace === "" ? "" : `:${namespace}`}\n`;
+  for (const pid of ["007", "00", "0123"]) {
+    const parsed = parseOwner(text(pid));
+    assert.equal(parsed.unreadable, undefined, `${pid}: the grammar still reads it (vector r-g11)`);
+    assert.equal(ownerState(parsed, dead, NOT_HIDDEN), "unknown", `pid ${pid}`);
+  }
+  assert.equal(ownerState(parseOwner(text("4242", "01792053744")), dead, NOT_HIDDEN), "unknown", "a start");
+  if (here.ns !== undefined) assert.equal(ownerState(parseOwner(text("4242", "1792053744", `0${here.ns}`)), dead, NOT_HIDDEN), "unknown", "a namespace: 04242 is not 4242 (the janitor compares the text)");
+  const canonical = parseOwner(text("4242", "1792053744"));
+  assert.equal(ownerState(canonical, dead, NOT_HIDDEN), "gone", "the same record written canonically is still asked and still gone");
+  assert.equal(parseOwner(`${here.owner}:${here.host}:0\n`).unreadable, undefined, "a lone 0 is canonical digit text (it is no process id, which is isProcessId's answer)");
+  assert.equal(ownerState(parseOwner(`${here.owner}:${here.host}:0\n`), dead, NOT_HIDDEN), "unknown");
+  assert.deepEqual(asked, [4242], "only the canonical record's pid was ever asked of the OS");
+});
+
+test("L-zero. A leading zero in a legacy record is non-canonical too, and the run record refuses it", () => {
+  const legacy = parseLegacyOwner("h@linux:007");
+  assert.equal(legacy.unreadable, undefined);
+  assert.equal(legacy.nonCanonical, true);
+  assert.equal(parseLegacyOwner("h@linux:7:01").nonCanonical, true);
+  assert.equal(parseLegacyOwner("h@linux:7:1").nonCanonical, undefined);
+  assert.equal(parseOwner("u1:h@linux:7:1:2").nonCanonical, undefined, "a canonical record carries no flag");
+  const here = thisOwner();
+  const stderr = [];
+  const write = process.stderr.write;
+  process.stderr.write = (chunk) => { stderr.push(String(chunk)); return true; };
+  try {
+    assert.deepEqual(runRecord({ TESTSTODELETE_RUN: `${here.owner}:${here.host}:007` }), here, "a run record with a leading zero is ignored, this process's own is used");
+  } finally {
+    process.stderr.write = write;
+  }
+  assert.match(stderr.join(""), /TESTSTODELETE_RUN/);
 });

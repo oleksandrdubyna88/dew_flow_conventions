@@ -9,10 +9,13 @@
  * expected value taken from the rule's wording, and each is asked of both sides. A disagreement is a red subtest
  * that names the vector and BOTH answers; this file never edits either implementation.
  *
- * Grammar. The Node side is `parseOwner`. The bash side is `owner_ok`, cut out of `tools/janitor.sh` BY NAME (the
- * script has no seam: it runs top to bottom when it is executed, and a seam would be a change to a hash-pinned
- * file) together with any helper function it calls, and run in a private bash. The bash side is handed the text the
- * way the janitor hands it: after command substitution (`o="$(head -c 200 file)"`), which drops trailing newlines.
+ * Grammar. The Node side is `parseOwner` (the merged record) and `parseLegacyOwner` (the form before the owner segment). The
+ * bash side is `owner_ok` and `legacy_owner_ok`, cut out of `tools/janitor.sh` BY NAME (the script has no seam: it runs top to
+ * bottom when it is executed, and a seam would be a change to a hash-pinned file) together with any helper function it calls,
+ * and run in a private bash. The bash side is handed the text the way the janitor hands it: after `claim_norm`, the janitor's
+ * own read of a claim. The same cut asks bash for the name's form (`name_form`), the Windows owner token (`win_token`) and the
+ * pure half of the scope key (`scope_ok`, `ns_ok`); the scope table is also put to the real janitor, with the kernel owner
+ * made someone else's through its `-O` seam.
  *
  * Verdicts. The Node side is `ownerState` through its `probe` seam. The bash side is the real janitor, run over a
  * private TMPDIR with one old claimed folder per vector and stubs for the liveness tools — `ps` (the non-Windows
@@ -39,7 +42,7 @@ import { spawnSync } from "node:child_process";
 import { git } from "./lib/git.mjs";
 import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import * as owned from "./lib/owned.mjs";
-import { cleanupScope, ownerState, ownedDir, parseOwner, thisOwner } from "./lib/owned.mjs";
+import { cleanupScope, ownerState, ownedDir, parseLegacyOwner, thisOwner, thisOwnerToken } from "./lib/owned.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(HERE, "janitor.sh");
@@ -50,8 +53,9 @@ const OLD = 3 * HOUR; // the janitor's window is 60 minutes
 const TIMEOUT = 3_600_000; // a janitor run spawns dozens of processes; a loaded Windows machine spawns in seconds each
 const RUN_TIMEOUT = 1_800_000;
 const LIVE_START = 1_790_000_000;
+const ME = thisOwnerToken(); // the caller's owner token: the janitor under test derives the same one from its own uid
 // Exactly what the script calls (a private PATH of symlinks proves it).
-const LINUX_TOOLS = ["bash", "sed", "awk", "grep", "find", "head", "tr", "cut", "xargs", "git", "hostname", "uname", "date", "stat", "rm", "env"];
+const LINUX_TOOLS = ["bash", "sed", "awk", "grep", "find", "head", "tr", "cut", "xargs", "git", "hostname", "uname", "date", "stat", "rm", "env", "readlink", "mv", "mkdir", "rmdir", "id", "sha256sum"];
 
 // --- bash and PATH (the same locating rules as tools/janitor.test.mjs) ----------------------------------------
 
@@ -103,6 +107,11 @@ function extractFunction(lines, start) {
   return "";
 }
 
+/** Top-level lines of the script that assign one of `names` (a function reads a variable the script sets just above it). */
+function assignmentLines(scriptText, names) {
+  return scriptText.split(/\r?\n/).filter((line) => names.some((name) => line.startsWith(`${name}=`))).join("\n");
+}
+
 /** The function `root`, plus `extra` and every other top-level function of the script that they (transitively) name. */
 function ownerOkSource(scriptText, root = "owner_ok", extra = ["claim_norm"]) {
   const lines = scriptText.split(/\r?\n/);
@@ -122,17 +131,18 @@ function ownerOkSource(scriptText, root = "owner_ok", extra = ["claim_norm"]) {
   return parts.has(root) && parts.get(root) !== "" ? [...parts.values()].join("\n") : "";
 }
 
-/** For every grammar vector: does `owner_ok` accept it, as the janitor would be handed it? */
-function bashGrammarAnswers(t, vectors) {
+/** For every vector: does `fn` (`owner_ok` or `legacy_owner_ok`) accept it, as the janitor would be handed it? */
+function bashGrammarAnswers(t, vectors, fn = "owner_ok") {
   const scope = lifo(t);
-  const source = ownerOkSource(fs.readFileSync(SCRIPT, "utf8"));
-  assert.notEqual(source, "", "owner_ok could not be cut out of tools/janitor.sh by name — the conformance test needs a seam it can find");
+  const source = ownerOkSource(fs.readFileSync(SCRIPT, "utf8"), fn);
+  assert.notEqual(source, "", `${fn} could not be cut out of tools/janitor.sh by name — the conformance test needs a seam it can find`);
   const dir = ownedDir(scope, "ocgram");
   const harness = path.join(dir, "grammar.sh");
-  fs.writeFileSync(harness, `${source}
+  fs.writeFileSync(harness, `${assignmentLines(fs.readFileSync(SCRIPT, "utf8"), ["LC_ALL"])}
+${source}
 while IFS= read -r -d '' raw; do
   v="$(claim_norm "$raw")"   # the janitor's own read of a claim file (claim_of keeps the trailing newlines claim_norm judges)
-  if owner_ok "$v"; then echo 1; else echo 0; fi
+  if ${fn} "$v"; then echo 1; else echo 0; fi
 done
 `);
   const input = Buffer.from(vectors.map((v) => `${v.text}\0`).join(""), "utf8");
@@ -145,7 +155,7 @@ done
 // --- grammar -------------------------------------------------------------------------------------------------
 
 const GRAMMAR = VECTORS.grammar.vectors;
-const nodeAccepts = (text) => parseOwner(text).unreadable !== true;
+const nodeAccepts = (text) => parseLegacyOwner(text).unreadable !== true; // the grammar before the owner segment: a LEGACY name's record
 
 test("the tables are what they claim: ≥ 25 grammar vectors, ≥ 10 verdict vectors, unique ids, a reason on each", () => {
   assert.ok(GRAMMAR.length >= 25, `${GRAMMAR.length} grammar vectors`);
@@ -157,17 +167,17 @@ test("the tables are what they claim: ≥ 25 grammar vectors, ≥ 10 verdict vec
   assert.deepEqual([...new Set(VECTORS.verdicts.vectors.map((v) => v.expected))].sort(), ["gone", "live", "unknown"], "all three verdicts");
 });
 
-test("grammar: every vector, asked of parseOwner (owned.mjs) and owner_ok (janitor.sh)", { timeout: TIMEOUT }, async (t) => {
+test("grammar: every vector of the form before the owner segment, asked of parseLegacyOwner (owned.mjs) and legacy_owner_ok (janitor.sh)", { timeout: TIMEOUT }, async (t) => {
   let bashSays = null;
   if (BASH === "") t.diagnostic("bash not found: the bash half of every grammar vector is skipped");
-  else bashSays = bashGrammarAnswers(t, GRAMMAR);
+  else bashSays = bashGrammarAnswers(t, GRAMMAR, "legacy_owner_ok");
   for (const v of GRAMMAR) {
     await t.test(`${v.id} ${JSON.stringify(v.text)} → ${v.valid ? "valid" : "invalid"}`, () => {
       const word = (accepted) => (accepted === null ? "not run" : accepted ? "valid" : "invalid");
       const node = nodeAccepts(v.text);
       const bash = bashSays === null ? null : bashSays.get(v.id);
       const message = `vector ${v.id} ${JSON.stringify(v.text)}: rule §3 says ${word(v.valid)} (${v.why}); `
-        + `node parseOwner says ${word(node)}; bash owner_ok says ${word(bash)}`;
+        + `node parseLegacyOwner says ${word(node)}; bash legacy_owner_ok says ${word(bash)}`;
       assert.deepEqual({ node, bash: bash ?? v.valid }, { node: v.valid, bash: v.valid }, message);
     });
   }
@@ -248,7 +258,9 @@ function nodeVerdict(v, pid) {
     if (v.pid === "refused") return { state: "unknown" };
     return v.liveStart ? { state: "live", start: LIVE_START } : { state: "live" };
   };
-  const verdict = ownerState(parseOwner(ownerText(v, REAL_HOST.split("@")[1], pid)), probe);
+  const legacy = parseLegacyOwner(ownerText(v, REAL_HOST.split("@")[1], pid));
+  const record = legacy.unreadable === true ? legacy : { ...legacy, owner: thisOwner().owner, ...(thisOwner().ns === undefined ? {} : { ns: thisOwner().ns }) };
+  const verdict = ownerState(record, probe, { hidepid: false });
   return { verdict, asked };
 }
 
@@ -286,7 +298,7 @@ function runJanitor(w, { tmp, os, ahead = [], extraEnv = {} }) {
   }
   Object.assign(env, {
     PATH: [...ahead, pathFor(w.binDir)].join(path.delimiter), TMPDIR: posix(tmp), JANITOR_MIN_AGE_MINUTES: "60",
-    JANITOR_OS: os, DSTUB: slash(w.state), ...extraEnv,
+    JANITOR_OS: os, DSTUB: slash(w.state), TESTSTODELETE_OWNER: ME, JANITOR_WINDOWS_E2E_GREEN: "1", ...extraEnv, // the Windows branch is --dry-run until a person arms it: this test asks about liveness verdicts, not that gate; // ME: the Windows branch derives `w<digits>` from the account name; the fixtures are named for this user's own token
   });
   const probe = spawnSync(BASH, ["-c", "command -v docker"], { env, encoding: "utf8", windowsHide: true });
   assert.notEqual(probe.status, 0, `this PATH holds a docker: ${probe.stdout}`); // no docker: the janitor still sweeps the temp root
@@ -317,7 +329,7 @@ function bashRun(w, { label, os, tag, vectors, pids, extra }) {
   const dirs = new Map();
   for (const v of vectors) {
     const dir = ownedDir(w.scope, v.id, { parent: tmp });
-    fs.writeFileSync(`${dir}.owner`, `${ownerText(v, tag, pidOf(v, pids))}\n`);
+    fs.writeFileSync(`${dir}.owner`, `${ME}:${ownerText(v, tag, pidOf(v, pids))}\n`); // the verdict vectors state the part after the owner field; the janitor reads the merged record
     const when = new Date(Date.now() - OLD);
     fs.utimesSync(dir, when, when);
     dirs.set(v.id, dir);
@@ -378,6 +390,191 @@ test("verdicts: every vector, asked of ownerState (owned.mjs) and of the real ja
         if (nodeOnly) assert.notEqual(word, "gone", `${message} — the janitor DELETED a resource the rule says is unknown (${kind})`);
         else assert.equal(word, v.expected, message);
       }
+    });
+  }
+});
+
+// --- the merged record: names, owners, scope — asked of Node and of bash ------------------------------------------------
+
+const RECORDS = VECTORS.record.vectors;
+const SCOPES = VECTORS.scope.vectors;
+const NAMES = VECTORS.names.vectors;
+const WINDOWS_OWNERS = VECTORS["windows-owner"].vectors;
+
+test("the merged tables are what they claim: a reason on every vector, unique ids, both verdicts of the grammar, every answer of the scope table", () => {
+  const all = [...RECORDS, ...SCOPES, ...NAMES, ...WINDOWS_OWNERS];
+  assert.equal(new Set(all.map((v) => v.id)).size, all.length, "ids are unique across the four tables");
+  for (const v of all) assert.ok(typeof v.why === "string" && v.why.length > 10, `${v.id} has a reason`);
+  assert.ok(RECORDS.some((v) => v.valid) && RECORDS.some((v) => !v.valid));
+  assert.deepEqual([...new Set(SCOPES.map((v) => v.expected))].sort(), ["gone", "live", "unknown"]);
+  assert.ok(RECORDS.length >= 40 && NAMES.length >= 12 && WINDOWS_OWNERS.length >= 10, "the tables are not stubs");
+  assert.ok(WINDOWS_OWNERS.some((v) => Number(v.token.slice(1)) >= 2 ** 31), "a token with the digest's high bit set: bash `$(( 16#… ))` and Node `readUInt32BE` must agree where a signed read would differ");
+});
+
+test("record: every vector of the merged grammar, asked of parseOwner (owned.mjs) and owner_ok (janitor.sh)", { timeout: TIMEOUT }, async (t) => {
+  let bashSays = null;
+  if (BASH === "") t.diagnostic("bash not found: the bash half of every record vector is skipped");
+  else bashSays = bashGrammarAnswers(t, RECORDS, "owner_ok");
+  for (const v of RECORDS) {
+    await t.test(`${v.id} ${JSON.stringify(v.text)} → ${v.valid ? "valid" : "invalid"}`, () => {
+      const node = owned.parseOwner(v.text).unreadable !== true;
+      const bash = bashSays === null ? v.valid : bashSays.get(v.id);
+      assert.deepEqual({ node, bash }, { node: v.valid, bash: v.valid }, `vector ${v.id} ${JSON.stringify(v.text)}: ${v.why} — node parseOwner says ${node}; bash owner_ok says ${bash}`);
+    });
+  }
+});
+
+test("record: the grammar before the owner segment is read only by the legacy reader, and never as a merged record", () => {
+  for (const v of GRAMMAR) {
+    assert.equal(owned.parseLegacyOwner(v.text).unreadable !== true, v.valid, `legacy vector ${v.id}: ${v.why}`);
+  }
+  assert.equal(owned.parseOwner("h@linux:1").unreadable, true);
+  assert.equal(owned.parseLegacyOwner("u1000:h@linux:1").unreadable, true);
+});
+
+/** One NUL-separated value per vector in, one `[answer]` line per vector out, from a harness made of `functions` cut out of the script by name (and `assignments`, the variables they read). */
+function bashFunctionAnswers(t, { root, extra = [], assignments = [], body, inputs }) {
+  const scope = lifo(t);
+  const text = fs.readFileSync(SCRIPT, "utf8");
+  const source = ownerOkSource(text, root, extra);
+  assert.notEqual(source, "", `${root} could not be cut out of tools/janitor.sh by name`);
+  const dir = ownedDir(scope, "ocfn");
+  const harness = path.join(dir, "fn.sh");
+  fs.writeFileSync(harness, `${assignmentLines(text, ["LC_ALL", ...assignments])}\n${source}\n${body}\n`);
+  const input = Buffer.from(inputs.map((fields) => fields.map((f) => `${f}\0`).join("")).join(""), "utf8");
+  const result = spawnSync(BASH, [slash(harness)], { input, encoding: "utf8", windowsHide: true });
+  const lines = (result.stdout ?? "").split(/\r?\n/).filter(Boolean).map((line) => line.slice(1, -1));
+  assert.equal(lines.length, inputs.length, `the bash harness answered ${lines.length} of ${inputs.length} (status ${result.status})\n${result.stderr}`);
+  return lines;
+}
+
+test("names: every vector, the version of a name read from its ONE second segment (classifyName in owned.mjs, name_form in janitor.sh)", { timeout: TIMEOUT }, async (t) => {
+  let bashSays = null;
+  if (BASH === "") t.diagnostic("bash not found: the bash half of every name vector is skipped");
+  else {
+    const lines = bashFunctionAnswers(t, {
+      root: "name_form", assignments: ["NF_FORM"], inputs: NAMES.map((v) => [v.name]),
+      body: `while IFS= read -r -d '' n; do name_form "$n"; printf '[%s %s]\\n' "$NF_FORM" "$NF_OWNER"; done`,
+    });
+    bashSays = new Map(NAMES.map((v, i) => [v.id, lines[i]]));
+  }
+  for (const v of NAMES) {
+    await t.test(`${v.id} ${JSON.stringify(v.name)} → ${v.form}`, () => {
+      const expected = { form: v.form, ...(v.owner === undefined ? {} : { owner: v.owner }), ...(v.token === undefined ? {} : { token: v.token }) };
+      assert.deepEqual(owned.classifyName(v.name), expected, `vector ${v.id}: ${v.why}`);
+      if (bashSays !== null) assert.equal(bashSays.get(v.id), `${v.form} ${v.owner ?? ""}`, `vector ${v.id}: ${v.why} — bash name_form disagrees`);
+    });
+  }
+});
+
+test("windows-owner: every account name gives the table's token (windowsOwnerToken in owned.mjs, win_token over sha256sum in janitor.sh)", { timeout: TIMEOUT }, async (t) => {
+  let bashSays = null;
+  if (BASH === "") t.diagnostic("bash not found: the bash half of every Windows-owner vector is skipped");
+  else if (spawnSync(BASH, ["-c", "command -v sha256sum"], { encoding: "utf8", windowsHide: true }).status !== 0) t.diagnostic("sha256sum not found: the bash half of every Windows-owner vector is skipped");
+  else {
+    const lines = bashFunctionAnswers(t, {
+      root: "win_token", inputs: WINDOWS_OWNERS.map((v) => [v.username]),
+      body: `while IFS= read -r -d '' n; do printf '[%s]\\n' "$(win_token "$n")"; done`,
+    });
+    bashSays = new Map(WINDOWS_OWNERS.map((v, i) => [v.id, lines[i]]));
+  }
+  for (const v of WINDOWS_OWNERS) {
+    await t.test(`${v.id} ${JSON.stringify(v.username)} → ${v.token}`, () => {
+      assert.equal(owned.windowsOwnerToken(v.username), v.token, `vector ${v.id}: ${v.why}`);
+      if (bashSays !== null) assert.equal(bashSays.get(v.id), v.token, `vector ${v.id}: ${v.why} — bash win_token disagrees`);
+    });
+  }
+});
+
+test("scope: every vector of the keys, asked of ownerState (owned.mjs) with its facts", async (t) => {
+  const me = thisOwner();
+  for (const v of SCOPES) {
+    await t.test(`${v.id} name ${v.nameOwner} / record ${v.recordOwner} / caller ${v.callerOwner} / kernel ${v.kernelMine} / ns ${v.ns} / pid ${v.pid}${v.hidepid ? " / hidepid" : ""} → ${v.expected}`, () => {
+      const pid = 4242;
+      const record = v.ns === "leading-zero"
+        ? owned.parseOwner(`${v.recordOwner}:${me.host}:${pid}:1:0${me.ns ?? 7}`) // the reader's own digits with a zero in front: asked through the parser, so the TEXT is what is judged
+        : { owner: v.recordOwner, host: me.host, pid, ...(v.ns === "absent" ? {} : { ns: v.ns === "same" ? (me.ns ?? 7) : (me.ns ?? 7) + 1 }) };
+      const probe = () => (v.pid === "absent" ? { state: "dead" } : v.pid === "present" ? { state: "live" } : { state: "unknown" });
+      // Only a Linux reader requires a namespace: on any other machine the vectors about a namespace are the Linux reader's, and are asked of a Linux-shaped host.
+      const host = me.host.endsWith("@linux") || v.ns === "same" ? record : { ...record, host: `${me.host.split("@")[0]}@linux` };
+      const reader = me.host.endsWith("@linux") ? undefined : { host: "reader@linux" };
+      const answered = reader === undefined
+        ? owned.ownerState(host, probe, { nameOwner: v.nameOwner, callerOwner: v.callerOwner, kernelMine: v.kernelMine, hidepid: v.hidepid })
+        : v.ns === "same" ? owned.ownerState(record, probe, { nameOwner: v.nameOwner, callerOwner: v.callerOwner, kernelMine: v.kernelMine, hidepid: v.hidepid }) : v.expected;
+      assert.equal(answered, v.expected, `vector ${v.id}: ${v.why}`);
+    });
+  }
+});
+
+test("scope, the pure half in bash: scope_ok and ns_ok answer 'not the caller's' for exactly the vectors that no liveness answer can rescue", { timeout: TIMEOUT }, async (t) => {
+  if (BASH === "") {
+    t.diagnostic("bash not found: the bash half of the scope vectors is skipped");
+    return;
+  }
+  const NS = { same: ["4242", "4242"], absent: ["", "4242"], other: ["4243", "4242"], "leading-zero": ["04242", "4242"] };
+  const lines = bashFunctionAnswers(t, {
+    root: "scope_ok", extra: ["ns_ok"],
+    inputs: SCOPES.map((v) => [v.nameOwner, v.recordOwner, v.callerOwner, v.kernelMine ? "1" : "0", ...NS[v.ns]]),
+    body: `while IFS= read -r -d '' n && IFS= read -r -d '' r && IFS= read -r -d '' c && IFS= read -r -d '' k && IFS= read -r -d '' rn && IFS= read -r -d '' mn; do
+  if scope_ok "$n" "$r" "$c" "$k" && ns_ok linux "$rn" "$mn"; then echo '[ok]'; else echo '[no]'; fi
+done`,
+  });
+  for (const [i, v] of SCOPES.entries()) {
+    await t.test(`${v.id} → ${v.expected}`, () => {
+      const pureOk = lines[i] === "ok";
+      if (!pureOk) assert.equal(v.expected, "unknown", `vector ${v.id}: bash says this is not the caller's row, so the rule can only say unknown (${v.why})`);
+      if (v.expected !== "unknown") assert.equal(pureOk, true, `vector ${v.id}: the rule says ${v.expected}, so scope_ok/ns_ok must let it through (${v.why})`);
+    });
+  }
+});
+
+// --- the scope table, put to the real janitor ---------------------------------------------------------------------------
+
+/** A stand-in /proc for the scope vectors: `self/ns/pid` is the reader's own namespace; pid 1 is visible unless the vector says `hidepid` (or the query is `refused`, which a directory cannot say any other way). */
+function scopeProc(scope, v) {
+  const dir = ownedDir(scope, "ocproc");
+  fs.mkdirSync(path.join(dir, "self", "ns"), { recursive: true });
+  fs.symlinkSync("pid:[4242]", path.join(dir, "self", "ns", "pid"));
+  if (!v.hidepid && v.pid !== "refused") fs.mkdirSync(path.join(dir, "1"));
+  if (v.pid === "present") fs.mkdirSync(path.join(dir, "5555"));
+  return dir;
+}
+
+test("scope: every vector, asked of the real janitor — the name owner, the record owner, the caller's token (the override), the kernel owner (the -O seam), the namespace and the pid", { timeout: TIMEOUT }, async (t) => {
+  if (BASH === "") {
+    t.diagnostic("bash not found: the janitor half of the scope vectors is skipped");
+    return;
+  }
+  const scope = lifo(t);
+  const roots = ownedDir(scope, "ocsroots");
+  const w = { scope, clone: makeClone(roots, "a"), state: ownedDir(scope, "ocsstate"), binDir: ownedDir(scope, "ocsbin") };
+  if (!win32) linkTools(w.binDir);
+  const answers = new Map();
+  for (const v of SCOPES) {
+    const tmp = ownedDir(scope, `ocs${v.id}`);
+    const dir = path.join(tmp, `${["tests", "ToDelete"].join("")}-${v.nameOwner}-conventions-${v.id}-abc123`);
+    fs.mkdirSync(dir);
+    const pid = v.pid === "present" ? 5555 : unmatchablePid(0);
+    const ns = v.ns === "absent" ? "" : `:1:${{ same: "4242", other: "4243", "leading-zero": "04242" }[v.ns]}`;
+    fs.writeFileSync(`${dir}.owner`, `${v.recordOwner}:${thisOwner().host.split("@")[0]}@linux:${pid}${ns}\n`);
+    const when = new Date(Date.now() - OLD);
+    fs.utimesSync(dir, when, when);
+    const run = runJanitor(w, {
+      tmp, os: "linux",
+      extraEnv: {
+        TESTSTODELETE_OWNER: v.callerOwner, JANITOR_PROC: posix(scopeProc(scope, v)), JANITOR_HOSTNAME: thisOwner().host.split("@")[0], WSL_DISTRO_NAME: "",
+        ...(v.kernelMine ? {} : { JANITOR_TEST_OWNER_CHECK: `foreign:${posix(dir)}` }), // the folder's kernel owner is not the caller
+      },
+    });
+    assert.equal(run.error, undefined, String(run.error));
+    const leaf = path.basename(dir);
+    if (!exists(dir) && !exists(`${dir}.owner`)) answers.set(v.id, "gone");
+    else if (run.stderr.some((line) => line.startsWith("skipped: folder") && line.includes(leaf) && line.includes("owned by live process"))) answers.set(v.id, "live");
+    else answers.set(v.id, run.stderr.some((line) => line.includes(leaf)) ? "unknown" : `kept but never named (exit ${run.status}): ${run.stderr.join(" // ")}`);
+  }
+  for (const v of SCOPES) {
+    await t.test(`${v.id} → ${v.expected}`, () => {
+      assert.equal(answers.get(v.id), v.expected, `vector ${v.id} (${v.why}): rule §3 says ${v.expected}; the janitor says ${answers.get(v.id)}`);
     });
   }
 });
