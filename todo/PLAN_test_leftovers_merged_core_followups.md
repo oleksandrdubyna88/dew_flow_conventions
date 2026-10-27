@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review.** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -8,7 +8,7 @@
 > hold the release").
 >
 > Related docs: [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) (the plan these findings belong to; promoted 2026-10-27),
-> [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md) (the remainder plan: S0, the merge, the sibling's side, the release; none of F1–F9 blocks it),
+> [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md) (the remainder plan: S0, the merge, the sibling's side, the release; none of F1–F11 blocks it),
 > `common/recheck-followups.md` of the consumers' rule set (the format of this file; this repository does not carry that rule).
 
 ## Goal
@@ -137,9 +137,30 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
 - **When.** Before anyone sets `JANITOR_WINDOWS_E2E_GREEN` on any machine, or when a consumer needs its leftovers swept on
   Windows rather than listed.
 
+## F10 — The guard has no `module-load` class (a consumer's request, 2026-10-27)
+
+- **What.** The rule says a helper never creates a resource at module load (`common/test-leftovers.md:69`), and nothing checks it:
+  `tools/leftovers-check.mjs:51` lists "a `module-load` class (needs a parser)" as not built.
+- **Why.** A consumer keeps its own local check for this until the shared guard has the class. That is a second implementation
+  of one rule, and the two can drift.
+- **Fix when re-opened.** A parser-based detection of a resource created at a module's top level (outside a function), RED first
+  on a fixture that does it; then the consumer drops its local check.
+- **When.** Before the second consumer asks for it, or at the next change to the guard.
+
+## F11 — The barrier scan passes the allowlisted janitor line by its line hash alone (the private sibling's security pass, 2026-10-27)
+
+- **What.** `tools/lib/sweeper-scan.mjs:195-196` passes a line of `tools/janitor.sh` when its file, line number and line sha256
+  match the allowlist. A changed janitor that keeps that one line byte-identical passes it. The scan's other classes still see
+  the rest of the file, but the pass itself no longer proves that the janitor is the shipped one.
+- **Why.** The allowlist is meant to pass the shipped janitor, not any file at that path.
+- **Fix when re-opened.** Pass the line only when the scanned file's WHOLE sha256 equals the janitor shipped beside the scan (the
+  private sibling made this change on 2026-10-27). RED first: a janitor with one extra destructive line elsewhere and the
+  allowlisted line unchanged must lose the pass.
+- **When.** Before the next release that changes `tools/janitor.sh`, or with F1.
+
 ## Definition of Done
 
-- [ ] Each of F1 to F9 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
+- [ ] Each of F1 to F11 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.
