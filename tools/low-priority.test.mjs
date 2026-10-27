@@ -285,3 +285,52 @@ test("the runner leaves with the suite's exit code, and a signal never reads as 
   assert.deepEqual(calls[0][1], testArgs(["--x"]));
   assert.deepEqual(testArgs(["--x"], 4), ["--test", "--test-concurrency=3", "--x"]);
 });
+
+/** The `[key, value]` pairs of git's environment config list (`GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_<n>`, `GIT_CONFIG_VALUE_<n>`), read back by count. */
+function gitConfigPairs(env) {
+  const count = Number.parseInt(env.GIT_CONFIG_COUNT ?? "0", 10);
+  const pairs = [];
+  for (let n = 0; n < (Number.isInteger(count) && count > 0 ? count : 0); n++) pairs.push([env[`GIT_CONFIG_KEY_${n}`], env[`GIT_CONFIG_VALUE_${n}`]]);
+  return pairs;
+}
+
+test("the suite's child process gets an environment in which git's automatic maintenance is off", async () => {
+  const {runTests} = await import(new URL("./run-tests.mjs", import.meta.url).href);
+  const calls = [];
+  runTests([], (file, args, options) => { calls.push(options); return {status: 0, signal: null}; });
+  assert.equal(calls[0].stdio, "inherit");
+  assert.ok(calls[0].env, "runTests hands the child an explicit env");
+  assert.ok(gitConfigPairs(calls[0].env).some(([key, value]) => key === "maintenance.auto" && value === "false"));
+});
+
+test("testEnv appends to git's config list, keeps what is there, and never mutates its input", async () => {
+  const {testEnv} = await import(new URL("./run-tests.mjs", import.meta.url).href);
+  const input = {PATH: "/x", GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: "a.b", GIT_CONFIG_VALUE_0: "1", GIT_CONFIG_KEY_1: "c.d", GIT_CONFIG_VALUE_1: "2"};
+  const snapshot = {...input};
+  const out = testEnv(input);
+  assert.deepEqual(input, snapshot);
+  assert.notEqual(out, input);
+  assert.equal(out.PATH, "/x");
+  assert.deepEqual(gitConfigPairs(out), [["a.b", "1"], ["c.d", "2"], ["maintenance.auto", "false"]]);
+  for (const bad of [undefined, "", "abc", "-3", "1.5"]) {
+    const env = bad === undefined ? {} : {GIT_CONFIG_COUNT: bad};
+    assert.deepEqual(gitConfigPairs(testEnv(env)), [["maintenance.auto", "false"]], `count ${JSON.stringify(bad)} reads as 0`);
+  }
+});
+
+test("EFFECT: with testEnv, a commit in a real repository starts no automatic git maintenance", async (t) => {
+  const {testEnv} = await import(new URL("./run-tests.mjs", import.meta.url).href);
+  const dir = ownedDir(t, "git-maintenance");
+  const base = {...process.env};
+  for (const key of Object.keys(base)) if (key.startsWith("GIT_")) delete base[key];
+  const git = (args, env) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...args], {cwd: dir, env, encoding: "utf8"});
+  assert.equal(git(["init", "-q"], base).status, 0);
+  const trace = env => {
+    const run = git(["commit", "--allow-empty", "-q", "-m", "x"], {...env, GIT_TRACE: "1"});
+    assert.equal(run.status, 0, run.stderr);
+    return run.stderr;
+  };
+  const plain = trace(base);
+  if (!/maintenance run/.test(plain)) { t.skip("this git starts no auto maintenance after a commit"); return; }
+  assert.doesNotMatch(trace(testEnv(base)), /maintenance run/);
+});

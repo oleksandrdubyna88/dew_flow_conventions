@@ -55,11 +55,35 @@ export function testArgs(extra = [], threads = availableParallelism()) {
 }
 
 /**
+ * The environment of the one `node --test` this runner starts: a COPY of `env` with git's automatic maintenance
+ * switched off for every git process of the run, through git's own environment config (`GIT_CONFIG_COUNT`,
+ * `GIT_CONFIG_KEY_<n>`, `GIT_CONFIG_VALUE_<n>`). One entry, `maintenance.auto=false`, is appended after the entries
+ * already there; a missing or invalid count reads as 0, and no existing slot is overwritten. `env` is never mutated.
+ *
+ * <p>Why: after a commit git starts `git maintenance run --auto --quiet --detach`, a DETACHED background process the
+ * fixture never asked for. Its worktree-prune task deletes a hand-made `.git/worktrees/<name>` that has no `gitdir`
+ * file (measured with git 2.53.0). Seen as a CI failure of janitor test 22a at ca4b266 (2026-10-27): `mkfifo` found
+ * its folder gone a moment after the test made it. That the maintenance was the cause on the runner is not proven;
+ * that it can do this is. The variable is a request to git, and the suite's own test observes that it takes effect
+ * (`low-priority.test.mjs`).</p>
+ */
+export function testEnv(env = process.env) {
+  const raw = env.GIT_CONFIG_COUNT ?? "";
+  const count = /^[0-9]{1,6}$/.test(raw) ? Number(raw) : 0;
+  return {
+    ...env,
+    GIT_CONFIG_COUNT: String(count + 1),
+    [`GIT_CONFIG_KEY_${count}`]: "maintenance.auto",
+    [`GIT_CONFIG_VALUE_${count}`]: "false",
+  };
+}
+
+/**
  * Run the suite and return the exit code to leave with: the child's own, or 128 + the signal's number when a
  * signal ended it, never a plain 1 that a caller could not tell from a failing test. `spawn` is a seam for tests.
  */
 export function runTests(extra = [], spawn = spawnSync) {
-  const result = spawn(process.execPath, testArgs(extra), { stdio: "inherit" });
+  const result = spawn(process.execPath, testArgs(extra), { stdio: "inherit", env: testEnv() });
   if (result.error) {
     process.stderr.write(`run-tests: ${result.error.message}\n`);
     return 1;
