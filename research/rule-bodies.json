@@ -447,14 +447,15 @@
     {
       "id": "common.test-leftovers-janitor",
       "source": "common/test-leftovers-janitor.md",
-      "bodySha256": "74f338c76042493d684f9e2cfbc71716d14ca452dd6bd977d5b36aeb393668f4",
+      "bodySha256": "3dd8a5b003a332c9d03fc18242cd5c330876a1496c5caf7093cdf7cf38e77b9a",
       "sections": [
         "# The leftover janitor — `tools/janitor.sh`, the one host-wide sweep (MANDATORY where it runs)",
         "## Running it",
         "## What it prints",
         "## Exit codes",
         "## What a copy must keep",
-        "## Never"
+        "## Never",
+        "## Definition of Done"
       ]
     },
     {

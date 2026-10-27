@@ -147,4 +147,11 @@ nothing), not a clean machine; a machine with no `docker` binary says so once an
 - Never delete on a name alone, on age alone, or by a path or id read before the capture's re-check.
 - Never re-implement the janitor in another language: a wrapper starts this file.
 - Never run it through WSL interop against Windows resources, or WSL's bash against the Windows temp root.
+
+## Definition of Done
+
+- [ ] It ran as the user whose leftovers were meant, from inside the repository it sweeps, `--dry-run` first; no option named an owner.
+- [ ] Its exit code was read: 0, or 3 with every `skipped:` line read; 1 and 2 are failures, never a clean machine.
+- [ ] On Windows it ran from Git for Windows' bash, and `JANITOR_WINDOWS_E2E_GREEN` was set only where S4-28 passed green on that machine.
+- [ ] A wrapper starts this file; no copy re-implements it or drops one of items 1 to 6.
 <!-- core:end -->
