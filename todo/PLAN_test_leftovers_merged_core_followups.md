@@ -1,8 +1,8 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26.** Scope: six low findings of the security pass of PR #82
-> (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4 were fixed in the same
-> PR) in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7 and F8 added 2026-10-27.** Scope: six low findings of the
+> security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
+> were fixed in the same PR), and two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
 > `common/test-leftovers-janitor.md`. Not one of them blocks the release of the merged core (the verdict: "none a reason to
 > hold the release").
 >
@@ -83,9 +83,35 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
 - **When.** Before worktrees are registered under a shared parent folder on a machine several OS users share, or with a
   report of a swapped worktree.
 
+## F7 — The stub docker never answers "no such volume" (Opus review of 9b62ba3, L2)
+
+- **What.** The stub's `volume inspect --format` (`tools/janitor.test.mjs:161`) prints `name<TAB>` and exits 0 for a volume it
+  does not know. Real docker exits 1 with `Error response from daemon: get <n>: no such volume` (measured 2026-10-27, Docker
+  29.9.1). So no stub scenario reaches the per-name fallback of `volume_created` (`tools/janitor.sh:428-434`), the capture's
+  `notice: volume … vanished after the capture` (`:463`), or `volume_state` answering 2 at the removal (`:855`).
+- **Why.** Before 9b62ba3 no volume reached these paths on a real daemon; now they run on every host with a volume that
+  disappears during a run. The reviewer checked the fallback by hand against the real daemon and it works; nothing keeps it
+  working.
+- **Fix when re-opened.** A stub mode that marks named volumes "gone at inspect" (exit 1, docker's message on stderr), one
+  scenario for the batch-fails-then-per-name path and one for a volume that vanishes between the capture and the removal.
+- **When.** With the next change to `volume_created` or `volume_state`, or to the stub docker.
+
+## F8 — The live check covers only the two capture templates (Opus review of 9b62ba3, L3)
+
+- **What.** `tools/janitor-docker-live.test.mjs` asks the real daemon about the two `volume_created` templates only. It does not
+  run `volume_state`'s re-check template (`tools/janitor.sh:741`), the `ps -a`, `volume ls` and `network ls` templates
+  (`:456`, `:458`, `:465`), nor check that `epoch_of` (`:318`) parses the real `CreatedAt`.
+- **Why.** Each of these is the same stub-against-real contract that let the volume defect stay green. All of them were checked
+  by hand on Docker 29.9.1 on 2026-10-27 and work; a later Docker could change any one of them.
+- **Fix when re-opened.** Extend the live test: create a labelled volume, container and network, run each template the script
+  sends (read by content, count asserted), and assert the field count, a real tab, and that `epoch_of` gives digits for each
+  `CreatedAt`.
+- **When.** With a Docker major-version upgrade on any machine that runs the janitor, or the next change to a docker template
+  in the script.
+
 ## Definition of Done
 
-- [ ] Each of F1 to F6 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
+- [ ] Each of F1 to F8 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.
