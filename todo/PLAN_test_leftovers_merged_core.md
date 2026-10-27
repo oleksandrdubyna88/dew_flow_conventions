@@ -348,17 +348,20 @@ S7 is the release step.
 ## Test plan
 
 `npm test` (every suite above); `node tools/leftovers-check.mjs` on this repository; `node tools/sweeper-scan.mjs --root .`;
-`node tools/ownership-check.mjs`; `node tools/rule-bodies.mjs`; `npm run check`; the conformance test and S4 test 28 on
-Windows (Git for Windows' bash) and the suite on Linux (CI, once as root for S4 scenario 21); the RED observations of every
-numbered test quoted in the PR.
+`node tools/ownership-check.mjs`; `node tools/rule-bodies.mjs`; `npm run check`; the suite on Linux (CI, once as root for
+S4 scenario 21); the RED observations of every numbered test quoted in the PR. The Windows run (the suite, the conformance
+test and S4 test 28 under Git for Windows' bash) is follow-up F9 since 2026-10-27 (owner decision): the janitor stays
+`--dry-run` on Windows until it is recorded.
 
 ## Definition of Done
 
 - [ ] The two rule texts are the spec's companions byte for byte; both bodies under the cap (the inflated-copy RED
       observed); no owner-blind line; the sibling's rebuild reports both spans byte-identical.
 - [ ] `owned.mjs`, the sweep, the janitor, the guard, the allowlist, the scan and the vectors implement decisions 1–10;
-      every new test was RED first with its real symptom, then green; the full suite green on Windows and Linux; the Windows
-      end-to-end check (S4 test 28) green on at least one Windows machine, recorded.
+      every new test was RED first with its real symptom, then green; the full suite green on Linux. The Windows run and the
+      Windows end-to-end check (S4 test 28) are NOT a merge condition since 2026-10-27 (owner decision): they are follow-up
+      F9 of [the follow-ups plan](PLAN_test_leftovers_merged_core_followups.md), and the janitor stays `--dry-run` on
+      Windows until a machine records them.
 - [ ] The hardening branch is merged first and its tests stay green.
 - [ ] `research/security/test-leftovers-merged-core.md` exists for the merged commit with a SHIP line per scenario of the
       spec's §6 (forged owner, forged claim, root, replacement after capture, inaccessible evidence, hostile names, two

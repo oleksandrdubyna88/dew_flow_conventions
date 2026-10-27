@@ -1,8 +1,9 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7 and F8 added 2026-10-27.** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27.** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
-> were fixed in the same PR), and two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
+> were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
+> the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
 > `common/test-leftovers-janitor.md`. Not one of them blocks the release of the merged core (the verdict: "none a reason to
 > hold the release").
 >
@@ -109,9 +110,27 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
 - **When.** With a Docker major-version upgrade on any machine that runs the janitor, or the next change to a docker template
   in the script.
 
+## F9 — The Windows run of the merged core (owner decision 2026-10-27)
+
+- **What.** No Windows machine has run the suite since S4 landed (the last Windows count is at 93cabc6, before the janitor
+  work), and the Windows end-to-end check `S4-28` in `tools/janitor.test.mjs:2090` has never run green. The owner decided on
+  2026-10-27 that PR #82 merges without it.
+- **Why it is safe to wait.** The janitor fails closed on Windows: without `JANITOR_WINDOWS_E2E_GREEN` it forces `--dry-run`
+  (`common/test-leftovers-janitor.md` item 6; tested by `S4-28b`), so an unverified machine lists and removes nothing. What is
+  missing is the evidence that the Windows branch (the `w<digits>` token, `tasklist` liveness, `stat %u` ownership, the temp
+  root) removes the right things on a real machine.
+- **Fix when re-opened.** On a Windows machine with Git for Windows and Node 20+, from a checkout of `main`: a private
+  `TEMP`/`TMP`/`TMPDIR` under the user's home, `npm ci`, `npm test` (fail 0), then
+  `node --test --test-name-pattern="S4-28" tools/janitor.test.mjs` — the line must read `ok`, not `# SKIP` (a skip saying
+  "Git for Windows bash not found" is not a pass). Record the machine, the date, the commit and both outputs; only then may
+  that account set `JANITOR_WINDOWS_E2E_GREEN`. A GitHub-hosted `windows-latest` job running the same two commands proves the
+  code on Windows, but it does not arm any other machine: the switch is per machine.
+- **When.** Before anyone sets `JANITOR_WINDOWS_E2E_GREEN` on any machine, or when a consumer needs its leftovers swept on
+  Windows rather than listed.
+
 ## Definition of Done
 
-- [ ] Each of F1 to F8 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
+- [ ] Each of F1 to F9 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.
