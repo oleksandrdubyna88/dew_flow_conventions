@@ -1,6 +1,6 @@
 # Barrier records — one section per machine that builds or tests this repository
 
-> Status: **one machine recorded, 2026-10-27; its barrier is open except three places only root can read.** The checklist
+> Status: **two machines recorded, 2026-10-27: the Ubuntu dev VM's barrier is OPEN; the owner's Windows machine was not tested, so its barrier is closed.** The checklist
 > each section answers is the merged-core plan's *Barrier checklist* ([PLAN_test_leftovers_merged_core.md](../PLAN_test_leftovers_merged_core.md)).
 > A machine with no section here is a machine whose barrier is closed. Names of other repositories are not written here.
 
@@ -26,7 +26,9 @@ list, a package manager's cache; `grep -rIliF teststodelete` over it: 0 matches.
 
 **System scan** (`--system`, as the same developer account): no owner-blind line in any place it could read; exit 2 for
 three places only root can read — **root's user systemd folder, another developer account's user systemd folder, and
-`/var/spool/cron/crontabs`**. These three are the open part of this record.
+`/var/spool/cron/crontabs`**. The root scan below read them.
+
+**System scan as root** (2026-10-27, an administrator, from this repository's worktree at `e20561f`): `sweeper-scan: none found (288 file(s) read) — the barrier is open for this scope` — exit 0. The three places above were read and hold no owner-blind line.
 
 **Scheduled jobs read by hand.** No crontab for the developer account; no `teststodelete` in `/etc/cron*`, the system and
 user systemd unit folders or the tmpfiles configuration. The four site timers run scripts under `/usr/local/sbin` and
@@ -37,5 +39,12 @@ consumer of this repository is checked out here.
 **Legacy resources:** not inventoried — no consumer of this repository runs here, so nothing of this family was left.
 
 **Attested** by the repository owner on 2026-10-27 on the evidence above, for every class in the table and the unreadable
-files. **Still open:** an administrator runs `node tools/sweeper-scan.mjs --system` as root (or reads the three places) and
-adds the result here.
+files. With the root scan, **the barrier on this machine is open** (2026-10-27).
+
+## The owner's Windows machine — 2026-10-27, not tested
+
+**Owner statement, 2026-10-27:** this machine was not tested for the barrier — no scan, no checklist. Its barrier is therefore
+**closed**. The suite of this repository ran there on 2026-10-23 (at `93cabc6`, Git for Windows' bash); nothing has been recorded
+since. Until a section here records a scan of it, it builds or tests this repository only with `TMPDIR`, `TEMP` and `TMP` set to a
+private folder under the user's own profile, and the janitor stays `--dry-run` there (follow-up F9 of
+[the follow-ups plan](../../todo/PLAN_test_leftovers_merged_core_followups.md); `JANITOR_WINDOWS_E2E_GREEN` is not set).

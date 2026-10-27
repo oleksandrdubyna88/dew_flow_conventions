@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, the merged core: what is left before PR #82 merges and the release is promoted
 
-> Status: **plan only, nothing implemented yet, 2026-10-27.** Scope: the open part of
+> Status: **in progress, 2026-10-27 — R1 and R2 done (the barrier record: the Ubuntu dev VM open, the owner's Windows machine not tested); R3–R6 open.** Scope: the open part of
 > [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) — the machine barrier on every machine that
 > builds or tests this repository (`research/security/machines.md`), the merge of PR #82, the private sibling's side of the
 > merged core's Definition of Done, the ONE promotion of `release`, and the consumer migration of
@@ -71,6 +71,7 @@ cache or a process.
 - **When.** Before R3. Needs an administrator on that machine.
 - **Done when.** The section says the three places were read, with the scan commit and its exit code; or it names each one still unread and
   who attested for it. A record without the scan commit does not count.
+- **Done, 2026-10-27.** Root scan at `e20561f`: none found, 288 files read, exit 0 — recorded in `research/security/machines.md`.
 
 ### R2 — S0 on every other machine
 
@@ -84,6 +85,7 @@ cache or a process.
   is one whose old sweeper nobody has looked for.
 - **When.** Before R3. The owner names the machines; a GitHub-hosted runner is out of scope (one job's, discarded with it, never shared by two OS users).
 - **Done when.** Every machine the owner names has a section or a written statement.
+- **Done, 2026-10-27.** The owner named one other machine, the Windows machine, and stated it was not tested; its section records the barrier there as closed and the private-temp-folder condition. No other machine was named.
 
 ### R3 — PR #82 merges
 
@@ -144,8 +146,8 @@ checkout of the PR's branch. Their outcome is recorded by hand; the scan itself 
 
 ## Definition of Done
 
-- [ ] R1: the three root-only places are read (or attested by name), the scan commit and exit code recorded.
-- [ ] R2: every machine the owner names has a section in `research/security/machines.md`, or a written statement that it no longer builds or tests here.
+- [x] R1: the three root-only places are read (or attested by name), the scan commit and exit code recorded.
+- [x] R2: every machine the owner names has a section in `research/security/machines.md`, or a written statement that it no longer builds or tests here.
 - [ ] R3: PR #82 merged; the merge commit's `ci` run green (the sha stated).
 - [ ] R4: the private sibling's confirmation exists (both spans byte-identical; the two consumer files copied with their sha256 pinned).
 - [ ] R5: the warning went to the sessions with open consumer pull requests; `release` promoted once; `release-distance` 0.
