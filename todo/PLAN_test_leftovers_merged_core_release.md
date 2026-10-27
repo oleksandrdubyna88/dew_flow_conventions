@@ -9,7 +9,7 @@
 > Related docs: [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) (the build, promoted 2026-10-27, with its
 > deviations), [PLAN_test_leftovers_E1.md](../research/PLAN_test_leftovers_E1.md) (the contract the build revised),
 > [PLAN_test_leftovers_rollout.md](PLAN_test_leftovers_rollout.md) (the consumer epics, R6),
-> [PLAN_test_leftovers_merged_core_followups.md](PLAN_test_leftovers_merged_core_followups.md) (F1–F11, none of which blocks this plan),
+> [PLAN_test_leftovers_merged_core_followups.md](PLAN_test_leftovers_merged_core_followups.md) (F1–F13, none of which blocks this plan),
 > [research/security/machines.md](../research/security/machines.md) (the barrier record), [common/test-leftovers.md](../common/test-leftovers.md).
 >
 > The private sibling rule repository is never named here; it is "the private sibling".
@@ -50,7 +50,7 @@ migration starts with every sweep-only stage before any producer stage.
 | Item | Built by | The other plan's part |
 |---|---|---|
 | The tools, the rule texts, the scan, the vectors, the reviews and the security pass | [the merged-core plan](../research/PLAN_test_leftovers_merged_core.md) (promoted) | Nothing here edits them; a defect found while running R1–R5 is a new commit on PR #82's branch or a follow-up, never a story here |
-| The findings the security pass parked, the stub-docker gaps, the Windows run | [the follow-ups plan](PLAN_test_leftovers_merged_core_followups.md) F1–F11 | None blocks R1–R6. F9 (the Windows run) is the evidence for a Windows machine's janitor switch; R2 only records that machine's barrier |
+| The findings the security pass parked, the stub-docker gaps, the Windows run | [the follow-ups plan](PLAN_test_leftovers_merged_core_followups.md) F1–F13 | None blocks R1–R6. F9 (the Windows run) is the evidence for a Windows machine's janitor switch; R2 only records that machine's barrier |
 | The consumers' resources, ports, pin bumps | [the rollout plan](PLAN_test_leftovers_rollout.md) epics E2–E7 | R6 is its two-stage rule; this plan carries the order, the rollout plan carries each epic's content |
 
 Order: R1 and R2 (parallel), R3, R4 (parallel with R1–R3 for its copy part), R5, R6. Disjoint: nothing here edits a consumer repository.
@@ -124,7 +124,7 @@ cache or a process.
 - **Why.** An owner-form producer beside an owner-blind sweeper is the failure of the Symptom.
 - **When.** Sweep-only stages: any time. Producer stages: after R5 and after every sweep-only stage.
 - **Done when.** The rollout plan's own Definition of Done.
-- **Sweep-only stage, 2026-10-27.** This repository's barrier scan (`tools/sweeper-scan.mjs` at `72ae2f3`) over the default branch of each of the private sibling's ten consumers found no enabled owner-blind sweeper: six had no line at all; in four, the lines it listed only count, match or validate names, and one removes one fixed file it has just made. So no sweep-only pull request is needed there; each listed line is a guard finding for that consumer's producer stage. This repository's own seven consumers are not checked out on the machine that ran the scan, so their sweep-only stage is not recorded yet.
+- **Sweep-only stage, 2026-10-27.** This repository's barrier scan (`tools/sweeper-scan.mjs` at `72ae2f3`) over the default branch of each of the private sibling's ten consumers found no enabled owner-blind sweeper: six had no line at all; in four, the lines it listed only count, match or validate names, and one removes one fixed file it has just made. Corrected later on 2026-10-27, after the private sibling's stories were rewritten: of its ten consumers, one had already merged its sweep-only stage, two need one (one removes a sweep that deletes by age with a name built from a variable — a shape this repository's scan missed, F12; one rewrites two listed text lines so the machine-wide scan lists nothing), and seven have an empty stage A. Each other listed line is a guard finding for that consumer's producer stage. This repository's own seven consumers are not checked out on the machine that ran the scan, so their sweep-only stage is not recorded yet.
 
 ## Build order
 

@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review.** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27.** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -8,7 +8,7 @@
 > hold the release").
 >
 > Related docs: [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) (the plan these findings belong to; promoted 2026-10-27),
-> [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md) (the remainder plan: S0, the merge, the sibling's side, the release; none of F1–F11 blocks it),
+> [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md) (the remainder plan: S0, the merge, the sibling's side, the release; none of F1–F13 blocks it),
 > `common/recheck-followups.md` of the consumers' rule set (the format of this file; this repository does not carry that rule).
 
 ## Goal
@@ -158,9 +158,29 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   allowlisted line unchanged must lose the pass.
 - **When.** Before the next release that changes `tools/janitor.sh`, or with F1.
 
+## F12 — The barrier scan and the guard's owner-blind class miss an age-selected removal whose name is a variable (found 2026-10-27)
+
+- **What.** `classifyLine` (`tools/lib/sweeper-scan.mjs:101`; the shapes are at `:33-49`) calls a line broad only when it sees the literal
+  prefix beside a deletion. A line such as `find … -name "${VAR}*" -mmin +N … rm -rf` carries no literal prefix, so the scan lists
+  nothing for it. A deploy runner's script of that shape was found by reading, not by the scan.
+- **Why.** The barrier is only as good as the scan: a deleter it cannot see keeps running after the barrier is declared closed. The rule
+  forbids removal by age, whatever the source of the name.
+- **Fix when re-opened.** Flag an age-selected removal (`-mmin`, `-mtime`, `-newermt` with `rm`, `-delete` or `xargs rm` after it)
+  whatever its name source. RED first: the exact line above must be listed.
+- **When.** Before the barrier is declared closed on a machine that runs a deploy runner, or at the next change to the scan.
+
+## F13 — `owned.mjs` assumes 100 clock ticks per second (found 2026-10-27)
+
+- **What.** `tools/lib/owned.mjs:60` sets `CLOCK_TICKS_PER_SECOND = 100`; `startFromProcStat` (`:255`) uses it to turn field 22 of
+  `/proc/<pid>/stat` into seconds. On a host whose rate is not 100, a correct record written by a helper in another language reads as
+  `unknown` and is kept. That is the safe direction, but the leftover is then never swept.
+- **Why.** The comment beside the constant says reading the rate would spawn a process; it can be read without one.
+- **Fix when re-opened.** Read `AT_CLKTCK` from the auxiliary vector (`/proc/self/auxv`), or state the assumption in the rule text.
+- **When.** Before a consumer writes a helper in another language for a host whose rate is not 100.
+
 ## Definition of Done
 
-- [ ] Each of F1 to F11 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
+- [ ] Each of F1 to F13 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.
