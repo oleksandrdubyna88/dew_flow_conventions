@@ -47,9 +47,9 @@ test("live 2. real `docker volume inspect` prints a REAL tab between the name an
   const templates = captureTemplates(fs.readFileSync(SCRIPT, "utf8"));
   assert.equal(templates.length, EXPECTED_TEMPLATES);
   const name = ownedName("livevol");
-  const created = docker("volume", "create", "--label", `testsToDelete.owner=${formatOwner(runRecord())}`, name);
-  assert.equal(created.status, 0, `creating the live volume failed: ${created.stderr}`);
-  try {
+  try { // the create is inside: a client that timed out may have left a volume the daemon made, and the finally removes it
+    const created = docker("volume", "create", "--label", `testsToDelete.owner=${formatOwner(runRecord())}`, name);
+    assert.equal(created.status, 0, `creating the live volume failed: ${created.stderr}`);
     for (const template of templates) {
       const inspected = docker("volume", "inspect", "--format", template, name);
       assert.equal(inspected.status, 0, `docker volume inspect failed: ${inspected.stderr}`);
@@ -60,6 +60,9 @@ test("live 2. real `docker volume inspect` prints a REAL tab between the name an
       assert.ok(fields[1].length > 0 && !fields[1].includes("\\"), `no creation time in ${JSON.stringify(out)}`);
     }
   } finally {
-    docker("volume", "rm", name);
+    const removed = docker("volume", "rm", name);
+    if (removed.status !== 0 && !/no such volume/i.test(removed.stderr ?? "")) {
+      t.diagnostic(`the live volume ${name} could not be removed (${removed.error?.message ?? removed.stderr}); a later janitor run collects it by its prefix and run label`);
+    }
   }
 });
