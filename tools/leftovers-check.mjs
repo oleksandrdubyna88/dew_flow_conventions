@@ -164,7 +164,7 @@ const NODE_EXTENSIONS = "ts|tsx|mts|cts|js|mjs|cjs";
 const NODE_TEST = new RegExp(`\\.(?:test|spec)\\.(?:${NODE_EXTENSIONS})$`);
 const NODE_TREE = /^(?:scripts|test|tests)\/.+/; // EVERY file under these three root folders, whatever its name: a script need not have an extension (`scripts/start-db`)
 const BINARY_EXTENSION = /\.(?:png|jpe?g|gif|webp|avif|ico|bmp|tiff?|pdf|zip|gz|tgz|bz2|xz|7z|tar|jar|woff2?|ttf|otf|eot|mp[34]|mov|webm|wav|ogg|wasm|so|dll|dylib|exe|bin|class|sqlite3?|db)$/i; // known binary and media files: never text, never read
-const NODE_NEVER = /^(?:\.claude\/rules\/shared\/|\.agents\/conventions\/)|(?:^|\/)node_modules\//;
+const NODE_NEVER = /(?:^(?:\.claude\/rules\/shared\/|\.agents\/conventions\/))|(?:(?:^|\/)node_modules\/)/;
 
 function checkProfile(profile) {
   if (profile !== undefined && !PROFILES.includes(profile)) throw new TypeError(`unknown profile \`${profile}\` (the profiles are: ${PROFILES.map((name) => `\`${name}\``).join(", ")})`);

@@ -571,7 +571,7 @@ test("2. owner-blind: a prefix-only regex, glob and docker filter are findings",
   ]) {
     const result = one(t, file, `${line}\n`);
     assert.equal(result.code, 1, line);
-    assert.match(result.text, new RegExp(`${file.replace(".", "\.")}:1 — owner-blind`), line);
+    assert.ok(result.text.includes(`${file}:1 — owner-blind`), `${line}\n${result.text}`);
   }
   assert.equal(one(t, "tools/e.sh", `grep -i '^${P}[-_]u1000[-_]' list\n`).code, 0, "an owner after the prefix is not blind");
 });
