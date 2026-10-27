@@ -240,6 +240,7 @@ function removeWorktree(repo, worktree, captured, hooks) {
 /** The command a person would run to remove a legacy resource by hand, for this platform. */
 function legacyCommand(kind, target) {
   if (kind === "worktree") return `git worktree remove --force --force ${shellQuote(target)}`;
+  if (kind === "claim") return process.platform === "win32" ? `Remove-Item -Force ${shellQuote(target)}` : `rm -f -- ${shellQuote(target)}`; // an orphan claim: the target IS the claim file
   if (process.platform === "win32") return `Remove-Item -Recurse -Force ${shellQuote(target)}, ${shellQuote(`${target}${OWNER_SUFFIX}`)}`;
   return `rm -rf -- ${shellQuote(target)} ${shellQuote(`${target}${OWNER_SUFFIX}`)}`;
 }

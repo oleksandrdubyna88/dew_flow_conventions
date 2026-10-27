@@ -574,6 +574,19 @@ test("14F. a legacy claim another uid wrote is no evidence: the folder is listed
   assert.deepEqual(reasonsOf(result), { [path.basename(dir)]: "legacy" });
 });
 
+test("14O. a legacy claim with no folder is listed with a command that removes that one file, not the claim's own claim", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "legacy-orphan-repo");
+  const claim = path.join(tmp, `${"testsTo" + "Delete"}-conventions-lg-orphan-abc123.owner`);
+  fs.writeFileSync(claim, `${thisOwner().host}:${PRETEND_DEAD}\n`);
+  setOld(claim);
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, platform: "linux" }); // a Linux reader keeps every legacy record
+  assert.deepEqual(result.removed, []);
+  const lines = result.listed.filter((line) => line.startsWith("legacy: claim"));
+  const quoted = win32 ? `'${claim.replaceAll("'", "''")}'` : `'${claim}'`;
+  assert.deepEqual(lines.map((line) => line.split(" — remove with: ")[1]), [win32 ? `Remove-Item -Force ${quoted}` : `rm -f -- ${quoted}`], JSON.stringify(result.listed));
+});
+
 test("14G. a claim that is a FIFO is never opened: the sweep does not hang and the folder is kept", { timeout: 120_000, skip: win32 ? "no FIFO on Windows" : false }, (t) => {
   const { own, work, tmp } = arena(t);
   const repo = ownedRepo(own, work, "fifo-repo");
