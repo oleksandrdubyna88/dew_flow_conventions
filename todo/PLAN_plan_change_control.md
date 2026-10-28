@@ -440,7 +440,7 @@ describes it, which must describe what runs ([knowledge-base.md](../common/knowl
 whole diff together with an Opus review; fixes folded into that one commit. The pull request is E2's branch, carrying both
 epic commits, merged by rebase (S10 above); E1 opens none of its own.
 
-Cornerstones: 0 of 1 — (marked when the stories are written)
+Cornerstones: 1 of 1 — E1.S1
 
 ### E1 — The ledger contract and its safe enforcement
 

@@ -17,6 +17,10 @@
  *
  *     node .claude/rules/shared/tools/plan-lifecycle.mjs
  *
+ * A fifth finding class, `changes`, reads the change ledger (`## Plan changes`) of every plan in `todo/` — and
+ * of `todo/` ONLY, because `research/` is history. Its grammar and what it cannot see are `lib/plan-ledger.mjs`'s
+ * header; the rule behind it is `common/plan-change-control.md`. A plan with no ledger heading is not read.
+ *
  * Exit 0 when clean, 1 with every finding printed. A repository without both plan folders exits 0 and says
  * so — not every repository in the family has plans yet, and inventing a failure for that would train
  * people to ignore the check.
@@ -24,6 +28,8 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+
+import { ledgerFindings, parentPlanOf, STOP_PHRASE } from "./lib/plan-ledger.mjs";
 
 /** The status must be findable without reading the document — the rule says line 2 or 3; this allows a
  *  little slack for a title block, and nothing like "somewhere in section 2". */
@@ -129,10 +135,15 @@ function statusParagraph(file) {
 }
 
 /** Finished, by the convention's own promoted form or by the plan's own admission. In `todo/` either is a
- *  misfiling; anything less certain is left alone deliberately — see the constants above. */
+ *  misfiling; anything less certain is left alone deliberately — see the constants above.
+ *
+ *  A STOPPED plan is the one exception, and only to the totality verdict: it may say what is done ("all four stories
+ *  of E1 are done; E2 has not started") while it waits for its re-review, and that is not a plan asking to be moved.
+ *  The promoted form and a self-reported misfiling still count — a stop does not change where a plan belongs. The
+ *  phrase is the ledger check's own constant, so the two checks read ONE definition of "stopped". */
 const isFullyDone = (status) =>
   PROMOTED_VERDICT.test(status)
-  || TOTALITY_VERDICT.test(status)
+  || (TOTALITY_VERDICT.test(status) && !STOP_PHRASE.test(status))
   || SELF_REPORTED_MISFILING.some((m) => status.includes(m));
 
 /** Not started. In `research/` that is a misfiling — the folder documents the system as it is, and an
@@ -170,6 +181,36 @@ function checkStatuses(root, findings) {
       } else if (folder === "research" && isUnstarted(status)) {
         findings.push(`misfiled  ${folder}/${file} — unstarted; it belongs in todo/`);
       }
+    }
+  }
+}
+
+/**
+ * The change ledger of every plan in `todo/` (`lib/plan-ledger.mjs` says what a ledger is and what the check cannot see).
+ *
+ * `todo/` only: a plan in `research/` is history, and a ledger there records what already happened. One `try` per
+ * plan around the WHOLE body, the read included — the unit is the file, and a throw out of one plan's parse must be
+ * one finding naming it, never a crash: a crash would turn every consumer's CI red with a stack trace (the finding is
+ * red too, but it names the file and the fix). The protection against a FALSE red is the dry run over the estate
+ * (`todo/PLAN_plan_change_control_E1.md`, E1.S4), not a softer exit code.
+ */
+function checkChangeLedgers(root, findings) {
+  const todo = path.join(root, "todo");
+  for (const file of plansIn(todo)) {
+    const name = `todo/${file}`;
+    try {
+      const parent = parentPlanOf(file, (candidate) => fs.existsSync(path.join(todo, candidate)));
+      const found = ledgerFindings({
+        file: name,
+        text: fs.readFileSync(path.join(todo, file), "utf8"),
+        status: statusParagraph(path.join(todo, file)),
+        parentInTodo: parent !== null && fs.existsSync(path.join(todo, parent)),
+      });
+      for (const message of found) findings.push(`changes   ${message}`);
+    } catch (error) {
+      findings.push(
+        `changes   ${name} — the ledger could not be read (${error?.message ?? error}); red until the file or the check is fixed`,
+      );
     }
   }
 }
@@ -275,6 +316,7 @@ function main() {
 
   const findings = [];
   checkStatuses(root, findings);
+  checkChangeLedgers(root, findings);
   checkLinks(root, findings);
   checkTodoIndex(root, findings);
   checkResearchIndex(root, findings);
@@ -287,6 +329,9 @@ function main() {
   console.error(`plan-lifecycle: ${findings.length} finding(s) — see common/planning-docs.md\n`);
   for (const finding of findings.sort((a, b) => a.localeCompare(b))) console.error(`  ${finding}`);
   console.error("\nPromote a finished plan with /promote-plan; it performs the whole move in one pass.");
+  if (findings.some((f) => f.startsWith("changes "))) {
+    console.error("A plan that changed twice after its approval stops for a whole re-review: common/plan-change-control.md");
+  }
   return 1;
 }
 

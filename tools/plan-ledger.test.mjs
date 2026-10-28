@@ -1,0 +1,607 @@
+#!/usr/bin/env node
+/**
+ * `lib/plan-ledger.mjs`'s own tests: which text is a change ledger, which is not, and how a ledger moves from open
+ * to stopped to closed. The cases are the scenarios of `todo/PLAN_plan_change_control_E1.md` (E1.S1, which wins over
+ * anything else), the rows of the parent plan's findings table (§3) and the clean cases of its test plan.
+ *
+ * PURE: strings in, strings out. Nothing here writes a file, makes a folder or spawns a process, so
+ * `common/test-leftovers.md` asks nothing of this file — the spawned cases live in `plan-lifecycle.test.mjs`.
+ *
+ * Three habits, each from `common/testing.md`:
+ *
+ * - A clean result alone could come from a parser that saw nothing, so every red case sits beside its twin: the
+ *   fixture that differs by one step and is clean, or the reverse. A test that goes red only for the twin, or only
+ *   for the case, is a test of the fixture.
+ * - The lists are the lib's own. `KINDS`, `SOURCES`, `STATES`, `APPROVERS`, `VERDICTS` and `STOP_PHRASE` are
+ *   iterated, never retyped; ONE test pins them to the parent plan's §2 on purpose, because they are the contract
+ *   and changing one is a migration of every recorded plan, not a refactor.
+ * - `check` runs every fixture twice, with `\n` and with `\r\n` line ends, and refuses a difference. A Windows
+ *   working copy is CRLF and the check runs on both; one helper means no case can forget it.
+ */
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+
+import {
+  APPROVERS, KINDS, ledgerFindings, parentPlanOf, SOURCES, STATES, STOP_PHRASE, VERDICTS,
+} from "./lib/plan-ledger.mjs";
+import { outsideFencedBlocks, sectionsOf } from "./lib/rule-body.mjs";
+
+const TICKS = "`".repeat(3); // a fence inside a fence cannot be shown in a document, so the test builds its own
+const FILE = "todo/PLAN_x.md";
+const IN_PROGRESS = "> Status: **in progress, 2026-10-28.** Work is open.";
+const STOPPED = "> Status: **stopped for re-review, 2026-10-28.** Two changes after approval.";
+
+// ---- the fixtures: every case differs from its neighbour only in the lines that matter ----
+
+const epoch = (k, { date = "2026-10-21", by = "reviewers", state = "open" } = {}) =>
+  `> Epoch ${k} · approved ${date} · by ${by} · state: ${state}`;
+const entry = (id, { date = "2026-10-26", source = "owner", kinds = "epics", cause = "consumers need the helper as a shipped file; S8 added" } = {}) =>
+  `- ${id} · ${date} · ${source} · ${kinds} — ${cause}`;
+
+const E11 = entry("1.1");
+const E12 = entry("1.2", { source: "reviewer", kinds: "approach", cause: "restore before capture; S3 and S4 rewritten" });
+const nextEntry = (k) => entry(`${k}.1`, { date: "2026-10-28", source: "agent", kinds: "build-order", cause: "E3 needs E2's helper first" });
+
+/** A: epoch 1, one entry. A2: two. */
+const A = (state = "open") => [epoch(1, { state }), "", E11];
+const A2 = (state = "open") => [epoch(1, { state }), "", E11, E12];
+
+const HEADER = ["| Work | Where | Verdict | Action |", "|---|---|---|---|"];
+const FITS = "| S5a classifier, 2fb413c | main | fits | kept |";
+const CUT = "| quarantine step, b2df09c | pushed, unmerged | cut | revert commit 1a2b3c4 |";
+
+/** A re-review record. `null` leaves a part out; `tableFirst` swaps the two parts (their order is free). */
+const record = (k, { narrowed = "Narrowed: no", table = [...HEADER, FITS, CUT], tableFirst = false } = {}) => {
+  const parts = [narrowed === null ? null : [narrowed], table === null ? null : table].filter(Boolean);
+  if (tableFirst) parts.reverse();
+  return [`### Re-review for epoch ${k}`, "", ...parts.flatMap((part, i) => (i === 0 ? part : ["", ...part]))];
+};
+
+/** B: a closed epoch 1 with two changes, its re-review, and the reset to epoch 2 at one change. */
+const B = ({ e1 = {}, e2 = {}, k = 2, rec = {}, custom } = {}) => [
+  epoch(1, { state: "closed", ...e1 }), "", E11, E12, "",
+  ...(custom ?? record(k, rec)), "",
+  epoch(k, { date: "2026-10-28", ...e2 }), "", nextEntry(k),
+];
+
+/** R: the re-review in progress — epoch 1 stopped, the record written, no epoch 2 line yet. */
+const R = ({ state = "stopped", k = 2 } = {}) => [...A2(state), "", ...record(k)];
+
+/** P: the parent plan's own live shape — one entry whose cause continues on indented lines. */
+const P = [
+  epoch(1, { date: "2026-10-28" }), "",
+  "- 1.1 · 2026-10-28 · reviewer · merge-conditions — S6a document round, finding 1: the server plan (S7) moves from a",
+  "  condition of the merge to a condition of the release, so a blocked review in another repository cannot strand this",
+  "  pull request",
+  "  (Plan round 1's accepted findings and the split its operator command ordered are part of the approval itself.)",
+  "  - an indented dash line is free text too",
+];
+
+const fence = (lines, { marker = TICKS, indent = "", info = "" } = {}) =>
+  [`${indent}${marker}${info}`, ...lines, `${indent}${marker}`];
+
+const planRaw = (lines, { status = IN_PROGRESS } = {}) =>
+  ["# PLAN — x", "", status, "", ...lines, "", "## Goal", "", "Body.", ""].join("\n");
+const plan = (ledger, { status = IN_PROGRESS, heading = "## Plan changes", next = "## Goal" } = {}) =>
+  ["# PLAN — x", "", status, "", heading, "", ...ledger, "", next, "", "Body.", ""].join("\n");
+
+/** Run the lib on one text with LF AND CRLF; the two must agree, and every message must name the file. */
+function run(text, { file = FILE, status = "in progress", parentInTodo = false } = {}) {
+  const found = ledgerFindings({ file, text, status, parentInTodo });
+  assert.ok(Array.isArray(found), `ledgerFindings must return an array, not ${typeof found}`);
+  const crlf = ledgerFindings({ file, text: text.replaceAll("\n", "\r\n"), status, parentInTodo });
+  assert.deepEqual(crlf, found, "CRLF must read exactly like LF");
+  for (const message of found) assert.ok(message.startsWith(`${file} — `), `a message starts with the file: ${message}`);
+  return found;
+}
+const check = (ledger, { status = IN_PROGRESS, heading, next, file, parentInTodo } = {}) =>
+  run(plan(ledger, { status, heading, next }), { status, file, parentInTodo });
+
+/** The finding text must hold every needle; the failure prints what WAS found, which is the whole diagnosis. */
+function said(found, ...needles) {
+  const all = found.join("\n");
+  for (const needle of needles) {
+    const hit = needle instanceof RegExp ? needle.test(all) : all.includes(needle);
+    assert.ok(hit, `expected ${needle} in the findings, got:\n${all === "" ? "(no findings)" : all}`);
+  }
+}
+const clean = (found, why) => assert.deepEqual(found, [], why);
+
+// ---- the contract ----
+
+test("the lists are the contract: pinned to the parent plan's §2, and frozen", () => {
+  // The ONE deliberate retyping in this file (common/testing.md: a test that repeats a list the code holds goes
+  // green while the code drifts). They are pinned because changing one is a migration of every plan in six
+  // repositories that carries a ledger, not a refactor.
+  assert.deepEqual([...SOURCES], ["owner", "agent", "reviewer"]);
+  assert.deepEqual([...KINDS], ["scope", "goals", "dod", "merge-conditions", "epics", "stories", "build-order", "contract", "approach"]);
+  assert.deepEqual([...STATES], ["open", "stopped", "closed"]);
+  assert.deepEqual([...APPROVERS], ["reviewers", "owner"]);
+  assert.deepEqual([...VERDICTS], ["fits", "cut", "—"]);
+  assert.equal(STOP_PHRASE.source, "\\bstopped for re-review\\b");
+  assert.equal(STOP_PHRASE.flags, "i");
+  for (const list of [SOURCES, KINDS, STATES, APPROVERS, VERDICTS]) assert.ok(Object.isFrozen(list), "a list is frozen: nobody edits the contract at run time");
+});
+
+// ---- C1, C2, C3: opt-in by presence, and the twin that proves the parser looked ----
+
+test("C1 a plan with no ledger heading is not read; prose and inline code that mention one do not opt in", () => {
+  const prose = [
+    "# PLAN — x", "", IN_PROGRESS, "",
+    "Plan changes are recorded in a ledger. The heading is `## Plan changes` and the first line is",
+    "`> Epoch 1 · approved 2026-10-21 · by reviewers · state: open`, and an entry reads `" + E11 + "`.", "",
+    "## Goal", "", "Body.", "",
+  ].join("\n");
+  clean(run(prose));
+  clean(run("# PLAN — x\n\n" + IN_PROGRESS + "\n\nNo ledger here.\n"));
+  // the twin: the same prose with a real ledger beside it is read
+  said(run(prose + ["## Plan changes", "", ...A2()].join("\n") + "\n"), "epoch 1 has 2 changes");
+});
+
+test("C2 an epoch with no entries is clean; C3 one entry is clean; the second is red", () => {
+  said(check(A2()), "epoch 1 has 2 changes and is not stopped");
+  clean(check([epoch(1)]));
+  clean(check(A()));
+});
+
+// ---- row 1 ----
+
+test("row 1 — a second change in an open epoch is red; a stopped epoch with two is not", () => {
+  const red = check(A2());
+  said(red, "epoch 1 has 2 changes and is not stopped; stop for a whole re-review", "1.2");
+  clean(check(A2("stopped"), { status: STOPPED }));
+});
+
+// ---- row 2 and the stop phrase ----
+
+test("row 2 — a stopped epoch whose status does not say so is red", () => {
+  said(check(A2("stopped"), { status: IN_PROGRESS }), 'epoch 1 is stopped, but the status paragraph does not say "stopped for re-review"');
+  clean(check(A2("stopped"), { status: STOPPED }));
+});
+
+test("C4/C5 the stop phrase is found bold, plain, capitalised and mid-paragraph; `re-reviewing` is not it", () => {
+  const forms = [
+    "> Status: **Stopped for re-review**",
+    "> Status: stopped for re-review, 2026-10-28.",
+    "> Status: **stopped for re-review, 2026-10-28.** Two changes after approval.",
+    "> Status: **in progress.** After the second change the plan is stopped for re-review since 2026-10-28.",
+  ];
+  for (const status of forms) assert.ok(STOP_PHRASE.test(status), `the constant must match: ${status}`);
+  said(check(A2("stopped"), { status: "> Status: **stopped for re-reviewing** until Friday." }), "stopped for re-review");
+  for (const status of forms) clean(check(A2("stopped"), { status }), status);
+});
+
+// ---- row 3: a ledger the parser cannot orient in ----
+
+test("row 3a/3b — an epoch line that does not parse is red; the clean twin is the same line spelled right", () => {
+  said(check([epoch(1, { state: "paused" }), "", E11]), "unreadable epoch line");
+  said(check(["> Epoch one · approved 2026-10-21 · by reviewers · state: open", "", E11]), "unreadable epoch line");
+  said(check(["> Epoch 1 | approved 2026-10-21 | by reviewers | state: open", "", E11]), "unreadable epoch line", "U+00B7");
+  said(check([epoch(1), "", E11, "> a note that starts like an epoch line"]), "unreadable epoch line");
+  clean(check(A()));
+});
+
+test("row 3c — a heading with entries and no epoch line is red; G5 `Epoch 0` is not an epoch", () => {
+  said(check([E11]), "no epoch line");
+  said(check([epoch(0), "", E11]), "unreadable epoch line");
+  said(check([epoch(1, { date: "2026-13-01" }), "", E11]), "unreadable epoch line", "calendar date");
+  said(check([epoch(1, { date: "2026-01-00" }), "", E11]), "unreadable epoch line", "calendar date");
+  clean(check(A()));
+});
+
+test("row 3d — two ledger headings are red, and the parse stops; one is clean", () => {
+  const two = run(planRaw(["## Plan changes", "", ...A(), "", "## Plan changes", "", ...A()]));
+  said(two, "two", "## Plan changes");
+  assert.equal(two.length, 1, "the parse stops at the headings");
+  clean(run(planRaw(["## Plan changes", "", ...A()])));
+});
+
+test("G2 the heading tolerates trailing spaces; `## Plan changes (epoch 1)` is no heading; `## Plan Changes` is a near miss", () => {
+  clean(check(A(), { heading: "## Plan changes   " }));
+  clean(check([epoch(1) + "  \t", "", E11]));
+  clean(check(A2(), { heading: "## Plan changes (epoch 1)" })); // not a heading: no ledger seen, so nothing to judge
+  said(check(A(), { heading: "## Plan Changes" }), "must read exactly");
+  said(check(A(), { heading: "## plan changes" }), "must read exactly");
+  said(check(A2(), { heading: "## Plan changes" }), "epoch 1 has 2 changes"); // the twin: the exact heading is read
+});
+
+test("G3 a heading with nothing under it, or only blank and indented lines, has no epoch line", () => {
+  said(check([]), "no epoch line");
+  said(check(["  an indented note", "\tand a tabbed one"]), "no epoch line");
+  clean(check(A()));
+});
+
+test("G4 an entry above the first epoch line is red", () => {
+  said(check([E11, "", epoch(1)]), "stands before the first epoch line");
+  clean(check([epoch(1), "", E11]));
+});
+
+// ---- row 4: a line the parser would silently drop ----
+
+test("row 4a/4b — an unknown source or kind is red and names the entry and the legal values", () => {
+  const source = check([epoch(1), "", entry("1.1", { source: "bot" })]);
+  said(source, 'unknown source "bot"', "1.1", SOURCES.join(", "));
+  const kind = check([epoch(1), "", entry("1.1", { kinds: "wording" })]);
+  said(kind, 'unknown kind "wording"', "1.1", KINDS.join(", "));
+  clean(check(A()));
+});
+
+test("row 4c/4e — a column-0 line that is not an entry is red, quoted; `* ` and `1. ` are not `- `", () => {
+  said(check([...A(), "- a note about the plan"]), "unreadable entry", "a note about the plan");
+  said(check([epoch(1), "", E11.replace(/^- /, "* ")]), "unreadable entry", '"- "');
+  said(check([epoch(1), "", E11.replace(/^- /, "1. ")]), "unreadable entry");
+  clean(check(A()));
+});
+
+test("T1/T2 `|`, `--` and the en dash are refused by a message that names the expected characters", () => {
+  const ascii = check([epoch(1), "", "- 1.1 | 2026-10-26 | owner | epics -- x"]);
+  said(ascii, "unreadable entry", "·", "U+00B7", "—", "U+2014", "found 1");
+  const en = check([epoch(1), "", "- 1.1 – 2026-10-26 – owner – epics — x"]);
+  said(en, "found 1", "·", "U+00B7");
+  clean(check(A()));
+});
+
+test("T3 a cause that does not follow ` — ` is red whatever dash was used", () => {
+  for (const tail of ["epics - x", "epics -- x", "epics—x"]) {
+    const found = check([epoch(1), "", `- 1.1 · 2026-10-26 · owner · ${tail}`]);
+    said(found, 'no cause: the cause follows " — " (U+2014)');
+  }
+  said(check([epoch(1), "", "- 1.1 · 2026-10-26 · owner · epics — "]), "unreadable entry");
+});
+
+test("T4 runs of spaces and tabs count as one, and spaces around a comma are free", () => {
+  clean(check([epoch(1), "", "-  1.1  ·  2026-10-26 ·\towner · epics  —  x"]));
+  clean(check([epoch(1), "", "- 1.1 · 2026-10-26 · owner · scope,dod — x"]));
+  clean(check([epoch(1), "", "- 1.1 · 2026-10-26 · owner · scope ,  dod — x"]));
+  said(check([epoch(1), "", "- 1.1 · 2026-10-26 · owner · scope,wording — x"]), 'unknown kind "wording"');
+});
+
+test("T5 keywords are case-sensitive and the message lists the legal values", () => {
+  const found = check([epoch(1), "", entry("1.1", { source: "Owner" })]);
+  said(found, 'unknown source "Owner"', SOURCES.join(", "));
+  said(check(["> epoch 1 · approved 2026-10-21 · by reviewers · state: open", "", E11]), "unreadable epoch line");
+  said(check([epoch(1, { by: "Owner" }), "", E11]), "unreadable epoch line");
+});
+
+test("T6 a date must be a real calendar date", () => {
+  said(check([epoch(1), "", entry("1.1", { date: "2026-02-30" })]), "not a calendar date");
+  said(check([epoch(1), "", entry("1.1", { date: "2026-13-01" })]), "not a calendar date");
+  said(check([epoch(1), "", entry("1.1", { date: "2026-01-00" })]), "not a calendar date");
+  said(check([epoch(1), "", entry("1.1", { date: "26-10-26" })]), "unreadable entry");
+  clean(check([epoch(1), "", entry("1.1", { date: "2026-02-28" })]));
+});
+
+test("G17 a column-0 paragraph, rule, stray table row or stray Narrowed line is red; indented, each is free text", () => {
+  const lines = ["Consulted: 7bdf3086", "---", "| x | y | fits | z |", "Narrowed: no"];
+  for (const line of lines) {
+    said(check([...A2("stopped"), "", line], { status: STOPPED }), "unreadable line", line);
+    clean(check([...A2("stopped"), "", `  ${line}`], { status: STOPPED }));
+  }
+});
+
+test("C10 indented lines under an entry are free text, whatever they hold; the same dash at column 0 is red", () => {
+  const withNotes = [...A(), "  continuation of the cause", "  (a parenthesis line)", "  - a dash line", "  > a quote", "  | a | b |", "  # a hash"];
+  clean(check(withNotes));
+  clean(check([...A(), "\ta tabbed line"]));
+  said(check([...A(), "  continuation", "- a dash line"]), "unreadable entry");
+});
+
+test("G19 a repeated kind is harmless; an unknown one is not", () => {
+  clean(check([epoch(1), "", entry("1.1", { kinds: "epics, epics" })]));
+  said(check([epoch(1), "", entry("1.1", { kinds: "epics, wording" })]), 'unknown kind "wording"');
+});
+
+test("C11 every kind and every source is accepted, iterated from the lib's own lists; two kinds are one entry", () => {
+  for (const kinds of KINDS) clean(check([epoch(1), "", entry("1.1", { kinds })]), `kind ${kinds}`);
+  for (const source of SOURCES) clean(check([epoch(1), "", entry("1.1", { source })]), `source ${source}`);
+  clean(check([epoch(1), "", entry("1.1", { kinds: "scope, dod" })]));
+  said(check([epoch(1), "", entry("1.1", { kinds: "" })]), "unreadable entry");
+});
+
+// ---- row 5: the numbers ----
+
+test("row 5a — an entry numbered above the current epoch is red", () => {
+  said(check([epoch(1), "", entry("2.1")]), "2.1", "above the current epoch");
+  clean(check(A()));
+});
+
+test("row 5b — entries not numbered 1..n are red; in order they are clean", () => {
+  said(check([epoch(1, { state: "stopped" }), "", E11, entry("1.3")], { status: STOPPED }), "1.3", "1..n");
+  clean(check(A2("stopped"), { status: STOPPED }));
+});
+
+test("row 5c — two entries with one number are the merge of two branches and are red", () => {
+  const found = check([epoch(1, { state: "stopped" }), "", E11, entry("1.1", { cause: "the other branch's change" })], { status: STOPPED });
+  said(found, "two branches each recorded a change — renumber; the merge is the stop");
+  clean(check(A2("stopped"), { status: STOPPED }));
+});
+
+test("G18 an entry under another epoch's line is red", () => {
+  const moved = [epoch(1, { state: "closed" }), "", E11, "", ...record(2), "", epoch(2, { date: "2026-10-28" }), "", nextEntry(2), E12];
+  said(check(moved), "entry 1.2 stands under epoch 2's line");
+  clean(check(B()));
+});
+
+// ---- row 6: the sequence ----
+
+test("row 6a — epochs not 1, 2, 3 … in order are red; a repeated number and a gap fall here", () => {
+  said(check(B({ k: 3 })), "epochs not 1, 2, 3", "found 1, 3");
+  said(check(B({ k: 1 })), "epochs not 1, 2, 3", "found 1, 1"); // G6
+  clean(check(B()));
+});
+
+test("row 6b — a lower epoch that is not closed is red (G7)", () => {
+  said(check(B({ e1: { state: "open" } })), "epoch 1 is not closed (state: open)");
+  said(check(B({ e1: { state: "stopped" } })), "epoch 1 is not closed");
+  clean(check(B()));
+});
+
+test("row 6c/G9 — a date that goes back is red; the same day is a same-day re-review and is clean", () => {
+  said(check(B({ e2: { date: "2026-10-20" } })), "date goes back", "2026-10-20", "2026-10-21");
+  clean(check(B({ e2: { date: "2026-10-21" } })));
+  clean(check(B({ e2: { date: "2026-10-28" } })));
+});
+
+test("G8 a current epoch that reads closed is red", () => {
+  said(check(A2("closed")), "is the current epoch and reads closed");
+  said(check(A("closed")), "is the current epoch and reads closed");
+});
+
+test("G21 each state of the lib's list: open and stopped are a current epoch, closed is not (the one named exception)", () => {
+  for (const state of STATES) {
+    const found = check(A(state), { status: STOPPED });
+    if (state === "closed") said(found, "is the current epoch and reads closed"); // a closed epoch is reached only by the NEXT epoch line
+    else clean(found, state);
+  }
+});
+
+test("G22 each approver of the lib's list is accepted", () => {
+  for (const by of APPROVERS) clean(check([epoch(1, { by }), "", E11]), by);
+  said(check([epoch(1, { by: "Owner" }), "", E11]), "unreadable epoch line"); // the twin: a value outside the list is refused
+});
+
+// ---- row 7: the re-review record ----
+
+test("row 7a — epoch 2 with no re-review record is red (C6 is the clean reset)", () => {
+  const found = check(B({ custom: [] }));
+  said(found, "re-review for epoch 2", "must leave a record");
+  clean(check(B()));
+});
+
+test("row 7b/7c — a record needs one `Narrowed: yes|no` line", () => {
+  said(check(B({ rec: { narrowed: null } })), "re-review for epoch 2", "Narrowed");
+  said(check(B({ rec: { narrowed: "Narrowed: maybe" } })), "Narrowed");
+  said(check(B({ rec: { narrowed: "narrowed: no" } })), "Narrowed"); // G15: the keyword is case-sensitive
+  clean(check(B({ rec: { narrowed: "Narrowed: no" } })));
+});
+
+test("G15 `Narrowed: no — a reason` and the bare line are both clean", () => {
+  clean(check(B({ rec: { narrowed: "Narrowed: no — nothing left" } })));
+  clean(check(B({ rec: { narrowed: "Narrowed: no" } })));
+  said(check(B({ rec: { narrowed: "narrowed: no" } })), "Narrowed"); // the twin: only the spelling differs
+});
+
+test("row 7d/7e — a record needs a table with at least one row", () => {
+  said(check(B({ rec: { table: null } })), "table");
+  said(check(B({ rec: { table: HEADER } })), "at least one row");
+  clean(check(B({ rec: { table: [...HEADER, FITS] } })));
+});
+
+test("row 7f/G16 — a verdict is fits, cut or —; every one of the lib's list is clean and `Fits` is not", () => {
+  said(check(B({ rec: { table: [...HEADER, "| x | y | partly | z |"] } })), 'verdict "partly"');
+  said(check(B({ rec: { table: [...HEADER, "| x | y | Fits | z |"] } })), 'verdict "Fits"');
+  for (const verdict of VERDICTS) clean(check(B({ rec: { table: [...HEADER, `| x | y | ${verdict} | z |`] } })), verdict);
+});
+
+test("G13 the table's header is checked, and every row has four cells", () => {
+  said(check(B({ rec: { table: ["| Item | Where | Verdict | Action |", "|---|---|---|---|", FITS] } })), "header must read");
+  said(check(B({ rec: { table: [...HEADER, FITS, "| x | y | fits |"] } })), "has 3 cells");
+  said(check(B({ rec: { table: [...HEADER, FITS, "| x | y | fits | z | w |"] } })), "has 5 cells");
+  clean(check(B()));
+});
+
+test("G14 the order inside a record is free: the table may come before the Narrowed line", () => {
+  clean(check(B({ rec: { tableFirst: true } })));
+  said(check(B({ rec: { tableFirst: true, narrowed: null } })), "Narrowed"); // the twin: the same order with the line missing
+});
+
+test("row 7g — a record after epoch 2's line is red: it comes before the epoch line it opens", () => {
+  const late = [...B({ custom: [] }), "", ...record(2)];
+  said(check(late), "before", "epoch 2");
+  clean(check(B()));
+});
+
+test("G11 a second record for one epoch is red", () => {
+  const twice = B({ custom: [...record(2), "", ...record(2)] });
+  said(check(twice), "two re-review records");
+  clean(check(B()));
+});
+
+test("G12 epoch 1 is the first approval and has no re-review", () => {
+  said(check([...record(1), "", ...A()]), "epoch 1 is the first approval");
+  clean(check(A()));
+});
+
+test("G10 the re-review in progress is clean while epoch 1 is stopped, and only then", () => {
+  clean(check(R(), { status: STOPPED }));
+  said(check(R({ state: "open" })), "while epoch 1 is open; the stop comes first");
+  // the record names the epoch that comes NEXT: with epoch 1 current that is 2, with epochs 1 and 2 it is 3.
+  // (S1's table writes `the next epoch is 3` beside a record named epoch 3 over ONE epoch; its state-machine row and the
+  // message it gives, `re-review for epoch 4, but the next epoch is 3`, say what the logic is, and the logic is tested.)
+  said(check(R({ k: 3 }), { status: STOPPED }), "re-review for epoch 3, but the next epoch is 2");
+  said(check([...B(), "", ...record(4)]), "re-review for epoch 4, but the next epoch is 3");
+});
+
+test("G1 the section ends at the next `## ` or `# ` heading; a `###` inside it is a record heading", () => {
+  clean(check(A2("stopped"), { status: STOPPED, next: "## Goal" }));
+  clean(check(A2("stopped"), { status: STOPPED, next: "# Part two" }));
+  const notes = check([...A2("stopped"), "", "### Notes", "", "A paragraph at column 0."], { status: STOPPED });
+  said(notes, "unreadable re-review heading", "unreadable line");
+  // the paragraph is only red because the `###` kept it inside the section: the same paragraph after `## Goal` is outside
+  clean(check(A2("stopped"), { status: STOPPED, next: "## Goal\n\nA paragraph at column 0." }));
+});
+
+// ---- row 8 ----
+
+test("row 8 — a narrowed re-review approved by reviewers is red; by owner it is clean (C7)", () => {
+  const narrowed = "Narrowed: yes — the Windows run left the merge conditions";
+  said(check(B({ rec: { narrowed } })), "epoch 2 is narrowed (Narrowed: yes) and approved by reviewers", "a smaller plan needs the owner");
+  clean(check(B({ rec: { narrowed }, e2: { by: "owner" } })));
+  clean(check(B({ rec: { narrowed: "Narrowed: no" }, e2: { by: "owner" } }))); // not red by choice: a whole plan may still go to the owner
+});
+
+// ---- row 9 ----
+
+test("row 9 — a stories document with a ledger, whose parent is in todo/, is red; without a parent it is clean", () => {
+  const found = check(A(), { file: "todo/PLAN_x_E1.md", parentInTodo: true });
+  said(found, "its changes count in the parent", "PLAN_x.md");
+  clean(check(A(), { file: "todo/PLAN_x_E1.md", parentInTodo: false }));
+  clean(check(A(), { file: "todo/PLAN_x.md", parentInTodo: false }));
+});
+
+// ---- C6, C9: the reset and the parent plan's own shape ----
+
+test("C6 the reset to epoch 2 at one change is clean; a second change in epoch 2 is red and names epoch 2", () => {
+  clean(check(B()));
+  said(check([...B(), entry("2.2", { date: "2026-10-28", kinds: "scope", cause: "x" })]), "epoch 2 has 2 changes");
+});
+
+test("C9 the parent plan's live ledger is clean, and a fenced example ledger further down is not read", () => {
+  const example = ["## Plan changes", "", ...B()];
+  const fenced = plan(P, { next: "## Design" }) + [...fence(example, { info: "markdown" }), ""].join("\n");
+  clean(run(fenced));
+  const unfenced = plan(P, { next: "## Design" }) + [...example, ""].join("\n");
+  said(run(unfenced), "two", "## Plan changes");
+});
+
+// ---- the fence rules (S1 decision 1) ----
+
+test("F1 a ledger only inside a column-0 fence is not read; unfenced it is", () => {
+  const body = ["## Plan changes", "", ...A2()];
+  clean(run(planRaw(fence(body))));
+  said(run(planRaw(body)), "epoch 1 has 2 changes");
+});
+
+test("F2 a ledger only inside a `~~~` fence is not read", () => {
+  const body = ["## Plan changes", "", ...A2()];
+  clean(run(planRaw(fence(body, { marker: "~~~" }))));
+  said(run(planRaw(body)), "epoch 1 has 2 changes");
+});
+
+test("F3 a fence indented one, two or three spaces is a fence; four spaces is not", () => {
+  const body = ["## Plan changes", "", ...A2()];
+  for (const indent of [" ", "  ", "   "]) {
+    clean(run(planRaw(fence(body, { indent }))), `indent ${indent.length}`);
+    clean(run(planRaw(fence(body, { indent, marker: "~~~" }))), `indent ${indent.length}, tildes`);
+  }
+  // four spaces: the markers are free text, so A2's column-0 lines between them are live
+  said(run(planRaw(fence(body, { indent: "    " }))), "epoch 1 has 2 changes");
+});
+
+test("F4/C9 a four-backtick fence holding ``` lines and a ledger is one block; three backticks would close early", () => {
+  const inner = [`${TICKS}text`, "x", TICKS, "", "## Plan changes", "", ...B()];
+  const four = plan(P, { next: "## Design" }) + [...fence(inner, { marker: "`".repeat(4), info: "markdown" }), ""].join("\n");
+  clean(run(four));
+  const three = plan(P, { next: "## Design" }) + [...fence(inner, { info: "markdown" }), ""].join("\n");
+  said(run(three), "two", "## Plan changes");
+});
+
+test("F5 an unclosed fence runs to the end of the file: the ledger above it stays live, the heading inside it is not read", () => {
+  const second = ["## Plan changes", "", ...B()];
+  const open = plan(A2()) + [`${TICKS}markdown`, ...second, ""].join("\n");
+  const found = run(open);
+  said(found, "epoch 1 has 2 changes");
+  assert.equal(found.length, 1, "row 1 only: the second heading is inside the fence, so there is no `two`");
+  const closed = plan(A2()) + [`${TICKS}markdown`, "x", TICKS, ...second, ""].join("\n");
+  said(run(closed), "two", "## Plan changes");
+});
+
+test("F6 `outsideFencedBlocks` knows `~~~`, and a ``` line does not close it; every fenced line becomes an empty line", () => {
+  assert.equal(outsideFencedBlocks(["a", "~~~", "b", TICKS, "c", "~~~", "d"].join("\n")), "a\n\n\n\n\n\nd");
+  assert.equal(outsideFencedBlocks(["a", TICKS, "b", TICKS, "c"].join("\n")), "a\n\n\n\nc");
+});
+
+test("F7 a longer fence closes only on a closer at least as long; a longer closer closes", () => {
+  const four = "`".repeat(4);
+  assert.equal(outsideFencedBlocks(["a", four, "x", TICKS, "y", four, "z"].join("\n")), "a\n\n\n\n\n\nz");
+  assert.equal(outsideFencedBlocks(["a", TICKS, "x", "`".repeat(5), "z"].join("\n")), "a\n\n\n\nz");
+  // a four-backtick fence "closed" by three is not closed: it runs to the end
+  assert.equal(outsideFencedBlocks(["a", four, "x", TICKS, "y"].join("\n")), "a\n\n\n\n");
+});
+
+test("F8 `sectionsOf` reads the same fences: a heading inside `~~~` or an indented fence is not a heading", () => {
+  assert.deepEqual(sectionsOf("~~~\n# not a heading\n~~~\n## real"), ["## real"]);
+  assert.deepEqual(sectionsOf(`  ${TICKS}\n# not a heading\n  ${TICKS}\n## real`), ["## real"]);
+  assert.deepEqual(sectionsOf("## a\n\n## b"), ["## a", "## b"]);
+});
+
+test("F9 the edges of the fence rules: info strings, closers with text, other characters, four-space indent", () => {
+  // a backtick opener whose info string holds a backtick is inline code, not a fence — and a tilde opener may hold one
+  assert.equal(outsideFencedBlocks(`${TICKS}x\`y\nz\n`), `${TICKS}x\`y\nz\n`);
+  assert.equal(outsideFencedBlocks("~~~x`y\nz\n~~~\nw"), "\n\n\nw");
+  // a closer carries nothing but whitespace: a line with text after the marker does not close
+  assert.equal(outsideFencedBlocks([TICKS, "a", `${TICKS} text`, "b", `${TICKS}  \t`, "c"].join("\n")), "\n\n\n\n\nc");
+  // four spaces is an indented code block, not a fence
+  assert.equal(outsideFencedBlocks([`    ${TICKS}`, "a", `    ${TICKS}`].join("\n")), `    ${TICKS}\na\n    ${TICKS}`);
+  // a `~~~` closer does not close a backtick fence
+  assert.equal(outsideFencedBlocks([TICKS, "a", "~~~", "b"].join("\n")), "\n\n\n");
+});
+
+// ---- C12 and robustness: never a throw, whatever the text ----
+
+test("C12 the CRLF twin of a fixture really is CRLF (the helper would otherwise compare a text with itself)", () => {
+  const text = plan(A2());
+  assert.ok(!text.includes("\r"));
+  assert.ok(text.replaceAll("\n", "\r\n").includes("\r\n"));
+  said(run(text), "epoch 1 has 2 changes"); // run() compares the CRLF twin and refuses a difference
+});
+
+test("the lib never throws on any text, and reads a hostile corpus as findings", () => {
+  const pool = [
+    ...A2(), ...B(), ...R(), ...P, "## Plan changes", "## plan changes", "### Re-review for epoch 2", "### Re-review for epoch 0",
+    "Narrowed: yes", "narrowed:", ...HEADER, "|", "||", "| | | | |", "> Epoch", ">", "> Epoch 9007199254740993 · approved 2026-13-01 · by owner · state: open",
+    "- ", "-", "*", "1.", "  ", "\t- x", "", TICKS, "~~~", "`".repeat(4), "# H", "## Goal", "\0", "\ud800", "- 1.1 · · · ·  — ",
+    "- 9007199254740993.1 · 2026-01-00 · owner · scope — x", "- 1.1 · 2026-02-30 · owner · scope — x", "—", "·", "\r",
+    "a".repeat(5000), "- " + "·".repeat(300),
+  ];
+  let seed = 20261028;
+  const next = (n) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  let withFindings = 0;
+  for (let round = 0; round < 400; round += 1) {
+    const lines = Array.from({ length: 1 + next(14) }, () => pool[next(pool.length)]);
+    if (round % 3 === 0) lines.unshift("## Plan changes");
+    const found = ledgerFindings({ file: FILE, text: lines.join("\n"), status: "stopped for re-review", parentInTodo: round % 2 === 0 });
+    assert.ok(Array.isArray(found) && found.every((m) => typeof m === "string"), `round ${round}`);
+    if (found.length > 0) withFindings += 1;
+  }
+  for (const text of ["", "\n", "\r\n", "## Plan changes", "## Plan changes\n", TICKS, "\0\0\0", "𐀀"]) {
+    assert.ok(Array.isArray(ledgerFindings({ file: FILE, text, status: "", parentInTodo: false })), JSON.stringify(text));
+  }
+  // the twin of "never throws": the corpus is not so tame that nothing was ever read
+  assert.ok(withFindings > 50, `the corpus produced findings in only ${withFindings} of 400 rounds`);
+});
+
+// ---- parentPlanOf ----
+
+test("parentPlanOf names the parent of a stories document, and nothing else", () => {
+  assert.equal(parentPlanOf("PLAN_plan_change_control_E1.md"), "PLAN_plan_change_control.md");
+  assert.equal(parentPlanOf("PLAN_x_E12.md"), "PLAN_x.md");
+  assert.equal(parentPlanOf("PLAN_x_E1_remainder.md"), "PLAN_x.md");
+  assert.equal(parentPlanOf("PLAN_x.md"), null);
+  assert.equal(parentPlanOf("PLAN_x_Eval.md"), null);
+  assert.equal(parentPlanOf("PLAN_x_E.md"), null);
+  assert.equal(parentPlanOf("PLAN_E1.md"), null);
+  assert.equal(parentPlanOf("notes_E1.md"), null);
+  assert.equal(parentPlanOf(""), null);
+});
+
+test("parentPlanOf tries from the right, and prefers a parent that exists", () => {
+  assert.equal(parentPlanOf("PLAN_E1_feature_E2.md"), "PLAN_E1_feature.md"); // the rightmost split
+  assert.equal(parentPlanOf("PLAN_a_E1_b_E2.md"), "PLAN_a_E1_b.md");
+  assert.equal(parentPlanOf("PLAN_a_E1_b_E2.md", (name) => name === "PLAN_a.md"), "PLAN_a.md");
+  assert.equal(parentPlanOf("PLAN_a_E1_b_E2.md", (name) => name === "PLAN_a_E1_b.md"), "PLAN_a_E1_b.md");
+  const asked = [];
+  parentPlanOf("PLAN_a_E1_b_E2.md", (name) => { asked.push(name); return false; });
+  assert.deepEqual(asked, ["PLAN_a_E1_b.md", "PLAN_a.md"], "longest topic first");
+});
