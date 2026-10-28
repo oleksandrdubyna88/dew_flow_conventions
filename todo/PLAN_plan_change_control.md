@@ -28,6 +28,29 @@
   (A contract change by decision 1 — it reverses an explicit §2 sentence; the consultant agreed, consult 9dc03004.
   THE FULL STOP: no new code on E1 or E2 until the whole plan is re-reviewed.)
 
+### Re-review for epoch 2
+
+Narrowed: yes — entry 1.1 took the server plan (S7) out of the merge conditions
+  (A merge without S7 was forbidden and is now allowed, so the merge conditions got smaller — consult 9dc03004, turn 2,
+  checked against decision 5. Epoch 2 needs the owner's approval.)
+  Consulted: `consult` 9dc03004 (trigger 5 for 1.2, then the re-review: both changes quoted; advice verified on the lib).
+  Revised, the whole plan: §2 reserves entry-, epoch- and heading-shaped indented lines anywhere in the section (fences
+  excluded); §3 row 4 and the lib's interface (`parent` name, not a boolean); E1's fixes become a second commit, since
+  its first is pushed; the S6b record; the §5 table repaired. Epics and build order: unchanged (E1 → E2 → S10 and S7 →
+  S9) — no re-split. Sorted by an Opus judge, 2026-10-28; nothing is cut and no revert is needed.
+
+| Work | Where | Verdict | Action |
+|---|---|---|---|
+| 16ae967, 93109b1, ad7ba89 — the plan, round 1, the split, entry 1.1 | pushed, unmerged | fits | kept |
+| b256502 — the parser (epochs, entries, records; rows 1-8) | pushed, unmerged | fits | fix forward: duplicate numbers with a Set; the Narrowed message names U+2014 and its line; field values cleaned like quote(); duplicate records found while stopped; parse() under 50 lines |
+| b256502 — free text / indent handling | pushed, unmerged | fits | fix forward to the reserved prefixes of §2; the header comment rewritten |
+| b256502 — row 9 and the wiring | pushed, unmerged | fits | fix forward: the wiring passes the resolved parent name; the caught message cleaned |
+| b256502 — `isFullyDone` exemption, fence widening, ownership regression test | pushed, unmerged | fits | kept |
+| b256502 — the two test files | pushed, unmerged | fits | fix forward: new red cases with twins for every fix, each watched failing first |
+| b256502 — the dry-run record | pushed, unmerged | fits | run again on the final tree; prediction still 0 |
+| b256502 — the E1 stories document | pushed, unmerged | fits | fix forward: status line, the cornerstone grammar's free-text rows (by Fable), S6b's findings and decisions, the fix story |
+| 7e59e0d — the stop record | pushed, unmerged | fits | kept; epoch 1 becomes `closed` at resume |
+
 ## Symptom
 
 No rule says what happens when a plan changes AFTER its approval. Deviations are written down once, at promotion
@@ -215,6 +238,12 @@ Narrowed: yes — the Windows run left the merge conditions
   `k` is current; every lower one is `closed`.
 - **Entry:** `- <k>.<n> · <YYYY-MM-DD> · owner|agent|reviewer · <kinds> — <cause>`, kinds comma-separated from `scope`,
   `goals`, `dod`, `merge-conditions`, `epics`, `stories`, `build-order`, `contract`, `approach`. Column 0 only.
+- **Free text and the reserved prefixes (epoch 2, entry 1.2):** an indented line anywhere in the section is free text —
+  EXCEPT one whose trimmed text starts like a ledger line: an entry, `^(?:[-*+]\s+)?[1-9]\d*\.[1-9]\d*(?=\s|$)` (`- 1.2`,
+  `* 1.2`, `+ 1.2`, a bare `1.2`), an epoch line (`>`), or a heading (`#`). That line is finding 4, *a ledger line stands
+  at column 0*: a renderer shows a one-space `- ` as a sibling list item and a one-space `>` or `###` as a real quote or
+  heading, which a reader counts, so the check must not skip it. Cost: free text may not begin with an entry-shaped
+  number, `>` or `#`. Fenced lines stay outside the ledger — an example is not a record.
 - **Re-review record:** `### Re-review for epoch <k>` before epoch k's line, for every k ≥ 2: a `Narrowed: yes|no` line and
   a `Work | Where | Verdict | Action` table, at least one row, verdict `fits`, `cut` or `—` (nothing was built).
 - **The count is never written** — it is the number of entries `k.*` of the current epoch.
@@ -222,7 +251,9 @@ Narrowed: yes — the Windows run left the merge conditions
 ### 3. The check — `tools/lib/plan-ledger.mjs` (new) called from `tools/plan-lifecycle.mjs`
 
 The lib is dependency-free, imports only `folded` and `outsideFencedBlocks` from `tools/lib/rule-body.mjs` (`:21`, `:29`),
-and exports `ledgerFindings({ file, text, status, parentInTodo })` → `string[]`. `plan-lifecycle.mjs` gains
+and exports `ledgerFindings({ file, text, status, parent })` → `string[]`, where `parent` is the parent plan's name the
+wiring resolved on disk (`todo/PLAN_x.md`), or `null` when the file is no stories document or its parent is not in `todo/`
+(epoch 2: it was a boolean, and row 9 then named a file the lib guessed). `plan-lifecycle.mjs` gains
 `checkChangeLedgers(root, findings)` beside `checkStatuses` (`:161`), over **`todo/` only** (research is history), with the
 finding class `changes` padded to 10 like the others (`:167`). A throw inside one file's parse becomes a `changes` finding
 naming the file, never a crash — a crash would turn every consumer's CI red.
@@ -239,14 +270,14 @@ Findings (each names the file and, where it has one, the entry):
 | 1 | the current epoch has ≥ 2 entries and is not `stopped` | `epoch k has n changes and is not stopped; stop for a whole re-review` |
 | 2 | `stopped`, but the status paragraph (`statusParagraph`, `:109`) does not match `/\bstopped for re-review\b/i` | the stop must be visible where a reader looks first; tests cover bold, plain, capitalised and mid-paragraph forms, and a stopped status that also says "all … done" must not read as misfiled (`TOTALITY_VERDICT`, `:66`) |
 | 3 | an `> Epoch` line that does not parse; a heading with no epoch line; two headings | `unreadable epoch line` / `no epoch line` |
-| 4 | a column-0 list line in the section that does not parse as an entry; an unknown source or kind | an unreadable entry would undercount |
+| 4 | a column-0 list line in the section that does not parse as an entry; an unknown source or kind; an indented line with the reserved entry prefix (§2) | an unreadable or hidden entry would undercount |
 | 5 | an entry's epoch above the current; entry numbers in an epoch not 1..n or repeated | repeated → *"two branches each recorded a change — renumber; the merge is the stop"* |
 | 6 | epochs not 1, 2, 3 … in order; a lower epoch not `closed`; dates going back | |
 | 7 | epoch k ≥ 2 without `### Re-review for epoch k`, or its `Narrowed` line or table missing or bad | the re-review must leave a record |
 | 8 | `Narrowed: yes` and epoch k's line is `by reviewers` (k ≥ 2 only: a `Narrowed` line exists only in a re-review record; epoch 1 has none, and its approval is whatever approved the plan) | a smaller plan needs the owner |
 | 9 | a stories document (`PLAN_<topic>_E<n>….md`) carries a ledger while `PLAN_<topic>.md` is in `todo/` | its changes count in the parent |
 
-Indented lines under an entry are free text and not parsed. **The check reads the file as it stands in the checkout — never
+Indented lines under an entry are free text and not parsed, except the reserved entry prefix of §2. **The check reads the file as it stands in the checkout — never
 git history.** When two branches each recorded entry `k.1`, the merge keeps both causes: the later one is renumbered
 `k.2` in the merge (or the commit right after it), and that second entry IS the stop — `state: stopped` in the same
 commit. Earlier commits keep their old numbers; nothing reads them. A finding-free run prints nothing new; a run with any `changes`
@@ -270,7 +301,6 @@ finding adds one hint line naming `common/plan-change-control.md`.
 | A non-empty `planText` is the code round's scope; empty falls back to the stored plan | `PanelService.cs:1362-1363` |
 | `review_code` refuses a scope that is not substantial once the plan proceeded | `PanelService.cs:792-796` |
 | `again: true` reopens a closed code stage and keeps the plan's approval | `RoundMachine.cs:225-236` |
-
 | `review_document` refuses only: both or neither input, a credential-shaped name, an over-size text, a path outside the repository, a directory, a non-text extension, an unreadable file — nothing about plans | `DocumentReader.cs:65-291` |
 
 Not yet observed live: a plan read under the document prompts. It is observed FIRST (S6 runs before any rule text is written,
@@ -405,6 +435,15 @@ branch reading the revised plan as `planText` — which is S6b, inside E1.
 | 2 | Finding 8 for epoch 1 | Accepted: `Narrowed` exists only in a re-review record, k ≥ 2 (§3 row 8) |
 | 3 | Two steps both called S8 | Accepted: the pull request is S10 |
 
+## S6b — the second half, observed (2026-10-28)
+
+E1's `review_code` on `feat/plan-change-control-e1` (base `ad7ba89`, head `b256502`) was given a non-empty `planText`
+different from the plan its session stored (that session's plan round had read the E1 stories document): a scope preface
+plus this plan, abridged only in sections E1 does not build, the abridged parts marked. **Accepted and used as the
+scope: `proceed`, 8 of 8 reviewers, gating 4 of threshold 5** — their findings cite the epic's grammar rows, which only the
+supplied text carried. Both halves of the interim path have now been seen working. Its eight findings and the parallel
+Opus review are recorded in the E1 stories document; one of them was this plan's second change (1.2).
+
 ## Definition of Done
 
 - [ ] `common/plan-change-control.md` exists by the outline, selected by the fourteen split-read tasks and none of the four
@@ -442,8 +481,10 @@ describes it, which must describe what runs ([knowledge-base.md](../common/knowl
 **Branches and gates.** `feat/plan-change-control-e1` starts from this branch's commit after S6a is recorded;
 `feat/plan-change-control-e2` starts from E1's commit. Each epic: `open` on its branch; `review_plan` with
 `plan: "todo/PLAN_plan_change_control.md"` and `epic: "k/2"`; build its stories; ONE commit; `review_code` over the epic's
-whole diff together with an Opus review; fixes folded into that one commit. The pull request is E2's branch, carrying both
-epic commits, merged by rebase (S10 above); E1 opens none of its own.
+whole diff together with an Opus review; fixes folded into that one commit while it is unpushed. **Epoch 2:** E1's commit
+was pushed with the stop record, and pushed history is never rewritten (decision 7), so E1's fixes after the re-review
+are a SECOND commit on its branch, reviewed by `review_code` with `again: true` and this revised plan as `planText`. The
+pull request is E2's branch, carrying the epics' commits, merged by rebase (S10 above); E1 opens none of its own.
 
 Cornerstones: 1 of 1 — E1.S1
 

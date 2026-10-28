@@ -6,7 +6,9 @@
 >
 > Stories of epic E1 of [PLAN_plan_change_control.md](PLAN_plan_change_control.md) (§ *Epics*, E1). Split by Opus on
 > 2026-10-28; models per story below. This document keeps no change ledger of its own: a change to E1's approved work
-> is recorded in the parent (parent §3, finding 9).
+> is recorded in the parent (parent §3, finding 9). Revised by Fable on 2026-10-28 during the parent's full stop (its
+> entry 1.2): S1 gains the reserved prefixes of the parent's revised §2 bullet, S3 gains the *fix forward after the stop*
+> list — accepted review findings, not changes to the plan.
 
 Done when (from the parent): every test was watched failing first; every row of the parent's findings table (§3) has a
 red case naming the file and the entry; the clean cases of the parent's test plan pass; the five commands are green; the
@@ -47,8 +49,9 @@ end (that call is S6b).
   *Cornerstone area*).
 - **Scope.** The epoch line, the entry line and the re-review record of the parent's §2; the transitions open →
   stopped → closed; the reset to epoch k+1 at 0 changes; the renumbering after a merge of two branches' entries;
-  `Narrowed: yes` → `by owner`; the acceptance scenarios that fix which text is a ledger and which is not. The schema
-  itself is decided (§2) and is not reopened here.
+  `Narrowed: yes` → `by owner`; the acceptance scenarios that fix which text is a ledger and which is not; since the
+  stop, the reserved prefixes of §2 (an indented line that starts like an entry, an epoch line or a heading). The schema itself is decided (§2) and
+  is not reopened here.
 - **The five decisions S1 must take**, each with at least one scenario (parent, E1 *Scope* 1-5):
   1. **Fences.** `outsideFencedBlocks` (`tools/lib/rule-body.mjs:29`) strips only column-0 triple-backtick fences,
      non-greedy: no `~~~`, no indented fence, and a four-backtick fence that holds a triple-backtick line closes early.
@@ -78,6 +81,14 @@ and a survey of the estate. The §2 schema is not changed: everything below is e
 story, or a reading of §3 — the readings are listed by name in *Readings of §3* so the Opus caller can object to one
 without reopening the rest. **No change to §2 is proposed.** Where this text and E1.S2/E1.S3 disagree, this text wins;
 S2 and S3 below were aligned to it in this file on the same day.
+
+*Revised 2026-10-28, during the full stop of the parent's epoch 1 (parent entry 1.2, the E1 Opus code review's finding
+5, consult 9dc03004).* The parent's §2 now carries the bullet *Free text and the reserved prefixes*: the grammar below
+implements it (the *free text* and *reserved prefixes* rows, the sub-section *The reserved prefixes*, the I-scenarios).
+The three reserved shapes — an entry, an epoch line (`>`), a heading (`#`) — are the parent's decision; this text
+settles their edges only. The same re-review aligned the lib's interface with the parent's §3: `parent` (the resolved
+name or `null`) in place of a boolean. Everything else in this sub-section stands as written; the cases the stop added
+to S2 and S3 are marked *(stop)*.
 
 ##### The five decisions
 
@@ -187,7 +198,8 @@ S2 and S3 below were aligned to it in this file on the same day.
 
 Precedence: `folded` first (CRLF = LF), then `outsideFencedBlocks` (decision 1; fenced lines are empty lines), then
 the file is split on `\n`. Every regex below is applied to a line after `trimEnd()` and after a run of spaces or tabs
-is folded to ONE space — EXCEPT the free-text test, which reads the original line. Messages quote the original line.
+is folded to ONE space — EXCEPT the free-text test, which reads the original line, and the reserved-prefix test, which
+reads the original line with its indent stripped (*The reserved prefixes* below). Messages quote the original line.
 `·` is U+00B7 and `—` is U+2014 throughout.
 
 The exported constants, the only lists (tests iterate them, never a retyped copy — `common/testing.md` § *A test
@@ -200,6 +212,8 @@ export const STATES    = ["open", "stopped", "closed"];
 export const APPROVERS = ["reviewers", "owner"];
 export const VERDICTS  = ["fits", "cut", "—"];
 export const STOP_PHRASE = /\bstopped for re-review\b/i;
+// (stop) parent §2, the revised bullet: an entry, an epoch line (`>`) or a heading (`#`) — one regex, three shapes
+export const RESERVED_PREFIX = /^(?:[>#]|(?:[-*+]\s+)?[1-9]\d*\.[1-9]\d*(?=\s|$))/;
 ```
 
 The regexes that carry a list are BUILT from the constant (`STATES.join("|")`), so there is one list per word.
@@ -210,7 +224,8 @@ The regexes that carry a list are BUILT from the constant (`STATES.join("|")`), 
 | near-miss heading | same | `/^## plan changes$/i` and not the exact one → finding 3 *not a ledger heading; it must read exactly `## Plan changes`* (a ledger under a mis-cased heading would otherwise be invisible) |
 | section end | after the heading | the first line matching `/^#{1,2} /` (a `# ` or `## ` heading), or the end of the file; `### …` lines are INSIDE |
 | blank | in the section | `/^\s*$/` → skipped |
-| free text | in the section | the ORIGINAL line starts with a space or a tab (any indent ≥ 1) → skipped, whatever it holds: an indented `- `, `>`, `\|` or `#` is free text |
+| free text | in the section | the ORIGINAL line starts with a space or a tab (any indent ≥ 1) → the reserved-prefix test (next row) and then skipped, whatever it holds: an indented `- note`, `\|`, `(…)` or prose is free text |
+| reserved prefixes *(stop)* | an indented line, in the section | the line with its indent stripped — `raw.replace(/^[ \t ​-‍⁠﻿]+/, "")` — matches `RESERVED_PREFIX` (an entry-shaped start, a `>`, or a `#`) → finding 4 *a ledger line stands at column 0*, quoting the original line and naming its line number; the line is NOT parsed and NOT counted. Any other indented line is free text. Fenced lines never reach this row (they are empty lines by then) |
 | epoch line | column 0, starts with `>` | `` /^> Epoch ([1-9]\d*) · approved (\d{4}-\d{2}-\d{2}) · by (reviewers\|owner) · state: (open\|stopped\|closed)$/ `` built from `APPROVERS` and `STATES`; the date must be a calendar date (`Date.UTC` round-trip: `2026-02-30` is not); ANY other `>` line in the section is finding 3 *unreadable epoch line* |
 | entry | column 0, matches `/^(?:[-*+]\|\d+[.)]) /` (a list line) | must start `- `; the rest splits on the FIRST ` — ` into head and cause; head splits on ` · ` into exactly 4 fields: number `/^([1-9]\d*)\.([1-9]\d*)$/`, calendar date, source ∈ `SOURCES`, kinds = comma-separated (spaces after a comma allowed), each ∈ `KINDS`, at least one; cause non-empty. Any failure is finding 4 *unreadable entry* with the detail (table below); the entry is then NOT counted — the red keeps the count honest |
 | re-review heading | column 0, starts with `###` | `/^### Re-review for epoch ([1-9]\d*)$/`; any other `###`/`####` line → finding 7 *unreadable re-review heading* |
@@ -229,6 +244,59 @@ re-review heading opens a RECORD that runs to the next epoch line, the next reco
 the first epoch line*); a section with no epoch line at all is finding 3 *no epoch line*. Two ledger headings (exact
 or near-miss, counted together) is finding 3 *two `## Plan changes` headings (lines a and b)*, and the parse stops.
 
+##### The reserved prefixes — an indented line that starts like a ledger line *(stop; parent §2, entry 1.2)*
+
+- *What the parent decided.* An indented line anywhere in the section is free text — EXCEPT one whose trimmed text
+  starts like a ledger line: an entry, `^(?:[-*+]\s+)?[1-9]\d*\.[1-9]\d*(?=\s|$)`; an epoch line, `^>`; a heading, `^#`.
+  Verified 2026-10-28 on the built lib: with entry 1.1 at column 0 in an open epoch, a second entry written ` - 1.2 · …`,
+  ` * 1.2 · …` or `  1.2 · …` gave NO finding, and so did ` > Epoch 2 · approved … · state: open` and ` ### Re-review
+  for epoch 2` (the Opus judge's verification, the same day). A CommonMark renderer shows a one-space `- ` as a sibling
+  list item (a two-space one as a nested item, a bare `  1.2 · …` as a lazy continuation of 1.1's paragraph), a
+  one-space `>` as a real block quote and a one-space `###` as a real heading — in every shape a reader sees a ledger
+  line and counts it: an entry, an epoch, a re-review. The check must not skip what a reader counts.
+- *One constant, one message, three shapes.* `RESERVED_PREFIX = /^(?:[>#]|(?:[-*+]\s+)?[1-9]\d*\.[1-9]\d*(?=\s|$))/`
+  on the indent-stripped line. The message, the same for all three: `a ledger line stands at column 0: line <N> "<the
+  original line>" is indented and starts like a ledger line — an entry, an epoch line (>) or a heading (#) — which a
+  renderer shows as a list item, a quote or a heading a reader counts; move it to column 0, or reword the free text`.
+  It is finding 4 (parent §3 row 4, *a hidden entry would undercount*; a hidden epoch line or record heading would
+  miscount the same way). The line is never parsed: an indented line is not an entry, not an epoch line, not a record
+  heading, and adds nothing to the count or the structure; the red keeps the count honest, exactly as an unreadable
+  entry does. The quote goes through `quote()` (indent kept, control characters cleaned, capped), so the writer sees the
+  indent that hid the line.
+- *`>` and `#` are reserved whatever follows them.* The test is the first character after the indent, any content: an
+  indented `> note` quote in free text, `  #1 priority`, `  #hashtag`, `  >` alone and `  ># x` are all red. **That is by
+  design — the cost the parent's §2 states** (*free text may not begin with an entry-shaped number, `>` or `#`*): a
+  parser that tried to tell a quoted note from an epoch line would need a second grammar for free text, and a one-space
+  `> note` renders as a block quote a reader cannot tell from an epoch line's shape. The message's fix is the same:
+  reword (`  note: …`, `  (quoted) …`) or move to column 0.
+- *"Trimmed" means the indent AND the invisible characters are stripped first:*
+  `/^[ \t ​-‍⁠﻿]+/`. The free-text test itself stays `/^[ \t]/` on the original line — a line
+  that begins with an NBSP (U+00A0) or a zero-width space (U+200B) is a column-0 line, and today it is finding 4
+  *unreadable line* (verified 2026-10-28; `fold()` folds spaces and tabs only, so no line kind matches it). Consistent
+  with that, `  - 1.2 · …` (a space, then an NBSP) is finding 4 through the reserved prefix, and so are
+  `  > Epoch 2 · …` and ` ​### Re-review for epoch 2`: an invisible character hides a ledger line on neither
+  side of column 0. JavaScript's `trim()` is NOT the definition — it strips the NBSP but not U+200B, so a zero-width
+  space after the indent would hide the line again. The same indent set serves all three shapes.
+- *The edges, settled by the regex and named in the I-scenarios:* a tab is an indent (`\t- 1.2`, `\t\t1.2`); `\s+` after
+  the marker accepts a tab (`-\t1.2`); multi-digit numbers are entry numbers (`10.1`, `1.20`); `1.2.3` is NOT reserved
+  (after `1.2` comes a `.`, not whitespace or the end), nor `1.0`, `0.1`, `1.2:`, `(1.2)`, `1. x` (a numbered list) or
+  `version 1.2` (the number is not first). **Genuine prose that begins with an entry-shaped number — `  1.2 was the
+  version we shipped`, `  - 1.2 is where it broke` — is red by design:** that is the cost the parent's §2 states (*free
+  text may not begin with an entry-shaped number*), and the message says the fix (reword: `  version 1.2 was …`).
+- *Where the line stands changes nothing.* The test runs on every indented line of the section, before the record and
+  block logic: an indented `- 2.2 · …` under a re-review record's table is the same finding, and so is one under a
+  `Narrowed` line or between two epoch lines; an indented `### Re-review for epoch 2` inside a record or an indented
+  `> Epoch 2 · …` under a record's table is the same finding too. The line does not open or close a record or a block.
+- *Fenced lines stay outside the ledger — an example is not a record.* `outsideFencedBlocks` has already emptied them
+  (decision 1), so an indented ` - 1.2 · …`, ` > Epoch 2 · …` or ` ### Re-review for epoch 2` inside a column-0 ```
+  fence, a `~~~` fence or an indented fence under the heading is nothing — scenario I10 says so with its twin.
+- *Interaction with the free-text test.* The order inside the walk is: blank → indented (reserved test, then skip) →
+  column-0 line kinds. The reserved test is the ONLY thing the parser reads from an indented line, and it never turns one
+  into an entry; column-0 lines never reach it. So the parent's sentence *indented lines under an entry are free text and
+  not parsed* still holds for every line that is not red — and the one exception is loud, never silent.
+- *The lib's header comment* (S4) rewrites its sentence *a line that starts with a space or a tab is free text whatever
+  it holds* to say the exception.
+
 ##### The state machine
 
 An epoch is `open` → `stopped` → `closed`. Nothing goes back, and `closed` is reached only by the next epoch line.
@@ -245,10 +313,12 @@ An epoch is `open` → `stopped` → `closed`. Nothing goes back, and `closed` i
 | **the re-review in progress:** a record for m+1 with NO epoch m+1 line is legal only while epoch m is `stopped` (parent §1.6 steps 5–8: the record is written during the stop, the epoch line at resume) | row 7 — *re-review for epoch 2 while epoch 1 is open; the stop comes first*; *re-review for epoch 4, but the next epoch is 3* |
 | every record has one `Narrowed: yes\|no` line and one table with the exact header and ≥ 1 body row of 4 cells, verdicts ∈ `VERDICTS` | row 7 — *re-review for epoch 2: no `Narrowed: yes\|no` line*; *… Narrowed must be yes or no, not "maybe"*; *… no table; the record is a `\| Work \| Where \| Verdict \| Action \|` table*; *… the table header must read …*; *… the table has no rows; at least one row (verdict — when nothing was built)*; *… row 3 has 3 cells, not 4*; *… verdict "partly" in row 2; a verdict is fits, cut or —* |
 | `Narrowed: yes` for epoch k ⇒ epoch k's line says `by owner` | row 8 — *epoch 2 is narrowed (Narrowed: yes) and approved by reviewers; a smaller plan needs the owner (by owner)* |
-| a stories document (`parentPlanOf(file) !== null`) with a ledger and `parentInTodo` | row 9 — *a stories document carries a ledger; its changes count in the parent, todo/PLAN_x.md* — added beside whatever else the ledger yields |
+| a stories document with a ledger, called with `parent !== null` (the wiring resolved `todo/PLAN_x.md` on disk) *(stop: `parent`, parent §3)* | row 9 — *a stories document carries a ledger; its changes count in the parent, todo/PLAN_x.md* — the name is `parent` as given, added beside whatever else the ledger yields |
 
 The count is derived: the number of entries that PARSED in the current block. An entry that did not parse is a row-4
-finding; the run is red, so a lower count never passes. Order of work in `ledgerFindings`: parse (findings in line
+finding; the run is red, so a lower count never passes. An indented line with a reserved prefix (entry, `>` or `#`) is
+a row-4 finding too and is neither counted nor part of the structure *(stop)*: the same red, for the same reason. Order
+of work in `ledgerFindings`: parse (findings in line
 order) → if a row-3 finding was pushed (unreadable epoch line, no epoch line, two headings, an entry before the first
 epoch line) return; row 6 (sequence first: if the sequence is not 1..m, return after row 6) → row 5 → row 1 → row 2
 → row 7 → row 8 → row 9. Every message is `${file} — …`. A transition between two commits, for the record: `open`
@@ -260,7 +330,8 @@ to `closed` (row 6 says k must be closed once k+1 exists).
 
 1. Row 4 reads *a column-0 line in the section that does not parse as an entry* as **any** column-0 line that is not
    a line kind of the grammar — a paragraph is red, not free text, because an entry that lost its `- ` IS a paragraph
-   and would undercount in silence. Free text is indented, as §3 says.
+   and would undercount in silence. Free text is indented, as §3 says — except the reserved prefixes (§2, entry 1.2;
+   §3 row 4 names them), which are red whatever their indent.
 2. Row 3 covers the near-miss heading and an entry before the first epoch line (both "a heading with no epoch line"
    in effect).
 3. Row 6 covers a `closed` current epoch (the states of the sequence, not only the lower ones).
@@ -333,7 +404,39 @@ reverse). *Expect* names the substring the test asserts; the full messages are i
 | G22 | for each of `APPROVERS`: epoch 1 `by <a>` with A | `[]` | — |
 | G23 | every fixture of this subsection with `\r\n` line ends | `deepEqual` the same findings (C12's rule) | — |
 
-**The stop and the wiring** (`tools/plan-lifecycle.test.mjs`): W6, W6b, W6c, W9 as in S2 (fixed there).
+**The reserved prefixes** *(stop)* (`tools/plan-ledger.test.mjs`; each on A — epoch 1 open, entry 1.1, status `in
+progress` — with the line placed right under entry 1.1, which is line 10 of the `plan` helper's text; *Expect* row 4 is
+the substring `a ledger line stands at column 0`, plus `line 10` and the line quoted as written, indent included):
+
+| # | Input | Expect | Twin |
+|---|---|---|---|
+| I1 | ` - 1.2 · 2026-10-26 · owner · epics — y` (one space, dash) | row 4, `line 10`, the quoted line | the same line at column 0 → row 1 `entries 1.1, 1.2` and NO row 4: at column 0 it parses as an entry |
+| I2 | `  1.2 · 2026-10-26 · owner · epics — y` (two spaces, bare id) | row 4 | `- 1.2 · …` at column 0 → row 1 (a bare id at column 0 is row 4 *unreadable line*: red on both sides, so the twin that PARSES is the dashed one) |
+| I3 | `\t- 1.2 · …` (a tab), `\t\t1.2 · …`, and `  -\t1.2 · …` (a tab after the marker) | row 4, three cases | the first at column 0 → row 1 |
+| I4 | ` * 1.2 · …` and ` + 1.2 · …` | row 4 — the renderer shows a bullet; which marker is beside the point | at column 0, `* 1.2 · …` → row 4 `unreadable entry` (4e): red on both sides |
+| I5 | `  10.1 · …`, `  1.20 · …`, and `  1.2` alone (nothing after the id) | row 4, three cases — multi-digit numbers are entry numbers; `(?=$)` catches the bare id | — |
+| I6 | `  1.2.3 was the version`, `  1.0 is not an entry number`, `  0.1 neither`, `  1.2: a colon`, `  (1.2) in parentheses`, `  version 1.2 shipped`, `  1. a numbered list`, `  - 1.2—x` (no space before the dash) | `[]`, eight cases — not the reserved prefix: the id is followed by `.`, `:`, `)` or `—`, `0` is no `n`, the number is not first | the first with `1.2 ·` in place of `1.2.3` → row 4 |
+| I7 | `  1.2 was the version we shipped` and `  - 1.2 is where it broke` (genuine prose that begins with an entry-shaped number) | row 4 — **red by design**, the cost §2 states; the message's fix (reword) is what the writer does | I6's `version 1.2 shipped` → `[]` |
+| I8 | `  - 1.2 · …` (a space, then an NBSP), ` ​1.2 · …` (a space, then a zero-width space), ` ﻿- 1.2 · …` | row 4, three cases — the invisible characters are stripped with the indent | at column 0, ` - 1.2 · …` and `​- 1.2 · …` → row 4 `unreadable line` (today's behaviour, pinned here): an invisible character never hides an entry on either side of column 0 |
+| I9 | B with ` - 2.2 · 2026-10-28 · owner · scope — z` indented under the record's table, and with `  1.3 · 2026-10-26 · owner · scope — z` indented under `Narrowed: no` | row 4, two cases — the test runs before the record logic; the record is otherwise clean (no row 7) | `- 1.3 · …` at column 0 in the same place → `[]`: it is an entry of the closed epoch 1 and parses as one; `- 2.2 · …` at column 0 there → row 5 `stands under epoch 1's line` — parsed, so counted |
+| I10 | the lines of I1, I2 and I3 inside a column-0 ``` fence; inside a `~~~` fence; inside a two-space-indented ``` fence — each fence under the heading, after entry 1.1 | `[]`, three cases — an example is not a record | the fence markers removed → row 4 (I1) |
+| I11 | P as it stands (`  - an indented dash line is free text too`, `  (Plan round 1's …`), and A2s with each entry followed by two continuation lines of prose | `[]` — ordinary continuation prose stays clean | — |
+| I12 | the message: I1's line with `\u001b[31m` inside the cause and 400 characters long | row 4; the message holds no `\u001b` and the quote ends in `…` at `QUOTE_LIMIT` — `quote()` is the one quoting function | — |
+| I13 | ` > Epoch 2 · approved 2026-10-28 · by reviewers · state: open` (one space) and `\t> Epoch 2 · …` (a tab) | row 4, `line 10`, the quoted line — the same message as I1 | the same line at column 0 → row 6 `epoch 1 is not closed` and row 7 `no re-review for epoch 2`, and NO row 4: at column 0 it parses as an epoch line |
+| I14 | R (A2s, status `STOPPED`) with its `### Re-review for epoch 2` heading indented one space (the `Narrowed` line and the table left at column 0) | row 4 for the heading; and row 4 `unreadable line` for the `Narrowed:` line and the table rows, which now stand outside any record — the hidden heading opened nothing | the heading at column 0 → `[]` (G10): it parses as a record heading |
+| I15 | `  > note: the reviewer asked for this`, `  #1 priority`, `  #hashtag`, `  >` alone, `  ># x` — free text that happens to begin with `>` or `#` | row 4, five cases — **red by design**, the cost §2 states; the message's fix (reword) is what the writer does | `  note: the reviewer asked for this` and `  (quoted) …` → `[]`; `# Part two` at column 0 → `[]`, it ends the section (G1) |
+| I16 | `  > Epoch 2 · …` (a space, then an NBSP) and ` ​### Re-review for epoch 2` (a space, then a zero-width space) | row 4, two cases — the same indent set as I8 serves every shape | at column 0, ` > Epoch 2 · …` → row 4 `unreadable line` (today's behaviour, pinned): red on either side |
+| I17 | B with ` ### Re-review for epoch 2` indented inside its own record (a second, hidden heading) and with `  > Epoch 2 · …` indented under the record's table before the real epoch 2 line | row 4, two cases; the real record and epoch line stay clean (no row 6/7) | the hidden heading at column 0 → row 7 `two re-review records for epoch 2` (G11); the hidden epoch line at column 0 → row 6 `epochs not 1, 2, 3` (found 1, 2, 2) — parsed, so counted |
+
+The matrix test (one `for` over a row list, never twenty-four copies — `common/testing.md` § *A test that repeats a
+list*): rows = { indent ∈ `" "`, `"  "`, `"\t"` } × { line ∈ `"- 1.2 · 2026-10-26 · owner · epics — y"`, the same with
+`* `, with `+ `, bare `"1.2 · …"`, `"> Epoch 2 · approved 2026-10-28 · by reviewers · state: open"`, `"### Re-review for
+epoch 2"`, `"> note"`, `"# x"` }, each → row 4 with the row's exact line quoted; plus the two clean rows `"  continues
+the cause of 1.1 in prose"` (prose continuation) → `[]` and I1's line inside a column-0 fence (fenced example) → `[]`.
+Twenty-six rows, one assertion shape, the row's input in every failure message.
+
+**The stop and the wiring** (`tools/plan-lifecycle.test.mjs`): W6, W6b, W6c, W9 as in S2 (fixed there); W10 *(stop)*
+for the resolved parent name (S3, *fix forward*, a).
 
 ##### The brief for the parser core (for the Sonnet coder of E1.S3)
 
@@ -345,8 +448,10 @@ reverse). *Expect* names the substring the test asserts; the full messages are i
    all three green with nothing recorded moved, or stop.
 2. `tools/lib/plan-ledger.mjs`: the constants above (frozen arrays); the regexes built from them; `ledgerFindings` as
    the walk of *Grammar* + the checks of *The state machine* in the order given; `parentPlanOf` as S3 brief 6. Shape:
-   `sectionOf(lines)` → `{ start, end }` or the heading findings; `classify(raw)` → one of the line kinds; `parseEntry`
-   returning `{ entry }` or `{ detail }`; then one function per row that reads the parsed model and pushes messages.
+   `sectionOf(lines)` → `{ start, end }` or the heading findings; `classify(raw)` → one of the line kinds — blank;
+   indented (the reserved-prefix test on the indent-stripped line, then free text) *(stop)*; the column-0 kinds;
+   `parseEntry` returning `{ entry }` or `{ detail }`; then one function per row that reads the parsed model and pushes
+   messages. No function over 50 lines (`common/coding-style.md`; S3 *fix forward* f).
    Keep the model plain data (`epochs: [{ k, date, approver, state, line, entries: [] }]`, `records: [{ k, line,
    narrowed, table }]`) so a test can read what the parser saw if a message is wrong.
 3. Every message starts with `${file} — ` and carries the substring S2 asserts (the *Expect* columns); the detail of
@@ -354,7 +459,9 @@ reverse). *Expect* names the substring the test asserts; the full messages are i
    start with "- "*; *expected 4 fields separated by " · " (U+00B7) before " — " (U+2014): <k>.<n> · <YYYY-MM-DD> ·
    owner|agent|reviewer · <kinds>; found N*; *no cause: the cause follows " — " (U+2014)*; *number "x" is not <k>.<n>*;
    *date "x" is not a calendar date YYYY-MM-DD*; *unknown source "x" (owner, agent, reviewer)*; *unknown kind "x"
-   (scope, goals, …)* — the lists joined from the constants; *empty cause*.
+   (scope, goals, …)* — the lists joined from the constants; *empty cause*. The reserved prefixes' one message is in
+   *The reserved prefixes* above *(stop)*. Every value a message quotes — the line, and each field value — goes through the one
+   cleaning function (control characters to a space, capped at `QUOTE_LIMIT`; S3 *fix forward* e).
 4. The calendar check: `s` must first match `/^\d{4}-\d{2}-\d{2}$/` (E1 plan round, finding 3), then
    `const d = new Date(\`${s}T00:00:00Z\`); return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(s);`.
    (Cadence consultation, verified 2026-10-28 on Node 26: `Number.isNaN(new Date("2026-13-01T00:00:00Z"))` is
@@ -364,8 +471,10 @@ reverse). *Expect* names the substring the test asserts; the full messages are i
    throw is W9's case and a defect. The tests of this subsection are the acceptance tests; S2's tables are the rest.
 
 - **Done when.** This subsection stands; S2 and S3 were aligned to it in this file (4d, C8 → F1–F5, C11b, the stub's
-  exports, W6c, W9's stub, S3 steps 0 and 1, the RED-GREEN-RED rows); `node tools/plan-lifecycle.mjs` in the worktree
-  prints `clean` (the parent's live ledger parses under this grammar: one epoch, one entry with indented free text).
+  exports, W6c, W9's stub, S3 steps 0 and 1, the RED-GREEN-RED rows; since the stop: 4f, 4g, I1–I17 and the matrix,
+  W10, the `parent` interface, the *fix forward* list, the reserved-prefixes RED-GREEN-RED rows); `node tools/plan-lifecycle.mjs` in the worktree
+  prints `clean` (the parent's live ledger parses under this grammar: epoch 1 `stopped` with entries 1.1 and 1.2, each
+  followed by indented continuation lines, none of which starts like an entry — a stopped plan is clean by design).
 
 ## E1.S2 — RED: the pure parser tests and the spawned wiring tests
 
@@ -384,18 +493,23 @@ reverse). *Expect* names the substring the test asserts; the full messages are i
   - `tools/lib/plan-ledger.mjs` — **new, a stub only** in this story, so the RED is an assertion failure and not
     "Cannot find module" (a setup error proves nothing, `common/testing.md`): it exports `ledgerFindings` returning
     `[]`, `parentPlanOf` returning `null`, and the real constants of S1 — `KINDS`, `SOURCES`, `STATES`, `APPROVERS`,
-    `VERDICTS`, `STOP_PHRASE` (data, not behaviour).
+    `VERDICTS`, `STOP_PHRASE`, `RESERVED_PREFIX` *(stop)* (data, not behaviour).
 - **The lib's interface** (parent §3; S3 fills it):
-  - `ledgerFindings({ file, text, status, parentInTodo })` → `string[]`. `file` is root-relative (`todo/PLAN_x.md`);
-    `text` is the whole file; `status` is the status paragraph as `statusParagraph` returns it (lower-cased — the lib
-    matches case-insensitively, and the pure tests pass mixed case); `parentInTodo` is true when the file is a stories
-    document whose parent plan is in `todo/`. Every message starts with `file`; the class prefix is added by
+  - `ledgerFindings({ file, text, status, parent })` → `string[]` (parent §3). `file` is root-relative
+    (`todo/PLAN_x.md`); `text` is the whole file; `status` is the status paragraph as `statusParagraph` returns it
+    (lower-cased — the lib matches case-insensitively, and the pure tests pass mixed case); `parent` is the parent plan's
+    root-relative name the wiring resolved on disk (`todo/PLAN_x.md`) when the file is a stories document whose parent
+    is in `todo/`, else `null` — the lib prints that string in row 9 and never resolves a name itself *(stop; S3 fix
+    forward a — it was a boolean `parentInTodo`, and the lib's own `parentPlanOf` with no `exists` named the wrong
+    candidate for `PLAN_a_E1_b_E2.md`)*. Every message starts with `file`; the class prefix is added by
     `plan-lifecycle.mjs`.
   - `parentPlanOf(name)` → `PLAN_<topic>.md` for `PLAN_<topic>_E<n>.md` or `PLAN_<topic>_E<n>_<more>.md`, else
     `null`.
   - `KINDS` = `scope`, `goals`, `dod`, `merge-conditions`, `epics`, `stories`, `build-order`, `contract`, `approach`;
     `SOURCES` = `owner`, `agent`, `reviewer`; `STATES` = `open`, `stopped`, `closed`; `APPROVERS` = `reviewers`,
-    `owner`; `VERDICTS` = `fits`, `cut`, `—`; `STOP_PHRASE` = `/\bstopped for re-review\b/i` (S1, *Grammar*).
+    `owner`; `VERDICTS` = `fits`, `cut`, `—`; `STOP_PHRASE` = `/\bstopped for re-review\b/i`; `RESERVED_PREFIX` =
+    `/^(?:[>#]|(?:[-*+]\s+)?[1-9]\d*\.[1-9]\d*(?=\s|$))/` (S1, *Grammar*; the last one pinned to the parent's §2 bullet
+    too — the entry shape, `>` and `#`).
 
 ### The fixtures
 
@@ -405,8 +519,8 @@ lines that matter:
 ```js
 const plan = (ledger, { status = "> Status: **in progress, 2026-10-28.** Work is open." } = {}) =>
   ["# PLAN — x", "", status, "", "## Plan changes", "", ...ledger, "", "## Goal", "", "Body.", ""].join("\n");
-const run = (text, { file = "todo/PLAN_x.md", status = "in progress", parentInTodo = false } = {}) =>
-  ledgerFindings({ file, text, status, parentInTodo });
+const run = (text, { file = "todo/PLAN_x.md", status = "in progress", parent = null } = {}) =>
+  ledgerFindings({ file, text, status, parent });
 ```
 
 `STOPPED` is the status `> Status: **stopped for re-review, 2026-10-28.** Two changes after approval.`
@@ -443,7 +557,8 @@ Narrowed: no
 - 2.1 · 2026-10-28 · agent · build-order — E3 needs E2's helper first
 ```
 
-**P** — the parent plan's own shape (it carries a live ledger, epoch 1, entry 1.1 with indented free text):
+**P** — the parent plan's own shape at its approval (a live ledger, epoch 1, entry 1.1 with indented free text; since
+the stop the parent itself reads as A2s with continuation lines, and `node tools/plan-lifecycle.mjs` reads that one):
 
 ```text
 > Epoch 1 · approved 2026-10-28 · by reviewers · state: open
@@ -476,7 +591,7 @@ positive*).
 | C7 | B with `Narrowed: yes — the Windows run left the merge conditions` and epoch 2 `by owner` | the same `by reviewers` → finding 8 |
 | C8 | A2 (open) only inside a fence — S1 decision 1 settled the fence rules: the cases are S1's F1–F5 (column-0 ```, `~~~`, indented 1–3 spaces, four-backtick with ``` inside, unclosed) | the same lines unfenced → finding 1 (each F row names its twin) |
 | C9 | P with its fenced B | P with the fence markers removed → finding 3 (two headings) |
-| C10 | A with three indented lines under 1.1, one starting `(`, one starting `- ` | the `- ` line moved to column 0 → finding 4 |
+| C10 | A with three indented lines under 1.1, one starting `(`, one starting `- ` (none starting like a ledger line) | the `- ` line moved to column 0 → finding 4; the `- ` line made ` - 1.2 · …` and left indented → finding 4 *a ledger line stands at column 0* (4f, S1's I1) *(stop)* |
 | C11 | for each of `KINDS` and each of `SOURCES` (iterated from the lib's exports, never retyped), A with that value; and `scope, dod` as two kinds | — |
 | C11b | for each of `STATES`, `APPROVERS` and `VERDICTS`, iterated the same way: S1's G21, G22 and G16's twin | G21's `closed` → finding 6 |
 | C12 | **CRLF equals LF**: every fixture of this file, clean and red, run with `\r\n` line ends gives `deepEqual` the same findings | — |
@@ -503,6 +618,8 @@ is the substring the test asserts with `assert.match`; S3 writes the full messag
 | 4c | A plus the column-0 line `- a note about the plan` | `unreadable entry` and the line's text |
 | 4d | A written `- 1.1 \| 2026-10-26 \| owner \| epics -- x` | **refused** (S1 decision 2): `unreadable entry`, `U+00B7`, `U+2014` and `found 1` — S1's T1; T2–T6 are the rest of the tolerance cases |
 | 4e | A's entry with `* ` instead of `- ` | `unreadable entry` |
+| 4f *(stop)* | A plus ` - 1.2 · 2026-10-26 · owner · epics — y` indented one space (S1's I1; I2–I17 and the matrix are the rest) | `a ledger line stands at column 0`, `line 10` and the line quoted with its indent; the same line at column 0 → row 1 (the positive twin) |
+| 4g *(stop)* | A plus ` > Epoch 2 · approved 2026-10-28 · by reviewers · state: open` indented one space (S1's I13); A plus ` ### Re-review for epoch 2` indented one space | `a ledger line stands at column 0` — the one message for all three shapes; at column 0 the first → rows 6 and 7, never row 4 |
 | 5a | A with entry `2.1` in place of `1.1` | `2.1` and `above the current epoch` |
 | 5b | entries `1.1` and `1.3` (state `stopped`, status `STOPPED`) | `1.3` and `1..n` |
 | 5c | two entries numbered `1.1` | `two branches each recorded a change — renumber; the merge is the stop` |
@@ -517,7 +634,8 @@ is the substring the test asserts with `assert.match`; S3 writes the full messag
 | 7f | B with a verdict `partly` | `verdict "partly"` |
 | 7g | B with the re-review block after epoch 2's line | `before` and `epoch 2` |
 | 8 | B with `Narrowed: yes` and epoch 2 `by reviewers` | `a smaller plan needs the owner` |
-| 9 | A as `todo/PLAN_x_E1.md` with `parentInTodo: true` | `its changes count in the parent` and `PLAN_x.md`; with `parentInTodo: false` → `[]` |
+| 9 | A as `todo/PLAN_x_E1.md` with `parent: "todo/PLAN_x.md"` | `its changes count in the parent` and `todo/PLAN_x.md`; with `parent: null` → `[]` |
+| 9b *(stop)* | A as `todo/PLAN_a_E1_b_E2.md` with `parent: "todo/PLAN_a.md"` (the name the wiring resolved against the folder) | `todo/PLAN_a.md`, and NOT `PLAN_a_E1_b` — the lib prints what it was given (S3 fix forward a); red today because the lib reads the old key, treats it as a boolean and re-derives the rightmost candidate |
 
 `parentPlanOf`: `PLAN_plan_change_control_E1.md` → `PLAN_plan_change_control.md`; `PLAN_x_E12.md` → `PLAN_x.md`;
 `PLAN_x_E1_remainder.md` → `PLAN_x.md`; `PLAN_x.md` → `null`; `PLAN_x_Eval.md` → `null`;
@@ -560,6 +678,7 @@ files share no module).
 | W7 | A2 `stopped`; the stop phrase only in the status block's SECOND paragraph (after a `>` blank line) | exit 1, finding 2 — `statusParagraph` reads the first paragraph only |
 | W8 | the existing missing-row case of `repo()` | stderr does NOT name `plan-change-control.md`: the hint comes only with a `changes` finding |
 | W9 | `todo/PLAN_x.md` = A, while the lib is replaced by one whose `ledgerFindings` throws | exit 1; stderr has `changes   todo/PLAN_x.md` and `could not be read`; stderr has no `    at ` stack line and no `Node.js v` banner — a finding, not a crash |
+| W10 *(stop)* | `todo/PLAN_a.md` with no ledger and `todo/PLAN_a_E1_b_E2.md` = A | exit 1; stderr has `changes   todo/PLAN_a_E1_b_E2.md`, `its changes count in the parent` and `todo/PLAN_a.md`, and no `PLAN_a_E1_b.md` — the wiring resolved the name against the folder and passed it as `parent` (S3 fix forward a) |
 
 W9 swaps the module with a resolve hook preloaded through `--import`, so `plan-lifecycle.mjs` needs no test seam. Checked
 on Node 26.12.1 on 2026-10-28 with a two-file model of the same import. CI runs Node 22 (`.github/workflows/ci.yml:28`):
@@ -570,6 +689,7 @@ import * as nodeModule from "node:module";
 
 const THROWING_LEDGER = "data:text/javascript," + encodeURIComponent(
   // Export EVERY name plan-lifecycle.mjs imports from the lib, or the child dies at link time — a crash, not this case.
+  // The wiring still imports `parentPlanOf` to resolve `parent` on disk (fix forward a), so the stub keeps it.
   "export const STOP_PHRASE = /x/; export const parentPlanOf = () => null;" +
   " export function ledgerFindings() { throw new Error('stub: the parser threw'); }");
 const SWAP_LEDGER = "data:text/javascript," + encodeURIComponent(
@@ -594,7 +714,9 @@ node --test tools/leftovers-check.test.mjs
 Expected: every red case and every red twin fails on its assertion (`[]` where a finding was expected; exit 0 where 1
 was expected; W9 exit 0, because nothing imports the lib yet; S1's F6–F8 and the `~~~`/indented/four-backtick halves of
 F2–F5 fail because the old one-line fence regex still runs; W6 fails with a `misfiled` line); the clean cases, W1, W4,
-W5, W6b, W6c and W8 pass;
+W5, W6b, W6c and W8 pass. The cases the stop added (4f, I1–I12, the matrix's red rows, 9b, G11b, G15b, T7, W10 — S3
+*fix forward*) are watched red the same way against the lib as it stands on the branch: each fails on its assertion
+(`[]` or the wrong name where a finding or a name was expected), never on a missing export;
 `leftovers-check` passes. A failure that names a missing module, a syntax error or an `ownedDir` error is the wrong
 reason. Fix the test before going on.
 
@@ -629,7 +751,10 @@ reason. Fix the test before going on.
 3. Classify each line of the section by S1's *Grammar* table — its line kinds, regexes, constants and the detail set
    of an unreadable entry are the specification; the structure (blocks, records) is S1's *Structure* paragraph. The
    points the first draft got wrong, kept here so they are not re-learned: a line that starts with whitespace is free
-   text whatever it holds; any OTHER column-0 line that is not a line kind is finding 4 `unreadable line`, never free
+   text whatever it holds — EXCEPT one whose indent-stripped text matches `RESERVED_PREFIX` (an entry shape, `>` or
+   `#`), which is finding 4 `a ledger line stands at column 0`, never free text and never an entry, epoch line or
+   record heading (S1 *The reserved prefixes*, *(stop)*); any OTHER
+   column-0 line that is not a line kind is finding 4 `unreadable line`, never free
    text; an entry is split on the first ` — ` and then on ` · ` so the message says WHICH field is wrong; the table
    header is checked, so "the verdict is the third cell" is a fact.
 4. Then the state checks in S1's order: row 6 (sequence first), 5, 1, 2 (`STOP_PHRASE`, the one exported constant —
@@ -662,7 +787,8 @@ reason. Fix the test before going on.
            file: name,
            text: fs.readFileSync(path.join(todo, file), "utf8"),
            status: statusParagraph(path.join(todo, file)),
-           parentInTodo: parent !== null && fs.existsSync(path.join(todo, parent)),
+           // The RESOLVED root-relative name, or null: the lib prints it and never re-derives it (fix forward a; parent §3).
+           parent: parent !== null && fs.existsSync(path.join(todo, parent)) ? `todo/${parent}` : null,
          });
          for (const message of found) findings.push(`changes   ${message}`);
        } catch (error) {
@@ -685,6 +811,23 @@ reason. Fix the test before going on.
    the exact function is in S1 decision 3 (W6, W6b, W6c). `TOTALITY_VERDICT` itself is unchanged.
 6. `main()` already takes a root argument (`process.argv[2] ?? process.cwd()`, `:268`); E1.S4's dry run uses it.
 
+### Fix forward after the stop *(stop)* — accepted review findings, NOT changes to the plan
+
+The E1 Opus code review and the code round (S6b, recorded in the parent) accepted these against the lib and the wiring
+as built on the branch (`b256502`). Each was verified on 2026-10-28 by running the built lib; each is a defect of the
+implementation against the spec above, or a style debt, so none is a ledger entry (parent decision 1). The reserved
+prefix itself is the parent's entry 1.2 and lives in S1. Order: every RED test first, watched failing for the reason
+named; then the fix; (d) and (f) change no behaviour and get no new test.
+
+| | Finding | RED test first | The fix |
+|---|---|---|---|
+| a | The wiring passes `parentInTodo` as a boolean and the lib re-derives the name with `parentPlanOf(name)` and NO `exists`, so for `todo/PLAN_a_E1_b_E2.md` beside `todo/PLAN_a.md` the message names `todo/PLAN_a_E1_b.md` — a file that does not exist (verified) | pure 9b: `file: "todo/PLAN_a_E1_b_E2.md", parent: "todo/PLAN_a.md"` → the message names `todo/PLAN_a.md` and not `PLAN_a_E1_b`; spawned W10: `todo/` with `PLAN_a.md` (no ledger) and `PLAN_a_E1_b_E2.md` = A → stderr names `todo/PLAN_a.md`. Both red today: the lib has no `parent` key and guesses | the interface is the parent's §3: `ledgerFindings({ file, text, status, parent })`, `parent` = the resolved root-relative name (`todo/PLAN_x.md`) or `null`; the wiring resolves it (the code in step 2 above); the lib's row 9 prints `parent` when it is a non-empty string and is silent otherwise; `ledgerFindings` no longer calls `parentPlanOf` (the wiring still does, so W9's stub keeps the export). Row 9's existing test passes `"todo/PLAN_x.md"`; `parentInTodo` is gone from every signature and test |
+| b | Two `### Re-review for epoch k` records give no finding while epoch k's line does not exist yet (epoch k−1 stopped, the re-review in progress): `checkRecords` tests uniqueness per EXISTING epoch only (verified: R with its record block twice → `[]`) | G11b: R (A2s, status `STOPPED`) with its `### Re-review for epoch 2` block twice → row 7 `two re-review records for epoch 2`; G10 (one record) stays `[]` | uniqueness over ALL records: group `model.records` by `k` (one `Map`), push the finding once per `k` with more than one; the per-epoch loop keeps *no re-review* and row 8 only |
+| c | The Narrowed message names neither the em dash nor the line: `Narrowed must be yes or no: "Narrowed: yes|no"` (verified on `Narrowed: no - nothing left`) | G15b: `Narrowed: no - nothing left` (hyphen), `Narrowed: no – x` (en dash), `Narrowed: no —x` (no space) and `Narrowed: maybe` → row 7 whose message holds `Narrowed`, `line <N>` (the line's number) and `U+2014`; G15's clean twins stay `[]` | the message: `re-review for epoch k: unreadable Narrowed line at line N "<line>" — it reads "Narrowed: yes|no", optionally followed by " — " (U+2014) and a reason`. 7b/7c keep their substring |
+| d | Duplicate entry numbers are found with `findIndex` inside `filter` — quadratic in the entries of a block | none: behaviour unchanged; 5b, 5c and G18 cover the messages and their order | one pass over the block's own entries with a `Set` of seen `n`; an entry whose `n` is already seen is reported (the second and later, as today); the *1..n in order* message keeps its condition |
+| e | Field values are interpolated raw into messages — `unknown source "own\u001ber"` carries the control character (verified); the line is cleaned by `quote()`, the value is not | T7: for each of number, date, source, kind, a table header cell and a verdict, a value holding `\u001b[31m` → no message holds `\u001b` (a space stands there); and each 400 characters long → the quoted value ends in `…` and is at most `QUOTE_LIMIT` + 1 characters. One `for` over six rows | one `clean(value)` (control characters → a space, capped at `QUOTE_LIMIT` with `…`); `quote()` becomes `"${clean(raw.trimEnd())}"`; every `"${value}"` in a message goes through `clean` — the detail set of S1's brief 3, the epoch's detail, the table header and the verdict |
+| f | `parse()` is 56 lines (`tools/lib/plan-ledger.mjs:167-222`); `common/coding-style.md` asks for functions under 50 | none: behaviour unchanged; every test of `tools/plan-ledger.test.mjs` covers the walk, and the hostile-corpus test covers the no-throw promise | the open record moves onto the model (`model.open`); the record-level kinds (`###`, `Narrowed:`, `\|`) go to `readRecordLine(model, raw, line, at, say)`, the entry to `readEntry`, the indented branch (the reserved test) to `readIndented`; `parse` keeps the loop and the dispatch. Count from the `function` line to its closing brace, by eye and in the review |
+
 ### Commands
 
 ```bash
@@ -697,8 +840,8 @@ node tools/rule-bodies.mjs
 node tools/plan-lifecycle.mjs          # this worktree: must print "plan-lifecycle: clean."
 ```
 
-The last one reads the parent's live ledger (fixture P's real twin) and this document, which carries no ledger: both
-clean.
+The last one reads the parent's live ledger (since the stop: epoch 1 `stopped`, entries 1.1 and 1.2 — A2s's real twin,
+and a stopped plan is clean by design) and this document, which carries no ledger: both clean.
 
 ### The RED-GREEN-RED check
 
@@ -712,9 +855,12 @@ Revert the line the behaviour depends on, run, see the named tests fail with the
 | the row-1 push in the lib | row 1 and the red twins of C2, C3, C6, C8 (F1–F5) |
 | the `try`/`catch` in `checkChangeLedgers` (let the throw through) | W9, with a stack in stderr |
 | the `&& !STOP_PHRASE.test(status)` in `isFullyDone` | W6 (W6b and W6c stay red-as-expected: they prove the other half) |
+| *(stop)* the reserved-prefixes check (put the plain `/^[ \t]/` skip back, so every indented line is free text again) | 4f, 4g, I1–I5, I7–I9, I12–I17, the matrix's twenty-four red rows, C10's second twin; I6, I10, I11 and the matrix's two clean rows stay green — they prove the check reads only what §2 reserved |
+| *(stop)* the `[>#]` alternative alone, removed from `RESERVED_PREFIX` (the entry shape kept) | 4g, I13–I17 and the matrix's `>`/`#` rows (twelve); I1–I5 stay green — the two halves of the constant are proved apart |
 
-- **Done when.** Every S2 and S1 test passes; the five reverts each went red as listed and were restored; the seven
-  commands above are green; the coder's summary quotes one RED message and the GREEN count.
+- **Done when.** Every S2 and S1 test passes; the seven reverts each went red as listed and were restored; the seven
+  commands above are green; the coder's summary quotes one RED message and the GREEN count; the six *fix forward*
+  items are in, their RED tests watched red first.
 
 ## E1.S4 — The estate dry run, the header comments, S6b
 
