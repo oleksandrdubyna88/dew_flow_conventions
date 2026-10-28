@@ -1,6 +1,6 @@
 # PLAN — A plan changed twice after its approval stops for a whole re-review
 
-> Status: **approved 2026-10-28 (plan round 1 `proceed`), split into two epics; nothing implemented yet.** Scope: a new shared rule
+> Status: **stopped for re-review, 2026-10-28 — second change after approval (entry 1.2); E1 built at b256502, E2 not started.** Scope: a new shared rule
 > `common/plan-change-control.md`, two pointer lines in `common/planning-docs.md`, a change-ledger check in
 > `tools/plan-lifecycle.mjs` through a new `tools/lib/plan-ledger.mjs`, their tests, `research/rule-bodies.json`,
 > `research/module_rules.md`, `research/module_tests.md`, the `README.md` tools row — and, as a separate plan in another
@@ -15,13 +15,18 @@
 
 ## Plan changes
 
-> Epoch 1 · approved 2026-10-28 · by reviewers · state: open
+> Epoch 1 · approved 2026-10-28 · by reviewers · state: stopped
 
 - 1.1 · 2026-10-28 · reviewer · merge-conditions — S6a document round, finding 1: the server plan (S7) moves from a
   condition of the merge to a condition of the release, so a blocked review in another repository cannot strand this
   pull request
   (Plan round 1's accepted findings and the split its operator command ordered are part of the approval itself. S6a's
   findings 0, 2 and 3 clarify wording — not changes, decision 1. One change is allowed; the next stops this plan.)
+- 1.2 · 2026-10-28 · reviewer · contract — E1 Opus code review, finding 5: an entry indented one space renders as a
+  sibling list item but parses as free text, so a second change can hide (verified: ` - 1.2`, ` * 1.2`, `  1.2` give no
+  finding); §2's "indented lines are free text" must reserve entry-shaped lines
+  (A contract change by decision 1 — it reverses an explicit §2 sentence; the consultant agreed, consult 9dc03004.
+  THE FULL STOP: no new code on E1 or E2 until the whole plan is re-reviewed.)
 
 ## Symptom
 
