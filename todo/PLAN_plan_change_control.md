@@ -1,6 +1,6 @@
 # PLAN — A plan changed twice after its approval stops for a whole re-review
 
-> Status: **plan only, nothing implemented yet, 2026-10-28.** Scope: a new shared rule
+> Status: **approved 2026-10-28 (plan round 1 `proceed`), split into two epics; nothing implemented yet.** Scope: a new shared rule
 > `common/plan-change-control.md`, two pointer lines in `common/planning-docs.md`, a change-ledger check in
 > `tools/plan-lifecycle.mjs` through a new `tools/lib/plan-ledger.mjs`, their tests, `research/rule-bodies.json`,
 > `research/module_rules.md`, `research/module_tests.md`, the `README.md` tools row — and, as a separate plan in another
@@ -12,6 +12,13 @@
 > [coai-consultant.md](../common/coai-consultant.md) (trigger 5), [coai-question-consultant.md](../common/coai-question-consultant.md),
 > [rule-ownership.md](../common/rule-ownership.md), [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md)
 > (the measured case).
+
+## Plan changes
+
+> Epoch 1 · approved 2026-10-28 · by reviewers · state: open
+
+(No change since the approval. Plan round 1's accepted findings and the split into epics its operator command ordered are
+part of that approval — decision 1.)
 
 ## Symptom
 
@@ -121,12 +128,16 @@ Outline:
 4. `## How it is counted` — decision 4. Approval = the plan's first passing plan-round verdict (`proceed`, `good_enough`,
    `continue_anyway`) or the owner's go-ahead where no review server runs — whichever comes first; that opens epoch 1. Two
    branches that each record one change merge into a plan with two: the check turns red at the merge that brings them
-   together, which is where the stop belongs. Decision 11 for older plans, with the adoption date.
+   together, which is where the stop belongs. Decision 11 for older plans, with the adoption date: **the commit that
+   accepts an older plan's first change after adoption also opens its ledger** — epoch 1 at its last approval, that
+   change as entry 1.1. The check cannot see a plan that skipped this (it has no approval marker to read); the rule's DoD
+   and the code review own it, and S9 lists the estate's approved open plans once so none is forgotten.
 5. `## The ledger` — the format (§2), its place (directly under the status block, before the first section, so `## Epics`
    stays last), append-only, written in the commit that accepts the change.
 6. `## The full stop` — in order:
-   1. **Record** the second entry and set `state: stopped`; the status paragraph starts `**Stopped for re-review, <date>.**`.
-      One commit, pushed — the stop is then visible to every other session.
+   1. **Record** the second entry and set `state: stopped`; the status paragraph (the `> Status:` block the checker
+      already reads) carries the words `stopped for re-review` — the exact form is in §3, finding 2. One commit, pushed —
+      the stop is then visible to every other session.
    2. **Halt:** no new code on any epic of the plan and no merge of a pull request carrying its work. Allowed: the re-review,
       the reverts it decides, work outside the plan, an incident fix the owner orders.
    3. **Consult:** one `mcp__coai__consult` for the re-review, every change of the epoch quoted as evidence (trigger 5's
@@ -143,14 +154,15 @@ Outline:
       epoch line then says `by owner`.
    9. **Continue** with epics, stories and gates as the pipeline says.
 7. `## Reviewing the revised plan` — epics not yet started: their own `mcp__coai__review_plan` on their own branch, as today.
-   A branch whose plan round already passed — **interim, and named so**:
+   A branch whose plan round already passed (its session is then in the code stage, whether or not a code round has run)
+   — **interim, and named so**:
    - `mcp__coai__review_document` with `documentPath` = the plan file and a `purposeText` naming the re-review of epoch
      k+1; `newReview: true` when an earlier review of that file finished; `mcp__coai__resolve` every finding with the same
      `document`; act on the verdict;
    - the next `mcp__coai__review_code` on that branch passes the revised plan as `planText` (a non-empty `planText` is the
      round's scope — `PanelService.cs:1362-1363`), with `again: true` when its last code round closed.
    - The pinned exception: **"This is the only case where a plan goes to the document review, and only on a branch whose
-     code review is already open."** coai-document-gate keeps plans out because a document round leaves the code round
+     plan round has already passed."** coai-document-gate keeps plans out because a document round leaves the code round
      shut; here it is open, and what is missing is a reading of the whole plan. Everywhere else that rule stands.
    - **"When `mcp__coai__review_plan` accepts `again: true` after `proceed`, use that, and this paragraph goes."** No
      repository named.
@@ -217,7 +229,7 @@ Findings (each names the file and, where it has one, the entry):
 | # | Red when | Message gist |
 |---|---|---|
 | 1 | the current epoch has ≥ 2 entries and is not `stopped` | `epoch k has n changes and is not stopped; stop for a whole re-review` |
-| 2 | `stopped`, but the status paragraph (`statusParagraph`, `:109`) lacks "stopped for re-review" | the stop must be visible where a reader looks first |
+| 2 | `stopped`, but the status paragraph (`statusParagraph`, `:109`) does not match `/\bstopped for re-review\b/i` | the stop must be visible where a reader looks first; tests cover bold, plain, capitalised and mid-paragraph forms, and a stopped status that also says "all … done" must not read as misfiled (`TOTALITY_VERDICT`, `:66`) |
 | 3 | an `> Epoch` line that does not parse; a heading with no epoch line; two headings | `unreadable epoch line` / `no epoch line` |
 | 4 | a column-0 list line in the section that does not parse as an entry; an unknown source or kind | an unreadable entry would undercount |
 | 5 | an entry's epoch above the current; entry numbers in an epoch not 1..n or repeated | repeated → *"two branches each recorded a change — renumber; the merge is the stop"* |
@@ -226,7 +238,10 @@ Findings (each names the file and, where it has one, the entry):
 | 8 | `Narrowed: yes` and epoch k's line is `by reviewers` | a smaller plan needs the owner |
 | 9 | a stories document (`PLAN_<topic>_E<n>….md`) carries a ledger while `PLAN_<topic>.md` is in `todo/` | its changes count in the parent |
 
-Indented lines under an entry are free text and not parsed. A finding-free run prints nothing new; a run with any `changes`
+Indented lines under an entry are free text and not parsed. **The check reads the file as it stands in the checkout — never
+git history.** When two branches each recorded entry `k.1`, the merge keeps both causes: the later one is renumbered
+`k.2` in the merge (or the commit right after it), and that second entry IS the stop — `state: stopped` in the same
+commit. Earlier commits keep their old numbers; nothing reads them. A finding-free run prints nothing new; a run with any `changes`
 finding adds one hint line naming `common/plan-change-control.md`.
 
 ### 4. The pointers in `common/planning-docs.md` (two lines, no new heading)
@@ -248,8 +263,11 @@ finding adds one hint line naming `common/plan-change-control.md`.
 | `review_code` refuses a scope that is not substantial once the plan proceeded | `PanelService.cs:792-796` |
 | `again: true` reopens a closed code stage and keeps the plan's approval | `RoundMachine.cs:225-236` |
 
-Not yet observed live: a plan read under the document prompts. S6 runs it once on this plan before the rule merges, so the rule
-does not describe a path nobody has seen work ([measurement.md](../common/measurement.md)).
+| `review_document` refuses only: both or neither input, a credential-shaped name, an over-size text, a path outside the repository, a directory, a non-text extension, an unreadable file — nothing about plans | `DocumentReader.cs:65-291` |
+
+Not yet observed live: a plan read under the document prompts. It is observed FIRST (S6 runs before any rule text is written,
+after this branch's plan round passed — the rule's precondition), so the rule does not describe a path nobody has seen
+work ([measurement.md](../common/measurement.md)), and a surprise costs a paragraph, not a rewrite.
 
 ## Boundary with the server plan (named on both sides)
 
@@ -270,35 +288,45 @@ cache or process.
 
 ## Stories and build order
 
-No `## Epics`: one pull request here delivers everything that ships, and the hard decisions are already made. Each story goes
-through the pipeline of [subagent-models.md](../common/subagent-models.md): scenarios and brief by Opus, code by Sonnet,
-review by Opus, fixes by Sonnet; the small-edit exception where a change is bounded to one file and ≤ 50 lines before it starts.
+The work is split into two epics — see `## Epics`, the last section. The steps below are the ones that come BEFORE the
+first epic and AFTER the last one; everything that ships in this repository is built inside an epic. The story numbers
+S1–S5 and S8 name the work the epics carry (the sections above cite them); their stories documents are written by Opus when
+each epic starts. Each story goes through the pipeline of [subagent-models.md](../common/subagent-models.md): scenarios and
+brief by Opus (by Fable on the one cornerstone story), code by Sonnet, review by Opus, fixes by Sonnet; the small-edit
+exception where a change is bounded to one file and ≤ 50 lines before it starts.
 
-- **S0 — this plan.** Worktree `feat/plan-change-control`; the `todo/README.md` row in the same commit; `open` +
-  `review_plan` until `proceed`. Then this plan opens its own `## Plan changes` with epoch 1 — its first live instance.
-- **S1 — RED.** `tools/plan-ledger.test.mjs` (pure, no temp folders) and new spawned cases in
-  `tools/plan-lifecycle.test.mjs` (keeping `ownedDir(t, "plan-lifecycle ")`, pinned by `tools/leftovers-check.test.mjs:524`).
-  Watch them fail for the right reason: the module does not exist / the finding is absent.
-- **S2 — GREEN.** `tools/lib/plan-ledger.mjs` and the wiring in `plan-lifecycle.mjs`, its header comment naming the new rule.
-- **S3 — the rule.** `common/plan-change-control.md` by the outline; the two `planning-docs` lines; the `rule-bodies.json`
-  entry and `--update`. Can run beside S1-S2: no shared file.
-- **S4 — the rule's tests.** In `tools/rules.test.mjs`: the new rule is selected by the fourteen split-read tasks and none of
-  the four single-read ones (reusing `SPLIT_READ_TASKS` / `SINGLE_READ_TASKS`, `:204-213`). A new
-  `tools/plan-change-rule.test.mjs` in the pattern of `tools/gate-routing.test.mjs`: it pins the three bold sentences above,
-  and a splice case shows each assertion fails when its paragraph is removed. A rule/check agreement case: the fenced ledger
-  example inside the rule, unfenced into a fixture plan, is clean; with `state: closed` → `open` and a second entry, red.
-- **S5 — documentation.** `research/module_rules.md` (the rule, its 14 tasks, why no paths, the depends, the meaning test,
-  opt-in by presence); `research/module_tests.md` (a *Change ledger* section: the cases, what they do not prove, the
-  sibling measurement); the `README.md` tools row for `plan-lifecycle` (`:245`) names the ledger.
-- **S6 — observe the interim path.** `review_document` on this plan file once (one panel round), recorded in this plan.
+Before the epics:
+
+- **S0 — this plan.** Done: worktree `feat/plan-change-control`; the `todo/README.md` row in the same commit; `open` +
+  `review_plan` — `proceed` on 2026-10-28 (the round below). This plan opens its own `## Plan changes` with epoch 1 — its
+  first live instance. The split into epics applies that round's operator command; it is not a change after approval
+  (decision 1).
+- **S6a — observe the interim path, now.** Right after S0's `proceed` (the branch's plan round has passed — the rule's
+  precondition): `review_document` on this plan file once (one panel round), resolved, recorded in this plan. Runs before
+  any rule text is written. The second half, S6b, needs a non-empty diff (`review_code` refuses an empty one), so it is
+  inside E1.
+
+Inside the epics (the numbers the sections above cite):
+
+- **S1 — RED** and **S2 — GREEN**: the ledger tests and `tools/lib/plan-ledger.mjs` with its wiring — E1.
+- **S6b**: E1's `review_code` passes this plan, as revised, as `planText` — E1.
+- **S3 — the rule**, **S4 — the rule's tests**, **S5 — documentation** — E2.
+- **S8 — verify and review**: the five commands (`npm test`, `npm run check`, `node tools/ownership-check.mjs`,
+  `node tools/rule-bodies.mjs`, `node tools/plan-lifecycle.mjs` — five, because `npm test` does not run the family checks,
+  `research/module_tests.md:989`), the dry run over the estate, `review_code` and an Opus review started together — once per
+  epic, as its done-when says. The pull request, the bot threads and the merge are the closing step below.
+
+After the epics:
+
 - **S7 — the server plan**, in its own worktree, branch and pull request in that repository, under its own rules (plan
-  only; no server code here).
-- **S8 — verify and review.** `npm test`, `npm run check`, `node tools/ownership-check.mjs`, `node tools/rule-bodies.mjs`,
-  `node tools/plan-lifecycle.mjs` — five commands, because `npm test` does not run the family checks
-  (`research/module_tests.md:989`). Then the dry run below. Then `review_code` and an Opus review started together; the pull
-  request; every bot thread verified and resolved; merge by rebase.
+  only; no server code here). It is outside the epics because it changes no file here; it is written after E2, when the
+  rule's interim paragraph exists to be replaced, and before the pull request merges (Definition of Done).
+- **S8, closing half — the pull request.** ONE pull request, E2's branch, carrying E1's commit and E2's commit: `main` must
+  never carry a check whose hint line names a rule it does not have, nor `planning-docs`' "seven findings" line without the
+  seventh. Every bot thread verified and resolved; merge by rebase.
 - **S9 — ask the owner** about promoting `release` and the consumer bumps (decision 9), with the unchecked repository's
-  `todo/` checked on its remote first. Until then this plan stays in `todo/`.
+  `todo/` checked on its remote first, and with a one-time list of the estate's open plans that passed a plan round —
+  each one opens its ledger at its next change (decision 11). Until then this plan stays in `todo/`.
 
 ## Test plan
 
@@ -333,6 +361,23 @@ deployed thing, in a way a green build would hide? **No** — the check runs ins
    the stop belongs.
 6. **Ownership check.** Any undeclared `mcp__coai__*` token or "the gate" fails CI; run it before every push.
 
+## Plan round 1 (2026-10-28) — findings and what changed
+
+`proceed`, 2 of 2 reviewers (Codex, Gemini), gating 5 of threshold 6. Both noted that the project rules were not sent with
+the plan, so neither judged compliance with them.
+
+| # | Finding | Decision |
+|---|---|---|
+| 0 | The check passes a stopped plan, so its pull requests can merge during the stop | **Rejected:** the check scans every plan in `todo/` on every pull request, so a red while stopped would block the stop commit itself, the re-review, its reverts and unrelated work the rule allows. The halt is the rule's; the server plan enforces it by refusing `review_code` until the new `proceed` |
+| 1 | An older plan with no ledger stays invisible after adoption | Accepted: the commit that accepts its first change opens its ledger (§1.4); S9 lists the estate's approved open plans once; the check's blind spot is stated |
+| 2 | S6 ran before the precondition it claims to observe | Accepted: the precondition is "the plan round passed" (§1.7); S6 runs right after S0 |
+| 3 | `review_document` might refuse a plan file | Accepted the reorder (S6 first); the refusal itself was checked and does not exist (§5, `DocumentReader.cs`) |
+| 4 | The stop phrase in the status paragraph was not specified | Accepted: the regex and its test variants (§3, finding 2) |
+| 5 | Renumbering after a merge of two branches' entries | Accepted: the check reads the checkout, never history; the merge renumbers and stops (§3) |
+
+The round's operator commands, applied: the split into epics by Fable after the question consultants; one plan round and
+one code round per epic on its own branch; consultations on a cadence; autonomous work with questions at the end.
+
 ## Definition of Done
 
 - [ ] `common/plan-change-control.md` exists by the outline, selected by the fourteen split-read tasks and none of the four
@@ -346,3 +391,113 @@ deployed thing, in a way a green build would hide? **No** — the check runs ins
 - [ ] `research/module_rules.md`, `research/module_tests.md` and the `README.md` tools row describe what runs.
 - [ ] Five commands green; `review_code` and an Opus review resolved; every bot thread answered; merged by rebase.
 - [ ] The owner was asked about `release` and the consumer bumps; the answer is recorded here.
+
+## Epics
+
+Two epics; cornerstone quota ⌈2·2/5⌉ = 1. Split by Fable on 2026-10-28, after the question consultants were asked what
+matters (two rows answered; both said two epics, and both named the durable ledger schema, not the parser alone, as the
+cornerstone — the caller verified their reasons). Each epic's stories live in `todo/PLAN_plan_change_control_E<k>.md`,
+written by Opus when the epic starts, with its own `todo/README.md` row in the same commit (`plan-lifecycle.mjs:233-236`
+demands it) and NO `## Plan changes` of its own (finding 9: a stories document's changes count in the parent).
+
+**Why two, not the four or five the gate asked for.** The gate's measure — 349 lines, 19 build steps, 58 files named, 9
+areas, "Huge" — over-counts this plan. Most of the 58 names are citations of files that are read, not changed
+(`RoundMachine.cs`, `PanelService.cs`, `DocumentReader.cs`, the line numbers in `rules.test.mjs`, `rule-catalog.mjs`,
+`ownership-check.mjs`). What ships here is about ten files: one new rule, two lines in `planning-docs`, one new lib, one
+changed check, three test files, three research documents and one README row — plus one plan document in another
+repository. Of the 19 steps, one is done (S0), one is an observation (S6a) and three are closing steps that edit nothing
+here (S7, the pull request, S9). Four epics would be epics of one or two stories each, and a plan round plus a code round
+per epic would cost more than the stories they gate. Two epics give each one 3–5 complete stories, and they cut along the
+one seam that matters: E1 is executable code that runs in six consumers' CI and is reviewed alone; E2 is the text that
+describes it, which must describe what runs ([knowledge-base.md](../common/knowledge-base.md)) and so comes second.
+
+**Branches and gates.** `feat/plan-change-control-e1` starts from this branch's commit after S6a is recorded;
+`feat/plan-change-control-e2` starts from E1's commit. Each epic: `open` on its branch; `review_plan` with
+`plan: "todo/PLAN_plan_change_control.md"` and `epic: "k/2"`; build its stories; ONE commit; `review_code` over the epic's
+whole diff together with an Opus review; fixes folded into that one commit. The pull request is E2's branch (the closing
+half of S8 above).
+
+Cornerstones: 0 of 1 — (marked when the stories are written)
+
+### E1 — The ledger contract and its safe enforcement
+
+Stories: `todo/PLAN_plan_change_control_E1.md` (written when the epic starts).
+
+- **Goal.** `tools/lib/plan-ledger.mjs` reads the ledger of §2 and reports every row of the findings table of §3;
+  `tools/plan-lifecycle.mjs` calls it over `todo/` only, a throw becomes a finding, and the whole estate stays clean on the
+  day it lands.
+- **Scope.** S1 (RED: `tools/plan-ledger.test.mjs`, pure; the spawned cases in `tools/plan-lifecycle.test.mjs`, keeping
+  `ownedDir(t, "plan-lifecycle ")`), S2 (GREEN: the lib, `checkChangeLedgers`, the `changes` class, the hint line naming
+  `common/plan-change-control.md` — a file E2 creates), the compatibility fixtures, the dry run over the estate, S6b. The
+  stories document decides and tests these, each with a case:
+  1. **Fences.** `outsideFencedBlocks` (`tools/lib/rule-body.mjs:29`) strips only column-0 triple-backtick fences,
+     non-greedy: no `~~~`, no indented fence, and a four-backtick fence that holds ``` lines closes early. The ledger
+     parser needs a stated fence interpretation. Widening the shared helper also moves `sectionsOf` (`:55`), whose
+     headings are recorded in `research/rule-bodies.json`; a new export leaves it alone. The epic decides — new export
+     or widening plus a `rule-bodies` verification — and tests both fence kinds either way.
+  2. **Tolerance.** The format uses `·` and `—`. Decide whether `|`, `--` and the en dash are accepted or refused, and make
+     the finding say which character was expected, so the message corrects the writer.
+  3. **A stopped plan and `checkStatuses`.** A status paragraph that says `stopped for re-review` and also "all … done"
+     must not become a `misfiled` finding (`TOTALITY_VERDICT`, `plan-lifecycle.mjs:66`) — a spawned integration case.
+  4. **A caught throw is still a red CI.** The finding replaces the crash, not the red. The protection against a false red
+     is the dry run: `node tools/plan-lifecycle.mjs <repo>` on `main` and on this branch for every `dew_flow_*` checkout
+     here and `wsl_care`, the diff of the outputs with zero `changes` lines, recorded in the stories document.
+  5. **What the check cannot see**, written in the lib's header: a plan with no ledger, a change nobody recorded, code
+     written during a stop. A stopped plan is clean by design (plan round 1, finding 0 rejected); the halt is the rule's.
+- **Depends on.** S0 and S6a done on this branch. Nothing else: the schema is §2, decided.
+- **Done when.** Every test was watched failing first; every row of the findings table has a red case naming the file
+  and the entry; the clean cases of the test plan pass (CRLF equals LF, indented lines ignored, the ledger only inside a
+  fence); the five commands are green; the dry run added zero `changes` findings; `review_code` on E1's branch passed
+  this plan as `planText` (S6b, recorded here); the Opus review and the code round are resolved; one commit on
+  `feat/plan-change-control-e1`.
+- **Cornerstone area — the ledger schema and its state machine as the parser accepts them.** The epoch line, the
+  entry line and the re-review record of §2; the transitions open → stopped → closed, the reset to epoch k+1 at 0,
+  the renumbering after a merge of two branches' entries, `Narrowed: yes` → `by owner`; and the acceptance scenarios
+  that fix which text is a ledger and which is not. Once plans in six repositories carry records, a change to what
+  these lines mean is a migration of every one of them — the precedent is test-leftovers E1, whose contract text was
+  the cornerstone and was later superseded at that cost. The parser's code is Sonnet's as for every story; the
+  scenarios and the brief of this one story are Fable's.
+- **Easy to get wrong.** (1) A list line in the section that is not an entry is finding 4, never free text — only
+  indented lines are free text. (2) The check reads the checkout, never git history; a test that builds history tests
+  nothing. (3) `research/` is history and is not read; a test must show a red ledger there is ignored.
+
+### E2 — The rule, the lines that point at it, and what describes it
+
+Stories: `todo/PLAN_plan_change_control_E2.md` (written when the epic starts).
+
+- **Goal.** `common/plan-change-control.md` by the outline of §1, selected by the fourteen split-read tasks and none of the
+  four single-read ones; the two `planning-docs` lines; the body freeze; the tests that pin the rule's meaning and its
+  agreement with E1's check; the research documents; the hand-off to the server plan.
+- **Scope.** S3 (the rule with its `owns:` markers; the two lines of §4; the `rule-bodies.json` entry and
+  `tools/rule-bodies.mjs --update`), S4 (`tools/rules.test.mjs`: the 14 / 4 selection, with negative cases over
+  `inspect --file todo/…` paths; `tools/plan-change-rule.test.mjs`: the three bold sentences with splice cases; the
+  rule/check agreement case — the fenced example inside the rule, unfenced into a fixture plan, clean, and red once
+  `state: closed` → `open` with a second entry), S5 (`research/module_rules.md`, `research/module_tests.md`, the
+  `README.md` tools row), and the rule's § *The check* saying what E1 cannot see — the halt included. The size
+  measurement of the test plan (`inspect --file todo/PLAN_x.md` before and after, ≤ 32 768 B) is a functional check of
+  this epic, with the numbers in `research/module_rules.md`.
+- **Depends on.** E1's commit: the rule describes the check that runs, the agreement case needs the parser, and the
+  "seven findings" line is true only with the seventh finding in place.
+- **Done when.** `node tools/ownership-check.mjs` passes with every `mcp__coai__*` token declared and no "the gate" in
+  prose; `node tools/rule-bodies.mjs` is clean with both ids re-recorded; selection, meaning and agreement tests pass and
+  each splice case went red; the rule is 9–11 KB; the five commands are green; `review_code` and the Opus review are
+  resolved; one commit on `feat/plan-change-control-e2`. The server plan (S7) and the owner's answer (S9) follow outside
+  the epic.
+- **Cornerstone area.** None. The quota is one, and the rule text does not take it: its sentences quote the schema E1
+  fixed, and a wrong sentence is a body re-record and a release, not a migration of recorded plans. The meaning test
+  with its splice cases is the guard on that text, as an Opus-spec story.
+- **Easy to get wrong.** (1) `tools/ownership-check.mjs:48` matches an `owns:` marker exactly and `:59` forbids
+  "the gate" / "its panel" in prose — run it before every push. (2) `--update` refuses an id it has no entry for
+  (`tools/rule-bodies.mjs:184-189`): the hand-added entry comes first. (3) A `paths:` glob or a `depends:` from
+  `planning-docs` would pull the rule into every `inspect` scope (§1); the negative selection cases exist to catch it.
+
+### Order, and why
+
+S0 (done) → S6a → E1 → E2 → S7 → the pull request → S9.
+
+- E1 before E2: the text must describe what runs, and E2's agreement case reads E1's parser.
+- One pull request after E2: a check that names an absent rule, or a rule line that counts a finding that is not there,
+  must never sit on `main` alone.
+- S7 after E2: the server plan replaces the rule's interim paragraph, which exists only after E2.
+
+**Security:** neither epic touches authentication, authorisation or cryptography.
