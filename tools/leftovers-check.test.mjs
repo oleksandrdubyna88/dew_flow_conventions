@@ -608,6 +608,18 @@ test("2. owner-blind: the pass of the janitor's inventory line covers the uses o
   assert.deepEqual(broadAt(tree(t, { [JANITOR]: text.replace(`GLOB='${P}[-_]*'`, `GLOB='${P}[-_]**'`) })), [2, 3], "one byte changed on the passed line: the line is reported and its uses with it");
 });
 
+test("2. --update-allowlist writes exactly the janitor's one inventory line: a line broad only through a variable is never entered", (t) => {
+  const repo = tree(t, {});
+  fs.writeFileSync(path.join(repo, "x.txt"), "x\n");
+  fs.mkdirSync(path.join(repo, "tools"), { recursive: true });
+  fs.copyFileSync(path.join(root, JANITOR), path.join(repo, JANITOR));
+  assert.equal(guard(repo, ["--update-allowlist"]).code, 0);
+  const written = JSON.parse(fs.readFileSync(path.join(repo, "tools", "fixtures", "owner-blind-allowlist.json"), "utf8"));
+  const shipped = JSON.parse(fs.readFileSync(ALLOWLIST, "utf8"));
+  assert.deepEqual(written.entries, shipped.entries, "the janitor's inventory line and nothing the variables' uses would add");
+  assert.equal(written.entries.length, 1);
+});
+
 test("2. owner-blind takes NO inline exemption: an annotated arbitrary rm -rf sweep is still a finding", (t) => {
   const reason = "inventory only, deletion is gated per row by something";
   const annotated = one(t, "tools/s.sh", `# ${Q}-exempt: owner-blind — ${reason}\nfind /tmp -iname '${Q}-*' -exec rm -rf {} +\n`);

@@ -14,8 +14,9 @@
  *   shared-store  a `DROP`, `TRUNCATE`, `FLUSH` or delete-all against an unprefixed name
  *   ryuk-off      `TESTCONTAINERS_RYUK_DISABLED` set to true — no exemption accepted
  *   legacy-name   a literal, or a constant-built prefix, that spells a prefixed name whose second segment is not an owner (§1)
- *   owner-blind   a pattern, glob or filter that matches the prefix with no owner segment after it — the shape of a sweeper
- *                 that cannot tell one user's leftovers from another's. It takes NO inline exemption: the one pass is
+ *   owner-blind   a pattern, glob or filter that matches the prefix with no owner segment after it, written literally or through a
+ *                 variable the same file assigns a value holding the prefix (a name from another file, the environment or an
+ *                 argument is not traced) — the shape of a sweeper that cannot tell one user's leftovers from another's. It takes NO inline exemption: the one pass is
  *                 `tools/fixtures/owner-blind-allowlist.json`, keyed by file, line and the sha256 of the line
  * plus two that are about the guard's own grammar:
  *   exemption     a `testsToDelete-exempt:` comment that is not well-formed
@@ -62,7 +63,7 @@ import { fileURLToPath } from "node:url";
 import { gitOutput } from "./lib/git.mjs";
 import { OWNER_GRAMMAR } from "./lib/owned.mjs";
 import { REPO_ROW, REPO_TOKEN } from "./lib/owned-token.mjs";
-import { JANITOR_FILE, classifyLine, classifyLines, lineSha256 } from "./lib/sweeper-scan.mjs";
+import { JANITOR_FILE, classifyLine, classifyLines, lineSha256, passes } from "./lib/sweeper-scan.mjs";
 import { isReason } from "./ownership-check.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -380,17 +381,13 @@ function legacyNameHits(line) {
   return LEGACY_BUILT.test(line) ? [...literal, "a prefix built from the repository token"] : literal;
 }
 
-/** Is the line allowlisted: the entry names the shipped janitor (and no other file), and its file, 1-based line and the hash of the line's text all match. */
-const allowed = (allowlist, file, number, text) => allowlist.some((entry) => entry.file === JANITOR_FILE && entry.file === file && entry.line === number && entry.sha256 === lineSha256(text));
-
 function lineFindings(file, lines, exemptions, allowlist) {
   const extra = RAW_TEMP_BY_EXTENSION[path.extname(file)] ?? [];
   const found = [];
   const add = (index, cls, text) => {
     if (cls === "ryuk-off" || !isExempt(exemptions, cls, index + 1)) found.push(finding(file, index + 1, cls, text));
   };
-  const sanctioned = new Set(lines.flatMap((line, index) => (allowed(allowlist, file, index + 1, line) ? [index + 1] : []))); // a binding made on a passed line propagates nowhere
-  const verdicts = classifyLines(lines.join("\n"), { sanctioned }); // the file's own prefix bindings are read once, for every line
+  const verdicts = classifyLines(lines.join("\n"), { allowlist, file }); // the file's own prefix bindings are read once, for every line
   lines.forEach((line, index) => {
     if (isComment(line)) return;
     const checks = [
@@ -403,7 +400,7 @@ function lineFindings(file, lines, exemptions, allowlist) {
     ];
     for (const [cls, hits] of checks) if (hits.length > 0) add(index, cls, [...new Set(hits)].map((hit) => `\`${hit}\``).join(", "));
     // owner-blind: no exemption of any kind — the allowlist (file, line, hash) is the one pass
-    if (verdicts[index] === "broad" && !allowed(allowlist, file, index + 1, line)) found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
+    if (verdicts[index] === "broad" && !passes(allowlist, file, index + 1, line)) found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
   });
   return found;
 }
@@ -817,7 +814,7 @@ export function resolveRule(repo, rule) {
 /**
  * The allowlist entries: the file the operator names with `--allowlist`, else the one shipped beside this tool — NEVER a file of the scanned
  * repository (a scanned tree must not configure the control that judges it: §7 `owner-blind`). `[]` when there is none. A file that is not the
- * shape is an error, never "no entries". Whatever the file holds, `allowed` passes only an entry that names the janitor's own file.
+ * shape is an error, never "no entries". Whatever the file holds, `passes` passes only an entry that names the janitor's own file.
  */
 export function loadAllowlist(explicit) {
   const file = [explicit, path.join(HERE, "..", ALLOWLIST_FILE)].find((candidate) => candidate !== undefined && fs.existsSync(candidate));

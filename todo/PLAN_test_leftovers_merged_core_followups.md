@@ -220,12 +220,36 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   4 (a quoted concatenation would not classify) rejected by the measurement in step 2.
 - **Deviation (2026-10-28, judged at build):** the plan's conservative binding made this repository's own janitor red on 7 lines (456, 458, 465,
   475, 501, 503, 543) through `RX`/`GLOB`, assigned on its allowlisted inventory line 156. A binding made on a line the allowlist passes
-  (same file, line number and line hash) does not propagate: `classifyLines` takes the set of such lines (`sanctioned`), the scan and the
-  guard fill it from their allowlist, and `--update-allowlist` writes only lines broad on their own, so a binding never widens the file.
-  The risk — a changed janitor that keeps line 156 byte-identical could hide a new use of `$RX` — is no wider than before F12 (such a use
-  was invisible then too) and is closed by F11 (the whole janitor's hash).
-- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`. RED: the use lines of a same-file binding classified null (`actual null, expected 'broad'`) and the
-  guard exited 0 on a file that removes through a bare-prefix variable; GREEN: all new tests, and the janitor's 7 uses clean through the sanction.
+  (same file, line number and line hash) does not propagate: `classifyLines` derives those lines itself from the allowlist and the file
+  (`classifyLines(text, { allowlist, file, honourMarker })`, with the one `passes` function), and `--update-allowlist` writes only lines
+  broad on their own, so a binding never widens the file it writes. The risk — a changed janitor that keeps line 156 byte-identical could
+  hide a new use of `$RX` — is no wider than before F12 (such a use was invisible then too) and is closed by F11 (the whole janitor's hash).
+  Two widenings of the pass are known and are closed by F11 as well: (a) an alias `X="$RX"` added anywhere in the janitor stays unbound,
+  so its uses are hidden; (b) `--update-allowlist` admits every janitor line that is broad on its own, and one that also assigns sanctions
+  its variables' uses, while the diff a reviewer reads shows only that line. Until F11, a change to the janitor is reviewed by a person.
+- **Review round (2026-10-28, coai code gate 8 of 8 and a judge):** the binding code moved to `tools/lib/prefix-bindings.mjs`. What changed:
+  `${NAME<operator>…}` is a use (not the length `${#NAME}`); the value of a name is its WHOLE right-hand side with the known bindings
+  written into it, bound when ONE literal piece holds the prefix word, to a true fixed point (the cycle guard is a value-length and a
+  values-per-name bound, not a pass cap), so a default, a path and an owner interpolation bind, and `'<prefix>-' + owner + '-'` is
+  owner-aware, not broad; the two-piece spelling this family uses (`"teststo" + "delete"`) binds nothing; a line carrying the transition
+  marker binds nothing for a caller that honours it; every combination of the values of the names a line uses is read (above 256 readings
+  the line is judged broad); an assignment's own right-hand side is not read as a use; the Python string prefix class includes `f`.
+- **Limits, recorded 2026-10-28 (not fixed in this change):** Python f-strings at the USE (`f'/tmp/{PREFIX}*'`, `Path(...).glob(f'{PREFIX}*')`);
+  a concatenated glob with the removal on another line (`glob.glob('/tmp/' + PREFIX + '*')` then `shutil.rmtree(p)`; JS `rimraf('/tmp/' + P + '*')`);
+  quoted globs (`[[ "$n" == "$P"* ]]`, a `"$P"*)` case arm — the glob shape does not accept a quote before `*`, which also missed literals before
+  F12); Python written without PEP 8 spacing (read as shell); a second assignment on one shell line (`local a=0 P='…'`), a second JS
+  declarator (`const A = 1, P = '…'`), shell arrays, PowerShell `[string]$P`, `$script:P`/`$global:P` and PowerShell's case-insensitive names;
+  a non-literal operand that is not a plain call (a regex literal, an arrow, an object). Fixed in this change from that list: the Python
+  `f` string prefix at the binding (a test).
+- **Expected fleet work:** measured by the judge with a machine scan over one host's checkouts, the change reports 143 MORE owner-blind lines than
+  before, all in test or detector code that spells sweep text through a variable (a consumer's dev-VM shell test that builds `find … '${p}-*' -delete`
+  strings from `local p=<prefix>`; the private sibling's dev-env tests and its leftover and sweeper libraries) — none a real sweeper. They are false
+  positives in the safe direction: they keep the barrier closed until those files spell the prefix in two pieces (this repository's own practice,
+  which the binding reader honours), or carry the transition marker.
+- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`, in two rounds. RED, round 1: the use lines of a same-file binding classified null
+  (`actual null, expected 'broad'`) and the guard exited 0 on a file that removes through a bare-prefix variable. RED, round 2: the use of an
+  owner-aware concatenation classified broad, `${P:?}` and its kin classified null, and a 100000-character line of the shape `x:` and spaces took 21 s.
+  GREEN: all new tests, and the janitor's 7 uses clean through the sanction.
 
 ## F13 — `owned.mjs` assumes 100 clock ticks per second (found 2026-10-27)
 

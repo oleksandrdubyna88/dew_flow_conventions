@@ -1185,7 +1185,7 @@ release — is `todo/PLAN_test_leftovers_merged_core_release.md`.
 - **`tools/sweeper-scan.mjs`** (the barrier's scan; `node tools/sweeper-scan.mjs [--root <dir>] [--system] [--honour-marker]`) lists the owner-blind sweepers still
   enabled on a machine: the caller's checkouts under `--root`, crontab, systemd user units and, on Windows, scheduled tasks; `--system` adds the system places.
   It deletes nothing. Exit 0: nothing found and everything read. Exit 1: owner-blind lines found. Exit 2: something in the requested scope could not be read, or
-  nothing was scanned (2 outranks 1). The classifier is `tools/lib/sweeper-scan.mjs` (`classifyLine`, and `classifyLines` for a whole file, which also reads a prefix held in a variable the same file assigns — except a variable assigned on a line the allowlist passes), the only implementation: the guard and the scan both call it.
+  nothing was scanned (2 outranks 1). The classifier is `tools/lib/sweeper-scan.mjs` (`classifyLine`, and `classifyLines` for a whole file, which also reads a prefix held in a variable the same file assigns a value holding it — `tools/lib/prefix-bindings.mjs` — except a variable assigned on a line the allowlist passes), the only implementation: the guard and the scan both call it.
   The barrier records are in `research/security/machines.md`; the security pass is `research/security/test-leftovers-merged-core.md`.
 - **The vectors.** `tools/fixtures/owner-vectors.json` holds seven tables (grammar, hostnames, verdicts, names, windows-owner, record, scope — 204 vectors on
   2026-10-27, counted from the file) and `tools/owner-conformance.test.mjs` asks each of both implementations of the rule, `owned.mjs` and `janitor.sh`

@@ -13,8 +13,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { performance } from "node:perf_hooks";
 
-import { NOT_A_SWEEPER, broadLines, classifyLine, classifyLines, prefixBindings } from "./lib/sweeper-scan.mjs";
+import { NOT_A_SWEEPER, broadLines, classifyLine, classifyLines } from "./lib/sweeper-scan.mjs";
+import { prefixBindings } from "./lib/prefix-bindings.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const P = "teststo" + "delete"; // the prefix, lower case
@@ -145,10 +147,10 @@ test("F12 6 a variable holding an OWNER-AWARE value makes its use line owner-awa
   assert.deepEqual(verdicts(rows(`P_='${Q}-u1000-'`, ...SHELL_USE.slice(1))), [null, "owner-aware"]);
 });
 
-test("F12 7 a value with an interpolation binds nothing: the use line keeps today's verdict", () => {
-  assert.deepEqual(verdicts(rows(`P_="${Q}-\${OWNER}-"`, ...SHELL_USE.slice(1))), [null, null]);
-  assert.equal(prefixBindings(`P_="${Q}-$OWNER-"`).size, 0);
-  assert.equal(prefixBindings(`const PREFIX = \`${Q}-\${owner}-\`;`).size, 0);
+test("F12 7 a value with an owner interpolation is bound and its use line is owner-aware", () => {
+  assert.deepEqual(verdicts(rows(`P_="${Q}-\${OWNER}-"`, ...SHELL_USE.slice(1))), [null, "owner-aware"]);
+  assert.deepEqual(verdicts(rows(`P_="${Q}-$OWNER-"`, ...SHELL_USE.slice(1))), [null, "owner-aware"]);
+  assert.deepEqual([...prefixBindings(`const PREFIX = \`${Q}-\${owner}-\`;`).keys()], ["PREFIX"]);
 });
 
 test("F12 8 a LEGACY literal value is narrow: its use lines are null", () => {
@@ -195,20 +197,88 @@ test("F12 14 a name assigned the prefix anywhere binds on every line, whatever t
   assert.deepEqual(verdicts(rows(...SHELL_USE.slice(1), `P_='${Q}-'`, "P_=other")), ["broad", null, null]);
 });
 
-test("F12 15 a binding made on a SANCTIONED line propagates nowhere: only that line's own assignments are ignored", () => {
-  const text = rows(`RX_='${Q}[-_]'; GLOB_='${Q}[-_]*'`, `P_='${Q}-'`, 'awk -v rx="^$RX_" x', 'rm -rf "$TMPDIR/$P_"*');
+const JANITOR_PASS = () => {
+  const janitor = fs.readFileSync(path.join(here, "janitor.sh"), "utf8");
+  const allowlist = JSON.parse(fs.readFileSync(path.join(here, "fixtures", "owner-blind-allowlist.json"), "utf8")).entries;
+  return { janitor, allowlist, file: "tools/janitor.sh", lines: allowlist.map((entry) => entry.line) };
+};
+
+test("F12 15 a binding made on a line the allowlist passes propagates nowhere, and the sanction is per (file, line, hash)", () => {
+  const assign = `RX_='${Q}[-_]'; GLOB_='${Q}[-_]*'`;
+  const text = rows(assign, `P_='${Q}-'`, 'awk -v rx="^$RX_" x', 'rm -rf "$TMPDIR/$P_"*');
+  const entry = { file: "tools/janitor.sh", line: 1, sha256: createHash("sha256").update(assign, "utf8").digest("hex") };
   assert.deepEqual(verdicts(text), ["broad", null, "broad", "broad"]);
-  assert.deepEqual(verdicts(text, { sanctioned: new Set([1]) }), ["broad", null, null, "broad"], "RX_ is no longer bound, P_ still is");
-  assert.deepEqual([...prefixBindings(text, new Set([1])).keys()], ["P_"]);
+  assert.deepEqual(verdicts(text, { allowlist: [entry], file: "tools/janitor.sh" }), ["broad", null, null, "broad"], "RX_ is no longer bound, P_ still is");
+  assert.deepEqual(verdicts(text, { allowlist: [entry], file: "tools/other.sh" }), ["broad", null, "broad", "broad"], "another file: no sanction");
+  assert.deepEqual(verdicts(text, { allowlist: [{ ...entry, sha256: "0".repeat(64) }], file: "tools/janitor.sh" }), ["broad", null, "broad", "broad"], "another hash: no sanction");
 });
 
-test("F12 16 the janitor, read with the shipped allowlist's lines sanctioned, holds no broad line beyond the passed one; read without it, the uses show", () => {
-  const janitor = fs.readFileSync(path.join(here, "janitor.sh"), "utf8");
-  const entries = JSON.parse(fs.readFileSync(path.join(here, "fixtures", "owner-blind-allowlist.json"), "utf8")).entries;
-  const sanctioned = new Set(entries.map((entry) => entry.line));
-  const broad = classifyLines(janitor, { sanctioned }).flatMap((verdict, index) => (verdict === "broad" ? [index + 1] : []));
-  assert.deepEqual(broad, [...sanctioned], "the one passed line, and none of the uses of its variables");
-  assert.ok(broadLines(janitor).length > sanctioned.size, "without the sanction the variables' uses are broad: the test would be empty otherwise");
+test("F12 16 the janitor read with the shipped allowlist has only the passed line broad; broadLines without it shows the uses", () => {
+  const { janitor, allowlist, file, lines: passed } = JANITOR_PASS();
+  assert.deepEqual(broadLines(janitor, { allowlist, file }), passed, "the one passed line, and none of the uses of its variables");
+  assert.ok(broadLines(janitor).length > passed.length, "without the sanction the variables' uses are broad: the test would be empty otherwise");
+});
+
+test("F12 17 a parameter operator on a bound name is a use: ${P:?} ${P:-x} ${P%-} ${P,,} — and ${#P}, a length, is not", () => {
+  for (const use of ['"/tmp/${P_:?}"*', '"/tmp/${P_:-x}"*', '"/tmp/${P_%-}"*', '"/tmp/${P_,,}"*']) {
+    assert.deepEqual(verdicts(rows(`P_='${Q}-'`, `rm -rf ${use}`)), [null, "broad"], use);
+  }
+  assert.deepEqual(verdicts(rows(`P_='${Q}-'`, 'echo "${#P_}" | xargs rm -rf')), [null, null]);
+});
+
+test("F12 18 a value built from the file's own bindings is bound, to a true fixed point: a default, a path, a call", () => {
+  assert.deepEqual(verdicts(rows(`PFX="\${LEFTOVER_PREFIX:-${Q}-}"`, 'rm -rf "/tmp/$PFX"*')), [null, "broad"]);
+  assert.deepEqual(verdicts(rows(`BASE='${Q}-'`, 'P_="$TMPDIR/$BASE"', 'rm -rf "$P_"*')), [null, null, "broad"]);
+  assert.deepEqual(verdicts(rows(`const BASE = "${Q}-";`, "const P = path.join(dir, BASE);", "fs.rmSync(P);")), [null, null, "broad"]);
+  const chain = ["L0='" + Q + "-'", ...Array.from({ length: 20 }, (_, i) => `L${i + 1}="$L${i}"`), 'rm -rf "/tmp/$L20"*'];
+  assert.equal(verdicts(rows(...chain)).at(-1), "broad", "a chain longer than any pass cap still binds");
+});
+
+test("F12 19 a cycle that keeps growing its values terminates, and still reads", () => {
+  const text = rows(`BASE='${Q}-'`, 'A_="$B_$BASE"', 'B_="$A_$BASE"', 'rm -rf "/tmp/$A_"*');
+  assert.equal(verdicts(text).at(-1), "broad");
+});
+
+test("F12 20 an owner-aware concatenation binds the WHOLE value: its uses are owner-aware, never broad", () => {
+  const sh = 'rm -rf "$TMPDIR/$P_"*';
+  assert.deepEqual(verdicts(rows(`const PREFIX = '${Q}-' + owner + '-';`, "fs.rmSync(PREFIX + id)")), [null, "owner-aware"]);
+  assert.deepEqual(verdicts(rows(`PREFIX = '${Q}-' + OWNER + '-'`, "if n.startswith(PREFIX): shutil.rmtree(n)")), [null, "owner-aware"]);
+  assert.deepEqual(verdicts(rows(`P_='${Q}-'"$OWNER"'-'`, sh)), [null, "owner-aware"]);
+  assert.deepEqual(verdicts(rows(`P_=${Q}-"$OWNER"-`, sh)), [null, "owner-aware"]);
+  assert.deepEqual(verdicts(rows(`$P = '${Q}-' + $owner + '-'`, 'Remove-Item "$env:TEMP/$P"*')), [null, "owner-aware"]);
+  assert.deepEqual(verdicts(rows(`PREFIX = f'${Q}-{owner}-'`, "if n.startswith(PREFIX): shutil.rmtree(n)")), [null, "owner-aware"], "a Python f-string prefix");
+});
+
+test("F12 21 a legacy concatenation binds a narrow value: its use is null", () => {
+  assert.deepEqual(verdicts(rows(`const PREFIX = '${Q}-' + 'myrepo-';`, "fs.rmSync(PREFIX + id)")), [null, null]);
+  assert.deepEqual(verdicts(rows(`P_='${Q}-'"myrepo"-`, 'rm -rf "$TMPDIR/$P_"*')), [null, null]);
+});
+
+test("F12 22 a binding line carrying the marker binds nothing for a caller that honours it", () => {
+  const text = rows(`P_='${Q}-' # ${NOT_A_SWEEPER}`, ...SHELL_USE.slice(1));
+  assert.deepEqual(verdicts(text, { honourMarker: true }), [null, null]);
+  assert.deepEqual(verdicts(text), [null, "broad"]);
+});
+
+test("F12 23 only the names a line uses vary on it; above 256 readings the line is judged broad, the safe direction", () => {
+  const many = (name, count) => Array.from({ length: count }, (_, i) => `${name}='${Q}-r${i}-'`);
+  const irrelevant = Array.from({ length: 20 }, (_, i) => many(`N${i}_`, 2)).flat();
+  assert.deepEqual(verdicts(rows(...irrelevant, ...many("A_", 2), 'rm -rf "/tmp/$A_"')).at(-1), null, "twenty other names do not multiply the readings of a line that does not use them");
+  const text = rows(...many("A_", 17), ...many("B_", 17), 'rm -rf "/tmp/$A_$B_"');
+  assert.equal(verdicts(text).at(-1), "broad", "17 x 17 = 289 readings: over the cap, broad (every reading alone is a narrow literal)");
+  assert.equal(verdicts(rows(...many("A_", 16), ...many("B_", 16), 'rm -rf "/tmp/$A_$B_"')).at(-1), null, "16 x 16 = 256: all read");
+});
+
+test("F12 24 a very long line of the shape `x:` and spaces does not backtrack: under a second", () => {
+  const long = `PREFIX:${" ".repeat(100000)}${Q}`;
+  const started = performance.now();
+  assert.deepEqual(verdicts(rows(long, `x:${" ".repeat(100000)}= '${Q}-'`, `${" ".repeat(100000)}x ${Q}`)).length, 3);
+  const elapsed = performance.now() - started;
+  assert.ok(elapsed < 1000, `took ${elapsed} ms`);
+});
+
+test("F12 25 a text without the prefix word is read as lines, with no binding work", () => {
+  assert.deepEqual(verdicts(rows("a=1", "rm -rf /tmp/x")), [null, null]);
 });
 
 // --- S5b: the scan ---------------------------------------------------------------------------------------------------
