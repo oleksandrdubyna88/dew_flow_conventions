@@ -168,6 +168,43 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
 - **Fix when re-opened.** Flag an age-selected removal (`-mmin`, `-mtime`, `-newermt` with `rm`, `-delete` or `xargs rm` after it)
   whatever its name source. RED first: the exact line above must be listed.
 - **When.** Before the barrier is declared closed on a machine that runs a deploy runner, or at the next change to the scan.
+- **Re-assessed 2026-10-28, before the build — the gap is the VARIABLE, not the age.** Measured with `node tools/leftovers-check.mjs
+  --repo <fixture>` on this branch's base:
+  - the deploy script that triggered F12 holds `PREFIX='testsToDelete-<repo>-preflight-'` — a LEGACY literal. The guard already
+    reports that line (`legacy-name`), and the pattern cannot reach an owner-form name (no owner starts with a letter-continued
+    segment), so it is no barrier threat;
+  - a file holding `P='testsToDelete-'` and then `find "${TMPDIR:-/tmp}" -maxdepth 1 -name "${P}*" -mmin +60 -exec rm -rf {} +` and
+    `rm -rf "$TMPDIR/$P"*` is reported **clean** — it removes every user's leftovers, and neither the guard nor the barrier scan
+    sees it. That is the defect.
+  Flagging every age test is the wrong fix: rule §4 lets age SELECT (the janitor keeps what is younger than 10 minutes), and a log
+  retention line (`find "$LOG_DIR" -name '*.log' -mtime +14 -delete`) is no sweep at all; one line cannot tell selecting from
+  authorising.
+- **Fix.** In `tools/lib/sweeper-scan.mjs`, ONE file-level entry point, used by every reader (`broadLines`, the scan's
+  `classifyText` `:198-208`, the guard's per-line loop `tools/leftovers-check.mjs:404`):
+  1. `prefixBindings(text)` — the names assigned a LITERAL value that holds the prefix word (case-insensitive), in the same file:
+     shell (`NAME=`, with `export`/`local`/`readonly`/`declare` before it), JavaScript/TypeScript (`const|let|var NAME =`), Python
+     (`NAME =`), PowerShell (`$NAME =`); quoted with `'`, `"` or a backtick, or bare. A value with an interpolation (`$`, `${`, `{`)
+     binds nothing: its owner segment cannot be read, and the line that uses it stays as today.
+  2. `expandLine(line, bindings)` — `${NAME}`, `$NAME` (and `$env:NAME`) become the value; a bare identifier `NAME` becomes the
+     value in quotes for a binding made in JavaScript, TypeScript or Python syntax. The binding's own line is not expanded.
+  3. `classifyLine` runs on the expanded line; the reported line number, the allowlist's hash and the message stay the ORIGINAL
+     line's. A line the expansion changes is broad only if its expanded form is broad, so nothing that is clean today becomes red
+     unless a prefix-bound variable reaches a sweep shape.
+  Rule §7's `owner-blind` row gains "written literally or through a variable the same file assigns the prefix"; the header of
+  `sweeper-scan.mjs` says the same; `research/rule-bodies.json` moves.
+- **Tests, RED first** (`tools/sweeper-scan.test.mjs`, and one guard test in `tools/leftovers-check.test.mjs`): the two lines above
+  are broad, for a shell binding; `const PREFIX = "testsToDelete-"` with `names.filter((n) => n.startsWith(PREFIX))` and an
+  `rmSync` → broad; the same in Python with `startswith(PREFIX)` and `shutil.rmtree` → broad; an owner-aware value
+  (`'testsToDelete-u1000-'`) → owner-aware; an interpolated value → no binding, unchanged verdict; a legacy literal value → null,
+  and the guard still reports its `legacy-name`; a log-retention line → null; the guard over a fixture repository lists the
+  bare-prefix lines as `owner-blind` with their original line numbers; the scan's allowlist still passes the janitor's line by
+  its original hash. The repository's own self-scan (`tools/sweeper-scan.test.mjs:105`, every tracked file holds no broad line)
+  stays green — a binding in this repository's own tools that the expansion turns red is judged, not exempted.
+- **Not in this change, recorded as limits:** a binding made in ANOTHER file, an environment variable, a value built over several
+  lines, or a name passed as an argument — the scan reads one file at a time. Age as the authoriser of an owner-aware removal is
+  not detected by a line scan; the janitor is the one remover (rule *The janitor*), and review owns the rest.
+- **Done when.** The RED tests were observed failing for the stated reason, then pass; the whole suite, `npm run check`,
+  `node tools/rule-bodies.mjs` and `node tools/plan-lifecycle.mjs` are green; this section says F12 is fixed.
 
 ## F13 — `owned.mjs` assumes 100 clock ticks per second (found 2026-10-27)
 
