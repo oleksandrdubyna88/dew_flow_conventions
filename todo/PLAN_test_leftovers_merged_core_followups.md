@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27.** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28.** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -175,8 +175,16 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   `/proc/<pid>/stat` into seconds. On a host whose rate is not 100, a correct record written by a helper in another language reads as
   `unknown` and is kept. That is the safe direction, but the leftover is then never swept.
 - **Why.** The comment beside the constant says reading the rate would spawn a process; it can be read without one.
-- **Fix when re-opened.** Read `AT_CLKTCK` from the auxiliary vector (`/proc/self/auxv`), or state the assumption in the rule text.
-- **When.** Before a consumer writes a helper in another language for a host whose rate is not 100.
+- **Decided 2026-10-28 by the owner: read the real rate, and say what §3's "without spawning" allows.** Two changes, one PR,
+  RED first:
+  1. `owned.mjs` reads `AT_CLKTCK` (type 17) from `/proc/self/auxv` — a `/proc` read, no child process. Measured 2026-10-28 on
+     an Ubuntu VM (Linux 7.0, x86-64): Node read `AT_CLKTCK=100`, the value `getconf CLK_TCK` printed. When the entry cannot be
+     read, the start is treated as one that cannot be read without spawning (rule §3 already says what then happens, for a
+     writer and for a reader), never as a guessed 100.
+  2. Rule §3's sentence names the bound it means: a helper may start ONE child per script or run to learn a constant of the
+     host (a shell has no built-in for the rate, so `getconf CLK_TCK` once, when the helper is loaded); never a child per
+     test process. The companion and the vectors say the same.
+- **When.** At the next change to `owned.mjs` or rule §3, and before a consumer writes a helper in another language.
 
 ## Definition of Done
 
