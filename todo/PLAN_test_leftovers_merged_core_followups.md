@@ -191,18 +191,24 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   1. RED: in `tools/owned.test.mjs`, (a) `startFromProcStat` takes the rate as a third argument and uses it — field 22 =
      250 000 at 250 ticks a second is 1000 s after `btime`, where today's constant gives 2500 s; (b) a pure
      `clockTicksFromAuxv(buffer)` reads type 17 from a little-endian 64-bit auxiliary vector built by the test, returns
-     `undefined` for an empty, truncated or zero-valued vector and for one that ends (type 0) before type 17; (c) on a Linux
+     `undefined` for an empty, truncated or zero-valued vector and for one that ends (type 0) before type 17 — and the same
+     vectors in 4-byte words and in big-endian order, since `clockTicksFromAuxv(buffer, wordBytes, endianness)` takes both
+     (plan gate finding 0); a value above `Number.MAX_SAFE_INTEGER` is `undefined` (finding 3); (c) on a Linux
      test host, `clockTicksPerSecond()` equals `getconf CLK_TCK` — the TEST may spawn, the helper may not; skipped elsewhere.
   2. GREEN: `tools/lib/owned.mjs` — remove `CLOCK_TICKS_PER_SECOND` (`:60`); add `clockTicksFromAuxv` and a memoised
      `clockTicksPerSecond()` that reads `/proc/self/auxv` once (`undefined` on any failure, never a guessed 100);
      `startFromProcStat(statText, btimeSeconds, ticksPerSecond = clockTicksPerSecond())` (`:249`) returns `undefined` when the
      rate is not a positive integer. The reader (`:258-262`) then has no start, which rule §3 already handles: a writer omits
-     the start, a reader with no live start judges `live`. The word size is 8 bytes on a 64-bit Node and 4 on a 32-bit one
-     (`process.arch`); the endianness is `os.endianness()`.
+     the start, a reader with no live start judges `live`. The word size comes from an explicit table of `process.arch`
+     values, because `process.arch` names an architecture, not a width (plan gate finding 1): 8 bytes for `arm64`,
+     `loong64`, `mips64el`, `ppc64`, `riscv64`, `s390x`, `x64`; 4 for `arm`, `ia32`, `mips`, `mipsel`, `ppc`; any other
+     value → `undefined` (no start), never a guess. The endianness is `os.endianness()`. The value is a `BigInt`
+     converted to a `Number` only when it is a positive safe integer (finding 3).
   3. Rule §3 (`common/test-leftovers.md:116-119`): the parenthesis names the bound — one child per script or run to learn a
      host constant is allowed (a shell's `getconf CLK_TCK`, read once when the helper is loaded), never a child per test
      process. `node tools/rule-bodies.mjs --update common.test-leftovers` moves the record in the same commit.
-  4. The whole suite, lowered (`npm test`), and `node tools/plan-lifecycle.mjs`, `node tools/rule-bodies.mjs`.
+  4. The whole suite, lowered (`npm test`), `npm run check` (plan gate finding 2), `node tools/plan-lifecycle.mjs`, `node tools/rule-bodies.mjs`.
+  Plan gate (coai, 2026-10-28): `proceed`, 2 of 2 reviewers, 4 findings, all accepted and written into the steps above.
 - **Not in this change.** The private sibling's byte copy of `owned.mjs` and its pinned rule spans: they follow at its next copy,
   and its own follow-ups track that. No other file in this repository converts clock ticks (`git grep -n "CLK_TCK\|clock tick"`).
 - **Done when.** The three RED tests were observed failing for the right reason, then pass; the suite is green; the rule body
