@@ -208,14 +208,14 @@ test("F12 15 a binding made on a line the allowlist passes propagates nowhere, a
   const text = rows(assign, `P_='${Q}-'`, 'awk -v rx="^$RX_" x', 'rm -rf "$TMPDIR/$P_"*');
   const entry = { file: "tools/janitor.sh", line: 1, sha256: createHash("sha256").update(assign, "utf8").digest("hex") };
   assert.deepEqual(verdicts(text), ["broad", null, "broad", "broad"]);
-  assert.deepEqual(verdicts(text, { allowlist: [entry], file: "tools/janitor.sh" }), ["broad", null, null, "broad"], "RX_ is no longer bound, P_ still is");
+  assert.deepEqual(verdicts(text, { allowlist: [entry], file: "tools/janitor.sh" }), [null, null, null, "broad"], "the passed line is null (one contract: a caller does not check the allowlist again); RX_ is no longer bound, P_ still is");
   assert.deepEqual(verdicts(text, { allowlist: [entry], file: "tools/other.sh" }), ["broad", null, "broad", "broad"], "another file: no sanction");
   assert.deepEqual(verdicts(text, { allowlist: [{ ...entry, sha256: "0".repeat(64) }], file: "tools/janitor.sh" }), ["broad", null, "broad", "broad"], "another hash: no sanction");
 });
 
-test("F12 16 the janitor read with the shipped allowlist has only the passed line broad; broadLines without it shows the uses", () => {
+test("F12 16 the janitor read with the shipped allowlist has no broad line; broadLines without it shows the passed line and the uses", () => {
   const { janitor, allowlist, file, lines: passed } = JANITOR_PASS();
-  assert.deepEqual(broadLines(janitor, { allowlist, file }), passed, "the one passed line, and none of the uses of its variables");
+  assert.deepEqual(broadLines(janitor, { allowlist, file }), [], "the passed line is not reported, and none of the uses of its variables is");
   assert.ok(broadLines(janitor).length > passed.length, "without the sanction the variables' uses are broad: the test would be empty otherwise");
 });
 
@@ -279,6 +279,60 @@ test("F12 24 a very long line of the shape `x:` and spaces does not backtrack: u
 
 test("F12 25 a text without the prefix word is read as lines, with no binding work", () => {
   assert.deepEqual(verdicts(rows("a=1", "rm -rf /tmp/x")), [null, null]);
+});
+
+// round 3: the shapes `0dce2ca` called broad must not become null
+
+test("R1 a string literal with something after it still binds: a method chain, ||, a conditional, -replace", () => {
+  const js = "names.filter((n) => n.startsWith(P)).forEach((n) => fs.rmSync(n))";
+  const py = "if n.startswith(P): shutil.rmtree(n)";
+  const ps = 'Get-ChildItem $env:TEMP | Where-Object Name -like "$P*" | Remove-Item -Recurse';
+  for (const [binding, use] of [
+    [`const P = '${Q}-'.toLowerCase();`, js],
+    [`const P = "${Q}-".trim();`, js],
+    [`const P = '${Q}-' || fallback;`, js],
+    [`P = '${Q}-'.lower()`, py],
+    [`P = '${Q}-' if a else '${Q}_'`, py],
+    [`$P = '${Q}-' -replace 'x','y'`, ps],
+    [`$P = '${Q}-'.ToLower()`, ps],
+  ]) assert.deepEqual(verdicts(rows(binding, use)), [null, "broad"], binding);
+  assert.deepEqual(verdicts(rows(`const P = 'TESTSTO${"DELETE"}_OWNER'.trim();`, "names.filter((n) => n.startsWith(P)).forEach((n) => fs.rmSync(n))")), [null, null], "a literal that holds the word but names no prefix reads narrow");
+});
+
+test("R2 an alias assigned and used on the same line is read: later uses on the line expand from the file's bindings", () => {
+  assert.deepEqual(verdicts(rows(`B='${Q}-'`, 'P=$B; rm -rf /tmp/$P*')), [null, "broad"]);
+  assert.deepEqual(verdicts(rows(`BASE='${Q}-'`, 'P="$BASE"; rm -rf "/tmp/$P"*')), [null, "broad"]);
+  assert.deepEqual(verdicts(rows(`const B = '${Q}-';`, "const P = B; fs.readdirSync(d).filter((n) => n.startsWith(P)).forEach((n) => fs.rmSync(n));")), [null, "broad"]);
+});
+
+test("R3 exactly the assignment's own span is not a use: the same text elsewhere on the line is", () => {
+  assert.deepEqual(verdicts(rows(`P='${Q}-'`, 'ls /tmp | grep "$P" ; V="$P"')), [null, "broad"]);
+  assert.deepEqual(verdicts(rows(`P='${Q}-'`, 'rm -rf "$P"* ; V="$P"')), [null, "broad"]);
+  assert.deepEqual(verdicts(rows(`P='${Q}-'`, `rm -rf /tmp/${Q}-* && P=""`)), [null, "broad"]);
+  assert.deepEqual(verdicts(rows(`P='${Q}-'`, `P="/tmp" ; rm -rf "$P/${Q}-"*`)), [null, "broad"]);
+  assert.deepEqual(verdicts(rows(`P='${Q}-'`, 'echo "$P" | xargs rm -rf; V="$P"')), [null, "broad"]);
+});
+
+test("R4 a name past its value bound is judged broad where it is used, not silently narrowed", () => {
+  const owned = Array.from({ length: 32 }, (_, i) => `P_='${Q}-u${i + 1}-'`);
+  assert.equal(verdicts(rows(...owned, 'rm -rf "/tmp/$P_"*')).at(-1), "owner-aware", "32 values read fully");
+  assert.equal(verdicts(rows(...owned, `P_='${Q}-'`, 'rm -rf "/tmp/$P_"*')).at(-1), "broad", "the 33rd value, the bare prefix, cannot hide");
+});
+
+test("R6 an unclosed bracket, an unclosed ${ and a 100000-character line are read in well under a second", () => {
+  const cases = [
+    `${"const a = [".repeat(9000)}${Q}`,
+    `${"const a = (".repeat(9000)}${Q}`,
+    `${";a=$(".repeat(16000)}${Q}`,
+    `${"${P_:".repeat(25000)}${Q}`,
+    `${"${P_%x".repeat(20000)}${Q}`,
+  ];
+  for (const line of cases) {
+    const started = performance.now();
+    assert.equal(verdicts(rows(`P_='${Q}-'`, line)).length, 2);
+    const elapsed = performance.now() - started;
+    assert.ok(elapsed < 1000, `${line.slice(0, 12)}… took ${elapsed} ms`);
+  }
 });
 
 // --- S5b: the scan ---------------------------------------------------------------------------------------------------

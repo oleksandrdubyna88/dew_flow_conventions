@@ -63,7 +63,7 @@ import { fileURLToPath } from "node:url";
 import { gitOutput } from "./lib/git.mjs";
 import { OWNER_GRAMMAR } from "./lib/owned.mjs";
 import { REPO_ROW, REPO_TOKEN } from "./lib/owned-token.mjs";
-import { JANITOR_FILE, classifyLine, classifyLines, lineSha256, passes } from "./lib/sweeper-scan.mjs";
+import { JANITOR_FILE, classifyLine, classifyLines, lineSha256 } from "./lib/sweeper-scan.mjs";
 import { isReason } from "./ownership-check.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -400,7 +400,7 @@ function lineFindings(file, lines, exemptions, allowlist) {
     ];
     for (const [cls, hits] of checks) if (hits.length > 0) add(index, cls, [...new Set(hits)].map((hit) => `\`${hit}\``).join(", "));
     // owner-blind: no exemption of any kind — the allowlist (file, line, hash) is the one pass
-    if (verdicts[index] === "broad" && !passes(allowlist, file, index + 1, line)) found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
+    if (verdicts[index] === "broad") found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
   });
   return found;
 }

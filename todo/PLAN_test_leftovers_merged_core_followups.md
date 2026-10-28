@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28.** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28.** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -239,16 +239,30 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   quoted globs (`[[ "$n" == "$P"* ]]`, a `"$P"*)` case arm — the glob shape does not accept a quote before `*`, which also missed literals before
   F12); Python written without PEP 8 spacing (read as shell); a second assignment on one shell line (`local a=0 P='…'`), a second JS
   declarator (`const A = 1, P = '…'`), shell arrays, PowerShell `[string]$P`, `$script:P`/`$global:P` and PowerShell's case-insensitive names;
-  a non-literal operand that is not a plain call (a regex literal, an arrow, an object). Fixed in this change from that list: the Python
-  `f` string prefix at the binding (a test).
+  Fixed in this change from that list: the Python `f` string prefix at the binding (a test). Added after round 3:
+  - **J1** — a value whose prefix word is split over two literal pieces (`'teststo''delete-'`, `"teststo" + "delete-"`) binds nothing: this
+    family's own spelling of "not the prefix" for detector and test code. A real sweeper written that way is missed (F14).
+  - **J2** — what binds from a script operand that is not literal-only: each string literal holding the word (`'W-'.lower()`, `'W-' || x`, a
+    conditional expression, PowerShell `-replace`); a plain call (a dotted name, simple arguments, one nesting level) is kept as written too. A
+    call nested deeper keeps only its literals; a regex literal, an arrow, an object and an environment name that merely holds the word bind
+    nothing. A right-hand side is read to 1024 characters: past that only its literals and word-runs bind.
+  - **J3** — `'W-' + STAR`: any non-literal operand after the prefix reads as an owner segment, so the use is owner-aware (missed).
 - **Expected fleet work:** measured by the judge with a machine scan over one host's checkouts, the change reports 143 MORE owner-blind lines than
   before, all in test or detector code that spells sweep text through a variable (a consumer's dev-VM shell test that builds `find … '${p}-*' -delete`
   strings from `local p=<prefix>`; the private sibling's dev-env tests and its leftover and sweeper libraries) — none a real sweeper. They are false
   positives in the safe direction: they keep the barrier closed until those files spell the prefix in two pieces (this repository's own practice,
   which the binding reader honours), or carry the transition marker.
-- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`, in two rounds. RED, round 1: the use lines of a same-file binding classified null
+- **Round 3 (2026-10-28):** a string literal with something after it binds (`'W-'.toLowerCase()`, `||`, a conditional, `-replace`, `.ToLower()`) — these were
+  broad at `0dce2ca` and null at `f7926cd`; an alias assigned and used on one line is read (`P=$B; rm -rf /tmp/$P*`); the span an assignment
+  occupies is removed by offset, not by its first textual match; a name past its value bounds is marked `overflow` and a line that uses it is
+  judged broad; `classifyLines` returns null for a line the allowlist passes, so no caller checks it again; the prefix word is tested on the
+  whole text before any line is classified; a right-hand side is read to 1024 characters and an operator tail of a `${NAME…}` use to 512, so an
+  unclosed bracket or `${P:` on a 100000-character line takes tens of milliseconds, not seconds.
+- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`, in three rounds. RED, round 1: the use lines of a same-file binding classified null
   (`actual null, expected 'broad'`) and the guard exited 0 on a file that removes through a bare-prefix variable. RED, round 2: the use of an
   owner-aware concatenation classified broad, `${P:?}` and its kin classified null, and a 100000-character line of the shape `x:` and spaces took 21 s.
+  RED, round 3 (against `0dce2ca` → `f7926cd`): the seven literal-first shapes, the same-line alias, the repeated-text span, the 33rd value, and
+  five adversarial 100000-character lines (29 s for the first) all failed or were null where `0dce2ca` said broad.
   GREEN: all new tests, and the janitor's 7 uses clean through the sanction.
 
 ## F13 — `owned.mjs` assumes 100 clock ticks per second (found 2026-10-27)
@@ -268,9 +282,21 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
      test process. The companion and the vectors say the same.
 - **When.** At the next change to `owned.mjs` or rule §3, and before a consumer writes a helper in another language.
 
+## F14 — a prefix split over two literal pieces binds nothing (found 2026-10-28)
+
+- **What.** `tools/lib/prefix-bindings.mjs` (`candidates`, `shellPieces`) binds a value only when ONE literal piece holds the prefix word as
+  written, so `P='teststo''delete-'` followed by `rm -rf "/tmp/$P"*` reads as null: the sweeper is missed. The scan's own rule for
+  detector and test code — "spell the prefix in two pieces" — is what a person could apply, mechanically, to a REAL sweeper to hide it.
+- **Why.** The fleet's expected work after F12 tells files to spell the prefix in two pieces. The two-piece spelling is the one thing the
+  binding reader honours without a marker, so it is also the one way to write a sweeper the barrier scan cannot see.
+- **Fix when re-opened.** Fold adjacent quoted pieces of ONE shell word (`'a''b'`, `a"b"`), and measure how many of the family's own detector
+  and test lines that turns red; keep the JavaScript and Python `"a" + "b"` exception, which is a statement of intent in code. RED first:
+  the line above must be broad.
+- **When.** Before the barrier is declared closed on a machine whose sweepers were changed after this release.
+
 ## Definition of Done
 
-- [ ] Each of F1 to F13 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
+- [ ] Each of F1 to F14 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.

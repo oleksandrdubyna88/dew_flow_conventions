@@ -17,7 +17,18 @@
 //
 // Conservative on purpose: a name assigned such a value ANYWHERE in the file is bound on EVERY line, whatever the scope, the order or
 // a later reassignment — the error is then a false `broad`, which keeps the barrier closed, never a missed sweep.
-// Not traced: a name bound in another file, the environment, a value built over several lines or passed as an argument.
+// Limits (not traced; the plan that tracks this check records them too):
+//   - a name bound in another file, the environment, a value built over several lines or passed as an argument;
+//   - a value whose prefix word is split over two literal pieces (`'teststo''delete-'`, `"teststo" + "delete-"`) binds nothing: this
+//     family's own spelling of "not the prefix" for detector and test code — a real sweeper written that way is missed (follow-up F14);
+//   - from a script operand that is not literal-only, only its string literals holding the word bind (`'<prefix>-'.lower()`,
+//     `'<prefix>-' || x`, a conditional, `-replace`), and a plain call (a dotted name, simple arguments, one nesting level) is kept as
+//     written; a call nested deeper, a regex literal, an arrow, an object and an environment name that merely holds the word bind nothing;
+//   - `'<prefix>-' + STAR`: any non-literal operand after the prefix reads as an owner segment, so the use is owner-aware;
+//   - a right-hand side is read to 1024 characters: past that only its literals and word-runs bind;
+//   - Python f-strings and `Path.glob` at the USE, a glob built by concatenation with the removal on another line, a quoted glob
+//     (`[[ "$n" == "$P"* ]]`), Python without PEP 8 spacing, a second assignment on one shell line or a second JS declarator, shell
+//     arrays, PowerShell `[string]$P`, `$script:P` and PowerShell's case-insensitive names.
 
 export const PREFIX_WORD = "teststo" + "delete"; // spelled in two pieces: this file is read by the machine scan too
 
@@ -25,6 +36,9 @@ const SHELL = "shell"; // `$NAME`, `${NAME}`, `$env:NAME` are uses (shell, Power
 const CODE = "code"; //   a bare `NAME` is a use too (JavaScript, TypeScript, Python)
 const MAX_VALUE = 512;
 const MAX_VALUES = 32;
+/** A right-hand side is read up to this many characters: a value over MAX_VALUE never binds once folded, and an unclosed bracket must not make a long line quadratic. */
+const MAX_EXPRESSION = 1024;
+const MAX_OPERATOR = 512; // the longest `${NAME<operator>…}` tail read as one use
 /** Above this many readings of one line (the product of the value counts of the names it uses) the caller judges the line broad. */
 export const MAX_READINGS = 256;
 
@@ -38,13 +52,14 @@ const PYTHON_ASSIGN_RE = new RegExp(String.raw`^\s*(${IDENT})${TYPE}\s+=(?!=)\s*
 const STRING_PREFIX_RE = /[rRbBuUfF]/; // a Python string prefix (`f'…'` keeps its `{name}` as an interpolation)
 const CLOSER = { "(": ")", "[": "]", "{": "}" };
 
-/** The assignments of one line: `{ name, family, syntax, rhs }`. */
+/** The assignments of one line: `{ name, family, syntax, rhs, holds, truncated, start, end }` (`holds`: the right-hand side holds the prefix word) (`start`/`end` are the span of the whole assignment in the line). */
 export function assignments(line) {
   if (!line.includes("=")) return [];
   const found = [];
   const read = (re, family, syntax) => {
     for (const match of line.matchAll(re)) {
-      found.push({ name: match[1], family, syntax, rhs: scanExpression(line, match.index + match[0].length, syntax === "sh") });
+      const expression = scanExpression(line, match.index + match[0].length, syntax === "sh");
+      found.push({ name: match[1], family, syntax, rhs: expression.text, holds: holdsPrefix(expression.text), truncated: expression.truncated, start: match.index, end: expression.end });
     }
   };
   read(SHELL_ASSIGN_RE, SHELL, "sh");
@@ -54,11 +69,24 @@ export function assignments(line) {
   return found;
 }
 
-/** The text of the right-hand side that starts at `start`: to the first top-level terminator (see the header), quotes and brackets respected. */
+/** `line` without the spans of the given assignments (exactly those characters, by offset): what is left of the line is where its uses are. */
+export function withoutAssignments(line, items) {
+  const spans = items.map(({ start, end }) => [start, end]).sort((x, y) => x[0] - y[0]);
+  let out = "";
+  let from = 0;
+  for (const [start, end] of spans) {
+    if (start > from) out += line.slice(from, start);
+    from = Math.max(from, end);
+  }
+  return out + line.slice(from);
+}
+
+/** The right-hand side that starts at `start`: `{ text, end, truncated }` — to the first top-level terminator (see the header), quotes and brackets respected, at most MAX_EXPRESSION characters. */
 function scanExpression(line, start, shell) {
   const stack = [];
+  const limit = Math.min(line.length, start + MAX_EXPRESSION);
   let quote = null;
-  for (let index = start; index < line.length; index += 1) {
+  for (let index = start; index < limit; index += 1) {
     const char = line[index];
     if (quote !== null) {
       if (char === "\\" && (!shell || quote !== "'")) index += 1;
@@ -75,9 +103,9 @@ function scanExpression(line, start, shell) {
     }
     if (opener !== null) { stack.push(opener); continue; }
     const ends = shell ? /[\s;&|)]/.test(char) : char === ";" || char === "," || char === ")" || char === "]" || char === "}" || char === "#" || (char === "/" && line[index + 1] === "/");
-    if (ends) return line.slice(start, index);
+    if (ends) return { text: line.slice(start, index), end: index, truncated: false };
   }
-  return line.slice(start);
+  return { text: line.slice(start, limit), end: limit, truncated: limit < line.length };
 }
 
 /** The pieces of a shell word, quotes and escapes removed: `'a'"$B"c` is `a`, `$B`, `c` (each quoted part, and each unquoted run, is one piece). */
@@ -145,14 +173,48 @@ const CALL_RE = /^[\w.$]+\((?:[^(){}]|\([^(){}]*\))*\)$/;
 const QUOTED_PREFIX_RE = new RegExp(String.raw`["'\x60][^"'\x60]*${PREFIX_WORD}`, "i");
 const keptOperand = (operand) => CALL_RE.test(operand.trim()) && QUOTED_PREFIX_RE.test(operand);
 
+/** The inner texts of every closed string literal in `text`, nested ones included. */
+function quotedLiterals(text) {
+  const found = [];
+  let quote = null;
+  let from = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (quote === null) {
+      if (char === "'" || char === '"' || char === "`") { quote = char; from = index + 1; }
+    } else if (char === "\\") index += 1;
+    else if (char === quote) { found.push(text.slice(from, index)); quote = null; }
+  }
+  return found;
+}
+
+const WORD_RUN_RE = new RegExp(String.raw`[^\s'"\x60;&|()]*${PREFIX_WORD}[^\s'"\x60;&|()]{0,128}`, "gi");
+
 /**
- * The pieces a right-hand side is made of: shell words unquoted; script operands folded, a literal operand as its inner text(s), one that is
- * not a literal kept as it is when it is a plain call holding the prefix word in a string (`keptOperand`) and else as `${x}`. The value is the pieces joined; the prefix is HELD only when
- * ONE piece holds the word as written — `'teststo' + 'delete'` (two pieces, this family's own spelling of "not the prefix") holds nothing.
+ * The values a right-hand side can stand for that hold the prefix word. The whole value: the pieces joined — shell words unquoted; script
+ * operands folded, a literal operand as its inner text(s), a plain call holding the word in a string kept as written (`keptOperand`),
+ * anything else as `${x}`; it counts only when ONE piece holds the word as written, so `'teststo' + 'delete'` (two pieces, this family's
+ * own spelling of "not the prefix") holds nothing. Beside it, every string literal that holds the word inside an operand that is not a
+ * literal (`'<prefix>-'.toLowerCase()`, `'<prefix>-' || x`, `'<prefix>-' if a else …`, `-replace`) is a value of its own. A right-hand side
+ * cut at MAX_EXPRESSION adds the word-runs of its text: a value that long is read conservatively, never dropped.
  */
-function fold(text, syntax) {
-  const pieces = syntax === "sh" ? shellPieces(text) : splitPlus(text).flatMap((operand) => literalTexts(operand) ?? [keptOperand(operand) ? operand.trim() : "${x}"]);
-  return { value: pieces.join(""), holds: pieces.some(holdsPrefix) };
+function candidates(text, syntax, truncated) {
+  const found = [];
+  if (syntax === "sh") {
+    const pieces = shellPieces(text);
+    if (pieces.some(holdsPrefix)) found.push(pieces.join(""));
+  } else {
+    const pieces = [];
+    for (const operand of splitPlus(text)) {
+      const literals = literalTexts(operand);
+      if (literals !== null) { pieces.push(...literals); continue; }
+      pieces.push(keptOperand(operand) ? operand.trim() : "${x}");
+      found.push(...quotedLiterals(operand).filter(holdsPrefix));
+    }
+    if (pieces.some(holdsPrefix)) found.push(pieces.join(""));
+  }
+  if (truncated) found.push(...(text.match(WORD_RUN_RE) ?? []));
+  return found;
 }
 
 // --- uses ----------------------------------------------------------------------------------------------------------------
@@ -180,7 +242,7 @@ function makeUses(bindings) {
   if (bindings.size === 0) return null;
   const names = [...bindings.keys()].sort((a, b) => b.length - a.length);
   const alternation = names.map(escapeRegExp).join("|");
-  const re = new RegExp(String.raw`\$\{(${alternation})(?:[:%#/^,@][^}]*)?\}|\$(?:env:)?(${alternation})(?![A-Za-z0-9_])|(?<![A-Za-z0-9_$.])(${alternation})(?![A-Za-z0-9_$])`, "g");
+  const re = new RegExp(String.raw`\$\{(${alternation})(?:[:%#/^,@][^}]{0,${MAX_OPERATOR}})?\}|\$(?:env:)?(${alternation})(?![A-Za-z0-9_])|(?<![A-Za-z0-9_$.])(${alternation})(?![A-Za-z0-9_$])`, "g");
   return { bindings, names, re };
 }
 
@@ -207,6 +269,7 @@ export function readings(line, uses, own = new Set()) {
   replaceUses(line, uses, own, (name, entry) => { used.set(name, entry); return ""; });
   if (used.size === 0) return [line];
   const entries = [...used];
+  if (entries.some(([, entry]) => entry.overflow)) return null; // a name that outgrew its bounds: some of its values are unknown
   const total = entries.reduce((product, [, entry]) => product * entry.values.length, 1);
   if (total > MAX_READINGS) return null;
   return Array.from({ length: total }, (_, k) => {
@@ -232,24 +295,35 @@ export { makeUses };
 
 // --- bindings ------------------------------------------------------------------------------------------------------------
 
-/** `Map<name, { family, values }>` of the names the `items` (assignments) give a value holding the prefix word, to a true fixed point. */
+/**
+ * `Map<name, { family, values, overflow }>` of the names the `items` (assignments) give a value holding the prefix word, to a true fixed
+ * point. A name that outgrows MAX_VALUES or MAX_VALUE is marked `overflow`: a line that uses it is judged broad by the caller.
+ */
 function bindItems(items) {
   const bindings = new Map();
+  const set = (item, entry, values, overflow) => bindings.set(item.name, { family: entry?.family ?? item.family, values, overflow });
+  const markOverflow = (item) => {
+    const entry = bindings.get(item.name);
+    if (entry?.overflow) return false;
+    set(item, entry, entry?.values ?? [], true);
+    return true;
+  };
   const bind = (item, value) => {
     const entry = bindings.get(item.name);
-    if (value.length > MAX_VALUE || entry?.values.includes(value) || (entry?.values.length ?? 0) >= MAX_VALUES) return false;
-    bindings.set(item.name, { family: entry?.family ?? item.family, values: [...(entry?.values ?? []), value] });
+    if (entry?.values.includes(value)) return false;
+    if (value.length > MAX_VALUE || (entry?.values.length ?? 0) >= MAX_VALUES) return markOverflow(item);
+    set(item, entry, [...(entry?.values ?? []), value], entry?.overflow ?? false);
     return true;
   };
   for (let changed = true; changed;) {
     changed = false;
     const uses = makeUses(bindings);
     for (const item of items) {
-      if (!holdsPrefix(item.rhs) && !uses?.names.some((name) => item.rhs.includes(name))) continue; // nothing to read in it
-      for (const text of readings(item.rhs, uses, new Set([item.name])) ?? [item.rhs]) {
-        const { value, holds } = fold(text, item.syntax);
-        if (holds && bind(item, value)) changed = true;
-      }
+      const long = item.rhs.length > MAX_VALUE; // a value that long never binds as a whole: only its literals and word-runs can, and they need no reading
+      if (!item.holds && (long || !uses?.names.some((name) => item.rhs.includes(name)))) continue; // nothing to read in it
+      const found = long ? [item.rhs] : readings(item.rhs, uses, new Set([item.name]));
+      if (found === null) { if (markOverflow(item)) changed = true; continue; } // reads a name of unknown value: overflow, never narrowed
+      for (const text of found) for (const value of candidates(text, item.syntax, item.truncated)) if (bind(item, value)) changed = true;
     }
   }
   return bindings;

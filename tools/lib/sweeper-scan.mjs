@@ -32,7 +32,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { PREFIX_WORD, assignments, holdsPrefix, makeUses, prefixBindings, readings } from "./prefix-bindings.mjs";
+import { PREFIX_WORD, assignments, holdsPrefix, makeUses, prefixBindings, readings, withoutAssignments } from "./prefix-bindings.mjs";
 
 export const NOT_A_SWEEPER = "not-a-sweeper";
 
@@ -129,20 +129,20 @@ const RANK = { broad: 2, "owner-aware": 1 };
 const stronger = (a, b) => ((RANK[b] ?? 0) > (RANK[a] ?? 0) ? b : a);
 
 export function classifyLines(text, { allowlist = [], file, honourMarker = false } = {}) {
-  const lines = String(text).split(/\r?\n/);
+  const source = String(text);
+  const lines = source.split(/\r?\n/);
+  if (!holdsPrefix(source)) return lines.map(() => null); // every shape needs the prefix word: nothing to read
   const verdicts = lines.map((line) => classifyLine(line, { honourMarker }));
-  if (!holdsPrefix(String(text))) return verdicts;
-  const skip = new Set(lines.flatMap((line, index) => (passes(allowlist, file, index + 1, line) || (honourMarker && line.toLowerCase().includes(NOT_A_SWEEPER)) ? [index + 1] : [])));
+  const passed = new Set(lines.flatMap((line, index) => (passes(allowlist, file, index + 1, line) ? [index + 1] : [])));
+  const skip = new Set([...passed, ...lines.flatMap((line, index) => (honourMarker && line.toLowerCase().includes(NOT_A_SWEEPER) ? [index + 1] : []))]);
   const perLine = lines.map(assignments);
-  const bindings = prefixBindings(text, { skip, perLine });
-  const uses = makeUses(bindings);
-  if (uses === null) return verdicts;
+  const uses = makeUses(prefixBindings(source, { skip, perLine }));
   return lines.map((line, index) => {
-    if (verdicts[index] === "broad") return "broad";
-    const assigns = perLine[index];
-    const body = assigns.reduce((rest, item) => rest.replace(item.rhs, ""), line); // an assignment's own right-hand side is not a use: `P="$TMPDIR/$BASE"` sweeps nothing
-    const found = readings(body, uses, new Set(assigns.map((item) => item.name)));
-    if (found === null) return "broad"; // more readings than MAX_READINGS: not judged one by one — the safe direction
+    if (passed.has(index + 1)) return null; // the one contract: a line the allowlist passes is not a finding, and no caller checks it again
+    if (uses === null || verdicts[index] === "broad") return verdicts[index];
+    const body = withoutAssignments(line, perLine[index]); // an assignment's own span is not a use: `P="$TMPDIR/$BASE"` sweeps nothing; what is left of the line is read
+    const found = readings(body, uses);
+    if (found === null) return "broad"; // more readings than MAX_READINGS, or a name that outgrew its bounds: the safe direction
     return found.reduce((verdict, reading) => (reading === body ? verdict : stronger(verdict, classifyLine(reading, { honourMarker }))), verdicts[index]);
   });
 }
@@ -244,7 +244,7 @@ function classifyText(sink, display, text, options) {
   lines.forEach((line, index) => {
     const number = index + 1;
     if (verdicts[index] === "broad") {
-      if (!passes(allowlist, relative, number, line)) sink.found({ path: display, line: number, reason: SCAN_REASONS.OWNER_BLIND });
+      sink.found({ path: display, line: number, reason: SCAN_REASONS.OWNER_BLIND });
     } else if (jobs && !isCommentLine(line) && CALLS_A_SWEEP_RE.test(line)) {
       sink.found({ path: display, line: number, reason: SCAN_REASONS.CALLS_A_SWEEP });
     }
