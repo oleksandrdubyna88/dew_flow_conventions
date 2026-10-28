@@ -17,8 +17,11 @@
 
 > Epoch 1 · approved 2026-10-28 · by reviewers · state: open
 
-(No change since the approval. Plan round 1's accepted findings and the split into epics its operator command ordered are
-part of that approval — decision 1.)
+- 1.1 · 2026-10-28 · reviewer · merge-conditions — S6a document round, finding 1: the server plan (S7) moves from a
+  condition of the merge to a condition of the release, so a blocked review in another repository cannot strand this
+  pull request
+  (Plan round 1's accepted findings and the split its operator command ordered are part of the approval itself. S6a's
+  findings 0, 2 and 3 clarify wording — not changes, decision 1. One change is allowed; the next stops this plan.)
 
 ## Symptom
 
@@ -235,7 +238,7 @@ Findings (each names the file and, where it has one, the entry):
 | 5 | an entry's epoch above the current; entry numbers in an epoch not 1..n or repeated | repeated → *"two branches each recorded a change — renumber; the merge is the stop"* |
 | 6 | epochs not 1, 2, 3 … in order; a lower epoch not `closed`; dates going back | |
 | 7 | epoch k ≥ 2 without `### Re-review for epoch k`, or its `Narrowed` line or table missing or bad | the re-review must leave a record |
-| 8 | `Narrowed: yes` and epoch k's line is `by reviewers` | a smaller plan needs the owner |
+| 8 | `Narrowed: yes` and epoch k's line is `by reviewers` (k ≥ 2 only: a `Narrowed` line exists only in a re-review record; epoch 1 has none, and its approval is whatever approved the plan) | a smaller plan needs the owner |
 | 9 | a stories document (`PLAN_<topic>_E<n>….md`) carries a ledger while `PLAN_<topic>.md` is in `todo/` | its changes count in the parent |
 
 Indented lines under an entry are free text and not parsed. **The check reads the file as it stands in the checkout — never
@@ -314,19 +317,22 @@ Inside the epics (the numbers the sections above cite):
 - **S8 — verify and review**: the five commands (`npm test`, `npm run check`, `node tools/ownership-check.mjs`,
   `node tools/rule-bodies.mjs`, `node tools/plan-lifecycle.mjs` — five, because `npm test` does not run the family checks,
   `research/module_tests.md:989`), the dry run over the estate, `review_code` and an Opus review started together — once per
-  epic, as its done-when says. The pull request, the bot threads and the merge are the closing step below.
+  epic, as its done-when says. The pull request, the bot threads and the merge are S10 below.
 
 After the epics:
 
+- **S10 — the pull request.** E1's branch opens NO pull request: it is reviewed by its own gates and E2 starts from its
+  commit. ONE pull request, from E2's branch to `main`, carries both commits — E1's and E2's, each one epic — and is merged
+  by **rebase**, which keeps them as two commits on `main`. One pull request because `main` must never carry a check whose
+  hint line names a rule it does not have, nor `planning-docs`' "seven findings" line without the seventh. Every bot
+  thread verified and resolved.
 - **S7 — the server plan**, in its own worktree, branch and pull request in that repository, under its own rules (plan
-  only; no server code here). It is outside the epics because it changes no file here; it is written after E2, when the
-  rule's interim paragraph exists to be replaced, and before the pull request merges (Definition of Done).
-- **S8, closing half — the pull request.** ONE pull request, E2's branch, carrying E1's commit and E2's commit: `main` must
-  never carry a check whose hint line names a rule it does not have, nor `planning-docs`' "seven findings" line without the
-  seventh. Every bot thread verified and resolved; merge by rebase.
-- **S9 — ask the owner** about promoting `release` and the consumer bumps (decision 9), with the unchecked repository's
-  `todo/` checked on its remote first, and with a one-time list of the estate's open plans that passed a plan round —
-  each one opens its ledger at its next change (decision 11). Until then this plan stays in `todo/`.
+  only; no server code here). It is outside the epics because it changes no file here; it is written once E2 exists, when
+  the rule's interim paragraph is there to be replaced. It is a condition of the RELEASE (S9), not of S10's merge: a
+  blocked review in another repository must not strand this one's pull request.
+- **S9 — ask the owner** about promoting `release` and the consumer bumps (decision 9), once S7 exists, with the
+  unchecked repository's `todo/` checked on its remote first, and with a one-time list of the estate's open plans that
+  passed a plan round — each one opens its ledger at its next change (decision 11). Until then this plan stays in `todo/`.
 
 ## Test plan
 
@@ -378,6 +384,22 @@ the plan, so neither judged compliance with them.
 The round's operator commands, applied: the split into epics by Fable after the question consultants; one plan round and
 one code round per epic on its own branch; consultations on a cadence; autonomous work with questions at the end.
 
+## S6a — the interim path, observed (2026-10-28)
+
+`review_document` with `documentPath: todo/PLAN_plan_change_control.md` on `feat/plan-change-control`, after this
+branch's plan round had passed: **accepted, ran, `proceed`** — 4 of 4 reviewers (a review and a summary role each from
+Codex and Gemini), gating 3 of threshold 5. The plan file was read as a document with no refusal (§5); the reviewers judged
+it as a plan for code, from the `purposeText` alone. Resolved with `document` passed back; the session closed at `Done`.
+Codex again noted that the project rules were not sent. What it does NOT show: the second half — a `review_code` on this
+branch reading the revised plan as `planText` — which is S6b, inside E1.
+
+| # | Finding | Decision |
+|---|---|---|
+| 0 | E1's and E2's branches against one pull request: which merges where | Accepted: S10 — E1 opens no pull request; E2's carries both commits, rebase-merged |
+| 1 | S7 in another repository blocked this repository's merge | Accepted: S7 is a condition of the release (S9), not of S10 |
+| 2 | Finding 8 for epoch 1 | Accepted: `Narrowed` exists only in a re-review record, k ≥ 2 (§3 row 8) |
+| 3 | Two steps both called S8 | Accepted: the pull request is S10 |
+
 ## Definition of Done
 
 - [ ] `common/plan-change-control.md` exists by the outline, selected by the fourteen split-read tasks and none of the four
@@ -387,7 +409,8 @@ one code round per epic on its own branch; consultations on a cadence; autonomou
 - [ ] The meaning test pins the three sentences, with splice cases; the rule/check agreement case passes.
 - [ ] The dry run over the estate added zero `changes` findings; the `inspect --file todo/…` scope stays ≤ 32 768 B.
 - [ ] The interim path was observed once on this plan, and the result recorded here.
-- [ ] The server plan exists in its repository with the same boundary table.
+- [ ] The server plan exists in its repository with the same boundary table — before S9's release question, not as a
+      condition of the merge.
 - [ ] `research/module_rules.md`, `research/module_tests.md` and the `README.md` tools row describe what runs.
 - [ ] Five commands green; `review_code` and an Opus review resolved; every bot thread answered; merged by rebase.
 - [ ] The owner was asked about `release` and the consumer bumps; the answer is recorded here.
@@ -414,8 +437,8 @@ describes it, which must describe what runs ([knowledge-base.md](../common/knowl
 **Branches and gates.** `feat/plan-change-control-e1` starts from this branch's commit after S6a is recorded;
 `feat/plan-change-control-e2` starts from E1's commit. Each epic: `open` on its branch; `review_plan` with
 `plan: "todo/PLAN_plan_change_control.md"` and `epic: "k/2"`; build its stories; ONE commit; `review_code` over the epic's
-whole diff together with an Opus review; fixes folded into that one commit. The pull request is E2's branch (the closing
-half of S8 above).
+whole diff together with an Opus review; fixes folded into that one commit. The pull request is E2's branch, carrying both
+epic commits, merged by rebase (S10 above); E1 opens none of its own.
 
 Cornerstones: 0 of 1 — (marked when the stories are written)
 
@@ -493,7 +516,7 @@ Stories: `todo/PLAN_plan_change_control_E2.md` (written when the epic starts).
 
 ### Order, and why
 
-S0 (done) → S6a → E1 → E2 → S7 → the pull request → S9.
+S0 (done) → S6a (done) → E1 → E2 → S10 (the pull request) and S7 in parallel → S9.
 
 - E1 before E2: the text must describe what runs, and E2's agreement case reads E1's parser.
 - One pull request after E2: a check that names an absent rule, or a rule line that counts a finding that is not there,
