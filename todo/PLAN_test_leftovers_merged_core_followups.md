@@ -213,6 +213,8 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   and its own follow-ups track that. No other file in this repository converts clock ticks (`git grep -n "CLK_TCK\|clock tick"`).
 - **Done when.** The three RED tests were observed failing for the right reason, then pass; the suite is green; the rule body
   record matches; this section says F13 is fixed, with the commit.
+- **Fixed** 2026-10-28 on branch `fix/owned-clock-tick-rate`, in this commit. RED: `tools/owned.test.mjs` failed to load (`does not provide an export named 'auxvWordBytes'`),
+  and the old `startFromProcStat(stat, btime, 250)` returned `+2500` where `+1000` was expected. GREEN: all of the file's tests pass; with `/ 100` put back, only 14c2 fails.
 
 ## Definition of Done
 
