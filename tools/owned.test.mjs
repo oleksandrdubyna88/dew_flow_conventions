@@ -539,17 +539,17 @@ test("14b. a start only on Linux, read from /proc: within a few seconds of this 
   assert.equal(thisOwner().start, self.start, "the writer reads its own start through the reader's path");
 });
 
-test("14c. startFromProcStat reads field 22 after the LAST `)`, over btime", () => {
+test("14c. startFromProcStat reads field 22 after the LAST `)`, over btime, at the rate it is given (the same on every host)", () => {
   const fields = (comm) => {
     const rest = Array.from({ length: 50 }, (_, i) => String(i + 3)); // fields 3..52
     rest[19] = "123456"; // field 22 is index 19 of the remainder
     return `4711 (${comm}) ${rest.join(" ")}\n`;
   };
-  assert.equal(startFromProcStat(fields("node"), 1_000_000), 1_000_000 + Math.floor(123456 / 100));
-  assert.equal(startFromProcStat(fields("we ird) na(me"), 1_000_000), 1_000_000 + 1234, "spaces and parentheses in the command name");
-  assert.equal(startFromProcStat("", 1), undefined);
-  assert.equal(startFromProcStat("4711 (x) S 1 2", 1), undefined, "too few fields");
-  assert.equal(startFromProcStat(fields("node"), Number.NaN), undefined);
+  assert.equal(startFromProcStat(fields("node"), 1_000_000, 100), 1_000_000 + Math.floor(123456 / 100));
+  assert.equal(startFromProcStat(fields("we ird) na(me"), 1_000_000, 100), 1_000_000 + 1234, "spaces and parentheses in the command name");
+  assert.equal(startFromProcStat("", 1, 100), undefined);
+  assert.equal(startFromProcStat("4711 (x) S 1 2", 1, 100), undefined, "too few fields");
+  assert.equal(startFromProcStat(fields("node"), Number.NaN, 100), undefined);
 });
 
 test("14c2. startFromProcStat divides field 22 by the rate it is given, and has no start for a rate that is not a positive safe integer", () => {
@@ -584,11 +584,11 @@ test("14c3. clockTicksFromAuxv reads AT_CLKTCK (type 17) in every word size and 
     const label = `${bytes}-byte ${order}`;
     assert.equal(clockTicksFromAuxv(auxv([[16, 0x178bfbff], [17, 100], [6, 4096]], bytes, order), bytes, order), 100, label);
     assert.equal(clockTicksFromAuxv(auxv([[17, 250]], bytes, order), bytes, order), 250, `${label}: another rate`);
-    assert.equal(clockTicksFromAuxv(auxv([[17, 100]], bytes, order, { terminate: false }), bytes, order), 100, `${label}: no AT_NULL after it`);
+    assert.equal(clockTicksFromAuxv(auxv([[17, 100], [6, 4096]], bytes, order), bytes, order), 100, `${label}: type 17 first, AT_NULL after the others`);
   }
 });
 
-test("14c4. clockTicksFromAuxv has no rate for an empty, truncated, zero or AT_NULL-first vector", () => {
+test("14c4. clockTicksFromAuxv has no rate for an empty, truncated, unterminated, zero or AT_NULL-first vector", () => {
   for (const [bytes, order] of AUXV_SHAPES) {
     const label = `${bytes}-byte ${order}`;
     const whole = auxv([[16, 7], [17, 100]], bytes, order);
@@ -600,6 +600,8 @@ test("14c4. clockTicksFromAuxv has no rate for an empty, truncated, zero or AT_N
     assert.equal(clockTicksFromAuxv(auxv([[17, 0]], bytes, order), bytes, order), undefined, `${label}: value 0`);
     assert.equal(clockTicksFromAuxv(auxv([[0, 0], [17, 100]], bytes, order, { terminate: false }), bytes, order), undefined, `${label}: AT_NULL comes first`);
     assert.equal(clockTicksFromAuxv(auxv([[16, 7]], bytes, order), bytes, order), undefined, `${label}: no type 17`);
+    assert.equal(clockTicksFromAuxv(auxv([[17, 100]], bytes, order, { terminate: false }), bytes, order), undefined, `${label}: type 17 whole but no AT_NULL after it`);
+    assert.equal(clockTicksFromAuxv(auxv([[16, 7], [17, 100]], bytes, order, { terminate: false }), bytes, order), undefined, `${label}: no AT_NULL, type 17 last`);
   }
 });
 
@@ -622,7 +624,7 @@ test("14c6. auxvWordBytes is a table of process.arch values: 8, 4, or no answer"
     4: ["arm", "ia32", "mips", "mipsel", "ppc"],
   };
   for (const [bytes, arches] of Object.entries(SPEC)) for (const arch of arches) assert.equal(auxvWordBytes(arch), Number(bytes), arch);
-  for (const arch of ["sparc", "", undefined, null, "X64", "x64 ", 64]) assert.equal(auxvWordBytes(arch), undefined, `arch ${String(arch)}`);
+  for (const arch of ["sparc", "s390", "", undefined, null, "X64", "x64 ", 64, "constructor", "toString", "__proto__"]) assert.equal(auxvWordBytes(arch), undefined, `arch ${String(arch)}`);
 });
 
 test("14c7. on Linux clockTicksPerSecond is the rate getconf prints, and is the same value on every call", (t) => {

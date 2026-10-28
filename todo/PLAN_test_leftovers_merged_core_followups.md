@@ -179,8 +179,9 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   RED first:
   1. `owned.mjs` reads `AT_CLKTCK` (type 17) from `/proc/self/auxv` — a `/proc` read, no child process. Measured 2026-10-28 on
      an Ubuntu VM (Linux 7.0, x86-64): Node read `AT_CLKTCK=100`, the value `getconf CLK_TCK` printed. When the entry cannot be
-     read, the start is treated as one that cannot be read without spawning (rule §3 already says what then happens, for a
-     writer and for a reader), never as a guessed 100.
+     read, the start is treated as one that cannot be read without a child per test process (rule §3 already says what then
+     happens: the writer omits the start and, with it, the namespace; a Linux reader judges a record without `<ns>`
+     `unknown`, `owned.mjs` `ownerState`), never as a guessed 100.
   2. Rule §3's sentence names the bound it means: a helper may start ONE child per script or run to learn a constant of the
      host (a shell has no built-in for the rate, so `getconf CLK_TCK` once, when the helper is loaded); never a child per
      test process. Neither the companion (`common/test-leftovers-janitor.md`) nor the owner vectors state the rate or the
@@ -199,7 +200,8 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
      `clockTicksPerSecond()` that reads `/proc/self/auxv` once (`undefined` on any failure, never a guessed 100);
      `startFromProcStat(statText, btimeSeconds, ticksPerSecond = clockTicksPerSecond())` (`:249`) returns `undefined` when the
      rate is not a positive integer. The reader (`:258-262`) then has no start, which rule §3 already handles: a writer omits
-     the start, a reader with no live start judges `live`. The word size comes from an explicit table of `process.arch`
+     the start and the namespace, and a Linux reader judges a record without `<ns>` `unknown`, so nothing is swept (the safe direction; a
+     reader that has no live start but a record with one judges `live`). The word size comes from an explicit table of `process.arch`
      values, because `process.arch` names an architecture, not a width (plan gate finding 1): 8 bytes for `arm64`,
      `loong64`, `mips64el`, `ppc64`, `riscv64`, `s390x`, `x64`; 4 for `arm`, `ia32`, `mips`, `mipsel`, `ppc`; any other
      value → `undefined` (no start), never a guess. The endianness is `os.endianness()`. The value is a `BigInt`
@@ -213,8 +215,12 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   and its own follow-ups track that. No other file in this repository converts clock ticks (`git grep -n "CLK_TCK\|clock tick"`).
 - **Done when.** The three RED tests were observed failing for the right reason, then pass; the suite is green; the rule body
   record matches; this section says F13 is fixed, with the commit.
-- **Fixed** 2026-10-28 on branch `fix/owned-clock-tick-rate`, in this commit. RED: `tools/owned.test.mjs` failed to load (`does not provide an export named 'auxvWordBytes'`),
+- **Limit, recorded:** a Linux host whose rate cannot be read (an arch not in the table, no readable `/proc/self/auxv`) writes records without start and namespace, which every Linux reader judges `unknown`: nothing of that host is swept until the table names its arch.
+- **Fixed** 2026-10-28 on branch `fix/owned-clock-tick-rate`, in this commit and the review-fixes commit after it. RED: `tools/owned.test.mjs` failed to load (`does not provide an export named 'auxvWordBytes'`),
   and the old `startFromProcStat(stat, btime, 250)` returned `+2500` where `+1000` was expected. GREEN: all of the file's tests pass; with `/ 100` put back, only 14c2 fails.
+  A host whose rate cannot be read writes no start and no namespace, so its records read `unknown` and are kept (see the limit above). Review: coai code gate `proceed` (8 of 8;
+  findings 1 and 2 accepted and applied in the review-fixes commit, 0 and 3 rejected with reasons) and the Opus review (SHIP WITH FIXES; 1, 2, 3, 4, 5 and the `s390` half of 6 applied;
+  the once-read counting half of 6 and 7 not applied — the merge commit is named at promotion).
 
 ## Definition of Done
 

@@ -59,8 +59,8 @@ const LEGACY_OWNER_TEXT = /^([^@:\s]+@(linux|macos|windows)):(\d+)(?::(\d+))?$/;
 const OS_TAGS = { linux: "linux", darwin: "macos", win32: "windows" };
 const AT_CLKTCK = 17n;                                               // the auxiliary-vector type of the kernel's clock-tick rate (`CLK_TCK`)
 const AUXV_WORD_BYTES = { // `process.arch` names an architecture, not a width: an arch that is not here has no start (rule §3), never a guess
-  8: ["arm64", "loong64", "mips64el", "ppc64", "riscv64", "s390x", "x64"],
-  4: ["arm", "ia32", "mips", "mipsel", "ppc"],
+  arm64: 8, loong64: 8, mips64el: 8, ppc64: 8, riscv64: 8, s390x: 8, x64: 8,
+  arm: 4, ia32: 4, mips: 4, mipsel: 4, ppc: 4,
 };
 
 /** The one place a test learns the temp root (the guard's `raw-temp` class refuses every other spelling). */
@@ -251,20 +251,22 @@ export function cleanupScope() {
 
 /** The width in bytes of one auxiliary-vector word on `arch` (a `process.arch` value): 8, 4, or `undefined` for an arch not in the table. */
 export function auxvWordBytes(arch) {
-  return Object.keys(AUXV_WORD_BYTES).map(Number).find((bytes) => AUXV_WORD_BYTES[bytes].includes(arch));
+  return typeof arch === "string" && Object.hasOwn(AUXV_WORD_BYTES, arch) ? AUXV_WORD_BYTES[arch] : undefined;
 }
 
-/** `AT_CLKTCK` from an auxiliary vector (`wordBytes` 4 or 8, `endianness` "LE" or "BE"), or `undefined` for anything not a positive safe integer found before `AT_NULL`. */
+/** `AT_CLKTCK` from an auxiliary vector (`wordBytes` 4 or 8, `endianness` "LE" or "BE"): a positive safe integer found before an `AT_NULL` that ends the vector, else `undefined`. */
 export function clockTicksFromAuxv(buffer, wordBytes, endianness) {
   if (!Buffer.isBuffer(buffer) || (wordBytes !== 4 && wordBytes !== 8) || (endianness !== "LE" && endianness !== "BE")) return undefined;
   if (buffer.length === 0 || buffer.length % (2 * wordBytes) !== 0) return undefined; // the kernel writes whole pairs
   const read = (at) => (wordBytes === 8 ? buffer[`readBigUInt64${endianness}`](at) : BigInt(buffer[`readUInt32${endianness}`](at)));
+  let rate;
   for (let at = 0; at < buffer.length; at += 2 * wordBytes) {
     const type = read(at);
-    if (type === 0n) return undefined; // AT_NULL ends the vector before the entry
-    if (type !== AT_CLKTCK) continue;
+    if (type === 0n) return rate; // AT_NULL ends the vector; a vector that never reaches it is not trusted
+    if (type !== AT_CLKTCK || rate !== undefined) continue;
     const value = read(at + wordBytes);
-    return value > 0n && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : undefined;
+    rate = value > 0n && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : undefined;
+    if (rate === undefined) return undefined;
   }
   return undefined;
 }
@@ -285,7 +287,7 @@ export function clockTicksPerSecond() {
   return clockTicks.rate;
 }
 
-/** Field 22 of `/proc/<pid>/stat`, over `btime`, as integer Unix seconds at `ticksPerSecond` — or `undefined` when it, or the rate, cannot be read. */
+/** Field 22 of `/proc/<pid>/stat`, over `btime`, as integer Unix seconds at `ticksPerSecond` — or `undefined` when it, or the rate, cannot be read. An omitted or `undefined` `ticksPerSecond` means THIS host's rate (a JS default parameter): a caller whose rate may be `undefined` checks it before calling. */
 export function startFromProcStat(statText, btimeSeconds, ticksPerSecond = clockTicksPerSecond()) {
   if (typeof statText !== "string" || !Number.isFinite(btimeSeconds)) return undefined;
   if (!Number.isSafeInteger(ticksPerSecond) || ticksPerSecond <= 0) return undefined;
