@@ -183,8 +183,30 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
      writer and for a reader), never as a guessed 100.
   2. Rule §3's sentence names the bound it means: a helper may start ONE child per script or run to learn a constant of the
      host (a shell has no built-in for the rate, so `getconf CLK_TCK` once, when the helper is loaded); never a child per
-     test process. The companion and the vectors say the same.
+     test process. Neither the companion (`common/test-leftovers-janitor.md`) nor the owner vectors state the rate or the
+     no-spawn bound (checked 2026-10-28 with `git grep -n "spawn\|CLK_TCK" common/ tools/fixtures/owner-vectors.json`), so only the
+     rule body and its record (`research/rule-bodies.json`) move.
 - **When.** At the next change to `owned.mjs` or rule §3, and before a consumer writes a helper in another language.
+- **Build order** (branch `fix/owned-clock-tick-rate`):
+  1. RED: in `tools/owned.test.mjs`, (a) `startFromProcStat` takes the rate as a third argument and uses it — field 22 =
+     250 000 at 250 ticks a second is 1000 s after `btime`, where today's constant gives 2500 s; (b) a pure
+     `clockTicksFromAuxv(buffer)` reads type 17 from a little-endian 64-bit auxiliary vector built by the test, returns
+     `undefined` for an empty, truncated or zero-valued vector and for one that ends (type 0) before type 17; (c) on a Linux
+     test host, `clockTicksPerSecond()` equals `getconf CLK_TCK` — the TEST may spawn, the helper may not; skipped elsewhere.
+  2. GREEN: `tools/lib/owned.mjs` — remove `CLOCK_TICKS_PER_SECOND` (`:60`); add `clockTicksFromAuxv` and a memoised
+     `clockTicksPerSecond()` that reads `/proc/self/auxv` once (`undefined` on any failure, never a guessed 100);
+     `startFromProcStat(statText, btimeSeconds, ticksPerSecond = clockTicksPerSecond())` (`:249`) returns `undefined` when the
+     rate is not a positive integer. The reader (`:258-262`) then has no start, which rule §3 already handles: a writer omits
+     the start, a reader with no live start judges `live`. The word size is 8 bytes on a 64-bit Node and 4 on a 32-bit one
+     (`process.arch`); the endianness is `os.endianness()`.
+  3. Rule §3 (`common/test-leftovers.md:116-119`): the parenthesis names the bound — one child per script or run to learn a
+     host constant is allowed (a shell's `getconf CLK_TCK`, read once when the helper is loaded), never a child per test
+     process. `node tools/rule-bodies.mjs --write` moves the record in the same commit.
+  4. The whole suite, lowered (`npm test`), and `node tools/plan-lifecycle.mjs`, `node tools/rule-bodies.mjs`.
+- **Not in this change.** The private sibling's byte copy of `owned.mjs` and its pinned rule spans: they follow at its next copy,
+  and its own follow-ups track that. No other file in this repository converts clock ticks (`git grep -n "CLK_TCK\|clock tick"`).
+- **Done when.** The three RED tests were observed failing for the right reason, then pass; the suite is green; the rule body
+  record matches; this section says F13 is fixed, with the commit.
 
 ## Definition of Done
 
