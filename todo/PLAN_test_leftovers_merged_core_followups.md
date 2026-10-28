@@ -184,20 +184,31 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   1. `prefixBindings(text)` — the names assigned a LITERAL value that holds the prefix word (case-insensitive), in the same file:
      shell (`NAME=`, with `export`/`local`/`readonly`/`declare` before it), JavaScript/TypeScript (`const|let|var NAME =`), Python
      (`NAME =`), PowerShell (`$NAME =`); quoted with `'`, `"` or a backtick, or bare. A value with an interpolation (`$`, `${`, `{`)
-     binds nothing: its owner segment cannot be read, and the line that uses it stays as today.
+     binds nothing: its owner segment cannot be read, and the line that uses it stays as today. **Conservative binding** (plan
+     gate finding 1): a name assigned a prefix value ANYWHERE in the file is bound on every line, whatever the scope, order or a
+     later reassignment — the error is then a false `broad`, which keeps the barrier closed (the safe direction), never a
+     missed sweep. **Aliases** (finding 5): an assignment whose whole value is a reference to a bound name (`P="$BASE"`,
+     `P = BASE`) binds too, to a fixed point (at most a few passes; a cycle binds nothing more).
   2. `expandLine(line, bindings)` — `${NAME}`, `$NAME` (and `$env:NAME`) become the value; a bare identifier `NAME` becomes the
-     value in quotes for a binding made in JavaScript, TypeScript or Python syntax. The binding's own line is not expanded.
+     value in quotes for a binding made in JavaScript, TypeScript or Python syntax — only as a whole token (finding 3): not part
+     of a longer identifier, not after a `.` (a property), and not inside a string literal. The binding's own line is not
+     expanded. A concatenation needs nothing more: measured 2026-10-28, `fs.rmSync("testsToDelete-" + id)`,
+     `startsWith("testsToDelete-")` with a removal, and Python's `startswith(…)` with `shutil.rmtree` already classify broad.
   3. `classifyLine` runs on the expanded line; the reported line number, the allowlist's hash and the message stay the ORIGINAL
      line's. A line the expansion changes is broad only if its expanded form is broad, so nothing that is clean today becomes red
      unless a prefix-bound variable reaches a sweep shape.
-  Rule §7's `owner-blind` row gains "written literally or through a variable the same file assigns the prefix"; the header of
-  `sweeper-scan.mjs` says the same; `research/rule-bodies.json` moves.
+  Rule §7's `owner-blind` row gains "written literally or through a variable the same file assigns the prefix — a name from
+  another file, the environment or an argument is not traced" (finding 0: the guarantee is narrowed in writing, where a reader of
+  the barrier's verdict sees it); the header of `sweeper-scan.mjs` says the same; `research/rule-bodies.json` moves.
 - **Tests, RED first** (`tools/sweeper-scan.test.mjs`, and one guard test in `tools/leftovers-check.test.mjs`): the two lines above
   are broad, for a shell binding; `const PREFIX = "testsToDelete-"` with `names.filter((n) => n.startsWith(PREFIX))` and an
   `rmSync` → broad; the same in Python with `startswith(PREFIX)` and `shutil.rmtree` → broad; an owner-aware value
   (`'testsToDelete-u1000-'`) → owner-aware; an interpolated value → no binding, unchanged verdict; a legacy literal value → null,
-  and the guard still reports its `legacy-name`; a log-retention line → null; the guard over a fixture repository lists the
-  bare-prefix lines as `owner-blind` with their original line numbers; the scan's allowlist still passes the janitor's line by
+  and the guard still reports its `legacy-name`; a log-retention line → null; an alias chain → broad; a bare identifier that is
+  only part of a longer name or a property → no expansion; the REAL guard (`main`/the CLI of `tools/leftovers-check.mjs`, as
+  the file's existing fixture-repository tests call it) over a git repository the test builds with the binding and the removal
+  in ONE file and a second file using the same name unbound, lists the bare-prefix lines as `owner-blind` with that file's path
+  and their original line numbers and nothing for the second file (finding 2); the scan's allowlist still passes the janitor's line by
   its original hash. The repository's own self-scan (`tools/sweeper-scan.test.mjs:105`, every tracked file holds no broad line)
   stays green — a binding in this repository's own tools that the expansion turns red is judged, not exempted.
 - **Not in this change, recorded as limits:** a binding made in ANOTHER file, an environment variable, a value built over several
@@ -205,6 +216,8 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   not detected by a line scan; the janitor is the one remover (rule *The janitor*), and review owns the rest.
 - **Done when.** The RED tests were observed failing for the stated reason, then pass; the whole suite, `npm run check`,
   `node tools/rule-bodies.mjs` and `node tools/plan-lifecycle.mjs` are green; this section says F12 is fixed.
+- **Plan gate** (coai, 2026-10-28): `proceed`, 2 of 2 reviewers, 6 findings; 0, 1, 2, 3 and 5 accepted and written in above;
+  4 (a quoted concatenation would not classify) rejected by the measurement in step 2.
 
 ## F13 — `owned.mjs` assumes 100 clock ticks per second (found 2026-10-27)
 
