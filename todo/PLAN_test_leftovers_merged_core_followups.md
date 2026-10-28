@@ -201,7 +201,7 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
      (`process.arch`); the endianness is `os.endianness()`.
   3. Rule §3 (`common/test-leftovers.md:116-119`): the parenthesis names the bound — one child per script or run to learn a
      host constant is allowed (a shell's `getconf CLK_TCK`, read once when the helper is loaded), never a child per test
-     process. `node tools/rule-bodies.mjs --write` moves the record in the same commit.
+     process. `node tools/rule-bodies.mjs --update common.test-leftovers` moves the record in the same commit.
   4. The whole suite, lowered (`npm test`), and `node tools/plan-lifecycle.mjs`, `node tools/rule-bodies.mjs`.
 - **Not in this change.** The private sibling's byte copy of `owned.mjs` and its pinned rule spans: they follow at its next copy,
   and its own follow-ups track that. No other file in this repository converts clock ticks (`git grep -n "CLK_TCK\|clock tick"`).
