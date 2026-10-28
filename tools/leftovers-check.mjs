@@ -62,7 +62,7 @@ import { fileURLToPath } from "node:url";
 import { gitOutput } from "./lib/git.mjs";
 import { OWNER_GRAMMAR } from "./lib/owned.mjs";
 import { REPO_ROW, REPO_TOKEN } from "./lib/owned-token.mjs";
-import { JANITOR_FILE, classifyLine, lineSha256 } from "./lib/sweeper-scan.mjs";
+import { JANITOR_FILE, classifyLine, classifyLines, lineSha256 } from "./lib/sweeper-scan.mjs";
 import { isReason } from "./ownership-check.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -389,6 +389,8 @@ function lineFindings(file, lines, exemptions, allowlist) {
   const add = (index, cls, text) => {
     if (cls === "ryuk-off" || !isExempt(exemptions, cls, index + 1)) found.push(finding(file, index + 1, cls, text));
   };
+  const sanctioned = new Set(lines.flatMap((line, index) => (allowed(allowlist, file, index + 1, line) ? [index + 1] : []))); // a binding made on a passed line propagates nowhere
+  const verdicts = classifyLines(lines.join("\n"), { sanctioned }); // the file's own prefix bindings are read once, for every line
   lines.forEach((line, index) => {
     if (isComment(line)) return;
     const checks = [
@@ -401,7 +403,7 @@ function lineFindings(file, lines, exemptions, allowlist) {
     ];
     for (const [cls, hits] of checks) if (hits.length > 0) add(index, cls, [...new Set(hits)].map((hit) => `\`${hit}\``).join(", "));
     // owner-blind: no exemption of any kind — the allowlist (file, line, hash) is the one pass
-    if (classifyLine(line) === "broad" && !allowed(allowlist, file, index + 1, line)) found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
+    if (verdicts[index] === "broad" && !allowed(allowlist, file, index + 1, line)) found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
   });
   return found;
 }
@@ -831,6 +833,8 @@ export function loadAllowlist(explicit) {
 export function updateAllowlist(repo, explicit) {
   const script = path.join(repo, JANITOR_FILE);
   const lines = fs.readFileSync(script, "utf8").split(/\r?\n/);
+  // the allowlist is the lines broad ON THEIR OWN: a line broad only through a variable's value is never entered, so the file this
+  // writes cannot be widened by a binding (the inventory line's own variables are sanctioned by the entry, at read time)
   const entries = lines.flatMap((text, index) => (!isComment(text) && classifyLine(text) === "broad" ? [{ file: JANITOR_FILE, line: index + 1, sha256: lineSha256(text) }] : []));
   const target = explicit ?? path.join(repo, ALLOWLIST_FILE);
   fs.mkdirSync(path.dirname(target), { recursive: true });

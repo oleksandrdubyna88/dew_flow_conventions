@@ -14,7 +14,7 @@ import * as path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
-import { broadLines, classifyLine } from "./lib/sweeper-scan.mjs";
+import { NOT_A_SWEEPER, broadLines, classifyLine, classifyLines, prefixBindings } from "./lib/sweeper-scan.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const P = "teststo" + "delete"; // the prefix, lower case
@@ -104,6 +104,111 @@ test("S5a 10 the classifier's own module and this test spell no broad line", () 
     const text = fs.readFileSync(path.join(here, file), "utf8");
     assert.deepEqual(broadLines(text), [], `${file} must not hold a line its own classifier calls broad`);
   }
+});
+
+// --- F12: a prefix held in a variable of the SAME file ------------------------------------------------------------------
+//
+// Every text below is a list of lines joined with newlines; the prefix is spelled through `Q`, and a line that assigns
+// it sits in a template literal with an interpolation, so this file's own scan reads no binding of its own.
+
+const rows = (...list) => list.join("\n");
+const verdicts = (text, options) => classifyLines(text, options);
+const SHELL_USE = [`find "\${TMPDIR:-/tmp}" -maxdepth 1 -name "\${P_}*" -mmin +60 -exec rm -rf {} +`, `rm -rf "$TMPDIR/$P_"*`];
+
+test("F12 1 a shell variable holding the bare prefix makes the age-selected find and the rm of the same file broad, at their own lines", () => {
+  const text = rows("#!/usr/bin/env bash", `P_='${Q}-'`, ...SHELL_USE);
+  assert.deepEqual(verdicts(text), [null, null, "broad", "broad"]);
+  assert.deepEqual(broadLines(text), [3, 4], "the line numbers are the original lines'");
+});
+
+test("F12 2 the same lines with no binding in the file are not traced: the name may come from anywhere", () => {
+  assert.deepEqual(verdicts(rows(...SHELL_USE)), [null, null]);
+});
+
+test("F12 3 a JavaScript constant holding the bare prefix: startsWith, and a concatenation, are broad", () => {
+  const constant = `const PREFIX = "${Q}-";`;
+  assert.deepEqual(verdicts(rows(constant, "names.filter((n) => n.startsWith(PREFIX)).forEach((n) => fs.rmSync(n))")), [null, "broad"]);
+  assert.deepEqual(verdicts(rows(constant, "fs.rmSync(PREFIX + id)")), [null, "broad"]);
+  assert.deepEqual(verdicts(rows(`let PREFIX = '${Q}_'`, "names.filter((n) => n.startsWith(`${PREFIX}`)).forEach((n) => fs.rmSync(n))")), [null, "broad"], "a template's ${NAME} too");
+});
+
+test("F12 4 a Python name holding the bare prefix: startswith and rmtree are broad", () => {
+  assert.deepEqual(verdicts(rows(`PREFIX = "${Q}-"`, "if n.startswith(PREFIX): shutil.rmtree(n)")), [null, "broad"]);
+});
+
+test("F12 5 a PowerShell variable holding the bare prefix: $name and $env:name are read", () => {
+  assert.deepEqual(verdicts(rows(`$Pfx = '${Q}-'`, 'Get-ChildItem $env:TEMP | Where-Object Name -like "$Pfx*" | Remove-Item -Recurse')), [null, "broad"]);
+  assert.deepEqual(verdicts(rows(`$env:Pfx = '${Q}-'`, 'Remove-Item "$env:TEMP/$env:Pfx"*')), [null, "broad"]);
+});
+
+test("F12 6 a variable holding an OWNER-AWARE value makes its use line owner-aware, not broad", () => {
+  assert.deepEqual(verdicts(rows(`P_='${Q}-u1000-'`, ...SHELL_USE.slice(1))), [null, "owner-aware"]);
+});
+
+test("F12 7 a value with an interpolation binds nothing: the use line keeps today's verdict", () => {
+  assert.deepEqual(verdicts(rows(`P_="${Q}-\${OWNER}-"`, ...SHELL_USE.slice(1))), [null, null]);
+  assert.equal(prefixBindings(`P_="${Q}-$OWNER-"`).size, 0);
+  assert.equal(prefixBindings(`const PREFIX = \`${Q}-\${owner}-\`;`).size, 0);
+});
+
+test("F12 8 a LEGACY literal value is narrow: its use lines are null", () => {
+  assert.deepEqual(verdicts(rows(`P_='${Q}-myrepo-preflight-'`, ...SHELL_USE)), [null, null, null]);
+});
+
+test("F12 9 a log-retention line is nothing, with or without a binding elsewhere in the file", () => {
+  const retention = `find "$LOG_DIR" -name '*.log' -mtime +14 -delete`;
+  assert.deepEqual(verdicts(retention), [null]);
+  assert.deepEqual(verdicts(rows(`P_='${Q}-'`, retention)), [null, null]);
+});
+
+test("F12 10 an alias of a bound name binds too, through a chain, and a cycle binds nothing", () => {
+  assert.deepEqual(verdicts(rows(`BASE='${Q}-'`, `P_="$BASE"`, ...SHELL_USE.slice(1))), [null, null, "broad"]);
+  assert.deepEqual(verdicts(rows(`BASE='${Q}-'`, "MID=${BASE}", "P_=$MID", ...SHELL_USE.slice(1))), [null, null, null, "broad"]);
+  assert.deepEqual(verdicts(rows(`const BASE = "${Q}-";`, "const PREFIX = BASE;", "fs.rmSync(PREFIX + id)")), [null, null, "broad"]);
+  assert.deepEqual(verdicts(rows(`A_="$B_"`, `B_="$A_"`, ...SHELL_USE.slice(1).map((l) => l.replace("$P_", "$A_")))), [null, null, null], "a cycle with no literal at its root");
+});
+
+test("F12 11 a bare identifier is expanded as a whole token only: not in a longer name, after a dot, or inside a string", () => {
+  const bound = `PREFIX = "${Q}-"`;
+  for (const use of [
+    "shutil.rmtree(PREFIXES + n)",
+    "shutil.rmtree(MY_PREFIX + n)",
+    "shutil.rmtree(obj.PREFIX + n)",
+    "shutil.rmtree('PREFIX' + n)",
+    'shutil.rmtree("a PREFIX b")',
+  ]) assert.deepEqual(verdicts(rows(bound, use)), [null, null], use);
+  assert.deepEqual(verdicts(rows(bound, "shutil.rmtree(PREFIX + n)")), [null, "broad"], "the whole token is read");
+});
+
+test("F12 12 a shell binding does not expand a bare word: only $NAME, ${NAME} and $env:NAME are uses", () => {
+  assert.deepEqual(verdicts(rows(`P_='${Q}-'`, "echo P_ | xargs rm -rf")), [null, null]);
+});
+
+test("F12 13 the binding's own line keeps its own verdict, and the marker clears a use line only for a caller that honours it", () => {
+  assert.deepEqual(verdicts(`P_='${Q}-'`), [null]);
+  const text = rows(`P_='${Q}-'`, `${SHELL_USE[1]} # ${NOT_A_SWEEPER}`);
+  assert.deepEqual(verdicts(text), [null, "broad"]);
+  assert.deepEqual(verdicts(text, { honourMarker: true }), [null, null]);
+});
+
+test("F12 14 a name assigned the prefix anywhere binds on every line, whatever the order or a later reassignment", () => {
+  assert.deepEqual(verdicts(rows(...SHELL_USE.slice(1), `P_='${Q}-'`, "P_=other")), ["broad", null, null]);
+});
+
+test("F12 15 a binding made on a SANCTIONED line propagates nowhere: only that line's own assignments are ignored", () => {
+  const text = rows(`RX_='${Q}[-_]'; GLOB_='${Q}[-_]*'`, `P_='${Q}-'`, 'awk -v rx="^$RX_" x', 'rm -rf "$TMPDIR/$P_"*');
+  assert.deepEqual(verdicts(text), ["broad", null, "broad", "broad"]);
+  assert.deepEqual(verdicts(text, { sanctioned: new Set([1]) }), ["broad", null, null, "broad"], "RX_ is no longer bound, P_ still is");
+  assert.deepEqual([...prefixBindings(text, new Set([1])).keys()], ["P_"]);
+});
+
+test("F12 16 the janitor, read with the shipped allowlist's lines sanctioned, holds no broad line beyond the passed one; read without it, the uses show", () => {
+  const janitor = fs.readFileSync(path.join(here, "janitor.sh"), "utf8");
+  const entries = JSON.parse(fs.readFileSync(path.join(here, "fixtures", "owner-blind-allowlist.json"), "utf8")).entries;
+  const sanctioned = new Set(entries.map((entry) => entry.line));
+  const broad = classifyLines(janitor, { sanctioned }).flatMap((verdict, index) => (verdict === "broad" ? [index + 1] : []));
+  assert.deepEqual(broad, [...sanctioned], "the one passed line, and none of the uses of its variables");
+  assert.ok(broadLines(janitor).length > sanctioned.size, "without the sanction the variables' uses are broad: the test would be empty otherwise");
 });
 
 // --- S5b: the scan ---------------------------------------------------------------------------------------------------

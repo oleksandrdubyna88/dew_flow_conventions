@@ -218,6 +218,14 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   `node tools/rule-bodies.mjs` and `node tools/plan-lifecycle.mjs` are green; this section says F12 is fixed.
 - **Plan gate** (coai, 2026-10-28): `proceed`, 2 of 2 reviewers, 6 findings; 0, 1, 2, 3 and 5 accepted and written in above;
   4 (a quoted concatenation would not classify) rejected by the measurement in step 2.
+- **Deviation (2026-10-28, judged at build):** the plan's conservative binding made this repository's own janitor red on 7 lines (456, 458, 465,
+  475, 501, 503, 543) through `RX`/`GLOB`, assigned on its allowlisted inventory line 156. A binding made on a line the allowlist passes
+  (same file, line number and line hash) does not propagate: `classifyLines` takes the set of such lines (`sanctioned`), the scan and the
+  guard fill it from their allowlist, and `--update-allowlist` writes only lines broad on their own, so a binding never widens the file.
+  The risk — a changed janitor that keeps line 156 byte-identical could hide a new use of `$RX` — is no wider than before F12 (such a use
+  was invisible then too) and is closed by F11 (the whole janitor's hash).
+- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`. RED: the use lines of a same-file binding classified null (`actual null, expected 'broad'`) and the
+  guard exited 0 on a file that removes through a bare-prefix variable; GREEN: all new tests, and the janitor's 7 uses clean through the sanction.
 
 ## F13 — `owned.mjs` assumes 100 clock ticks per second (found 2026-10-27)
 
