@@ -16,16 +16,13 @@
 // re-review and its reverts; the halt is the rule's, `common/plan-change-control.md`, and the review server's when it
 // refuses `review_code` until the new `proceed`); an entry dated before its epoch, or entries dated out of order (the
 // check judges structure and count, not when); where the section stands in the file (the rule says under the status
-// block; the check reads it anywhere); an indented line behind TWO list markers (`  - - 1.2 · …`, `  1. - 1.2 · …`),
-// which a renderer shows as a visibly nested bullet that takes deliberate nesting to write — reserving it would widen
-// the parent's § 2, a contract change, so it is a known limit (code round 3, 2026-10-29); a setext heading (`Plan
-// changes` over `---` or `===`), which a reader may take for the ledger's but which the parent's § 2 does not name —
-// the ATX `## Plan changes` is the one heading — and which no plan of the estate writes: a second known limit, not
-// worth a second grammar (code round 4); a heading styled with inline markup or a character reference (`## **Plan
-// changes**`, `## *Plan changes*`, a code span, `## Plan&nbsp;changes`), which a reader takes for the ledger's but
-// which spells the heading differently from § 2's: a third known limit (code round 5). What it does see is exactly the
-// grammar below, and every line it cannot read is a red, never a skip: an entry that fails to parse would otherwise
-// lower the count in silence.
+// block; the check reads it anywhere); a setext heading (`Plan changes` over `---` or `===`), which a reader may take
+// for the ledger's but which the parent's § 2 does not name — the ATX `## Plan changes` is the one heading — and which
+// no plan of the estate writes: a known limit, not worth a second grammar (code round 4); a heading styled with inline
+// markup or a character reference (`## **Plan changes**`, `## *Plan changes*`, a code span, `## Plan&nbsp;changes`),
+// which a reader takes for the ledger's but which spells the heading differently from § 2's: a second known limit (code
+// round 5). What it does see is exactly the grammar below, and every line it cannot read is a red, never a skip: an
+// entry that fails to parse would otherwise lower the count in silence.
 //
 // The grammar, in one place. Text is folded (CRLF = LF) and a lone CR becomes a line ending too, as CommonMark reads it
 // (here and not in the shared `folded`, which feeds the hashed rule bodies), then stripped of fenced blocks through
@@ -36,15 +33,15 @@
 // a line after `trimEnd()` and with each run of spaces or tabs folded to ONE space, except the tests that read the
 // original: the near-miss heading and the two on an indented line. A line that starts with a space or a tab is free
 // text — EXCEPT one that, with its indent stripped (every Unicode space and format character) and its format characters
-// removed (a renderer prints nothing for them), starts like a ledger line: an entry (`- 1.2`, `* 1.2`, `1. 1.2`, a bare
-// `1.2`), an epoch line (`>`) or a heading (`#`), whatever follows. A renderer shows such a line as a list item, a
-// quote or a heading, which a reader counts, so it is a finding — `RESERVED_PREFIX`, parent § 2 — and is never parsed,
-// never counted. Free text therefore may not begin with an entry-shaped number, `>` or `#`. Fields are separated by " ·
-// " (U+00B7) and the cause follows " — " (U+2014); `|`, `--`, `-` and the en dash are refused by a message that names
-// the expected character, because a second spelling of the format would be a second grammar to keep in step forever.
-// Keywords and values are case-sensitive. A pipe behind one or more backslashes is cell text, not a boundary (the cell
-// keeps the run minus one backslash). Every value a message quotes goes through `clean`: control and format characters
-// become a space and a long one is cut.
+// removed (a renderer prints nothing for them), starts like a ledger line: an entry (`- 1.2`, `* 1.2`, `1. 1.2`, `- -
+// 1.2`, a bare `1.2`), an epoch line (`>`) or a heading (`#`), whatever follows. A renderer shows such a line as a list
+// item, a quote or a heading, which a reader counts, so it is a finding — `RESERVED_PREFIX`, parent § 2 — and is never
+// parsed, never counted. Free text therefore may not begin with an entry-shaped number, `>` or `#`. Fields are
+// separated by " · " (U+00B7) and the cause follows " — " (U+2014); `|`, `--`, `-` and the en dash are refused by a
+// message that names the expected character, because a second spelling of the format would be a second grammar to keep
+// in step forever. Keywords and values are case-sensitive. A pipe behind one or more backslashes is cell text, not a
+// boundary (the cell keeps the run minus one backslash). Every value a message quotes goes through `clean`: control and
+// format characters become a space and a long one is cut.
 //
 // Dependency-free on purpose: `plan-lifecycle.mjs` runs in every consumer's CI from the mounted rules, before any
 // `npm ci`, so this file imports from `./rule-body.mjs` and from nothing else.
@@ -63,10 +60,10 @@ export const VERDICTS = Object.freeze(["fits", "cut", "—"]);
  *  the `misfiled` check read ONE phrase: a stopped plan may say what is done without being called finished. */
 export const STOP_PHRASE = /\bstopped for re-review\b/i;
 
-/** An indented line that starts like a ledger line (parent § 2, entries 1.2 and 2.1): an entry — whose marker may be a
- *  bullet or an ordered-list marker of at most nine digits, CommonMark's limit —, an epoch line (`>`) or a heading
- *  (`#`). One regex, three shapes, tested on the line with its indent stripped. */
-export const RESERVED_PREFIX = /^(?:[>#]|(?:(?:[-*+]|\d{1,9}[.)])\s+)?[1-9]\d*\.[1-9]\d*(?=\s|$))/;
+/** An indented line that starts like a ledger line (parent § 2, entries 1.2 and 2.1, and the epoch 3 re-review): an entry —
+ *  behind any number of list markers, each a bullet or an ordered-list marker of at most nine digits (CommonMark's
+ *  limit) —, an epoch line (`>`) or a heading (`#`). One regex, three shapes, tested on the line with its indent stripped. */
+export const RESERVED_PREFIX = /^(?:[>#]|(?:(?:[-*+]|\d{1,9}[.)])\s+)*[1-9]\d*\.[1-9]\d*(?=\s|$))/;
 
 const HEADING = /^## Plan changes$/;
 /** What a reader takes for the ledger's heading and the exact one is not: another case, level or spacing, one to three
