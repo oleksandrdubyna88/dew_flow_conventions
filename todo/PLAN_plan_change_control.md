@@ -1,6 +1,6 @@
 # PLAN — A plan changed twice after its approval stops for a whole re-review
 
-> Status: **in progress, epoch 3 (approved by the owner 2026-10-29 after the second full stop of 2026-10-29) — E1 and E2 built on `feat/plan-change-control-e2`; the pull request (S10), the server plan (S7) and the owner's release question (S9) are open.** Scope: a new shared rule
+> Status: **in progress, epoch 3 (approved by the owner 2026-10-29 after the second full stop of 2026-10-29) — E1 and E2 built and merged to `main` by #86 (squash, S10); open: the server plan (S7, #935 in the server repository) and the owner's release question (S9).** Scope: a new shared rule
 > `common/plan-change-control.md`, two pointer lines in `common/planning-docs.md`, a change-ledger check in
 > `tools/plan-lifecycle.mjs` through a new `tools/lib/plan-ledger.mjs`, their tests, `research/rule-bodies.json`,
 > `research/module_rules.md`, `research/module_tests.md`, the `README.md` tools row, a `plan-lifecycle` step in
