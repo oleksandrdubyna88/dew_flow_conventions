@@ -20,9 +20,11 @@ agreement tests pass and each splice case was watched going red; the rule is at 
 recorded as the parent's DoD states it; CI runs `node tools/plan-lifecycle.mjs`; the five commands are green;
 `review_code` and the Opus review are resolved; ONE commit on `feat/plan-change-control-e2`.
 
-The five commands, from the worktree root (`npm test` does not run the family checks, `research/module_tests.md:989`):
+The five commands, from the worktree root (`npm test` does not run the family checks, `research/module_tests.md:989`),
+after the locked install that `.agents/PROJECT.md` requires (E2 plan round, finding 0):
 
 ```bash
+npm ci --ignore-scripts
 npm test
 npm run check
 node tools/ownership-check.mjs
@@ -523,8 +525,8 @@ The helpers:
 ```js
 const STATUS = "> Status: **in progress, 2026-10-29.** The rule's example as a plan carries it.";
 const STOPPED = "> Status: **stopped for re-review, 2026-10-29.** The rule's example, stopped.";
-const plan = (ledger) => ["# PLAN — the rule's example", "", STATUS, "", ...ledger, "", "## Goal", "", "Text."].join("\n");
-const findings = (ledger, status = STATUS) => ledgerFindings({ file: "todo/PLAN_x.md", text: plan(ledger), status, parent: null });
+const plan = (ledger, status = STATUS) => ["# PLAN — the rule's example", "", status, "", ...ledger, "", "## Goal", "", "Text."].join("\n");
+const findings = (ledger, status = STATUS) => ledgerFindings({ file: "todo/PLAN_x.md", text: plan(ledger, status), status, parent: null }); // the status line in the text and the status argument agree (E2 plan round, finding 1)
 
 /** The ONE `markdown` fence of the rule whose first line is `## Plan changes`, as lines, fence lines excluded. */
 function example() {
@@ -648,8 +650,8 @@ observed red, what it does not prove — with the counts the runner printed, nev
   A1–A5; and the selection cases in `tools/rules.test.mjs`. The RED messages of S4 and the RED-GREEN-RED breaks, one line
   each.
 - **What it does not prove:** that an agent counts, stops or re-reviews — no loader output and no check is evidence of
-  behaviour; an unrecorded change, a plan with no ledger and code written during a stop are invisible by design; the three
-  shapes the check does not see (two list markers, a setext heading, a styled heading); git history is never read.
+  behaviour; an unrecorded change, a plan with no ledger and code written during a stop are invisible by design; the two
+  shapes the check does not see (a setext heading, a styled heading — two list markers are detected since E1's K1 fix); git history is never read.
 
 ### `README.md` — the `tools/plan-lifecycle.mjs` row (`:245`)
 
