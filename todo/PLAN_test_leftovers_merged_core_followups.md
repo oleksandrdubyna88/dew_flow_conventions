@@ -242,10 +242,10 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   Fixed in this change from that list: the Python `f` string prefix at the binding (a test). Added after round 3:
   - **J1** — a value whose prefix word is split over two literal pieces (`'teststo''delete-'`, `"teststo" + "delete-"`) binds nothing: this
     family's own spelling of "not the prefix" for detector and test code. A real sweeper written that way is missed (F14).
-  - **J2** — what binds from a script operand that is not literal-only: each string literal holding the word (`'W-'.lower()`, `'W-' || x`, a
-    conditional expression, PowerShell `-replace`); a plain call (a dotted name, simple arguments, one nesting level) is kept as written too. A
-    call nested deeper keeps only its literals; a regex literal, an arrow, an object and an environment name that merely holds the word bind
-    nothing. A right-hand side is read to 1024 characters: past that only its literals and word-runs bind.
+  - **J2** — what binds from a script operand that is not string-shaped: each ORIGINAL string literal holding the word (`'W-'.lower()`, `'W-' || x`, a
+    conditional expression, PowerShell `-replace`); a regex literal, an arrow, an object, a command substitution and an environment name that
+    merely holds the word bind nothing; a path-join call (`PATH_JOIN_CALLS`) binds only with literals or names as arguments. A right-hand side is read
+    to 1024 characters: past that only its literals and word-runs bind.
   - **J3** — `'W-' + STAR`: any non-literal operand after the prefix reads as an owner segment, so the use is owner-aware (missed).
 - **Expected fleet work:** measured by the judge with a machine scan over one host's checkouts, the change reports 143 MORE owner-blind lines than
   before, all in test or detector code that spells sweep text through a variable (a consumer's dev-VM shell test that builds `find … '${p}-*' -delete`
@@ -258,7 +258,17 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   judged broad; `classifyLines` returns null for a line the allowlist passes, so no caller checks it again; the prefix word is tested on the
   whole text before any line is classified; a right-hand side is read to 1024 characters and an operator tail of a `${NAME…}` use to 512, so an
   unclosed bracket or `${P:` on a 100000-character line takes tens of milliseconds, not seconds.
-- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`, in three rounds. RED, round 1: the use lines of a same-file binding classified null
+- **Round 4 (measured on real compliant code):** a machine scan over the private sibling's main checkout reported 53 owner-blind lines at round 3 (51 in one
+  test file that builds owner-aware names, one in each of two provisioning tests), none a sweeper, against none at the base release. The binding reader
+  had bound 22 names there by taint: a name given to a call or a member access (`volumeFiles(s.from)`) "held the word in a literal" once expansion had
+  written the value in, and a template cycle grew until the name overflowed. Now only a string-shaped value binds (a literal, a template or word of
+  literals and names, a bound name, a call of `PATH_JOIN_CALLS` with such arguments); the word comes from an original literal or a bound name's value;
+  a name's own placeholder and that of a name built from it stays a placeholder; a regular-expression literal is not a place where a name is a use. The
+  other two lines were a bound name (a listing query) written inside a regular-expression literal. After the fix the same scan reports none (462 files).
+  A machine scan over one host's checkouts (`--honour-marker`, lowered), base release against round 4: 390 → 542 owner-blind lines (+152, against +143 measured
+  at the first commit), all in one consumer's dev-VM shell tests that write sweep text through `local p=<prefix>` (8 files, 22 checkouts of the same
+  tree; the main checkout of it +5 in one file), none a sweeper; nothing else on the host changed.
+- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`, in four rounds. RED, round 1: the use lines of a same-file binding classified null
   (`actual null, expected 'broad'`) and the guard exited 0 on a file that removes through a bare-prefix variable. RED, round 2: the use of an
   owner-aware concatenation classified broad, `${P:?}` and its kin classified null, and a 100000-character line of the shape `x:` and spaces took 21 s.
   RED, round 3 (against `0dce2ca` → `f7926cd`): the seven literal-first shapes, the same-line alias, the repeated-text span, the 33rd value, and

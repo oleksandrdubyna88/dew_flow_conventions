@@ -9,9 +9,14 @@
 // The value is the WHOLE right-hand side, up to `;`, a top-level `,`, an unbalanced `)`, a comment or the end of the line: adjacent
 // literals are folded, a shell word of several quoted pieces is one word, and every operand that is not a literal (`+ owner +`,
 // `"$OWNER"`) is kept as an interpolation, so the classifier sees an owner segment. A value is bound only when ONE literal piece
-// holds the prefix word as written: `'teststo' + 'delete'` is the family's own spelling of "not the prefix" and binds nothing. The known bindings are written into the value
-// first, so an alias (`P="$BASE"`), a path (`P="$TMPDIR/$BASE"`) and a default (`P="${X:-<prefix>-}"`) bind too, to a TRUE fixed point:
-// the loop ends when no binding changes; a value longer than MAX_VALUE or a name with MAX_VALUES values stops growing (the cycle guard).
+// holds the prefix word as written: `'teststo' + 'delete'` is the family's own spelling of "not the prefix" and binds nothing.
+// Only a STRING-SHAPED value binds: a literal, a template or shell word of literals and names, a bound name, or a call of PATH_JOIN_CALLS
+// whose arguments are such. A bound name given to any other call, a member access or a subscript (`volumeFiles(s.from)`, `base.length`) makes
+// no value: that would be taint, not value tracing. The word comes from an ORIGINAL literal of the file or from a bound name's value, never
+// from a literal that expansion wrote into a call. The known bindings are written into the value, so an alias (`P="$BASE"`), a path
+// (`P="$TMPDIR/$BASE"`) and a default (`P="${X:-<prefix>-}"`) bind too, to a TRUE fixed point: the loop ends when no binding changes; a name's
+// own placeholder, and that of a name built from it, stays a placeholder in its value (a cycle ends there); a value longer than MAX_VALUE or a
+// name with MAX_VALUES values stops growing (`overflow`: a line that uses it is judged broad).
 // A use is `$NAME`, `${NAME}` or `${NAME<operator>…}` (not the length `${#NAME}`), `$env:NAME`, and — for a name bound in script code —
 // a bare `NAME` outside a string, a longer identifier and a property access.
 //
@@ -21,9 +26,9 @@
 //   - a name bound in another file, the environment, a value built over several lines or passed as an argument;
 //   - a value whose prefix word is split over two literal pieces (`'teststo''delete-'`, `"teststo" + "delete-"`) binds nothing: this
 //     family's own spelling of "not the prefix" for detector and test code — a real sweeper written that way is missed (follow-up F14);
-//   - from a script operand that is not literal-only, only its string literals holding the word bind (`'<prefix>-'.lower()`,
-//     `'<prefix>-' || x`, a conditional, `-replace`), and a plain call (a dotted name, simple arguments, one nesting level) is kept as
-//     written; a call nested deeper, a regex literal, an arrow, an object and an environment name that merely holds the word bind nothing;
+//   - from a script operand that is not string-shaped, only its ORIGINAL string literals holding the word bind (`'<prefix>-'.lower()`,
+//     `'<prefix>-' || x`, a conditional, `-replace`); a regex literal, an arrow, an object, a command substitution and an environment
+//     name that merely holds the word bind nothing; a path-join call is read only with arguments that are literals or names;
 //   - `'<prefix>-' + STAR`: any non-literal operand after the prefix reads as an owner segment, so the use is owner-aware;
 //   - a right-hand side is read to 1024 characters: past that only its literals and word-runs bind;
 //   - Python f-strings and `Path.glob` at the USE, a glob built by concatenation with the removal on another line, a quoted glob
@@ -145,8 +150,8 @@ function literalTexts(operand) {
   return out;
 }
 
-/** `text` split at its top-level `+` (outside quotes and brackets). */
-function splitPlus(text) {
+/** `text` split at its top-level characters for which `isSeparator` holds (outside quotes and brackets). */
+function splitTop(text, isSeparator) {
   const parts = [];
   let depth = 0;
   let quote = null;
@@ -159,19 +164,28 @@ function splitPlus(text) {
     } else if (char === "'" || char === '"' || char === "`") quote = char;
     else if (char in CLOSER) depth += 1;
     else if (char === ")" || char === "]" || char === "}") depth -= 1;
-    else if (char === "+" && depth === 0) { parts.push(text.slice(from, index)); from = index + 1; }
+    else if (depth === 0 && isSeparator(char)) { parts.push(text.slice(from, index)); from = index + 1; }
   }
   return [...parts, text.slice(from)];
 }
 
-export const holdsPrefix = (value) => value.toLowerCase().includes(PREFIX_WORD);
+/** The index of the bracket that closes the one at `open`, quotes respected; -1 when it does not close. */
+function closingIndex(text, open) {
+  let depth = 0;
+  let quote = null;
+  for (let index = open; index < text.length; index += 1) {
+    const char = text[index];
+    if (quote !== null) {
+      if (char === "\\") index += 1;
+      else if (char === quote) quote = null;
+    } else if (char === "'" || char === '"' || char === "`") quote = char;
+    else if (char in CLOSER) depth += 1;
+    else if ((char === ")" || char === "]" || char === "}") && (depth -= 1) === 0) return index;
+  }
+  return -1;
+}
 
-// A non-literal operand is kept as written only when it is a plain call (`path.join(os.tmpdir(), "<prefix>-")`: a dotted name, simple
-// arguments, no braces, no arrow) with the prefix word inside a string literal: a regex literal, an object, a function or an environment
-// name that merely holds the word (`TESTSTODELETE_OWNER`) is not a value the name stands for, and binding it would flag every use of the name.
-const CALL_RE = /^[\w.$]+\((?:[^(){}]|\([^(){}]*\))*\)$/;
-const QUOTED_PREFIX_RE = new RegExp(String.raw`["'\x60][^"'\x60]*${PREFIX_WORD}`, "i");
-const keptOperand = (operand) => CALL_RE.test(operand.trim()) && QUOTED_PREFIX_RE.test(operand);
+export const holdsPrefix = (value) => value.toLowerCase().includes(PREFIX_WORD);
 
 /** The inner texts of every closed string literal in `text`, nested ones included. */
 function quotedLiterals(text) {
@@ -190,36 +204,129 @@ function quotedLiterals(text) {
 
 const WORD_RUN_RE = new RegExp(String.raw`[^\s'"\x60;&|()]*${PREFIX_WORD}[^\s'"\x60;&|()]{0,128}`, "gi");
 
-/**
- * The values a right-hand side can stand for that hold the prefix word. The whole value: the pieces joined — shell words unquoted; script
- * operands folded, a literal operand as its inner text(s), a plain call holding the word in a string kept as written (`keptOperand`),
- * anything else as `${x}`; it counts only when ONE piece holds the word as written, so `'teststo' + 'delete'` (two pieces, this family's
- * own spelling of "not the prefix") holds nothing. Beside it, every string literal that holds the word inside an operand that is not a
- * literal (`'<prefix>-'.toLowerCase()`, `'<prefix>-' || x`, `'<prefix>-' if a else …`, `-replace`) is a value of its own. A right-hand side
- * cut at MAX_EXPRESSION adds the word-runs of its text: a value that long is read conservatively, never dropped.
- */
-function candidates(text, syntax, truncated) {
-  const found = [];
-  if (syntax === "sh") {
-    const pieces = shellPieces(text);
-    if (pieces.some(holdsPrefix)) found.push(pieces.join(""));
-  } else {
-    const pieces = [];
-    for (const operand of splitPlus(text)) {
-      const literals = literalTexts(operand);
-      if (literals !== null) { pieces.push(...literals); continue; }
-      pieces.push(keptOperand(operand) ? operand.trim() : "${x}");
-      found.push(...quotedLiterals(operand).filter(holdsPrefix));
-    }
-    if (pieces.some(holdsPrefix)) found.push(pieces.join(""));
+/** The calls that join path parts: their arguments, when literals or names, make a string, so a value built by one is a value. */
+export const PATH_JOIN_CALLS = ["path.join", "path.resolve", "path.posix.join", "path.win32.join", "os.path.join", "Join-Path", "[IO.Path]::Combine"];
+
+/** The arguments of `operand` when it is a call of PATH_JOIN_CALLS (`name(a, b)`, or PowerShell's `Join-Path a b`), else null. */
+function pathJoinArgs(operand) {
+  let text = operand.trim();
+  while (text.startsWith("(") && closingIndex(text, 0) === text.length - 1) text = text.slice(1, -1).trim();
+  const name = PATH_JOIN_CALLS.find((call) => text.startsWith(call) && !/^[\w.$]/.test(text.slice(call.length)));
+  if (name === undefined) return null;
+  const rest = text.slice(name.length);
+  if (/^\s*\(/.test(rest)) {
+    const open = text.indexOf("(", name.length);
+    return closingIndex(text, open) === text.length - 1 ? splitTop(text.slice(open + 1, -1), (char) => char === ",") : null;
   }
-  if (truncated) found.push(...(text.match(WORD_RUN_RE) ?? []));
-  return found;
+  if (name !== "Join-Path" || !/^\s/.test(rest)) return null;
+  return splitTop(rest, (char) => /\s/.test(char)).map((arg) => arg.trim()).filter((arg) => arg !== "" && !/^-[A-Za-z]+$/.test(arg));
+}
+
+const cross = (left, right) => left.flatMap((head) => right.map((tail) => [...head, ...tail]));
+const UNKNOWN = ["${x}"]; // an operand that is not a literal and not a bound name: an interpolation, which the classifier reads as an owner segment
+const SCRIPT_NAME_RE = /^\s*([A-Za-z_]\w*)\s*$/;
+const POWERSHELL_NAME_RE = /^\s*\$(?:env:)?([A-Za-z_]\w*)\s*$/;
+
+/**
+ * The alternatives (each a list of pieces) one operand of a script right-hand side can stand for. A STRING-SHAPED operand only: a literal (its
+ * `${NAME}` forms expanded), a bound name (one alternative per value), or a path-join call whose arguments are such. Anything else — a call, a
+ * member access, a subscript, whatever it takes as arguments — is an interpolation: a bound name given to it does NOT make its result a value.
+ */
+function operandAlternatives(operand, syntax, ctx) {
+  const literals = literalTexts(operand);
+  if (literals !== null) {
+    let combos = [[]];
+    for (const inner of literals) {
+      const variants = readings(inner, ctx.uses, ctx.own, false);
+      if (variants === null) ctx.overflow = true;
+      combos = cross(combos, (variants ?? [inner]).map((text) => [text]));
+    }
+    return combos;
+  }
+  const name = (syntax === "ps" ? POWERSHELL_NAME_RE : SCRIPT_NAME_RE).exec(operand)?.[1];
+  if (name !== undefined) {
+    const entry = ctx.bindings.get(name);
+    if (entry === undefined || ctx.own.has(name) || (syntax !== "ps" && entry.family !== CODE)) return [UNKNOWN];
+    if (entry.overflow) ctx.overflow = true;
+    return entry.values.length === 0 ? [UNKNOWN] : entry.values.map((value) => [value]);
+  }
+  const args = pathJoinArgs(operand);
+  if (args === null) return [UNKNOWN];
+  let combos = [[]];
+  args.forEach((arg, index) => { combos = cross(combos, cross(index === 0 ? [[]] : [["/"]], operandAlternatives(arg, syntax, ctx))); });
+  return combos;
+}
+
+/** The shell text with every command substitution (`$(…)`, backticks) made `${x}`: what a command prints is not the value of a word that holds a bound name. */
+function maskSubstitutions(text) {
+  let out = "";
+  let single = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === "'") single = !single;
+    if (!single && char === "$" && text[index + 1] === "(") {
+      const end = closingIndex(text, index + 1);
+      out += "${x}";
+      index = end < 0 ? text.length : end;
+    } else if (!single && char === "`") {
+      const end = text.indexOf("`", index + 1);
+      out += "${x}";
+      index = end < 0 ? text.length : end;
+    } else out += char;
+  }
+  return out;
+}
+
+/**
+ * The values a right-hand side can stand for that hold the prefix word, `{ values, overflow }`. Only a STRING-SHAPED value binds: a shell word
+ * (unquoted, its `$NAME` forms expanded, command substitutions masked) or script operands that are literals, bound names or path-join calls
+ * (`operandAlternatives`). The word must come from an ORIGINAL literal or from a bound name's value, and it counts only when ONE piece holds
+ * it as written, so `'teststo' + 'delete'` (two pieces, this family's own spelling of "not the prefix") holds nothing. Beside the whole value,
+ * every original string literal that holds the word inside an operand that is not a literal (`'<prefix>-'.toLowerCase()`, `'<prefix>-' || x`, a
+ * conditional, `-replace`) is a value of its own. A right-hand side cut at MAX_EXPRESSION adds the word-runs of its text: never dropped.
+ */
+function evaluate(item, uses, bindings, own) {
+  const found = [];
+  const ctx = { uses, bindings, own, overflow: false };
+  if (item.syntax === "sh") {
+    const masked = maskSubstitutions(item.rhs);
+    const variants = readings(masked, uses, own, false);
+    if (variants === null) ctx.overflow = true;
+    for (const text of variants ?? [masked]) {
+      const pieces = shellPieces(text);
+      if (pieces.some(holdsPrefix)) found.push(pieces.join(""));
+    }
+  } else {
+    let combos = [[]];
+    for (const operand of splitTop(item.rhs, (char) => char === "+")) {
+      if (combos.length <= MAX_READINGS) combos = cross(combos, operandAlternatives(operand, item.syntax, ctx));
+      else ctx.overflow = true;
+      if (literalTexts(operand) === null) found.push(...quotedLiterals(operand).filter(holdsPrefix));
+    }
+    for (const pieces of combos) if (pieces.some(holdsPrefix)) found.push(pieces.join(""));
+  }
+  if (item.truncated) found.push(...(item.rhs.match(WORD_RUN_RE) ?? []));
+  return { values: found, overflow: ctx.overflow };
 }
 
 // --- uses ----------------------------------------------------------------------------------------------------------------
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** The index of the `/` that closes a regular-expression literal opening at `start`, or -1: it opens after nothing or after an operator, never after a word or a closing bracket (that is a division). */
+function regexLiteralEnd(line, start) {
+  const before = line.slice(0, start).trimEnd().at(-1);
+  if ((before !== undefined && !"([{,;:=!&|?+-*%<>~^".includes(before)) || /[/*]/.test(line[start + 1] ?? "/")) return -1;
+  let inClass = false;
+  for (let index = start + 1; index < line.length; index += 1) {
+    const char = line[index];
+    if (char === "\\") index += 1;
+    else if (char === "[") inClass = true;
+    else if (char === "]") inClass = false;
+    else if (char === "/" && !inClass) return index;
+  }
+  return -1;
+}
 
 /** Which characters of the line sit inside a string literal (`'`, `"` or a backtick, with backslash escapes), the quotes included. */
 function stringMask(line) {
@@ -229,6 +336,10 @@ function stringMask(line) {
     const char = line[index];
     if (quote === null) {
       if (char === "'" || char === '"' || char === "`") { quote = char; mask[index] = true; }
+      else if (char === "/") {
+        const end = regexLiteralEnd(line, index);
+        if (end > index) { mask.fill(true, index, end + 1); index = end; }
+      }
     } else {
       mask[index] = true;
       if (char === "\\") { index += 1; mask[index] = true; } else if (char === quote) quote = null;
@@ -247,13 +358,13 @@ function makeUses(bindings) {
 }
 
 /** `line` with every use of a bound name replaced by what `choose(name, entry)` returns; a name in `own` (assigned on the line) is left alone. */
-function replaceUses(line, uses, own, choose) {
+function replaceUses(line, uses, own, choose, allowBare = true) {
   let mask;
   return line.replace(uses.re, (match, braced, dollar, bare, offset) => {
     const name = braced ?? dollar ?? bare;
     if (own.has(name)) return match;
     const entry = uses.bindings.get(name);
-    if (bare !== undefined && (entry.family !== CODE || (mask ??= stringMask(line))[offset])) return match;
+    if (bare !== undefined && (!allowBare || entry.family !== CODE || (mask ??= stringMask(line))[offset])) return match;
     const value = choose(name, entry);
     return bare === undefined ? value : `"${value}"`;
   });
@@ -263,10 +374,10 @@ function replaceUses(line, uses, own, choose) {
  * Every reading of `line`: the line with the bound names it uses replaced by their values, one reading per combination of the values
  * of THOSE names (names the line does not use do not multiply anything). `[line]` when it uses none; `null` above MAX_READINGS.
  */
-export function readings(line, uses, own = new Set()) {
+export function readings(line, uses, own = new Set(), allowBare = true) {
   if (uses === null || !uses.names.some((name) => line.includes(name))) return [line];
   const used = new Map();
-  replaceUses(line, uses, own, (name, entry) => { used.set(name, entry); return ""; });
+  replaceUses(line, uses, own, (name, entry) => { used.set(name, entry); return ""; }, allowBare);
   if (used.size === 0) return [line];
   const entries = [...used];
   if (entries.some(([, entry]) => entry.overflow)) return null; // a name that outgrew its bounds: some of its values are unknown
@@ -279,7 +390,7 @@ export function readings(line, uses, own = new Set()) {
       rest = Math.floor(rest / entry.values.length);
       return [name, value];
     }));
-    return replaceUses(line, uses, own, (name) => pick.get(name));
+    return replaceUses(line, uses, own, (name) => pick.get(name), allowBare);
   });
 }
 
@@ -295,12 +406,39 @@ export { makeUses };
 
 // --- bindings ------------------------------------------------------------------------------------------------------------
 
+const IDENTIFIER_RE = /[A-Za-z_]\w*/g;
+
+/**
+ * `name => Set` of the names a value of `name` must NOT expand: itself, and every name whose value is built from it, directly or through
+ * others. A name's own placeholder (`${id}`) stays in its own value, and so does the placeholder of a name that depends on it: that is what
+ * ends a cycle (`base` holds `${id}`, `id` holds `${base}`) with the placeholder, which reads as an owner, instead of growing without end.
+ */
+function dependencyGuard(items) {
+  const assigned = new Set(items.map((item) => item.name));
+  const dependents = new Map(); // name -> the names whose right-hand side mentions it
+  for (const item of items) {
+    for (const token of new Set(item.rhs.match(IDENTIFIER_RE) ?? [])) {
+      if (token !== item.name && assigned.has(token)) dependents.set(token, (dependents.get(token) ?? new Set()).add(item.name));
+    }
+  }
+  const cache = new Map();
+  return (name) => {
+    if (!cache.has(name)) {
+      const reached = new Set([name]);
+      for (const current of reached) for (const dependent of dependents.get(current) ?? []) reached.add(dependent);
+      cache.set(name, reached);
+    }
+    return cache.get(name);
+  };
+}
+
 /**
  * `Map<name, { family, values, overflow }>` of the names the `items` (assignments) give a value holding the prefix word, to a true fixed
  * point. A name that outgrows MAX_VALUES or MAX_VALUE is marked `overflow`: a line that uses it is judged broad by the caller.
  */
 function bindItems(items) {
   const bindings = new Map();
+  const ownOf = dependencyGuard(items);
   const set = (item, entry, values, overflow) => bindings.set(item.name, { family: entry?.family ?? item.family, values, overflow });
   const markOverflow = (item) => {
     const entry = bindings.get(item.name);
@@ -319,11 +457,11 @@ function bindItems(items) {
     changed = false;
     const uses = makeUses(bindings);
     for (const item of items) {
-      const long = item.rhs.length > MAX_VALUE; // a value that long never binds as a whole: only its literals and word-runs can, and they need no reading
+      const long = item.rhs.length > MAX_VALUE; // a value that long never binds as a whole: only its literals and word-runs can
       if (!item.holds && (long || !uses?.names.some((name) => item.rhs.includes(name)))) continue; // nothing to read in it
-      const found = long ? [item.rhs] : readings(item.rhs, uses, new Set([item.name]));
-      if (found === null) { if (markOverflow(item)) changed = true; continue; } // reads a name of unknown value: overflow, never narrowed
-      for (const text of found) for (const value of candidates(text, item.syntax, item.truncated)) if (bind(item, value)) changed = true;
+      const { values, overflow } = evaluate(item, uses, bindings, ownOf(item.name));
+      if (overflow && markOverflow(item)) changed = true; // it reads a name of unknown value: overflow, never narrowed
+      for (const value of values) if (bind(item, value)) changed = true;
     }
   }
   return bindings;

@@ -234,8 +234,9 @@ test("F12 18 a value built from the file's own bindings is bound, to a true fixe
   assert.equal(verdicts(rows(...chain)).at(-1), "broad", "a chain longer than any pass cap still binds");
 });
 
-test("F12 19 a cycle that keeps growing its values terminates, and still reads", () => {
-  const text = rows(`BASE='${Q}-'`, 'A_="$B_$BASE"', 'B_="$A_$BASE"', 'rm -rf "/tmp/$A_"*');
+test("F12 19 a cycle of names ends at once: a name is not expanded into a value that depends on it, and the other bindings still read", () => {
+  const text = rows(`BASE='${Q}-'`, 'A_="$B_$BASE"', 'B_="$A_$BASE"', 'rm -rf "/tmp/$BASE"*');
+  assert.equal(prefixBindings(text).get("A_").overflow, false);
   assert.equal(verdicts(text).at(-1), "broad");
 });
 
@@ -333,6 +334,62 @@ test("R6 an unclosed bracket, an unclosed ${ and a 100000-character line are rea
     const elapsed = performance.now() - started;
     assert.ok(elapsed < 1000, `${line.slice(0, 12)}… took ${elapsed} ms`);
   }
+});
+
+// round 4: a bound name given to a call, a member access or a subscript does not make the result a value (measured on compliant code)
+
+const BOUND = (text) => [...prefixBindings(text).keys()].sort();
+
+test("R7 owner-aware names built by a helper and the variables derived from them through calls and member access bind nothing, and sweep nothing", () => {
+  const text = rows(
+    `const P = '${Q}';`,
+    "const base = `${P}-u${uid}-repo-mig-${what}-${id}`;",
+    "const s = scenario(t, base);",
+    "await up(s, s.from);",
+    "const original = await volumeFiles(s.fromVolume);",
+    "const plan = await run(s, base, original);",
+    "const copied = plan.copy.length;",
+    "const label = base.toLowerCase();",
+    "const picked = lookup[base];",
+    "const m = /^(.*)-(\\d+)$/.exec(base);",
+    "for (const id of ids) { await check(id, original); }",
+    "const { a } = derive(base);",
+    "fs.rmSync(`${root}/${base}`, { recursive: true });",
+    "assert.equal(await count(original, base), 0);",
+  );
+  assert.deepEqual(broadLines(text), []);
+  assert.deepEqual(BOUND(text), ["P", "base"], "only the names whose value is a string built from the prefix");
+});
+
+test("R8 a listing query that names the prefix and deletes nothing is not a sweep — and a variable's name inside a regular-expression literal is not a use", () => {
+  const listing = `const leftovers = "SELECT datname FROM pg_database WHERE datname LIKE '${Q}%' ORDER BY 1;";`;
+  assert.deepEqual(verdicts(rows(listing, "assert.deepEqual(await query(leftovers), []);")), [null, null], "no deletion verb, no anchor or glob shape: the word sits inside a quoted LIKE");
+  assert.deepEqual(verdicts(rows(listing, "assert.match(record.file, /^leftovers-provision-.+-\\d{4}\\.md$/);")), [null, null], "the variable's name in a regular-expression literal is text, not a use");
+});
+
+test("R9 a name's own placeholder is not expanded into its own value: a template cycle binds, reads as an owner, and never overflows", () => {
+  const text = rows(`const P = '${Q}';`, "const base = `${P}-u${uid}-${id}`;", "const id = `${base}`;", "fs.rmSync(`${root}/${base}`);", "fs.rmSync(`${root}/${id}`);");
+  const bindings = prefixBindings(text);
+  assert.equal(bindings.get("base").overflow, false);
+  assert.deepEqual(bindings.get("base").values, [`${Q}-u\${uid}-\${id}`]);
+  assert.equal(bindings.has("id"), false, "its value is another name's template: no original literal holds the word");
+  assert.deepEqual(verdicts(text), [null, null, null, "owner-aware", null]);
+});
+
+test("R10 a shell command substitution is not a value, and a shell word of literals and names is", () => {
+  assert.deepEqual(BOUND(rows(`BASE='${Q}-'`, 'P_="$(basename "$BASE")"', "Q_=`echo $BASE`", 'R_="$BASE/x"')), ["BASE", "R_"]);
+});
+
+test("R11 the path-join calls make a value from literals and names; any other call does not", () => {
+  const base = `BASE = '${Q}-'`;
+  assert.deepEqual(BOUND(rows(`const BASE = '${Q}-';`, "const a = path.resolve(dir, BASE);", "const b = path.posix.join(dir, 'x', BASE);", "const c = pathFor(dir, BASE);", "const d = path.join(dir, BASE).trim();")), ["BASE", "a", "b"]);
+  assert.deepEqual(BOUND(rows(base, "A = os.path.join(d, BASE)", "B = other.join(d, BASE)")), ["A", "BASE"]);
+  assert.deepEqual(BOUND(rows(`$Base = '${Q}-'`, "$a = Join-Path $d $Base", "$b = [IO.Path]::Combine($d, $Base)", "$c = Get-Item $Base")), ["Base", "a", "b"]);
+  assert.deepEqual(verdicts(rows(`const BASE = '${Q}-';`, "const P = path.resolve(dir, BASE);", "fs.rmSync(P);")), [null, null, "broad"]);
+});
+
+test("R12 destructuring and loop variables never bind", () => {
+  assert.deepEqual(BOUND(rows(`const { a } = { a: '${Q}-' };`, `const [b] = ['${Q}-'];`, `for (const c of ['${Q}-']) { use(c); }`)), []);
 });
 
 // --- S5b: the scan ---------------------------------------------------------------------------------------------------
