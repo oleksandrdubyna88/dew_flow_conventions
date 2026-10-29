@@ -242,7 +242,7 @@ asking in writing to be moved and another had two promoted plans absent from its
 
 | Tool | Enforces | Run |
 |---|---|---|
-| [`tools/plan-lifecycle.mjs`](tools/plan-lifecycle.mjs) | [`common/planning-docs.md`](common/planning-docs.md) | `node .agents/conventions/tools/plan-lifecycle.mjs` |
+| [`tools/plan-lifecycle.mjs`](tools/plan-lifecycle.mjs) | [`common/planning-docs.md`](common/planning-docs.md), and a plan's change ledger — [`common/plan-change-control.md`](common/plan-change-control.md) | `node .agents/conventions/tools/plan-lifecycle.mjs` |
 | [`tools/pin-check.mjs`](tools/pin-check.mjs) | Editing discipline — every pin at the tip of the ref it tracks (`release` for the shared rules, its own default branch for a code pin) | `node .agents/conventions/tools/pin-check.mjs` |
 | [`tools/promote-release.mjs`](tools/promote-release.mjs) | The `release` ref moves only to a commit that is on `main` and whose `ci` run finished green — an absent or unfinished run is a refusal, never a pass | `node tools/promote-release.mjs <sha> [--dry-run]` (this repository only) |
 | [`tools/ownership-check.mjs`](tools/ownership-check.mjs) | [`common/rule-ownership.md`](common/rule-ownership.md) — no shared rule names a product, unless the name IS the instruction and says so in an `owns:` marker | `node tools/ownership-check.mjs [--warn]` (this repository only; **armed** — there is no baseline, so any undeclared product reference fails) |

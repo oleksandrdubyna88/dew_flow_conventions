@@ -29,7 +29,9 @@ status line on the second or third line, so a reader knows its standing before r
 ```
 
 A plan carries: the symptom or goal **before** any solution, references to real code as `file.cs:line`
-(verified, not guessed), a build order, a test plan, and a Definition of Done checklist.
+(verified, not guessed), a build order, a test plan, and a Definition of Done checklist. From its first approval it also
+carries a change ledger — a plan approved before that rule opens one at its next change — and its second change stops
+it for a whole re-review — [plan-change-control.md](plan-change-control.md).
 
 ### A plan that creates something that GROWS names its budget — before the first write
 
@@ -158,11 +160,12 @@ the predecessor repository had it as a test and it was lost in the split into fo
 node .agents/conventions/tools/plan-lifecycle.mjs
 ```
 
-Six findings, all of them failures this family has actually made: a plan with no status line where the
+Seven findings, all of them failures this family has actually made: a plan with no status line where the
 convention says to look, a finished plan left in `todo/`, an unstarted one sitting in `research/`, a
-link between the folders that does not resolve, the open table drifting from its folder, and a promoted
-plan the research index never mentions. One implementation for all four repositories rather than a copy
-each — the check reads markdown, not code, and one of the four is Rust.
+link between the folders that does not resolve, the open table drifting from its folder, a promoted
+plan the research index never mentions, and a change ledger that cannot be read or records a second change
+without its stop ([plan-change-control.md](plan-change-control.md)). One implementation for all four repositories
+rather than a copy each — the check reads markdown, not code, and one of the four is Rust.
 
 **Check at task completion, every time.** Before reporting work done, ask whether it finished a plan —
 or whether a plan's status line simply no longer matches reality. Promote it in the same task, not
