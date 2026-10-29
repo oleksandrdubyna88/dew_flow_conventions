@@ -242,9 +242,12 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   Fixed in this change from that list: the Python `f` string prefix at the binding (a test). Added after round 3:
   - **J1** — a value whose prefix word is split over two literal pieces (`'teststo''delete-'`, `"teststo" + "delete-"`) binds nothing: this
     family's own spelling of "not the prefix" for detector and test code. A real sweeper written that way is missed (F14).
-  - **J2** — what binds from a script operand that is not string-shaped: each ORIGINAL string literal holding the word (`'W-'.lower()`, `'W-' || x`, a
+  - **J2** — what binds from a script operand that is not string-shaped: each ORIGINAL string literal holding the word (`'W-' || x`, a
     conditional expression, PowerShell `-replace`); a regex literal, an arrow, an object, a command substitution and an environment name that
-    merely holds the word bind nothing; a path-join call (`PATH_JOIN_CALLS`) binds only with literals or names as arguments. A right-hand side is read
+    merely holds the word bind nothing; a path-join call (`PATH_JOIN_CALLS`) binds only with literals or names as arguments. Added in round 5: a
+    bound name passed to a call other than a path join or a case conversion, or reached through a member access, binds nothing (`'{}-'.format(BASE)`,
+    `'%s-' % BASE`, `[a, BASE].join('/')`, `BASE.concat('-')`, `BASE.trim()`, shell `$(echo "$BASE" | tr …)` and `$(printf '%s-' "$BASE")`); a real
+    sweeper written so is missed. A right-hand side is read
     to 1024 characters: past that only its literals and word-runs bind.
   - **J3** — `'W-' + STAR`: any non-literal operand after the prefix reads as an owner segment, so the use is owner-aware (missed).
 - **Expected fleet work:** measured by the judge with a machine scan over one host's checkouts, the change reports 143 MORE owner-blind lines than
@@ -268,11 +271,41 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   A machine scan over one host's checkouts (`--honour-marker`, lowered), base release against round 4: 390 → 542 owner-blind lines (+152, against +143 measured
   at the first commit), all in one consumer's dev-VM shell tests that write sweep text through `local p=<prefix>` (8 files, 22 checkouts of the same
   tree; the main checkout of it +5 in one file), none a sweeper; nothing else on the host changed.
-- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`, in four rounds. RED, round 1: the use lines of a same-file binding classified null
+- **Round 5 (judge re-check of round 4):** round 4's cycle guard (`dependencyGuard`) took a dependency edge from every identifier of a right-hand
+  side, string contents included, and then refused a name every value that came through the cycle. Two defects, both a MISSED SWEEP (the costly
+  error; the file header's contract is "a false broad, never a missed sweep"):
+  (a) a word inside a path literal made a false edge with no cycle at all: `BASE='/tmp/<p>-'`, `tmp="$BASE"`, `rm -rf "$tmp"*` read null, because `tmp`
+  sits in BASE's literal; the same in JavaScript (`` `rm -rf ${tmp}*` ``), with `ROOT='/var/tmp/<p>-'`/`var="$ROOT"`, in Python (`PREFIX='<p>-%d' % 0`:
+  the `d` of `%d`, then `d = os.path.join(tempfile.gettempdir(), PREFIX)`) and across two shell functions (`local base='<p>-'; local dir="$TMPDIR/$base"`
+  and elsewhere `local base="$(mktemp -d)/dir"`);
+  (b) it excluded whole NAMES, not the values that came through the cycle: function a `p='<p>-'; dir="$TMPDIR/$p"; rm -rf "$dir"*` and function b
+  `dir=/tmp; p="$dir/x"` read null (the same in JavaScript and Python), and `A='<p>-'; B="$A"; A="$B-x"` then `rm -rf /tmp/$B*` read null.
+  Round 4's review had rejected this exact concern on a wrong argument: "the graph is static, so it is complete". It is static, and it is built from
+  words inside literals, so it is complete only for edges nobody wrote. Verdicts of the use line: `fe05417` broad (every one, by taint: it bound names the value never reached),
+  `5f49dcc` null, now broad.
+  **Fix (the judge's option 2, value provenance).** Dependency edges are gone. Every bound value carries the names it was built through; a build of X
+  takes no value whose provenance holds X, and takes the others (cycles still end; R9's template case is unchanged: not overflowing, not broad, `id`
+  unbound). A use is only what `makeUses` reads: `$NAME`, `${NAME…}`, a template's `${NAME}`, a bare code name outside a string literal. Where the
+  provenance is wrong it is too SMALL (a name inside a call that is not a path join is not recorded), so the error is a value that grows to
+  MAX_VALUE and marks the name `overflow` — broad, the safe direction. Also: a case conversion of a bound name (`.toLowerCase()`, `.toUpperCase()`,
+  Python `.lower()`/`.upper()`, `String(X)`, `str(X)`) is string-shaped and binds (the classifier lower-cases, so the case is no matter), and a pathlib
+  join (`Path(a) / X`, `pathlib.Path(a, 'b') / X`) is a path join. R7 keeps its measured shape; its `base.toLowerCase()` line, which now binds (a
+  string-shaped value, no taint), became `base.trim()`, a call that still binds nothing. Performance (judge F3): `regexLiteralEnd` rescanned to the
+  end of the line from every `/` that opens an unclosed character class; a scan that reaches the end without closing is not started again on that
+  line. A line of 100000 characters, `f(PFX ` and `=/[` repeated, took 10.7 s and takes 22 ms (R16).
+  **Limits** (J-list): **J2** now says, in plain words, that a bound name passed to a call other than a path join or a case conversion, or reached
+  through a member access, binds nothing (`'{}-'.format(BASE)`, `'%s-' % BASE`, `[a, BASE].join('/')`, `BASE.concat('-')`, shell `$(echo "$BASE" | tr …)`,
+  `$(printf '%s-' "$BASE")`): a real sweeper written so is missed. New: **J4** — a line that holds the prefix word thousands of
+  times once the names are expanded costs the classifier (`looseVerdicts`) time quadratic in that count (14000 occurrences: 2 s); not fixed here.
+  **J5** — a placeholder glued directly BEFORE the prefix (`P="$D<p>-"`, a self-append `P=/tmp/; P="$P<p>-"`) is not read as a prefix: null in
+  every version.
+- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`, in five rounds. RED, round 1: the use lines of a same-file binding classified null
   (`actual null, expected 'broad'`) and the guard exited 0 on a file that removes through a bare-prefix variable. RED, round 2: the use of an
   owner-aware concatenation classified broad, `${P:?}` and its kin classified null, and a 100000-character line of the shape `x:` and spaces took 21 s.
   RED, round 3 (against `0dce2ca` → `f7926cd`): the seven literal-first shapes, the same-line alias, the repeated-text span, the 33rd value, and
   five adversarial 100000-character lines (29 s for the first) all failed or were null where `0dce2ca` said broad.
+  RED, round 5 (against `5f49dcc`): the use line of each of the five (a) probes and the three (b) probes read null, the case conversions and
+  pathlib joins bound nothing, and the unclosed-class line took 10.7 s.
   GREEN: all new tests, and the janitor's 7 uses clean through the sanction.
 
 ## F13 — `owned.mjs` assumes 100 clock ticks per second (found 2026-10-27)

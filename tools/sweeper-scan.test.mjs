@@ -349,7 +349,7 @@ test("R7 owner-aware names built by a helper and the variables derived from them
     "const original = await volumeFiles(s.fromVolume);",
     "const plan = await run(s, base, original);",
     "const copied = plan.copy.length;",
-    "const label = base.toLowerCase();",
+    "const label = base.trim();",
     "const picked = lookup[base];",
     "const m = /^(.*)-(\\d+)$/.exec(base);",
     "for (const id of ids) { await check(id, original); }",
@@ -390,6 +390,53 @@ test("R11 the path-join calls make a value from literals and names; any other ca
 
 test("R12 destructuring and loop variables never bind", () => {
   assert.deepEqual(BOUND(rows(`const { a } = { a: '${Q}-' };`, `const [b] = ['${Q}-'];`, `for (const c of ['${Q}-']) { use(c); }`)), []);
+});
+
+// round 5: the cycle guard reads real uses only and drops cyclic VALUES, not whole names (a missed sweep is the costly error)
+
+const USE_JS = "names.filter((n) => n.startsWith(p)).forEach((n) => fs.rmSync(n))";
+
+test("R13 a word inside a path literal is not a use: it makes no dependency, so the sweep through the variable is still broad", () => {
+  const cases = [
+    [rows(`BASE='/tmp/${Q}-'`, 'tmp="$BASE"', 'rm -rf "$tmp"*'), 2],
+    [rows(`const BASE = '/tmp/${Q}-';`, "const tmp = BASE;", "execSync(`rm -rf ${tmp}*`);"), 2],
+    [rows(`ROOT='/var/tmp/${Q}-'`, 'var="$ROOT"', 'rm -rf "$var"*'), 2],
+    [rows(`PREFIX = '/tmp/${Q}-%d' % 0`, "d = os.path.join(tempfile.gettempdir(), PREFIX)", "os.system('rm -rf ' + d + '*')"), 2],
+    [rows("fa() {", `  local base='${Q}-'`, '  local dir="$TMPDIR/$base"', '  rm -rf "$dir"*', "}", "fb() {", '  local base="$(mktemp -d)/dir"', "}"), 3],
+  ];
+  for (const [text, use] of cases) assert.equal(verdicts(text)[use], "broad", `the use line (${use + 1}) is broad: ${text}`);
+});
+
+test("R14 a name reused elsewhere keeps its other values: only a value built through the name itself is dropped", () => {
+  const shell = rows("fa() {", `  p='${Q}-'`, '  dir="$TMPDIR/$p"', '  rm -rf "$dir"*', "}", "fb() {", "  dir=/tmp", '  p="$dir/x"', "}");
+  assert.equal(verdicts(shell)[3], "broad", "shell");
+  const js = rows(`const p = '${Q}-';`, "const dir = path.join(base, p);", "fs.rmSync(dir);", "const dir2 = '/tmp';", "const p2 = dir2 + '/x';");
+  assert.equal(verdicts(js)[2], "broad", "script, names that never meet");
+  const js2 = rows(`const p = '${Q}-';`, "const dir = path.join(base, p);", "fs.rmSync(dir);", "const dir = '/tmp';", "const p = dir + '/x';");
+  assert.equal(verdicts(js2)[2], "broad", "script, the same names reused");
+  const py = rows(`p = '${Q}-'`, "dir = os.path.join(TMP, p)", "shutil.rmtree(dir)", "dir = '/tmp'", "p = dir + '/x'");
+  assert.equal(verdicts(py)[2], "broad", "python");
+  assert.equal(verdicts(rows(`A='${Q}-'`, 'B="$A"', 'A="$B-x"', 'rm -rf /tmp/$B*')).at(-1), "broad", "a name built from another that was built from it");
+  assert.equal(verdicts(rows("D=/tmp/", `P="$D${Q}-"`, 'rm -rf "$P"*')).at(-1), null, "limit J5, recorded: a placeholder glued directly before the prefix (a self-append too) is not read as a prefix");
+});
+
+test("R15 a case conversion, String(), str() and a pathlib join of a bound name are string-shaped: they bind", () => {
+  const shellBase = `BASE='${Q}-'`;
+  for (const conversion of ["BASE.toLowerCase()", "BASE.toUpperCase()", "String(BASE)", "path.join(dir, BASE.toLowerCase())"]) {
+    assert.equal(verdicts(rows(`const BASE = '${Q}-';`, `const p = ${conversion};`, USE_JS)).at(-1), "broad", conversion);
+  }
+  for (const conversion of ["BASE.lower()", "BASE.upper()", "str(BASE)", "Path(tmp) / BASE", "pathlib.Path(tmp, 'x') / BASE", "Path(tmp) / 'x' / BASE"]) {
+    assert.equal(verdicts(rows(`BASE = '${Q}-'`, `p = ${conversion}`, "if n.startswith(p): shutil.rmtree(n)")).at(-1), "broad", conversion);
+  }
+  assert.equal(verdicts(rows(shellBase, 'p="${BASE,,}"', 'rm -rf "/tmp/$p"*')).at(-1), "broad", "shell case operators already worked");
+  assert.deepEqual(BOUND(rows(`BASE = '${Q}-'`, "a = other(BASE)", "b = BASE.strip()", "c = BASE.lower")), ["BASE"], "any other call or member access binds nothing");
+});
+
+test("R16 a line of 100000 characters that open an unclosed character class at every slash is read in well under a second", () => {
+  const started = performance.now();
+  assert.equal(verdicts(rows(`const PFX = '${Q}-';`, `f(PFX ${"=/[".repeat(33000)}`)).length, 2);
+  const elapsed = performance.now() - started;
+  assert.ok(elapsed < 1000, `took ${elapsed} ms`);
 });
 
 // --- S5b: the scan ---------------------------------------------------------------------------------------------------
