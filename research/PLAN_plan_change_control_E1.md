@@ -1,7 +1,6 @@
 # PLAN — Plan change control, E1: the ledger contract and its safe enforcement
 
-> Status: **built, 2026-10-29 — `b256502` and its fix-forward commit after the parent's full stop; its code rounds are
-> recorded below.** Scope: the stories of epic E1 — the change-ledger parser
+> Status: **IMPLEMENTED, 2026-10-29 — merged with the parent in #86; its code rounds are recorded below.** Scope: the stories of epic E1 — the change-ledger parser
 > `tools/lib/plan-ledger.mjs`, its wiring in `tools/plan-lifecycle.mjs`, their tests, the compatibility fixtures, the
 > dry run over the estate and S6b.
 >

@@ -4,7 +4,7 @@
  * side in `todo/`, and the folder's index must name BOTH. The epic document is the one a hurried edit
  * forgets, because the parent already has its row.
  *
- * The second half is the change-ledger check (`lib/plan-ledger.mjs`, E1 of `todo/PLAN_plan_change_control.md`),
+ * The second half is the change-ledger check (`lib/plan-ledger.mjs`, E1 of `research/PLAN_plan_change_control.md`),
  * seen from outside: a folder of plans is built, the checker is SPAWNED on it, and the exit code and the lines on
  * stderr are the assertions. The grammar itself is tested on strings in `plan-ledger.test.mjs`; what only a
  * spawn can show lives here — that the check reads `todo/` and not `research/`, that a stopped plan is not called

@@ -192,7 +192,7 @@ function checkStatuses(root, findings) {
  * plan around the WHOLE body, the read included — the unit is the file, and a throw out of one plan's parse must be
  * one finding naming it, never a crash: a crash would turn every consumer's CI red with a stack trace (the finding is
  * red too, but it names the file and the fix). The protection against a FALSE red is the dry run over the estate
- * (`todo/PLAN_plan_change_control_E1.md`, E1.S4), not a softer exit code. The caught message is cleaned like every
+ * (`research/PLAN_plan_change_control_E1.md`, E1.S4), not a softer exit code. The caught message is cleaned like every
  * value the lib quotes (`clean`): it can hold a parser's own text, and a terminal must not read an escape out of it.
  */
 function checkChangeLedgers(root, findings) {
