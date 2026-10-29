@@ -18,14 +18,14 @@ import * as fs from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import * as path from "node:path";
 import { once } from "node:events";
-import { spawn, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { git, gitOutput } from "./lib/git.mjs";
 import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import {
   MAX_NAME, OWNER_GRAMMAR, PREFIX, REPO_TOKEN, START_TOLERANCE_S,
-  asciiLower, classifyName, cleanupScope, formatLegacyOwner, formatOwner, gitdirOf, isMine, ownedDir, ownedName, ownedPattern,
+  asciiLower, auxvWordBytes, classifyName, clockTicksFromAuxv, clockTicksPerSecond, cleanupScope, formatLegacyOwner, formatOwner, gitdirOf, isMine, ownedDir, ownedName, ownedPattern,
   ownedWorktree, ownerState, ownerToken, parseLegacyOwner, parseOwner, processProbe, readOwner, removeLink, removeQuietly, runRecord,
   isInsideProfile, legacyOwnerState, startFromProcStat, tempRoot, thisOwner, thisOwnerToken, windowsOwnerToken,
 } from "./lib/owned.mjs";
@@ -539,17 +539,106 @@ test("14b. a start only on Linux, read from /proc: within a few seconds of this 
   assert.equal(thisOwner().start, self.start, "the writer reads its own start through the reader's path");
 });
 
-test("14c. startFromProcStat reads field 22 after the LAST `)`, over btime", () => {
+test("14c. startFromProcStat reads field 22 after the LAST `)`, over btime, at the rate it is given (the same on every host)", () => {
   const fields = (comm) => {
     const rest = Array.from({ length: 50 }, (_, i) => String(i + 3)); // fields 3..52
     rest[19] = "123456"; // field 22 is index 19 of the remainder
     return `4711 (${comm}) ${rest.join(" ")}\n`;
   };
-  assert.equal(startFromProcStat(fields("node"), 1_000_000), 1_000_000 + Math.floor(123456 / 100));
-  assert.equal(startFromProcStat(fields("we ird) na(me"), 1_000_000), 1_000_000 + 1234, "spaces and parentheses in the command name");
-  assert.equal(startFromProcStat("", 1), undefined);
-  assert.equal(startFromProcStat("4711 (x) S 1 2", 1), undefined, "too few fields");
-  assert.equal(startFromProcStat(fields("node"), Number.NaN), undefined);
+  assert.equal(startFromProcStat(fields("node"), 1_000_000, 100), 1_000_000 + Math.floor(123456 / 100));
+  assert.equal(startFromProcStat(fields("we ird) na(me"), 1_000_000, 100), 1_000_000 + 1234, "spaces and parentheses in the command name");
+  assert.equal(startFromProcStat("", 1, 100), undefined);
+  assert.equal(startFromProcStat("4711 (x) S 1 2", 1, 100), undefined, "too few fields");
+  assert.equal(startFromProcStat(fields("node"), Number.NaN, 100), undefined);
+});
+
+test("14c2. startFromProcStat divides field 22 by the rate it is given, and has no start for a rate that is not a positive safe integer", () => {
+  const rest = Array.from({ length: 50 }, (_, i) => String(i + 3));
+  rest[19] = "250000";
+  const stat = `4711 (node) ${rest.join(" ")}\n`;
+  assert.equal(startFromProcStat(stat, 1_000_000, 250), 1_000_000 + 1000, "250 000 ticks at 250 a second; a fixed 100 would give +2500");
+  assert.equal(startFromProcStat(stat, 1_000_000, 100), 1_000_000 + 2500);
+  for (const bad of [0, -100, 2.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1, "100", null]) {
+    assert.equal(startFromProcStat(stat, 1_000_000, bad), undefined, `rate ${String(bad)}`);
+  }
+});
+
+/** An auxiliary vector as the kernel hands it over: (type, value) pairs of `wordBytes`-byte words, ending with AT_NULL. */
+function auxv(pairs, wordBytes, endianness, { terminate = true } = {}) {
+  const all = terminate ? [...pairs, [0, 0]] : pairs;
+  const out = Buffer.alloc(all.length * 2 * wordBytes);
+  all.forEach(([type, value], i) => {
+    [type, value].forEach((word, k) => {
+      const at = (2 * i + k) * wordBytes;
+      if (wordBytes === 8) out[`writeBigUInt64${endianness}`](BigInt(word), at);
+      else out[`writeUInt32${endianness}`](Number(word), at);
+    });
+  });
+  return out;
+}
+
+const AUXV_SHAPES = [[8, "LE"], [8, "BE"], [4, "LE"], [4, "BE"]];
+
+test("14c3. clockTicksFromAuxv reads AT_CLKTCK (type 17) in every word size and byte order", () => {
+  for (const [bytes, order] of AUXV_SHAPES) {
+    const label = `${bytes}-byte ${order}`;
+    assert.equal(clockTicksFromAuxv(auxv([[16, 0x178bfbff], [17, 100], [6, 4096]], bytes, order), bytes, order), 100, label);
+    assert.equal(clockTicksFromAuxv(auxv([[17, 250]], bytes, order), bytes, order), 250, `${label}: another rate`);
+    assert.equal(clockTicksFromAuxv(auxv([[17, 100], [6, 4096]], bytes, order), bytes, order), 100, `${label}: type 17 first, AT_NULL after the others`);
+  }
+});
+
+test("14c4. clockTicksFromAuxv has no rate for an empty, truncated, unterminated, zero or AT_NULL-first vector", () => {
+  for (const [bytes, order] of AUXV_SHAPES) {
+    const label = `${bytes}-byte ${order}`;
+    const whole = auxv([[16, 7], [17, 100]], bytes, order);
+    assert.equal(clockTicksFromAuxv(Buffer.alloc(0), bytes, order), undefined, `${label}: empty`);
+    assert.equal(clockTicksFromAuxv(whole.subarray(0, whole.length - 1), bytes, order), undefined, `${label}: length is not a whole number of pairs`);
+    assert.equal(clockTicksFromAuxv(whole.subarray(0, 3 * bytes), bytes, order), undefined, `${label}: ends mid-pair, before type 17's value`);
+    assert.equal(clockTicksFromAuxv(whole.subarray(0, 2 * bytes), bytes, order), undefined, `${label}: ends before type 17`);
+    assert.equal(clockTicksFromAuxv(whole.subarray(0, 1), bytes, order), undefined, `${label}: one byte`);
+    assert.equal(clockTicksFromAuxv(auxv([[17, 0]], bytes, order), bytes, order), undefined, `${label}: value 0`);
+    assert.equal(clockTicksFromAuxv(auxv([[0, 0], [17, 100]], bytes, order, { terminate: false }), bytes, order), undefined, `${label}: AT_NULL comes first`);
+    assert.equal(clockTicksFromAuxv(auxv([[16, 7]], bytes, order), bytes, order), undefined, `${label}: no type 17`);
+    assert.equal(clockTicksFromAuxv(auxv([[17, 100]], bytes, order, { terminate: false }), bytes, order), undefined, `${label}: type 17 whole but no AT_NULL after it`);
+    assert.equal(clockTicksFromAuxv(auxv([[16, 7], [17, 100]], bytes, order, { terminate: false }), bytes, order), undefined, `${label}: no AT_NULL, type 17 last`);
+  }
+});
+
+test("14c5. clockTicksFromAuxv refuses a word size that is not 4 or 8, an unknown byte order, and a value above the safe integers", () => {
+  const good = auxv([[17, 100]], 8, "LE");
+  assert.equal(clockTicksFromAuxv(good, 8, "LE"), 100, "the vector the refusals below start from is good");
+  for (const bytes of [0, 1, 2, 3, 6, 16, undefined, "8", 4.5]) assert.equal(clockTicksFromAuxv(good, bytes, "LE"), undefined, `wordBytes ${String(bytes)}`);
+  for (const order of ["le", "little", "", undefined, null, "BE ", 8]) assert.equal(clockTicksFromAuxv(good, 8, order), undefined, `endianness ${String(order)}`);
+  assert.equal(clockTicksFromAuxv("not a buffer", 8, "LE"), undefined);
+  for (const order of ["LE", "BE"]) {
+    assert.equal(clockTicksFromAuxv(auxv([[17, BigInt(Number.MAX_SAFE_INTEGER)]], 8, order), 8, order), Number.MAX_SAFE_INTEGER, `${order}: the largest safe integer`);
+    assert.equal(clockTicksFromAuxv(auxv([[17, BigInt(Number.MAX_SAFE_INTEGER) + 1n]], 8, order), 8, order), undefined, `${order}: one above it`);
+    assert.equal(clockTicksFromAuxv(auxv([[17, 2n ** 64n - 1n]], 8, order), 8, order), undefined, `${order}: all bits set`);
+  }
+});
+
+test("14c6. auxvWordBytes is a table of process.arch values: 8, 4, or no answer", () => {
+  const SPEC = {
+    8: ["arm64", "loong64", "mips64el", "ppc64", "riscv64", "s390x", "x64"],
+    4: ["arm", "ia32", "mips", "mipsel", "ppc"],
+  };
+  for (const [bytes, arches] of Object.entries(SPEC)) for (const arch of arches) assert.equal(auxvWordBytes(arch), Number(bytes), arch);
+  for (const arch of ["sparc", "s390", "", undefined, null, "X64", "x64 ", 64, "constructor", "toString", "__proto__"]) assert.equal(auxvWordBytes(arch), undefined, `arch ${String(arch)}`);
+});
+
+test("14c7. on Linux clockTicksPerSecond is the rate getconf prints, and is the same value on every call", (t) => {
+  if (!linux) { t.skip("the rate is read from /proc/self/auxv, which only Linux has"); return; }
+  let printed;
+  try {
+    printed = execFileSync("getconf", ["CLK_TCK"], { encoding: "utf8", timeout: 10_000 }).trim(); // the TEST may spawn; the helper may not
+  } catch (error) {
+    t.skip(`no getconf to compare with (${error.code ?? error.message})`);
+    return;
+  }
+  assert.match(printed, /^[1-9][0-9]*$/);
+  assert.equal(clockTicksPerSecond(), Number(printed));
+  assert.equal(clockTicksPerSecond(), clockTicksPerSecond());
 });
 
 test("14d. no spawn: thisOwner and processProbe never start a process", (t) => {

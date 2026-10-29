@@ -179,12 +179,48 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   RED first:
   1. `owned.mjs` reads `AT_CLKTCK` (type 17) from `/proc/self/auxv` — a `/proc` read, no child process. Measured 2026-10-28 on
      an Ubuntu VM (Linux 7.0, x86-64): Node read `AT_CLKTCK=100`, the value `getconf CLK_TCK` printed. When the entry cannot be
-     read, the start is treated as one that cannot be read without spawning (rule §3 already says what then happens, for a
-     writer and for a reader), never as a guessed 100.
+     read, the start is treated as one that cannot be read without a child per test process (rule §3 already says what then
+     happens: the writer omits the start and, with it, the namespace; a Linux reader judges a record without `<ns>`
+     `unknown`, `owned.mjs` `ownerState`), never as a guessed 100.
   2. Rule §3's sentence names the bound it means: a helper may start ONE child per script or run to learn a constant of the
      host (a shell has no built-in for the rate, so `getconf CLK_TCK` once, when the helper is loaded); never a child per
-     test process. The companion and the vectors say the same.
+     test process. Neither the companion (`common/test-leftovers-janitor.md`) nor the owner vectors state the rate or the
+     no-spawn bound (checked 2026-10-28 with `git grep -n "spawn\|CLK_TCK" common/ tools/fixtures/owner-vectors.json`), so only the
+     rule body and its record (`research/rule-bodies.json`) move.
 - **When.** At the next change to `owned.mjs` or rule §3, and before a consumer writes a helper in another language.
+- **Build order** (branch `fix/owned-clock-tick-rate`):
+  1. RED: in `tools/owned.test.mjs`, (a) `startFromProcStat` takes the rate as a third argument and uses it — field 22 =
+     250 000 at 250 ticks a second is 1000 s after `btime`, where today's constant gives 2500 s; (b) a pure
+     `clockTicksFromAuxv(buffer)` reads type 17 from a little-endian 64-bit auxiliary vector built by the test, returns
+     `undefined` for an empty, truncated or zero-valued vector and for one that ends (type 0) before type 17 — and the same
+     vectors in 4-byte words and in big-endian order, since `clockTicksFromAuxv(buffer, wordBytes, endianness)` takes both
+     (plan gate finding 0); a value above `Number.MAX_SAFE_INTEGER` is `undefined` (finding 3); (c) on a Linux
+     test host, `clockTicksPerSecond()` equals `getconf CLK_TCK` — the TEST may spawn, the helper may not; skipped elsewhere.
+  2. GREEN: `tools/lib/owned.mjs` — remove `CLOCK_TICKS_PER_SECOND` (`:60`); add `clockTicksFromAuxv` and a memoised
+     `clockTicksPerSecond()` that reads `/proc/self/auxv` once (`undefined` on any failure, never a guessed 100);
+     `startFromProcStat(statText, btimeSeconds, ticksPerSecond = clockTicksPerSecond())` (`:249`) returns `undefined` when the
+     rate is not a positive integer. The reader (`:258-262`) then has no start, which rule §3 already handles: a writer omits
+     the start and the namespace, and a Linux reader judges a record without `<ns>` `unknown`, so nothing is swept (the safe direction; a
+     reader that has no live start but a record with one judges `live`). The word size comes from an explicit table of `process.arch`
+     values, because `process.arch` names an architecture, not a width (plan gate finding 1): 8 bytes for `arm64`,
+     `loong64`, `mips64el`, `ppc64`, `riscv64`, `s390x`, `x64`; 4 for `arm`, `ia32`, `mips`, `mipsel`, `ppc`; any other
+     value → `undefined` (no start), never a guess. The endianness is `os.endianness()`. The value is a `BigInt`
+     converted to a `Number` only when it is a positive safe integer (finding 3).
+  3. Rule §3 (`common/test-leftovers.md:116-119`): the parenthesis names the bound — one child per script or run to learn a
+     host constant is allowed (a shell's `getconf CLK_TCK`, read once when the helper is loaded), never a child per test
+     process. `node tools/rule-bodies.mjs --update common.test-leftovers` moves the record in the same commit.
+  4. The whole suite, lowered (`npm test`), `npm run check` (plan gate finding 2), `node tools/plan-lifecycle.mjs`, `node tools/rule-bodies.mjs`.
+  Plan gate (coai, 2026-10-28): `proceed`, 2 of 2 reviewers, 4 findings, all accepted and written into the steps above.
+- **Not in this change.** The private sibling's byte copy of `owned.mjs` and its pinned rule spans: they follow at its next copy,
+  and its own follow-ups track that. No other file in this repository converts clock ticks (`git grep -n "CLK_TCK\|clock tick"`).
+- **Done when.** The three RED tests were observed failing for the right reason, then pass; the suite is green; the rule body
+  record matches; this section says F13 is fixed, with the commit.
+- **Limit, recorded:** a Linux host whose rate cannot be read (an arch not in the table, no readable `/proc/self/auxv`) writes records without start and namespace, which every Linux reader judges `unknown`: nothing of that host is swept until the table names its arch.
+- **Fixed** 2026-10-28 on branch `fix/owned-clock-tick-rate`, in this commit and the review-fixes commit after it. RED: `tools/owned.test.mjs` failed to load (`does not provide an export named 'auxvWordBytes'`),
+  and the old `startFromProcStat(stat, btime, 250)` returned `+2500` where `+1000` was expected. GREEN: all of the file's tests pass; with `/ 100` put back, only 14c2 fails.
+  A host whose rate cannot be read writes no start and no namespace, so its records read `unknown` and are kept (see the limit above). Review: coai code gate `proceed` (8 of 8;
+  findings 1 and 2 accepted and applied in the review-fixes commit, 0 and 3 rejected with reasons) and the Opus review (SHIP WITH FIXES; 1, 2, 3, 4, 5 and the `s390` half of 6 applied;
+  the once-read counting half of 6 and 7 not applied — the merge commit is named at promotion).
 
 ## Definition of Done
 

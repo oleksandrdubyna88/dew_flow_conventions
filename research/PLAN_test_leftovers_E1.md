@@ -691,7 +691,7 @@ export function removeQuietly(dir)                // folder, then its `.owner` s
   refused or failed, nothing is known; success ⇒ `{ state: "live" }`, and **only on Linux** a `start` (integer Unix seconds UTC, D4): `/proc/<pid>/stat`,
   parsed AFTER the last `)` (the command name may hold spaces and parentheses), field 22 = index 19 of the remainder
   split on spaces, divided by the clock-tick rate (`100`, the value every Linux the family runs on reports for
-  `CLK_TCK` — no `getconf` spawn), plus `btime` from `/proc/stat`, floored. Any failure, and every other OS ⇒
+  `CLK_TCK` — no `getconf` spawn) (Superseded 2026-10-28 by F13 of [`todo/PLAN_test_leftovers_merged_core_followups.md`](../todo/PLAN_test_leftovers_merged_core_followups.md): the rate is read from `AT_CLKTCK` in `/proc/self/auxv`), plus `btime` from `/proc/stat`, floored. Any failure, and every other OS ⇒
   `{ state: "live" }` with no `start`. `ownerState` reads `state` only (a bare `alive` is `unknown`) and refuses a pid that is not a positive safe integer before asking. `processProbe` never spawns a process.
 - **`ownerState(owner, probe)`** — rule §3's order exactly (D4): `null` or `{ unreadable }` ⇒ `"unknown"`;
   `owner.host` ≠ `thisOwner().host` compared case-insensitively ⇒ `"unknown"`; (no store locks in this repository)

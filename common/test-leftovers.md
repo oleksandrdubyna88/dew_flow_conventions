@@ -113,10 +113,12 @@ first process that is not one (measured from a Git Bash started by `pwsh`: that 
 a child process uses it when set, valid and naming a LIVE run of the caller (a stale value would make every claim
 dead at birth), so what it makes belongs to the run, not to a helper that exits. A
 claim is ONE line (an LF or CRLF line end) of at most **512 bytes**: anything else — a second line, a lone CR, a
-longer text — is unreadable. And, **only where the OS gives it without spawning a process** (a `/proc` read, a
-native process API — never a shell or PowerShell child per test process), the process's start time as **integer
-Unix seconds, UTC**, from the OS's record of that pid — never the writer's own clock at startup; a writer that
-would have to spawn to learn its start omits it. On Linux, and only together with the start, the process's pid
+longer text — is unreadable. And, **only where the OS gives it without a child process per test process** (a `/proc`
+read, a native process API, or ONE child per script or run to learn a constant of the host — a shell has no built-in for
+the clock-tick rate, so `getconf CLK_TCK`, read once when the helper is loaded; never a shell or PowerShell child per
+test process), the process's start time as **integer Unix seconds, UTC**, from the OS's record of that pid — never the
+writer's own clock at startup; a writer that would need a child per test process to learn its start omits it. On Linux,
+and only together with the start, the process's pid
 namespace as the decimal inode of `/proc/self/ns/pid`: two namespaces can share one host name (`--uts=host`),
 never a pid space. The owner never lives inside the resource where a test can see it:
 
@@ -146,7 +148,7 @@ reader, a record without `<ns>` or with another namespace's → `unknown`; a pid
 leading zero, past 2^53) or `windows:1` → `unknown`; **no process with that pid → `gone` — the only `gone` there
 is**; the query refused or failed (`EPERM`, access denied, a missing tool), or a process list that may hide other
 users' processes (`hidepid`) → `unknown`; alive, and the owner carries no start or the reader cannot read the live
-one without spawning → `live`; alive, start times within **2 seconds** → `live`; further apart → `unknown` — a
+one without a child per test process → `live`; alive, start times within **2 seconds** → `live`; further apart → `unknown` — a
 reused pid, or a wall clock stepped between the write and the read; a mismatch delays reclamation and never deletes
 something live. Two seconds covers two one-second roundings; a wider window only preserves more.
 
