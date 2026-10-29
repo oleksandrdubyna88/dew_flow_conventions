@@ -613,7 +613,7 @@ test("T7 every value a message quotes is cleaned like the line is: control chara
     assert.ok(cut.length <= QUOTE_LIMIT + 1, `${field}: at most QUOTE_LIMIT + 1 characters, got ${cut.length}`);
 
     // (g) the C1 controls (NEL, CSI) and the bidi controls (RLO, LRI) are not made harmless by the ASCII range alone
-    for (const hazard of ["\u0085", "\u009b", "\u202e", "\u2066"]) {
+    for (const hazard of ["\u0085", "\u009b", "\u202e", "\u2066", "\u200e", "\u200f", "\u061c", "\u00ad"]) {
       const found = check(ledger(`own${hazard}er`));
       assert.ok(found.length > 0, `${field}: the value is a finding`);
       for (const message of found) assert.ok(!message.includes(hazard), `${field}: U+${hazard.codePointAt(0).toString(16)} reached a message: ${JSON.stringify(message)}`);
@@ -637,6 +637,7 @@ function expectHidden(found, line, why, at = 10) {
   const needles = [RESERVED_MESSAGE, asQuoted(line), ...(at === null ? [] : [`line ${at}`])];
   for (const needle of needles) assert.ok(all.includes(needle), `${why}: expected ${needle} for ${JSON.stringify(line)}, got:\n${all === "" ? "(no findings)" : all}`);
   assert.equal(found.length, 1, `${why}: the indented line is the only finding for ${JSON.stringify(line)}, got:\n${all}`);
+  assert.ok(!/\p{Cf}/u.test(all), `${why}: a format character reached the message for ${JSON.stringify(line)} (a space stands there): ${JSON.stringify(all)}`);
 }
 const hidden = (line, why) => expectHidden(under11(line), line, why);
 
@@ -909,6 +910,10 @@ test("I18 every format character is stripped with the indent: an LRM, an RLM or 
   said(under11(`\u200e- ${ID}`), "unreadable line"); // pinned: at column 0 the same line is red as well
 });
 
+test("I18b a format character BETWEEN two runs of spaces: the whole indent, format characters included, is stripped first", () => {
+  for (const line of [` \u200e - ${ID}`, `  \u2066 ${ID}`]) hidden(line, "I18b");
+});
+
 test("I19 a bidi control, an Arabic letter mark or a Mongolian vowel separator before a reserved shape hides nothing", () => {
   const epoch2 = "> Epoch 2 · approved 2026-10-28 · by reviewers · state: open";
   const lines = [` \u2066${epoch2}`, " \u202e### Re-review for epoch 2", " \u061c# x", ` \u180e1) ${ID}`, ` \u2061+ ${ID}`];
@@ -925,14 +930,21 @@ test("K1 a line behind TWO list markers is a known limit, recorded and not fixed
   said(under11(`- - ${ID}`), "unreadable entry", 'number "- 1.2"'); // at column 0 the nested form is red
 });
 
-test("P1/7h a pipe behind TWO backslashes is a cell boundary: an escaped backslash, then a bare pipe (GFM)", () => {
+test("P1 a run of ONE OR MORE backslashes before a pipe escapes it (measured with GitHub's renderer): 4 cells; with none it is a boundary", () => {
   const row = (n) => `| a | b | fits | c${"\\".repeat(n)}| d |`;
-  said(check(B({ rec: { table: [...HEADER, row(2)] } })), "row 1 has 5 cells, not 4");
-  clean(check(B({ rec: { table: [...HEADER, row(1)] } }))); // C14: one backslash escapes the pipe
+  for (const n of [1, 2, 3]) clean(check(B({ rec: { table: [...HEADER, row(n)] } })), `${n} backslash(es)`);
+  said(check(B({ rec: { table: [...HEADER, row(0)] } })), "row 1 has 5 cells, not 4"); // the red twin
 });
 
-test("C15 a pipe behind THREE backslashes is escaped: 4 cells, and the cell keeps the escaped backslash", () => {
-  clean(check(B({ rec: { table: [...HEADER, `| a | b | fits | c${"\\".repeat(3)}| d |`] } })));
+test("C15 two and three backslashes before a pipe: 4 cells each", () => {
+  for (const n of [2, 3]) clean(check(B({ rec: { table: [...HEADER, `| a | b | fits | c${"\\".repeat(n)}| d |`] } })));
+});
+
+test("P4/7h the row that tells the measured rule from the odd-run rule: `b`, two backslashes, a pipe is ONE cell, so the row has three", () => {
+  said(check(B({ rec: { table: [...HEADER, `| a | b${"\\".repeat(2)}| fits | x |`] } })), "row 1 has 3 cells, not 4");
+  clean(check(B({ rec: { table: [...HEADER, "| a | b | fits | x |"] } }))); // zero backslashes: four cells, verdict fits
+  // the cell keeps the run minus one backslash: `fits`, two backslashes, a pipe reads as `fits`, ONE backslash, `|`
+  said(check(B({ rec: { table: [...HEADER, `| a | b | fits${"\\".repeat(2)}| | d |`] } })), 'verdict "fits\\|"');
 });
 
 test("P2 an escaped pipe in the header is shown to the reader unescaped: the header is wrong, with four cells", () => {
@@ -947,6 +959,30 @@ test("P3 an escaped pipe glued to a verdict is part of the verdict: four cells, 
   said(found, 'verdict "fits|"');
   assert.ok(!found.join("\n").includes("cells, not"), "four cells, not five");
   clean(check(B({ rec: { table: [...HEADER, "| a | b | fits | d |"] } })));
+});
+
+// ---- code round 4 (E1.S1 cases marked cr4): H7/3g, I21/4i, K2 ----
+
+test("H7/3g a format character in the heading is still the ledger's near-miss heading: GitHub shows the h2", () => {
+  const marks = ["\u200b", "\u200e", "\u00ad", "\u2060", "\u2066"];
+  const headings = [`## Plan changes${marks[0]}`, `## Plan${marks[1]} changes`, `## Plan${marks[2]} changes`, `## Plan changes${marks[3]}`, `## Plan${marks[4]} changes`];
+  for (const heading of headings) {
+    const found = check(A2(), { heading });
+    assert.ok(found.join("\n").includes("must read exactly"), `${JSON.stringify(heading)}: expected a near-miss finding, got:\n${found.join("\n") || "(no findings)"}`);
+    assert.ok(!/\p{Cf}/u.test(found.join("\n")), `${JSON.stringify(heading)}: the heading is quoted cleaned, a space where the character stood`);
+  }
+  said(check(A2(), { heading: "## Plan changes" }), "epoch 1 has 2 changes"); // the twin: the exact heading
+});
+
+test("I21/4i a format character after the marker or inside the number does not hide an entry shape", () => {
+  const lines = [`  - \u200b${ID}`, `  - 1\u200b.2 · 2026-10-26 · owner · epics — y`, `  - \u200e${ID}`, `  - 1\u200e.2 · 2026-10-26 · owner · epics — y`];
+  for (const line of lines) hidden(line, "I21");
+  said(under11(`- \u200b${ID}`), "unreadable entry"); // pinned: at column 0 the same line is red as well
+});
+
+test("K2 a setext heading over `---` or `===` is a known limit, recorded and not fixed: no ledger is seen", () => {
+  for (const underline of ["---", "==="]) clean(check(A2(), { heading: `Plan changes\n${underline}` }), underline);
+  said(check(A2()), "epoch 1 has 2 changes"); // the twin: the ATX heading
 });
 
 // ---- C12 and robustness: never a throw, whatever the text ----
