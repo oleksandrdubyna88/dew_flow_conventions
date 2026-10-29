@@ -22,8 +22,10 @@
 // never takes a value whose provenance holds X. So a name another function reuses keeps its other values, and a word inside a string literal is no
 // dependency: only a real use is (`$NAME`, `${NAME…}`, a template's `${NAME}`, a bare code name outside a string). The provenance is exact by
 // construction, so an error in it can only be a refused value: one whose derivation ran through the name that builds it. What that can lose is a
-// variant of a value the name already holds, with text the cycle added around it; it reads as a MISSED reading only if that added text changes what
-// follows the prefix (a parameter operator that strips it) — limit J6. It never adds a value, and it never makes a name overflow. A value longer than
+// variant of a value the name already holds, with the text the cycle added around it; that matters when the text changes what follows the prefix
+// (a parameter operator that strips it) AND when it sits BEFORE the prefix, where it is what makes the path anchor (`P='<prefix>-'; P="$TMPDIR/$P";
+// for d in "$P"*; do rm -rf "$d"; done`: the self-reference drops the `$TMPDIR/<prefix>-` variant, the quoted glob that is left is a classifier limit, and
+// the removal is on another line) — limit J6. It never adds a value, and it never makes a name overflow. A value longer than
 // MAX_VALUE or a name with MAX_VALUES values stops growing (`overflow`: a line that uses it is judged broad), and so does a name whose right-hand
 // side is cut at MAX_EXPRESSION with the prefix word in the part that was not read.
 // A command substitution is the placeholder `${-}` (no identifier, so no use pattern matches it, and the classifier reads it as an owner segment).
@@ -46,7 +48,7 @@
 //     were absent, so the use reads with the owner segment it may have removed (owner-aware); and a value read right after the prefix separator that
 //     is empty or holds no owner still reads as an owner (follow-up F15). Found 2026-10-28 by consultation; not a regression of the pre-F12 classifier;
 //   - `'<prefix>-' + STAR`: any non-literal operand after the prefix reads as an owner segment, so the use is owner-aware;
-//   - a right-hand side is read to 1024 characters: past that only its literals and word-runs bind, and a prefix word in the part not read makes the name overflow;
+//   - a right-hand side is read to 1024 characters: past that only its literals and word-runs bind, and a prefix word in the part not read makes the name overflow, and so does a right-hand side over MAX_VALUE that uses a bound name;
 //   - Python f-strings and `Path.glob` at the USE, a glob built by concatenation with the removal on another line, a quoted glob
 //     (`[[ "$n" == "$P"* ]]`), Python without PEP 8 spacing, a second assignment on one shell line or a second JS declarator, shell
 //     arrays, PowerShell `[string]$P`, `$script:P` and PowerShell's case-insensitive names.
@@ -506,6 +508,14 @@ export { makeUses };
 
 // --- bindings ------------------------------------------------------------------------------------------------------------
 
+/** Whether the right-hand side of `item` USES a bound name, by the use grammar (a name inside a string literal, or in a longer word, is not a use). */
+function usesBoundName(item, uses) {
+  if (uses === null) return false;
+  let used = false;
+  replaceUses(item.rhs, uses, new Set(), () => { used = true; }, item.family === CODE);
+  return used;
+}
+
 /**
  * `Map<name, { family, values, prov, overflow }>` of the names the `items` (assignments) give a value holding the prefix word, to a true fixed
  * point. `prov[i]` is the provenance of `values[i]` (see `evaluate`): when two builds give one value, the smaller provenance is kept. A name that
@@ -540,6 +550,7 @@ function bindItems(items) {
     for (const item of items) {
       if (item.tailHolds && markOverflow(item)) changed = true; // the word is past what was read: some value is unknown, the safe direction is broad
       const long = item.rhs.length > MAX_VALUE; // a value that long never binds as a whole: only its literals and word-runs can
+      if (long && !item.holds && usesBoundName(item, uses) && markOverflow(item)) changed = true; // read to its end it could hold the word: unknown, broad
       if (!item.holds && (long || !uses?.names.some((name) => item.rhs.includes(name)))) continue; // nothing to read in it
       const { values, overflow } = evaluate(item, uses, bindings);
       if (overflow && markOverflow(item)) changed = true; // it reads a name of unknown value: overflow, never narrowed

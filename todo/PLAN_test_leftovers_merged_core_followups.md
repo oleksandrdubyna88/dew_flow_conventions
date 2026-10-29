@@ -314,12 +314,15 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   template and its use line reads owner-aware, not null; base then refuses id's value. R7 (the measured owner-aware shape) is unchanged: no broad line,
   `BOUND` still `["P","base"]`. What an error in provenance can do, exactly: it is exact by construction, so it can only REFUSE a value whose
   derivation ran through the name that builds it; that loses a variant of a value the name already holds (text the cycle added around it), and reads as
-  a missed reading only if that text changes what follows the prefix (a parameter operator that strips it). This corrects round 5's sentence that a wrong
+  a missed reading when that text changes what follows the prefix or sits before it (see J6). This corrects round 5's sentence that a wrong
   provenance is "too small" and so errs to overflow: that was never true (it did not overflow, it read null).
   **C0** (gate finding, accepted) — a right-hand side cut at 1024 characters whose unread tail holds the prefix word (or whose word straddles the cut)
   marks the name `overflow`: its uses read broad. The check costs one `lastIndexOf` per line, found once. A 1100-character right-hand side with the
   prefix at its end and `rm -rf "$P"*` was null, is broad.
-  **Limit J6** — see B2: a refusal can drop a variant of a value around a cycle (above).
+  **Limit J6** — see B2: a refusal can drop a variant of a value around a cycle. It matters for text added AFTER the prefix (a stripping operator) and for
+  text added BEFORE it, which is what makes the path anchor. Input, null at `fe05417`, `65d50c1` and `532846f` alike (so not a regression): `P='<p>-'` /
+  `P="$TMPDIR/$P"` / `for d in "$P"*; do` / `rm -rf "$d"` / `done`. The self-reference drops the `$TMPDIR/<p>-` variant; what is left is the quoted glob
+  `"<p>-"*`, which the classifier does not read (a base classifier limit), and the line has no deletion.
   **Limit J7** — a parameter operator that can strip the owner segment (`${P%%-u*}`, `${P%-*}`, `${P#…}`) is expanded to the bound value as if the
   operator were absent, so the use reads with the owner segment the operator may have removed (owner-aware). Tracer limitation, found 2026-10-28 by
   an outside consultation; not a regression of the pre-F12 classifier. Verified on this branch's HEAD: `P="<p>-u1000-repo-"; find /tmp -name "${P%%-u*}-*"
@@ -328,8 +331,16 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   `fe05417`; adversarial, the use pattern is rebuilt once per pass); (2) R6's timing: each of its five lines takes 36–300 ms against a 1 s budget
   (the 0.84 s measured earlier was the sum of the five), so the margin on a loaded machine is about 3x — left as is; (3) `${NAME}` inside a
   single-quoted shell string or a JavaScript non-template string is still replaced as a use at the USE site (a false broad, the safe direction); the part
-  that fed provenance went with B2.
-- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`, in six rounds. RED, round 1: the use lines of a same-file binding classified null
+  that fed provenance went with B2; (4) C0's `tailHolds` takes the last prefix word anywhere on the line, so a cut right-hand side followed by the word in a
+  COMMENT or a later statement marks the name `overflow` (a false broad, the safe direction), e.g. `DATA='<1100 a>' # <p>-u1000-` then `echo "$DATA"`; (5) a
+  base-classifier false broad, not F12: ``P="/tmp/<p>-u`id -u`-"`` reads broad, because a backtick after `u` is not an owner start in `OWNER_START_RE`.
+- **Round 7 (coai round 6, finding 2, confirmed):** `bindItems` skipped an assignment whose right-hand side is longer than MAX_VALUE (512) and does not hold
+  the word, even when it USES a bound name: `BASE='<p>-'`, `P="<600 chars of /x>/$BASE"`, `rm -rf "$P"*` read null (the JavaScript form, `const P = '<600 chars>/' +
+  BASE;` with `startsWith(P)` and `rmSync`, too), while the short form read broad. Measured at `532846f` and `cfedbb0`; the same at `65d50c1`. Now such a right-hand
+  side marks the assigned name `overflow` when it makes a real use of a bound name, by the use grammar (a name inside a string literal or a longer word is no
+  use): its uses read broad. One that uses no bound name still binds nothing (no false broad), and the 1024-character cut (C0) is unchanged. J6 was
+  rewritten (above). Reviews of `532846f`: an Opus judge, SHIP (90 probes, no regression, no new false positive); the coai gate, proceed.
+- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`, in seven rounds. RED, round 1: the use lines of a same-file binding classified null
   (`actual null, expected 'broad'`) and the guard exited 0 on a file that removes through a bare-prefix variable. RED, round 2: the use of an
   owner-aware concatenation classified broad, `${P:?}` and its kin classified null, and a 100000-character line of the shape `x:` and spaces took 21 s.
   RED, round 3 (against `0dce2ca` → `f7926cd`): the seven literal-first shapes, the same-line alias, the repeated-text span, the 33rd value, and
@@ -337,6 +348,7 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   RED, round 5 (against `5f49dcc`): the use line of each of the five (a) probes and the three (b) probes read null, the case conversions and
   pathlib joins bound nothing, and the unclosed-class line took 10.7 s.
   RED, round 6 (against `65d50c1`): the four B1 probes, the six B2 probes and the 1100-character right-hand side all read null on the use line.
+  RED, round 7 (against `cfedbb0`): the 600- and 1000-character right-hand sides, shell and script, read null on the use line.
   GREEN: all new tests, and the janitor's 7 uses clean through the sanction.
 
 ## F13 — `owned.mjs` assumes 100 clock ticks per second (found 2026-10-27)

@@ -475,6 +475,18 @@ test("C0 a prefix after the right-hand side's read limit makes the name overflow
   assert.ok(elapsed < 1000, `took ${elapsed} ms`);
 });
 
+// round 7: a right-hand side too long to bind that USES a bound name overflows: the name's uses read broad
+
+test("R19 a long right-hand side that uses a bound name overflows, shell and script, at 600 and 1000 characters; one that uses none binds nothing", () => {
+  for (const length of [600, 1000]) {
+    const path = "/x".repeat(length / 2);
+    assert.equal(verdicts(rows(`BASE='${Q}-'`, `P="${path}/$BASE"`, 'rm -rf "$P"*')).at(-1), "broad", `shell, ${length}`);
+    assert.equal(verdicts(rows(`const BASE = '${Q}-';`, `const P = '${path}/' + BASE;`, "names.filter((n) => n.startsWith(P)).forEach((n) => fs.rmSync(n))")).at(-1), "broad", `script, ${length}`);
+    assert.equal(verdicts(rows(`BASE='${Q}-'`, `P="${path}"`, 'rm -rf "$P"*')).at(-1), null, `shell, ${length}, no bound name used: nothing to read`);
+    assert.equal(verdicts(rows(`const BASE = '${Q}-';`, `const P = '${path}/BASE';`, "names.filter((n) => n.startsWith(P)).forEach((n) => fs.rmSync(n))")).at(-1), null, `script, ${length}, the name only inside a literal`);
+  }
+});
+
 // --- S5b: the scan ---------------------------------------------------------------------------------------------------
 
 import { spawnSync } from "node:child_process";
