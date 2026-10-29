@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
 
 import { NOT_A_SWEEPER, broadLines, classifyLine, classifyLines } from "./lib/sweeper-scan.mjs";
-import { prefixBindings } from "./lib/prefix-bindings.mjs";
+import { assignments, prefixBindings } from "./lib/prefix-bindings.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const P = "teststo" + "delete"; // the prefix, lower case
@@ -320,20 +320,44 @@ test("R4 a name past its value bound is judged broad where it is used, not silen
   assert.equal(verdicts(rows(...owned, `P_='${Q}-'`, 'rm -rf "/tmp/$P_"*')).at(-1), "broad", "the 33rd value, the bare prefix, cannot hide");
 });
 
-test("R6 an unclosed bracket, an unclosed ${ and a 100000-character line are read in well under a second", () => {
-  const cases = [
-    `${"const a = [".repeat(9000)}${Q}`,
-    `${"const a = (".repeat(9000)}${Q}`,
-    `${";a=$(".repeat(16000)}${Q}`,
-    `${"${P_:".repeat(25000)}${Q}`,
-    `${"${P_%x".repeat(20000)}${Q}`,
-  ];
-  for (const line of cases) {
-    const started = performance.now();
-    assert.equal(verdicts(rows(`P_='${Q}-'`, line)).length, 2);
-    const elapsed = performance.now() - started;
-    assert.ok(elapsed < 1000, `${line.slice(0, 12)}… took ${elapsed} ms`);
+test("R6 an unclosed bracket, an unclosed ${ and a 100000-character line are read in well under a second, each case on its own", async (t) => {
+  const cases = {
+    "bracket `const a = [` x9000": `${"const a = [".repeat(9000)}${Q}`,
+    "paren `const a = (` x9000": `${"const a = (".repeat(9000)}${Q}`,
+    "substitution `;a=$(` x16000": `${";a=$(".repeat(16000)}${Q}`,
+    "operator `${P_:` x25000": `${"${P_:".repeat(25000)}${Q}`,
+    "operator `${P_%x` x20000": `${"${P_%x".repeat(20000)}${Q}`,
+  };
+  for (const [name, line] of Object.entries(cases)) {
+    await t.test(name, () => {
+      const started = performance.now();
+      assert.equal(verdicts(rows(`P_='${Q}-'`, line)).length, 2);
+      const elapsed = performance.now() - started;
+      assert.ok(elapsed < 1000, `${name} took ${Math.round(elapsed)} ms`);
+    });
   }
+});
+
+// round 8: the right-hand sides of one line are bounded; nothing that is a real, separate assignment is lost
+
+test("R20 an assignment that is a separate statement after a closed right-hand side still binds, on one line", () => {
+  assert.deepEqual(verdicts(rows(`a=1; P='${Q}-'; rm -rf "/tmp/$P"*`)), ["broad"], "shell: a=1; P=…; rm");
+  assert.deepEqual(verdicts(rows(`const a = [1, 2]; const P = '${Q}-'; fs.rmSync(P);`)), ["broad"], "script: two declarations after a closed bracket");
+  assert.deepEqual(verdicts(rows(`const a = [1, [2, 3]], b = (x), c = {}; const P = '${Q}-';`, "fs.rmSync(P);")), [null, "broad"]);
+  assert.deepEqual(assignments(`const a = [ const P = '${Q}-'`).map((item) => item.name), ["a", "P"], "inside an unclosed bracket, an assignment that holds the word is still read");
+  assert.deepEqual(assignments("const a = [ const b = 1").map((item) => item.name), ["a"], "inside an unclosed bracket, one that cannot hold the word is text of it");
+  assert.deepEqual(assignments(`${";a=$(".repeat(300)}${Q}`).map((item) => item.name).length > 1, true, "the one that comes before the word, inside, is read when the word is inside the text");
+});
+
+test("R21 past the per-line reading budget an assignment is returned unread, and its name overflows only if the prefix word comes after it", () => {
+  const filler = Array.from({ length: 200 }, () => `b=${"x".repeat(100)}`).join("; ");
+  const after = prefixBindings(rows(`${filler}; P='${Q}-'`, 'rm -rf "$P"*')).get("P");
+  assert.equal(after.overflow, true, "past the budget, the word after it: unknown, broad");
+  assert.equal(verdicts(rows(`${filler}; P='${Q}-'`, 'rm -rf "$P"*')).at(-1), "broad");
+  const under = prefixBindings(rows(`${filler.slice(0, 5000)}; P='${Q}-'`, 'rm -rf "$P"*')).get("P");
+  assert.deepEqual([under.overflow, under.values], [false, [`${Q}-`]], "inside the budget it binds as before");
+  const before = prefixBindings(rows(`echo ${Q}-x; ${filler}`, 'rm -rf "$b"*'));
+  assert.equal(before.get("b")?.overflow ?? false, false, "the word comes BEFORE every assignment: nothing to overflow");
 });
 
 // round 4: a bound name given to a call, a member access or a subscript does not make the result a value (measured on compliant code)

@@ -48,6 +48,10 @@
 //     were absent, so the use reads with the owner segment it may have removed (owner-aware); and a value read right after the prefix separator that
 //     is empty or holds no owner still reads as an owner (follow-up F15). Found 2026-10-28 by consultation; not a regression of the pre-F12 classifier;
 //   - `'<prefix>-' + STAR`: any non-literal operand after the prefix reads as an owner segment, so the use is owner-aware;
+//   - J8: the right-hand sides of one line are read to MAX_LINE_READ characters in all (16 x MAX_EXPRESSION); an assignment past it is not read, and its
+//     name overflows (broad) when the prefix word comes after it. A match that starts inside a right-hand side that ran to its cut or the end of the line
+//     without a terminator (an unclosed `$(`, `[`, `(`) is text of it and binds nothing — unless the prefix word comes after it inside that text; so an alias
+//     of a bound name written inside such an unclosed bracket on one line is not read;
 //   - a right-hand side is read to 1024 characters: past that only its literals and word-runs bind, and a prefix word in the part not read makes the name overflow, and so does a right-hand side over MAX_VALUE that uses a bound name;
 //   - Python f-strings and `Path.glob` at the USE, a glob built by concatenation with the removal on another line, a quoted glob
 //     (`[[ "$n" == "$P"* ]]`), Python without PEP 8 spacing, a second assignment on one shell line or a second JS declarator, shell
@@ -61,6 +65,8 @@ const MAX_VALUE = 512;
 const MAX_VALUES = 32;
 /** A right-hand side is read up to this many characters: a value over MAX_VALUE never binds once folded, and an unclosed bracket must not make a long line quadratic. */
 const MAX_EXPRESSION = 1024;
+/** The right-hand sides of ONE line are read to this many characters in all: past it an assignment is not read, and its name overflows if the prefix word comes after it. */
+const MAX_LINE_READ = 16 * MAX_EXPRESSION;
 const MAX_OPERATOR = 512; // the longest `${NAME<operator>…}` tail read as one use
 /** Above this many readings of one line (the product of the value counts of the names it uses) the caller judges the line broad. */
 export const MAX_READINGS = 256;
@@ -77,17 +83,40 @@ const CLOSER = { "(": ")", "[": "]", "{": "}" };
 
 /**
  * The assignments of one line: `{ name, family, syntax, rhs, holds, truncated, tailHolds, start, end }` (`holds`: the right-hand side holds the prefix word;
- * `tailHolds`: a right-hand side cut at MAX_EXPRESSION has the word where it was not read, or across the cut) (`start`/`end` are the span of the whole
- * assignment in the line).
+ * `tailHolds`: a right-hand side cut at MAX_EXPRESSION, or not read at all, has the word where it was not read, or across the cut) (`start`/`end` are the
+ * span of the whole assignment in the line). Two bounds keep a long line cheap:
+ *   - a match that starts INSIDE a right-hand side that ran to its cut or to the end of the line without a terminator (the next `;a=$(` inside an unclosed
+ *     `$(`, the next `const a = [` inside an unclosed `[`) is text of that right-hand side and makes no assignment — unless the prefix word comes after it
+ *     inside that text, when it is read like any other (an assignment that holds the word must not be lost);
+ *   - the right-hand sides of one line are read to MAX_LINE_READ characters in all; an assignment past it is returned unread (`rhs` empty, `truncated`) and
+ *     `tailHolds` is true when the prefix word comes after its start: the name overflows, its uses read broad.
  */
 export function assignments(line) {
   if (!line.includes("=")) return [];
   const found = [];
-  let lastWord; // where the prefix word last starts in the line: found once, for the cut right-hand sides
+  let lower; // the line in lower case, once, for the prefix word's positions
+  let lastWord; // where the prefix word last starts in the line
+  let nextWord = -1; // where it starts at or after the last position asked about (Infinity: nowhere)
+  let spent = 0; // characters of right-hand sides read on this line
+  const wordIn = (from, until) => {
+    lower ??= line.toLowerCase();
+    if (nextWord < from) nextWord = lower.indexOf(PREFIX_WORD, from) < 0 ? Infinity : lower.indexOf(PREFIX_WORD, from);
+    return nextWord < until;
+  };
   const read = (re, family, syntax) => {
+    let insideUntil = -1; // the end of the last right-hand side that ran out without a terminator
     for (const match of line.matchAll(re)) {
-      const expression = scanExpression(line, match.index + match[0].length, syntax === "sh");
-      if (expression.truncated) lastWord ??= line.toLowerCase().lastIndexOf(PREFIX_WORD);
+      const afterName = match.index + match[0].length;
+      if (match.index < insideUntil && !wordIn(match.index, insideUntil)) continue;
+      lower ??= line.toLowerCase();
+      lastWord ??= lower.lastIndexOf(PREFIX_WORD);
+      if (spent >= MAX_LINE_READ) {
+        found.push({ name: match[1], family, syntax, rhs: "", holds: false, truncated: true, tailHolds: lastWord + PREFIX_WORD.length > match.index, start: match.index, end: afterName });
+        continue;
+      }
+      const expression = scanExpression(line, afterName, syntax === "sh");
+      spent += expression.end - match.index;
+      if (expression.unterminated) insideUntil = expression.end;
       const tailHolds = expression.truncated && lastWord + PREFIX_WORD.length > expression.end;
       found.push({ name: match[1], family, syntax, rhs: expression.text, holds: holdsPrefix(expression.text), truncated: expression.truncated, tailHolds, start: match.index, end: expression.end });
     }
@@ -111,7 +140,7 @@ export function withoutAssignments(line, items) {
   return out + line.slice(from);
 }
 
-/** The right-hand side that starts at `start`: `{ text, end, truncated }` — to the first top-level terminator (see the header), quotes and brackets respected, at most MAX_EXPRESSION characters. */
+/** The right-hand side that starts at `start`: `{ text, end, truncated, unterminated }` — to the first top-level terminator (see the header), quotes and brackets respected, at most MAX_EXPRESSION characters (`unterminated`: none was found before the cut or the end of the line). */
 function scanExpression(line, start, shell) {
   const stack = [];
   const limit = Math.min(line.length, start + MAX_EXPRESSION);
@@ -133,9 +162,9 @@ function scanExpression(line, start, shell) {
     }
     if (opener !== null) { stack.push(opener); continue; }
     const ends = shell ? /[\s;&|)]/.test(char) : char === ";" || char === "," || char === ")" || char === "]" || char === "}" || char === "#" || (char === "/" && line[index + 1] === "/");
-    if (ends) return { text: line.slice(start, index), end: index, truncated: false };
+    if (ends) return { text: line.slice(start, index), end: index, truncated: false, unterminated: false };
   }
-  return { text: line.slice(start, limit), end: limit, truncated: limit < line.length };
+  return { text: line.slice(start, limit), end: limit, truncated: limit < line.length, unterminated: true };
 }
 
 /** The pieces of a shell word, quotes and escapes removed: `'a'"$B"c` is `a`, `$B`, `c` (each quoted part, and each unquoted run, is one piece). */
@@ -508,11 +537,17 @@ export { makeUses };
 
 // --- bindings ------------------------------------------------------------------------------------------------------------
 
-/** Whether the right-hand side of `item` USES a bound name, by the use grammar (a name inside a string literal, or in a longer word, is not a use). */
-function usesBoundName(item, uses) {
+/**
+ * Whether the right-hand side of `item` USES a bound name, by the use grammar (a name inside a string literal, or in a longer word, is not a use).
+ * Asked again every pass of the fixed point: `asked` keeps the answer per item while the set of bound names (which only grows) has the same size.
+ */
+function usesBoundName(item, uses, asked) {
   if (uses === null) return false;
+  const known = asked.get(item);
+  if (known?.size === uses.names.length) return known.used;
   let used = false;
   replaceUses(item.rhs, uses, new Set(), () => { used = true; }, item.family === CODE);
+  asked.set(item, { size: uses.names.length, used });
   return used;
 }
 
@@ -523,6 +558,7 @@ function usesBoundName(item, uses) {
  */
 function bindItems(items) {
   const bindings = new Map();
+  const asked = new Map(); // item -> { size, used }, see `usesBoundName`
   const set = (item, entry, values, prov, overflow) => bindings.set(item.name, { family: entry?.family ?? item.family, values, prov, overflow });
   const markOverflow = (item) => {
     const entry = bindings.get(item.name);
@@ -550,7 +586,7 @@ function bindItems(items) {
     for (const item of items) {
       if (item.tailHolds && markOverflow(item)) changed = true; // the word is past what was read: some value is unknown, the safe direction is broad
       const long = item.rhs.length > MAX_VALUE; // a value that long never binds as a whole: only its literals and word-runs can
-      if (long && !item.holds && usesBoundName(item, uses) && markOverflow(item)) changed = true; // read to its end it could hold the word: unknown, broad
+      if (long && !item.holds && usesBoundName(item, uses, asked) && markOverflow(item)) changed = true; // read to its end it could hold the word: unknown, broad
       if (!item.holds && (long || !uses?.names.some((name) => item.rhs.includes(name)))) continue; // nothing to read in it
       const { values, overflow } = evaluate(item, uses, bindings);
       if (overflow && markOverflow(item)) changed = true; // it reads a name of unknown value: overflow, never narrowed

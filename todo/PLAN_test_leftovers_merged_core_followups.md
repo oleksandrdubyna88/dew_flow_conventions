@@ -340,7 +340,19 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   side marks the assigned name `overflow` when it makes a real use of a bound name, by the use grammar (a name inside a string literal or a longer word is no
   use): its uses read broad. One that uses no bound name still binds nothing (no false broad), and the 1024-character cut (C0) is unchanged. J6 was
   rewritten (above). Reviews of `532846f`: an Opus judge, SHIP (90 probes, no regression, no new false positive); the coai gate, proceed.
-- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`, in seven rounds. RED, round 1: the use lines of a same-file binding classified null
+- **Round 8 (CI under V8 coverage):** PR #90's required check ("SonarCloud Scan") runs `npm run test:coverage`, and R6's unclosed-bracket case took 2094 ms there
+  against its 1000 ms limit. Reproduced here with `node --test --experimental-test-coverage --test-name-pattern='^R6'`: three cases over the limit. Cause (measured):
+  `assignments` read 1024 characters for EVERY match of an assignment shape (`const a = [` x9000, `;a=$(` x16000), although each match lies inside the unclosed
+  right-hand side of the one before; 9000-16000 reads of 1024 characters, then `bindItems` re-asked `usesBoundName` of every item each pass. Per case, ms, three runs
+  (plain / coverage) BEFORE: bracket 394-420 / 2222-2275, paren 421-442 / 2283-2357, `;a=$(` 631-672 / 2718-2796, `${P_:` 44-45 / 45-47, `${P_%x` 36-37 / 36-37.
+  AFTER: bracket 21-26 / 27-33, paren 11-13 / 15-21, `;a=$(` 13-16 / 18-23, `${P_:` 47-60 / 50-53, `${P_%x` 37-47 / 37-38. The limit is still 1000 ms. Fix: (1) a match
+  that starts inside a right-hand side that ran to its cut or the end of the line without a terminator makes no assignment, unless the prefix word comes after it inside
+  that text (an assignment that holds the word is never lost); (2) the right-hand sides of one line are read to MAX_LINE_READ (16 x 1024) characters in all, past it an
+  assignment is returned unread and its name overflows when the word comes after it (broad, the safe direction); (3) `usesBoundName` is cached per item while the set
+  of bound names has the same size. R6 is one subtest per case, naming it. R20 and R21 hold the positives (`a=1; P='<p>-'; rm -rf "/tmp/$P"*`, two declarations after a
+  closed bracket, an assignment that holds the word inside an unclosed bracket) and the budget. **Limit J8** (header): an alias of a bound name written inside an
+  unclosed bracket on one line, with no prefix word after it, is not read. Whole suite, plain and with coverage: 1342 tests, 1336 pass, 0 fail, 6 skipped, both.
+- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`, in eight rounds. RED, round 1: the use lines of a same-file binding classified null
   (`actual null, expected 'broad'`) and the guard exited 0 on a file that removes through a bare-prefix variable. RED, round 2: the use of an
   owner-aware concatenation classified broad, `${P:?}` and its kin classified null, and a 100000-character line of the shape `x:` and spaces took 21 s.
   RED, round 3 (against `0dce2ca` → `f7926cd`): the seven literal-first shapes, the same-line alias, the repeated-text span, the 33rd value, and
@@ -349,6 +361,7 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   pathlib joins bound nothing, and the unclosed-class line took 10.7 s.
   RED, round 6 (against `65d50c1`): the four B1 probes, the six B2 probes and the 1100-character right-hand side all read null on the use line.
   RED, round 7 (against `cfedbb0`): the 600- and 1000-character right-hand sides, shell and script, read null on the use line.
+  RED, round 8 (against `48e4e0c`): R6's bracket, paren and `;a=$(` cases took 2.2-2.8 s under `--experimental-test-coverage`; R20 and R21 failed on the old reading.
   GREEN: all new tests, and the janitor's 7 uses clean through the sanction.
 
 ## F13 — `owned.mjs` assumes 100 clock ticks per second (found 2026-10-27)
