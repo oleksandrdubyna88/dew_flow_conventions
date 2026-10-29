@@ -1,6 +1,6 @@
 # PLAN — A plan changed twice after its approval stops for a whole re-review
 
-> Status: **stopped for re-review, 2026-10-29 — the second change of epoch 2 (entry 2.2); the re-review for epoch 3 is written and waits for its review and the owner; E1 built (b256502 … 0af69b0) with one fix-forward commit owed after resume; E2 not started.** Scope: a new shared rule
+> Status: **in progress, epoch 3 (approved by the owner 2026-10-29 after the second full stop) — E1 built (b256502 … 0af69b0), its K1 fix-forward next; E2 not started.** Scope: a new shared rule
 > `common/plan-change-control.md`, two pointer lines in `common/planning-docs.md`, a change-ledger check in
 > `tools/plan-lifecycle.mjs` through a new `tools/lib/plan-ledger.mjs`, their tests, `research/rule-bodies.json`,
 > `research/module_rules.md`, `research/module_tests.md`, the `README.md` tools row, a `plan-lifecycle` step in
@@ -52,7 +52,7 @@ Narrowed: yes — entry 1.1 took the server plan (S7) out of the merge condition
 | b256502 — the E1 stories document | pushed, unmerged | fits | fix forward: status line, the cornerstone grammar's free-text rows (by Fable), S6b's findings and decisions, the fix story |
 | 7e59e0d — the stop record | pushed, unmerged | fits | kept; epoch 1 becomes `closed` at resume |
 
-> Epoch 2 · approved 2026-10-29 · by owner · state: stopped
+> Epoch 2 · approved 2026-10-29 · by owner · state: closed
 
 - 2.1 · 2026-10-29 · reviewer · contract — E1 fix-forward Opus review, finding 3: an entry behind an ordered-list
   marker (`  1. 1.2 · …`, ` 1) 1.2 · …`) still hides when indented; §2's reserved entry prefix widens its marker group
@@ -100,6 +100,12 @@ Narrowed: yes — the DoD's absolute size cap becomes a measured, attributed del
 | 0af69b0 — code round 5 recorded | pushed, unmerged | fits | kept |
 | 8163cfe — the second stop record (2.2) | pushed, unmerged | fits | kept; epoch 2 becomes `closed` at resume |
 | the E2 stories document and its `todo/README.md` row | local, uncommitted | fits | fix forward: Q1 becomes the adopted criterion, the size budget, the CI step, K1, the citations |
+
+> Epoch 3 · approved 2026-10-29 · by owner · state: open
+
+  (The re-review passed on 2026-10-29 — `review_document` with `newReview: true`, `proceed`, 4 of 4 reviewers, gating 1
+  of 5, its one finding accepted as part of this revision. Narrowed, so the owner approved epoch 3 in the conversation
+  on 2026-10-29. One change is allowed in epoch 3; the next stops the plan again.)
 
 ## Symptom
 
