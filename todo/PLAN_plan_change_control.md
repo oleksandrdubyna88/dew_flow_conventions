@@ -1,9 +1,10 @@
 # PLAN — A plan changed twice after its approval stops for a whole re-review
 
-> Status: **stopped for re-review, 2026-10-29 — the second change of epoch 2 (entry 2.2); E1 built and closed (b256502 … 0af69b0), E2 not started.** Scope: a new shared rule
+> Status: **stopped for re-review, 2026-10-29 — the second change of epoch 2 (entry 2.2); the re-review for epoch 3 is written and waits for its review and the owner; E1 built (b256502 … 0af69b0) with one fix-forward commit owed after resume; E2 not started.** Scope: a new shared rule
 > `common/plan-change-control.md`, two pointer lines in `common/planning-docs.md`, a change-ledger check in
 > `tools/plan-lifecycle.mjs` through a new `tools/lib/plan-ledger.mjs`, their tests, `research/rule-bodies.json`,
-> `research/module_rules.md`, `research/module_tests.md`, the `README.md` tools row — and, as a separate plan in another
+> `research/module_rules.md`, `research/module_tests.md`, the `README.md` tools row, a `plan-lifecycle` step in
+> `.github/workflows/ci.yml` — and, as a separate plan in another
 > repository, `review_plan` with `again: true` after `proceed`.
 >
 > Related docs: [planning-docs.md](../common/planning-docs.md) (where plans live, epics and stories, promotion and
@@ -69,6 +70,36 @@ Narrowed: yes — entry 1.1 took the server plan (S7) out of the merge condition
   (Discovering the false premise is not a change; accepting a different criterion is — consultants 074c2bab, both rows.
   The corrected item is weaker than the written one, so the re-review is narrowed and the owner approves. THE SECOND FULL
   STOP: no new code on E2 until the whole plan is re-reviewed.)
+
+### Re-review for epoch 3
+
+Narrowed: yes — the DoD's absolute size cap becomes a measured, attributed delta
+  (The written item, "the `inspect --file todo/…` scope stays ≤ 32 768 B", could never be met: 38 612 B on `main` at
+  `72ae2f3` before any work. The item that replaces it is weaker, so the owner approves epoch 3.)
+  Consulted: `ask_consultants` 074c2bab (both rows: finding the false premise is not a change, accepting another
+  criterion is) and `consult` b4b714d2 (the re-review, entries 2.1 and 2.2 quoted; advice verified).
+  Audited: an Opus judge re-checked every premise of the plan against the code, A1-A32, 2026-10-29.
+  Revised, the whole plan: the DoD's size item, the test plan's Size line, §1 and E2's scope (the ten scopes of the
+  four single-read tasks; the measured cost of `depends: planning-docs`); the rule's size target at most 12 288 B;
+  §1's rationale ("triggers a review of whether"); the rule's § The check says it validates syntax, not obedience; §2's
+  reserved entry prefix accepts repeated markers, so known limit K1 is fixed (declined before only to avoid a counted
+  change) and E1 owes one more fix-forward commit after resume; E1's done-when and S10 say what was built, and S10
+  merges by squash; a `plan-lifecycle` step in this repository's CI (A19, E2); the stale line citations repaired.
+  Epics and build order: unchanged (E1 → E2 → S10 and S7 → S9) — no re-split. Sorted by an Opus judge, 2026-10-29;
+  nothing is cut and no revert is needed.
+
+| Work | Where | Verdict | Action |
+|---|---|---|---|
+| 362d00a, 07608f6 — the re-review for epoch 2 and its resume | pushed, unmerged | fits | kept |
+| dce67ed — E1 fixed forward: the reserved prefixes | pushed, unmerged | fits | kept; one more fix forward after resume: repeated list markers (K1) |
+| cd3ccde — three more shapes under which a change hides (2.1) | pushed, unmerged | fits | kept |
+| 603b52b — code round 3: heading spacing, format characters, escaped pipes | pushed, unmerged | fits | kept |
+| c05f870 — code round 3 recorded | pushed, unmerged | fits | kept |
+| 4d18e4d — code round 4: the pipe escape, format characters | pushed, unmerged | fits | kept |
+| 04e423e — code round 5: every Unicode space is indent; K3 | pushed, unmerged | fits | kept |
+| 0af69b0 — code round 5 recorded | pushed, unmerged | fits | kept |
+| 8163cfe — the second stop record (2.2) | pushed, unmerged | fits | kept; epoch 2 becomes `closed` at resume |
+| the E2 stories document and its `todo/README.md` row | local, uncommitted | fits | fix forward: Q1 becomes the adopted criterion, the size budget, the CI step, K1, the citations |
 
 ## Symptom
 
@@ -149,17 +180,21 @@ depends: ["common.planning-docs"]
 ```
 
 - **The fourteen split-read tasks, exactly the set of [subagent-models.md](../common/subagent-models.md)**, and none of
-  `inspect`, `ui`, `gpu`, `storage`: those four must fit one 32 768 B read (`tools/rules.test.mjs:215-222`).
+  `inspect`, `ui`, `gpu`, `storage`: the ten scopes of those four single-read tasks that `tools/rules.test.mjs:215-222` pins
+  must each fit one 32 768 B read.
 - **No `paths`.** Selection is paths OR tasks (`tools/lib/rule-catalog.mjs:157-163`); a `todo/**` glob would pull it into
-  `inspect --file todo/…`. For the same reason `planning-docs` must NOT `depends:` on it.
+  `inspect --file todo/…`. For the same reason `planning-docs` must NOT `depends:` on it. The measured cost of the
+  rule's own `depends: planning-docs`: `audit`, `http`, `benchmark` and `logging`, which `planning-docs` does not list,
+  each gain `planning-docs` and the rule, about 26 KB (≈ 14.8 KB + ≤ 12.3 KB); all four are split reads already
+  (190 574, 70 968, 69 787 and 47 207 B, measured 2026-10-29 at `0af69b0`), so no cap moves.
 - **No `depends:` on the coai rules.** They share `planning-docs`' task list, so a scope that has this rule has them too, apart
   from `audit`, `http`, `benchmark` and `logging`; the rule says the re-review is planning work and is read with `--task plan`
   (ENTRY step 8).
-- **`owns:` markers**, one per token the text really names, below the H1 (`tools/ownership-check.mjs:48`, exact match):
+- **`owns:` markers**, one per token the text really names, below the H1 (`tools/ownership-check.mjs:262-264`, exact match):
   `coai`, `mcp__coai__review_plan`, `mcp__coai__review_code`, `mcp__coai__review_document`, `mcp__coai__resolve`,
   `mcp__coai__consult`, `mcp__coai__ask_consultants`. Reason text: "a tool name a session types; there is no generic
   spelling of it". Never "the gate" / "its panel" in prose (`ownership-check.mjs:59`).
-- Target size 9-11 KB, simple English, the house shape: lead blockquote, measured paragraph, sections, `## Never`,
+- Target size at most 12 288 B (the outline's content does not fit 11 KB: measured ≈ 12.1 KB), simple English, the house shape: lead blockquote, measured paragraph, sections, `## Never`,
   `## Definition of Done`.
 
 Outline:
@@ -170,7 +205,8 @@ Outline:
    no new code on any epic of the plan until the whole plan has been reviewed again."**
 2. `## Why — measured` — the case above, anonymised and dated per rule-ownership (*"a plan in this family that passed its plan
    review on 2026-10-21 …"*), ending: counted by this rule, the stop comes on 2026-10-26 — before the merge conditions were
-   cut. One line of rationale: one change is learning; the second says the plan's model of the work is drifting — the same
+   cut. One line of rationale: one change is learning; the second triggers a review of whether the plan's model of the work is
+   drifting — the same
    signal as coai-consultant's second failed fix or a person saying twice that it is still broken.
 3. `## What counts as a change` — decisions 1-3. The pinned phrase: **"counts exactly like one you find"**. The FIRST change
    is not free of the other rules: when it changes the shape of the work, coai-consultant trigger 5 still fires before
@@ -218,7 +254,9 @@ Outline:
      repository named.
    - Your own Opus review runs as always, in addition.
 8. `## The check` — what `plan-lifecycle.mjs` turns red (§3), and what it cannot see: a plan with no ledger, a change
-   nobody recorded, code written during a stop. Those belong to this rule, its DoD and the code review.
+   nobody recorded, code written during a stop. Those belong to this rule, its DoD and the code review. The sentence
+   that bounds it: **the check validates the prescribed ledger syntax and detects specified malformed variants; a clean
+   result does not prove that every change was recorded or the stop obeyed.**
 9. `## Never` — keep building after a second change; fold independent causes into one entry; edit or delete an entry to
    lower a count; rewrite pushed history to cut work; resume a narrowed plan without the owner; send a plan to the document
    review outside the interim case.
@@ -259,8 +297,9 @@ Narrowed: yes — the Windows run left the merge conditions
   `goals`, `dod`, `merge-conditions`, `epics`, `stories`, `build-order`, `contract`, `approach`. Column 0 only.
 - **Free text and the reserved prefixes (epoch 2, entry 1.2):** an indented line anywhere in the section is free text —
   EXCEPT one whose trimmed text starts like a ledger line: an entry,
-  `^(?:(?:[-*+]|\d{1,9}[.)])\s+)?[1-9]\d*\.[1-9]\d*(?=\s|$)` (`- 1.2`, `* 1.2`, `+ 1.2`, `1. 1.2`, `1) 1.2`, a bare
-  `1.2` — the ordered markers since entry 2.1), an epoch line (`>`), or a heading (`#`). That line is finding 4, *a ledger line stands
+  `^(?:(?:[-*+]|\d{1,9}[.)])\s+)*[1-9]\d*\.[1-9]\d*(?=\s|$)` (`- 1.2`, `* 1.2`, `+ 1.2`, `1. 1.2`, `1) 1.2`, a bare
+  `1.2` — the ordered markers since entry 2.1; repeated markers such as `- - 1.2` and `1. - 1.2` since the re-review for
+  epoch 3, which fixes known limit K1), an epoch line (`>`), or a heading (`#`). That line is finding 4, *a ledger line stands
   at column 0*: a renderer shows a one-space `- ` as a sibling list item and a one-space `>` or `###` as a real quote or
   heading, which a reader counts, so the check must not skip it. Cost: free text may not begin with an entry-shaped
   number, `>` or `#`. Fenced lines stay outside the ledger — an example is not a record.
@@ -272,12 +311,12 @@ Narrowed: yes — the Windows run left the merge conditions
 
 ### 3. The check — `tools/lib/plan-ledger.mjs` (new) called from `tools/plan-lifecycle.mjs`
 
-The lib is dependency-free, imports only `folded` and `outsideFencedBlocks` from `tools/lib/rule-body.mjs` (`:21`, `:29`),
+The lib is dependency-free, imports only `folded` and `outsideFencedBlocks` from `tools/lib/rule-body.mjs` (`:21`, `:48`),
 and exports `ledgerFindings({ file, text, status, parent })` → `string[]`, where `parent` is the parent plan's name the
 wiring resolved on disk (`todo/PLAN_x.md`), or `null` when the file is no stories document or its parent is not in `todo/`
 (epoch 2: it was a boolean, and row 9 then named a file the lib guessed). `plan-lifecycle.mjs` gains
-`checkChangeLedgers(root, findings)` beside `checkStatuses` (`:161`), over **`todo/` only** (research is history), with the
-finding class `changes` padded to 10 like the others (`:167`). A throw inside one file's parse becomes a `changes` finding
+`checkChangeLedgers(root, findings)` beside `checkStatuses` (`:172`), over **`todo/` only** (research is history), with the
+finding class `changes` padded to 10 like the others (the push, `:211`). A throw inside one file's parse becomes a `changes` finding
 naming the file, never a crash — a crash would turn every consumer's CI red.
 
 - **Opt-in by presence.** No `## Plan changes` heading outside fences → no check. Measured by both architects on
@@ -290,7 +329,7 @@ Findings (each names the file and, where it has one, the entry):
 | # | Red when | Message gist |
 |---|---|---|
 | 1 | the current epoch has ≥ 2 entries and is not `stopped` | `epoch k has n changes and is not stopped; stop for a whole re-review` |
-| 2 | `stopped`, but the status paragraph (`statusParagraph`, `:109`) does not match `/\bstopped for re-review\b/i` | the stop must be visible where a reader looks first; tests cover bold, plain, capitalised and mid-paragraph forms, and a stopped status that also says "all … done" must not read as misfiled (`TOTALITY_VERDICT`, `:66`) |
+| 2 | `stopped`, but the status paragraph (`statusParagraph`, `:115`) does not match `/\bstopped for re-review\b/i` | the stop must be visible where a reader looks first; tests cover bold, plain, capitalised and mid-paragraph forms, and a stopped status that also says "all … done" must not read as misfiled (`TOTALITY_VERDICT`, `:72`) |
 | 3 | an `> Epoch` line that does not parse; a heading with no epoch line; two headings | `unreadable epoch line` / `no epoch line` |
 | 4 | a column-0 list line in the section that does not parse as an entry; an unknown source or kind; an indented line with the reserved entry prefix (§2) | an unreadable or hidden entry would undercount |
 | 5 | an entry's epoch above the current; entry numbers in an epoch not 1..n or repeated | repeated → *"two branches each recorded a change — renumber; the merge is the stop"* |
@@ -381,8 +420,9 @@ Inside the epics (the numbers the sections above cite):
 After the epics:
 
 - **S10 — the pull request.** E1's branch opens NO pull request: it is reviewed by its own gates and E2 starts from its
-  commit. ONE pull request, from E2's branch to `main`, carries both commits — E1's and E2's, each one epic — and is merged
-  by **rebase**, which keeps them as two commits on `main`. One pull request because `main` must never carry a check whose
+  commit. ONE pull request, from E2's branch to `main`, carries both epics — E1's commits (`b256502` and its fix-forward
+  commits with their records) and E2's one commit — and is merged by **squash** (`common/pull-requests.md`: squash for a
+  fix-up trail): one commit on `main`, whose message summarises both epics. One pull request because `main` must never carry a check whose
   hint line names a rule it does not have, nor `planning-docs`' "seven findings" line without the seventh. Every bot
   thread verified and resolved.
 - **S7 — the server plan**, in its own worktree, branch and pull request in that repository, under its own rules (plan
@@ -405,8 +445,10 @@ After the epics:
 - **Rule.** Selection (14 / 4), the meaning test with its splice cases, the rule/check agreement case.
 - **Dry run on the real estate (read-only).** `node tools/plan-lifecycle.mjs <repo>` on `main` and on the branch for every
   `dew_flow_*` checkout here and `wsl_care`: the diff of the two outputs has zero `changes` lines.
-- **Size.** `node tools/rules.mjs explain` for `inspect --file todo/PLAN_x.md` before and after; the two `planning-docs`
-  lines must not take that scope over 32 768 B.
+- **Size.** `node tools/rules.mjs explain` for `inspect --file todo/PLAN_x.md` before E2's first edit (38 612 B on `main`
+  at `72ae2f3`) and after E2's commit, both with their commits in `research/module_rules.md`: the growth equals what the
+  two `planning-docs` lines add by `wc -c` (≈ 370 B), `common.plan-change-control` is not selected there, and the ten
+  scopes of the four single-read tasks pinned by `tools/rules.test.mjs` stay ≤ 32 768 B.
 
 ## Post-deploy
 
@@ -475,12 +517,17 @@ Opus review are recorded in the E1 stories document; one of them was this plan's
 - [ ] `tools/lib/plan-ledger.mjs` and `plan-lifecycle.mjs` report every row of the findings table; every test was watched
       failing first; a throw is a finding, not a crash.
 - [ ] The meaning test pins the three sentences, with splice cases; the rule/check agreement case passes.
-- [ ] The dry run over the estate added zero `changes` findings; the `inspect --file todo/…` scope stays ≤ 32 768 B.
+- [ ] The dry run over the estate added zero `changes` findings. The `inspect --file todo/PLAN_x.md` scope was measured
+      with `node tools/rules.mjs explain` before E2's first edit (38 612 B on `main` at `72ae2f3`) and after E2's commit,
+      both numbers with their commits recorded in `research/module_rules.md`; the growth equals what the two
+      `planning-docs` pointer lines add by `wc -c` (≈ 370 B); `common.plan-change-control` is not selected in that scope;
+      and the ten scopes of the four single-read tasks pinned by `tools/rules.test.mjs` remain ≤ 32 768 B.
 - [ ] The interim path was observed once on this plan, and the result recorded here.
 - [ ] The server plan exists in its repository with the same boundary table — before S9's release question, not as a
       condition of the merge.
 - [ ] `research/module_rules.md`, `research/module_tests.md` and the `README.md` tools row describe what runs.
-- [ ] Five commands green; `review_code` and an Opus review resolved; every bot thread answered; merged by rebase.
+- [ ] `.github/workflows/ci.yml` runs `node tools/plan-lifecycle.mjs` over this repository's own plans.
+- [ ] Five commands green; `review_code` and an Opus review resolved; every bot thread answered; merged by squash.
 - [ ] The owner was asked about `release` and the consumer bumps; the answer is recorded here.
 
 ## Epics
@@ -488,7 +535,7 @@ Opus review are recorded in the E1 stories document; one of them was this plan's
 Two epics; cornerstone quota ⌈2·2/5⌉ = 1. Split by Fable on 2026-10-28, after the question consultants were asked what
 matters (two rows answered; both said two epics, and both named the durable ledger schema, not the parser alone, as the
 cornerstone — the caller verified their reasons). Each epic's stories live in `todo/PLAN_plan_change_control_E<k>.md`,
-written by Opus when the epic starts, with its own `todo/README.md` row in the same commit (`plan-lifecycle.mjs:233-236`
+written by Opus when the epic starts, with its own `todo/README.md` row in the same commit (`plan-lifecycle.mjs:263-279`
 demands it) and NO `## Plan changes` of its own (finding 9: a stories document's changes count in the parent).
 
 **Why two, not the four or five the gate asked for.** The gate's measure — 349 lines, 19 build steps, 58 files named, 9
@@ -508,7 +555,8 @@ describes it, which must describe what runs ([knowledge-base.md](../common/knowl
 whole diff together with an Opus review; fixes folded into that one commit while it is unpushed. **Epoch 2:** E1's commit
 was pushed with the stop record, and pushed history is never rewritten (decision 7), so E1's fixes after the re-review
 are a SECOND commit on its branch, reviewed by `review_code` with `again: true` and this revised plan as `planText`. The
-pull request is E2's branch, carrying the epics' commits, merged by rebase (S10 above); E1 opens none of its own.
+pull request is E2's branch, carrying the epics' commits, merged by squash (S10 above); E1 opens none of its own.
+**Epoch 3:** the re-review fixed known limit K1 (§2), so E1 gets one more fix-forward commit after resume.
 
 Cornerstones: 1 of 1 — E1.S1
 
@@ -523,15 +571,15 @@ Stories: `todo/PLAN_plan_change_control_E1.md` (written when the epic starts).
   `ownedDir(t, "plan-lifecycle ")`), S2 (GREEN: the lib, `checkChangeLedgers`, the `changes` class, the hint line naming
   `common/plan-change-control.md` — a file E2 creates), the compatibility fixtures, the dry run over the estate, S6b. The
   stories document decides and tests these, each with a case:
-  1. **Fences.** `outsideFencedBlocks` (`tools/lib/rule-body.mjs:29`) strips only column-0 triple-backtick fences,
+  1. **Fences.** `outsideFencedBlocks` (`tools/lib/rule-body.mjs:48`) strips only column-0 triple-backtick fences,
      non-greedy: no `~~~`, no indented fence, and a four-backtick fence that holds ``` lines closes early. The ledger
-     parser needs a stated fence interpretation. Widening the shared helper also moves `sectionsOf` (`:55`), whose
+     parser needs a stated fence interpretation. Widening the shared helper also moves `sectionsOf` (`:89`), whose
      headings are recorded in `research/rule-bodies.json`; a new export leaves it alone. The epic decides — new export
      or widening plus a `rule-bodies` verification — and tests both fence kinds either way.
   2. **Tolerance.** The format uses `·` and `—`. Decide whether `|`, `--` and the en dash are accepted or refused, and make
      the finding say which character was expected, so the message corrects the writer.
   3. **A stopped plan and `checkStatuses`.** A status paragraph that says `stopped for re-review` and also "all … done"
-     must not become a `misfiled` finding (`TOTALITY_VERDICT`, `plan-lifecycle.mjs:66`) — a spawned integration case.
+     must not become a `misfiled` finding (`TOTALITY_VERDICT`, `plan-lifecycle.mjs:72`) — a spawned integration case.
   4. **A caught throw is still a red CI.** The finding replaces the crash, not the red. The protection against a false red
      is the dry run: `node tools/plan-lifecycle.mjs <repo>` on `main` and on this branch for every `dew_flow_*` checkout
      here and `wsl_care`, the diff of the outputs with zero `changes` lines, recorded in the stories document.
@@ -541,10 +589,13 @@ Stories: `todo/PLAN_plan_change_control_E1.md` (written when the epic starts).
 - **Done when.** Every test was watched failing first; every row of the findings table has a red case naming the file
   and the entry; the clean cases of the test plan pass (CRLF equals LF, indented lines ignored, the ledger only inside a
   fence); the five commands are green; the dry run added zero `changes` findings; `review_code` on E1's branch passed
-  this plan as `planText` (S6b, recorded here); the Opus review and the code round are resolved; on
-  `feat/plan-change-control-e1`, E1's work is TWO pushed commits — `b256502` and the fix-forward commit after the
-  stop (epoch 2; folding them would rewrite pushed history) — and the fix-forward commit passed `review_code` with
-  `again: true` and this revised plan as `planText`.
+  this plan as `planText` (S6b, recorded here); the Opus review and the code round are resolved. What was built:
+  `b256502`, then the fix-forward commits `dce67ed`, `cd3ccde`, `603b52b`, `4d18e4d` and `04e423e` with their records
+  (`c05f870`, `0af69b0`) — pushed, never folded (folding would rewrite pushed history) — and every one passed a code
+  round with `again: true` and the revised plan as `planText`, the last being round 6 over `4d18e4d..0af69b0`:
+  `proceed`, 8 of 8, 0 findings. **Epoch 3:** one more fix-forward commit after resume — the reserved entry prefix
+  accepts repeated markers (§2, known limit K1 fixed): a Fable spec delta in the E1 stories document (the cornerstone
+  area), Sonnet code with a red case and its twin, a code round with `again: true`.
 - **Cornerstone area — the ledger schema and its state machine as the parser accepts them.** The epoch line, the
   entry line and the re-review record of §2; the transitions open → stopped → closed, the reset to epoch k+1 at 0,
   the renumbering after a merge of two branches' entries, `Narrowed: yes` → `by owner`; and the acceptance scenarios
@@ -562,26 +613,30 @@ Stories: `todo/PLAN_plan_change_control_E2.md` (written when the epic starts).
 
 - **Goal.** `common/plan-change-control.md` by the outline of §1, selected by the fourteen split-read tasks and none of the
   four single-read ones; the two `planning-docs` lines; the body freeze; the tests that pin the rule's meaning and its
-  agreement with E1's check; the research documents; the hand-off to the server plan.
+  agreement with E1's check; the research documents; a `plan-lifecycle` step in this repository's CI; the hand-off to
+  the server plan.
 - **Scope.** S3 (the rule with its `owns:` markers; the two lines of §4; the `rule-bodies.json` entry and
   `tools/rule-bodies.mjs --update`), S4 (`tools/rules.test.mjs`: the 14 / 4 selection, with negative cases over
   `inspect --file todo/…` paths; `tools/plan-change-rule.test.mjs`: the three bold sentences with splice cases; the
   rule/check agreement case — the fenced example inside the rule, unfenced into a fixture plan, clean, and red once
   `state: closed` → `open` with a second entry), S5 (`research/module_rules.md`, `research/module_tests.md`, the
-  `README.md` tools row), and the rule's § *The check* saying what E1 cannot see — the halt included. The size
-  measurement of the test plan (`inspect --file todo/PLAN_x.md` before and after, ≤ 32 768 B) is a functional check of
-  this epic, with the numbers in `research/module_rules.md`.
+  `README.md` tools row, the `node tools/plan-lifecycle.mjs` step in `.github/workflows/ci.yml` — A19: this
+  repository's CI did not run it over its own `todo/`), and the rule's § *The check* saying what E1 cannot see — the
+  halt included. The size measurement of the test plan is a functional check of this epic: `inspect --file
+  todo/PLAN_x.md` before (38 612 B) and after, the growth attributed to the two `planning-docs` lines, the rule not
+  selected there, and the ten scopes of the four single-read tasks still ≤ 32 768 B — the numbers in
+  `research/module_rules.md`.
 - **Depends on.** E1's commit: the rule describes the check that runs, the agreement case needs the parser, and the
   "seven findings" line is true only with the seventh finding in place.
 - **Done when.** `node tools/ownership-check.mjs` passes with every `mcp__coai__*` token declared and no "the gate" in
   prose; `node tools/rule-bodies.mjs` is clean with both ids re-recorded; selection, meaning and agreement tests pass and
-  each splice case went red; the rule is 9–11 KB; the five commands are green; `review_code` and the Opus review are
+  each splice case went red; the rule is at most 12 288 B; CI runs `plan-lifecycle`; the five commands are green; `review_code` and the Opus review are
   resolved; one commit on `feat/plan-change-control-e2`. The server plan (S7) and the owner's answer (S9) follow outside
   the epic.
 - **Cornerstone area.** None. The quota is one, and the rule text does not take it: its sentences quote the schema E1
   fixed, and a wrong sentence is a body re-record and a release, not a migration of recorded plans. The meaning test
   with its splice cases is the guard on that text, as an Opus-spec story.
-- **Easy to get wrong.** (1) `tools/ownership-check.mjs:48` matches an `owns:` marker exactly and `:59` forbids
+- **Easy to get wrong.** (1) `tools/ownership-check.mjs:262-264` matches an `owns:` marker exactly and `:59` forbids
   "the gate" / "its panel" in prose — run it before every push. (2) `--update` refuses an id it has no entry for
   (`tools/rule-bodies.mjs:184-189`): the hand-added entry comes first. (3) A `paths:` glob or a `depends:` from
   `planning-docs` would pull the rule into every `inspect` scope (§1); the negative selection cases exist to catch it.
