@@ -406,7 +406,7 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
 
 ## F14 — a prefix split over two literal pieces binds nothing (found 2026-10-28)
 
-- **What.** `tools/lib/prefix-bindings.mjs` (`candidates`, `shellPieces`) binds a value only when ONE literal piece holds the prefix word as
+- **What.** `tools/lib/prefix-bindings.mjs` (`evaluate`, `shellPieces`) binds a value only when ONE literal piece holds the prefix word as
   written, so `P='teststo''delete-'` followed by `rm -rf "/tmp/$P"*` reads as null: the sweeper is missed. The scan's own rule for
   detector and test code — "spell the prefix in two pieces" — is what a person could apply, mechanically, to a REAL sweeper to hide it.
 - **Why.** The fleet's expected work after F12 tells files to spell the prefix in two pieces. The two-piece spelling is the one thing the
