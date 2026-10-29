@@ -1,6 +1,6 @@
 # PLAN — A plan changed twice after its approval stops for a whole re-review
 
-> Status: **in progress, epoch 2 (approved by the owner 2026-10-29 after the full stop of 2026-10-28) — E1 built at b256502, its fix-forward commit next; E2 not started.** Scope: a new shared rule
+> Status: **stopped for re-review, 2026-10-29 — the second change of epoch 2 (entry 2.2); E1 built and closed (b256502 … 0af69b0), E2 not started.** Scope: a new shared rule
 > `common/plan-change-control.md`, two pointer lines in `common/planning-docs.md`, a change-ledger check in
 > `tools/plan-lifecycle.mjs` through a new `tools/lib/plan-ledger.mjs`, their tests, `research/rule-bodies.json`,
 > `research/module_rules.md`, `research/module_tests.md`, the `README.md` tools row — and, as a separate plan in another
@@ -51,7 +51,7 @@ Narrowed: yes — entry 1.1 took the server plan (S7) out of the merge condition
 | b256502 — the E1 stories document | pushed, unmerged | fits | fix forward: status line, the cornerstone grammar's free-text rows (by Fable), S6b's findings and decisions, the fix story |
 | 7e59e0d — the stop record | pushed, unmerged | fits | kept; epoch 1 becomes `closed` at resume |
 
-> Epoch 2 · approved 2026-10-29 · by owner · state: open
+> Epoch 2 · approved 2026-10-29 · by owner · state: stopped
 
 - 2.1 · 2026-10-29 · reviewer · contract — E1 fix-forward Opus review, finding 3: an entry behind an ordered-list
   marker (`  1. 1.2 · …`, ` 1) 1.2 · …`) still hides when indented; §2's reserved entry prefix widens its marker group
@@ -63,6 +63,12 @@ Narrowed: yes — entry 1.1 took the server plan (S7) out of the merge condition
   (The re-review passed on 2026-10-28 — `review_document` with `newReview: true`, `proceed`, 4 of 4 reviewers, gating 3
   of 5, its four findings accepted as part of this revision. Narrowed, so the owner approved epoch 2 in the conversation
   on 2026-10-29. One change is allowed in epoch 2; the next stops the plan again.)
+- 2.2 · 2026-10-29 · agent · dod — E2's stories author measured the DoD's size item on main: the
+  `inspect --file todo/…` scope is already 38 612 B before any work (the plan's author never measured it), so "stays
+  ≤ 32 768 B" was never true; correcting the item is a change to the DoD
+  (Discovering the false premise is not a change; accepting a different criterion is — consultants 074c2bab, both rows.
+  The corrected item is weaker than the written one, so the re-review is narrowed and the owner approves. THE SECOND FULL
+  STOP: no new code on E2 until the whole plan is re-reviewed.)
 
 ## Symptom
 
