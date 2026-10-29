@@ -17,11 +17,16 @@
 // not value tracing. The word comes from an ORIGINAL literal of the file or from a bound name's value, never
 // from a literal that expansion wrote into a call. The known bindings are written into the value, so an alias (`P="$BASE"`), a path
 // (`P="$TMPDIR/$BASE"`) and a default (`P="${X:-<prefix>-}"`) bind too, to a TRUE fixed point: the loop ends when no binding changes; a name's
-// own placeholder stays a placeholder in its value. A cycle ends through PROVENANCE, not through names: every bound value carries the names it
-// was built through (every name its right-hand side uses, bound or not, and the provenance of the values it took), and a build of X never takes a
-// value whose provenance holds X. So a name another function reuses keeps its other values, and a word inside a string literal is no dependency:
-// only a real use is (`$NAME`, `${NAME…}`, a template's `${NAME}`, a bare code name outside a string). A value longer than MAX_VALUE or a name with
-// MAX_VALUES values stops growing (`overflow`: a line that uses it is judged broad).
+// own placeholder stays a placeholder in its value. A cycle ends through PROVENANCE, not through names: every bound value carries its own name
+// and the provenance of the values it actually TOOK (a use that stays a placeholder, or an operand that is no value, adds nothing), and a build of X
+// never takes a value whose provenance holds X. So a name another function reuses keeps its other values, and a word inside a string literal is no
+// dependency: only a real use is (`$NAME`, `${NAME…}`, a template's `${NAME}`, a bare code name outside a string). The provenance is exact by
+// construction, so an error in it can only be a refused value: one whose derivation ran through the name that builds it. What that can lose is a
+// variant of a value the name already holds, with text the cycle added around it; it reads as a MISSED reading only if that added text changes what
+// follows the prefix (a parameter operator that strips it) — limit J6. It never adds a value, and it never makes a name overflow. A value longer than
+// MAX_VALUE or a name with MAX_VALUES values stops growing (`overflow`: a line that uses it is judged broad), and so does a name whose right-hand
+// side is cut at MAX_EXPRESSION with the prefix word in the part that was not read.
+// A command substitution is the placeholder `${-}` (no identifier, so no use pattern matches it, and the classifier reads it as an owner segment).
 // A use is `$NAME`, `${NAME}` or `${NAME<operator>…}` (not the length `${#NAME}`), `$env:NAME`, and — for a name bound in script code —
 // a bare `NAME` outside a string, a longer identifier and a property access.
 //
@@ -65,14 +70,21 @@ const PYTHON_ASSIGN_RE = new RegExp(String.raw`^\s*(${IDENT})${TYPE}\s+=(?!=)\s*
 const STRING_PREFIX_RE = /[rRbBuUfF]/; // a Python string prefix (`f'…'` keeps its `{name}` as an interpolation)
 const CLOSER = { "(": ")", "[": "]", "{": "}" };
 
-/** The assignments of one line: `{ name, family, syntax, rhs, holds, truncated, start, end }` (`holds`: the right-hand side holds the prefix word) (`start`/`end` are the span of the whole assignment in the line). */
+/**
+ * The assignments of one line: `{ name, family, syntax, rhs, holds, truncated, tailHolds, start, end }` (`holds`: the right-hand side holds the prefix word;
+ * `tailHolds`: a right-hand side cut at MAX_EXPRESSION has the word where it was not read, or across the cut) (`start`/`end` are the span of the whole
+ * assignment in the line).
+ */
 export function assignments(line) {
   if (!line.includes("=")) return [];
   const found = [];
+  let lastWord; // where the prefix word last starts in the line: found once, for the cut right-hand sides
   const read = (re, family, syntax) => {
     for (const match of line.matchAll(re)) {
       const expression = scanExpression(line, match.index + match[0].length, syntax === "sh");
-      found.push({ name: match[1], family, syntax, rhs: expression.text, holds: holdsPrefix(expression.text), truncated: expression.truncated, start: match.index, end: expression.end });
+      if (expression.truncated) lastWord ??= line.toLowerCase().lastIndexOf(PREFIX_WORD);
+      const tailHolds = expression.truncated && lastWord + PREFIX_WORD.length > expression.end;
+      found.push({ name: match[1], family, syntax, rhs: expression.text, holds: holdsPrefix(expression.text), truncated: expression.truncated, tailHolds, start: match.index, end: expression.end });
     }
   };
   read(SHELL_ASSIGN_RE, SHELL, "sh");
@@ -230,11 +242,16 @@ function pathJoinArgs(operand) {
   return splitTop(rest, (char) => /\s/.test(char)).map((arg) => arg.trim()).filter((arg) => arg !== "" && !/^-[A-Za-z]+$/.test(arg));
 }
 
-/** An alternative is `{ pieces, prov }`: the pieces of one reading of an operand, and the names it was built through (`prov`, see `evaluate`). */
+/**
+ * What stands for a value nobody can read (an operand that is not a literal and not a bound name, a command substitution): an interpolation, which
+ * the classifier reads as an owner segment. `${-}` is no identifier, so no use pattern matches it: a file's own variable can be called `x`.
+ */
+const PLACEHOLDER = "${-}";
+/** An alternative is `{ pieces, prov }`: the pieces of one reading of an operand, and the names its values were built through (`prov`, see `evaluate`). */
 const alternative = (pieces, prov = []) => ({ pieces, prov: new Set(prov) });
 const cross = (left, right) => left.flatMap((head) => right.map((tail) => alternative([...head.pieces, ...tail.pieces], [...head.prov, ...tail.prov])));
 /** An operand that is not a literal and not a bound name: an interpolation, which the classifier reads as an owner segment. */
-const unknown = (names = []) => alternative(["${x}"], names);
+const unknown = () => alternative([PLACEHOLDER]);
 const CASE_CALL_RE = /^([\s\S]+?)\s*\.\s*(?:to(?:Locale)?(?:Lower|Upper)Case|lower|upper)\s*\(\s*\)\s*$/;
 const STRING_CALL_RE = { js: /^String\s*\(/, py: /^str\s*\(/ }; // the identity conversion of each script family
 const PATHLIB_RE = /^(?:pathlib\s*\.\s*)?(?:Pure)?Path\s*\(/;
@@ -282,7 +299,7 @@ function operandAlternatives(operand, syntax, ctx) {
   if (literals !== null) {
     let combos = [alternative([])];
     for (const inner of literals) {
-      const variants = expandReadings(inner, ctx.uses, { allowBare: false, target: ctx.target, generic: ctx.generic });
+      const variants = expandReadings(inner, ctx.uses, { allowBare: false, target: ctx.target });
       if (variants === null) ctx.overflow = true;
       combos = cross(combos, (variants ?? [{ text: inner, prov: new Set() }]).map(({ text, prov }) => alternative([text], prov)));
     }
@@ -291,10 +308,10 @@ function operandAlternatives(operand, syntax, ctx) {
   const name = (syntax === "ps" ? POWERSHELL_NAME_RE : SCRIPT_NAME_RE).exec(operand)?.[1];
   if (name !== undefined) {
     const entry = ctx.bindings.get(name);
-    if (entry === undefined || (syntax !== "ps" && entry.family !== CODE)) return [unknown([name])];
+    if (entry === undefined || (syntax !== "ps" && entry.family !== CODE)) return [unknown()];
     if (entry.overflow) ctx.overflow = true;
     const usable = usableValues(entry, ctx.target);
-    return usable.length === 0 ? [unknown([name])] : usable.map((index) => alternative([entry.values[index]], [name, ...entry.prov[index]]));
+    return usable.length === 0 ? [unknown()] : usable.map((index) => alternative([entry.values[index]], entry.prov[index]));
   }
   const converted = CASE_CALL_RE.exec(operand);
   if (converted !== null) return operandAlternatives(converted[1], syntax, ctx); // the classifier reads the word in either case
@@ -311,7 +328,7 @@ function operandAlternatives(operand, syntax, ctx) {
   return args === null ? [unknown()] : joined(args, syntax, ctx);
 }
 
-/** The shell text with every command substitution (`$(…)`, backticks) made `${x}`: what a command prints is not the value of a word that holds a bound name. */
+/** The shell text with every command substitution (`$(…)`, backticks) made PLACEHOLDER: what a command prints is not the value of a word that holds a bound name. */
 function maskSubstitutions(text) {
   let out = "";
   let single = false;
@@ -320,11 +337,11 @@ function maskSubstitutions(text) {
     if (char === "'") single = !single;
     if (!single && char === "$" && text[index + 1] === "(") {
       const end = closingIndex(text, index + 1);
-      out += "${x}";
+      out += PLACEHOLDER;
       index = end < 0 ? text.length : end;
     } else if (!single && char === "`") {
       const end = text.indexOf("`", index + 1);
-      out += "${x}";
+      out += PLACEHOLDER;
       index = end < 0 ? text.length : end;
     } else out += char;
   }
@@ -339,16 +356,16 @@ function maskSubstitutions(text) {
  * Beside the whole value, every original string literal that holds the word inside an operand that is not a literal (`'<prefix>-' || x`, a
  * conditional, `-replace`) is a value of its own. A right-hand side cut at MAX_EXPRESSION adds the word-runs of its text: never dropped.
  *
- * `prov` is the PROVENANCE of a value: the names it was built through (every name its right-hand side uses, bound or not, and the provenance of
- * the values it took from them). A build of X never takes a value whose provenance holds X: that is what ends a cycle (`base` holds `${id}`, `id`
- * holds `${base}`) and it drops only the cyclic VALUES of a name, never the name — a name another function reuses keeps its other values.
+ * `prov` is the PROVENANCE of a value: the name that holds it and the provenance of the values it actually TOOK. A name used without a value (unbound,
+ * or every value refused) adds nothing. A build of X never takes a value whose provenance holds X: every value carries its own name, so a cycle back
+ * to X is refused, and only the cyclic VALUES of a name are dropped, never the name — a name another function reuses keeps its other values.
  */
-function evaluate(item, uses, bindings, generic) {
+function evaluate(item, uses, bindings) {
   const found = [];
-  const ctx = { uses, bindings, generic, target: item.name, overflow: false };
+  const ctx = { uses, bindings, target: item.name, overflow: false };
   if (item.syntax === "sh") {
     const masked = maskSubstitutions(item.rhs);
-    const variants = expandReadings(masked, uses, { allowBare: false, target: item.name, generic });
+    const variants = expandReadings(masked, uses, { allowBare: false, target: item.name });
     if (variants === null) ctx.overflow = true;
     for (const { text, prov } of variants ?? [{ text: masked, prov: new Set() }]) {
       const pieces = shellPieces(text);
@@ -420,14 +437,9 @@ function makeUses(bindings) {
   return { bindings, names, re: useRegex(names.map(escapeRegExp).join("|"), MAX_OPERATOR), familyOf: (name) => bindings.get(name)?.family };
 }
 
-/** The pattern of the uses of ANY identifier that `families` (name → family) says is assigned: the names a value was built through, bound or not. */
-function genericUses(families) {
-  return { bindings: new Map(), names: [], re: useRegex(IDENT, MAX_OPERATOR), familyOf: (name) => families.get(name) };
-}
-
 /**
  * `line` with every use replaced by what `choose(name, entry)` returns (`undefined`: the use stays as written); a name in `own` (assigned on the
- * line) is left alone, and so is an identifier `familyOf` does not know.
+ * line) is left alone.
  */
 function replaceUses(line, uses, own, choose, allowBare = true) {
   let mask;
@@ -445,17 +457,16 @@ function replaceUses(line, uses, own, choose, allowBare = true) {
 
 /**
  * Every reading of `line`, `{ text, prov }`: the line with the bound names it uses replaced by their values, one reading per combination of the
- * values of THOSE names (names the line does not use do not multiply anything). `prov`, with `generic` given, is every assigned name the line uses
- * and the provenance of the values picked. With a `target`, a value built through the target is not taken: its use stays as written. `null` above
+ * values of THOSE names (names the line does not use do not multiply anything). `prov` is the provenance of the values picked, nothing else: a use
+ * that stays as written adds no name. With a `target`, a value built through the target is not taken: its use stays as written. `null` above
  * MAX_READINGS, or when a name it uses outgrew its bounds.
  */
-function expandReadings(line, uses, { own = new Set(), allowBare = true, target = null, generic = null } = {}) {
-  const named = new Set();
-  if (generic !== null) replaceUses(line, generic, own, (name) => { named.add(name); }, allowBare);
-  if (uses === null || !uses.names.some((name) => line.includes(name))) return [{ text: line, prov: named }];
+function expandReadings(line, uses, { own = new Set(), allowBare = true, target = null } = {}) {
+  const none = new Set();
+  if (uses === null || !uses.names.some((name) => line.includes(name))) return [{ text: line, prov: none }];
   const used = new Map();
   replaceUses(line, uses, own, (name, entry) => { used.set(name, entry); }, allowBare);
-  if (used.size === 0) return [{ text: line, prov: named }];
+  if (used.size === 0) return [{ text: line, prov: none }];
   const entries = [...used].map(([name, entry]) => ({ name, entry, usable: usableValues(entry, target) }));
   if (entries.some(({ entry }) => entry.overflow)) return null; // a name that outgrew its bounds: some of its values are unknown
   const total = entries.reduce((product, { usable }) => product * Math.max(usable.length, 1), 1);
@@ -463,7 +474,7 @@ function expandReadings(line, uses, { own = new Set(), allowBare = true, target 
   return Array.from({ length: total }, (_, k) => {
     let rest = k;
     const pick = new Map();
-    const prov = new Set(named);
+    const prov = new Set();
     for (const { name, entry, usable } of entries) {
       if (usable.length === 0) continue; // every value was built through the target: the use stays as written
       const index = usable[rest % usable.length];
@@ -499,7 +510,6 @@ export { makeUses };
  */
 function bindItems(items) {
   const bindings = new Map();
-  const generic = genericUses(new Map(items.map((item) => [item.name, item.family]).reverse())); // the first assignment of a name gives its family
   const set = (item, entry, values, prov, overflow) => bindings.set(item.name, { family: entry?.family ?? item.family, values, prov, overflow });
   const markOverflow = (item) => {
     const entry = bindings.get(item.name);
@@ -525,9 +535,10 @@ function bindItems(items) {
     changed = false;
     const uses = makeUses(bindings);
     for (const item of items) {
+      if (item.tailHolds && markOverflow(item)) changed = true; // the word is past what was read: some value is unknown, the safe direction is broad
       const long = item.rhs.length > MAX_VALUE; // a value that long never binds as a whole: only its literals and word-runs can
       if (!item.holds && (long || !uses?.names.some((name) => item.rhs.includes(name)))) continue; // nothing to read in it
-      const { values, overflow } = evaluate(item, uses, bindings, generic);
+      const { values, overflow } = evaluate(item, uses, bindings);
       if (overflow && markOverflow(item)) changed = true; // it reads a name of unknown value: overflow, never narrowed
       for (const value of values) if (bind(item, value)) changed = true;
     }

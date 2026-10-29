@@ -286,8 +286,7 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   **Fix (the judge's option 2, value provenance).** Dependency edges are gone. Every bound value carries the names it was built through; a build of X
   takes no value whose provenance holds X, and takes the others (cycles still end; R9's template case is unchanged: not overflowing, not broad, `id`
   unbound). A use is only what `makeUses` reads: `$NAME`, `${NAME…}`, a template's `${NAME}`, a bare code name outside a string literal. Where the
-  provenance is wrong it is too SMALL (a name inside a call that is not a path join is not recorded), so the error is a value that grows to
-  MAX_VALUE and marks the name `overflow` — broad, the safe direction. Also: a case conversion of a bound name (`.toLowerCase()`, `.toUpperCase()`,
+  provenance is wrong only through round 6's correction below. Also: a case conversion of a bound name (`.toLowerCase()`, `.toUpperCase()`,
   Python `.lower()`/`.upper()`, `String(X)`, `str(X)`) is string-shaped and binds (the classifier lower-cases, so the case is no matter), and a pathlib
   join (`Path(a) / X`, `pathlib.Path(a, 'b') / X`) is a path join. R7 keeps its measured shape; its `base.toLowerCase()` line, which now binds (a
   string-shaped value, no taint), became `base.trim()`, a call that still binds nothing. Performance (judge F3): `regexLiteralEnd` rescanned to the
@@ -299,13 +298,41 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   times once the names are expanded costs the classifier (`looseVerdicts`) time quadratic in that count (14000 occurrences: 2 s); not fixed here.
   **J5** — a placeholder glued directly BEFORE the prefix (`P="$D<p>-"`, a self-append `P=/tmp/; P="$P<p>-"`) is not read as a prefix: null in
   every version.
-- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`, in five rounds. RED, round 1: the use lines of a same-file binding classified null
+- **Round 6 (an Opus judge, "do not ship", and the coai gate, proceed with one finding):** three fixes on round 5.
+  **B1** — `maskSubstitutions` wrote `${x}` for a `$(…)` or a backtick, and round 5's generic use pattern read it as a use of the file's own variable
+  `x`: `P="$(mktemp -d)/<p>-"; x="$P"; rm -rf "$x"*` (also backticks; also `P="$(date)/<p>-"` with `find … -name "${x}*" -exec rm -rf {} +`) was broad at
+  `fe05417` and `5f49dcc`, null at `65d50c1`, broad now. Chosen: the placeholder is `${-}` (not an identifier, so no use pattern matches it; the
+  classifier reads `<p>-${-}` as an owner segment, as it did `${x}`); every other unreadable operand uses the same constant. The other option (collect
+  names from the unmasked right-hand side) is moot after B2.
+  **B2** — round 5's provenance held every name a right-hand side MENTIONED, bound or not: a name used without a value (an argument, a command
+  substitution, a name not yet bound) blocked the later build of that very name — the same class as (b). Probes, all broad at `fe05417`, null at `65d50c1`,
+  broad now: `d="$1"; p="$d/<p>-"; d="$p"; rm -rf "$d"*`; `setup(){ tmp="$(mktemp -d)"; base="$tmp/<p>-"; }` with `teardown(){ tmp="$base"; rm -rf "$tmp"*; }`;
+  `dir="$(mktemp -d)"; p="$dir/<p>-"; dir="$p"`; JavaScript `const base = root + '/<p>-'; const root = base;`, `let d = …; let p = d + '/<p>-'; d = p;`, and
+  `const d = …; const p = d + '/<p>-';` then `const d = p;` in a function. Now a value's provenance is its own NAME and the provenance of the values it actually
+  TOOK; a use that stays a placeholder adds nothing. Termination holds: every taken value carries its own name, so a cycle back to X is refused. The
+  generic use pattern is gone. R9 changes: `id = \`${base}\`` now takes base's value (base's provenance does not hold `id`), so `id` binds the owner-aware
+  template and its use line reads owner-aware, not null; base then refuses id's value. R7 (the measured owner-aware shape) is unchanged: no broad line,
+  `BOUND` still `["P","base"]`. What an error in provenance can do, exactly: it is exact by construction, so it can only REFUSE a value whose
+  derivation ran through the name that builds it; that loses a variant of a value the name already holds (text the cycle added around it), and reads as
+  a missed reading only if that text changes what follows the prefix (a parameter operator that strips it). This corrects round 5's sentence that a wrong
+  provenance is "too small" and so errs to overflow: that was never true (it did not overflow, it read null).
+  **C0** (gate finding, accepted) — a right-hand side cut at 1024 characters whose unread tail holds the prefix word (or whose word straddles the cut)
+  marks the name `overflow`: its uses read broad. The check costs one `lastIndexOf` per line, found once. A 1100-character right-hand side with the
+  prefix at its end and `rm -rf "$P"*` was null, is broad.
+  **Limit J6** — see B2: a refusal can drop a variant of a value around a cycle (above).
+  **Follow-up candidates, not done here:** (1) the fixed point is super-linear on long shell chains (1000 names: 29 s on this machine, 12.8 s at
+  `fe05417`; adversarial, the use pattern is rebuilt once per pass); (2) R6's timing: each of its five lines takes 36–300 ms against a 1 s budget
+  (the 0.84 s measured earlier was the sum of the five), so the margin on a loaded machine is about 3x — left as is; (3) `${NAME}` inside a
+  single-quoted shell string or a JavaScript non-template string is still replaced as a use at the USE site (a false broad, the safe direction); the part
+  that fed provenance went with B2.
+- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`, in six rounds. RED, round 1: the use lines of a same-file binding classified null
   (`actual null, expected 'broad'`) and the guard exited 0 on a file that removes through a bare-prefix variable. RED, round 2: the use of an
   owner-aware concatenation classified broad, `${P:?}` and its kin classified null, and a 100000-character line of the shape `x:` and spaces took 21 s.
   RED, round 3 (against `0dce2ca` → `f7926cd`): the seven literal-first shapes, the same-line alias, the repeated-text span, the 33rd value, and
   five adversarial 100000-character lines (29 s for the first) all failed or were null where `0dce2ca` said broad.
   RED, round 5 (against `5f49dcc`): the use line of each of the five (a) probes and the three (b) probes read null, the case conversions and
   pathlib joins bound nothing, and the unclosed-class line took 10.7 s.
+  RED, round 6 (against `65d50c1`): the four B1 probes, the six B2 probes and the 1100-character right-hand side all read null on the use line.
   GREEN: all new tests, and the janitor's 7 uses clean through the sanction.
 
 ## F13 — `owned.mjs` assumes 100 clock ticks per second (found 2026-10-27)

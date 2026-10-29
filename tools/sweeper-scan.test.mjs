@@ -372,8 +372,9 @@ test("R9 a name's own placeholder is not expanded into its own value: a template
   const bindings = prefixBindings(text);
   assert.equal(bindings.get("base").overflow, false);
   assert.deepEqual(bindings.get("base").values, [`${Q}-u\${uid}-\${id}`]);
-  assert.equal(bindings.has("id"), false, "its value is another name's template: no original literal holds the word");
-  assert.deepEqual(verdicts(text), [null, null, null, "owner-aware", null]);
+  assert.equal(bindings.get("id").overflow, false);
+  assert.deepEqual(bindings.get("id").values, [`${Q}-u\${uid}-\${id}`], "round 6: `id` takes base's value, a value it was not built through; base then refuses id's (its provenance holds base)");
+  assert.deepEqual(verdicts(text), [null, null, null, "owner-aware", "owner-aware"]);
 });
 
 test("R10 a shell command substitution is not a value, and a shell word of literals and names is", () => {
@@ -435,6 +436,41 @@ test("R15 a case conversion, String(), str() and a pathlib join of a bound name 
 test("R16 a line of 100000 characters that open an unclosed character class at every slash is read in well under a second", () => {
   const started = performance.now();
   assert.equal(verdicts(rows(`const PFX = '${Q}-';`, `f(PFX ${"=/[".repeat(33000)}`)).length, 2);
+  const elapsed = performance.now() - started;
+  assert.ok(elapsed < 1000, `took ${elapsed} ms`);
+});
+
+// round 6: a substitution placeholder is no name; a name used without a value is no provenance; a prefix past the read limit overflows
+
+test("R17 a command substitution's placeholder never reads as a name of the file: not in a provenance, not replaced by a value", () => {
+  const cases = [
+    [rows(`P="$(mktemp -d)/${Q}-"`, 'x="$P"', 'rm -rf "$x"*'), 2],
+    [rows(`P="\`mktemp -d\`/${Q}-"`, 'x="$P"', 'rm -rf "$x"*'), 2],
+    [rows(`P="$(date)/${Q}-"`, 'x="$P"', 'find /tmp -name "${x}*" -exec rm -rf {} +'), 2],
+    [rows(`x='${Q}-'`, `P="$(mktemp -d)/${Q}-"`, 'rm -rf "$P"*'), 2],
+  ];
+  for (const [text, use] of cases) assert.equal(verdicts(text)[use], "broad", `the use line (${use + 1}) is broad: ${text}`);
+});
+
+test("R18 a name used WITHOUT a value adds nothing to a provenance: only the values actually taken do", () => {
+  const cases = [
+    [rows('d="$1"', `p="$d/${Q}-"`, 'd="$p"', 'rm -rf "$d"*'), 3, "an argument, then the name reused"],
+    [rows('setup() { tmp="$(mktemp -d)"; ' + `base="$tmp/${Q}-"; }`, 'teardown() { tmp="$base"; rm -rf "$tmp"*; }'), 1, "two functions, one line"],
+    [rows('dir="$(mktemp -d)"', `p="$dir/${Q}-"`, 'dir="$p"', 'rm -rf "$dir"*'), 3, "shell reuse"],
+    [rows(`const base = root + '/${Q}-';`, "const root = base;", "execSync(`rm ${root}*`);"), 2, "javascript, a name used before it is bound"],
+    [rows("let d = os.hostname();", `let p = d + '/${Q}-';`, "d = p;", "execSync(`rm ${d}*`);"), 3, "javascript, reassigned"],
+    [rows("const d = os.hostname();", `const p = d + '/${Q}-';`, "function f() {", "  const d = p;", "  execSync(`rm ${d}*`);", "}"), 4, "javascript, reused in a function"],
+  ];
+  for (const [text, use, what] of cases) assert.equal(verdicts(text)[use], "broad", `${what}: the use line (${use + 1}) is broad: ${text}`);
+});
+
+test("C0 a prefix after the right-hand side's read limit makes the name overflow: its uses are broad", () => {
+  const filler = "a".repeat(1100);
+  assert.equal(verdicts(rows(`P='${filler}${Q}-'`, 'rm -rf "$P"*')).at(-1), "broad", "shell");
+  assert.equal(verdicts(rows(`const P = '${filler}${Q}-';`, "fs.rmSync(P);")).at(-1), "broad", "script");
+  assert.equal(verdicts(rows(`P='${filler}'`, 'rm -rf "$P"*')).at(-1), null, "no prefix anywhere: nothing to read");
+  const started = performance.now();
+  assert.equal(verdicts(rows(`${";a=".repeat(30000)}${Q}`, `P=${"x".repeat(2000)}`)).length, 2);
   const elapsed = performance.now() - started;
   assert.ok(elapsed < 1000, `took ${elapsed} ms`);
 });
