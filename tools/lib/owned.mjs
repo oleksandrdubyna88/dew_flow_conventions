@@ -57,7 +57,11 @@ const CONTROL = /[\u0000-\u001f\u007f]/;
 const OWNER_TEXT = /^([uw][0-9]{1,10}):([^@:\s]+@(linux|macos|windows)):(\d+)(?::(\d+)(?::(\d+))?)?$/;
 const LEGACY_OWNER_TEXT = /^([^@:\s]+@(linux|macos|windows)):(\d+)(?::(\d+))?$/; // the grammar before the owner segment: `<host>@<os>:<pid>[:<start>]`
 const OS_TAGS = { linux: "linux", darwin: "macos", win32: "windows" };
-const CLOCK_TICKS_PER_SECOND = 100; // `CLK_TCK` on every Linux this family runs on; reading it would spawn `getconf`
+const AT_CLKTCK = 17n;                                               // the auxiliary-vector type of the kernel's clock-tick rate (`CLK_TCK`)
+const AUXV_WORD_BYTES = { // `process.arch` names an architecture, not a width: an arch that is not here has no start (rule §3), never a guess
+  arm64: 8, loong64: 8, mips64el: 8, ppc64: 8, riscv64: 8, s390x: 8, x64: 8,
+  arm: 4, ia32: 4, mips: 4, mipsel: 4, ppc: 4,
+};
 
 /** The one place a test learns the temp root (the guard's `raw-temp` class refuses every other spelling). */
 export function tempRoot() {
@@ -245,14 +249,53 @@ export function cleanupScope() {
 
 // --- the owner record (rule §3) ---------------------------------------------------------------------------------
 
-/** Field 22 of `/proc/<pid>/stat`, over `btime`, as integer Unix seconds — or `undefined` when it cannot be read. */
-export function startFromProcStat(statText, btimeSeconds) {
+/** The width in bytes of one auxiliary-vector word on `arch` (a `process.arch` value): 8, 4, or `undefined` for an arch not in the table. */
+export function auxvWordBytes(arch) {
+  return typeof arch === "string" && Object.hasOwn(AUXV_WORD_BYTES, arch) ? AUXV_WORD_BYTES[arch] : undefined;
+}
+
+/** `AT_CLKTCK` from an auxiliary vector (`wordBytes` 4 or 8, `endianness` "LE" or "BE"): a positive safe integer found before an `AT_NULL` that ends the vector, else `undefined`. */
+export function clockTicksFromAuxv(buffer, wordBytes, endianness) {
+  if (!Buffer.isBuffer(buffer) || (wordBytes !== 4 && wordBytes !== 8) || (endianness !== "LE" && endianness !== "BE")) return undefined;
+  if (buffer.length === 0 || buffer.length % (2 * wordBytes) !== 0) return undefined; // the kernel writes whole pairs
+  const read = (at) => (wordBytes === 8 ? buffer[`readBigUInt64${endianness}`](at) : BigInt(buffer[`readUInt32${endianness}`](at)));
+  let rate;
+  for (let at = 0; at < buffer.length; at += 2 * wordBytes) {
+    const type = read(at);
+    if (type === 0n) return rate; // AT_NULL ends the vector; a vector that never reaches it is not trusted
+    if (type !== AT_CLKTCK || rate !== undefined) continue;
+    const value = read(at + wordBytes);
+    rate = value > 0n && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : undefined;
+    if (rate === undefined) return undefined;
+  }
+  return undefined;
+}
+
+let clockTicks; // memoised: `{ rate }` once `/proc/self/auxv` has been read, whatever came of it
+
+/** The kernel's clock-tick rate, read ONCE from `/proc/self/auxv` (a `/proc` read, never a process, rule §3), or `undefined` where it cannot be read — never a guessed 100. */
+export function clockTicksPerSecond() {
+  if (clockTicks === undefined) {
+    let rate;
+    try {
+      rate = process.platform === "linux" ? clockTicksFromAuxv(fs.readFileSync("/proc/self/auxv"), auxvWordBytes(process.arch), os.endianness()) : undefined;
+    } catch {
+      rate = undefined;
+    }
+    clockTicks = { rate };
+  }
+  return clockTicks.rate;
+}
+
+/** Field 22 of `/proc/<pid>/stat`, over `btime`, as integer Unix seconds at `ticksPerSecond` — or `undefined` when it, or the rate, cannot be read. An omitted or `undefined` `ticksPerSecond` means THIS host's rate (a JS default parameter): a caller whose rate may be `undefined` checks it before calling. */
+export function startFromProcStat(statText, btimeSeconds, ticksPerSecond = clockTicksPerSecond()) {
   if (typeof statText !== "string" || !Number.isFinite(btimeSeconds)) return undefined;
+  if (!Number.isSafeInteger(ticksPerSecond) || ticksPerSecond <= 0) return undefined;
   const close = statText.lastIndexOf(")"); // the command name may hold spaces and parentheses
   if (close < 0) return undefined;
   const fields = statText.slice(close + 1).trim().split(/\s+/); // field 3 is index 0, so field 22 is index 19
   if (fields.length < 20 || !/^\d+$/.test(fields[19])) return undefined;
-  return Math.floor(btimeSeconds + Number(fields[19]) / CLOCK_TICKS_PER_SECOND);
+  return Math.floor(btimeSeconds + Number(fields[19]) / ticksPerSecond);
 }
 
 function readLinuxStart(pid) {
@@ -652,7 +695,7 @@ function worktreeFor(token, scope, repo, what, { ref = "HEAD", parent = tempRoot
 // The functions that do not depend on the token: a name's version, the owner record, liveness, removal. `ownedFor` hands them on as they are.
 // A test enumerates the module's own exports against this list and the six bound ones, so a function added above and forgotten here is red.
 const TOKEN_FREE = {
-  tempRoot, asciiLower, windowsOwnerToken, ownerToken, thisOwnerToken, classifyName, isInsideProfile, isMine, cleanupScope, startFromProcStat,
+  tempRoot, asciiLower, windowsOwnerToken, ownerToken, thisOwnerToken, classifyName, isInsideProfile, isMine, cleanupScope, startFromProcStat, auxvWordBytes, clockTicksFromAuxv, clockTicksPerSecond,
   readPidNamespace, isProcessId, processProbe, hidepidActive, hostName, hostId, thisOwner, formatOwner, formatLegacyOwner, parseOwner,
   parseLegacyOwner, runRecord, writeOwner, removeClaimIfStill, gitdirOf, readClaimText, readOwner, ownerState, legacyOwnerState, removeLink,
   removeQuietly, removeClaim,
