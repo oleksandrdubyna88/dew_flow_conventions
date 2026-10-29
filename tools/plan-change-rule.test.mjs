@@ -31,6 +31,7 @@ import { APPROVERS, KINDS, ledgerFindings, SOURCES, STATES, STOP_PHRASE, VERDICT
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE = "common/plan-change-control.md";
+const TICK = "`";
 const TICKS = "`".repeat(3); // a fence inside a fence cannot be shown in a document
 
 /** A sentence, verbatim, as a pattern in which any space may be a line break — the prose is hard-wrapped. */
@@ -127,7 +128,7 @@ test("the rule's ledger example is a clean ledger to the check", () => {
   assert.deepEqual(found, [], `the rule's example is not a ledger the check accepts — ${found.length} finding(s):${list(found)}`);
 });
 
-test("the example's first epic, still open with its two changes, is red", () => {
+test("the example's first epoch, still open with its two changes, is red", () => {
   const lines = example();
   const head = lines.slice(0, lines.indexOf("### Re-review for epoch 2")).map((line) => line.replace("state: closed", "state: open"));
   const found = findings(head);
@@ -170,12 +171,17 @@ test("the rule names every word the check accepts", () => {
     const end = body.indexOf("\n## ", start + 1);
     return body.slice(start, end === -1 ? undefined : end);
   })();
-  const lists = { KINDS, SOURCES, STATES, APPROVERS, VERDICTS };
+  const lists = { KINDS, SOURCES, STATES, APPROVERS };
   for (const [name, words] of Object.entries(lists)) {
     for (const word of words) {
       const pattern = new RegExp(`(?<![\\w-])${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w-])`);
       assert.match(ledger, pattern, `"## The ledger" never names ${JSON.stringify(word)}, a word of ${name} in lib/plan-ledger.mjs — a writer would be refused for a word the rule did not teach`);
     }
+  }
+  // A verdict is named as a code span (`fits`, `cut`, `—`): the dash alone is everywhere in the prose, so a whole-word
+  // match for it would stay green with the verdict removed.
+  for (const word of VERDICTS) {
+    assert.ok(ledger.includes(TICK + word + TICK), `"## The ledger" never names the verdict ${JSON.stringify(word)} as a code span, a word of VERDICTS in lib/plan-ledger.mjs`);
   }
   for (const separator of ["U+00B7", "U+2014"]) {
     assert.ok(ledger.includes(separator), `"## The ledger" never names ${separator}, a separator the check requires`);

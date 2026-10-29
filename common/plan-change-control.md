@@ -22,17 +22,17 @@ depends: ["common.planning-docs"]
 
 ## Why — measured
 
-*The case that made the rule.* A plan in this family passed its plan review on 2026-10-21. After that, a story was
+*The case that made the rule.* A plan in this family passed its plan review on 2026-10-21. Then a story was
 added (the owner, 2026-10-26); two stories moved to a remainder plan; a platform run and one of its tests left the merge
 conditions (the owner, 2026-10-27); eight lines were rewritten after a later review; and a merged predecessor
 epic had its contract rewritten and its 308-line script replaced by an 874-line one, while its release never
-happened. Each change was judged alone; all were first seen together at promotion. Counted by this rule, the stop comes
+happened. Each was judged alone; all were first seen together at promotion. Counted by this rule, the stop comes
 on 2026-10-26, before the merge conditions were cut.
 
-*This rule's own first run.* The plan that introduced this rule ran under it from its first approval on 2026-10-28. Its
-second change, the same day (an entry indented one space hid from the count), stopped it. The re-review was consulted
-and the done work sorted (nothing cut); the owner approved a narrowed epoch 2 on 2026-10-29, as the first change had
-made the merge conditions smaller.
+*This rule's own first run.* The plan that introduced it ran under it from its first approval on 2026-10-28. Its
+second change, the same day (an entry indented one space hid from the count), stopped it. The re-review was consulted,
+nothing was cut, and the owner approved a narrowed epoch 2 on 2026-10-29, as the first change had made the merge
+conditions smaller.
 
 One change is learning; the second triggers a review of whether the plan's model of the work is drifting — the same
 signal as a test still red after two fixes or a person saying twice that it is still broken
@@ -55,15 +55,17 @@ FIRST change is not free of the other rules: if it changes the shape of the work
 
 ## How it is counted
 
-- Per parent plan, across sessions, branches and epics. A stories document keeps no ledger: its changes to the
-  parent's work are entries in the parent.
+- Per parent plan, across sessions, branches and epics. A stories document keeps no ledger; its changes are
+  entries in the parent.
 - Approval is the first passing plan-round verdict (`proceed`, `good_enough` or `continue_anyway`) or the owner's
-  go-ahead where no review server runs, whichever comes first. It opens epoch 1.
+  go-ahead where no review server runs, whichever comes first. It opens epoch 1: that commit writes the heading and
+  the epoch 1 line.
 - Two branches that each record one change merge into a plan with two: the check turns red at the merge, which is where
   the stop belongs. That merge or the commit after it renumbers the later entry `k.2` and writes the stop.
-- A plan approved before this rule (adopted 2026-10-29) gets its ledger at its next change: that commit opens it, epoch
-  1 dated at the plan's last approval, the change as entry 1.1. Earlier changes stay in the deviations; no open plan
-  stops on the day this rule lands.
+- A plan approved before this rule reaches its repository (with the rules pin)
+  gets its ledger at its next change: that commit opens it, epoch
+  1 dated at the plan's last approval, the change as entry 1.1. Earlier changes stay in the deviations. No open plan
+  stops on arrival.
 
 ## The ledger
 
@@ -102,45 +104,44 @@ are lower case as shown.
 **Free text is INDENTED.** Every ledger line stands at column 0; anything else goes on an indented line. A prose line at
 column 0 is a finding: it reads like an entry that lost its `- `, and a lost entry lowers the count in silence.
 **Reserved prefixes:** an indented line that starts like a ledger line — an entry number, with or without list markers
-(`- 1.2`, `1. 1.2`, `- - 1.2`, a bare `1.2`), a `>` or a `#` — is a finding too: a renderer shows a list item, a quote
-or a heading that a reader counts. Free text may not begin that way; write ` (quoted) …` or ` version 1.2 …`.
+(`- 1.2`, `1. 1.2`, `- - 1.2`, a bare `1.2`), a `>` or a `#` — is a finding too (a renderer shows a list item, quote or
+heading). Free text may not begin that way; write `  (quoted) …` or `  version 1.2 …`.
 
 The re-review record, `### Re-review for epoch <k>` before epoch k's line for every k ≥ 2, holds one `Narrowed: yes|no`
 line (optionally ` — <why>`) and a `| Work | Where | Verdict | Action |` table of at least one row; the verdict is
-`fits`, `cut` or `—` (nothing was built). While the plan is stopped it may stand without a next epoch line. **The count
+`fits`, `cut` or `—` (nothing was built). While stopped it may stand without a next epoch line. **The count
 is never written**: it is the entries of the current epoch.
 
 ## The full stop
 
 1. **Record** the second entry, set `state: stopped` and say `stopped for re-review` in the status paragraph; one
-   commit, pushed, so every other session sees the stop.
+   commit, pushed. Another branch sees the stop only when it reads this one.
 2. **Halt.** No new code on any epic of the plan, no merge of a pull request carrying its work. Allowed: the re-review,
    its reverts, work outside the plan, an incident fix the owner orders.
-3. **Consult.** One `mcp__coai__consult` for the re-review, every change of the epoch quoted as evidence (trigger 5's
-   shape); owner questions go through `mcp__coai__ask_consultants` first. None to be had: say so, verify, ask the owner.
+3. **Consult.** One `mcp__coai__consult` for the re-review, every change of the epoch quoted as evidence; owner
+   questions go through `mcp__coai__ask_consultants` first. None to be had: say so, verify, ask the owner.
 4. **Revise the WHOLE plan** (goal, Definition of Done, merge conditions, epics, build order) against what is known now,
    not a patch of the two changes. **What the re-review changes is not counted: it is the baseline the next epoch is
-   approved on**, recorded in the re-review record, never as entries.
-5. **Sort the done work.** An Opus judge marks every merged pull request, pushed commit and local commit of the plan
+   approved on**, never an entry.
+5. **Sort the done work.** An Opus judge marks every merged pull request, pushed commit and local commit
    `fits` or `cut` in the record's table.
 6. **Cut.** Merged and contradicting the revised plan: reverted or corrected in a NEW pull request; merged and
    compatible: kept; pushed, unmerged: revert commits or a fix forward, never a history rewrite; local, never pushed:
-   may be dropped. The row's Action says which.
+   may be dropped.
 7. **Re-split** when the epics changed: Fable, after the question consultants; Opus rewrites changed stories documents
    when they start; the cornerstone ledger is recounted.
-8. **Re-review** (next section), then **resume**: epoch k+1's line, `open`; epoch k becomes `closed`. If scope, the
-   Definition of Done, the merge conditions or the release got smaller, the record says `Narrowed: yes`, the owner
-   approves first and the epoch line says `by owner`. Epoch k+1 starts at 0 changes.
-9. **Continue** as before.
+8. **Re-review**, then **resume**: epoch k+1's line, `open`; epoch k becomes `closed`. If scope, the Definition of Done,
+   the merge conditions or the release got smaller, the record says `Narrowed: yes`, the owner approves first and the
+   epoch line says `by owner`. Epoch k+1 starts at 0 changes.
 
 ## Reviewing the revised plan
 
 The re-review is planning work: select rules with `--task plan`. Epics not yet started get their own
-`mcp__coai__review_plan` on their own branch, as today.
+`mcp__coai__review_plan` on their own branch.
 
-A branch whose plan round has already passed (its session is in the code stage)
+A branch whose plan round has already passed (its session is in the code stage, whether or not a code round has run)
 takes an **interim path, named so**: `mcp__coai__review_document` with `documentPath` = the plan file and a
-`purposeText` naming the re-review of epoch k+1 (after `open`, as [coai-document-gate.md](coai-document-gate.md) says),
+`purposeText` naming the re-review of epoch k+1 (after `open`, per [coai-document-gate.md](coai-document-gate.md)),
 `newReview: true` when an earlier review of that file finished, and `mcp__coai__resolve` for every finding with the same
 `document`. The next `mcp__coai__review_code` there passes the revised plan as `planText`, with `again: true` when its
 last code round closed.
@@ -149,28 +150,28 @@ last code round closed.
 coai-document-gate keeps plans out because a document round leaves the code round shut; here the code round is already
 open, and what is missing is a reading of the whole plan.
 
-**"When `mcp__coai__review_plan` accepts `again: true` after `proceed`, use that, and this paragraph goes."**
+**When `mcp__coai__review_plan` accepts `again: true` after `proceed`, use that, and this paragraph goes.** Your own Opus
+review runs as always, in addition.
 
 ## The check
 
-[`tools/plan-lifecycle.mjs`](../tools/plan-lifecycle.mjs) reads the ledger of every plan in `todo/` — never `research/`,
-never git history. It is red when the current epoch has two entries and is not stopped, a stop is not in the status
-paragraph, a line cannot be read, numbers, epochs or dates are out of order, a re-review record is missing, reviewers
-approved a narrowed epoch, or a stories document carries a ledger.
+[`tools/plan-lifecycle.mjs`](../tools/plan-lifecycle.mjs) reads the ledger of every plan in `todo/` — never `research/`
+or git history. It is red when the current epoch has two entries and is not stopped, a stop is not in the status
+paragraph, a line cannot be read, numbers or epochs are out of order or an epoch's date goes back, a re-review record is
+missing, reviewers approved a narrowed epoch, or a stories document whose parent is in `todo/` carries a ledger.
 
 **The check validates the prescribed ledger syntax and detects specified malformed variants; a clean result does not prove that every change was recorded or the stop obeyed.**
 
-It cannot see a plan with no ledger, a change nobody recorded, or code written during a stop; this rule, its
-Definition of Done and the code review own those. **A stopped plan is clean by design**: a red would block the stop
-commit, the re-review and its reverts.
+It cannot see a plan with no ledger, a change nobody recorded, code written during a stop, entry dates, or where the
+section stands in the file; this rule, its Definition of Done and the code review own those. **A stopped plan is clean
+by design**: a red would block the stop commit, the re-review and its reverts.
 
-It misses two shapes, so never write them: a setext heading (`Plan changes` over `---` or `===`) and a heading with
+Never write the two shapes it misses: a setext heading (`Plan changes` over `---` or `===`) and a heading with
 inline markup or a character reference (`## **Plan changes**`, `## Plan&nbsp;changes`). Two list markers are a finding.
 
 ## Never
 
-- Never keep building after a second change.
-- Never fold independent causes into one entry.
+- Never keep building after a second change, or fold independent causes into one entry.
 - Never edit or delete an entry to lower a count.
 - Never rewrite pushed history to cut work.
 - Never resume a narrowed plan without the owner.
@@ -180,7 +181,7 @@ inline markup or a character reference (`## **Plan changes**`, `## Plan&nbsp;cha
 
 - [ ] Every approved plan the task touched has its ledger, one entry per cause in the parent, in the commit that accepts
       it; at the second change the stop was recorded in one commit and no code or merge followed until re-approval.
-- [ ] The re-review asked the consultants (or said why not), revised the whole plan, had an Opus judge sort the done
-      work with every disposition recorded, made the cuts and re-split by Fable if the epics changed; re-approval went
-      by the path above, with the owner when narrowed.
+- [ ] The re-review asked the consultants, revised the whole plan, had an Opus judge sort the done work with every
+      disposition recorded, made the cuts, re-split by Fable if the epics changed, and was re-approved by the path above
+      (the owner, when narrowed).
 - [ ] `plan-lifecycle.mjs` is clean; the summary names the epoch, the count and what was cut.

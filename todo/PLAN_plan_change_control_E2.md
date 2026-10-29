@@ -727,3 +727,21 @@ the parent's status line says what is built; `node tools/plan-lifecycle.mjs` is 
 - **One commit.** Stage by path (`git add` each file by name), read `git diff --staged --stat`, commit with a
   conventional message (`feat(rules): plan change control — the rule, its pointers, tests and documents (E2)`) and the
   session's attribution trailer.
+
+## Code round 1 (E2, 7fdbc2c) and its Opus review — findings and decisions (2026-10-29)
+
+`review_code` over `61ce484..7fdbc2c` (E1 merged and reviewed in its own rounds): `proceed`, 8 of 8 reviewers, 0 findings.
+The parallel Opus review found the rule's text short of what the plan says in three places; each is a wording fix to the
+plan as written, not a change. Fixed forward in the commit after this record.
+
+| # | Finding | Decision |
+|---|---|---|
+| F1 | § The check says entry dates are ordered and every stories document with a ledger is red; the lib orders epoch dates only and flags a stories document only when its parent is in `todo/` | Accepted: the text says what §3 says; entry dates join what it cannot see |
+| F2 | "pushed, so every other session sees the stop" is false for a session on another branch of the plan | Accepted as wording: the stop is pushed; another branch sees it when it reads this one. A notification step would be a change (3.2) — not taken |
+| F3 | § Reviewing the revised plan lost two outline items: your own Opus review runs as well, and the precondition holds "whether or not a code round has run" | Accepted: restored |
+| F4 | this document's status promised a code-round record it did not have | Accepted: this section |
+| F5 | a test name says "epic" for "epoch" | Accepted |
+| F6 | A5's check for the verdict `—` can never fail | Accepted |
+| F7 | the size record names an uncommitted tree; the byte change moves its numbers | Accepted: re-measured, recorded against E2's commit |
+| — | below threshold: the rule's adoption date is the source repository's, but a consumer gets the rule at its pin bump | Accepted as wording within decision 11 ("before the rule" is per repository) |
+| — | below threshold: the rule never says the approval commit opens the ledger | Accepted: one sentence |

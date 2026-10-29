@@ -1023,8 +1023,8 @@ runner printed on 2026-10-29, on Node 26.12.1, not typed from memory.
   rule's fenced example goes through `ledgerFindings` and must be clean; the same example with epoch 1 left open is red;
   a second change in the open epoch is red and its stopped twin is clean; free text at column 0, an entry behind one
   space and an entry behind two list markers are each a finding; and the rule's ledger section names every word the lib
-  accepts, with both separators by code point. The selection cases: the rule is selected for the fourteen split-read
-  tasks and none of the four single-read ones; a plan file does not pull it into a single-read scope (with a companion
+  accepts (the three verdicts as code spans, because the dash alone is everywhere in the prose), with both separators by
+  code point. The selection cases: the rule is selected for the fourteen split-read tasks and none of the four single-read ones; a plan file does not pull it into a single-read scope (with a companion
   that `planning-docs` is still selected there, so the negative is not vacuous); and it brings `planning-docs` into
   `audit`, `http`, `benchmark` and `logging` as `dependency:common.plan-change-control`. The existing *every single-read
   scope still fits one read* test gets no `todo/` scope: that scope is 38 612 B on `main`.
