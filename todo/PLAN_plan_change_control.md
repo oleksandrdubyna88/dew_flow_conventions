@@ -53,6 +53,13 @@ Narrowed: yes — entry 1.1 took the server plan (S7) out of the merge condition
 
 > Epoch 2 · approved 2026-10-29 · by owner · state: open
 
+- 2.1 · 2026-10-29 · reviewer · contract — E1 fix-forward Opus review, finding 3: an entry behind an ordered-list
+  marker (`  1. 1.2 · …`, ` 1) 1.2 · …`) still hides when indented; §2's reserved entry prefix widens its marker group
+  to `(?:[-*+]|\d{1,9}[.)])`
+  (Its findings 1 — a lone CR is a line ending — and 2 — an indented or closing-hashes heading is the same h2 — are
+  implementation fixes inside the contract, not changes: what a line is, and the near-miss heading E1 already
+  specifies. One change is allowed in epoch 2; the next stops the plan again.)
+
   (The re-review passed on 2026-10-28 — `review_document` with `newReview: true`, `proceed`, 4 of 4 reviewers, gating 3
   of 5, its four findings accepted as part of this revision. Narrowed, so the owner approved epoch 2 in the conversation
   on 2026-10-29. One change is allowed in epoch 2; the next stops the plan again.)
@@ -245,8 +252,9 @@ Narrowed: yes — the Windows run left the merge conditions
 - **Entry:** `- <k>.<n> · <YYYY-MM-DD> · owner|agent|reviewer · <kinds> — <cause>`, kinds comma-separated from `scope`,
   `goals`, `dod`, `merge-conditions`, `epics`, `stories`, `build-order`, `contract`, `approach`. Column 0 only.
 - **Free text and the reserved prefixes (epoch 2, entry 1.2):** an indented line anywhere in the section is free text —
-  EXCEPT one whose trimmed text starts like a ledger line: an entry, `^(?:[-*+]\s+)?[1-9]\d*\.[1-9]\d*(?=\s|$)` (`- 1.2`,
-  `* 1.2`, `+ 1.2`, a bare `1.2`), an epoch line (`>`), or a heading (`#`). That line is finding 4, *a ledger line stands
+  EXCEPT one whose trimmed text starts like a ledger line: an entry,
+  `^(?:(?:[-*+]|\d{1,9}[.)])\s+)?[1-9]\d*\.[1-9]\d*(?=\s|$)` (`- 1.2`, `* 1.2`, `+ 1.2`, `1. 1.2`, `1) 1.2`, a bare
+  `1.2` — the ordered markers since entry 2.1), an epoch line (`>`), or a heading (`#`). That line is finding 4, *a ledger line stands
   at column 0*: a renderer shows a one-space `- ` as a sibling list item and a one-space `>` or `###` as a real quote or
   heading, which a reader counts, so the check must not skip it. Cost: free text may not begin with an entry-shaped
   number, `>` or `#`. Fenced lines stay outside the ledger — an example is not a record.

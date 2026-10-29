@@ -106,7 +106,7 @@ function said(found, ...needles) {
     assert.ok(hit, `expected ${needle} in the findings, got:\n${all === "" ? "(no findings)" : all}`);
   }
 }
-const clean = (found, why) => assert.deepEqual(found, [], why);
+const clean = (found, why = "expected no findings") => assert.deepEqual(found, [], `${why}, got:\n${found.join("\n")}`);
 
 // ---- the contract ----
 
@@ -121,8 +121,9 @@ test("the lists are the contract: pinned to the parent plan's §2, and frozen", 
   assert.deepEqual([...VERDICTS], ["fits", "cut", "—"]);
   assert.equal(STOP_PHRASE.source, "\\bstopped for re-review\\b");
   assert.equal(STOP_PHRASE.flags, "i");
-  // parent § 2, the reserved prefixes (epoch 2, entry 1.2): an entry shape, `>` or `#` — the constant IS the contract
-  assert.equal(RESERVED_PREFIX.source, "^(?:[>#]|(?:[-*+]\\s+)?[1-9]\\d*\\.[1-9]\\d*(?=\\s|$))");
+  // parent § 2, the reserved prefixes (epoch 2, entries 1.2 and 2.1): an entry shape whose marker may also be an ordered-list
+  // marker of at most nine digits, `>` or `#` — the constant IS the contract
+  assert.equal(RESERVED_PREFIX.source, "^(?:[>#]|(?:(?:[-*+]|\\d{1,9}[.)])\\s+)?[1-9]\\d*\\.[1-9]\\d*(?=\\s|$))");
   assert.equal(RESERVED_PREFIX.flags, "");
   for (const list of [SOURCES, KINDS, STATES, APPROVERS, VERDICTS]) assert.ok(Object.isFrozen(list), "a list is frozen: nobody edits the contract at run time");
 });
@@ -610,6 +611,14 @@ test("T7 every value a message quotes is cleaned like the line is: control chara
     assert.ok(cut !== undefined, `${field}: no message quotes the value`);
     assert.ok(cut.endsWith("…"), `${field}: a long value is cut with …, got ${cut.length} characters`);
     assert.ok(cut.length <= QUOTE_LIMIT + 1, `${field}: at most QUOTE_LIMIT + 1 characters, got ${cut.length}`);
+
+    // (g) the C1 controls (NEL, CSI) and the bidi controls (RLO, LRI) are not made harmless by the ASCII range alone
+    for (const hazard of ["\u0085", "\u009b", "\u202e", "\u2066"]) {
+      const found = check(ledger(`own${hazard}er`));
+      assert.ok(found.length > 0, `${field}: the value is a finding`);
+      for (const message of found) assert.ok(!message.includes(hazard), `${field}: U+${hazard.codePointAt(0).toString(16)} reached a message: ${JSON.stringify(message)}`);
+      said(found, "own er"); // a space stands where the control was
+    }
   }
 });
 
@@ -768,16 +777,16 @@ test("I17 hidden lines inside a record are the only finding; at column 0 they ar
 
 // The matrix: one test per row, so the row's input is in every failure's name and a revert shows which rows went red.
 const MATRIX_SHAPES = [
-  `- ${ID}`, `* ${ID}`, `+ ${ID}`, ID, "> Epoch 2 · approved 2026-10-28 · by reviewers · state: open", "### Re-review for epoch 2", "> note", "# x",
+  `- ${ID}`, `* ${ID}`, `+ ${ID}`, `1. ${ID}`, `1) ${ID}`, ID, "> Epoch 2 · approved 2026-10-28 · by reviewers · state: open", "### Re-review for epoch 2", "> note", "# x",
 ];
 const MATRIX = [
   ...[" ", "  ", "\t"].flatMap((indent) => MATRIX_SHAPES.map((shape) => ({ line: indent + shape, red: true }))),
   { line: "  continues the cause of 1.1 in prose", red: false },
   { line: ` - ${ID}`, red: false, fenced: true },
 ];
-test("the matrix has twenty-four red rows (3 indents x 8 shapes) and two clean ones", () => {
-  assert.equal(MATRIX.length, 26);
-  assert.equal(MATRIX.filter((row) => row.red).length, 24);
+test("the matrix has thirty red rows (3 indents x 10 shapes) and two clean ones", () => {
+  assert.equal(MATRIX.length, 32);
+  assert.equal(MATRIX.filter((row) => row.red).length, 30);
 });
 for (const { line, red, fenced } of MATRIX) {
   test(`matrix ${red ? "red" : "clean"}: ${JSON.stringify(line)}${fenced ? " inside a fence" : ""}`, () => {
@@ -786,6 +795,96 @@ for (const { line, red, fenced } of MATRIX) {
     else clean(found, "matrix");
   });
 }
+
+// ---- epoch 2, entry 2.1: three more shapes under which a change hides (E1.S1 L1-L4, H1-H5, O1-O3; C13, C14) ----
+
+const SECOND = "- 1.2 · 2026-10-26 · owner · epics — y";
+const FIRST = "- 1.1 · 2026-10-26 · owner · epics — x";
+const EPOCH2 = "> Epoch 2 · approved 2026-10-28 · by reviewers · state: open";
+
+test("L1/1b a lone CR is a line ending: two entries glued by one are two entries, as with LF and CRLF", () => {
+  const glued = check([epoch(1), "", `${FIRST}\r${SECOND}`]);
+  said(glued, "epoch 1 has 2 changes and is not stopped", "entries 1.1, 1.2");
+  assert.deepEqual(glued, check([epoch(1), "", FIRST, SECOND]), "the same findings as with a line feed");
+  assert.deepEqual(glued, check([epoch(1), "", `${FIRST}\r\n${SECOND}`]), "and as with a CRLF");
+});
+
+test("L2 an epoch line glued to an entry by a lone CR is an epoch line", () => {
+  const glued = check([epoch(1), "", `${FIRST}\r${EPOCH2}`]);
+  said(glued, "epoch 1 is not closed", "no re-review for epoch 2");
+  assert.deepEqual(glued, check([epoch(1), "", FIRST, EPOCH2]));
+});
+
+test("L3 a record heading glued to an entry by a lone CR opens the record: the re-review in progress is clean", () => {
+  const rec = record(2);
+  const glued = [epoch(1, { state: "stopped" }), "", E11, `${E12}\r${rec[0]}`, ...rec.slice(1)];
+  clean(check(glued, { status: STOPPED }));
+  clean(check([epoch(1, { state: "stopped" }), "", E11, E12, ...rec], { status: STOPPED })); // the heading on its own line (G10)
+});
+
+test("L4 `\\r\\r` is a blank line, a CR-only file is a file, and a finding's line number counts CR-terminated lines", () => {
+  clean(check([`${epoch(1)}\r\r${E11}`]));
+  clean(run(plan(A()).replaceAll("\n", "\r")));
+  const text = plan([...A(), ` - ${ID}`]);
+  const crOnly = run(text.replaceAll("\n", "\r"));
+  said(crOnly, RESERVED_MESSAGE, "line 10");
+  assert.deepEqual(crOnly, run(text), "the same findings as with line feeds");
+});
+
+test("H1/3e a heading indented one to three spaces is the ledger's near-miss heading, not an invisible ledger", () => {
+  for (const heading of [" ## Plan changes", "   ## Plan changes"]) {
+    const found = check(A2(), { heading });
+    said(found, "must read exactly", `"${heading}"`);
+    assert.equal(found.length, 1, "the ledger under a near-miss heading is not read further");
+  }
+  said(check(A2(), { heading: "## Plan changes" }), "epoch 1 has 2 changes"); // the twin: the exact heading is read
+});
+
+test("H2 closing hashes, any count and spacing, are a near-miss heading too", () => {
+  for (const heading of ["## Plan changes ##", "## Plan changes #", "## Plan changes   ##"]) said(check(A2(), { heading }), "must read exactly", heading);
+});
+
+test("H3/C13 four leading spaces are a code block: not a heading, no finding, no ledger", () => {
+  clean(check(A2(), { heading: "    ## Plan changes" }));
+});
+
+test("H3 twin — three leading spaces are a near miss", () => {
+  said(check(A2(), { heading: "   ## Plan changes" }), "must read exactly");
+});
+
+test("H4 the wrong level, no space after the hashes, or two spaces are near misses; other words are not", () => {
+  for (const heading of ["# Plan changes", "### Plan changes", "##Plan changes", "##  plan changes"]) said(check(A2(), { heading }), "must read exactly", heading);
+  clean(check(A2(), { heading: "## Plan changes (epoch 1)" })); // G2, still no heading
+  clean(check(A2(), { heading: "## plan   changes" })); // the words' single space is part of the phrase
+});
+
+test("H5 the exact heading and a near-miss one further down are two headings", () => {
+  const found = run(planRaw(["## Plan changes", "", ...A(), "", " ## Plan changes", "", ...A()]));
+  said(found, "two", "## Plan changes");
+  assert.equal(found.length, 1, "the parse stops at the headings");
+  said(check(A(), { heading: "## Plan Changes" }), "must read exactly"); // G2, unchanged
+});
+
+test("O1/4h an ordered-list marker before an entry shape is hidden: it renders as a numbered item a reader counts", () => {
+  for (const line of [`  1. ${ID}`, ` 1) ${ID}`]) hidden(line, "O1");
+  const col0 = under11(`1. ${ID}`);
+  said(col0, "unreadable entry", 'entries start with "- "'); // red on both sides, as today
+  said(under11(`- ${ID}`), "entries 1.1, 1.2"); // the twin that parses
+});
+
+test("O2 the marker takes up to nine digits and any whitespace after it; ten digits are no marker", () => {
+  for (const line of [`  12. ${ID}`, `  123456789) ${ID}`, `  1.  ${ID}`, `\t1.\t${ID}`]) hidden(line, "O2");
+  clean(under11(`  1234567890. ${ID}`));
+});
+
+test("O3 a marker alone reserves nothing: the entry number must follow it", () => {
+  for (const line of ["  1. a numbered list", "  1. 1.2.3 is a version", "  1.1.2 · 2026-10-26 · owner · epics — y", "  2) see 1.2 above"]) clean(under11(line), line);
+});
+
+test("C14/h a GFM-escaped pipe inside a table cell is not a cell boundary; unescaped it is, and the row has five cells", () => {
+  clean(check(B({ rec: { table: [...HEADER, "| a | b | fits | c \\| d |"] } })));
+  said(check(B({ rec: { table: [...HEADER, "| a | b | fits | c | d |"] } })), "row 1 has 5 cells, not 4");
+});
 
 // ---- C12 and robustness: never a throw, whatever the text ----
 
@@ -801,6 +900,7 @@ test("the lib never throws on any text, and reads a hostile corpus as findings",
     ...A2(), ...B(), ...R(), ...P, "## Plan changes", "## plan changes", "### Re-review for epoch 2", "### Re-review for epoch 0",
     "Narrowed: yes", "narrowed:", ...HEADER, "|", "||", "| | | | |", "> Epoch", ">", "> Epoch 9007199254740993 · approved 2026-13-01 · by owner · state: open",
     "- ", "-", "*", "1.", "  ", "\t- x", "", TICKS, "~~~", "`".repeat(4), "# H", "## Goal", "\0", "\ud800", "- 1.1 · · · ·  — ",
+    " ## Plan changes", "1. 1.2 · 2026-10-26 · owner · epics — y", " 1) 1.2", "a\rb", "\r\r", "| a \\| b |", "\u0085", "\u202e",
     "- 9007199254740993.1 · 2026-01-00 · owner · scope — x", "- 1.1 · 2026-02-30 · owner · scope — x", "—", "·", "\r",
     "a".repeat(5000), "- " + "·".repeat(300),
   ];

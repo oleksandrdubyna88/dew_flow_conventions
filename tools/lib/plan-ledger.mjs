@@ -19,18 +19,22 @@
 // block; the check reads it anywhere). What it does see is exactly the grammar below, and every line it cannot read is
 // a red, never a skip: an entry that fails to parse would otherwise lower the count in silence.
 //
-// The grammar, in one place. Text is folded (CRLF = LF), then stripped of fenced blocks through `outsideFencedBlocks`
-// (the one fence definition; a fenced line becomes an empty line, so a finding can say "line 90"). Every pattern runs
-// on a line after `trimEnd()` and with each run of spaces or tabs folded to ONE space, except the two tests on an
-// indented line, which read the original. A line that starts with a space or a tab is free text — EXCEPT one that,
-// with its indent (and the invisible characters a renderer ignores) stripped, starts like a ledger line: an entry
-// (`- 1.2`, `* 1.2`, a bare `1.2`), an epoch line (`>`) or a heading (`#`), whatever follows. A renderer shows such a
-// line as a list item, a quote or a heading, which a reader counts, so it is a finding — `RESERVED_PREFIX`, parent
-// § 2 — and is never parsed, never counted. Free text therefore may not begin with an entry-shaped number, `>` or `#`.
-// Fields are separated by " · " (U+00B7) and the cause follows " — " (U+2014); `|`, `--`, `-` and the en dash are
-// refused by a message that names the expected character, because a second spelling of the format would be a second
-// grammar to keep in step forever. Keywords and values are case-sensitive. Every value a message quotes goes through
-// `clean`: control characters become a space and a long one is cut.
+// The grammar, in one place. Text is folded (CRLF = LF) and a lone CR becomes a line ending too, as CommonMark reads it
+// (here and not in the shared `folded`, which feeds the hashed rule bodies), then stripped of fenced blocks through
+// `outsideFencedBlocks` (the one fence definition; a fenced line becomes an empty line, so a finding can say "line
+// 90"). The ledger's heading is exactly `## Plan changes`; what a reader would take for it — another case or level, one
+// to three leading spaces, closing hashes — is a finding, never an invisible ledger (four spaces are a code block: no
+// heading, no ledger). Every pattern runs on a line after `trimEnd()` and with each run of spaces or tabs folded to ONE
+// space, except the tests that read the original: the near-miss heading and the two on an indented line. A line that
+// starts with a space or a tab is free text — EXCEPT one that, with its indent (and the invisible characters a renderer
+// ignores) stripped, starts like a ledger line: an entry (`- 1.2`, `* 1.2`, `1. 1.2`, a bare `1.2`), an epoch line
+// (`>`) or a heading (`#`), whatever follows. A renderer shows such a line as a list item, a quote or a heading, which
+// a reader counts, so it is a finding — `RESERVED_PREFIX`, parent § 2 — and is never parsed, never counted. Free text
+// therefore may not begin with an entry-shaped number, `>` or `#`. Fields are separated by " · " (U+00B7) and the cause
+// follows " — " (U+2014); `|`, `--`, `-` and the en dash are refused by a message that names the expected character,
+// because a second spelling of the format would be a second grammar to keep in step forever. Keywords and values are
+// case-sensitive. A table cell may hold a backslash-escaped pipe. Every value a message quotes goes through `clean`:
+// control characters (ASCII, C1, bidi overrides) become a space and a long one is cut.
 //
 // Dependency-free on purpose: `plan-lifecycle.mjs` runs in every consumer's CI from the mounted rules, before any
 // `npm ci`, so this file imports from `./rule-body.mjs` and from nothing else.
@@ -49,12 +53,17 @@ export const VERDICTS = Object.freeze(["fits", "cut", "—"]);
  *  the `misfiled` check read ONE phrase: a stopped plan may say what is done without being called finished. */
 export const STOP_PHRASE = /\bstopped for re-review\b/i;
 
-/** An indented line that starts like a ledger line (parent § 2, entry 1.2): an entry, an epoch line (`>`) or a heading
+/** An indented line that starts like a ledger line (parent § 2, entries 1.2 and 2.1): an entry — whose marker may be a
+ *  bullet or an ordered-list marker of at most nine digits, CommonMark's limit —, an epoch line (`>`) or a heading
  *  (`#`). One regex, three shapes, tested on the line with its indent stripped. */
-export const RESERVED_PREFIX = /^(?:[>#]|(?:[-*+]\s+)?[1-9]\d*\.[1-9]\d*(?=\s|$))/;
+export const RESERVED_PREFIX = /^(?:[>#]|(?:(?:[-*+]|\d{1,9}[.)])\s+)?[1-9]\d*\.[1-9]\d*(?=\s|$))/;
 
 const HEADING = /^## Plan changes$/;
-const NEAR_HEADING = /^## plan changes$/i;
+/** What a reader takes for the ledger's heading and the exact one is not: another case, level or spacing, one to three
+ *  leading spaces, closing hashes. Tested on the original line after `trimEnd()` — `fold` would shrink four leading
+ *  spaces to one and make a code block a heading. Wider than CommonMark on purpose: a near miss costs one loud finding
+ *  with the fix in it, a miss costs the whole ledger. */
+const NEAR_HEADING = /^ {0,3}#{1,6}\s*plan changes(?:\s+#+)?\s*$/i;
 const SECTION_END = /^#{1,2} /;
 const EPOCH_LINE = new RegExp(
   `^> Epoch ([1-9]\\d*) · approved (\\d{4}-\\d{2}-\\d{2}) · by (${APPROVERS.join("|")}) · state: (${STATES.join("|")})$`,
@@ -65,7 +74,8 @@ const LIST_LINE = /^(?:[-*+]|\d+[.)]) /;
 const ENTRY_NUMBER = /^([1-9]\d*)\.([1-9]\d*)$/;
 const TABLE_HEADER = ["Work", "Where", "Verdict", "Action"];
 const TABLE_SEPARATOR = /^:?-+:?$/;
-const CONTROL = /[\u0000-\u001f\u007f]/g;
+/** Control characters a terminal acts on: ASCII and C1 (NEL, CSI …), and the bidirectional overrides and isolates. */
+const CONTROL = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g;
 /** The indent of a free-text line and the characters a renderer ignores beside it: space, tab, NBSP, the zero-width
  *  spaces and joiners, the word joiner and the byte-order mark. `trim()` is NOT this set (it keeps U+200B). */
 const INDENT = /^[ \t\u00a0\u200b-\u200d\u2060\ufeff]+/;
@@ -271,7 +281,8 @@ function parse(lines, { start, end }, say) {
 
 /** One table row of a record: the separator is skipped, the first other row is the header, the rest are body rows. */
 function addTableRow(record, line) {
-  const cells = line.replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+  // A pipe escaped with a backslash is part of a cell (GFM); the cell shows what the reader sees.
+  const cells = line.replace(/^\|/, "").replace(/(?<!\\)\|$/, "").split(/(?<!\\)\|/).map((cell) => cell.trim().replaceAll("\\|", "|"));
   if (cells.every((cell) => TABLE_SEPARATOR.test(cell))) return;
   if (record.header === null) record.header = cells;
   else record.rows.push(cells);
@@ -416,7 +427,9 @@ function checkRecords(model, say) {
   for (const record of model.records) {
     checkRecordPlace(record, model, say);
     checkRecordBody(record, model, say);
-    byEpoch.set(record.k, [...(byEpoch.get(record.k) ?? []), record]);
+    let own = byEpoch.get(record.k);
+    if (own === undefined) byEpoch.set(record.k, (own = []));
+    own.push(record);
   }
   for (const [k, own] of byEpoch) {
     if (own.length > 1) model.findings.push(say(`two re-review records for epoch ${k}; there is one`));
@@ -448,11 +461,12 @@ function checkRecords(model, say) {
  */
 export function ledgerFindings({ file, text, status, parent }) {
   const say = (message) => `${file} — ${message}`;
-  const lines = outsideFencedBlocks(folded(text)).split("\n");
+  // A lone CR is a line ending as CommonMark reads it; `folded` (shared, feeds the hashed rule bodies) knows CRLF only.
+  const lines = outsideFencedBlocks(folded(text).replace(/\r\n?/g, "\n")).split("\n");
   const headings = [];
   for (const [index, raw] of lines.entries()) {
     const line = fold(raw);
-    if (HEADING.test(line) || NEAR_HEADING.test(line)) headings.push({ index, exact: HEADING.test(line), raw });
+    if (HEADING.test(line) || NEAR_HEADING.test(raw.trimEnd())) headings.push({ index, exact: HEADING.test(line), raw });
   }
   if (headings.length === 0) return []; // opt-in by presence
 
