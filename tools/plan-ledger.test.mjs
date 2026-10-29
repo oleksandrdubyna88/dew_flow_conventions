@@ -23,7 +23,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  APPROVERS, KINDS, ledgerFindings, parentPlanOf, QUOTE_LIMIT, RESERVED_PREFIX, SOURCES, STATES, STOP_PHRASE, VERDICTS,
+  APPROVERS, clean as cleanValue, KINDS, ledgerFindings, parentPlanOf, QUOTE_LIMIT, RESERVED_PREFIX, SOURCES, STATES, STOP_PHRASE, VERDICTS,
 } from "./lib/plan-ledger.mjs";
 import { outsideFencedBlocks, sectionsOf } from "./lib/rule-body.mjs";
 
@@ -626,8 +626,8 @@ test("T7 every value a message quotes is cleaned like the line is: control chara
 
 const RESERVED_MESSAGE = "a ledger line stands at column 0";
 const ID = "1.2 · 2026-10-26 · owner · epics — y"; // an entry without its marker
-/** A line as the lib quotes it: a control character, a tab included, becomes a space. The lib's own range, retyped here once. */
-const asQuoted = (line) => `"${line.replace(/[\u0000-\u001f\u007f]/g, " ")}"`;
+/** A line as the lib quotes it: through the lib's own `clean`, never a retyped copy of its character range. */
+const asQuoted = (line) => `"${cleanValue(line)}"`;
 /** `line` right under entry 1.1 of A: line 10 of the `plan` helper's text. */
 const under11 = (line, opts) => check([...A(), line], opts);
 
@@ -686,10 +686,10 @@ test("I7 prose that begins with an entry-shaped number is red by design; reworde
 });
 
 test("I8 an invisible character after the indent is stripped with it; at column 0 it is today's unreadable line", () => {
-  for (const line of ["  - 1.2 · 2026-10-26 · owner · epics — y", " ​1.2 · 2026-10-26 · owner · epics — y", " ﻿- 1.2 · 2026-10-26 · owner · epics — y"]) {
+  for (const line of [" \u00a0- 1.2 · 2026-10-26 · owner · epics — y", " \u200b1.2 · 2026-10-26 · owner · epics — y", " \ufeff- 1.2 · 2026-10-26 · owner · epics — y"]) {
     hidden(line, "I8");
   }
-  for (const line of [" - 1.2 · 2026-10-26 · owner · epics — y", "​- 1.2 · 2026-10-26 · owner · epics — y"]) {
+  for (const line of ["\u00a0- 1.2 · 2026-10-26 · owner · epics — y", "\u200b- 1.2 · 2026-10-26 · owner · epics — y"]) {
     said(under11(line), "unreadable line"); // pinned: an invisible character never hides an entry on either side of column 0
   }
 });
@@ -760,9 +760,9 @@ test("I15 free text may not begin with `>` or `#`: red by design; reworded, or a
 
 test("I16 the same invisible characters are stripped for an epoch line and a heading; at column 0 it stays an unreadable line", () => {
   const epoch2 = "> Epoch 2 · approved 2026-10-28 · by reviewers · state: open";
-  for (const line of [`  ${epoch2}`, " ​### Re-review for epoch 2"]) hidden(line, "I16");
-  said(under11(` ${epoch2}`), "unreadable line");
-  said(under11("​### Re-review for epoch 2"), "unreadable line");
+  for (const line of [` \u00a0${epoch2}`, " \u200b### Re-review for epoch 2"]) hidden(line, "I16");
+  said(under11(`\u00a0${epoch2}`), "unreadable line");
+  said(under11("\u200b### Re-review for epoch 2"), "unreadable line");
 });
 
 test("I17 hidden lines inside a record are the only finding; at column 0 they are a second record and a repeated epoch", () => {
@@ -855,7 +855,8 @@ test("H3 twin — three leading spaces are a near miss", () => {
 test("H4 the wrong level, no space after the hashes, or two spaces are near misses; other words are not", () => {
   for (const heading of ["# Plan changes", "### Plan changes", "##Plan changes", "##  plan changes"]) said(check(A2(), { heading }), "must read exactly", heading);
   clean(check(A2(), { heading: "## Plan changes (epoch 1)" })); // G2, still no heading
-  clean(check(A2(), { heading: "## plan   changes" })); // the words' single space is part of the phrase
+  // the exact heading takes any spacing between the words (it runs on the folded line), so the near miss must too (H6)
+  said(check(A2(), { heading: "## plan   changes" }), "must read exactly");
 });
 
 test("H5 the exact heading and a near-miss one further down are two headings", () => {
@@ -884,6 +885,68 @@ test("O3 a marker alone reserves nothing: the entry number must follow it", () =
 test("C14/h a GFM-escaped pipe inside a table cell is not a cell boundary; unescaped it is, and the row has five cells", () => {
   clean(check(B({ rec: { table: [...HEADER, "| a | b | fits | c \\| d |"] } })));
   said(check(B({ rec: { table: [...HEADER, "| a | b | fits | c | d |"] } })), "row 1 has 5 cells, not 4");
+});
+
+// ---- code round 3 (E1.S1 cases marked cr3): H6, I18, I19, K1, P1-P3, C15 ----
+
+test("H6/3f the near miss takes any spacing between the words, as the exact heading does: it is never stricter", () => {
+  for (const heading of ["## plan   changes", "## plan\tchanges", " ## Plan  changes", "### Plan  changes", "## Plan  changes ##"]) {
+    const found = check(A2(), { heading });
+    assert.ok(found.join("\n").includes("must read exactly"), `${JSON.stringify(heading)}: expected a near-miss finding, got:\n${found.join("\n") || "(no findings)"}`);
+  }
+});
+
+test("H6 twin — extra spaces in an otherwise exact heading ARE the exact heading: row 1, never row 3", () => {
+  for (const heading of ["##  Plan changes", "## Plan  changes"]) {
+    const found = check(A2(), { heading });
+    said(found, "epoch 1 has 2 changes");
+    assert.ok(!found.join("\n").includes("must read exactly"), `${JSON.stringify(heading)} is the exact heading after folding`);
+  }
+});
+
+test("I18 every format character is stripped with the indent: an LRM, an RLM or a soft hyphen hides no line", () => {
+  for (const line of [`  \u200e- ${ID}`, `  \u200f${ID}`, `  \u00ad* ${ID}`]) hidden(line, "I18");
+  said(under11(`\u200e- ${ID}`), "unreadable line"); // pinned: at column 0 the same line is red as well
+});
+
+test("I19 a bidi control, an Arabic letter mark or a Mongolian vowel separator before a reserved shape hides nothing", () => {
+  const epoch2 = "> Epoch 2 · approved 2026-10-28 · by reviewers · state: open";
+  const lines = [` \u2066${epoch2}`, " \u202e### Re-review for epoch 2", " \u061c# x", ` \u180e1) ${ID}`, ` \u2061+ ${ID}`];
+  for (const line of lines) hidden(line, "I19");
+  for (const line of lines) said(under11(line.slice(1)), "unreadable line"); // at column 0 (the space dropped): red as well
+  // the two controls of the bidi class reach the message as a space (fix forward g)
+  assert.ok(!under11(lines[0])[0].includes("\u2066") && !under11(lines[1])[0].includes("\u202e"));
+});
+
+test("K1 a line behind TWO list markers is a known limit, recorded and not fixed: it stays free text", () => {
+  clean(under11(`  - - ${ID}`), "two bullets");
+  clean(under11(`  1. - ${ID}`), "a number and a bullet");
+  hidden(`  - ${ID}`, "K1 twin"); // one marker is reserved (I1)
+  said(under11(`- - ${ID}`), "unreadable entry", 'number "- 1.2"'); // at column 0 the nested form is red
+});
+
+test("P1/7h a pipe behind TWO backslashes is a cell boundary: an escaped backslash, then a bare pipe (GFM)", () => {
+  const row = (n) => `| a | b | fits | c${"\\".repeat(n)}| d |`;
+  said(check(B({ rec: { table: [...HEADER, row(2)] } })), "row 1 has 5 cells, not 4");
+  clean(check(B({ rec: { table: [...HEADER, row(1)] } }))); // C14: one backslash escapes the pipe
+});
+
+test("C15 a pipe behind THREE backslashes is escaped: 4 cells, and the cell keeps the escaped backslash", () => {
+  clean(check(B({ rec: { table: [...HEADER, `| a | b | fits | c${"\\".repeat(3)}| d |`] } })));
+});
+
+test("P2 an escaped pipe in the header is shown to the reader unescaped: the header is wrong, with four cells", () => {
+  const found = check(B({ rec: { table: ["| Work | Where | Verdict | Action\\| x |", "|---|---|---|---|", FITS] } }));
+  said(found, "header must read", "Action| x");
+  assert.ok(!found.join("\n").includes("cells, not"), "four cells, not five");
+  clean(check(B())); // the header as written
+});
+
+test("P3 an escaped pipe glued to a verdict is part of the verdict: four cells, and the verdict is wrong", () => {
+  const found = check(B({ rec: { table: [...HEADER, "| a | b | fits\\| | d |"] } }));
+  said(found, 'verdict "fits|"');
+  assert.ok(!found.join("\n").includes("cells, not"), "four cells, not five");
+  clean(check(B({ rec: { table: [...HEADER, "| a | b | fits | d |"] } })));
 });
 
 // ---- C12 and robustness: never a throw, whatever the text ----

@@ -12,6 +12,8 @@
 > list — accepted review findings, not changes to the plan. Revised again on 2026-10-29 after epoch 2's approval (parent
 > entry 2.1): ordered-list markers join the reserved entry prefix, and two implementation fixes inside the contract — a
 > lone CR is a line ending, an indented or closing-hashes heading is the near-miss heading (S1 *Epoch 2, entry 2.1*).
+> A fourth pass the same day, after code round 3 over `cd3ccde`: the near-miss heading's word spacing, the indent set as
+> `\p{Cf}`, GFM's odd-backslash rule for pipes, and one known limit recorded rather than fixed (S1, cases marked *(cr3)*).
 
 Done when (from the parent): every test was watched failing first; every row of the parent's findings table (§3) has a
 red case naming the file and the entry; the clean cases of the parent's test plan pass; the five commands are green; the
@@ -93,7 +95,10 @@ settles their edges only. The same re-review aligned the lib's interface with th
 name or `null`) in place of a boolean. Everything else in this sub-section stands as written; the cases the stop added
 to S2 and S3 are marked *(stop)*. *Revised again 2026-10-29* after the fix-forward commit `dce67ed` passed its code
 round: the parallel Opus review found three more shapes under which a change hides, each verified on the lib — the
-sub-section *Epoch 2, entry 2.1* below; its cases are marked *(2.1)*.
+sub-section *Epoch 2, entry 2.1* below; its cases are marked *(2.1)*. *And a fourth pass* after code round 3 over
+`cd3ccde` passed: its findings are implementation and E1-spec items inside the parent's contract — §2 says only
+"trimmed", "the exact heading" and "four cells", and none of these words moves — so they are fix-forward rows (k)–(n)
+in S3 and cases marked *(cr3)* here; one shape is recorded as a known limit because fixing it WOULD widen §2.
 
 ##### The five decisions
 
@@ -196,7 +201,9 @@ sub-section *Epoch 2, entry 2.1* below; its cases are marked *(2.1)*.
 > re-review and its reverts; the halt is the rule's, `common/plan-change-control.md`, and the review server's when it
 > refuses `review_code` until the new `proceed`); an entry dated before its epoch, or entries dated out of order (the
 > check judges structure and count, not when); where the section stands in the file (the rule says under the status
-> block; the check reads it anywhere). What it does see is exactly the grammar below, and every line it cannot read
+> block; the check reads it anywhere); an indented line behind TWO list markers (`  - - 1.2 · …`), which renders as a
+> visibly nested bullet and takes deliberate nesting to write — reserving it would widen §2, a contract change, so it
+> is a known limit (code round 3, 2026-10-29). What it does see is exactly the grammar below, and every line it cannot read
 > is a red, never a skip: an entry that fails to parse would otherwise lower the count in silence.
 
 ##### Grammar — the ledger as the parser accepts it
@@ -230,11 +237,11 @@ The regexes that carry a list are BUILT from the constant (`STATES.join("|")`), 
 | Line kind | Where | Regex / rule |
 |---|---|---|
 | ledger heading | anywhere at column 0, outside fences | `/^## Plan changes$/` — exact case |
-| near-miss heading | same, on the `trimEnd()`-ed original line | `/^ {0,3}#{1,6}\s*plan changes(?:\s+#+)?\s*$/i` *(2.1; was `/^## plan changes$/i`)* and not the exact one → finding 3 *not a ledger heading; it must read exactly `## Plan changes`* (a ledger under a mis-cased, indented, closing-hashes or wrong-level heading would otherwise be invisible); four or more leading spaces are a code block — not a heading, no finding |
+| near-miss heading | same, on the `trimEnd()`-ed original line | `/^ {0,3}#{1,6}\s*plan\s+changes(?:\s+#+)?\s*$/i` *(2.1; was `/^## plan changes$/i`; `\s+` between the words since code round 3 — the test runs on the UNfolded line, and the exact heading, tested on the folded line, takes any run of spaces, so the near miss may not be stricter)* and not the exact one → finding 3 *not a ledger heading; it must read exactly `## Plan changes`* (a ledger under a mis-cased, indented, closing-hashes or wrong-level heading would otherwise be invisible); four or more leading spaces are a code block — not a heading, no finding |
 | section end | after the heading | the first line matching `/^#{1,2} /` (a `# ` or `## ` heading), or the end of the file; `### …` lines are INSIDE |
 | blank | in the section | `/^\s*$/` → skipped |
 | free text | in the section | the ORIGINAL line starts with a space or a tab (any indent ≥ 1) → the reserved-prefix test (next row) and then skipped, whatever it holds: an indented `- note`, `\|`, `(…)` or prose is free text |
-| reserved prefixes *(stop)* | an indented line, in the section | the line with its indent stripped — `raw.replace(/^[ \t ​-‍⁠﻿]+/, "")` — matches `RESERVED_PREFIX` (an entry-shaped start, a `>`, or a `#`) → finding 4 *a ledger line stands at column 0*, quoting the original line and naming its line number; the line is NOT parsed and NOT counted. Any other indented line is free text. Fenced lines never reach this row (they are empty lines by then) |
+| reserved prefixes *(stop)* | an indented line, in the section | the line with its indent stripped — `raw.replace(/^[ \t\u00a0\p{Cf}]+/u, "")` — matches `RESERVED_PREFIX` (an entry-shaped start, a `>`, or a `#`) → finding 4 *a ledger line stands at column 0*, quoting the original line and naming its line number; the line is NOT parsed and NOT counted. Any other indented line is free text. Fenced lines never reach this row (they are empty lines by then). Known limit (code round 3): an indented line behind TWO list markers (`  - - 1.2 · …`) is free text — a visibly nested bullet; reserving it would widen §2, see *The reserved prefixes* |
 | epoch line | column 0, starts with `>` | `` /^> Epoch ([1-9]\d*) · approved (\d{4}-\d{2}-\d{2}) · by (reviewers\|owner) · state: (open\|stopped\|closed)$/ `` built from `APPROVERS` and `STATES`; the date must be a calendar date (`Date.UTC` round-trip: `2026-02-30` is not); ANY other `>` line in the section is finding 3 *unreadable epoch line* |
 | entry | column 0, matches `/^(?:[-*+]\|\d+[.)]) /` (a list line) | must start `- `; the rest splits on the FIRST ` — ` into head and cause; head splits on ` · ` into exactly 4 fields: number `/^([1-9]\d*)\.([1-9]\d*)$/`, calendar date, source ∈ `SOURCES`, kinds = comma-separated (spaces after a comma allowed), each ∈ `KINDS`, at least one; cause non-empty. Any failure is finding 4 *unreadable entry* with the detail (table below); the entry is then NOT counted — the red keeps the count honest |
 | re-review heading | column 0, starts with `###` | `/^### Re-review for epoch ([1-9]\d*)$/`; any other `###`/`####` line → finding 7 *unreadable re-review heading* |
@@ -279,14 +286,19 @@ or near-miss, counted together) is finding 3 *two `## Plan changes` headings (li
   parser that tried to tell a quoted note from an epoch line would need a second grammar for free text, and a one-space
   `> note` renders as a block quote a reader cannot tell from an epoch line's shape. The message's fix is the same:
   reword (`  note: …`, `  (quoted) …`) or move to column 0.
-- *"Trimmed" means the indent AND the invisible characters are stripped first:*
-  `/^[ \t ​-‍⁠﻿]+/`. The free-text test itself stays `/^[ \t]/` on the original line — a line
-  that begins with an NBSP (U+00A0) or a zero-width space (U+200B) is a column-0 line, and today it is finding 4
-  *unreadable line* (verified 2026-10-28; `fold()` folds spaces and tabs only, so no line kind matches it). Consistent
-  with that, `  - 1.2 · …` (a space, then an NBSP) is finding 4 through the reserved prefix, and so are
-  `  > Epoch 2 · …` and ` ​### Re-review for epoch 2`: an invisible character hides a ledger line on neither
-  side of column 0. JavaScript's `trim()` is NOT the definition — it strips the NBSP but not U+200B, so a zero-width
-  space after the indent would hide the line again. The same indent set serves all three shapes.
+- *"Trimmed" means the indent AND every invisible format character are stripped first:* `INDENT = /^[ \t\u00a0\p{Cf}]+/u`
+  — spaces, tabs, the NBSP (U+00A0, category Zs) and the WHOLE `Cf` category, which needs the `u` flag (settled
+  2026-10-29, code round 3: the enumerated set `\u200b-\u200d\u2060\ufeff` left U+200E/U+200F, U+061C, U+00AD,
+  U+180E, U+2061-U+2064 and the bidi controls U+202A-U+202E, U+2066-U+2069 as a way to hide a line — verified: two
+  spaces, an LRM, `- 1.2 · …` was silent while the same at column 0 was red). A format character prints nothing in
+  any renderer, so the category is the right boundary and no further enumeration will be needed. The free-text test
+  itself stays `/^[ \t]/` on the original line — a line that begins with an NBSP or a format character is a column-0
+  line, and today it is finding 4 *unreadable line* (`fold()` folds spaces and tabs only, so no line kind matches it).
+  Consistent with that, ` \u00a0- 1.2 · …` (a space, then an NBSP), ` \u200e> Epoch 2 · …` (a space, then an LRM) and
+  ` \u2066### Re-review for epoch 2` (a space, then a bidi isolate) are finding 4 through the reserved prefix: an
+  invisible character hides a ledger line on neither side of column 0. JavaScript's `trim()` is NOT the definition — it
+  strips the NBSP but not U+200B, so a zero-width space after the indent would hide the line again. The same indent
+  set serves all three shapes.
 - *The edges, settled by the regex and named in the I-scenarios:* a tab is an indent (`\t- 1.2`, `\t\t1.2`); `\s+` after
   the marker accepts a tab (`-\t1.2`); multi-digit numbers are entry numbers (`10.1`, `1.20`); `1.2.3` is NOT reserved
   (after `1.2` comes a `.`, not whitespace or the end), nor `1.0`, `0.1`, `1.2:`, `(1.2)`, `1. x` (a numbered list) or
@@ -304,6 +316,13 @@ or near-miss, counted together) is finding 3 *two `## Plan changes` headings (li
   column-0 line kinds. The reserved test is the ONLY thing the parser reads from an indented line, and it never turns one
   into an entry; column-0 lines never reach it. So the parent's sentence *indented lines under an entry are free text and
   not parsed* still holds for every line that is not red — and the one exception is loud, never silent.
+- *Known limit, recorded and not fixed (code round 3, 2026-10-29).* An indented line behind TWO list markers —
+  `  - - 1.2 · …`, `  1. - 1.2 · …` — is silent: after the first marker the regex wants the entry number, and finds a
+  second marker. A renderer shows it as a visibly NESTED bullet, which nobody writes by accident; reserving it would
+  widen §2's regex, and that is a contract change — the second of epoch 2, which would stop the plan again for a shape
+  that needs deliberate nesting. So it is named in the lib's header (S4, *what the check cannot see*), in the grammar
+  row and in scenario K1, and the next epoch may take it up. (Verified 2026-10-29: `[]`; at column 0, `- - 1.2 · …` is
+  row 4 `unreadable entry`.)
 - *The lib's header comment* (S4) rewrites its sentence *a line that starts with a space or a tab is free text whatever
   it holds* to say the exception.
 
@@ -326,8 +345,11 @@ specifies). One change is allowed in epoch 2; the next stops the plan again.
 2. **Heading variants** *(implementation fix inside E1's near-miss rule)*. ` ## Plan changes` (one to three leading
    spaces) and `## Plan changes ##` (closing hashes) render as the same h2, and so do `# Plan changes` and
    `### Plan changes` as headings a reader takes for the ledger's — none was seen, so the WHOLE ledger under it was
-   invisible (verified, seven shapes). The near-miss test widens to `/^ {0,3}#{1,6}\s*plan changes(?:\s+#+)?\s*$/i` on
-   the original line after `trimEnd()` (not the folded line: `fold` would shrink four spaces to one); the finding stays
+   invisible (verified, seven shapes). The near-miss test widens to `/^ {0,3}#{1,6}\s*plan\s+changes(?:\s+#+)?\s*$/i` on
+   the original line after `trimEnd()` (not the folded line: `fold` would shrink four spaces to one — and BECAUSE the
+   line is not folded, the space between the words is `\s+`: the exact heading runs on the folded line and takes
+   `##  Plan   changes` as exact, so a near miss spelled with one space was silent on `## plan   changes` and five more
+   shapes — code round 3's regression, fixed in fix-forward row k); the finding stays
    the existing *not a ledger heading; it must read exactly `## Plan changes`*, and the exact `## Plan changes` stays
    the ONLY legal heading. Four or more leading spaces are a code block in CommonMark — not a heading, no finding, no
    ledger. The near-miss is deliberately wider than CommonMark (`##Plan changes` without the space, `#plan changes`):
@@ -465,7 +487,7 @@ the substring `a ledger line stands at column 0`, plus `line 10` and the line qu
 | I5 | `  10.1 · …`, `  1.20 · …`, and `  1.2` alone (nothing after the id) | row 4, three cases — multi-digit numbers are entry numbers; `(?=$)` catches the bare id | — |
 | I6 | `  1.2.3 was the version`, `  1.0 is not an entry number`, `  0.1 neither`, `  1.2: a colon`, `  (1.2) in parentheses`, `  version 1.2 shipped`, `  1. a numbered list`, `  - 1.2—x` (no space before the dash) | `[]`, eight cases — not the reserved prefix: the id is followed by `.`, `:`, `)` or `—`, `0` is no `n`, the number is not first | the first with `1.2 ·` in place of `1.2.3` → row 4 |
 | I7 | `  1.2 was the version we shipped` and `  - 1.2 is where it broke` (genuine prose that begins with an entry-shaped number) | row 4 — **red by design**, the cost §2 states; the message's fix (reword) is what the writer does | I6's `version 1.2 shipped` → `[]` |
-| I8 | `  - 1.2 · …` (a space, then an NBSP), ` ​1.2 · …` (a space, then a zero-width space), ` ﻿- 1.2 · …` | row 4, three cases — the invisible characters are stripped with the indent | at column 0, ` - 1.2 · …` and `​- 1.2 · …` → row 4 `unreadable line` (today's behaviour, pinned here): an invisible character never hides an entry on either side of column 0 |
+| I8 | ` \u00a0- 1.2 · …` (a space, then an NBSP), ` \u200b1.2 · …` (a space, then a zero-width space), ` \ufeff- 1.2 · …` | row 4, three cases — the invisible characters are stripped with the indent | at column 0, `\u00a0- 1.2 · …` and `\u200b- 1.2 · …` → row 4 `unreadable line` (today's behaviour, pinned here): an invisible character never hides an entry on either side of column 0 |
 | I9 | B with ` - 2.2 · 2026-10-28 · owner · scope — z` indented under the record's table, and with `  1.3 · 2026-10-26 · owner · scope — z` indented under `Narrowed: no` | row 4, two cases — the test runs before the record logic; the record is otherwise clean (no row 7) | `- 1.3 · …` at column 0 in the same place → `[]`: it is an entry of the closed epoch 1 and parses as one; `- 2.2 · …` at column 0 there → row 5 `stands under epoch 1's line` — parsed, so counted |
 | I10 | the lines of I1, I2 and I3 inside a column-0 ``` fence; inside a `~~~` fence; inside a two-space-indented ``` fence — each fence under the heading, after entry 1.1 | `[]`, three cases — an example is not a record | the fence markers removed → row 4 (I1) |
 | I11 | P as it stands (`  - an indented dash line is free text too`, `  (Plan round 1's …`), and A2s with each entry followed by two continuation lines of prose | `[]` — ordinary continuation prose stays clean | — |
@@ -473,8 +495,11 @@ the substring `a ledger line stands at column 0`, plus `line 10` and the line qu
 | I13 | ` > Epoch 2 · approved 2026-10-28 · by reviewers · state: open` (one space) and `\t> Epoch 2 · …` (a tab) | row 4, `line 10`, the quoted line — the same message as I1 | the same line at column 0 → row 6 `epoch 1 is not closed` and row 7 `no re-review for epoch 2`, and NO row 4: at column 0 it parses as an epoch line |
 | I14 | R (A2s, status `STOPPED`) with its `### Re-review for epoch 2` heading indented one space (the `Narrowed` line and the table left at column 0) | row 4 for the heading; and row 4 `unreadable line` for the `Narrowed:` line and the table rows, which now stand outside any record — the hidden heading opened nothing | the heading at column 0 → `[]` (G10): it parses as a record heading |
 | I15 | `  > note: the reviewer asked for this`, `  #1 priority`, `  #hashtag`, `  >` alone, `  ># x` — free text that happens to begin with `>` or `#` | row 4, five cases — **red by design**, the cost §2 states; the message's fix (reword) is what the writer does | `  note: the reviewer asked for this` and `  (quoted) …` → `[]`; `# Part two` at column 0 → `[]`, it ends the section (G1) |
-| I16 | `  > Epoch 2 · …` (a space, then an NBSP) and ` ​### Re-review for epoch 2` (a space, then a zero-width space) | row 4, two cases — the same indent set as I8 serves every shape | at column 0, ` > Epoch 2 · …` → row 4 `unreadable line` (today's behaviour, pinned): red on either side |
+| I16 | ` \u00a0> Epoch 2 · …` (a space, then an NBSP) and ` \u200b### Re-review for epoch 2` (a space, then a zero-width space) | row 4, two cases — the same indent set as I8 serves every shape | at column 0, `\u00a0> Epoch 2 · …` → row 4 `unreadable line` (today's behaviour, pinned): red on either side |
 | I17 | B with ` ### Re-review for epoch 2` indented inside its own record (a second, hidden heading) and with `  > Epoch 2 · …` indented under the record's table before the real epoch 2 line | row 4, two cases; the real record and epoch line stay clean (no row 6/7) | the hidden heading at column 0 → row 7 `two re-review records for epoch 2` (G11); the hidden epoch line at column 0 → row 6 `epochs not 1, 2, 3` (found 1, 2, 2) — parsed, so counted |
+| I18 *(cr3)* | two spaces, then U+200E (LRM), then `- 1.2 · …`; two spaces, U+200F (RLM), `1.2 · …`; two spaces, U+00AD (a soft hyphen), `* 1.2 · …` | row 4, three cases — the indent set is spaces, tabs, the NBSP and every `Cf` format character; today silent. The message quotes the line through `quote()`: the LRM is not in `CONTROL` and stays in the quote (a terminal prints nothing for it) | at column 0, U+200E then `- 1.2 · …` → row 4 `unreadable line` (today's behaviour, pinned): red on either side |
+| I19 *(cr3)* | one space, U+2066 (LRI, a bidi isolate), `> Epoch 2 · …`; one space, U+202E (RLO), `### Re-review for epoch 2`; one space, U+061C (ALM), `# x`; one space, U+180E, `1) 1.2 · …`; one space, U+2061, `+ 1.2 · …` | row 4, five cases — the `>`, `#` and marker shapes behind a format character; the quotes of the two bidi cases hold a space where the control stood (fix forward g) | the same five at column 0 → row 4 `unreadable line` |
+| K1 *(cr3, known limit)* | `  - - 1.2 · 2026-10-26 · owner · epics — y` (two markers behind the indent) and `  1. - 1.2 · …` | `[]` — NOT fixed, recorded: the line renders as a visibly nested bullet, which takes deliberate nesting to write; reserving it would widen §2's regex, a contract change and the second of epoch 2, so it is a known limit here and in the lib's header (S4) | `  - 1.2 · …` (one marker) → row 4 (I1); `- - 1.2 · …` at column 0 → row 4 `unreadable entry`, `number "- 1.2"` |
 
 The matrix test (one `for` over a row list, never thirty copies — `common/testing.md` § *A test that repeats a
 list*): rows = { indent ∈ `" "`, `"  "`, `"\t"` } × { line ∈ `"- 1.2 · 2026-10-26 · owner · epics — y"`, the same with
@@ -495,11 +520,15 @@ message.
 | H1 | A2 (open) under ` ## Plan changes`, under `   ## Plan changes` (three spaces) | row 3 `must read exactly`, quoting the heading as written; today `[]` — the ledger was invisible | `## Plan changes` → row 1 |
 | H2 | A2 under `## Plan changes ##`, `## Plan changes #`, `## Plan changes   ##` (trailing hashes, any count, any spacing) | row 3 `must read exactly`, three cases | `## Plan changes` → row 1 |
 | H3 | A2 under `    ## Plan changes` (FOUR spaces) | `[]` — a code block is not a heading, so no ledger is seen (opt-in by presence, C1) | three spaces → row 3 (H1) |
-| H4 | A2 under `# Plan changes`, `### Plan changes`, `##Plan changes` (no space), `##  plan changes` (two spaces after the hashes) | row 3 `must read exactly`, four cases — wider than CommonMark on purpose | `## Plan changes (epoch 1)` is still no heading → `[]` (G2); `## plan   changes` (three spaces between the words) is no near miss either → `[]`: the words' single space is part of the phrase, as in the exact heading |
+| H4 | A2 under `# Plan changes`, `### Plan changes`, `##Plan changes` (no space), `##  plan changes` (two spaces after the hashes) | row 3 `must read exactly`, four cases — wider than CommonMark on purpose | `## Plan changes (epoch 1)` is still no heading → `[]` (G2); `## plan   changes` (three spaces between the words) IS a near miss → row 3 (H6; the first draft of this row said the opposite and was wrong: the exact heading accepts any spacing, so the near miss must too) |
 | H5 | the exact `## Plan changes` with A, then ` ## Plan changes` further down with A | row 3 `two` and `## Plan changes` — exact and near-miss still count together; and `## Plan Changes` → row 3 (G2, unchanged) | — |
 | O1 | A plus `  1. 1.2 · 2026-10-26 · owner · epics — y` and ` 1) 1.2 · …` | row 4 `a ledger line stands at column 0`, two cases; today `[]` | at column 0, `1. 1.2 · …` → row 4 `unreadable entry` and `entries start with "- "` (as today: red on both sides); `- 1.2 · …` at column 0 → row 1, the twin that parses |
 | O2 | `  12. 1.2 · …`, `  123456789) 1.2 · …` (nine digits), `  1.  1.2 · …` (two spaces after the marker, `\s+`), `\t1.\t1.2 · …` | row 4, four cases | `  1234567890. 1.2 · …` (ten digits) → `[]`: not a list marker in CommonMark, not one here |
 | O3 | `  1. a numbered list` (I6), `  1. 1.2.3 is a version`, `  1.1.2 · …` (no marker: `1.1` is followed by `.`), `  2) see 1.2 above` | `[]`, four cases — a marker alone reserves nothing; the entry number must follow it | O1 |
+| H6 *(cr3)* | A2 under `## plan   changes` (three spaces between the words), `## plan` + a TAB + `changes`, ` ## Plan  changes`, `### Plan  changes`, `## Plan  changes ##` | row 3 `must read exactly`, five cases — silent at `cd3ccde` (the near miss spelled the phrase with one space on the unfolded line), red at `dce67ed` (it folded); the regression of code round 3 | `##  Plan changes` and `## Plan  changes` (the extra spaces, lower case kept) at column 0 → the EXACT heading: `fold` makes both `## Plan changes`, so A2 under them → row 1 and no row 3 — the near miss is never stricter than the exact test |
+| P1 *(cr3)* | B with a body row whose Action cell reads `c`, TWO backslashes, a pipe, ` d` — GFM: an escaped backslash, then a bare pipe | row 7 `row 1 has 5 cells, not 4` — a pipe is escaped only when an ODD number of backslashes precedes it; today `[]` (the one-backslash lookbehind) | C14's single backslash → `[]` (4 cells); THREE backslashes (an escaped backslash, then an escaped pipe) → `[]`, 4 cells — the lib unescapes the PIPE only (the cell keeps `c`, two backslashes, `| d`); what a renderer makes of the remaining backslashes is not the check's business, since no header word or verdict holds one |
+| P2 *(cr3)* | B's header with its last cell written `Action`, one backslash, a pipe, ` x` | row 7 `header must read`, quoting the header with that cell as `Action \| x` (unescaped — the reader's view); 4 cells, so no `5 cells` | the header as written → `[]` |
+| P3 *(cr3)* | a body row of four cells whose third is `fits`, one backslash, a pipe — written `\| a \| b \| fits` + backslash + `\| \| d \|` (the escaped pipe glued to the verdict) | row 7 `verdict "fits\|"` — still 4 cells, the pipe part of the cell | the same row with `fits` → `[]` |
 
 **The stop and the wiring** (`tools/plan-lifecycle.test.mjs`): W6, W6b, W6c, W9 as in S2 (fixed there); W10 *(stop)*
 for the resolved parent name (S3, *fix forward*, a).
@@ -672,6 +701,7 @@ plans, not a refactor — which is why the marker group's widening is a ledger e
 |---|---|---|
 | C13 | A2 (open) under `    ## Plan changes` (four spaces: a code block, not a heading) | three spaces → finding 3 `must read exactly` (S1's H1/H3) |
 | C14 | B with the body row `\| a \| b \| fits \| c \\\| d \|` — a GFM-escaped pipe inside the Action cell (S3 fix forward h) | the pipe unescaped, `\| a \| b \| fits \| c \| d \|` → finding 7 `row 1 has 5 cells, not 4` |
+| C15 *(cr3)* | B with a body row whose Action cell holds `c`, THREE backslashes, a pipe, ` d` (an escaped backslash, then an escaped pipe — 4 cells) | TWO backslashes (an escaped backslash, then a bare pipe) → finding 7 `5 cells` (S1's P1) |
 
 ### Red cases — one per row of the parent's findings table
 
@@ -696,6 +726,8 @@ is the substring the test asserts with `assert.match`; S3 writes the full messag
 | 4h *(2.1)* | A plus `  1. 1.2 · 2026-10-26 · owner · epics — y` and ` 1) 1.2 · …` (S1's O1; O2–O3 and the matrix's `1. `/`1) ` rows are the rest) | `a ledger line stands at column 0`; at column 0 → `unreadable entry` (as today) |
 | 1b *(2.1)* | A whose entry line holds a lone `\r` before `- 1.2 · …` (S1's L1; L2–L4 are the rest) | `epoch 1 has 2 changes`, `1.2` — the same findings as with `\n` |
 | 3e *(2.1)* | A2 under ` ## Plan changes` and under `## Plan changes ##` (S1's H1–H5) | `must read exactly` and `## Plan changes` |
+| 3f *(cr3)* | A2 under `## plan   changes` and under ` ## Plan  changes` (S1's H6) | `must read exactly` |
+| 7h *(cr3)* | B with a body cell `c`, two backslashes, a pipe, ` d` (S1's P1) | `5 cells` |
 | 5a | A with entry `2.1` in place of `1.1` | `2.1` and `above the current epoch` |
 | 5b | entries `1.1` and `1.3` (state `stopped`, status `STOPPED`) | `1.3` and `1..n` |
 | 5c | two entries numbered `1.1` | `two branches each recorded a change — renumber; the merge is the stop` |
@@ -921,12 +953,16 @@ items, (g)–(j), all accepted. Same discipline: RED first where behaviour chang
 | | Finding | RED test first | The fix |
 |---|---|---|---|
 | 2.1-a | A lone CR is one line to the lib (`ledgerFindings`: `outsideFencedBlocks(folded(text))`, and `folded` replaces CRLF only), a line ending to CommonMark — an entry, an epoch line or a record heading glued by `\r` hides (verified) | L1–L4 | `outsideFencedBlocks(folded(text).replace(/\r\n?/g, "\n"))` in `ledgerFindings` only; `folded` in `tools/lib/rule-body.mjs` is NOT changed (hashed rule bodies; `node tools/rule-bodies.mjs` stays in step as the proof). The lib's header comment names the CR rule beside the CRLF one |
-| 2.1-b | `NEAR_HEADING = /^## plan changes$/i` misses an indented, closing-hashes or wrong-level heading, so the ledger under it is invisible (verified, seven shapes) | H1–H5, C13 | `NEAR_HEADING = /^ {0,3}#{1,6}\s*plan changes(?:\s+#+)?\s*$/i`, tested on `raw.trimEnd()` (not `fold(raw)`, which would shrink four spaces to one and make a code block a near miss); `HEADING` and its finding text unchanged; exact and near-miss still counted together for *two headings* |
+| 2.1-b | `NEAR_HEADING = /^## plan changes$/i` misses an indented, closing-hashes or wrong-level heading, so the ledger under it is invisible (verified, seven shapes) | H1–H5, C13 | `NEAR_HEADING = /^ {0,3}#{1,6}\s*plan\s+changes(?:\s+#+)?\s*$/i` (the `\s+` between the words: row k), tested on `raw.trimEnd()` (not `fold(raw)`, which would shrink four spaces to one and make a code block a near miss); `HEADING` and its finding text unchanged; exact and near-miss still counted together for *two headings* |
 | 2.1-c | `RESERVED_PREFIX`'s marker group `[-*+]` does not know an ordered-list marker: `  1. 1.2 · …` and ` 1) 1.2 · …` hide (verified) — **entry 2.1 of the parent, the contract change** | O1–O3, the matrix's six new rows, 4h | the group becomes `(?:[-*+]|\d{1,9}[.)])`; the contract-pin test moves to the §2 regex as revised; I6's `1. a numbered list` stays green |
-| g | `clean()`'s `CONTROL = /[\u0000-\u001f\u007f]/g` lets the C1 controls (U+0080–U+009F, e.g. NEL, CSI) and the bidi controls (U+202A–U+202E, U+2066–U+2069) through to the terminal (verified: a source `own\u0085er` and `own‮er` reach the message raw) | T7 extended: values holding `\u0085`, `\u009b`, `‮` (RLO) and `⁦` in each of the six positions → no message holds them (a space stands there); the `\u001b` rows stay | `CONTROL = /[\u0000-\u001f\u007f-\u009f‪-‮⁦-⁩]/g`; nothing else in `clean()` moves |
-| h | A GFM-escaped `\|` inside a re-review table cell is split as a cell boundary (`addTableRow` splits on every `\|`): `\| a \| b \| fits \| c \\\| d \|` is `row 1 has 5 cells, not 4` (verified) | C14: the escaped row → `[]`; its twin, the unescaped extra pipe → `5 cells` (red as today) | split on unescaped pipes only — `split(/(?<!\\)\|/)` after stripping one unescaped leading and trailing pipe — and unescape `\\\|` → `\|` in each cell, so a quoted header or verdict shows what the reader sees. A backslash that is itself escaped (`\\\\\|`) is not settled: no plan writes one |
+| g | `clean()`'s `CONTROL = /[\u0000-\u001f\u007f]/g` lets the C1 controls (U+0080–U+009F, e.g. NEL, CSI) and the bidi controls (U+202A–U+202E, U+2066–U+2069) through to the terminal (verified: a source `own\u0085er` and `own\u202eer` reach the message raw) | T7 extended: values holding `\u0085`, `\u009b`, `\u202e` (RLO) and `\u2066` in each of the six positions → no message holds them (a space stands there); the `\u001b` rows stay | `CONTROL = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g`; nothing else in `clean()` moves |
+| h | A GFM-escaped `\|` inside a re-review table cell is split as a cell boundary (`addTableRow` splits on every `\|`): `\| a \| b \| fits \| c \\\| d \|` is `row 1 has 5 cells, not 4` (verified) | C14: the escaped row → `[]`; its twin, the unescaped extra pipe → `5 cells` (red as today) | split on unescaped pipes only — `split(/(?<!\\)\|/)` after stripping one unescaped leading and trailing pipe — and unescape `\\\|` → `\|` in each cell, so a quoted header or verdict shows what the reader sees. An escaped backslash before the pipe (an EVEN number of backslashes) is settled in (m): the pipe is then a boundary |
 | i | `checkRecords` groups records with a spread copy per record — `byEpoch.set(k, [...(byEpoch.get(k) ?? []), record])` (quadratic in records of one epoch; coai code round, minor) | none: behaviour unchanged; G11, G11b and row 7a cover the grouping | get-or-create the array once (`let own = byEpoch.get(k); if (own === undefined) byEpoch.set(k, own = []); own.push(record)`) |
 | j | Document drift in this file: the W9 stub snippet in E1.S2 showed the first draft's hand-listed exports; the RED-GREEN-RED row for the `checkChangeLedgers` call did not list W9b and W10 | none: a document fix, done in this revision | the snippet now shows the `export * from <lib>?real` form as built; the row lists W2, W3, W7, W9, W9b, W10 |
+| k *(cr3)* | `NEAR_HEADING` spells `plan changes` with ONE space but runs on `raw.trimEnd()`, so `## plan   changes`, a tab between the words, ` ## Plan  changes`, `### Plan  changes` and `## Plan  changes ##` are silent — a regression: at `dce67ed` the test ran on the folded line and they were red — while the exact `HEADING` runs on `fold(raw)` and takes any spacing (verified, six shapes) | H6, 3f; H4's `## plan   changes` twin flipped from `[]` to row 3 | `/^ {0,3}#{1,6}\s*plan\s+changes(?:\s+#+)?\s*$/i`; still on `raw.trimEnd()`, four leading spaces still a code block and nothing |
+| l *(cr3)* | `INDENT`'s enumerated set misses U+200E/U+200F, U+061C, U+00AD, U+180E, U+2061–U+2064 and the bidi controls U+202A–U+202E, U+2066–U+2069: two spaces, an LRM, `- 1.2 · …` is silent; at column 0 the same line is red (verified, eight characters) | I18, I19 | `INDENT` = spaces, tabs, the NBSP and `\p{Cf}` with the `u` flag (S1 *The reserved prefixes*, the "Trimmed" bullet carries the regex); nothing else in the lib takes a Unicode property |
+| m *(cr3)* | `addTableRow` splits on a pipe not preceded by ONE backslash and unescapes every backslash-pipe pair, so a pipe behind TWO backslashes (an escaped backslash, then a bare pipe) reads as escaped — 4 cells where GFM has 5 (verified); the one-backslash lookbehind cannot count | P1 (two backslashes → `5 cells`), P2, P3; C14 and the three-backslash case stay `[]` | one left-to-right scan of the row, no regex: a run of n backslashes followed by a pipe — n odd: the pipe is cell text and the run loses one backslash; n even (0 included): the pipe is a boundary and the run stays; a run not followed by a pipe is kept as written. The scan does the split AND the unescape, so both agree; the leading and trailing pipe are stripped by the same rule |
+| n *(cr3)* | the test helper `asQuoted` (`tools/plan-ledger.test.mjs:630`) retypes the OLD `CONTROL` (C0 and DEL), so after (g) it disagrees with the lib on C1 and bidi characters — `common/testing.md` § *A test that repeats a list* | none: a test-helper fix; I18/I19's bidi cases and T7's C1 rows exercise it | `asQuoted` = `clean(line)` in quotes, with `clean` imported from the lib (it is exported): the lib's regex is the one source, never a retyped copy |
 
 ### Commands
 
@@ -962,10 +998,15 @@ Revert the line the behaviour depends on, run, see the named tests fail with the
 | *(2.1)* `NEAR_HEADING` back to `/^## plan changes$/i` | H1, H2, H4, H5's near-miss half, 3e; H3, C13 and G2 stay green |
 | *(2.1)* the marker group back to `[-*+]` | O1, O2, 4h, the matrix's six `1. `/`1) ` rows; O3 and I6 stay green |
 | *(h)* `addTableRow` back to `split("\|")` | C14's clean case; its twin stays red-as-expected |
+| *(cr3, k)* `NEAR_HEADING` with one space between the words again | H6, 3f, H4's flipped twin; H1–H5's other cases, H3, C13 and G2 stay green |
+| *(cr3, l)* `INDENT` back to the enumerated set | I18, I19; I8 and I16 stay green — the old set is inside the new one |
+| *(cr3, m)* the pipe scan back to the one-backslash lookbehind and `replaceAll` | P1, 7h; C14, C15, P2 and P3 stay green |
+| *(g)* `CONTROL` back to C0 and DEL | T7's C1 and bidi rows, and I19's two bidi quotes |
 
-- **Done when.** Every S2 and S1 test passes; the eleven reverts each went red as listed and were restored; the seven
+- **Done when.** Every S2 and S1 test passes; the fifteen reverts each went red as listed and were restored; the seven
   commands above are green; the coder's summary quotes one RED message and the GREEN count; the *fix forward* items —
-  (a)–(f), then 2.1-a to 2.1-c and (g)–(j) — are in, their RED tests watched red first.
+  (a)–(f), then 2.1-a to 2.1-c and (g)–(n) — are in, their RED tests watched red first; K1 is green as a documented
+  limit, not as a fix.
 
 ## E1.S4 — The estate dry run, the header comments, S6b
 
@@ -1006,7 +1047,8 @@ and the two commits compared.
 
 - `tools/lib/plan-ledger.mjs`: a header in the house style of `tools/plan-lifecycle.mjs` — what the lib reads (the
   parent's §2, by path), that it reads the checkout and never git history, and S1 decision 5: what the check cannot see
-  — a plan with no ledger, a change nobody recorded, code written during a stop; a stopped plan is clean by design,
+  — a plan with no ledger, a change nobody recorded, code written during a stop, an indented line behind two list
+  markers (`  - - 1.2`, the known limit of code round 3); a stopped plan is clean by design,
   and the halt is the rule's (`common/plan-change-control.md`, E2).
 - `tools/plan-lifecycle.mjs`: one paragraph in the header naming the new finding class `changes`, read over `todo/` only.
 
@@ -1152,6 +1194,41 @@ shape (`^ {0,3}#{1,6}\s*plan changes(\s+#+)?\s*$`, any case) over `todo/` and `r
 `wsl_care` and this worktree found only `## Plan changes` at column 0 of the parent plan (its live heading, line 16) and the
 §2 example inside a fence (line 231, not read); a search for a lone CR found one file, in a `research/` folder (not read, no
 ledger).
+
+| Checkout | main exit | branch exit | `changes` lines in the diff | Note |
+|---|---|---|---|---|
+| `dew_flow_benchmark` | 1 | 1 | 0 | one finding, the same in both runs |
+| `dew_flow_benchmark-wt` | 0 | 0 | 0 | no `todo/` + `research/` pair — nothing to check |
+| `dew_flow_connect_other_ais` | 0 | 0 | 0 | clean |
+| `dew_flow_connect_other_ais-wt` | 0 | 0 | 0 | no `todo/` + `research/` pair — nothing to check |
+| `dew_flow_conventions` (the `main` checkout) | 0 | 0 | 0 | clean |
+| `dew_flow_creds_for_devs` | 1 | 1 | 0 | 14 findings, the same in both runs |
+| `dew_flow_rag_qln` | 1 | 1 | 0 | 6 findings, the same in both runs |
+| `dew_flow_sidecar_rust` | 0 | 0 | 0 | clean |
+| `dew_flow_vscode_kit` | 0 | 0 | 0 | clean |
+| `wsl_care` | 0 | 0 | 0 | clean |
+| `wt-plan-change-control` (closed epoch 1, its record, open epoch 2) | 0 | 0 | 0 | `plan-lifecycle: clean.` |
+
+Diff count over the whole table: **0**. `dew_flow_mcp` is not on this machine and is checked on its remote before the release (parent S9).
+
+**Fourth run, 2026-10-29 — the third fix-forward** (S3 rows k–n, the cases marked *(cr3)*), recorded by the E1 coder (Sonnet) on
+branch `feat/plan-change-control-e1` at `cd3ccde` + uncommitted fix-forward (full sha: the `git rev-parse HEAD` of the run below).
+Compared as in the runs above: `main`'s checker (`git show main:tools/plan-lifecycle.mjs`, from the scratch folder) against the
+worktree's `tools/plan-lifecycle.mjs` with its changed lib, each given every `/home/jinx/git/dew_flow_*` checkout,
+`/home/jinx/git/wsl_care` and the worktree as `argv[2]`.
+
+**Prediction, written before this run's first command:** zero `changes` lines in the diff of the two outputs, for every
+checkout, and byte-identical outputs. What this run widens is what is READ as a near-miss heading (any spacing between
+the words `plan` and `changes`, so a line of up to three spaces, one to six `#` and those two words) and what is HIDDEN
+behind an indent (every format character); both can only add findings to a file that carries a ledger or a heading of that
+shape, and the estate has none: a multi-line grep with the new spacing is run beside the diff and expected to find only this
+worktree's parent plan (its live heading and the fenced §2 example). The pipe scan and the test-helper change touch nothing
+a plan without a ledger can show. The parent plan (closed epoch 1, its record, open epoch 2) must still read clean.
+
+**Result of the fourth run: the prediction held.** Zero `changes` lines in the diff for every checkout, and `diff` printed nothing for
+any of the eleven (run at `cd3ccdeb0c727c3e311568fbcd59eed0f97f1e26` + uncommitted fix-forward). The multi-line grep with the new
+spacing (`^ {0,3}#{1,6}\s*plan\s+changes(\s+#+)?\s*$`, any case) over `todo/` and `research/` of the seven `dew_flow_*` checkouts,
+`wsl_care` and this worktree found only the parent plan's live heading (line 16) and its fenced §2 example (line 231, not read).
 
 | Checkout | main exit | branch exit | `changes` lines in the diff | Note |
 |---|---|---|---|---|

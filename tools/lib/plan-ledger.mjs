@@ -16,8 +16,11 @@
 // re-review and its reverts; the halt is the rule's, `common/plan-change-control.md`, and the review server's when it
 // refuses `review_code` until the new `proceed`); an entry dated before its epoch, or entries dated out of order (the
 // check judges structure and count, not when); where the section stands in the file (the rule says under the status
-// block; the check reads it anywhere). What it does see is exactly the grammar below, and every line it cannot read is
-// a red, never a skip: an entry that fails to parse would otherwise lower the count in silence.
+// block; the check reads it anywhere); an indented line behind TWO list markers (`  - - 1.2 · …`, `  1. - 1.2 · …`),
+// which a renderer shows as a visibly nested bullet that takes deliberate nesting to write — reserving it would widen
+// the parent's § 2, a contract change, so it is a known limit (code round 3, 2026-10-29). What it does see is exactly
+// the grammar below, and every line it cannot read is a red, never a skip: an entry that fails to parse would otherwise
+// lower the count in silence.
 //
 // The grammar, in one place. Text is folded (CRLF = LF) and a lone CR becomes a line ending too, as CommonMark reads it
 // (here and not in the shared `folded`, which feeds the hashed rule bodies), then stripped of fenced blocks through
@@ -26,15 +29,16 @@
 // to three leading spaces, closing hashes — is a finding, never an invisible ledger (four spaces are a code block: no
 // heading, no ledger). Every pattern runs on a line after `trimEnd()` and with each run of spaces or tabs folded to ONE
 // space, except the tests that read the original: the near-miss heading and the two on an indented line. A line that
-// starts with a space or a tab is free text — EXCEPT one that, with its indent (and the invisible characters a renderer
-// ignores) stripped, starts like a ledger line: an entry (`- 1.2`, `* 1.2`, `1. 1.2`, a bare `1.2`), an epoch line
-// (`>`) or a heading (`#`), whatever follows. A renderer shows such a line as a list item, a quote or a heading, which
-// a reader counts, so it is a finding — `RESERVED_PREFIX`, parent § 2 — and is never parsed, never counted. Free text
-// therefore may not begin with an entry-shaped number, `>` or `#`. Fields are separated by " · " (U+00B7) and the cause
-// follows " — " (U+2014); `|`, `--`, `-` and the en dash are refused by a message that names the expected character,
-// because a second spelling of the format would be a second grammar to keep in step forever. Keywords and values are
-// case-sensitive. A table cell may hold a backslash-escaped pipe. Every value a message quotes goes through `clean`:
-// control characters (ASCII, C1, bidi overrides) become a space and a long one is cut.
+// starts with a space or a tab is free text — EXCEPT one that, with its indent (and every format character, which a
+// renderer ignores) stripped, starts like a ledger line: an entry (`- 1.2`, `* 1.2`, `1. 1.2`, a bare `1.2`), an epoch
+// line (`>`) or a heading (`#`), whatever follows. A renderer shows such a line as a list item, a quote or a heading,
+// which a reader counts, so it is a finding — `RESERVED_PREFIX`, parent § 2 — and is never parsed, never counted. Free
+// text therefore may not begin with an entry-shaped number, `>` or `#`. Fields are separated by " · " (U+00B7) and the
+// cause follows " — " (U+2014); `|`, `--`, `-` and the en dash are refused by a message that names the expected
+// character, because a second spelling of the format would be a second grammar to keep in step forever. Keywords and
+// values are case-sensitive. A pipe behind an odd number of backslashes is cell text, not a boundary. Every value a
+// message quotes goes through `clean`: control characters (ASCII, C1, bidi overrides) become a space and a long one is
+// cut.
 //
 // Dependency-free on purpose: `plan-lifecycle.mjs` runs in every consumer's CI from the mounted rules, before any
 // `npm ci`, so this file imports from `./rule-body.mjs` and from nothing else.
@@ -61,9 +65,10 @@ export const RESERVED_PREFIX = /^(?:[>#]|(?:(?:[-*+]|\d{1,9}[.)])\s+)?[1-9]\d*\.
 const HEADING = /^## Plan changes$/;
 /** What a reader takes for the ledger's heading and the exact one is not: another case, level or spacing, one to three
  *  leading spaces, closing hashes. Tested on the original line after `trimEnd()` — `fold` would shrink four leading
- *  spaces to one and make a code block a heading. Wider than CommonMark on purpose: a near miss costs one loud finding
+ *  spaces to one and make a code block a heading — so the space between the words is `\s+`: the exact heading runs on
+ *  the folded line and takes any spacing, and the near miss must never be stricter than the exact test. Wider than CommonMark on purpose: a near miss costs one loud finding
  *  with the fix in it, a miss costs the whole ledger. */
-const NEAR_HEADING = /^ {0,3}#{1,6}\s*plan changes(?:\s+#+)?\s*$/i;
+const NEAR_HEADING = /^ {0,3}#{1,6}\s*plan\s+changes(?:\s+#+)?\s*$/i;
 const SECTION_END = /^#{1,2} /;
 const EPOCH_LINE = new RegExp(
   `^> Epoch ([1-9]\\d*) · approved (\\d{4}-\\d{2}-\\d{2}) · by (${APPROVERS.join("|")}) · state: (${STATES.join("|")})$`,
@@ -76,9 +81,10 @@ const TABLE_HEADER = ["Work", "Where", "Verdict", "Action"];
 const TABLE_SEPARATOR = /^:?-+:?$/;
 /** Control characters a terminal acts on: ASCII and C1 (NEL, CSI …), and the bidirectional overrides and isolates. */
 const CONTROL = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g;
-/** The indent of a free-text line and the characters a renderer ignores beside it: space, tab, NBSP, the zero-width
- *  spaces and joiners, the word joiner and the byte-order mark. `trim()` is NOT this set (it keeps U+200B). */
-const INDENT = /^[ \t\u00a0\u200b-\u200d\u2060\ufeff]+/;
+/** The indent of a free-text line and what a renderer prints nothing for beside it: space, tab, NBSP and every format
+ *  character (category `Cf` — zero-width spaces and joiners, directional marks and isolates, the soft hyphen, the byte-
+ *  order mark …), so no enumeration can fall behind. `trim()` is NOT this set (it keeps U+200B). */
+const INDENT = /^[ \t\u00a0\p{Cf}]+/u;
 export const QUOTE_LIMIT = 160;
 
 const FIELD_SEPARATOR = '" · " (U+00B7)';
@@ -279,10 +285,41 @@ function parse(lines, { start, end }, say) {
   return model;
 }
 
+/**
+ * The cells of one table row, read left to right. A pipe behind an ODD number of backslashes is escaped (GFM): it is
+ * cell text and its run loses one backslash; behind an even number (none included) it is a boundary and the run stays.
+ * One scan does the split AND the unescape, so the two cannot disagree. The row's leading pipe and trailing boundary
+ * pipe are not cells.
+ */
+function rowCells(line) {
+  const cells = [""];
+  let boundaryAtEnd = false;
+  for (let i = 0; i < line.length; ) {
+    let end = i;
+    while (line[end] === "\\") end += 1;
+    const run = end - i;
+    boundaryAtEnd = false;
+    if (line[end] !== "|") {
+      cells[cells.length - 1] += line.slice(i, end === i ? i + 1 : end);
+      i = end === i ? i + 1 : end;
+    } else if (run % 2 === 1) {
+      cells[cells.length - 1] += `${"\\".repeat(run - 1)}|`;
+      i = end + 1;
+    } else {
+      cells[cells.length - 1] += "\\".repeat(run);
+      cells.push("");
+      boundaryAtEnd = true;
+      i = end + 1;
+    }
+  }
+  cells.shift();
+  if (boundaryAtEnd && cells.length > 1) cells.pop();
+  return cells.map((cell) => cell.trim());
+}
+
 /** One table row of a record: the separator is skipped, the first other row is the header, the rest are body rows. */
 function addTableRow(record, line) {
-  // A pipe escaped with a backslash is part of a cell (GFM); the cell shows what the reader sees.
-  const cells = line.replace(/^\|/, "").replace(/(?<!\\)\|$/, "").split(/(?<!\\)\|/).map((cell) => cell.trim().replaceAll("\\|", "|"));
+  const cells = rowCells(line);
   if (cells.every((cell) => TABLE_SEPARATOR.test(cell))) return;
   if (record.header === null) record.header = cells;
   else record.rows.push(cells);
