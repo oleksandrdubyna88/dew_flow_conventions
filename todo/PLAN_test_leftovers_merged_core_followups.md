@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28.** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28.** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -168,6 +168,201 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
 - **Fix when re-opened.** Flag an age-selected removal (`-mmin`, `-mtime`, `-newermt` with `rm`, `-delete` or `xargs rm` after it)
   whatever its name source. RED first: the exact line above must be listed.
 - **When.** Before the barrier is declared closed on a machine that runs a deploy runner, or at the next change to the scan.
+- **Re-assessed 2026-10-28, before the build — the gap is the VARIABLE, not the age.** Measured with `node tools/leftovers-check.mjs
+  --repo <fixture>` on this branch's base:
+  - the deploy script that triggered F12 holds `PREFIX='testsToDelete-<repo>-preflight-'` — a LEGACY literal. The guard already
+    reports that line (`legacy-name`), and the pattern cannot reach an owner-form name (no owner starts with a letter-continued
+    segment), so it is no barrier threat;
+  - a file holding `P='testsToDelete-'` and then `find "${TMPDIR:-/tmp}" -maxdepth 1 -name "${P}*" -mmin +60 -exec rm -rf {} +` and
+    `rm -rf "$TMPDIR/$P"*` is reported **clean** — it removes every user's leftovers, and neither the guard nor the barrier scan
+    sees it. That is the defect.
+  Flagging every age test is the wrong fix: rule §4 lets age SELECT (the janitor keeps what is younger than 10 minutes), and a log
+  retention line (`find "$LOG_DIR" -name '*.log' -mtime +14 -delete`) is no sweep at all; one line cannot tell selecting from
+  authorising.
+- **Fix.** In `tools/lib/sweeper-scan.mjs`, ONE file-level entry point, used by every reader (`broadLines`, the scan's
+  `classifyText` `:198-208`, the guard's per-line loop `tools/leftovers-check.mjs:404`):
+  1. `prefixBindings(text)` — the names assigned a LITERAL value that holds the prefix word (case-insensitive), in the same file:
+     shell (`NAME=`, with `export`/`local`/`readonly`/`declare` before it), JavaScript/TypeScript (`const|let|var NAME =`), Python
+     (`NAME =`), PowerShell (`$NAME =`); quoted with `'`, `"` or a backtick, or bare. A value with an interpolation (`$`, `${`, `{`)
+     binds nothing: its owner segment cannot be read, and the line that uses it stays as today. **Conservative binding** (plan
+     gate finding 1): a name assigned a prefix value ANYWHERE in the file is bound on every line, whatever the scope, order or a
+     later reassignment — the error is then a false `broad`, which keeps the barrier closed (the safe direction), never a
+     missed sweep. **Aliases** (finding 5): an assignment whose whole value is a reference to a bound name (`P="$BASE"`,
+     `P = BASE`) binds too, to a fixed point (at most a few passes; a cycle binds nothing more).
+  2. `expandLine(line, bindings)` — `${NAME}`, `$NAME` (and `$env:NAME`) become the value; a bare identifier `NAME` becomes the
+     value in quotes for a binding made in JavaScript, TypeScript or Python syntax — only as a whole token (finding 3): not part
+     of a longer identifier, not after a `.` (a property), and not inside a string literal. The binding's own line is not
+     expanded. A concatenation needs nothing more: measured 2026-10-28, `fs.rmSync("testsToDelete-" + id)`,
+     `startsWith("testsToDelete-")` with a removal, and Python's `startswith(…)` with `shutil.rmtree` already classify broad.
+  3. `classifyLine` runs on the expanded line; the reported line number, the allowlist's hash and the message stay the ORIGINAL
+     line's. A line the expansion changes is broad only if its expanded form is broad, so nothing that is clean today becomes red
+     unless a prefix-bound variable reaches a sweep shape.
+  Rule §7's `owner-blind` row gains "written literally or through a variable the same file assigns the prefix — a name from
+  another file, the environment or an argument is not traced" (finding 0: the guarantee is narrowed in writing, where a reader of
+  the barrier's verdict sees it); the header of `sweeper-scan.mjs` says the same; `research/rule-bodies.json` moves.
+- **Tests, RED first** (`tools/sweeper-scan.test.mjs`, and one guard test in `tools/leftovers-check.test.mjs`): the two lines above
+  are broad, for a shell binding; `const PREFIX = "testsToDelete-"` with `names.filter((n) => n.startsWith(PREFIX))` and an
+  `rmSync` → broad; the same in Python with `startswith(PREFIX)` and `shutil.rmtree` → broad; an owner-aware value
+  (`'testsToDelete-u1000-'`) → owner-aware; an interpolated value → no binding, unchanged verdict; a legacy literal value → null,
+  and the guard still reports its `legacy-name`; a log-retention line → null; an alias chain → broad; a bare identifier that is
+  only part of a longer name or a property → no expansion; the REAL guard (`main`/the CLI of `tools/leftovers-check.mjs`, as
+  the file's existing fixture-repository tests call it) over a git repository the test builds with the binding and the removal
+  in ONE file and a second file using the same name unbound, lists the bare-prefix lines as `owner-blind` with that file's path
+  and their original line numbers and nothing for the second file (finding 2); the scan's allowlist still passes the janitor's line by
+  its original hash. The repository's own self-scan (`tools/sweeper-scan.test.mjs:105`, every tracked file holds no broad line)
+  stays green — a binding in this repository's own tools that the expansion turns red is judged, not exempted.
+- **Not in this change, recorded as limits:** a binding made in ANOTHER file, an environment variable, a value built over several
+  lines, or a name passed as an argument — the scan reads one file at a time. Age as the authoriser of an owner-aware removal is
+  not detected by a line scan; the janitor is the one remover (rule *The janitor*), and review owns the rest.
+- **Done when.** The RED tests were observed failing for the stated reason, then pass; the whole suite, `npm run check`,
+  `node tools/rule-bodies.mjs` and `node tools/plan-lifecycle.mjs` are green; this section says F12 is fixed.
+- **Plan gate** (coai, 2026-10-28): `proceed`, 2 of 2 reviewers, 6 findings; 0, 1, 2, 3 and 5 accepted and written in above;
+  4 (a quoted concatenation would not classify) rejected by the measurement in step 2.
+- **Deviation (2026-10-28, judged at build):** the plan's conservative binding made this repository's own janitor red on 7 lines (456, 458, 465,
+  475, 501, 503, 543) through `RX`/`GLOB`, assigned on its allowlisted inventory line 156. A binding made on a line the allowlist passes
+  (same file, line number and line hash) does not propagate: `classifyLines` derives those lines itself from the allowlist and the file
+  (`classifyLines(text, { allowlist, file, honourMarker })`, with the one `passes` function), and `--update-allowlist` writes only lines
+  broad on their own, so a binding never widens the file it writes. The risk — a changed janitor that keeps line 156 byte-identical could
+  hide a new use of `$RX` — is no wider than before F12 (such a use was invisible then too) and is closed by F11 (the whole janitor's hash).
+  Two widenings of the pass are known and are closed by F11 as well: (a) an alias `X="$RX"` added anywhere in the janitor stays unbound,
+  so its uses are hidden; (b) `--update-allowlist` admits every janitor line that is broad on its own, and one that also assigns sanctions
+  its variables' uses, while the diff a reviewer reads shows only that line. Until F11, a change to the janitor is reviewed by a person.
+- **Review round (2026-10-28, coai code gate 8 of 8 and a judge):** the binding code moved to `tools/lib/prefix-bindings.mjs`. What changed:
+  `${NAME<operator>…}` is a use (not the length `${#NAME}`); the value of a name is its WHOLE right-hand side with the known bindings
+  written into it, bound when ONE literal piece holds the prefix word, to a true fixed point (the cycle guard is a value-length and a
+  values-per-name bound, not a pass cap), so a default, a path and an owner interpolation bind, and `'<prefix>-' + owner + '-'` is
+  owner-aware, not broad; the two-piece spelling this family uses (`"teststo" + "delete"`) binds nothing; a line carrying the transition
+  marker binds nothing for a caller that honours it; every combination of the values of the names a line uses is read (above 256 readings
+  the line is judged broad); an assignment's own right-hand side is not read as a use; the Python string prefix class includes `f`.
+- **Limits, recorded 2026-10-28 (not fixed in this change):** Python f-strings at the USE (`f'/tmp/{PREFIX}*'`, `Path(...).glob(f'{PREFIX}*')`);
+  a concatenated glob with the removal on another line (`glob.glob('/tmp/' + PREFIX + '*')` then `shutil.rmtree(p)`; JS `rimraf('/tmp/' + P + '*')`);
+  quoted globs (`[[ "$n" == "$P"* ]]`, a `"$P"*)` case arm — the glob shape does not accept a quote before `*`, which also missed literals before
+  F12); Python written without PEP 8 spacing (read as shell); a second assignment on one shell line (`local a=0 P='…'`), a second JS
+  declarator (`const A = 1, P = '…'`), shell arrays, PowerShell `[string]$P`, `$script:P`/`$global:P` and PowerShell's case-insensitive names;
+  Fixed in this change from that list: the Python `f` string prefix at the binding (a test). Added after round 3:
+  - **J1** — a value whose prefix word is split over two literal pieces (`'teststo''delete-'`, `"teststo" + "delete-"`) binds nothing: this
+    family's own spelling of "not the prefix" for detector and test code. A real sweeper written that way is missed (F14).
+  - **J2** — what binds from a script operand that is not string-shaped: each ORIGINAL string literal holding the word (`'W-' || x`, a
+    conditional expression, PowerShell `-replace`); a regex literal, an arrow, an object, a command substitution and an environment name that
+    merely holds the word bind nothing; a path-join call (`PATH_JOIN_CALLS`) binds only with literals or names as arguments. Added in round 5: a
+    bound name passed to a call other than a path join or a case conversion, or reached through a member access, binds nothing (`'{}-'.format(BASE)`,
+    `'%s-' % BASE`, `[a, BASE].join('/')`, `BASE.concat('-')`, `BASE.trim()`, shell `$(echo "$BASE" | tr …)` and `$(printf '%s-' "$BASE")`); a real
+    sweeper written so is missed. A right-hand side is read
+    to 1024 characters: past that only its literals and word-runs bind.
+  - **J3** — `'W-' + STAR`: any non-literal operand after the prefix reads as an owner segment, so the use is owner-aware (missed).
+- **Expected fleet work:** measured by the judge with a machine scan over one host's checkouts, the change reports 143 MORE owner-blind lines than
+  before, all in test or detector code that spells sweep text through a variable (a consumer's dev-VM shell test that builds `find … '${p}-*' -delete`
+  strings from `local p=<prefix>`; the private sibling's dev-env tests and its leftover and sweeper libraries) — none a real sweeper. They are false
+  positives in the safe direction: they keep the barrier closed until those files spell the prefix in two pieces (this repository's own practice,
+  which the binding reader honours), or carry the transition marker.
+- **Round 3 (2026-10-28):** a string literal with something after it binds (`'W-'.toLowerCase()`, `||`, a conditional, `-replace`, `.ToLower()`) — these were
+  broad at `0dce2ca` and null at `f7926cd`; an alias assigned and used on one line is read (`P=$B; rm -rf /tmp/$P*`); the span an assignment
+  occupies is removed by offset, not by its first textual match; a name past its value bounds is marked `overflow` and a line that uses it is
+  judged broad; `classifyLines` returns null for a line the allowlist passes, so no caller checks it again; the prefix word is tested on the
+  whole text before any line is classified; a right-hand side is read to 1024 characters and an operator tail of a `${NAME…}` use to 512, so an
+  unclosed bracket or `${P:` on a 100000-character line takes tens of milliseconds, not seconds.
+- **Round 4 (measured on real compliant code):** a machine scan over the private sibling's main checkout reported 53 owner-blind lines at round 3 (51 in one
+  test file that builds owner-aware names, one in each of two provisioning tests), none a sweeper, against none at the base release. The binding reader
+  had bound 22 names there by taint: a name given to a call or a member access (`volumeFiles(s.from)`) "held the word in a literal" once expansion had
+  written the value in, and a template cycle grew until the name overflowed. Now only a string-shaped value binds (a literal, a template or word of
+  literals and names, a bound name, a call of `PATH_JOIN_CALLS` with such arguments); the word comes from an original literal or a bound name's value;
+  a name's own placeholder and that of a name built from it stays a placeholder; a regular-expression literal is not a place where a name is a use. The
+  other two lines were a bound name (a listing query) written inside a regular-expression literal. After the fix the same scan reports none (462 files).
+  A machine scan over one host's checkouts (`--honour-marker`, lowered), base release against round 4: 390 → 542 owner-blind lines (+152, against +143 measured
+  at the first commit), all in one consumer's dev-VM shell tests that write sweep text through `local p=<prefix>` (8 files, 22 checkouts of the same
+  tree; the main checkout of it +5 in one file), none a sweeper; nothing else on the host changed.
+- **Round 5 (judge re-check of round 4):** round 4's cycle guard (`dependencyGuard`) took a dependency edge from every identifier of a right-hand
+  side, string contents included, and then refused a name every value that came through the cycle. Two defects, both a MISSED SWEEP (the costly
+  error; the file header's contract is "a false broad, never a missed sweep"):
+  (a) a word inside a path literal made a false edge with no cycle at all: `BASE='/tmp/<p>-'`, `tmp="$BASE"`, `rm -rf "$tmp"*` read null, because `tmp`
+  sits in BASE's literal; the same in JavaScript (`` `rm -rf ${tmp}*` ``), with `ROOT='/var/tmp/<p>-'`/`var="$ROOT"`, in Python (`PREFIX='<p>-%d' % 0`:
+  the `d` of `%d`, then `d = os.path.join(tempfile.gettempdir(), PREFIX)`) and across two shell functions (`local base='<p>-'; local dir="$TMPDIR/$base"`
+  and elsewhere `local base="$(mktemp -d)/dir"`);
+  (b) it excluded whole NAMES, not the values that came through the cycle: function a `p='<p>-'; dir="$TMPDIR/$p"; rm -rf "$dir"*` and function b
+  `dir=/tmp; p="$dir/x"` read null (the same in JavaScript and Python), and `A='<p>-'; B="$A"; A="$B-x"` then `rm -rf /tmp/$B*` read null.
+  Round 4's review had rejected this exact concern on a wrong argument: "the graph is static, so it is complete". It is static, and it is built from
+  words inside literals, so it is complete only for edges nobody wrote. Verdicts of the use line: `fe05417` broad (every one, by taint: it bound names the value never reached),
+  `5f49dcc` null, now broad.
+  **Fix (the judge's option 2, value provenance).** Dependency edges are gone. Every bound value carries the names it was built through; a build of X
+  takes no value whose provenance holds X, and takes the others (cycles still end; R9's template case is unchanged: not overflowing, not broad, `id`
+  unbound). A use is only what `makeUses` reads: `$NAME`, `${NAME…}`, a template's `${NAME}`, a bare code name outside a string literal. Where the
+  provenance is wrong only through round 6's correction below. Also: a case conversion of a bound name (`.toLowerCase()`, `.toUpperCase()`,
+  Python `.lower()`/`.upper()`, `String(X)`, `str(X)`) is string-shaped and binds (the classifier lower-cases, so the case is no matter), and a pathlib
+  join (`Path(a) / X`, `pathlib.Path(a, 'b') / X`) is a path join. R7 keeps its measured shape; its `base.toLowerCase()` line, which now binds (a
+  string-shaped value, no taint), became `base.trim()`, a call that still binds nothing. Performance (judge F3): `regexLiteralEnd` rescanned to the
+  end of the line from every `/` that opens an unclosed character class; a scan that reaches the end without closing is not started again on that
+  line. A line of 100000 characters, `f(PFX ` and `=/[` repeated, took 10.7 s and takes 22 ms (R16).
+  **Limits** (J-list): **J2** now says, in plain words, that a bound name passed to a call other than a path join or a case conversion, or reached
+  through a member access, binds nothing (`'{}-'.format(BASE)`, `'%s-' % BASE`, `[a, BASE].join('/')`, `BASE.concat('-')`, shell `$(echo "$BASE" | tr …)`,
+  `$(printf '%s-' "$BASE")`): a real sweeper written so is missed. New: **J4** — a line that holds the prefix word thousands of
+  times once the names are expanded costs the classifier (`looseVerdicts`) time quadratic in that count (14000 occurrences: 2 s); not fixed here.
+  **J5** — a placeholder glued directly BEFORE the prefix (`P="$D<p>-"`, a self-append `P=/tmp/; P="$P<p>-"`) is not read as a prefix: null in
+  every version.
+- **Round 6 (an Opus judge, "do not ship", and the coai gate, proceed with one finding):** three fixes on round 5.
+  **B1** — `maskSubstitutions` wrote `${x}` for a `$(…)` or a backtick, and round 5's generic use pattern read it as a use of the file's own variable
+  `x`: `P="$(mktemp -d)/<p>-"; x="$P"; rm -rf "$x"*` (also backticks; also `P="$(date)/<p>-"` with `find … -name "${x}*" -exec rm -rf {} +`) was broad at
+  `fe05417` and `5f49dcc`, null at `65d50c1`, broad now. Chosen: the placeholder is `${-}` (not an identifier, so no use pattern matches it; the
+  classifier reads `<p>-${-}` as an owner segment, as it did `${x}`); every other unreadable operand uses the same constant. The other option (collect
+  names from the unmasked right-hand side) is moot after B2.
+  **B2** — round 5's provenance held every name a right-hand side MENTIONED, bound or not: a name used without a value (an argument, a command
+  substitution, a name not yet bound) blocked the later build of that very name — the same class as (b). Probes, all broad at `fe05417`, null at `65d50c1`,
+  broad now: `d="$1"; p="$d/<p>-"; d="$p"; rm -rf "$d"*`; `setup(){ tmp="$(mktemp -d)"; base="$tmp/<p>-"; }` with `teardown(){ tmp="$base"; rm -rf "$tmp"*; }`;
+  `dir="$(mktemp -d)"; p="$dir/<p>-"; dir="$p"`; JavaScript `const base = root + '/<p>-'; const root = base;`, `let d = …; let p = d + '/<p>-'; d = p;`, and
+  `const d = …; const p = d + '/<p>-';` then `const d = p;` in a function. Now a value's provenance is its own NAME and the provenance of the values it actually
+  TOOK; a use that stays a placeholder adds nothing. Termination holds: every taken value carries its own name, so a cycle back to X is refused. The
+  generic use pattern is gone. R9 changes: `id = \`${base}\`` now takes base's value (base's provenance does not hold `id`), so `id` binds the owner-aware
+  template and its use line reads owner-aware, not null; base then refuses id's value. R7 (the measured owner-aware shape) is unchanged: no broad line,
+  `BOUND` still `["P","base"]`. What an error in provenance can do, exactly: it is exact by construction, so it can only REFUSE a value whose
+  derivation ran through the name that builds it; that loses a variant of a value the name already holds (text the cycle added around it), and reads as
+  a missed reading when that text changes what follows the prefix or sits before it (see J6). This corrects round 5's sentence that a wrong
+  provenance is "too small" and so errs to overflow: that was never true (it did not overflow, it read null).
+  **C0** (gate finding, accepted) — a right-hand side cut at 1024 characters whose unread tail holds the prefix word (or whose word straddles the cut)
+  marks the name `overflow`: its uses read broad. The check costs one `lastIndexOf` per line, found once. A 1100-character right-hand side with the
+  prefix at its end and `rm -rf "$P"*` was null, is broad.
+  **Limit J6** — see B2: a refusal can drop a variant of a value around a cycle. It matters for text added AFTER the prefix (a stripping operator) and for
+  text added BEFORE it, which is what makes the path anchor. Input, null at `fe05417`, `65d50c1` and `532846f` alike (so not a regression): `P='<p>-'` /
+  `P="$TMPDIR/$P"` / `for d in "$P"*; do` / `rm -rf "$d"` / `done`. The self-reference drops the `$TMPDIR/<p>-` variant; what is left is the quoted glob
+  `"<p>-"*`, which the classifier does not read (a base classifier limit), and the line has no deletion.
+  **Limit J7** — a parameter operator that can strip the owner segment (`${P%%-u*}`, `${P%-*}`, `${P#…}`) is expanded to the bound value as if the
+  operator were absent, so the use reads with the owner segment the operator may have removed (owner-aware). Tracer limitation, found 2026-10-28 by
+  an outside consultation; not a regression of the pre-F12 classifier. Verified on this branch's HEAD: `P="<p>-u1000-repo-"; find /tmp -name "${P%%-u*}-*"
+  -exec rm -rf {} +` reads owner-aware. The wider family of this limit, an unresolved owner position, is F15.
+  **Follow-up candidates, not done here:** (1) the fixed point is super-linear on long shell chains (1000 names: 29 s on this machine, 12.8 s at
+  `fe05417`; adversarial, the use pattern is rebuilt once per pass); (2) R6's timing: each of its five lines takes 36–300 ms against a 1 s budget
+  (the 0.84 s measured earlier was the sum of the five), so the margin on a loaded machine is about 3x — left as is; (3) `${NAME}` inside a
+  single-quoted shell string or a JavaScript non-template string is still replaced as a use at the USE site (a false broad, the safe direction); the part
+  that fed provenance went with B2; (4) C0's `tailHolds` takes the last prefix word anywhere on the line, so a cut right-hand side followed by the word in a
+  COMMENT or a later statement marks the name `overflow` (a false broad, the safe direction), e.g. `DATA='<1100 a>' # <p>-u1000-` then `echo "$DATA"`; (5) a
+  base-classifier false broad, not F12: ``P="/tmp/<p>-u`id -u`-"`` reads broad, because a backtick after `u` is not an owner start in `OWNER_START_RE`.
+- **Round 7 (coai round 6, finding 2, confirmed):** `bindItems` skipped an assignment whose right-hand side is longer than MAX_VALUE (512) and does not hold
+  the word, even when it USES a bound name: `BASE='<p>-'`, `P="<600 chars of /x>/$BASE"`, `rm -rf "$P"*` read null (the JavaScript form, `const P = '<600 chars>/' +
+  BASE;` with `startsWith(P)` and `rmSync`, too), while the short form read broad. Measured at `532846f` and `cfedbb0`; the same at `65d50c1`. Now such a right-hand
+  side marks the assigned name `overflow` when it makes a real use of a bound name, by the use grammar (a name inside a string literal or a longer word is no
+  use): its uses read broad. One that uses no bound name still binds nothing (no false broad), and the 1024-character cut (C0) is unchanged. J6 was
+  rewritten (above). Reviews of `532846f`: an Opus judge, SHIP (90 probes, no regression, no new false positive); the coai gate, proceed.
+- **Round 8 (CI under V8 coverage):** PR #90's required check ("SonarCloud Scan") runs `npm run test:coverage`, and R6's unclosed-bracket case took 2094 ms there
+  against its 1000 ms limit. Reproduced here with `node --test --experimental-test-coverage --test-name-pattern='^R6'`: three cases over the limit. Cause (measured):
+  `assignments` read 1024 characters for EVERY match of an assignment shape (`const a = [` x9000, `;a=$(` x16000), although each match lies inside the unclosed
+  right-hand side of the one before; 9000-16000 reads of 1024 characters, then `bindItems` re-asked `usesBoundName` of every item each pass. Per case, ms, three runs
+  (plain / coverage) BEFORE: bracket 394-420 / 2222-2275, paren 421-442 / 2283-2357, `;a=$(` 631-672 / 2718-2796, `${P_:` 44-45 / 45-47, `${P_%x` 36-37 / 36-37.
+  AFTER: bracket 21-26 / 27-33, paren 11-13 / 15-21, `;a=$(` 13-16 / 18-23, `${P_:` 47-60 / 50-53, `${P_%x` 37-47 / 37-38. The limit is still 1000 ms. Fix: (1) a match
+  that starts inside a right-hand side that ran to its cut or the end of the line without a terminator makes no assignment, unless the prefix word comes after it inside
+  that text (an assignment that holds the word is never lost); (2) the right-hand sides of one line are read to MAX_LINE_READ (16 x 1024) characters in all, past it an
+  assignment is returned unread and its name overflows when the word comes after it (broad, the safe direction); (3) `usesBoundName` is cached per item while the set
+  of bound names has the same size. R6 is one subtest per case, naming it. R20 and R21 hold the positives (`a=1; P='<p>-'; rm -rf "/tmp/$P"*`, two declarations after a
+  closed bracket, an assignment that holds the word inside an unclosed bracket) and the budget. **Limit J8** (header): an alias of a bound name written inside an
+  unclosed bracket on one line, with no prefix word after it, is not read. Whole suite, plain and with coverage: 1342 tests, 1336 pass, 0 fail, 6 skipped, both.
+- **Fixed** 2026-10-28 on branch `fix/scan-age-sweep-through-variable`, in eight rounds. RED, round 1: the use lines of a same-file binding classified null
+  (`actual null, expected 'broad'`) and the guard exited 0 on a file that removes through a bare-prefix variable. RED, round 2: the use of an
+  owner-aware concatenation classified broad, `${P:?}` and its kin classified null, and a 100000-character line of the shape `x:` and spaces took 21 s.
+  RED, round 3 (against `0dce2ca` → `f7926cd`): the seven literal-first shapes, the same-line alias, the repeated-text span, the 33rd value, and
+  five adversarial 100000-character lines (29 s for the first) all failed or were null where `0dce2ca` said broad.
+  RED, round 5 (against `5f49dcc`): the use line of each of the five (a) probes and the three (b) probes read null, the case conversions and
+  pathlib joins bound nothing, and the unclosed-class line took 10.7 s.
+  RED, round 6 (against `65d50c1`): the four B1 probes, the six B2 probes and the 1100-character right-hand side all read null on the use line.
+  RED, round 7 (against `cfedbb0`): the 600- and 1000-character right-hand sides, shell and script, read null on the use line.
+  RED, round 8 (against `48e4e0c`): R6's bracket, paren and `;a=$(` cases took 2.2-2.8 s under `--experimental-test-coverage`; R20 and R21 failed on the old reading.
+  GREEN: all new tests, and the janitor's 7 uses clean through the sanction.
 
 ## F13 — `owned.mjs` assumes 100 clock ticks per second (found 2026-10-27)
 
@@ -222,9 +417,40 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   findings 1 and 2 accepted and applied in the review-fixes commit, 0 and 3 rejected with reasons) and the Opus review (SHIP WITH FIXES; 1, 2, 3, 4, 5 and the `s390` half of 6 applied;
   the once-read counting half of 6 and 7 not applied — the merge commit is named at promotion).
 
+## F14 — a prefix split over two literal pieces binds nothing (found 2026-10-28)
+
+- **What.** `tools/lib/prefix-bindings.mjs` (`evaluate`, `shellPieces`) binds a value only when ONE literal piece holds the prefix word as
+  written, so `P='teststo''delete-'` followed by `rm -rf "/tmp/$P"*` reads as null: the sweeper is missed. The scan's own rule for
+  detector and test code — "spell the prefix in two pieces" — is what a person could apply, mechanically, to a REAL sweeper to hide it.
+- **Why.** The fleet's expected work after F12 tells files to spell the prefix in two pieces. The two-piece spelling is the one thing the
+  binding reader honours without a marker, so it is also the one way to write a sweeper the barrier scan cannot see.
+- **Fix when re-opened.** Fold adjacent quoted pieces of ONE shell word (`'a''b'`, `a"b"`), and measure how many of the family's own detector
+  and test lines that turns red; keep the JavaScript and Python `"a" + "b"` exception, which is a statement of intent in code. RED first:
+  the line above must be broad.
+- **When.** Before the barrier is declared closed on a machine whose sweepers were changed after this release.
+
+## F15 — an unknown right after the prefix separator reads as an owner (found 2026-10-28)
+
+- **What.** Rule §7 and `OWNER_START_RE` (`tools/lib/sweeper-scan.mjs:43`) count a variable or a placeholder right after the prefix's separator as an
+  owner segment: on literal lines, and (through F12) on traced values. When that variable is empty or holds no owner (`suffix = ""`, `$S` empty), a
+  bare-prefix sweep reads owner-aware: a false negative for the barrier. Verified 2026-10-28 on this branch's HEAD (`<p>` is the prefix word):
+  - JavaScript `const suffix = ""; const P = "<p>-" + suffix;` with `startsWith(P)` and `rmSync` — owner-aware at HEAD (the base release's classifier,
+    `72ae2f3`, reads no binding, so it said nothing about the use line);
+  - shell `S=""; P="<p>-$S"; rm -rf "/tmp/$P"*` — owner-aware at HEAD (nothing at the base release, same reason);
+  - shell `P="<p>-u1000-repo-"; find /tmp -name "${P%%-u*}-*" -exec rm -rf {} +` — owner-aware at HEAD (J7);
+  - the plain literal line `rm -rf "/tmp/<p>-$S"*` — owner-aware at the BASE release as well: the classifier has always read `$` after the separator as
+    an owner. So F12 did not introduce this; it carries it onto traced values.
+- **Why.** The barrier's guarantee is "no owner-blind sweeper left". An unresolved owner position is not evidence of an owner; a sweeper whose owner
+  variable is empty removes every user's leftovers.
+- **Decision needed (the owner's, not this follow-up's).** Whether an unresolved owner position becomes an explicit "unresolved" finding that keeps the
+  barrier closed. Cost: every legitimate `<p>-${OWNER}-…` or `<p>-$owner-…` line in every consumer becomes a finding, unless the owner variable is itself
+  traced to the owner grammar (`u<digits>`, `w<name>`, the helper). Measure the fleet count first (the machine scan, `--honour-marker`) before deciding.
+- **When.** Before the barrier is declared closed on a shared machine, or at the next change to `OWNER_START_RE`.
+- **Anchor.** `tools/lib/sweeper-scan.mjs:43` (`OWNER_START_RE`); the traced half is `tools/lib/prefix-bindings.mjs` (`PLACEHOLDER`, `expandReadings`).
+
 ## Definition of Done
 
-- [ ] Each of F1 to F13 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
+- [ ] Each of F1 to F15 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.

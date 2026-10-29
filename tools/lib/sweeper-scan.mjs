@@ -14,6 +14,14 @@
 //                  segment that no owner can start with (`conventions`, `wt`) — such a pattern reaches only LEGACY names,
 //                  which the guard's `legacy-name` class and the janitor's `legacy:` lines already own.
 //
+// A whole file is read with `classifyLines`: it also traces a prefix held in a variable the SAME file assigns a value holding it
+// (`P='<prefix>-'` then `find … -name "${P}*"`; `prefix-bindings.mjs` says which forms); a name from another file, the environment or
+// an argument is not traced. A variable assigned on a line the allowlist passes (the janitor's inventory line) is not traced either,
+// so that one pass covers its variables' uses and nothing else. Two widenings of that pass are known: an alias added anywhere in the
+// janitor (`X="$RX"`) stays unbound, so its uses are hidden; and `--update-allowlist` admits every line that is broad on its own,
+// and one that also assigns sanctions its variables' uses, while the diff of the allowlist shows only that line. Both are closed by
+// the whole-janitor hash (F11); until then a change to the janitor is read by a person.
+//
 // A line carrying `not-a-sweeper` is honoured ONLY when the caller asks (`honourMarker`): the corporate sibling's tools use
 // it on their own detector lines and the scan reads those files during the transition. The guard never asks — in this
 // repository no comment clears an owner-blind line (rule §7); the one pass is a hash-keyed allowlist.
@@ -23,6 +31,8 @@ import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
+import { PREFIX_WORD, assignments, holdsPrefix, makeUses, prefixBindings, readings, withoutAssignments } from "./prefix-bindings.mjs";
 
 export const NOT_A_SWEEPER = "not-a-sweeper";
 
@@ -47,7 +57,7 @@ const STARTS_WITH_RE = /startswith\(\s*["'`]teststodelete(?=[-_])/g;
 // `ls | grep <prefix> | xargs rm -rf`, `n.includes("<prefix>-")`, `re.match(r"<prefix>-", n)`, `$_.Name -match '<prefix>'`.
 const DELETION_RE = /(?:^|[^a-z0-9_-])(?:rm|rmdir|unlink|del|erase)(?=\s|$)|remove-item|docker\s+(?:(?:container|volume|network|image)\s+)?(?:rm|rmi|prune)\b|rmsync|rmtree|xargs|-delete\b|os\.remove|\.unlink\(|\.rmdir\(/;
 const MATCHER_RE = /(?:\bgrep\b|\bfindstr\b|-i?match\b|-i?like\b|\.test\(|\.includes\(|\.match\(|\.search\(|\bre\.\w+\(|startswith\(|endswith\(|-iname\b|(?<![-\w])-name\b|-regex\b)[^|;]*$/;
-const PREFIX_WORD_RE = new RegExp("teststo" + "delete", "g"); // spelled in two pieces: this file is read by the machine scan too
+const PREFIX_WORD_RE = new RegExp(PREFIX_WORD, "g");
 
 /** The verdicts of the unanchored occurrences of the prefix, when the line deletes or the prefix is a matcher's argument. */
 function looseVerdicts(lower) {
@@ -106,9 +116,40 @@ export function classifyLine(text, { honourMarker = false } = {}) {
   return verdicts.includes("owner-aware") ? "owner-aware" : null;
 }
 
-/** The lines of a text that `classifyLine` calls broad, as 1-based numbers. */
+// --- a prefix held in a variable of the same file -----------------------------------------------------------------------
+//
+// `classifyLines` reads a whole file: `classifyLine`'s verdict of every line as written, and again with each name the file
+// assigns a value holding the prefix replaced by that value (`prefix-bindings.mjs` says what is traced and what is not). The
+// strongest verdict wins; the result is indexed like the lines, so a caller reports the ORIGINAL line, its number and its hash.
+// A caller that has an allowlist passes it with the file's path: an assignment made on a line the allowlist passes (file, line,
+// hash — the one `passes` below) binds nothing, so that pass also covers the uses of the variables the line assigns. A caller
+// that honours the transition marker passes `honourMarker`: a line carrying it binds nothing either.
+
+const RANK = { broad: 2, "owner-aware": 1 };
+const stronger = (a, b) => ((RANK[b] ?? 0) > (RANK[a] ?? 0) ? b : a);
+
+export function classifyLines(text, { allowlist = [], file, honourMarker = false } = {}) {
+  const source = String(text);
+  const lines = source.split(/\r?\n/);
+  if (!holdsPrefix(source)) return lines.map(() => null); // every shape needs the prefix word: nothing to read
+  const verdicts = lines.map((line) => classifyLine(line, { honourMarker }));
+  const passed = new Set(lines.flatMap((line, index) => (passes(allowlist, file, index + 1, line) ? [index + 1] : [])));
+  const skip = new Set([...passed, ...lines.flatMap((line, index) => (honourMarker && line.toLowerCase().includes(NOT_A_SWEEPER) ? [index + 1] : []))]);
+  const perLine = lines.map(assignments);
+  const uses = makeUses(prefixBindings(source, { skip, perLine }));
+  return lines.map((line, index) => {
+    if (passed.has(index + 1)) return null; // the one contract: a line the allowlist passes is not a finding, and no caller checks it again
+    if (uses === null || verdicts[index] === "broad") return verdicts[index];
+    const body = withoutAssignments(line, perLine[index]); // an assignment's own span is not a use: `P="$TMPDIR/$BASE"` sweeps nothing; what is left of the line is read
+    const found = readings(body, uses);
+    if (found === null) return "broad"; // more readings than MAX_READINGS, or a name that outgrew its bounds: the safe direction
+    return found.reduce((verdict, reading) => (reading === body ? verdict : stronger(verdict, classifyLine(reading, { honourMarker }))), verdicts[index]);
+  });
+}
+
+/** The lines of a text that `classifyLines` calls broad, as 1-based numbers (`options`: `allowlist`, `file`, `honourMarker`). */
 export function broadLines(text, options) {
-  return String(text).split(/\r?\n/).flatMap((line, index) => (classifyLine(line, options) === "broad" ? [index + 1] : []));
+  return classifyLines(text, options).flatMap((verdict, index) => (verdict === "broad" ? [index + 1] : []));
 }
 
 /** The hash an allowlist entry pins a line by: sha256 of the line's text, line end excluded, as lower-case hex. */
@@ -192,17 +233,18 @@ function readTextFile(file, sink) {
 /** The repository's one sweeper script: the only file an allowlist entry can name (rule §7 `owner-blind`). */
 export const JANITOR_FILE = "tools/janitor.sh";
 
-const passes = (allowlist, relative, number, line) => relative === JANITOR_FILE
+export const passes = (allowlist, relative, number, line) => relative === JANITOR_FILE
   && allowlist.some((entry) => entry.file === JANITOR_FILE && entry.file === relative && entry.line === number && entry.sha256 === lineSha256(line));
 
 function classifyText(sink, display, text, options) {
   const { allowlist, relative, honourMarker, jobs, kind } = options;
   sink.read.files += 1;
   const lines = text.split(/\r?\n/);
+  const verdicts = classifyLines(text, { honourMarker, allowlist, file: relative });
   lines.forEach((line, index) => {
     const number = index + 1;
-    if (classifyLine(line, { honourMarker }) === "broad") {
-      if (!passes(allowlist, relative, number, line)) sink.found({ path: display, line: number, reason: SCAN_REASONS.OWNER_BLIND });
+    if (verdicts[index] === "broad") {
+      sink.found({ path: display, line: number, reason: SCAN_REASONS.OWNER_BLIND });
     } else if (jobs && !isCommentLine(line) && CALLS_A_SWEEP_RE.test(line)) {
       sink.found({ path: display, line: number, reason: SCAN_REASONS.CALLS_A_SWEEP });
     }

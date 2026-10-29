@@ -576,6 +576,50 @@ test("2. owner-blind: a prefix-only regex, glob and docker filter are findings",
   assert.equal(one(t, "tools/e.sh", `grep -i '^${P}[-_]u1000[-_]' list\n`).code, 0, "an owner after the prefix is not blind");
 });
 
+test("2. owner-blind: a prefix held in a variable of the same file is a finding at the use lines; a name bound in another file is not traced", (t) => {
+  const uses = ['find "${TMPDIR:-/tmp}" -maxdepth 1 -name "${P}*" -mmin +60 -exec rm -rf {} +', 'rm -rf "$TMPDIR/$P"*'];
+  const repo = tree(t, {
+    "tools/a.sh": ["#!/usr/bin/env bash", `P='${Q}-'`, ...uses, ""].join("\n"),
+    "tools/b.sh": ["#!/usr/bin/env bash", ...uses, ""].join("\n"),
+  });
+  const result = guard(repo);
+  assert.equal(result.code, 1, result.text);
+  assert.ok(result.text.includes("tools/a.sh:3 — owner-blind"), result.text);
+  assert.ok(result.text.includes("tools/a.sh:4 — owner-blind"), result.text);
+  assert.ok(!result.text.includes("tools/b.sh"), `a name this file does not assign is not traced:\n${result.text}`);
+});
+
+test("2. owner-blind: a LEGACY literal held in a variable stays a legacy-name finding and is not owner-blind", (t) => {
+  const text = ["#!/usr/bin/env bash", `P='${Q}-myrepo-preflight-'`, 'find "${TMPDIR:-/tmp}" -maxdepth 1 -name "${P}*" -mmin +60 -exec rm -rf {} +', 'rm -rf "$TMPDIR/$P"*', ""].join("\n");
+  const result = one(t, "tools/c.sh", text);
+  assert.equal(result.code, 1, result.text);
+  assert.match(result.text, /tools\/c\.sh:2 — legacy-name/);
+  assert.ok(!result.text.includes("owner-blind"), result.text);
+});
+
+test("2. owner-blind: the pass of the janitor's inventory line covers the uses of its variables — in the janitor only, and only while the line's hash matches", (t) => {
+  const assign = `RX='${P}[-_]'; GLOB='${P}[-_]*'`;
+  const use = `awk -v rx="^$RX" 'tolower($1) ~ rx' && find "$T" -iname "$GLOB"`;
+  const entry = { file: JANITOR, line: 2, sha256: sha(assign) };
+  const text = ["#!/usr/bin/env bash", assign, use, ""].join("\n");
+  const broadAt = (repo) => scanRepository({ repo, allowlist: [entry] }).findings.filter((found) => found.cls === "owner-blind").map((found) => found.line);
+  assert.deepEqual(broadAt(tree(t, { [JANITOR]: text })), [], "the janitor: the passed line and its uses are clean");
+  assert.deepEqual(broadAt(tree(t, { "tools/other.sh": text })), [2, 3], "the same two lines in another file: the sanction is per allowlisted line, not per variable name");
+  assert.deepEqual(broadAt(tree(t, { [JANITOR]: text.replace(`GLOB='${P}[-_]*'`, `GLOB='${P}[-_]**'`) })), [2, 3], "one byte changed on the passed line: the line is reported and its uses with it");
+});
+
+test("2. --update-allowlist writes exactly the janitor's one inventory line: a line broad only through a variable is never entered", (t) => {
+  const repo = tree(t, {});
+  fs.writeFileSync(path.join(repo, "x.txt"), "x\n");
+  fs.mkdirSync(path.join(repo, "tools"), { recursive: true });
+  fs.copyFileSync(path.join(root, JANITOR), path.join(repo, JANITOR));
+  assert.equal(guard(repo, ["--update-allowlist"]).code, 0);
+  const written = JSON.parse(fs.readFileSync(path.join(repo, "tools", "fixtures", "owner-blind-allowlist.json"), "utf8"));
+  const shipped = JSON.parse(fs.readFileSync(ALLOWLIST, "utf8"));
+  assert.deepEqual(written.entries, shipped.entries, "the janitor's inventory line and nothing the variables' uses would add");
+  assert.equal(written.entries.length, 1);
+});
+
 test("2. owner-blind takes NO inline exemption: an annotated arbitrary rm -rf sweep is still a finding", (t) => {
   const reason = "inventory only, deletion is gated per row by something";
   const annotated = one(t, "tools/s.sh", `# ${Q}-exempt: owner-blind — ${reason}\nfind /tmp -iname '${Q}-*' -exec rm -rf {} +\n`);
