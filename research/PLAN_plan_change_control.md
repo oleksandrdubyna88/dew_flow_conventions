@@ -1,6 +1,6 @@
 # PLAN — A plan changed twice after its approval stops for a whole re-review
 
-> Status: **in progress, epoch 3 (approved by the owner 2026-10-29 after the second full stop of 2026-10-29) — E1 and E2 built and merged to `main` by #86 (squash, S10); open: the server plan (S7, #935 in the server repository) and the owner's release question (S9).** Scope: a new shared rule
+> Status: **IMPLEMENTED, 2026-10-29 — merged to `main` by #86 (`1469841`, squash); deviations in [Deviations](#deviations-recorded-2026-10-29). The release waits for the test-leftovers merged core's one promotion (owner, 2026-10-29).** Scope: a new shared rule
 > `common/plan-change-control.md`, two pointer lines in `common/planning-docs.md`, a change-ledger check in
 > `tools/plan-lifecycle.mjs` through a new `tools/lib/plan-ledger.mjs`, their tests, `research/rule-bodies.json`,
 > `research/module_rules.md`, `research/module_tests.md`, the `README.md` tools row, a `plan-lifecycle` step in
@@ -11,7 +11,7 @@
 > deviations), [subagent-models.md](../common/subagent-models.md) (who acts at each step),
 > [coai-review-gate.md](../common/coai-review-gate.md), [coai-document-gate.md](../common/coai-document-gate.md),
 > [coai-consultant.md](../common/coai-consultant.md) (trigger 5), [coai-question-consultant.md](../common/coai-question-consultant.md),
-> [rule-ownership.md](../common/rule-ownership.md), [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md)
+> [rule-ownership.md](../common/rule-ownership.md), [PLAN_test_leftovers_merged_core.md](PLAN_test_leftovers_merged_core.md)
 > (the measured case).
 
 ## Plan changes
@@ -112,13 +112,48 @@ Narrowed: yes — the DoD's absolute size cap becomes a measured, attributed del
   (A correction of which plan builds an item — in doubt, a change; the first of epoch 3, allowed. The next stops the
   plan again.)
 
+## Deviations (recorded 2026-10-29)
+
+What shipped differently from the plan as first approved — the ledger above records each change; this is the summary.
+
+1. **The rule stopped its own plan twice.** Epoch 1: 1.1 (the server plan moved from a merge to a release condition) and
+   1.2 (an entry indented one space hid from the count — the reserved prefixes). Epoch 2: 2.1 (ordered list markers) and
+   2.2 (the DoD's size item, "stays ≤ 32 768 B", was never true — checked: `explain --task inspect --file todo/PLAN_x.md`
+   on `main` 72ae2f3 gave 38 612 B; it became a measured, attributed delta). Epoch 3: 3.1 (the canonical review
+   snippet's update moved from the server plan to the later rule change here). Both re-reviews passed by the interim
+   path; the owner approved the narrowed epochs 2 and 3 on 2026-10-29.
+2. **E1 took seven code rounds and six fix-forward commits**, each closing a shape under which a change could hide: the
+   reserved prefixes; ordered markers, a lone CR, a near-miss heading; heading spacing and format characters; GitHub's
+   pipe escape; every Unicode space as indent; repeated list markers (known limit K1, fixed in the epoch-3 re-review).
+   Two shapes remain known limits, stated in the rule: a setext heading and a heading with inline markup or a character
+   reference. Code round 3 accepted a reviewer's claim about GFM pipe escapes without measuring it; round 4 measured
+   GitHub's renderer (`gh api markdown`), and the decision was reversed — recorded in the E1 stories.
+3. **The shared fence helper was widened** to CommonMark fences instead of adding a second fence definition; the recorded
+   headings did not move (`rule-bodies` in step).
+4. **One pull request, squash-merged** (#86), not two epic commits rebase-merged: E1 grew a fix-up trail, and its first
+   commit was pushed with a stop record, so it was never rewritten.
+5. **A `plan-lifecycle` step was added to this repository's CI** (the epoch-3 audit found nothing ran the check on its
+   own `todo/`).
+6. **The rule's size cap is 12 288 B** (the outline's content did not fit the first 9–11 KB target); it shipped at
+   12 274 B. `depends: planning-docs` adds 27 046 B to `audit`, `http`, `benchmark` and `logging`, all split reads already.
+7. **SonarCloud on #86 found a quadratic split** of an entry's kinds: 84 539 ms on one hostile line, ~10 ms after the fix.
+8. **The interim re-review path was observed live**, both halves (S6a, S6b — S6b's `planText` was abridged, marked).
+9. **Not released.** `release` is at `e29883f`, and `main` is 11 commits ahead, including #82 (the test-leftovers merged
+   core), whose plan allows its ONE promotion only after its R4 and with a warning first. Owner decision 2026-10-29: this
+   rule reaches consumers with that promotion; consumer pin bumps follow its R6 order. Named on its side, in
+   `todo/PLAN_test_leftovers_merged_core_release.md`.
+10. **The server plan merged** as `dew_flow_connect_other_ais` #935 (`80b829ef`) — plan only; its build replaces the interim
+    path, and the rule's paragraph with it.
+11. **Locally, six janitor tests fail** (S4-23, S4-34, S4-35, S4-37, S4-38, S4-46) identically on clean `main` on this
+    machine and pass on CI (`tools · selftest`); the owner chose not to investigate them in this task.
+
 ## Symptom
 
 No rule says what happens when a plan changes AFTER its approval. Deviations are written down once, at promotion
 ([planning-docs.md](../common/planning-docs.md) § *Promoting a finished plan*, step 2), when the work is already built. Nothing
 counts the changes and nothing stops the work.
 
-Measured 2026-10-27 on [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md). Its plan round
+Measured 2026-10-27 on [PLAN_test_leftovers_merged_core.md](PLAN_test_leftovers_merged_core.md). Its plan round
 passed on 2026-10-21 (`good_enough`, line 10). After that:
 
 - story S8 was **added** (decision 11, owner, 2026-10-26 — Deviations item 1, line 398);
@@ -127,7 +162,7 @@ passed on 2026-10-21 (`good_enough`, line 10). After that:
 - **eight** lines were rewritten in place with a later review tag — "plan gate 2026-10-26" or "plan gate round 2"
   (lines 160, 169, 170, 245, 247, 248, 266, 300; counted with `grep -n -iE "plan gate (round 2|2026-10-26)"`);
 - the merged predecessor E1 had its contract rewritten and its `tools/janitor.sh` (308 lines,
-  [PLAN_test_leftovers_E1.md](../research/PLAN_test_leftovers_E1.md) line 47) replaced by one of 874 lines; E1's one release,
+  [PLAN_test_leftovers_E1.md](PLAN_test_leftovers_E1.md) line 47) replaced by one of 874 lines; E1's one release,
   an item of its Definition of Done, never happened (E1 Deviations, lines 34-39).
 
 Each change was reasonable on its day and each was judged alone, against the text just before it. They were seen together

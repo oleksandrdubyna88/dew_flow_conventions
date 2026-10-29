@@ -1013,7 +1013,7 @@ runner printed on 2026-10-29, on Node 26.12.1, not typed from memory.
   swapped in through `--import`, Node 22.15 or later, skipped with a reason below that) gives a finding and exit 1, not
   a crash.
 - **The dry run over the estate** (E1.S4): zero `changes` lines added in any of the eleven checkouts, twice; the record is
-  the *Dry run record* section of `todo/PLAN_plan_change_control_E1.md`.
+  the *Dry run record* section of `research/PLAN_plan_change_control_E1.md`.
 - **`tools/plan-change-rule.test.mjs`** (pure, 8 cases) and three selection cases in `tools/rules.test.mjs`. The freeze
   proves a body changed, never that it still says what it exists to say, so the rule's three sentences (one change is
   allowed and the second stops all new code; an owner's request counts exactly like one you find; the interim path is the

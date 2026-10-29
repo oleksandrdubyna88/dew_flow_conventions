@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * `lib/plan-ledger.mjs`'s own tests: which text is a change ledger, which is not, and how a ledger moves from open
- * to stopped to closed. The cases are the scenarios of `todo/PLAN_plan_change_control_E1.md` (E1.S1, which wins over
+ * to stopped to closed. The cases are the scenarios of `research/PLAN_plan_change_control_E1.md` (E1.S1, which wins over
  * anything else), the rows of the parent plan's findings table (§3) and the clean cases of its test plan.
  *
  * PURE: strings in, strings out. Nothing here writes a file, makes a folder or spawns a process, so

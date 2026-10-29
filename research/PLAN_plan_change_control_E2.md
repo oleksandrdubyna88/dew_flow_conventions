@@ -1,7 +1,6 @@
 # PLAN — Plan change control, E2: the rule, the lines that point at it, and what describes it
 
-> Status: **built, 2026-10-29 — in epoch 3 of the parent (owner-approved 2026-10-29); its code round is recorded
-> below.** Scope: the
+> Status: **IMPLEMENTED, 2026-10-29 — merged with the parent in #86; its code rounds are recorded below.** Scope: the
 > stories of epic E2 — the shared rule
 > `common/plan-change-control.md`, two pointer lines in `common/planning-docs.md`, the body freeze in
 > `research/rule-bodies.json`, the selection cases in `tools/rules.test.mjs`, a new `tools/plan-change-rule.test.mjs`,
@@ -624,8 +623,8 @@ only:
   growth, the rule not selected there, the ten single-read scopes still ≤ 32 768 B; one sentence that the old absolute
   cap could never hold (the parent's entry 2.2); and the cost of `depends: planning-docs` on `audit`, `http`,
   `benchmark` and `logging`, before and after.
-- Design record: [PLAN_plan_change_control.md](../todo/PLAN_plan_change_control.md) (a `todo/` link; it becomes a
-  sibling link at promotion).
+- Design record: [PLAN_plan_change_control.md](PLAN_plan_change_control.md) (a sibling link since the promotion; it was a
+  `todo/` link while the plan was open).
 
 ### `research/module_tests.md` — a new section after *What a hash cannot say*
 

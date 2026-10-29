@@ -125,8 +125,8 @@ before any work (the parent's entry 2.2); the criterion above replaced it.
 | `benchmark` | 69 787 B | 96 833 B |
 | `logging` | 47 207 B | 74 253 B |
 
-Design record: [PLAN_plan_change_control.md](../todo/PLAN_plan_change_control.md) (a `todo/` link; it becomes a sibling
-link at promotion).
+Design record: [PLAN_plan_change_control.md](PLAN_plan_change_control.md) (a sibling link since the promotion; it was a
+`todo/` link while the plan was open).
 
 References: [yaml parser](https://eemeli.org/yaml/),
 [picomatch](https://github.com/micromatch/picomatch),

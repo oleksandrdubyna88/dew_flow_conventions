@@ -1,7 +1,7 @@
 // plan-ledger.mjs — what a plan's change ledger IS, and what the lifecycle check says about one.
 //
 // What it reads. The `## Plan changes` section of a plan in `todo/`, in the format of
-// `todo/PLAN_plan_change_control.md` § 2 (the rule that gives it meaning is `common/plan-change-control.md`): epoch
+// `research/PLAN_plan_change_control.md` § 2 (the rule that gives it meaning is `common/plan-change-control.md`): epoch
 // lines, entries, and the re-review records that separate one epoch from the next. `ledgerFindings` takes the file's
 // text, its status paragraph and the name of its parent plan (or `null`), and returns the findings as plain strings.
 // Nothing here reads the file system, the clock or the environment, and nothing throws on any text — the caller wraps
