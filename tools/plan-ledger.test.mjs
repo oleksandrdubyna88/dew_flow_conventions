@@ -123,7 +123,7 @@ test("the lists are the contract: pinned to the parent plan's §2, and frozen", 
   assert.equal(STOP_PHRASE.flags, "i");
   // parent § 2, the reserved prefixes (epoch 2, entries 1.2 and 2.1): an entry shape whose marker may also be an ordered-list
   // marker of at most nine digits, `>` or `#` — the constant IS the contract
-  assert.equal(RESERVED_PREFIX.source, "^(?:[>#]|(?:(?:[-*+]|\\d{1,9}[.)])\\s+)?[1-9]\\d*\\.[1-9]\\d*(?=\\s|$))");
+  assert.equal(RESERVED_PREFIX.source, "^(?:[>#]|(?:(?:[-*+]|\\d{1,9}[.)])\\s+)*[1-9]\\d*\\.[1-9]\\d*(?=\\s|$))");
   assert.equal(RESERVED_PREFIX.flags, "");
   for (const list of [SOURCES, KINDS, STATES, APPROVERS, VERDICTS]) assert.ok(Object.isFrozen(list), "a list is frozen: nobody edits the contract at run time");
 });
@@ -778,16 +778,16 @@ test("I17 hidden lines inside a record are the only finding; at column 0 they ar
 
 // The matrix: one test per row, so the row's input is in every failure's name and a revert shows which rows went red.
 const MATRIX_SHAPES = [
-  `- ${ID}`, `* ${ID}`, `+ ${ID}`, `1. ${ID}`, `1) ${ID}`, ID, "> Epoch 2 · approved 2026-10-28 · by reviewers · state: open", "### Re-review for epoch 2", "> note", "# x",
+  `- ${ID}`, `* ${ID}`, `+ ${ID}`, `1. ${ID}`, `1) ${ID}`, `- - ${ID}`, ID, "> Epoch 2 · approved 2026-10-28 · by reviewers · state: open", "### Re-review for epoch 2", "> note", "# x",
 ];
 const MATRIX = [
   ...[" ", "  ", "\t"].flatMap((indent) => MATRIX_SHAPES.map((shape) => ({ line: indent + shape, red: true }))),
   { line: "  continues the cause of 1.1 in prose", red: false },
   { line: ` - ${ID}`, red: false, fenced: true },
 ];
-test("the matrix has thirty red rows (3 indents x 10 shapes) and two clean ones", () => {
-  assert.equal(MATRIX.length, 32);
-  assert.equal(MATRIX.filter((row) => row.red).length, 30);
+test("the matrix has thirty-three red rows (3 indents x 11 shapes) and two clean ones", () => {
+  assert.equal(MATRIX.length, 35);
+  assert.equal(MATRIX.filter((row) => row.red).length, 33);
 });
 for (const { line, red, fenced } of MATRIX) {
   test(`matrix ${red ? "red" : "clean"}: ${JSON.stringify(line)}${fenced ? " inside a fence" : ""}`, () => {
@@ -930,11 +930,15 @@ test("I19 a bidi control, an Arabic letter mark or a Mongolian vowel separator b
   assert.ok(!under11(lines[0])[0].includes("\u2066") && !under11(lines[1])[0].includes("\u202e"));
 });
 
-test("K1 a line behind TWO list markers is a known limit, recorded and not fixed: it stays free text", () => {
-  clean(under11(`  - - ${ID}`), "two bullets");
-  clean(under11(`  1. - ${ID}`), "a number and a bullet");
-  hidden(`  - ${ID}`, "K1 twin"); // one marker is reserved (I1)
-  said(under11(`- - ${ID}`), "unreadable entry", 'number "- 1.2"'); // at column 0 the nested form is red
+test("K1 (epoch 3) a line behind TWO or more list markers is reserved too: a visibly nested bullet a reader counts", () => {
+  for (const line of [`  - - ${ID}`, `  1. - ${ID}`, `  * + ${ID}`, `  - - - ${ID}`]) hidden(line, "K1");
+  for (const line of ["  - - note", "  1. a list", "  1.2.3 was the version", "  - - 1.2.3"]) clean(under11(line), line); // markers alone reserve nothing
+  said(under11(`- - ${ID}`), "unreadable entry", 'number "- 1.2"'); // column 0 is unchanged: red as an unreadable entry
+});
+
+test("4j a nested bullet behind the indent is reserved; one marker is, too (I1)", () => {
+  hidden(`  - - ${ID}`, "4j");
+  hidden(`  - ${ID}`, "4j twin");
 });
 
 test("P1 a run of ONE OR MORE backslashes before a pipe escapes it (measured with GitHub's renderer): 4 cells; with none it is a boundary", () => {
