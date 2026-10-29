@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, the merged core: what is left before PR #82 merges and the release is promoted
 
-> Status: **in progress, 2026-10-27 — R1 and R2 done (the barrier record: the Ubuntu dev VM open, the owner's Windows machine not tested); R3–R6 open.** Scope: the open part of
+> Status: **in progress, 2026-10-27 — R1, R2 and R3 done (PR #82 merged as 72ae2f3, its ci, CodeQL and sonarcloud runs green); R4 built and reviewed, waiting for the private sibling's owner to merge it and confirm; R6's sweep-only stage scanned for the private sibling's consumers; R5 and the producer stages open (the barrier record: the Ubuntu dev VM open, the owner's Windows machine not tested).** Scope: the open part of
 > [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) — the machine barrier on every machine that
 > builds or tests this repository (`research/security/machines.md`), the merge of PR #82, the private sibling's side of the
 > merged core's Definition of Done, the ONE promotion of `release`, and the consumer migration of
@@ -9,7 +9,7 @@
 > Related docs: [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) (the build, promoted 2026-10-27, with its
 > deviations), [PLAN_test_leftovers_E1.md](../research/PLAN_test_leftovers_E1.md) (the contract the build revised),
 > [PLAN_test_leftovers_rollout.md](PLAN_test_leftovers_rollout.md) (the consumer epics, R6),
-> [PLAN_test_leftovers_merged_core_followups.md](PLAN_test_leftovers_merged_core_followups.md) (F1–F9, none of which blocks this plan),
+> [PLAN_test_leftovers_merged_core_followups.md](PLAN_test_leftovers_merged_core_followups.md) (F1–F13, none of which blocks this plan),
 > [research/security/machines.md](../research/security/machines.md) (the barrier record), [common/test-leftovers.md](../common/test-leftovers.md).
 >
 > The private sibling rule repository is never named here; it is "the private sibling".
@@ -50,7 +50,7 @@ migration starts with every sweep-only stage before any producer stage.
 | Item | Built by | The other plan's part |
 |---|---|---|
 | The tools, the rule texts, the scan, the vectors, the reviews and the security pass | [the merged-core plan](../research/PLAN_test_leftovers_merged_core.md) (promoted) | Nothing here edits them; a defect found while running R1–R5 is a new commit on PR #82's branch or a follow-up, never a story here |
-| The findings the security pass parked, the stub-docker gaps, the Windows run | [the follow-ups plan](PLAN_test_leftovers_merged_core_followups.md) F1–F9 | None blocks R1–R6. F9 (the Windows run) is the evidence for a Windows machine's janitor switch; R2 only records that machine's barrier |
+| The findings the security pass parked, the stub-docker gaps, the Windows run | [the follow-ups plan](PLAN_test_leftovers_merged_core_followups.md) F1–F13 | None blocks R1–R6. F9 (the Windows run) is the evidence for a Windows machine's janitor switch; R2 only records that machine's barrier |
 | The consumers' resources, ports, pin bumps | [the rollout plan](PLAN_test_leftovers_rollout.md) epics E2–E7 | R6 is its two-stage rule; this plan carries the order, the rollout plan carries each epic's content |
 | The plan-change rule and its ledger check (#86, merged after #82) | [the plan-change-control plan](../research/PLAN_plan_change_control.md) (promoted) | Rides in R5's one promotion — no change to R5's what, when or done-when; owner decision 2026-10-29 |
 
@@ -94,6 +94,7 @@ cache or a process.
 - **Why.** The PR makes this repository the first owner-form producer.
 - **When.** After R1 and R2. The Windows run is not a condition (owner decision 2026-10-27, F9).
 - **Done when.** The merge commit's CI run is green (state the sha); `node tools/plan-lifecycle.mjs` is clean on `main`.
+- **Done, 2026-10-27.** Merged as `72ae2f3` (merged 18:36 UTC); its `ci`, `CodeQL` and `sonarcloud` runs on that commit are green; `node tools/plan-lifecycle.mjs` on a clean copy of `main` is clean.
 
 ### R4 — The private sibling's side
 
@@ -104,6 +105,7 @@ cache or a process.
 - **When.** After PR #82 is reviewed; the copy part may run in parallel with R1–R3 from the PR's branch, the confirmation after R3.
 - **Done when.** The sibling's confirmation exists, naming the sha256 of each copied file and of the two spans. This public repository
   names none of the sibling's own files or checks; the confirmation is quoted as a decision, not as a source.
+- **State, 2026-10-27.** The private sibling's rebuild is built from this repository's `72ae2f3` and reviewed (its multi-model gate `proceed` twice, an Opus review and a security pass, both "ship with fixes", the fixes made); its pull request waits for its owner. Its pins record the sha256 of each copied file and of the three spans; the written confirmation this item asks for is still missing. Two findings of that review belong to this repository and are parked here as F10 and F11 of the follow-ups plan.
 
 ### R5 — S7: ONE promotion of `release`
 
@@ -123,6 +125,7 @@ cache or a process.
 - **Why.** An owner-form producer beside an owner-blind sweeper is the failure of the Symptom.
 - **When.** Sweep-only stages: any time. Producer stages: after R5 and after every sweep-only stage.
 - **Done when.** The rollout plan's own Definition of Done.
+- **Sweep-only stage, 2026-10-27.** This repository's barrier scan (`tools/sweeper-scan.mjs` at `72ae2f3`) over the default branch of each of the private sibling's ten consumers found no enabled owner-blind sweeper: six had no line at all; in four, the lines it listed only count, match or validate names, and one removes one fixed file it has just made. Corrected later on 2026-10-27, after the private sibling's stories were rewritten: of its ten consumers, one had already merged its sweep-only stage, two need one (one removes a sweep that deletes by age with a name built from a variable — a shape this repository's scan missed, F12; one rewrites two listed text lines so the machine-wide scan lists nothing), and seven have an empty stage A. Each other listed line is a guard finding for that consumer's producer stage. This repository's own seven consumers are not checked out on the machine that ran the scan, so their sweep-only stage is not recorded yet.
 
 ## Build order
 
@@ -149,7 +152,7 @@ checkout of the PR's branch. Their outcome is recorded by hand; the scan itself 
 
 - [x] R1: the three root-only places are read (or attested by name), the scan commit and exit code recorded.
 - [x] R2: every machine the owner names has a section in `research/security/machines.md`, or a written statement that it no longer builds or tests here.
-- [ ] R3: PR #82 merged; the merge commit's `ci` run green (the sha stated).
+- [x] R3: PR #82 merged; the merge commit's `ci` run green (the sha stated).
 - [ ] R4: the private sibling's confirmation exists (both spans byte-identical; the two consumer files copied with their sha256 pinned).
 - [ ] R5: the warning went to the sessions with open consumer pull requests; `release` promoted once; `release-distance` 0.
 - [ ] R6: every sweep-only stage merged before any producer stage; the rollout plan's Definition of Done met.
