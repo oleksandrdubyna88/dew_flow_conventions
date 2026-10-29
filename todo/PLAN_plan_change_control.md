@@ -1,6 +1,6 @@
 # PLAN — A plan changed twice after its approval stops for a whole re-review
 
-> Status: **stopped for re-review, 2026-10-28 — second change after approval (entry 1.2); E1 built at b256502, E2 not started.** Scope: a new shared rule
+> Status: **in progress, epoch 2 (approved by the owner 2026-10-29 after the full stop of 2026-10-28) — E1 built at b256502, its fix-forward commit next; E2 not started.** Scope: a new shared rule
 > `common/plan-change-control.md`, two pointer lines in `common/planning-docs.md`, a change-ledger check in
 > `tools/plan-lifecycle.mjs` through a new `tools/lib/plan-ledger.mjs`, their tests, `research/rule-bodies.json`,
 > `research/module_rules.md`, `research/module_tests.md`, the `README.md` tools row — and, as a separate plan in another
@@ -15,7 +15,7 @@
 
 ## Plan changes
 
-> Epoch 1 · approved 2026-10-28 · by reviewers · state: stopped
+> Epoch 1 · approved 2026-10-28 · by reviewers · state: closed
 
 - 1.1 · 2026-10-28 · reviewer · merge-conditions — S6a document round, finding 1: the server plan (S7) moves from a
   condition of the merge to a condition of the release, so a blocked review in another repository cannot strand this
@@ -50,6 +50,12 @@ Narrowed: yes — entry 1.1 took the server plan (S7) out of the merge condition
 | b256502 — the dry-run record | pushed, unmerged | fits | run again on the final tree; prediction still 0 |
 | b256502 — the E1 stories document | pushed, unmerged | fits | fix forward: status line, the cornerstone grammar's free-text rows (by Fable), S6b's findings and decisions, the fix story |
 | 7e59e0d — the stop record | pushed, unmerged | fits | kept; epoch 1 becomes `closed` at resume |
+
+> Epoch 2 · approved 2026-10-29 · by owner · state: open
+
+  (The re-review passed on 2026-10-28 — `review_document` with `newReview: true`, `proceed`, 4 of 4 reviewers, gating 3
+  of 5, its four findings accepted as part of this revision. Narrowed, so the owner approved epoch 2 in the conversation
+  on 2026-10-29. One change is allowed in epoch 2; the next stops the plan again.)
 
 ## Symptom
 
@@ -245,7 +251,9 @@ Narrowed: yes — the Windows run left the merge conditions
   heading, which a reader counts, so the check must not skip it. Cost: free text may not begin with an entry-shaped
   number, `>` or `#`. Fenced lines stay outside the ledger — an example is not a record.
 - **Re-review record:** `### Re-review for epoch <k>` before epoch k's line, for every k ≥ 2: a `Narrowed: yes|no` line and
-  a `Work | Where | Verdict | Action` table, at least one row, verdict `fits`, `cut` or `—` (nothing was built).
+  a `Work | Where | Verdict | Action` table, at least one row, verdict `fits`, `cut` or `—` (nothing was built). Checked:
+  the header, four cells per row, the verdict. Work, Where and Action are free text and not validated (an action is
+  "kept", "revert commit …", "fix forward: …" — a list would refuse the honest one).
 - **The count is never written** — it is the number of entries `k.*` of the current epoch.
 
 ### 3. The check — `tools/lib/plan-ledger.mjs` (new) called from `tools/plan-lifecycle.mjs`
@@ -275,7 +283,7 @@ Findings (each names the file and, where it has one, the entry):
 | 6 | epochs not 1, 2, 3 … in order; a lower epoch not `closed`; dates going back | |
 | 7 | epoch k ≥ 2 without `### Re-review for epoch k`, or its `Narrowed` line or table missing or bad | the re-review must leave a record |
 | 8 | `Narrowed: yes` and epoch k's line is `by reviewers` (k ≥ 2 only: a `Narrowed` line exists only in a re-review record; epoch 1 has none, and its approval is whatever approved the plan) | a smaller plan needs the owner |
-| 9 | a stories document (`PLAN_<topic>_E<n>….md`) carries a ledger while `PLAN_<topic>.md` is in `todo/` | its changes count in the parent |
+| 9 | a stories document (`PLAN_<topic>_E<n>….md`) carries a ledger while its parent is in `todo/` — in the lib: the file carries a ledger AND `parent !== null`; the wiring passes a name only for a stories document whose parent exists in `todo/`, so a plan that is no stories document, or whose parent is not in `todo/`, gets `null` and no row 9 | its changes count in the parent, named |
 
 Indented lines under an entry are free text and not parsed, except the reserved entry prefix of §2. **The check reads the file as it stands in the checkout — never
 git history.** When two branches each recorded entry `k.1`, the merge keeps both causes: the later one is renumbered
@@ -285,8 +293,10 @@ finding adds one hint line naming `common/plan-change-control.md`.
 
 ### 4. The pointers in `common/planning-docs.md` (two lines, no new heading)
 
-- In *Creating a plan*, after "A plan carries: …": *"From its first approval it also carries a change ledger, and its
-  second change stops it for a whole re-review — plan-change-control.md."* (written as a link to the new rule)
+- In *Creating a plan*, after "A plan carries: …": *"From its first approval it also carries a change ledger — a plan
+  approved before that rule opens one at its next change — and its second change stops it for a whole re-review —
+  plan-change-control.md."* (written as a link to the new rule; the clause keeps decision 11 in the pointer, re-review
+  for epoch 2, finding 0)
 - *"Six findings, all of them failures …"* (`:161`) → seven, the seventh being that rule's. Without it the sentence turns
   false ([knowledge-base.md](../common/knowledge-base.md): a sentence that does not describe what runs is a bug).
 
@@ -517,8 +527,10 @@ Stories: `todo/PLAN_plan_change_control_E1.md` (written when the epic starts).
 - **Done when.** Every test was watched failing first; every row of the findings table has a red case naming the file
   and the entry; the clean cases of the test plan pass (CRLF equals LF, indented lines ignored, the ledger only inside a
   fence); the five commands are green; the dry run added zero `changes` findings; `review_code` on E1's branch passed
-  this plan as `planText` (S6b, recorded here); the Opus review and the code round are resolved; one commit on
-  `feat/plan-change-control-e1`.
+  this plan as `planText` (S6b, recorded here); the Opus review and the code round are resolved; on
+  `feat/plan-change-control-e1`, E1's work is TWO pushed commits — `b256502` and the fix-forward commit after the
+  stop (epoch 2; folding them would rewrite pushed history) — and the fix-forward commit passed `review_code` with
+  `again: true` and this revised plan as `planText`.
 - **Cornerstone area — the ledger schema and its state machine as the parser accepts them.** The epoch line, the
   entry line and the re-review record of §2; the transitions open → stopped → closed, the reset to epoch k+1 at 0,
   the renumbering after a merge of two branches' entries, `Narrowed: yes` → `by owner`; and the acceptance scenarios
