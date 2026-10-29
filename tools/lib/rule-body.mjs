@@ -53,12 +53,12 @@ export function outsideFencedBlocks(text) {
       if (fence === null) {
         const open = FENCE_OPEN.exec(line);
         // a backtick fence's info string may not hold a backtick: that line is inline code, not an opener
-        if (open === null || (open[1][0] === "`" && open[2].includes("`"))) return line;
+        if (open === null || (open[1].startsWith("`") && open[2].includes("`"))) return line;
         fence = open[1];
         return "";
       }
       const close = FENCE_CLOSE.exec(line);
-      if (close !== null && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
+      if (close !== null && close[1].startsWith(fence[0]) && close[1].length >= fence.length) fence = null;
       return "";
     })
     .join("\n");

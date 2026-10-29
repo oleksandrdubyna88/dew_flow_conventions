@@ -1444,3 +1444,19 @@ the eleven (run at `0af69b09843a5b17a019f794ab1248434dde6b37` + uncommitted fix-
 `dew_flow_rag_qln` exit 1 on their existing `link` findings in both runs; `dew_flow_benchmark-wt` and `dew_flow_connect_other_ais-wt` have no
 `todo/` + `research/` pair; the other five and this worktree print `plan-lifecycle: clean.` Diff count over the whole table: **0**.
 `dew_flow_mcp` is not on this machine and is checked on its remote before the release (parent S9).
+
+**Eighth run, 2026-10-29 — SonarCloud's findings on PR #86** (a `kinds.split(/\s*,\s*/)` that is quadratic on a long run of whitespace with no
+comma, and three style items: `x[0] ===` as `startsWith` in `rule-body.mjs`, an assignment inside an expression in `checkRecords`), recorded
+by the E1 coder (Sonnet) on branch `feat/plan-change-control-e2` at `cba4b0f` + uncommitted fix. Compared as in the runs above.
+
+**Prediction, written before this run's first command:** zero `changes` lines in the diff of the two outputs, for every checkout, and
+byte-identical outputs. The splitter now trims each kind instead of matching `\s*,\s*`; that can differ only for a kinds field with
+leading or trailing Unicode whitespace that `fold` leaves alone, which no plan in the estate has (none carries a ledger but this
+worktree's parent plan, whose entries use single-space separators). The `startsWith` and assignment edits change no behaviour.
+
+**Result of the eighth run: the prediction held.** Zero `changes` lines in the diff for every checkout, and `diff` printed nothing for any of the
+eleven (run at `cba4b0fb47c584c1abeac802f7d516684b2e9c87` + uncommitted fix). The new test measured the old splitter: a kinds field of `epics`, a
+200 000-character run of U+00A0 and `x` (`fold` makes a run of spaces ONE space, so only another Unicode space reaches the splitter) took
+84 539 ms; the test (that line and its space-run twin) takes about 10 ms with `split(",")` and `trim()`. `dew_flow_benchmark`, `dew_flow_creds_for_devs` and `dew_flow_rag_qln`
+exit 1 on their existing `link` findings in both runs; the other seven checkouts and this worktree are clean or have no plan folders.
+Diff count over the whole table: **0**. `dew_flow_mcp` is not on this machine and is checked on its remote before the release (parent S9).

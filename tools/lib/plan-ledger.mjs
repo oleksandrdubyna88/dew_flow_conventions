@@ -165,7 +165,7 @@ function parseEntry(raw) {
   }
   if (!isCalendarDate(date)) return { detail: `date "${clean(date)}" is not a calendar date YYYY-MM-DD` };
   if (!SOURCES.includes(source)) return { detail: `unknown source "${clean(source)}" (${oneOf(SOURCES)})` };
-  for (const kind of kinds.split(/\s*,\s*/)) {
+  for (const kind of kinds.split(",").map((part) => part.trim())) {
     if (!KINDS.includes(kind)) return { detail: `unknown kind "${clean(kind)}" (${oneOf(KINDS)})` };
   }
   return { entry: { k: Number(id[1]), n: Number(id[2]), id: number, line: raw } };
@@ -446,7 +446,10 @@ function checkRecords(model, say) {
     checkRecordPlace(record, model, say);
     checkRecordBody(record, model, say);
     let own = byEpoch.get(record.k);
-    if (own === undefined) byEpoch.set(record.k, (own = []));
+    if (own === undefined) {
+      own = [];
+      byEpoch.set(record.k, own);
+    }
     own.push(record);
   }
   for (const [k, own] of byEpoch) {

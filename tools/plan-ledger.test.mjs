@@ -299,6 +299,24 @@ test("G19 a repeated kind is harmless; an unknown one is not", () => {
   said(check([epoch(1), "", entry("1.1", { kinds: "epics, wording" })]), 'unknown kind "wording"');
 });
 
+test("a long run of whitespace in the kinds field, with no comma, is read in linear time (a hostile line must not stall CI)", () => {
+  // `fold` makes a run of spaces or tabs ONE space, so the run that reaches the kinds field is of another Unicode space
+  // (`\u00a0` here), which `\\s` matches and `fold` leaves alone. Spaces are the twin: they never reached the splitter.
+  for (const space of ["\u00a0", " "]) {
+    const started = performance.now();
+    const found = check([epoch(1), "", `- 1.1 · 2026-10-26 · owner · epics${space.repeat(200000)}x — cause`]);
+    const took = performance.now() - started;
+    said(found, 'unknown kind "');
+    assert.ok(took < 1000, `U+${space.codePointAt(0).toString(16).padStart(4, "0")}: the 200 000-character run took ${Math.round(took)} ms (limit 1000)`);
+  }
+});
+
+test("a comma with spaces around it still separates two kinds, and an empty kind is still refused", () => {
+  clean(check([epoch(1), "", entry("1.1", { kinds: "scope ,  epics" })]));
+  clean(check([epoch(1), "", entry("1.1", { kinds: "scope,epics" })]));
+  said(check([epoch(1), "", entry("1.1", { kinds: "scope, , epics" })]), "unreadable entry");
+});
+
 test("C11 every kind and every source is accepted, iterated from the lib's own lists; two kinds are one entry", () => {
   for (const kinds of KINDS) clean(check([epoch(1), "", entry("1.1", { kinds })]), `kind ${kinds}`);
   for (const source of SOURCES) clean(check([epoch(1), "", entry("1.1", { source })]), `source ${source}`);
