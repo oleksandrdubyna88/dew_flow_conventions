@@ -25,9 +25,43 @@ export function bodyOf(text) {
   return folded(text).replace(/^---\n[\s\S]*?\n---\n/, "");
 }
 
-/** Text with fenced code BLOCKS removed. What is left includes inline spans, backticks and all. */
+// A fence opens on 0-3 spaces and three or more backticks or tildes; it closes on 0-3 spaces, the SAME character, at
+// least as many of them, and nothing else but whitespace (CommonMark). Four spaces is an indented code block, not a fence.
+const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
+
+/**
+ * Text with fenced code BLOCKS removed. What is left includes inline spans, backticks and all.
+ *
+ * Every line of a fence — opener, content, closer — becomes an EMPTY line, so what is left keeps the file's line
+ * numbers (the plan-change check says "line 90" and means the file's). An unclosed fence runs to the end of the text,
+ * as a renderer draws it.
+ *
+ * This is the ONE fence definition: the heading list, the marker reader and the plan ledger all read through it, so no
+ * two of them can disagree about whether a line is inside a block. It used to know only column-0 triple backticks,
+ * non-greedy. Measured on 2026-10-28 over the `todo/` and `research/` folders of eight checkouts, that missed 213
+ * indented fence lines and three four-backtick fences — a renderer hides their content, and a check that read it would
+ * be a false red — and a four-backtick fence holding a triple-backtick line closed early and leaked the lines after it.
+ * Over the 38 rule files no recorded heading list changed (`node tools/rule-bodies.mjs` stays in step), so the
+ * widening cost nothing recorded.
+ */
 export function outsideFencedBlocks(text) {
-  return folded(text).replace(/^```[\s\S]*?^```/gm, "");
+  let fence = null; // the opener's marker while a fence is open
+  return folded(text)
+    .split("\n")
+    .map((line) => {
+      if (fence === null) {
+        const open = FENCE_OPEN.exec(line);
+        // a backtick fence's info string may not hold a backtick: that line is inline code, not an opener
+        if (open === null || (open[1].startsWith("`") && open[2].includes("`"))) return line;
+        fence = open[1];
+        return "";
+      }
+      const close = FENCE_CLOSE.exec(line);
+      if (close !== null && close[1].startsWith(fence[0]) && close[1].length >= fence.length) fence = null;
+      return "";
+    })
+    .join("\n");
 }
 
 /**

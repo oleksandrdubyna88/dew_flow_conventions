@@ -177,6 +177,35 @@ test("a marker shown inside a code fence is documentation, not a declaration", (
   assert.equal(findingsIn(fenced, "common/x.md").length, 1, "a name in an example is still a name");
 });
 
+test("a marker inside a `~~~` or an indented fence grants nothing, and a product name inside one is still a finding", (t) => {
+  // The fence helper was widened to CommonMark's rules (E1 of the plan-change-control plan), and the one thing the
+  // heading count in `rule-bodies.json` cannot show is what that does HERE: markers are read through `outsideFences`
+  // and findings through the whole text. Before the widening a marker inside `~~~` (or inside a fence indented one to
+  // three spaces) was not seen as shown, so it GRANTED its token — a declaration nobody gave, written inside an example.
+  const marker = "<!-- owns: mcp__coai__open — a tool name a session must type -->";
+  for (const [label, open, close] of [["tildes", "~~~", "~~~"], ["indented", "  ```", "  ```"], ["four backticks", "````", "````"]]) {
+    const shown = ["# Rule", "", open, marker, close, "", "Call `mcp__coai__open`.", ""].join("\n");
+    assert.deepEqual(markersIn(shown), { tokens: [], malformed: [] }, `${label}: a marker shown in a fence declares nothing`);
+
+    const root = ownedDir(t, "ownership");
+    fs.mkdirSync(path.join(root, "common"), { recursive: true });
+    fs.writeFileSync(path.join(root, "common", "shown.md"), shown);
+    const refused = run(root);
+    assert.equal(refused.code, 1, `${label}: the product word outside the fence stays a finding\n${refused.out}`);
+    assert.match(refused.out, /PRODUCT common[\\/]shown\.md/);
+
+    // a product name inside the same fence is still a name
+    assert.equal(findingsIn(["# Rule", "", open, "Measured in dew_flow_mcp.", close, ""].join("\n"), "common/x.md").length, 1, label);
+  }
+
+  // the twin, with the same words: a marker OUTSIDE any fence grants its token, so the refusal above came from the fence
+  const given = ownedDir(t, "ownership");
+  fs.mkdirSync(path.join(given, "common"), { recursive: true });
+  fs.writeFileSync(path.join(given, "common", "given.md"), ["# Rule", "", marker, "", "Call `mcp__coai__open`.", ""].join("\n"));
+  const granted = run(given);
+  assert.equal(granted.code, 0, granted.out);
+});
+
 test("a file over its recorded count fails, naming the file and both numbers", (t) => {
   const root = baselineScene(t, { "common/x.md": 0 });
   const { code, out } = run(root);

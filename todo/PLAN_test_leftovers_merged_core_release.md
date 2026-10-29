@@ -52,6 +52,7 @@ migration starts with every sweep-only stage before any producer stage.
 | The tools, the rule texts, the scan, the vectors, the reviews and the security pass | [the merged-core plan](../research/PLAN_test_leftovers_merged_core.md) (promoted) | Nothing here edits them; a defect found while running R1–R5 is a new commit on PR #82's branch or a follow-up, never a story here |
 | The findings the security pass parked, the stub-docker gaps, the Windows run | [the follow-ups plan](PLAN_test_leftovers_merged_core_followups.md) F1–F13 | None blocks R1–R6. F9 (the Windows run) is the evidence for a Windows machine's janitor switch; R2 only records that machine's barrier |
 | The consumers' resources, ports, pin bumps | [the rollout plan](PLAN_test_leftovers_rollout.md) epics E2–E7 | R6 is its two-stage rule; this plan carries the order, the rollout plan carries each epic's content |
+| The plan-change rule and its ledger check (#86, merged after #82) | [the plan-change-control plan](../research/PLAN_plan_change_control.md) (promoted) | Rides in R5's one promotion — no change to R5's what, when or done-when; owner decision 2026-10-29 |
 
 Order: R1 and R2 (parallel), R3, R4 (parallel with R1–R3 for its copy part), R5, R6. Disjoint: nothing here edits a consumer repository.
 

@@ -212,6 +212,41 @@ test("the subagent-models rule is selected for the fourteen split-read tasks and
   for(const task of SINGLE_READ_TASKS)assert.ok(!selects(task),`${task} must not select common.subagent-models`);
 });
 
+// The plan-change-control rule is scoped like subagent-models — tasks alone, the same fourteen — and has no `paths`:
+// selection is paths OR tasks, so a `todo/**` glob would pull it into every `inspect --file todo/…` scope, and so would
+// a `depends:` on it from planning-docs, which IS selected there.
+const PLAN_CHANGE_RULE="common.plan-change-control";
+
+test("the plan-change-control rule is selected for the fourteen split-read tasks and for none of the four single-read ones",()=>{
+  const catalog=loadCatalog(sourceRoot);
+  const selects=task=>selectRules(catalog,[task],[]).some(rule=>rule.id===PLAN_CHANGE_RULE);
+  for(const task of SPLIT_READ_TASKS)assert.ok(selects(task),`${task} must select ${PLAN_CHANGE_RULE}`);
+  for(const task of SINGLE_READ_TASKS)assert.ok(!selects(task),`${task} must not select ${PLAN_CHANGE_RULE}`);
+});
+
+test("a plan file does not pull the plan-change-control rule into a scope of the four single-read tasks",()=>{
+  const catalog=loadCatalog(sourceRoot);
+  const byId=id=>catalog.find(rule=>rule.id===id);
+  assert.ok(byId(PLAN_CHANGE_RULE),"the rule exists in the catalog — otherwise every negative below is vacuous");
+  for(const task of SINGLE_READ_TASKS)for(const file of ["todo/PLAN_x.md","todo/PLAN_x_E2.md","research/PLAN_x.md"]){
+    const ids=selectRules(catalog,[task],[file]).map(rule=>rule.id);
+    assert.ok(!ids.includes(PLAN_CHANGE_RULE),`${task} --file ${file} selects ${PLAN_CHANGE_RULE}: a paths glob on it, or a depends on it from a rule that path selects`);
+    // the companion: the path really reaches planning-docs, so the negative above is about the dependency, not about a path that matches nothing
+    assert.ok(ids.includes("common.planning-docs"),`${task} --file ${file} no longer selects common.planning-docs, so this case proves nothing`);
+  }
+  assert.deepEqual(byId(PLAN_CHANGE_RULE).paths,[],"the rule carries no paths");
+  assert.deepEqual(byId(PLAN_CHANGE_RULE).depends,["common.planning-docs"],"the rule depends on planning-docs and on nothing else");
+  assert.ok(!byId("common.planning-docs").depends.includes(PLAN_CHANGE_RULE),"planning-docs must not depend on the rule");
+});
+
+test("the rule brings planning-docs where planning-docs' own tasks do not reach",()=>{
+  const catalog=loadCatalog(sourceRoot);
+  for(const task of ["audit","http","benchmark","logging"]){
+    const docs=selectRules(catalog,[task],[]).find(rule=>rule.id==="common.planning-docs");
+    assert.ok(docs?.reasons.includes(`dependency:${PLAN_CHANGE_RULE}`),`${task}: common.planning-docs must arrive as the rule's dependency`);
+  }
+});
+
 test("every single-read scope of the four excluded tasks still fits one read",()=>{
   const catalog=loadCatalog(sourceRoot);
   const scopes={inspect:[[],["src/x.cs"],["src/x.csproj"],["ui/a.ts"]],ui:[[],["src/x.cs"],["ui/a.ts"]],gpu:[[],["src/x.cs"]],storage:[[]]};
