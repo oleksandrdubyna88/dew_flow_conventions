@@ -1103,6 +1103,21 @@ checked on the lib before its decision.
 | P5 | Opus | a GFM-escaped `\|` in a cell splits the row — a false red | Accepted (h) |
 | P6 | Opus | the W9 stub snippet and one RED-GREEN-RED row drifted from the code | Accepted (j) |
 
+## Code round 3 (epoch 2, cd3ccde) and its Opus review — findings and decisions (2026-10-29)
+
+`review_code` with `again: true` over `dce67ed..cd3ccde`: `proceed`, 8 of 8 reviewers, gating 1 of 5. Each claim checked on
+the lib first. None is a change to the parent's contract (§2 says only "trimmed", "the exact heading", "four cells").
+Fixed in `603b52b`.
+
+| # | Source | Finding | Decision |
+|---|---|---|---|
+| 0 | coai | two backslashes before a pipe escape each other in GFM; the lookbehind joins the cells | Accepted (m: one odd-backslash scan for split and unescape) |
+| Q1 | Opus | the near-miss heading spells one space between the words, so spacing variants went silent — a regression of 2.1-b | Accepted (k) |
+| Q2 | Opus | invisible format characters outside INDENT (LRM, soft hyphen, bidi controls) hide an indented line | Accepted (l: spaces, tabs, NBSP and the Cf category) |
+| Q3 | Opus | the test helper `asQuoted` retyped the old control range | Accepted (n: the lib's `clean`) |
+| Q4 | Opus, below threshold | two markers, `  - - 1.2 · …`, are silent | Declined as a fix, recorded as a known limit (K1, the lib header): reserving it would widen §2, the second contract change of epoch 2 and a full stop, for a shape that needs deliberate nesting and renders as a visibly nested bullet |
+| — | the caller | literal invisible characters in the test file's fixtures | Replaced by escapes; a scan finds none in the tool files |
+
 ## Dry run record
 
 Recorded 2026-10-28 by the E1 coder (Sonnet), on branch `feat/plan-change-control-e1` at `0c3febe0797a55ff8b704009b9095d3faae5be05`
