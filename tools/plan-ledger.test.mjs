@@ -914,6 +914,13 @@ test("I18b a format character BETWEEN two runs of spaces: the whole indent, form
   for (const line of [` \u200e - ${ID}`, `  \u2066 ${ID}`]) hidden(line, "I18b");
 });
 
+test("I22 every Unicode space after the indent is stripped with it: an ideographic space, an em space or a narrow no-break space hides no line", () => {
+  for (const space of ["\u3000", "\u2003", "\u202f"]) {
+    for (const line of [`  ${space}${ID}`, `  ${space}- ${ID}`]) hidden(line, "I22");
+    for (const line of [`${space}${ID}`, `${space}- ${ID}`]) said(under11(line), "unreadable line"); // pinned: red at column 0 as well
+  }
+});
+
 test("I19 a bidi control, an Arabic letter mark or a Mongolian vowel separator before a reserved shape hides nothing", () => {
   const epoch2 = "> Epoch 2 · approved 2026-10-28 · by reviewers · state: open";
   const lines = [` \u2066${epoch2}`, " \u202e### Re-review for epoch 2", " \u061c# x", ` \u180e1) ${ID}`, ` \u2061+ ${ID}`];
@@ -978,6 +985,11 @@ test("I21/4i a format character after the marker or inside the number does not h
   const lines = [`  - \u200b${ID}`, `  - 1\u200b.2 · 2026-10-26 · owner · epics — y`, `  - \u200e${ID}`, `  - 1\u200e.2 · 2026-10-26 · owner · epics — y`];
   for (const line of lines) hidden(line, "I21");
   said(under11(`- \u200b${ID}`), "unreadable entry"); // pinned: at column 0 the same line is red as well
+});
+
+test("K3 a heading styled with inline markup or a character reference is a known limit, recorded and not fixed: no ledger is seen", () => {
+  for (const heading of ["## **Plan changes**", "## *Plan changes*", "## `Plan changes`", "## Plan&nbsp;changes"]) clean(check(A2(), { heading }), heading);
+  said(check(A2(), { heading: "## Plan changes" }), "epoch 1 has 2 changes"); // the twin: the exact heading
 });
 
 test("K2 a setext heading over `---` or `===` is a known limit, recorded and not fixed: no ledger is seen", () => {

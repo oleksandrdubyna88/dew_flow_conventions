@@ -1367,3 +1367,18 @@ holds a format character.
 | `wt-plan-change-control` (closed epoch 1, its record, open epoch 2) | 0 | 0 | 0 | `plan-lifecycle: clean.` |
 
 Diff count over the whole table: **0**. `dew_flow_mcp` is not on this machine and is checked on its remote before the release (parent S9).
+
+**Sixth run, 2026-10-29 — the fifth fix-forward** (code round 5: `INDENT` = every Unicode space and format character; K3 recorded as a
+known limit), recorded by the E1 coder (Sonnet) on branch `feat/plan-change-control-e1` at `4d18e4d` + uncommitted fix-forward.
+Compared as in the runs above (`main`'s checker from the scratch folder against the worktree's, each checkout as `argv[2]`).
+
+**Prediction, written before this run's first command:** zero `changes` lines in the diff of the two outputs, for every checkout, and
+byte-identical outputs. The change widens only what an indented line may START with before a reserved shape (`INDENT`), which can
+add a finding only to a file that already carries a `## Plan changes` ledger — and only this worktree's parent plan does, whose
+indented lines hold no entry shape after a space character. It must still read clean.
+
+**Result of the sixth run: the prediction held.** Zero `changes` lines in the diff for every checkout, and `diff` printed nothing for any of
+the eleven (run at `4d18e4d214dc2ed46b631a43b66b427c473953f6` + uncommitted fix-forward): `dew_flow_benchmark`, `dew_flow_creds_for_devs` and
+`dew_flow_rag_qln` exit 1 on their existing `link` findings in both runs; `dew_flow_benchmark-wt` and `dew_flow_connect_other_ais-wt` have no
+`todo/` + `research/` pair; the other five and this worktree (closed epoch 1, its record, open epoch 2) print `plan-lifecycle: clean.`
+Diff count over the whole table: **0**. `dew_flow_mcp` is not on this machine and is checked on its remote before the release (parent S9).

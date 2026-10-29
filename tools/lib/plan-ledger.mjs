@@ -21,8 +21,11 @@
 // the parent's § 2, a contract change, so it is a known limit (code round 3, 2026-10-29); a setext heading (`Plan
 // changes` over `---` or `===`), which a reader may take for the ledger's but which the parent's § 2 does not name —
 // the ATX `## Plan changes` is the one heading — and which no plan of the estate writes: a second known limit, not
-// worth a second grammar (code round 4). What it does see is exactly the grammar below, and every line it cannot read
-// is a red, never a skip: an entry that fails to parse would otherwise lower the count in silence.
+// worth a second grammar (code round 4); a heading styled with inline markup or a character reference (`## **Plan
+// changes**`, `## *Plan changes*`, a code span, `## Plan&nbsp;changes`), which a reader takes for the ledger's but
+// which spells the heading differently from § 2's: a third known limit (code round 5). What it does see is exactly the
+// grammar below, and every line it cannot read is a red, never a skip: an entry that fails to parse would otherwise
+// lower the count in silence.
 //
 // The grammar, in one place. Text is folded (CRLF = LF) and a lone CR becomes a line ending too, as CommonMark reads it
 // (here and not in the shared `folded`, which feeds the hashed rule bodies), then stripped of fenced blocks through
@@ -32,16 +35,16 @@
 // heading, no ledger; a format character inside the heading is ignored, as a reader ignores it). Every pattern runs on
 // a line after `trimEnd()` and with each run of spaces or tabs folded to ONE space, except the tests that read the
 // original: the near-miss heading and the two on an indented line. A line that starts with a space or a tab is free
-// text — EXCEPT one that, with its indent stripped and its format characters removed (a renderer prints nothing for
-// them), starts like a ledger line: an entry (`- 1.2`, `* 1.2`, `1. 1.2`, a bare `1.2`), an epoch line (`>`) or a
-// heading (`#`), whatever follows. A renderer shows such a line as a list item, a quote or a heading, which a reader
-// counts, so it is a finding — `RESERVED_PREFIX`, parent § 2 — and is never parsed, never counted. Free text therefore
-// may not begin with an entry-shaped number, `>` or `#`. Fields are separated by " · " (U+00B7) and the cause follows "
-// — " (U+2014); `|`, `--`, `-` and the en dash are refused by a message that names the expected character, because a
-// second spelling of the format would be a second grammar to keep in step forever. Keywords and values are
-// case-sensitive. A pipe behind one or more backslashes is cell text, not a boundary (the cell keeps the run minus one
-// backslash). Every value a message quotes goes through `clean`: control and format characters become a space and a
-// long one is cut.
+// text — EXCEPT one that, with its indent stripped (every Unicode space and format character) and its format characters
+// removed (a renderer prints nothing for them), starts like a ledger line: an entry (`- 1.2`, `* 1.2`, `1. 1.2`, a bare
+// `1.2`), an epoch line (`>`) or a heading (`#`), whatever follows. A renderer shows such a line as a list item, a
+// quote or a heading, which a reader counts, so it is a finding — `RESERVED_PREFIX`, parent § 2 — and is never parsed,
+// never counted. Free text therefore may not begin with an entry-shaped number, `>` or `#`. Fields are separated by " ·
+// " (U+00B7) and the cause follows " — " (U+2014); `|`, `--`, `-` and the en dash are refused by a message that names
+// the expected character, because a second spelling of the format would be a second grammar to keep in step forever.
+// Keywords and values are case-sensitive. A pipe behind one or more backslashes is cell text, not a boundary (the cell
+// keeps the run minus one backslash). Every value a message quotes goes through `clean`: control and format characters
+// become a space and a long one is cut.
 //
 // Dependency-free on purpose: `plan-lifecycle.mjs` runs in every consumer's CI from the mounted rules, before any
 // `npm ci`, so this file imports from `./rule-body.mjs` and from nothing else.
@@ -87,10 +90,11 @@ const TABLE_SEPARATOR = /^:?-+:?$/;
  *  every format character (category `Cf`: directional marks and isolates, zero-width characters, the soft hyphen, the
  *  byte-order mark …). One definition — the indent and the heading test below use the same category. */
 const CONTROL = /[\u0000-\u001f\u007f-\u009f\p{Cf}]/gu;
-/** The indent of a free-text line and what a renderer prints nothing for beside it: space, tab, NBSP and every format
- *  character (category `Cf` — zero-width spaces and joiners, directional marks and isolates, the soft hyphen, the byte-
- *  order mark …), so no enumeration can fall behind. `trim()` is NOT this set (it keeps U+200B). */
-const INDENT = /^[ \t\u00a0\p{Cf}]+/u;
+/** The indent of a free-text line and what a renderer prints nothing for beside it: every Unicode space (`\s`: space, tab,
+ *  NBSP, the ideographic and en/em spaces, the narrow no-break space …) and every format character (category `Cf`:
+ *  zero-width spaces and joiners, directional marks and isolates, the soft hyphen, the byte-order mark …), so no
+ *  enumeration can fall behind. `trim()` is NOT this set (it keeps U+200B). */
+const INDENT = /^[\s\p{Cf}]+/u;
 /** A format character prints nothing; the tests that ask what a line READS as remove them first. */
 const FORMAT = /\p{Cf}/gu;
 export const QUOTE_LIMIT = 160;
