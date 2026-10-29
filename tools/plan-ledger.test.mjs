@@ -23,7 +23,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  APPROVERS, KINDS, ledgerFindings, parentPlanOf, SOURCES, STATES, STOP_PHRASE, VERDICTS,
+  APPROVERS, KINDS, ledgerFindings, parentPlanOf, QUOTE_LIMIT, RESERVED_PREFIX, SOURCES, STATES, STOP_PHRASE, VERDICTS,
 } from "./lib/plan-ledger.mjs";
 import { outsideFencedBlocks, sectionsOf } from "./lib/rule-body.mjs";
 
@@ -87,16 +87,16 @@ const plan = (ledger, { status = IN_PROGRESS, heading = "## Plan changes", next 
   ["# PLAN — x", "", status, "", heading, "", ...ledger, "", next, "", "Body.", ""].join("\n");
 
 /** Run the lib on one text with LF AND CRLF; the two must agree, and every message must name the file. */
-function run(text, { file = FILE, status = "in progress", parentInTodo = false } = {}) {
-  const found = ledgerFindings({ file, text, status, parentInTodo });
+function run(text, { file = FILE, status = "in progress", parent = null } = {}) {
+  const found = ledgerFindings({ file, text, status, parent });
   assert.ok(Array.isArray(found), `ledgerFindings must return an array, not ${typeof found}`);
-  const crlf = ledgerFindings({ file, text: text.replaceAll("\n", "\r\n"), status, parentInTodo });
+  const crlf = ledgerFindings({ file, text: text.replaceAll("\n", "\r\n"), status, parent });
   assert.deepEqual(crlf, found, "CRLF must read exactly like LF");
   for (const message of found) assert.ok(message.startsWith(`${file} — `), `a message starts with the file: ${message}`);
   return found;
 }
-const check = (ledger, { status = IN_PROGRESS, heading, next, file, parentInTodo } = {}) =>
-  run(plan(ledger, { status, heading, next }), { status, file, parentInTodo });
+const check = (ledger, { status = IN_PROGRESS, heading, next, file, parent } = {}) =>
+  run(plan(ledger, { status, heading, next }), { status, file, parent });
 
 /** The finding text must hold every needle; the failure prints what WAS found, which is the whole diagnosis. */
 function said(found, ...needles) {
@@ -121,6 +121,9 @@ test("the lists are the contract: pinned to the parent plan's §2, and frozen", 
   assert.deepEqual([...VERDICTS], ["fits", "cut", "—"]);
   assert.equal(STOP_PHRASE.source, "\\bstopped for re-review\\b");
   assert.equal(STOP_PHRASE.flags, "i");
+  // parent § 2, the reserved prefixes (epoch 2, entry 1.2): an entry shape, `>` or `#` — the constant IS the contract
+  assert.equal(RESERVED_PREFIX.source, "^(?:[>#]|(?:[-*+]\\s+)?[1-9]\\d*\\.[1-9]\\d*(?=\\s|$))");
+  assert.equal(RESERVED_PREFIX.flags, "");
   for (const list of [SOURCES, KINDS, STATES, APPROVERS, VERDICTS]) assert.ok(Object.isFrozen(list), "a list is frozen: nobody edits the contract at run time");
 });
 
@@ -280,11 +283,14 @@ test("G17 a column-0 paragraph, rule, stray table row or stray Narrowed line is 
   }
 });
 
-test("C10 indented lines under an entry are free text, whatever they hold; the same dash at column 0 is red", () => {
-  const withNotes = [...A(), "  continuation of the cause", "  (a parenthesis line)", "  - a dash line", "  > a quote", "  | a | b |", "  # a hash"];
+test("C10 indented lines under an entry are free text unless they start like a ledger line; the same dash at column 0 is red", () => {
+  // `> …` and `# …` are reserved since the stop (parent § 2, entry 1.2): they are red cases of the I-scenarios below.
+  const withNotes = [...A(), "  continuation of the cause", "  (a parenthesis line)", "  - a dash line", "  | a | b |"];
   clean(check(withNotes));
   clean(check([...A(), "\ta tabbed line"]));
   said(check([...A(), "  continuation", "- a dash line"]), "unreadable entry");
+  // the second twin: the dash line made entry-shaped and left indented is not free text any more
+  said(check([...A(), "  continuation", " - 1.2 · 2026-10-26 · owner · epics — y"]), "a ledger line stands at column 0");
 });
 
 test("G19 a repeated kind is harmless; an unknown one is not", () => {
@@ -454,10 +460,21 @@ test("row 8 — a narrowed re-review approved by reviewers is red; by owner it i
 // ---- row 9 ----
 
 test("row 9 — a stories document with a ledger, whose parent is in todo/, is red; without a parent it is clean", () => {
-  const found = check(A(), { file: "todo/PLAN_x_E1.md", parentInTodo: true });
-  said(found, "its changes count in the parent", "PLAN_x.md");
-  clean(check(A(), { file: "todo/PLAN_x_E1.md", parentInTodo: false }));
-  clean(check(A(), { file: "todo/PLAN_x.md", parentInTodo: false }));
+  const found = check(A(), { file: "todo/PLAN_x_E1.md", parent: "todo/PLAN_x.md" });
+  said(found, "its changes count in the parent", "todo/PLAN_x.md");
+  clean(check(A(), { file: "todo/PLAN_x_E1.md", parent: null }));
+  clean(check(A(), { file: "todo/PLAN_x.md", parent: null }));
+});
+
+test("row 9b — the lib prints the parent it was GIVEN and never guesses one: `PLAN_a_E1_b_E2.md` resolved to `PLAN_a.md`", () => {
+  const found = check(A(), { file: "todo/PLAN_a_E1_b_E2.md", parent: "todo/PLAN_a.md" });
+  said(found, "its changes count in the parent, todo/PLAN_a.md");
+  // (the file's own name holds `PLAN_a_E1_b`, so the guessed NAME — with its `.md` — is what must be absent)
+  assert.ok(!found.join("\n").includes("PLAN_a_E1_b.md"), `the lib re-derived a name instead of printing the given one:\n${found.join("\n")}`);
+  // the twin: no parent given, no row 9 — whatever the file is called
+  clean(check(A(), { file: "todo/PLAN_a_E1_b_E2.md" }));
+  // and the row is about a ledger: a stories document with no ledger heading is not read at all
+  clean(run("# PLAN — x\n\n" + IN_PROGRESS + "\n\nNo ledger.\n", { file: "todo/PLAN_a_E1_b_E2.md", parent: "todo/PLAN_a.md" }));
 });
 
 // ---- C6, C9: the reset and the parent plan's own shape ----
@@ -548,6 +565,228 @@ test("F9 the edges of the fence rules: info strings, closers with text, other ch
   assert.equal(outsideFencedBlocks([TICKS, "a", "~~~", "b"].join("\n")), "\n\n\n");
 });
 
+// ---- G11b, G15b, T7: the fixes the stop accepted (E1.S3, fix forward b, c, e) ----
+
+test("G11b two records for an epoch that does not exist yet are red while the plan is stopped; one is the re-review in progress", () => {
+  clean(check(R(), { status: STOPPED })); // G10: the twin with ONE record
+  const found = check([...A2("stopped"), "", ...record(2), "", ...record(2)], { status: STOPPED });
+  said(found, "two re-review records for epoch 2");
+  assert.equal(found.length, 1, `uniqueness is checked once per epoch number, over all records:\n${found.join("\n")}`);
+});
+
+test("G15b a Narrowed line that is not `Narrowed: yes|no` with an optional ` — reason` names its line and the dash it wants", () => {
+  const bad = ["Narrowed: no - nothing left", "Narrowed: no – x", "Narrowed: no —x", "Narrowed: maybe"];
+  for (const narrowed of bad) {
+    const text = plan(B({ rec: { narrowed } }));
+    const at = text.split("\n").indexOf(narrowed) + 1;
+    assert.ok(at > 0, `the fixture holds the line: ${narrowed}`);
+    said(run(text), "Narrowed", `line ${at}`, "U+2014", `"${narrowed}"`);
+  }
+  // the twins are G15's: `Narrowed: no — nothing left` and the bare line stay clean
+  clean(check(B({ rec: { narrowed: "Narrowed: no — nothing left" } })));
+  clean(check(B({ rec: { narrowed: "Narrowed: no" } })));
+});
+
+test("T7 every value a message quotes is cleaned like the line is: control characters become a space, and a long one is cut with `…`", () => {
+  const dirty = "own\u001b[31mer";
+  const long = "v".repeat(400);
+  const header = (cell) => B({ rec: { table: ["| Work | Where | " + cell + " | Action |", "|---|---|---|---|", FITS] } });
+  const verdict = (cell) => B({ rec: { table: [...HEADER, `| x | y | ${cell} | z |`] } });
+  const rows = [
+    { field: "number", ledger: (v) => [epoch(1), "", `- ${v} · 2026-10-26 · owner · epics — x`], quoted: /number "([^"]*)" is not/ },
+    { field: "date", ledger: (v) => [epoch(1), "", entry("1.1", { date: v })], quoted: /date "([^"]*)" is not a calendar date/ },
+    { field: "source", ledger: (v) => [epoch(1), "", entry("1.1", { source: v })], quoted: /unknown source "([^"]*)"/ },
+    { field: "kind", ledger: (v) => [epoch(1), "", entry("1.1", { kinds: v })], quoted: /unknown kind "([^"]*)"/ },
+    { field: "table header cell", ledger: header, quoted: /not "\| (.*) \|"/ },
+    { field: "verdict", ledger: verdict, quoted: /verdict "([^"]*)" in row/ },
+  ];
+  for (const { field, ledger, quoted } of rows) {
+    const control = check(ledger(dirty));
+    assert.ok(control.length > 0, `${field}: the dirty value is a finding`);
+    for (const message of control) assert.ok(!message.includes("\u001b"), `${field}: a control character reached a message: ${JSON.stringify(message)}`);
+    said(control, "own [31mer"); // a space stands where the escape was
+
+    const cut = check(ledger(long)).map((message) => quoted.exec(message)?.[1]).find((value) => value !== undefined);
+    assert.ok(cut !== undefined, `${field}: no message quotes the value`);
+    assert.ok(cut.endsWith("…"), `${field}: a long value is cut with …, got ${cut.length} characters`);
+    assert.ok(cut.length <= QUOTE_LIMIT + 1, `${field}: at most QUOTE_LIMIT + 1 characters, got ${cut.length}`);
+  }
+});
+
+// ---- the reserved prefixes (parent § 2, entry 1.2; E1.S1 I1-I17 and the matrix) ----
+
+const RESERVED_MESSAGE = "a ledger line stands at column 0";
+const ID = "1.2 · 2026-10-26 · owner · epics — y"; // an entry without its marker
+/** A line as the lib quotes it: a control character, a tab included, becomes a space. The lib's own range, retyped here once. */
+const asQuoted = (line) => `"${line.replace(/[\u0000-\u001f\u007f]/g, " ")}"`;
+/** `line` right under entry 1.1 of A: line 10 of the `plan` helper's text. */
+const under11 = (line, opts) => check([...A(), line], opts);
+
+/** The one red shape: the reserved message, the line quoted as written, and NOTHING else — the line is neither parsed nor counted. */
+function expectHidden(found, line, why, at = 10) {
+  const all = found.join("\n");
+  const needles = [RESERVED_MESSAGE, asQuoted(line), ...(at === null ? [] : [`line ${at}`])];
+  for (const needle of needles) assert.ok(all.includes(needle), `${why}: expected ${needle} for ${JSON.stringify(line)}, got:\n${all === "" ? "(no findings)" : all}`);
+  assert.equal(found.length, 1, `${why}: the indented line is the only finding for ${JSON.stringify(line)}, got:\n${all}`);
+}
+const hidden = (line, why) => expectHidden(under11(line), line, why);
+
+test("I1 an entry indented one space is not free text: it renders as a sibling list item a reader counts", () => {
+  hidden(` - ${ID}`, "I1");
+  // the twin: at column 0 the same line IS an entry, and the second change of an open epoch is row 1 — never this message
+  const col0 = under11(`- ${ID}`);
+  said(col0, "entries 1.1, 1.2");
+  assert.ok(!col0.join("\n").includes(RESERVED_MESSAGE));
+});
+
+test("I2 a bare id indented is hidden; at column 0 it is red as an unreadable line, and the dashed entry is the twin that parses", () => {
+  hidden(`  ${ID}`, "I2");
+  said(under11(ID), "unreadable line");
+  said(under11(`- ${ID}`), "entries 1.1, 1.2");
+});
+
+test("I3 a tab is an indent, and a tab after the marker is whitespace", () => {
+  for (const line of [`\t- ${ID}`, `\t\t${ID}`, `  -\t${ID}`]) hidden(line, "I3");
+  said(under11(`- ${ID}`), "entries 1.1, 1.2");
+});
+
+test("I4 the marker is beside the point: ` * ` and ` + ` are bullets too", () => {
+  for (const line of [` * ${ID}`, ` + ${ID}`]) hidden(line, "I4");
+  said(under11(`* ${ID}`), "unreadable entry"); // 4e: red at column 0 as well
+});
+
+test("I5 multi-digit ids are entry numbers, and an id alone on its line is one", () => {
+  for (const line of ["  10.1 · 2026-10-26 · owner · epics — y", "  1.20 · 2026-10-26 · owner · epics — y", "  1.2"]) hidden(line, "I5");
+});
+
+test("I6 what is not an entry shape stays free text: the id is followed by a dot, a colon, a dash, or is not first", () => {
+  const free = [
+    "  1.2.3 was the version", "  1.0 is not an entry number", "  0.1 neither", "  1.2: a colon", "  (1.2) in parentheses",
+    "  version 1.2 shipped", "  1. a numbered list", "  - 1.2—x",
+  ];
+  for (const line of free) clean(under11(line), line);
+});
+
+test("I6 twin — the first of them with `1.2 ·` in place of `1.2.3` is an entry shape again", () => {
+  hidden("  1.2 · was the version", "I6 twin");
+});
+
+test("I7 prose that begins with an entry-shaped number is red by design; reworded, it is free text", () => {
+  for (const line of ["  1.2 was the version we shipped", "  - 1.2 is where it broke"]) hidden(line, "I7");
+  clean(under11("  version 1.2 shipped"));
+});
+
+test("I8 an invisible character after the indent is stripped with it; at column 0 it is today's unreadable line", () => {
+  for (const line of ["  - 1.2 · 2026-10-26 · owner · epics — y", " ​1.2 · 2026-10-26 · owner · epics — y", " ﻿- 1.2 · 2026-10-26 · owner · epics — y"]) {
+    hidden(line, "I8");
+  }
+  for (const line of [" - 1.2 · 2026-10-26 · owner · epics — y", "​- 1.2 · 2026-10-26 · owner · epics — y"]) {
+    said(under11(line), "unreadable line"); // pinned: an invisible character never hides an entry on either side of column 0
+  }
+});
+
+test("I9 the test runs before the record logic: a hidden entry under a record's table or its Narrowed line is the only finding", () => {
+  const rec = record(2);
+  const afterNarrowed = (line) => [...rec.slice(0, 3), line, ...rec.slice(3)]; // rec[2] is the Narrowed line
+  const cases = [
+    { line: " - 2.2 · 2026-10-28 · owner · scope — z", custom: [...rec, " - 2.2 · 2026-10-28 · owner · scope — z"] },
+    { line: "  1.3 · 2026-10-26 · owner · scope — z", custom: afterNarrowed("  1.3 · 2026-10-26 · owner · scope — z") },
+  ];
+  for (const { line, custom } of cases) expectHidden(check(B({ custom })), line, "I9", null);
+  // the twins at column 0: `- 1.3` is an entry of the closed epoch 1 and parses; `- 2.2` there stands under epoch 1's line
+  clean(check(B({ custom: afterNarrowed("- 1.3 · 2026-10-26 · owner · scope — z") })));
+  said(check(B({ custom: [...rec, "- 2.2 · 2026-10-28 · owner · scope — z"] })), "entry 2.2 stands under epoch 1's line");
+});
+
+test("I10 an example is not a record: the same lines inside any fence are nothing", () => {
+  const lines = [` - ${ID}`, `  ${ID}`, `\t- ${ID}`, `\t\t${ID}`, `  -\t${ID}`];
+  for (const options of [{}, { marker: "~~~" }, { indent: "  " }]) {
+    clean(check([...A(), ...fence(lines, options)]), JSON.stringify(options));
+  }
+});
+
+test("I10 twin — the same lines with the fence markers removed are red", () => {
+  const lines = [` - ${ID}`, `  ${ID}`, `\t- ${ID}`, `\t\t${ID}`, `  -\t${ID}`];
+  said(check([...A(), ...lines]), RESERVED_MESSAGE);
+});
+
+test("I11 ordinary continuation prose stays clean, the parent plan's own shape included", () => {
+  const prose = ["  continues the cause of 1.1 in prose", "  and carries on with a second line"];
+  clean(check([epoch(1, { state: "stopped" }), "", E11, ...prose, E12, ...prose], { status: STOPPED }));
+  clean(check(P));
+});
+
+test("I12 the reserved message quotes through the one cleaning function: no escape, cut at QUOTE_LIMIT with …", () => {
+  const line = ` - 1.2 · 2026-10-26 · owner · epics — \u001b[31m${"x".repeat(400)}`;
+  const found = under11(line);
+  assert.equal(found.length, 1);
+  assert.ok(!found[0].includes("\u001b"), "no control character in the message");
+  const quoted = /line 10 "([^"]*)"/.exec(found[0])?.[1];
+  assert.ok(quoted !== undefined && quoted.endsWith("…"), `the quote ends in …: ${quoted}`);
+  assert.equal(quoted.length, QUOTE_LIMIT + 1);
+  said(found, RESERVED_MESSAGE);
+});
+
+test("I13 an epoch line indented is hidden; at column 0 it is an epoch line and never this message", () => {
+  const epoch2 = "> Epoch 2 · approved 2026-10-28 · by reviewers · state: open";
+  for (const line of [` ${epoch2}`, `\t${epoch2}`]) hidden(line, "I13");
+  const col0 = under11(epoch2);
+  said(col0, "epoch 1 is not closed", "no re-review for epoch 2");
+  assert.ok(!col0.join("\n").includes(RESERVED_MESSAGE));
+});
+
+test("I14 a record heading indented opens nothing: its Narrowed line and table stand outside any record", () => {
+  const indented = R().map((line) => (line === "### Re-review for epoch 2" ? ` ${line}` : line));
+  assert.ok(indented.includes(" ### Re-review for epoch 2"), "the fixture holds the indented heading");
+  const found = check(indented, { status: STOPPED });
+  said(found, RESERVED_MESSAGE, "unreadable line", "Narrowed: no");
+  clean(check(R(), { status: STOPPED })); // G10: at column 0 it parses as a record heading
+});
+
+test("I15 free text may not begin with `>` or `#`: red by design; reworded, or at column 0 as a heading, it is not", () => {
+  for (const line of ["  > note: the reviewer asked for this", "  #1 priority", "  #hashtag", "  >", "  ># x"]) hidden(line, "I15");
+  for (const line of ["  note: the reviewer asked for this", "  (quoted) the reviewer asked for this"]) clean(under11(line), line);
+  clean(under11("# Part two")); // a heading at column 0 ends the section (G1)
+});
+
+test("I16 the same invisible characters are stripped for an epoch line and a heading; at column 0 it stays an unreadable line", () => {
+  const epoch2 = "> Epoch 2 · approved 2026-10-28 · by reviewers · state: open";
+  for (const line of [`  ${epoch2}`, " ​### Re-review for epoch 2"]) hidden(line, "I16");
+  said(under11(` ${epoch2}`), "unreadable line");
+  said(under11("​### Re-review for epoch 2"), "unreadable line");
+});
+
+test("I17 hidden lines inside a record are the only finding; at column 0 they are a second record and a repeated epoch", () => {
+  const rec = record(2);
+  const heading = " ### Re-review for epoch 2";
+  const quote2 = "  > Epoch 2 · approved 2026-10-28 · by reviewers · state: open";
+  expectHidden(check(B({ custom: [...rec.slice(0, 3), heading, ...rec.slice(3)] })), heading, "I17 heading", null);
+  expectHidden(check(B({ custom: [...rec, quote2] })), quote2, "I17 epoch line", null);
+  said(check(B({ custom: [...rec.slice(0, 3), heading.trim(), ...rec.slice(3)] })), "two re-review records for epoch 2");
+  said(check(B({ custom: [...rec, quote2.trim()] })), "epochs not 1, 2, 3", "found 1, 2, 2");
+});
+
+// The matrix: one test per row, so the row's input is in every failure's name and a revert shows which rows went red.
+const MATRIX_SHAPES = [
+  `- ${ID}`, `* ${ID}`, `+ ${ID}`, ID, "> Epoch 2 · approved 2026-10-28 · by reviewers · state: open", "### Re-review for epoch 2", "> note", "# x",
+];
+const MATRIX = [
+  ...[" ", "  ", "\t"].flatMap((indent) => MATRIX_SHAPES.map((shape) => ({ line: indent + shape, red: true }))),
+  { line: "  continues the cause of 1.1 in prose", red: false },
+  { line: ` - ${ID}`, red: false, fenced: true },
+];
+test("the matrix has twenty-four red rows (3 indents x 8 shapes) and two clean ones", () => {
+  assert.equal(MATRIX.length, 26);
+  assert.equal(MATRIX.filter((row) => row.red).length, 24);
+});
+for (const { line, red, fenced } of MATRIX) {
+  test(`matrix ${red ? "red" : "clean"}: ${JSON.stringify(line)}${fenced ? " inside a fence" : ""}`, () => {
+    const found = check([...A(), ...(fenced ? fence([line]) : [line])]);
+    if (red) expectHidden(found, line, "matrix");
+    else clean(found, "matrix");
+  });
+}
+
 // ---- C12 and robustness: never a throw, whatever the text ----
 
 test("C12 the CRLF twin of a fixture really is CRLF (the helper would otherwise compare a text with itself)", () => {
@@ -571,12 +810,12 @@ test("the lib never throws on any text, and reads a hostile corpus as findings",
   for (let round = 0; round < 400; round += 1) {
     const lines = Array.from({ length: 1 + next(14) }, () => pool[next(pool.length)]);
     if (round % 3 === 0) lines.unshift("## Plan changes");
-    const found = ledgerFindings({ file: FILE, text: lines.join("\n"), status: "stopped for re-review", parentInTodo: round % 2 === 0 });
+    const found = ledgerFindings({ file: FILE, text: lines.join("\n"), status: "stopped for re-review", parent: round % 2 === 0 ? "todo/PLAN_x.md" : null });
     assert.ok(Array.isArray(found) && found.every((m) => typeof m === "string"), `round ${round}`);
     if (found.length > 0) withFindings += 1;
   }
   for (const text of ["", "\n", "\r\n", "## Plan changes", "## Plan changes\n", TICKS, "\0\0\0", "𐀀"]) {
-    assert.ok(Array.isArray(ledgerFindings({ file: FILE, text, status: "", parentInTodo: false })), JSON.stringify(text));
+    assert.ok(Array.isArray(ledgerFindings({ file: FILE, text, status: "", parent: null })), JSON.stringify(text));
   }
   // the twin of "never throws": the corpus is not so tame that nothing was ever read
   assert.ok(withFindings > 50, `the corpus produced findings in only ${withFindings} of 400 rounds`);

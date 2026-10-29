@@ -3,9 +3,9 @@
 // What it reads. The `## Plan changes` section of a plan in `todo/`, in the format of
 // `todo/PLAN_plan_change_control.md` § 2 (the rule that gives it meaning is `common/plan-change-control.md`): epoch
 // lines, entries, and the re-review records that separate one epoch from the next. `ledgerFindings` takes the file's
-// text, its status paragraph and one fact about its neighbours, and returns the findings as plain strings. Nothing
-// here reads the file system, the clock or the environment, and nothing throws on any text — the caller wraps each
-// plan in a `try` anyway, because a crash here would turn every consumer's CI red with a stack, and a throw that
+// text, its status paragraph and the name of its parent plan (or `null`), and returns the findings as plain strings.
+// Nothing here reads the file system, the clock or the environment, and nothing throws on any text — the caller wraps
+// each plan in a `try` anyway, because a crash here would turn every consumer's CI red with a stack, and a throw that
 // reaches the caller is a defect of this file.
 //
 // What the check cannot see. It reads the ledger as it stands in the checkout — never git history, never the diff. It
@@ -21,11 +21,16 @@
 //
 // The grammar, in one place. Text is folded (CRLF = LF), then stripped of fenced blocks through `outsideFencedBlocks`
 // (the one fence definition; a fenced line becomes an empty line, so a finding can say "line 90"). Every pattern runs
-// on a line after `trimEnd()` and with each run of spaces or tabs folded to ONE space, except the free-text test,
-// which reads the original line: a line that starts with a space or a tab is free text whatever it holds. Fields are
-// separated by " · " (U+00B7) and the cause follows " — " (U+2014); `|`, `--`, `-` and the en dash are refused by a
-// message that names the expected character, because a second spelling of the format would be a second grammar to
-// keep in step forever. Keywords and values are case-sensitive.
+// on a line after `trimEnd()` and with each run of spaces or tabs folded to ONE space, except the two tests on an
+// indented line, which read the original. A line that starts with a space or a tab is free text — EXCEPT one that,
+// with its indent (and the invisible characters a renderer ignores) stripped, starts like a ledger line: an entry
+// (`- 1.2`, `* 1.2`, a bare `1.2`), an epoch line (`>`) or a heading (`#`), whatever follows. A renderer shows such a
+// line as a list item, a quote or a heading, which a reader counts, so it is a finding — `RESERVED_PREFIX`, parent
+// § 2 — and is never parsed, never counted. Free text therefore may not begin with an entry-shaped number, `>` or `#`.
+// Fields are separated by " · " (U+00B7) and the cause follows " — " (U+2014); `|`, `--`, `-` and the en dash are
+// refused by a message that names the expected character, because a second spelling of the format would be a second
+// grammar to keep in step forever. Keywords and values are case-sensitive. Every value a message quotes goes through
+// `clean`: control characters become a space and a long one is cut.
 //
 // Dependency-free on purpose: `plan-lifecycle.mjs` runs in every consumer's CI from the mounted rules, before any
 // `npm ci`, so this file imports from `./rule-body.mjs` and from nothing else.
@@ -44,6 +49,10 @@ export const VERDICTS = Object.freeze(["fits", "cut", "—"]);
  *  the `misfiled` check read ONE phrase: a stopped plan may say what is done without being called finished. */
 export const STOP_PHRASE = /\bstopped for re-review\b/i;
 
+/** An indented line that starts like a ledger line (parent § 2, entry 1.2): an entry, an epoch line (`>`) or a heading
+ *  (`#`). One regex, three shapes, tested on the line with its indent stripped. */
+export const RESERVED_PREFIX = /^(?:[>#]|(?:[-*+]\s+)?[1-9]\d*\.[1-9]\d*(?=\s|$))/;
+
 const HEADING = /^## Plan changes$/;
 const NEAR_HEADING = /^## plan changes$/i;
 const SECTION_END = /^#{1,2} /;
@@ -57,7 +66,10 @@ const ENTRY_NUMBER = /^([1-9]\d*)\.([1-9]\d*)$/;
 const TABLE_HEADER = ["Work", "Where", "Verdict", "Action"];
 const TABLE_SEPARATOR = /^:?-+:?$/;
 const CONTROL = /[\u0000-\u001f\u007f]/g;
-const QUOTE_LIMIT = 160;
+/** The indent of a free-text line and the characters a renderer ignores beside it: space, tab, NBSP, the zero-width
+ *  spaces and joiners, the word joiner and the byte-order mark. `trim()` is NOT this set (it keeps U+200B). */
+const INDENT = /^[ \t\u00a0\u200b-\u200d\u2060\ufeff]+/;
+export const QUOTE_LIMIT = 160;
 
 const FIELD_SEPARATOR = '" · " (U+00B7)';
 const CAUSE_SEPARATOR = '" — " (U+2014)';
@@ -65,11 +77,16 @@ const CAUSE_SEPARATOR = '" — " (U+2014)';
 /** A line the way every pattern reads it: trailing whitespace gone, each run of spaces or tabs one space. */
 const fold = (line) => line.trimEnd().replace(/[ \t]+/g, " ");
 
-/** A line as a message quotes it: the original, shortened, with control characters made harmless to a terminal. */
-function quote(raw) {
-  const text = raw.trimEnd().replace(CONTROL, " ");
-  return `"${text.length > QUOTE_LIMIT ? `${text.slice(0, QUOTE_LIMIT)}…` : text}"`;
+/** A value as a message shows it: control characters (an escape sequence included) made a space, and a long one cut
+ *  with `…`. The ONE cleaning function: a quoted line and every quoted field value go through it, and so does a
+ *  message the caller catches. */
+export function clean(value) {
+  const text = String(value).replace(CONTROL, " ");
+  return text.length > QUOTE_LIMIT ? `${text.slice(0, QUOTE_LIMIT)}…` : text;
 }
+
+/** A line as a message quotes it: the original, indent kept, trailing whitespace gone, cleaned. */
+const quote = (raw) => `"${clean(raw.trimEnd())}"`;
 
 /** `s` must be a real calendar date: the shape first, then a round trip (`2026-02-30` and `2026-13-01` are not). */
 function isCalendarDate(s) {
@@ -119,12 +136,12 @@ function parseEntry(raw) {
   const [number, date, source, kinds] = fields;
   const id = ENTRY_NUMBER.exec(number);
   if (id === null || !Number.isSafeInteger(Number(id[1])) || !Number.isSafeInteger(Number(id[2]))) {
-    return { detail: `number "${number}" is not <k>.<n>` };
+    return { detail: `number "${clean(number)}" is not <k>.<n>` };
   }
-  if (!isCalendarDate(date)) return { detail: `date "${date}" is not a calendar date YYYY-MM-DD` };
-  if (!SOURCES.includes(source)) return { detail: `unknown source "${source}" (${oneOf(SOURCES)})` };
+  if (!isCalendarDate(date)) return { detail: `date "${clean(date)}" is not a calendar date YYYY-MM-DD` };
+  if (!SOURCES.includes(source)) return { detail: `unknown source "${clean(source)}" (${oneOf(SOURCES)})` };
   for (const kind of kinds.split(/\s*,\s*/)) {
-    if (!KINDS.includes(kind)) return { detail: `unknown kind "${kind}" (${oneOf(KINDS)})` };
+    if (!KINDS.includes(kind)) return { detail: `unknown kind "${clean(kind)}" (${oneOf(KINDS)})` };
   }
   return { entry: { k: Number(id[1]), n: Number(id[2]), id: number, line: raw } };
 }
@@ -139,8 +156,8 @@ function parseEpoch(raw) {
     };
   }
   const [, k, date, approver, state] = found;
-  if (!Number.isSafeInteger(Number(k))) return { detail: `epoch number "${k}" is too large` };
-  if (!isCalendarDate(date)) return { detail: `date "${date}" is not a calendar date YYYY-MM-DD` };
+  if (!Number.isSafeInteger(Number(k))) return { detail: `epoch number "${clean(k)}" is too large` };
+  if (!isCalendarDate(date)) return { detail: `date "${clean(date)}" is not a calendar date YYYY-MM-DD` };
   return { epoch: { k: Number(k), date, approver, state, entries: [] } };
 }
 
@@ -156,31 +173,84 @@ function sectionOf(lines, headingAt) {
   return { start: headingAt + 1, end };
 }
 
+/** A column-0 line that is no line kind of the grammar: red, never free text (an entry that lost its `- ` lands here). */
+function unreadableLine(model, raw, say) {
+  model.findings.push(say(
+    `unreadable line ${quote(raw)} — a ledger line is an epoch line, an entry, a re-review heading, a Narrowed line or ` +
+    "a table row; put free text on an indented line",
+  ));
+}
+
+/**
+ * An indented line is free text — unless, with its indent stripped, it starts like a ledger line (`RESERVED_PREFIX`).
+ * That one is a finding and nothing else: it is not parsed, not counted, and opens or closes no record or block.
+ */
+function readIndented(model, raw, at, say) {
+  if (!RESERVED_PREFIX.test(raw.replace(INDENT, ""))) return;
+  model.findings.push(say(
+    `a ledger line stands at column 0: line ${at} ${quote(raw)} is indented and starts like a ledger line — an entry, an ` +
+    "epoch line (>) or a heading (#) — which a renderer shows as a list item, a quote or a heading a reader counts; " +
+    "move it to column 0, or reword the free text",
+  ));
+}
+
+/** One entry line: it joins the block it stands in (an entry above the first epoch line is kept apart), or it is red. */
+function readEntry(model, raw, at, say) {
+  const { entry, detail } = parseEntry(raw);
+  if (entry === undefined) model.findings.push(say(`unreadable entry ${quote(raw)} — ${detail}`));
+  else if (model.epochs.length === 0) model.orphans.push({ ...entry, line: at });
+  else model.epochs.at(-1).entries.push({ ...entry, line: at });
+}
+
+/** The kinds that belong to a re-review record: its heading (which opens it), its `Narrowed` line and its table rows. */
+function readRecordLine(model, raw, line, at, say) {
+  if (line.startsWith("###")) {
+    const heading = RECORD_HEADING.exec(line);
+    if (heading === null) {
+      model.findings.push(say(`unreadable re-review heading ${quote(raw)} — it must read "### Re-review for epoch <k>"`));
+      model.open = null;
+      return;
+    }
+    model.open = { k: Number(heading[1]), line: at, narrowed: [], narrowedUnreadable: false, header: null, rows: [] };
+    model.records.push(model.open);
+  } else if (model.open === null) {
+    unreadableLine(model, raw, say); // a Narrowed line or a table row outside a record
+  } else if (line.startsWith("|")) {
+    addTableRow(model.open, line);
+  } else {
+    const narrowed = NARROWED_LINE.exec(line);
+    if (narrowed === null) {
+      model.open.narrowedUnreadable = true;
+      model.findings.push(say(
+        `re-review for epoch ${model.open.k}: unreadable Narrowed line at line ${at} ${quote(raw)} — it reads ` +
+        `"Narrowed: yes|no", optionally followed by ${CAUSE_SEPARATOR} and a reason`,
+      ));
+    } else model.open.narrowed.push(narrowed[1]);
+  }
+}
+
 /**
  * The walk, top to bottom: every line of the section is one of the grammar's line kinds or a finding.
  *
  * The model is plain data so a test can read what the parser saw when a message is wrong:
  * `epochs: [{ k, date, approver, state, line, entries }]` (an entry belongs to the block it stands in) and
- * `records: [{ k, line, narrowed, narrowedUnreadable, header, rows }]`. `structural` is true when a row-3 finding was
- * pushed: the shape of the section itself cannot be trusted, and the state checks do not run.
+ * `records: [{ k, line, narrowed, narrowedUnreadable, header, rows }]`; `open` is the record the walk is inside.
+ * `structural` is true when a row-3 finding was pushed: the shape of the section itself cannot be trusted, and the
+ * state checks do not run.
  */
 function parse(lines, { start, end }, say) {
-  const model = { epochs: [], records: [], orphans: [], findings: [], structural: false, unreadableEpoch: false };
-  let record = null;
-  const unreadableLine = (raw) => model.findings.push(say(
-    `unreadable line ${quote(raw)} — a ledger line is an epoch line, an entry, a re-review heading, a Narrowed line or ` +
-    "a table row; put free text on an indented line",
-  ));
-
+  const model = { epochs: [], records: [], orphans: [], findings: [], open: null, structural: false, unreadableEpoch: false };
   for (let i = start; i < end; i += 1) {
     const raw = lines[i];
     const line = fold(raw);
     const at = i + 1;
-    if (raw.trim() === "" || /^[ \t]/.test(raw)) continue; // blank, or free text whatever it holds
+    if (raw.trim() === "") continue;
 
-    if (line.startsWith(">")) {
+    if (/^[ \t]/.test(raw)) {
+      readIndented(model, raw, at, say);
+    } else if (line.startsWith(">")) {
       const { epoch, detail } = parseEpoch(raw);
-      record = null;
+      model.open = null;
       if (epoch === undefined) {
         model.findings.push(say(`unreadable epoch line ${quote(raw)} — ${detail}`));
         model.structural = true;
@@ -188,34 +258,12 @@ function parse(lines, { start, end }, say) {
       } else {
         model.epochs.push({ ...epoch, line: at });
       }
-    } else if (line.startsWith("###")) {
-      const heading = RECORD_HEADING.exec(line);
-      if (heading === null) {
-        model.findings.push(say(`unreadable re-review heading ${quote(raw)} — it must read "### Re-review for epoch <k>"`));
-        record = null;
-      } else {
-        record = { k: Number(heading[1]), line: at, narrowed: [], narrowedUnreadable: false, header: null, rows: [] };
-        model.records.push(record);
-      }
-    } else if (/^narrowed:/i.test(line)) {
-      const narrowed = NARROWED_LINE.exec(line);
-      if (record === null) unreadableLine(raw);
-      else if (narrowed === null) {
-        record.narrowedUnreadable = true;
-        model.findings.push(say(
-          `re-review for epoch ${record.k}: unreadable Narrowed line ${quote(raw)} — Narrowed must be yes or no: "Narrowed: yes|no"`,
-        ));
-      } else record.narrowed.push(narrowed[1]);
-    } else if (line.startsWith("|")) {
-      if (record === null) unreadableLine(raw);
-      else addTableRow(record, line);
+    } else if (line.startsWith("###") || /^narrowed:/i.test(line) || line.startsWith("|")) {
+      readRecordLine(model, raw, line, at, say);
     } else if (LIST_LINE.test(line)) {
-      const { entry, detail } = parseEntry(raw);
-      if (entry === undefined) model.findings.push(say(`unreadable entry ${quote(raw)} — ${detail}`));
-      else if (model.epochs.length === 0) model.orphans.push({ ...entry, line: at });
-      else model.epochs.at(-1).entries.push({ ...entry, line: at });
+      readEntry(model, raw, at, say);
     } else {
-      unreadableLine(raw);
+      unreadableLine(model, raw, say);
     }
   }
   return model;
@@ -273,13 +321,18 @@ function checkNumbers(model, say) {
   const current = model.epochs.at(-1).k;
   for (const epoch of model.epochs) {
     const own = [];
+    const repeated = [];
+    const seen = new Set(); // one pass: the second and later entry with a number is the repeat
     for (const entry of epoch.entries) {
       if (entry.k > current) model.findings.push(say(`entry ${entry.id} is above the current epoch ${current}`));
       else if (entry.k !== epoch.k) {
         model.findings.push(say(`entry ${entry.id} stands under epoch ${epoch.k}'s line; an entry stands under its own epoch line`));
-      } else own.push(entry);
+      } else if (seen.has(entry.n)) repeated.push(entry);
+      else {
+        seen.add(entry.n);
+        own.push(entry);
+      }
     }
-    const repeated = own.filter((entry, index) => own.findIndex((other) => other.n === entry.n) !== index);
     for (const entry of repeated) {
       model.findings.push(say(`entry ${entry.id} twice: two branches each recorded a change — renumber; the merge is the stop`));
     }
@@ -318,14 +371,16 @@ function checkRecordBody(record, model, say) {
     return;
   }
   if (record.header.join("|") !== TABLE_HEADER.join("|")) {
-    model.findings.push(say(`${where}: the table header must read "| ${TABLE_HEADER.join(" | ")} |", not "| ${record.header.join(" | ")} |"`));
+    model.findings.push(say(
+      `${where}: the table header must read "| ${TABLE_HEADER.join(" | ")} |", not "| ${clean(record.header.join(" | "))} |"`,
+    ));
   }
   if (record.rows.length === 0) model.findings.push(say(`${where}: the table has no rows; at least one row (verdict — when nothing was built)`));
   for (const [index, cells] of record.rows.entries()) {
     if (cells.length !== TABLE_HEADER.length) {
       model.findings.push(say(`${where}: row ${index + 1} has ${cells.length} cells, not ${TABLE_HEADER.length}`));
     } else if (!VERDICTS.includes(cells[2])) {
-      model.findings.push(say(`${where}: verdict "${cells[2]}" in row ${index + 1}; a verdict is ${verdictList}`));
+      model.findings.push(say(`${where}: verdict "${clean(cells[2])}" in row ${index + 1}; a verdict is ${verdictList}`));
     }
   }
 }
@@ -354,21 +409,25 @@ function checkRecordPlace(record, model, say) {
   }
 }
 
-/** Rows 7 and 8: every epoch k ≥ 2 has exactly one record, every record is well formed, and a narrowed one needs the owner. */
+/** Rows 7 and 8: every record is well formed and stands once (also for an epoch not yet opened), every epoch k ≥ 2 has
+ *  one, and a narrowed one needs the owner. */
 function checkRecords(model, say) {
+  const byEpoch = new Map();
   for (const record of model.records) {
     checkRecordPlace(record, model, say);
     checkRecordBody(record, model, say);
+    byEpoch.set(record.k, [...(byEpoch.get(record.k) ?? []), record]);
+  }
+  for (const [k, own] of byEpoch) {
+    if (own.length > 1) model.findings.push(say(`two re-review records for epoch ${k}; there is one`));
   }
   for (const epoch of model.epochs.filter((candidate) => candidate.k >= 2)) {
-    const own = model.records.filter((record) => record.k === epoch.k);
+    const own = byEpoch.get(epoch.k) ?? [];
     if (own.length === 0) {
       model.findings.push(say(
         `no re-review for epoch ${epoch.k}: a "### Re-review for epoch ${epoch.k}" record must stand before its epoch line; ` +
         "the re-review must leave a record",
       ));
-    } else if (own.length > 1) {
-      model.findings.push(say(`two re-review records for epoch ${epoch.k}; there is one`));
     }
     if (own[0]?.narrowed[0] === "yes" && epoch.approver === "reviewers") {
       model.findings.push(say(
@@ -381,12 +440,13 @@ function checkRecords(model, say) {
 /**
  * The findings for one plan, each starting with `file` (the class prefix is the caller's).
  *
- * `status` is the status paragraph as `statusParagraph` returns it; `parentInTodo` is true when `file` is a stories
- * document whose parent plan is in `todo/`. Order of work: parse (findings in line order); if the section's shape is
- * untrustworthy, stop; the sequence of epochs (and stop if it is not 1..m); entry numbers; the current epoch's count
- * and stop; the records; the stories-document row.
+ * `status` is the status paragraph as `statusParagraph` returns it; `parent` is the root-relative name of the parent
+ * plan (`todo/PLAN_x.md`) when `file` is a stories document whose parent is in `todo/`, else `null`. The caller
+ * resolved it against the folder; this file prints it and never derives one. Order of work: parse (findings in line
+ * order); if the section's shape is untrustworthy, stop; the sequence of epochs (and stop if it is not 1..m); entry
+ * numbers; the current epoch's count and stop; the records; the stories-document row.
  */
-export function ledgerFindings({ file, text, status, parentInTodo }) {
+export function ledgerFindings({ file, text, status, parent }) {
   const say = (message) => `${file} — ${message}`;
   const lines = outsideFencedBlocks(folded(text)).split("\n");
   const headings = [];
@@ -413,7 +473,8 @@ export function ledgerFindings({ file, text, status, parentInTodo }) {
     checkRecords(model, say);
   }
 
-  const parent = parentInTodo ? parentPlanOf(file.slice(file.lastIndexOf("/") + 1)) : null;
-  if (parent !== null) model.findings.push(say(`a stories document carries a ledger; its changes count in the parent, todo/${parent}`));
+  if (typeof parent === "string" && parent !== "") {
+    model.findings.push(say(`a stories document carries a ledger; its changes count in the parent, ${clean(parent)}`));
+  }
   return model.findings;
 }

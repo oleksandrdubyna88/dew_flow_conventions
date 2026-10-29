@@ -1,6 +1,7 @@
 # PLAN — Plan change control, E1: the ledger contract and its safe enforcement
 
-> Status: **plan only, nothing implemented yet, 2026-10-28.** Scope: the stories of epic E1 — the change-ledger parser
+> Status: **built, 2026-10-29 — `b256502` and its fix-forward commit after the parent's full stop; its code rounds are
+> recorded below.** Scope: the stories of epic E1 — the change-ledger parser
 > `tools/lib/plan-ledger.mjs`, its wiring in `tools/plan-lifecycle.mjs`, their tests, the compatibility fixtures, the
 > dry run over the estate and S6b.
 >
@@ -915,7 +916,30 @@ changes.
 
 - **Done when.** The dry-run table shows zero `changes` lines in every diff; the two headers are written; the five
   commands are green on the final tree; S6b and the Opus review are resolved and recorded; ONE commit on
-  `feat/plan-change-control-e1`.
+  `feat/plan-change-control-e1` — in epoch 2, two: `b256502` was pushed with the stop record, so the fix-forward is a
+  second commit (parent § Epics).
+
+## Code round 1 (S6b) and the Opus review — findings and decisions (2026-10-28)
+
+`review_code` over `ad7ba89..b256502`, `planText` = the revised parent plan (abridged where marked): `proceed`, 8 of 8
+reviewers, gating 4 of 5. Started together with an Opus code review (`feature-dev:code-reviewer`). Each claim was checked on
+the lib before its decision.
+
+| # | Source | Finding | Decision |
+|---|---|---|---|
+| 0 | coai | row 9 re-derives the parent without `exists` and can name a file that does not exist | Accepted (fix forward a): the wiring passes the resolved name, `parent` |
+| 1 | coai | duplicate `### Re-review for epoch k` records are missed while epoch k's line does not exist yet | Accepted, reproduced (fix forward b: G11b) |
+| 2 | coai | a backslash path skips row 9 | Rejected: the only caller builds `todo/${file}`; after (a) the lib derives nothing from a path |
+| 3 | coai | two reads of each plan file | Rejected: microseconds at this size; reusing `statusParagraph` inside the per-file `try` is the specified shape |
+| 4 | coai | skip non-ledger files with a cheap pre-test | Rejected: a second definition of "has a ledger heading" beside the parser's |
+| 5 | coai | the Narrowed message lacks its line number | Accepted (fix forward c: G15b) |
+| 6 | coai | an entry with an empty cause is counted | Rejected, not reproducible: the lib reports `no cause` |
+| 7 | coai | duplicate numbers found in quadratic time | Accepted (fix forward d: a Set) |
+| O1 | Opus | the same as 0 | Accepted (a) |
+| O2 | Opus | raw field values (an ESC, 5 000 characters) reach a message | Accepted (fix forward e: T7, one `clean()`) |
+| O3 | Opus | the Narrowed message does not name the em dash | Accepted (c) |
+| O4 | Opus | `parse()` is 56 lines | Accepted (fix forward f: 30 lines, the longest function 32) |
+| O5 | Opus | an entry indented one space renders as a sibling list item but parses as free text — a hidden second change | Accepted after a consultation (9dc03004): a CONTRACT change, the parent's entry 1.2, its second change — the full stop. Fixed forward by the reserved prefixes (I1–I17, the 26-row matrix) |
 
 ## Dry run record
 
@@ -949,3 +973,40 @@ has comes from `link` findings that `main` reports too.
 
 Diff count over the whole table: **0**. The checkout not present on this machine is checked on its remote before the release
 (parent S9), not here.
+
+**Second run, 2026-10-29 — the fix-forward tree** (E1.S3 *fix forward after the stop*, E1.S4 step 1 again), recorded by the E1
+coder (Sonnet) on branch `feat/plan-change-control-e1` at `07608f69dc05f91c3e49ac12e11523932687d9e5` + uncommitted fix-forward.
+Compared as before: the checker of `main` (`git show main:tools/plan-lifecycle.mjs`, from the scratch folder) against the
+worktree's `tools/plan-lifecycle.mjs` with its changed lib, each given every `/home/jinx/git/dew_flow_*` checkout,
+`/home/jinx/git/wsl_care` and the worktree as `argv[2]`.
+
+**Prediction, written before this run's first command:** zero `changes` lines in the diff of the two outputs, for every
+checkout, and byte-identical outputs for every checkout but one. The reason is unchanged — the check is opt-in by presence and
+no `todo/` or `research/` file of the estate carries `## Plan changes` — and the reserved prefixes, the cleaned values and the
+`parent` name only change what a parsed ledger says, never whether one is read. The one checkout that carries a ledger is this
+worktree: its parent plan now has a closed epoch 1 (entries 1.1 and 1.2), a re-review record for epoch 2 and an open epoch 2
+with no entry, each entry followed by indented continuation lines, none of which starts like an entry, an epoch line or a
+heading. It must read clean, and `main`'s checker, which has no `changes` class, reads it as it did before.
+
+**Result of the second run: the prediction held.** Zero `changes` lines in the diff for every checkout, and in fact `diff`
+printed nothing for any of the eleven — the two outputs are byte-identical, so the fix-forward adds nothing to any of them.
+The red the estate already has is the `link` findings `main` reports too. A control, to show the worktree's ledger is read and
+not skipped: the same parent plan with two entries added under epoch 2 gives `epoch 2 has 2 changes and is not stopped`; as it
+stands it gives none.
+
+| Checkout | main exit | branch exit | `changes` lines in the diff | Note |
+|---|---|---|---|---|
+| `dew_flow_benchmark` | 1 | 1 | 0 | one finding, the same in both runs |
+| `dew_flow_benchmark-wt` | 0 | 0 | 0 | no `todo/` + `research/` pair — nothing to check |
+| `dew_flow_connect_other_ais` | 0 | 0 | 0 | clean |
+| `dew_flow_connect_other_ais-wt` | 0 | 0 | 0 | no `todo/` + `research/` pair — nothing to check |
+| `dew_flow_conventions` (the `main` checkout) | 0 | 0 | 0 | clean |
+| `dew_flow_creds_for_devs` | 1 | 1 | 0 | 14 findings, the same in both runs |
+| `dew_flow_rag_qln` | 1 | 1 | 0 | 6 findings, the same in both runs |
+| `dew_flow_sidecar_rust` | 0 | 0 | 0 | clean |
+| `dew_flow_vscode_kit` | 0 | 0 | 0 | clean |
+| `wsl_care` | 0 | 0 | 0 | clean |
+| `wt-plan-change-control` (this worktree: closed epoch 1, its re-review record, open epoch 2) | 0 | 0 | 0 | the branch's run prints `plan-lifecycle: clean.` — the ledger parses under the reserved prefixes |
+
+Diff count over the whole table: **0**. The checkout that is not on this machine (`dew_flow_mcp`) is not part of this table; it is
+checked on its remote before the release (parent S9), as before.

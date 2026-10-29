@@ -9,7 +9,7 @@
  * stderr are the assertions. The grammar itself is tested on strings in `plan-ledger.test.mjs`; what only a
  * spawn can show lives here — that the check reads `todo/` and not `research/`, that a stopped plan is not called
  * misfiled, that a throw inside the parser is a finding and not a crash, and that the hint line comes only with a
- * `changes` finding. Case names W1–W9 are the stories document's.
+ * `changes` finding. Case names W1–W10 are the stories document's.
  */
 
 import { test } from "node:test";
@@ -18,10 +18,12 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { ownedDir } from "./lib/owned.mjs";
+import { QUOTE_LIMIT } from "./lib/plan-ledger.mjs";
 
-const script = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "plan-lifecycle.mjs");
+const here = path.dirname(fileURLToPath(import.meta.url));
+const script = path.resolve(here, "plan-lifecycle.mjs");
 
 function repo(t, readmeRows) {
   const root = ownedDir(t, "plan-lifecycle ");
@@ -158,16 +160,21 @@ test("W8 an index finding alone carries no ledger hint: the hint comes only with
 
 // W9 swaps the lib for one that throws, with a resolve hook preloaded by `--import`, so the checker needs no test seam.
 // Every name plan-lifecycle.mjs imports from the lib must be exported by the stub, or the child dies at link time — a
-// crash, which is not the case under test. `module.registerHooks` exists from Node 22.15; CI runs the latest 22.x, `engines`
-// says `>=20`, so an older local Node skips with a reason.
-const THROWING_LEDGER = "data:text/javascript," + encodeURIComponent(
-  "export const STOP_PHRASE = /x/; export const parentPlanOf = () => null;" +
-  " export function ledgerFindings() { throw new Error('stub: the parser threw'); }");
-const SWAP_LEDGER = "data:text/javascript," + encodeURIComponent(
+// crash, which is not the case under test. So the stub re-exports the REAL lib (under a `?real` query, which the hook
+// lets through) and replaces `ledgerFindings` alone: nothing the wiring imports can go missing, now or later, and a
+// helper the wiring takes from the lib (the cleaning of a message) is the real one. `module.registerHooks` exists
+// from Node 22.15; CI runs the latest 22.x, `engines` says `>=20`, so an older local Node skips with a reason.
+const REAL_LEDGER = pathToFileURL(path.resolve(here, "lib", "plan-ledger.mjs")).href;
+const throwingLedger = message => "data:text/javascript," + encodeURIComponent(
+  `export * from ${JSON.stringify(`${REAL_LEDGER}?real`)};` +
+  ` export function ledgerFindings() { throw new Error(${JSON.stringify(message)}); }`);
+const swapLedger = stub => "data:text/javascript," + encodeURIComponent(
   `import { registerHooks } from "node:module"; registerHooks({ resolve(s, c, n) {` +
-  ` return s.endsWith("/plan-ledger.mjs") ? { url: ${JSON.stringify(THROWING_LEDGER)}, shortCircuit: true } : n(s, c); } });`);
+  ` return s.endsWith("/plan-ledger.mjs") ? { url: ${JSON.stringify(stub)}, shortCircuit: true } : n(s, c); } });`);
+const SWAP_LEDGER = swapLedger(throwingLedger("stub: the parser threw"));
+const SKIP_HOOKS = nodeModule.registerHooks ? false : "module.registerHooks needs Node 22.15 or later";
 
-test("W9 a throw inside the parser is a finding that names the file, not a crash", { skip: nodeModule.registerHooks ? false : "module.registerHooks needs Node 22.15 or later" }, t => {
+test("W9 a throw inside the parser is a finding that names the file, not a crash", { skip: SKIP_HOOKS }, t => {
   const root = estate(t, { "todo/PLAN_x.md": ledgerPlan(A()) });
   const swapped = spawnSync(process.execPath, ["--import", SWAP_LEDGER, script, root], { encoding: "utf8", timeout: 10000 });
   assert.equal(swapped.status, 1, swapped.stdout + swapped.stderr);
@@ -180,4 +187,23 @@ test("W9 a throw inside the parser is a finding that names the file, not a crash
   // the twin: the same estate with the real lib is clean, so the red above came from the swap and nothing else
   const real = lifecycle(root);
   assert.equal(real.status, 0, real.stdout + real.stderr);
+});
+
+test("W9b the message of a caught throw is cleaned like every other quoted value: no escape reaches the terminal, a long one is cut", { skip: SKIP_HOOKS }, t => {
+  const swap = swapLedger(throwingLedger(`stub\u001b[31m: ${"z".repeat(400)}`));
+  const swapped = spawnSync(process.execPath, ["--import", swap, script, estate(t, { "todo/PLAN_x.md": ledgerPlan(A()) })], { encoding: "utf8", timeout: 10000 });
+  assert.equal(swapped.status, 1, swapped.stdout + swapped.stderr);
+  assert.doesNotMatch(swapped.stderr, /\u001b/, "no control character in the finding");
+  assert.match(swapped.stderr, /changes   todo\/PLAN_x\.md — the ledger could not be read \(stub \[31m: z+…\)/, "a space stands where the escape was; the cut ends in …");
+  const shown = /could not be read \((.*)\); red until/.exec(swapped.stderr)?.[1];
+  assert.ok(shown !== undefined && shown.length <= QUOTE_LIMIT + 1, `at most QUOTE_LIMIT + 1 characters, got ${shown?.length}`);
+});
+
+test("W10 a stories document whose topic holds `_E<n>` names the parent the wiring resolved on disk, not a guess", t => {
+  const root = estate(t, { "todo/PLAN_a.md": ledgerPlan(null), "todo/PLAN_a_E1_b_E2.md": ledgerPlan(A()) });
+  const found = lifecycle(root);
+  assert.equal(found.status, 1, found.stdout + found.stderr);
+  assert.match(found.stderr, /changes   todo\/PLAN_a_E1_b_E2\.md/);
+  assert.match(found.stderr, /its changes count in the parent, todo\/PLAN_a\.md/);
+  assert.doesNotMatch(found.stderr, /PLAN_a_E1_b\.md/, "the guessed name of a file that does not exist");
 });
