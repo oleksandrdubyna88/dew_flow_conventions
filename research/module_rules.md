@@ -76,6 +76,58 @@ when already converged, skipped under `SUBAGENT_MODEL_GUARD=off` and in this rep
 record: [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md); its release to the consumers is recorded in
 [PLAN_subagent_model_tiers_rollout.md](PLAN_subagent_model_tiers_rollout.md).
 
+## The plan-change-control rule and the change-ledger check (2026-10-29)
+
+`common/plan-change-control.md` (12 269 B by `wc -c`; the catalog's `bytes` is the same number) governs a plan's life
+after its first approval: one change is recorded and allowed, the second is a full stop until the whole plan has been
+reviewed again. Its `tasks` are the fourteen of `subagent-models` and omit `inspect`, `ui`, `gpu` and `storage`. It has no
+`paths`: selection is paths OR tasks, so a `todo/**` glob would pull it into every `inspect --file todo/…` scope.
+`depends: ["common.planning-docs"]` brings `planning-docs` into `audit`, `http`, `benchmark` and `logging`, the four
+split-read tasks `planning-docs` does not list. `planning-docs` does not depend on it, for the same reason. Seven `owns:`
+tokens: `coai` and the six tools it types, `mcp__coai__review_plan`, `review_code`, `review_document`, `resolve`,
+`consult` and `ask_consultants`.
+
+`common/planning-docs.md` carries the two pointer lines: the ledger sentence in § *Creating a plan*, and "Seven
+findings" (the seventh is a change ledger that cannot be read or records a second change without its stop).
+
+The check is the `changes` class of `tools/plan-lifecycle.mjs`, through `tools/lib/plan-ledger.mjs`. It reads `todo/`
+only, never `research/` and never git history, and only a plan that has the `## Plan changes` heading outside a fence. A
+throw while reading one file becomes a `changes` finding that names the file, and the run still exits 1. A run with any
+`changes` finding ends with a hint line naming `common/plan-change-control.md`. `STOP_PHRASE` (`stopped for re-review`)
+is shared with `isFullyDone`, so a stopped plan that says what is done is not called finished. E1 widened
+`outsideFencedBlocks` (`tools/lib/rule-body.mjs`) to CommonMark's fences; measured over the 38 rule files then, no
+recorded heading list changed, and `node tools/rule-bodies.mjs` stays in step. A stopped plan is clean by design: a red
+while stopped would block the stop commit, the re-review and its reverts, so the halt is the rule's, not the check's.
+
+**The size measurement** (the parent's Definition of Done; `node tools/rules.mjs explain --repo . --task inspect --file
+todo/PLAN_x.md`):
+
+| | `inspect --file todo/PLAN_x.md` | `planning-docs` (`wc -c`) | `common.plan-change-control` selected |
+|---|---|---|---|
+| before, `main` at `72ae2f3` and this branch at `59543d1`, no E2 edit | 38 612 B | 14 405 B | no (file absent) |
+| after, uncommitted E2 on `59543d1` (the commit is not yet written) | 38 979 B | 14 772 B | no |
+
+The scope's five rules are `common.coding-style` 2 889, `common.knowledge-base` 3 564, `common.planning-docs` (14 405,
+then 14 772), `common.security` 8 602 and `common.task-lifecycle` 9 152. The growth, 367 B, equals the `wc -c` growth of
+`planning-docs` exactly: the two pointer lines are all it is. `inspect` with no file stays at 24 207 B. The ten scopes of
+the four single-read tasks that `tools/rules.test.mjs` pins (four of `inspect`, three of `ui`, two of `gpu`, one of
+`storage`) stay at or under 32 768 B; the largest is `ui` with `ui/a.ts` at 32 329 B, and none of them selects
+`planning-docs`. The old absolute cap, "this scope stays at or under 32 768 B", could never hold: 38 612 B on `main`
+before any work (the parent's entry 2.2); the criterion above replaced it.
+
+**The cost of `depends: planning-docs`** on the four tasks that gain `planning-docs` and the rule (they gain 14 772 +
+12 269 = 27 041 B each; all four were split reads already, so no cap moves):
+
+| Task | before | after |
+|---|---|---|
+| `audit` | 190 574 B | 217 615 B |
+| `http` | 70 968 B | 98 009 B |
+| `benchmark` | 69 787 B | 96 828 B |
+| `logging` | 47 207 B | 74 248 B |
+
+Design record: [PLAN_plan_change_control.md](../todo/PLAN_plan_change_control.md) (a `todo/` link; it becomes a sibling
+link at promotion).
+
 References: [yaml parser](https://eemeli.org/yaml/),
 [picomatch](https://github.com/micromatch/picomatch),
 [Codex instructions](https://learn.chatgpt.com/docs/agent-configuration/agents-md),

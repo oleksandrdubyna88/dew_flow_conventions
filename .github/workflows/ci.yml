@@ -54,6 +54,11 @@ jobs:
       - name: Ownership
         run: node tools/ownership-check.mjs
 
+      # The plan lifecycle over THIS repository's own todo/ and research/ — every consumer's CI runs it over
+      # theirs, and until 2026-10-29 this one did not. Dependency-free, so it runs before npm ci.
+      - name: Plan lifecycle
+        run: node tools/plan-lifecycle.mjs
+
       # The protection `main` is supposed to have is a FILE now — `.github/branch-protection.json` —
       # because branch protection is the one part of a repository's CI that is not IN the repository.
       # Nothing makes GitHub read it; what it buys is that the intent is reviewed, and that the drift

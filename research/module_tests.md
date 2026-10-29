@@ -998,6 +998,74 @@ their order and the verb between them, which is strictly more than either bare c
 assertion that a stronger one subsumes is not a loss; an assertion the uniqueness case has to be
 taught to ignore is a hole with a comment over it.
 
+## The change ledger and its rule (`tools/plan-ledger.test.mjs`, `tools/plan-lifecycle.test.mjs`, `tools/plan-change-rule.test.mjs`, 2026-10-29)
+
+Three files guard `common/plan-change-control.md` and the check that reads the ledger it describes. Counts are what the
+runner printed on 2026-10-29, on Node 26.12.1, not typed from memory.
+
+- **`tools/plan-ledger.test.mjs`** (pure; 152 cases). The E1.S1 scenarios and one red case per row of the parent's
+  findings table, each beside its clean twin. Every fixture runs with `\n` and with `\r\n` line ends and the two must
+  agree. The lists (`KINDS`, `SOURCES`, `STATES`, `APPROVERS`, `VERDICTS`, `STOP_PHRASE`) are iterated from the lib and
+  pinned ONCE to the parent's § 2, because they are the contract.
+- **`tools/plan-lifecycle.test.mjs`** (12 cases, spawned). A plan without a ledger stays clean; two open entries exit 1
+  with the hint line; a stories document's ledger is red only while its parent is in `todo/`; a red ledger in `research/`
+  is ignored; a stopped plan that says what is done is not `misfiled`; the throw seam (a `module.registerHooks` stub
+  swapped in through `--import`, Node 22.15 or later, skipped with a reason below that) gives a finding and exit 1, not
+  a crash.
+- **The dry run over the estate** (E1.S4): zero `changes` lines added in any of the eleven checkouts, twice; the record is
+  the *Dry run record* section of `todo/PLAN_plan_change_control_E1.md`.
+- **`tools/plan-change-rule.test.mjs`** (pure, 8 cases) and three selection cases in `tools/rules.test.mjs`. The freeze
+  proves a body changed, never that it still says what it exists to say, so the rule's three sentences (one change is
+  allowed and the second stops all new code; an owner's request counts exactly like one you find; the interim path is the
+  only case where a plan goes to the document review) are asserted. Each has a splice case that removes its paragraph and
+  requires the phrase to vanish with it, and a placement case that finds it in its section, cut from the text outside
+  fences because the rule's example opens with a column-0 `## Plan changes`. Then the agreement half, A1 to A5: the
+  rule's fenced example goes through `ledgerFindings` and must be clean; the same example with epoch 1 left open is red;
+  a second change in the open epoch is red and its stopped twin is clean; free text at column 0, an entry behind one
+  space and an entry behind two list markers are each a finding; and the rule's ledger section names every word the lib
+  accepts, with both separators by code point. The selection cases: the rule is selected for the fourteen split-read
+  tasks and none of the four single-read ones; a plan file does not pull it into a single-read scope (with a companion
+  that `planning-docs` is still selected there, so the negative is not vacuous); and it brings `planning-docs` into
+  `audit`, `http`, `benchmark` and `logging` as `dependency:common.plan-change-control`. The existing *every single-read
+  scope still fits one read* test gets no `todo/` scope: that scope is 38 612 B on `main`.
+
+**The RED run**, before the rule existed, for the right reason: the three selection cases failed with
+`audit must select common.plan-change-control`, `the rule exists in the catalog — otherwise every negative below is
+vacuous` (the first assertion, so the red is never a `TypeError`) and `audit: common.planning-docs must arrive as the
+rule's dependency`; all 8 cases of `plan-change-rule.test.mjs` failed with `common/plan-change-control.md does not exist
+— the rule E2 writes`. After the rule, the pointer lines and the body freeze they passed: 8 of 8 and 3 of 3. Before the
+freeze was recorded `node tools/rule-bodies.mjs` printed `UNRECORDED common.plan-change-control` and
+`DRIFT common.planning-docs`, exit 1; after `--update` of both ids it printed `OK — 39 rule(s)`, exit 0.
+
+**RED-GREEN-RED**, each break made in the working tree only, watched red, restored and watched green:
+
+| Break | Went red |
+|---|---|
+| delete pinned sentence 1's paragraph | the sentences, the splice and the placement cases (3 of 8): `no longer carries "After the first approval, ONE change is allowed …"` |
+| copy "counts exactly like one you find" into `## Never` | the splice case alone (1 of 8): `survives its paragraph being removed` |
+| move pinned sentence 3's paragraph into `## The check` | the placement case alone: `must stand in ## Reviewing the revised plan` |
+| in the example, `by owner` to `by reviewers` | the example case and the stopped twin: `epoch 2 is narrowed (Narrowed: yes) and approved by reviewers` |
+| in the example, the first ` · ` of entry 2.1 to a pipe | the example case and the open-epoch case: `unreadable entry … expected 4 fields separated by " · " (U+00B7) before " — " (U+2014)` |
+| remove `dod` from `## The ledger` | the vocabulary case: `never names "dod", a word of KINDS` |
+| add `paths: ["todo/**"]` to the rule | the plan-file case: `inspect --file todo/PLAN_x.md selects common.plan-change-control` |
+| add `depends: ["common.plan-change-control"]` to `planning-docs` | all 3 selection cases: `Rule dependency cycle: common.plan-change-control -> common.planning-docs -> common.plan-change-control` |
+
+The pipe break also turns the open-epoch case red, because an unreadable entry is not counted: the same cause, a second
+case. `npm test` on the final tree: 1279 tests, 1265 passed, 6 failed, 8 skipped; the 6 are the janitor cases S4-23,
+S4-34, S4-35, S4-37, S4-38 and S4-46, which fail identically on clean `main` on this machine and belong to the
+test-leftovers work. `npm test` does not run the family checks (`ownership-check`, `rule-bodies`, `plan-lifecycle`,
+`pin-check`, `adapter-check`); CI runs them as steps, and since this work CI runs `plan-lifecycle` over this repository's
+own plans too. Turning that step red by removing a plan's `todo/README.md` row gave exit 1 with
+`index todo/README.md omits PLAN_plan_change_control_E2.md`; the row was restored.
+
+**What it does not prove.** That an agent counts, stops or re-reviews: no loader output and no check is evidence of
+behaviour. An unrecorded change, a plan with no ledger and code written during a stop are invisible by design, and a
+stopped plan is clean by design. Two heading shapes are not seen: a setext heading, and a heading styled with inline
+markup or a character reference. (Two list markers are detected since E1's K1 fix.) Git history is never read, entry
+dates are not ordered (only epoch dates are), and where the section stands in the file is not checked. The agreement
+cases compare the rule's example with the lib, not the rule's prose with the lib: a sentence that describes the check
+wrongly passes them.
+
 ## The consultant half moved here (`common/coai-consultant.md`, 2026-09-25)
 
 Until today the consultant half of the pasted snippet was the product's own file, on the operator's ruling

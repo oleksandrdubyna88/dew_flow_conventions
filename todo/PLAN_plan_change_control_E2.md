@@ -1,7 +1,7 @@
 # PLAN — Plan change control, E2: the rule, the lines that point at it, and what describes it
 
-> Status: **plan only, nothing implemented yet, 2026-10-29 — written during the parent's second full stop (entry 2.2);
-> epoch 3 is pending: E2 starts only after the re-review for epoch 3 passes and the owner approves it.** Scope: the
+> Status: **built, 2026-10-29 — in epoch 3 of the parent (owner-approved 2026-10-29); its code round is recorded
+> below.** Scope: the
 > stories of epic E2 — the shared rule
 > `common/plan-change-control.md`, two pointer lines in `common/planning-docs.md`, the body freeze in
 > `research/rule-bodies.json`, the selection cases in `tools/rules.test.mjs`, a new `tools/plan-change-rule.test.mjs`,

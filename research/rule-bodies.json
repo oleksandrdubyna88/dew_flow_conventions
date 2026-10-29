@@ -242,9 +242,26 @@
       ]
     },
     {
+      "id": "common.plan-change-control",
+      "source": "common/plan-change-control.md",
+      "bodySha256": "00300fef3a4933bd69305a531c44e6c894c34be8c83dc665bd83d58d3f6e6a20",
+      "sections": [
+        "# A plan changed twice after its approval stops for a whole re-review (MANDATORY)",
+        "## Why — measured",
+        "## What counts as a change",
+        "## How it is counted",
+        "## The ledger",
+        "## The full stop",
+        "## Reviewing the revised plan",
+        "## The check",
+        "## Never",
+        "## Definition of Done"
+      ]
+    },
+    {
       "id": "common.planning-docs",
       "source": "common/planning-docs.md",
-      "bodySha256": "870dd24e62ff1009ec48f90be825fa320699e83345411a55f0f7bb586c2277c7",
+      "bodySha256": "ec10cdc22191141813268a7b2e11e3b5d022b6a45a92fcb71c11234c1532b1fa",
       "sections": [
         "# Planning Docs — `todo/` is open work, `research/` is documentation",
         "## Creating a plan",

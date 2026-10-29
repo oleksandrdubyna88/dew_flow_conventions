@@ -1,6 +1,6 @@
 # PLAN — A plan changed twice after its approval stops for a whole re-review
 
-> Status: **in progress, epoch 3 (approved by the owner 2026-10-29 after the second full stop) — E1 built (b256502 … 0af69b0), its K1 fix-forward next; E2 not started.** Scope: a new shared rule
+> Status: **in progress, epoch 3 (approved by the owner 2026-10-29 after the second full stop of 2026-10-29) — E1 and E2 built on `feat/plan-change-control-e2`; the pull request (S10), the server plan (S7) and the owner's release question (S9) are open.** Scope: a new shared rule
 > `common/plan-change-control.md`, two pointer lines in `common/planning-docs.md`, a change-ledger check in
 > `tools/plan-lifecycle.mjs` through a new `tools/lib/plan-ledger.mjs`, their tests, `research/rule-bodies.json`,
 > `research/module_rules.md`, `research/module_tests.md`, the `README.md` tools row, a `plan-lifecycle` step in
@@ -106,6 +106,11 @@ Narrowed: yes — the DoD's absolute size cap becomes a measured, attributed del
   (The re-review passed on 2026-10-29 — `review_document` with `newReview: true`, `proceed`, 4 of 4 reviewers, gating 1
   of 5, its one finding accepted as part of this revision. Narrowed, so the owner approved epoch 3 in the conversation
   on 2026-10-29. One change is allowed in epoch 3; the next stops the plan again.)
+- 3.1 · 2026-10-29 · agent · scope — S7's author found that the canonical review snippet's text lives in this
+  repository (`common/coai-review-gate.md`, copied into the server at build time), so its update moves from the server
+  plan's row of the boundary table to the later rule change here
+  (A correction of which plan builds an item — in doubt, a change; the first of epoch 3, allowed. The next stops the
+  plan again.)
 
 ## Symptom
 
@@ -381,8 +386,8 @@ work ([measurement.md](../common/measurement.md)), and a surprise costs a paragr
 | Item | Built by | The other plan's part |
 |---|---|---|
 | The rule, the ledger, the count, the check, the interim path | this plan | none |
-| `review_plan` with `again: true` after `proceed`: back to the plan stage with a fresh round budget, `review_code` refused until the new `proceed`, the stored plan text replaced on `proceed`, an epoch shown in `status`, the tool description and the canonical review snippet updated | `dew_flow_connect_other_ais · todo/PLAN_review_plan_again_after_proceed.md` (S7 writes it, plan only) | none |
-| The rule's interim paragraph replaced by `again: true` | a later change here, after that server release | ships the feature |
+| `review_plan` with `again: true` after `proceed`: back to the plan stage with a fresh round budget, `review_code` refused until the new `proceed`, the stored plan text replaced on `proceed`, an epoch shown in `status`, the tool description updated (the snippet is regenerated from this repository at its pin bump — entry 3.1) | `dew_flow_connect_other_ais · todo/PLAN_review_plan_again_after_proceed.md` (S7 writes it, plan only) | none |
+| The rule's interim paragraph replaced by `again: true`, and the canonical review snippet's step "a plan changed after `proceed` → `review_plan` with `again: true`" (`common/coai-review-gate.md`, entry 3.1) | a later change here, after that server release | ships the feature; regenerates the snippet at its pin bump |
 
 Order: this plan first, then the server plan, then the rule update. Disjoint: the server never reads a ledger or counts
 changes; this plan changes no server code. The server plan also names its boundary with that repository's
