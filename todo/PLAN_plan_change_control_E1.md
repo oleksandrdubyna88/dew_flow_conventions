@@ -249,7 +249,7 @@ The regexes that carry a list are BUILT from the constant (`STATES.join("|")`), 
 | section end | after the heading | the first line matching `/^#{1,2} /` (a `# ` or `## ` heading), or the end of the file; `### …` lines are INSIDE |
 | blank | in the section | `/^\s*$/` → skipped |
 | free text | in the section | the ORIGINAL line starts with a space or a tab (any indent ≥ 1) → the reserved-prefix test (next row) and then skipped, whatever it holds: an indented `- note`, `\|`, `(…)` or prose is free text |
-| reserved prefixes *(stop)* | an indented line, in the section | the line with its indent stripped — `raw.replace(/^[ \t\u00a0\p{Cf}]+/u, "")` — and then, since cr4, with every `\p{Cf}` format character removed from what is left — matches `RESERVED_PREFIX` (an entry-shaped start, a `>`, or a `#`) → finding 4 *a ledger line stands at column 0*, quoting the original line (cleaned: every format character a space) and naming its line number; the line is NOT parsed and NOT counted. Any other indented line is free text. Fenced lines never reach this row (they are empty lines by then). Known limit (code round 3): an indented line behind TWO list markers (`  - - 1.2 · …`) is free text — a visibly nested bullet; reserving it would widen §2, see *The reserved prefixes* |
+| reserved prefixes *(stop)* | an indented line, in the section | the line with its indent stripped — `raw.replace(/^[\s\p{Cf}]+/u, "")` — and then, since cr4, with every `\p{Cf}` format character removed from what is left — matches `RESERVED_PREFIX` (an entry-shaped start, a `>`, or a `#`) → finding 4 *a ledger line stands at column 0*, quoting the original line (cleaned: every format character a space) and naming its line number; the line is NOT parsed and NOT counted. Any other indented line is free text. Fenced lines never reach this row (they are empty lines by then). Known limit (code round 3): an indented line behind TWO list markers (`  - - 1.2 · …`) is free text — a visibly nested bullet; reserving it would widen §2, see *The reserved prefixes* |
 | epoch line | column 0, starts with `>` | `` /^> Epoch ([1-9]\d*) · approved (\d{4}-\d{2}-\d{2}) · by (reviewers\|owner) · state: (open\|stopped\|closed)$/ `` built from `APPROVERS` and `STATES`; the date must be a calendar date (`Date.UTC` round-trip: `2026-02-30` is not); ANY other `>` line in the section is finding 3 *unreadable epoch line* |
 | entry | column 0, matches `/^(?:[-*+]\|\d+[.)]) /` (a list line) | must start `- `; the rest splits on the FIRST ` — ` into head and cause; head splits on ` · ` into exactly 4 fields: number `/^([1-9]\d*)\.([1-9]\d*)$/`, calendar date, source ∈ `SOURCES`, kinds = comma-separated (spaces after a comma allowed), each ∈ `KINDS`, at least one; cause non-empty. Any failure is finding 4 *unreadable entry* with the detail (table below); the entry is then NOT counted — the red keeps the count honest |
 | re-review heading | column 0, starts with `###` | `/^### Re-review for epoch ([1-9]\d*)$/`; any other `###`/`####` line → finding 7 *unreadable re-review heading* |
@@ -294,7 +294,7 @@ or near-miss, counted together) is finding 3 *two `## Plan changes` headings (li
   parser that tried to tell a quoted note from an epoch line would need a second grammar for free text, and a one-space
   `> note` renders as a block quote a reader cannot tell from an epoch line's shape. The message's fix is the same:
   reword (`  note: …`, `  (quoted) …`) or move to column 0.
-- *"Trimmed" means the indent AND every invisible format character are stripped first:* `INDENT = /^[ \t\u00a0\p{Cf}]+/u`
+- *"Trimmed" means the indent AND every invisible format character are stripped first:* `INDENT = /^[\s\p{Cf}]+/u`
   — spaces, tabs, the NBSP (U+00A0, category Zs) and the WHOLE `Cf` category, which needs the `u` flag (settled
   2026-10-29, code round 3: the enumerated set `\u200b-\u200d\u2060\ufeff` left U+200E/U+200F, U+061C, U+00AD,
   U+180E, U+2061-U+2064 and the bidi controls U+202A-U+202E, U+2066-U+2069 as a way to hide a line — verified: two
@@ -1190,6 +1190,18 @@ the lib (a probe) or on GitHub's renderer. None is a change to the parent's cont
 | R2 | Opus | a format character in the heading makes the whole ledger invisible | Accepted (p) |
 | R3 | Opus | a format character after the marker or inside the number hides an indented entry | Accepted (q); the regex and its pin unchanged |
 | R4 | Opus, below threshold | a setext heading (`Plan changes` over `---`) gives nothing | Known limit K2, not fixed: a deliberate non-ATX style |
+
+## Code round 5 (epoch 2, 4d18e4d) and its Opus review — findings and decisions (2026-10-29)
+
+`review_code` with `again: true` over `c05f870..4d18e4d`: `proceed`, 8 of 8 reviewers, gating 1 of 5. Fixed in `04e423e`.
+None is a change to the parent's contract. The INDENT set above reads `[\s\p{Cf}]` since this round (cr5).
+
+| # | Source | Finding | Decision |
+|---|---|---|---|
+| 0 | coai | a row ending in an escaped pipe, or without a trailing pipe, is miscounted | Rejected, measured: GitHub's renderer shows four such rows (an escaped final pipe, three backslashes before a pipe, no trailing pipe, a plain row) as four cells with verdict `fits`; the lib reports nothing for all four — the same reading |
+| 1 | coai | the order of indent and format-character removal | Rejected: INDENT itself strips format characters mixed with spaces (I18b); FORMAT removes the rest |
+| S1 | Opus | a Unicode space other than NBSP (U+3000, U+2003, U+202F …) after the indent hides an entry; column 0 is red | Accepted: INDENT = every Unicode space and format character, as §2's "trimmed" says (I22 and its RED-GREEN-RED row) |
+| S2 | Opus | a heading styled with inline markup or a character reference (`## **Plan changes**`, `&nbsp;`) is not seen | Known limit K3, not fixed: a deliberate styling, like K2's setext heading; a fix needs an inline parser. Pinned green, named in the lib header |
 
 ## Dry run record
 
