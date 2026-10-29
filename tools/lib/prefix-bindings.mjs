@@ -42,8 +42,11 @@
 //     binds nothing (`'{}-'.format(X)`, `'%s-' % X`, `[a, X].join('/')`, `X.concat('-')`, `$(echo "$X" | tr …)`, `$(printf '%s-' "$X")`);
 //   - a placeholder glued directly BEFORE the prefix (`P="$D<prefix>-"`, a self-append `P="$P<prefix>-"`) is not read as a prefix: null;
 //   - a line that holds the prefix word thousands of times after expansion costs the classifier time quadratic in that count;
+//   - J7: a parameter operator that can strip the owner segment (`${P%%-u*}`, `${P%-*}`, `${P#…}`) is expanded to the bound value as if the operator
+//     were absent, so the use reads with the owner segment it may have removed (owner-aware); and a value read right after the prefix separator that
+//     is empty or holds no owner still reads as an owner (follow-up F15). Found 2026-10-28 by consultation; not a regression of the pre-F12 classifier;
 //   - `'<prefix>-' + STAR`: any non-literal operand after the prefix reads as an owner segment, so the use is owner-aware;
-//   - a right-hand side is read to 1024 characters: past that only its literals and word-runs bind;
+//   - a right-hand side is read to 1024 characters: past that only its literals and word-runs bind, and a prefix word in the part not read makes the name overflow;
 //   - Python f-strings and `Path.glob` at the USE, a glob built by concatenation with the removal on another line, a quoted glob
 //     (`[[ "$n" == "$P"* ]]`), Python without PEP 8 spacing, a second assignment on one shell line or a second JS declarator, shell
 //     arrays, PowerShell `[string]$P`, `$script:P` and PowerShell's case-insensitive names.

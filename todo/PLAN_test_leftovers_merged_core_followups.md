@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28.** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28.** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -320,6 +320,10 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   marks the name `overflow`: its uses read broad. The check costs one `lastIndexOf` per line, found once. A 1100-character right-hand side with the
   prefix at its end and `rm -rf "$P"*` was null, is broad.
   **Limit J6** — see B2: a refusal can drop a variant of a value around a cycle (above).
+  **Limit J7** — a parameter operator that can strip the owner segment (`${P%%-u*}`, `${P%-*}`, `${P#…}`) is expanded to the bound value as if the
+  operator were absent, so the use reads with the owner segment the operator may have removed (owner-aware). Tracer limitation, found 2026-10-28 by
+  an outside consultation; not a regression of the pre-F12 classifier. Verified on this branch's HEAD: `P="<p>-u1000-repo-"; find /tmp -name "${P%%-u*}-*"
+  -exec rm -rf {} +` reads owner-aware. The wider family of this limit, an unresolved owner position, is F15.
   **Follow-up candidates, not done here:** (1) the fixed point is super-linear on long shell chains (1000 names: 29 s on this machine, 12.8 s at
   `fe05417`; adversarial, the use pattern is rebuilt once per pass); (2) R6's timing: each of its five lines takes 36–300 ms against a 1 s budget
   (the 0.84 s measured earlier was the sum of the five), so the margin on a loaded machine is about 3x — left as is; (3) `${NAME}` inside a
@@ -364,9 +368,28 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   the line above must be broad.
 - **When.** Before the barrier is declared closed on a machine whose sweepers were changed after this release.
 
+## F15 — an unknown right after the prefix separator reads as an owner (found 2026-10-28)
+
+- **What.** Rule §7 and `OWNER_START_RE` (`tools/lib/sweeper-scan.mjs:43`) count a variable or a placeholder right after the prefix's separator as an
+  owner segment: on literal lines, and (through F12) on traced values. When that variable is empty or holds no owner (`suffix = ""`, `$S` empty), a
+  bare-prefix sweep reads owner-aware: a false negative for the barrier. Verified 2026-10-28 on this branch's HEAD (`<p>` is the prefix word):
+  - JavaScript `const suffix = ""; const P = "<p>-" + suffix;` with `startsWith(P)` and `rmSync` — owner-aware at HEAD (the base release's classifier,
+    `72ae2f3`, reads no binding, so it said nothing about the use line);
+  - shell `S=""; P="<p>-$S"; rm -rf "/tmp/$P"*` — owner-aware at HEAD (nothing at the base release, same reason);
+  - shell `P="<p>-u1000-repo-"; find /tmp -name "${P%%-u*}-*" -exec rm -rf {} +` — owner-aware at HEAD (J7);
+  - the plain literal line `rm -rf "/tmp/<p>-$S"*` — owner-aware at the BASE release as well: the classifier has always read `$` after the separator as
+    an owner. So F12 did not introduce this; it carries it onto traced values.
+- **Why.** The barrier's guarantee is "no owner-blind sweeper left". An unresolved owner position is not evidence of an owner; a sweeper whose owner
+  variable is empty removes every user's leftovers.
+- **Decision needed (the owner's, not this follow-up's).** Whether an unresolved owner position becomes an explicit "unresolved" finding that keeps the
+  barrier closed. Cost: every legitimate `<p>-${OWNER}-…` or `<p>-$owner-…` line in every consumer becomes a finding, unless the owner variable is itself
+  traced to the owner grammar (`u<digits>`, `w<name>`, the helper). Measure the fleet count first (the machine scan, `--honour-marker`) before deciding.
+- **When.** Before the barrier is declared closed on a shared machine, or at the next change to `OWNER_START_RE`.
+- **Anchor.** `tools/lib/sweeper-scan.mjs:43` (`OWNER_START_RE`); the traced half is `tools/lib/prefix-bindings.mjs` (`PLACEHOLDER`, `expandReadings`).
+
 ## Definition of Done
 
-- [ ] Each of F1 to F14 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
+- [ ] Each of F1 to F15 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.
