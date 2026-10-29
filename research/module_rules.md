@@ -78,7 +78,7 @@ record: [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md); its releas
 
 ## The plan-change-control rule and the change-ledger check (2026-10-29)
 
-`common/plan-change-control.md` (12 256 B by `wc -c`; the catalog's `bytes` is the same number) governs a plan's life
+`common/plan-change-control.md` (12 274 B by `wc -c`; the catalog's `bytes` is the same number) governs a plan's life
 after its first approval: one change is recorded and allowed, the second is a full stop until the whole plan has been
 reviewed again. Its `tasks` are the fourteen of `subagent-models` and omit `inspect`, `ui`, `gpu` and `storage`. It has no
 `paths`: selection is paths OR tasks, so a `todo/**` glob would pull it into every `inspect --file todo/…` scope.
@@ -116,14 +116,14 @@ the four single-read tasks that `tools/rules.test.mjs` pins (four of `inspect`, 
 before any work (the parent's entry 2.2); the criterion above replaced it.
 
 **The cost of `depends: planning-docs`** on the four tasks that gain `planning-docs` and the rule (they gain 14 772 +
-12 256 = 27 028 B each; all four were split reads already, so no cap moves):
+12 274 = 27 046 B each; all four were split reads already, so no cap moves):
 
 | Task | before | after |
 |---|---|---|
-| `audit` | 190 574 B | 217 602 B |
-| `http` | 70 968 B | 97 996 B |
-| `benchmark` | 69 787 B | 96 815 B |
-| `logging` | 47 207 B | 74 235 B |
+| `audit` | 190 574 B | 217 620 B |
+| `http` | 70 968 B | 98 014 B |
+| `benchmark` | 69 787 B | 96 833 B |
+| `logging` | 47 207 B | 74 253 B |
 
 Design record: [PLAN_plan_change_control.md](../todo/PLAN_plan_change_control.md) (a `todo/` link; it becomes a sibling
 link at promotion).

@@ -181,7 +181,7 @@ inline markup or a character reference (`## **Plan changes**`, `## Plan&nbsp;cha
 
 - [ ] Every approved plan the task touched has its ledger, one entry per cause in the parent, in the commit that accepts
       it; at the second change the stop was recorded in one commit and no code or merge followed until re-approval.
-- [ ] The re-review asked the consultants, revised the whole plan, had an Opus judge sort the done work with every
+- [ ] The re-review asked the consultants (or said why not), revised the whole plan, had an Opus judge sort the done work with every
       disposition recorded, made the cuts, re-split by Fable if the epics changed, and was re-approved by the path above
       (the owner, when narrowed).
 - [ ] `plan-lifecycle.mjs` is clean; the summary names the epoch, the count and what was cut.
