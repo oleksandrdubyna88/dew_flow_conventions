@@ -496,7 +496,7 @@ branch reading the revised plan as `planText` — which is S6b, inside E1.
 
 | # | Finding | Decision |
 |---|---|---|
-| 0 | E1's and E2's branches against one pull request: which merges where | Accepted: S10 — E1 opens no pull request; E2's carries both commits, rebase-merged |
+| 0 | E1's and E2's branches against one pull request: which merges where | Accepted: S10 — E1 opens no pull request; E2's carries the epics' commits (rebase-merged as decided then; squash-merged since the re-review for epoch 3 — S10) |
 | 1 | S7 in another repository blocked this repository's merge | Accepted: S7 is a condition of the release (S9), not of S10 |
 | 2 | Finding 8 for epoch 1 | Accepted: `Narrowed` exists only in a re-review record, k ≥ 2 (§3 row 8) |
 | 3 | Two steps both called S8 | Accepted: the pull request is S10 |
