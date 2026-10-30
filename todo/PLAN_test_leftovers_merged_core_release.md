@@ -161,7 +161,7 @@ checkout of the PR's branch. Their outcome is recorded by hand; the scan itself 
 - [x] R1: the three root-only places are read (or attested by name), the scan commit and exit code recorded.
 - [x] R2: every machine the owner names has a section in `research/security/machines.md`, or a written statement that it no longer builds or tests here.
 - [x] R3: PR #82 merged; the merge commit's `ci` run green (the sha stated).
-- [ ] R4: the private sibling's confirmation exists (both spans byte-identical; the two consumer files copied with their sha256 pinned).
+- [x] R4: the private sibling's confirmation exists (both spans byte-identical; the two consumer files copied with their sha256 pinned).
 - [ ] R5: the warning went to the sessions with open consumer pull requests; `release` promoted once; `release-distance` 0.
 - [ ] R6: every sweep-only stage merged before any producer stage; the rollout plan's Definition of Done met.
 - [ ] This plan is promoted to `research/` with its deviations, or deleted with a recorded reason, when R6 is done; its row in `todo/README.md` goes with it.
