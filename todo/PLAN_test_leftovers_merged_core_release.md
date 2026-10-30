@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, the merged core: what is left before PR #82 merges and the release is promoted
 
-> Status: **in progress, 2026-10-27 — R1, R2 and R3 done (PR #82 merged as 72ae2f3, its ci, CodeQL and sonarcloud runs green); R4 built and reviewed, waiting for the private sibling's owner to merge it and confirm; R6's sweep-only stage scanned for the private sibling's consumers; R5 and the producer stages open (the barrier record: the Ubuntu dev VM open, the owner's Windows machine not tested).** Scope: the open part of
+> Status: **in progress, 2026-10-27 — R1, R2 and R3 done (PR #82 merged as 72ae2f3, its ci, CodeQL and sonarcloud runs green); R4 DONE 2026-10-30 (the owner's written confirmation: the private sibling's copies equal this repository's `2602416`, which carries F12 #90 and F13 #89); R6's sweep-only stage scanned for the private sibling's consumers; R5 and the producer stages open (the barrier record: the Ubuntu dev VM open, the owner's Windows machine not tested).** Scope: the open part of
 > [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) — the machine barrier on every machine that
 > builds or tests this repository (`research/security/machines.md`), the merge of PR #82, the private sibling's side of the
 > merged core's Definition of Done, the ONE promotion of `release`, and the consumer migration of
@@ -106,6 +106,14 @@ cache or a process.
 - **Done when.** The sibling's confirmation exists, naming the sha256 of each copied file and of the two spans. This public repository
   names none of the sibling's own files or checks; the confirmation is quoted as a decision, not as a source.
 - **State, 2026-10-27.** The private sibling's rebuild is built from this repository's `72ae2f3` and reviewed (its multi-model gate `proceed` twice, an Opus review and a security pass, both "ship with fixes", the fixes made); its pull request waits for its owner. Its pins record the sha256 of each copied file and of the three spans; the written confirmation this item asks for is still missing. Two findings of that review belong to this repository and are parked here as F10 and F11 of the follow-ups plan.
+- **Done, 2026-10-30.** The first rebuild was merged in the private sibling; it then re-copied this repository's tools at `2602416` (after F13 #89 and F12 #90), so one text is released, not two. The owner's confirmation, quoted as a decision: *the private sibling's rebuild is done; its copies equal this repository at `2602416`* —
+  - `tools/lib/owned.mjs` `2f83de3ffb8eca2d1d5c40ed95ed7414a377eacdb5375e68a3949441b2d6fbfb`
+  - `tools/leftovers-check.mjs` `477443f30700c4a016d044c28ddfdca7753e75ef4f0c44fddc15c9bcd04e90f3`
+  - `tools/lib/sweeper-scan.mjs` `7f93b14eeffb0642d860ebc2d62a2ba558157b05add0940f464c794fefc1c564`
+  - `tools/lib/prefix-bindings.mjs` `34d2b01ab7f2c8fda627aef227909a1af86be1f6c8573860619b851681259e43`
+  - `tools/lib/rule-body.mjs` `37c8c00b1dc4801f283913d1794bc7f4f81349f7f7f06c958b06c530f7df7d23`
+  - the two rule spans of `common/test-leftovers.md`: 27314 bytes `35a8bf3d72b0bda46d08dd26a2836b4759f1f73c91e794358e3108bd6a41d00d` and 1872 bytes `f136caee10af20c47512c2feda2e749d2495fbd5d04081dee3b244c0d3e2522f`; the janitor companion's span: 14103 bytes `b31585f932ac860de6189cc65bbb95cfa6b681d34c5ec2c861eeb4612d233e29`.
+  Each value was recomputed 2026-10-30 from this repository at `2602416` (`git show 2602416:<path> | sha256sum`; each span is the LF text between `<!-- core:begin -->` and `<!-- core:end -->`) and equals the confirmation. The other seven files the sibling copies are unchanged since `72ae2f3`. R5 may run.
 
 ### R5 — S7: ONE promotion of `release`
 
@@ -153,7 +161,7 @@ checkout of the PR's branch. Their outcome is recorded by hand; the scan itself 
 - [x] R1: the three root-only places are read (or attested by name), the scan commit and exit code recorded.
 - [x] R2: every machine the owner names has a section in `research/security/machines.md`, or a written statement that it no longer builds or tests here.
 - [x] R3: PR #82 merged; the merge commit's `ci` run green (the sha stated).
-- [ ] R4: the private sibling's confirmation exists (both spans byte-identical; the two consumer files copied with their sha256 pinned).
+- [x] R4: the private sibling's confirmation exists (both spans byte-identical; the two consumer files copied with their sha256 pinned).
 - [ ] R5: the warning went to the sessions with open consumer pull requests; `release` promoted once; `release-distance` 0.
 - [ ] R6: every sweep-only stage merged before any producer stage; the rollout plan's Definition of Done met.
 - [ ] This plan is promoted to `research/` with its deviations, or deleted with a recorded reason, when R6 is done; its row in `todo/README.md` goes with it.
