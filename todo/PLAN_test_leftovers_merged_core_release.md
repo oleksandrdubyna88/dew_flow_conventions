@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, the merged core: what is left before PR #82 merges and the release is promoted
 
-> Status: **in progress, 2026-10-27 — R1, R2 and R3 done (PR #82 merged as 72ae2f3, its ci, CodeQL and sonarcloud runs green); R4 DONE 2026-10-30 (the owner's written confirmation: the private sibling's copies equal this repository's `2602416`, which carries F12 #90 and F13 #89); R6's sweep-only stage scanned for the private sibling's consumers; R5 and the producer stages open (the barrier record: the Ubuntu dev VM open, the owner's Windows machine not tested).** Scope: the open part of
+> Status: **in progress, 2026-10-27 — R1, R2 and R3 done (PR #82 merged as 72ae2f3, its ci, CodeQL and sonarcloud runs green); R4 DONE 2026-10-30 (the owner's written confirmation: the private sibling's copies equal this repository's `2602416`, which carries F12 #90 and F13 #89); R5 DONE 2026-10-30 (`release` promoted to `115bbf8`, `release-distance` 0); R6's sweep-only stage scanned for the private sibling's consumers; R6 and the producer stages open (the barrier record: the Ubuntu dev VM open, the owner's Windows machine not tested).** Scope: the open part of
 > [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) — the machine barrier on every machine that
 > builds or tests this repository (`research/security/machines.md`), the merge of PR #82, the private sibling's side of the
 > merged core's Definition of Done, the ONE promotion of `release`, and the consumer migration of
@@ -124,6 +124,13 @@ cache or a process.
 - **Why.** Every consumer migrates once, on one text.
 - **When.** After R3 and R4; never before. The warning goes out before the dispatch, not after.
 - **Done when.** `release` is at the merged sha, `release-distance` reports 0, and the warning's recipients and date are recorded here.
+- **Done, 2026-10-30.** The warning went out before the dispatch: a comment on each of the 27 open consumer pull requests not opened
+  by dependabot or release-please (dew_flow_rag_qln #67; dew_flow_mcp #53; dew_flow_sidecar_rust #61; dew_flow_benchmark #103, #111;
+  dew_flow_creds_for_devs #253; dew_flow_vscode_kit #19; wsl_care #162, #174, #178, #179, #180, #181; dew_flow_connect_other_ais #850,
+  #909, #911, #918, #919, #920, #922, #923, #924, #925, #926, #927, #928, #930), and a message to the four Claude sessions then open on the
+  operator's WSL machine. `promote-release.mjs --dry-run` passed (`ci` green on `115bbf8`), and the dispatch
+  ([run 41089908585](https://github.com/oleksandrdubyna88/dew_flow_conventions/actions/runs/41089908585)) moved `release` from `e29883f` to
+  `115bbf8` (+16 commits, #78 to #91: among them E1 `2c96f83`, the merged core #82, F13 #89 and F12 #90). `release-distance`: OK, 0 commits behind main.
 
 ### R6 — The consumer migration
 
@@ -162,6 +169,6 @@ checkout of the PR's branch. Their outcome is recorded by hand; the scan itself 
 - [x] R2: every machine the owner names has a section in `research/security/machines.md`, or a written statement that it no longer builds or tests here.
 - [x] R3: PR #82 merged; the merge commit's `ci` run green (the sha stated).
 - [x] R4: the private sibling's confirmation exists (both spans byte-identical; the two consumer files copied with their sha256 pinned).
-- [ ] R5: the warning went to the sessions with open consumer pull requests; `release` promoted once; `release-distance` 0.
+- [x] R5: the warning went to the sessions with open consumer pull requests; `release` promoted once; `release-distance` 0.
 - [ ] R6: every sweep-only stage merged before any producer stage; the rollout plan's Definition of Done met.
 - [ ] This plan is promoted to `research/` with its deviations, or deleted with a recorded reason, when R6 is done; its row in `todo/README.md` goes with it.
