@@ -10,7 +10,8 @@
 > promotion and the bump pull requests of the consumers. It changes no consumer's code. The `## Plan changes` ledger
 > opened at the plan round of 2026-10-31, whose verdict was `proceed`
 > ([plan-change-control.md](../common/plan-change-control.md); the round is recorded in § 13); the PR #94 review of the
-> same day is entries 1.1–1.5 and the stop (§ 14); the owner's approval is still to come.
+> same day is entries 1.1–1.5 and the stop (§ 14); the re-review's revision of the whole plan — the epoch 2 baseline,
+> consult `58f05c75` — is § 15 and awaits its review round; the owner's approval is still to come.
 >
 > Related docs: [csharp/doctrine.md](../csharp/doctrine.md), [typescript/doctrine.md](../typescript/doctrine.md),
 > [rust/doctrine.md](../rust/doctrine.md), [csharp/nuget-packages.md](../csharp/nuget-packages.md),
@@ -36,6 +37,14 @@
 - 1.3 · 2026-10-31 · reviewer · contract — PR #94 review (CodeRabbit), comment 3: one TypeScript-repository predicate for the strictness check; `.ts` files with no project are a finding
 - 1.4 · 2026-10-31 · reviewer · stories — PR #94 review (CodeRabbit), comment 4: E4 gains a typed lossless-JSON fixture with a declaration file, because neither TypeScript 6.0.3 nor 7.0.2 declares the reviver context or `JSON.rawJSON`
 - 1.5 · 2026-10-31 · reviewer · scope — PR #94 review (CodeRabbit), comment 6: `research/consumers.json` as the derived consumer inventory, with a test against `README.md` § *Consumers*
+
+### Re-review for epoch 2
+
+Narrowed: no — the baseline `d986710` already allowed a stronger side and P4 as prose only; the epoch 2 revision (§ 15) adds obligations (the check wired for three consumer kinds, the suppression read, zero `planned` rows at the end) and cuts nothing
+
+| Work | Where | Verdict | Action |
+|---|---|---|---|
+| — nothing was built; the E1 stories document on `feat/rule-parity-e1` is planning work and is not on main | `feat/rule-parity-e1` | — | kept as the input to E1 once epoch 2 is approved |
 
 ## 0. Decisions
 
@@ -196,7 +205,7 @@ headings, are the content of `research/parity-matrix.json` (E1).
 | Where a suppression may live | inline `#pragma warning disable <id>` with the reason on the same line; never `<NoWarn>`/`<WarningsNotAsErrors>` in a props file, never `GlobalSuppressions.cs` | inline `// eslint-disable-next-line <rule> -- <reason>`; never a file-wide disable, never `ignores` of production folders; `reportUnusedDisableDirectives: "error"` so a stale suppression fails | equal once written: today C# has no rule and TS has two divergent configs |
 | A baseline of accepted violations | none (none found in three consumers) | none (none found; one consumer ignores a typed-fixtures folder that is MEANT not to compile — a legitimate exclusion the rule names as such) | equal |
 | Who may widen it | a rule change here, never a repository | the same | equal |
-| Where it is checked | the build (`TreatWarningsAsErrors`), and `tools/strictness-check.mjs`'s .NET half reads the effective `TreatWarningsAsErrors`/`Nullable` per project | `tools/strictness-check.mjs`'s TypeScript half reads the effective lint and compiler configuration | equal class (file + check) |
+| Where it is checked | the build (`TreatWarningsAsErrors`), and `tools/strictness-check.mjs`'s .NET half reads the effective `TreatWarningsAsErrors`/`Nullable` per project AND the effective `NoWarn`/`WarningsNotAsErrors` — a repository-added entry in either is a finding (§ 4.6; SDK defaults such as `1701;1702` are told apart by a clean-project baseline for the pinned SDK and by the repository's own props/csproj declarations) | `tools/strictness-check.mjs`'s TypeScript half reads the effective lint and compiler configuration, `reportUnusedDisableDirectives` included | equal class (file + check) |
 
 ## 4. Design
 
@@ -237,6 +246,17 @@ both-sides gap of § 3.3), each with `id`, `topic`, `side` (`csharp`, `typescrip
 asserts that every inventory entry has exactly one matrix row and every matrix row maps to one inventory entry, so a
 requirement added to the inventory without a row — or a row without a requirement — fails the suite. The two files are
 the machine-readable form of § 3; the prose table is the human one, and the test is what keeps them one.
+
+**How E1 exits green before any destination exists** (re-review, § 15): a matrix row or an inventory entry whose
+destination is not yet written has `status: "planned"` and names its owning epic (`epic: "E4"`); a move entry in
+`research/moved-blocks.json` whose destination does not yet exist is `planned` too. **E1 validates `planned` items
+STRUCTURALLY only**: the schema, an existing source file and line range, an owning epic among E2–E6, and — for a move —
+the SOURCE bytes' `sha256` and `length`, recorded now from the commit the move will be made from. E1 does NOT check a
+destination's bytes or a destination's `id`/`section`: there is nothing to check yet. **Each owning epic activates its
+items when it lands them**: the status becomes `counterpart` (or `deliberately-absent`/`stronger-*` with a reason), the
+reference test then requires the `id` and `section` to exist, and the move test then compares the destination's live
+bytes with the recorded source hash. The final Definition of Done (§ 11) requires **zero `planned` items**; a `planned`
+item whose owning epic has merged is a red suite.
 
 **The consumers as a file** (PR #94 review, comment 6 — ledger 1.5): `research/consumers.json`, derived from the one
 place the estate is listed, [README.md](../README.md) § *Consumers* (`README.md:188-199`), and asserted equal to that
@@ -293,7 +313,15 @@ block: `source`, `lines`, `beforeCommit`, `sha256`, `length`, `destination`.** T
 `actions/checkout` at `fetch-depth: 1` and in every shallow clone (PR #94 review, comment 2 — ledger 1.2; the
 alternative, `fetch-depth: 0` or a targeted fetch of each named commit, makes a test about rule text depend on the
 runner's network and on commits a squash merge may not keep — the manifest is reviewed in the same diff as the move and
-survives both). The semantics are unchanged: byte for byte, against the source as it stood before the move. Where a block also needs a wording change (today only `typescript/doctrine.md` § 1, § 4.4), the order is
+survives both). The semantics are unchanged: byte for byte, against the source as it stood before the move.
+
+**The manifest is historical evidence and immutable** (re-review, § 15): original source hashes and lengths are never
+edited; a later move or edit of a destination appends a provenance entry (`supersedes: <entry id>`, the new commit,
+the new hash) and never replaces earlier evidence — the same stance `research/shared-rules-migration-map.json` takes for
+the 24 migrated bodies. It differs from `research/rule-bodies.json` on purpose: `recordFor()` there hashes the CURRENT
+whole body and its headings and is moved with every deliberate edit, while `moved-blocks.json` holds a HISTORICAL slice
+of a file at one commit. Both are kept; the extraction and normalisation (`folded`, `bodyOf` in `tools/lib/rule-body.mjs`)
+are shared where a slice is taken from a rule body, so the two never disagree about what a byte of rule text is. Where a block also needs a wording change (today only `typescript/doctrine.md` § 1, § 4.4), the order is
 fixed by plan round 1 (findings 1–2): **first** a separate, documented commit that makes the wording change inside the
 SOURCE file and records its body with `node tools/rule-bodies.mjs --update <id>`; **then** the move, byte for byte from
 that anonymised source; the byte-equality test's "before" commit is the anonymisation commit. A move and a wording change
@@ -424,13 +452,16 @@ and `.npmrc` are not selectors: they are what following the rule produces, and e
 
 | .NET | Node | Class |
 |---|---|---|
-| `tools/build-flags-check.mjs`: `Directory.Build.rsp` exists and says `-nr:false`; no `-noautorsp`; a repository with no C# passes without opinion | **`tools/strictness-check.mjs`** (new; named `node-strictness-check.mjs` until ledger 1.1 gave it a .NET half). **The .NET half:** for every `*.csproj` outside the skip set, `dotnet msbuild <project> -getProperty:TreatWarningsAsErrors -getProperty:Nullable -m:4` must answer `true` and `enable` (the EFFECTIVE values, `Directory.Build.props` inheritance included — probed § 14); INCOMPLETE when projects exist and no `dotnet` SDK resolves; a repository with no project passes without opinion. **The TypeScript half, under ONE predicate** (ledger 1.3): `isTypeScriptRepository(dir)` = any `tsconfig*.json` outside `node_modules`, OR any `package.json` whose `dependencies`/`devDependencies` name `typescript`; the same predicate decides which files are walked and whether a missing `tsc` is INCOMPLETE. For every `tsconfig*.json` the predicate found, the compiler's own merged view (`tsc --showConfig -p <file>`, so `extends`, nested packages, excludes and overrides resolve as `tsc` resolves them) has `strict: true`, where **`tsc` is found through package resolution, never a fixed path** (plan round 1, finding 3): `createRequire(<the tsconfig's package dir>/package.json).resolve("typescript/bin/tsc")`, falling back to a walk up the parents' `node_modules/.bin` — the resolution that covers a hoisted workspace install, pnpm and yarn shims; **INCOMPLETE is reported only when no TypeScript resolves at all**, and `noEmitOnError: true` unless `noEmit: true`; the `lint` script runs eslint with `--max-warnings 0` and the config sets `reportUnusedDisableDirectives: "error"`; a `test` script that runs `node` on a `.ts` file is preceded by `tsc --noEmit`; every `package.json` with dependencies has an `.npmrc` beside it or above it saying `save-exact=true`; `--warn` first, as every check here lands ([README.md](../README.md) § *tools*); a repository the predicate calls non-TypeScript passes that half without opinion; **a TypeScript repository (by the predicate) where no `typescript` package resolves is INCOMPLETE, never green**; and `.ts` files outside any project — `.ts` present, no `tsconfig*.json`, no `typescript` dependency — are a FINDING, not INCOMPLETE and not a pass: `strictness-check: N .ts file(s) and no TypeScript project — nothing type-checks them (compiler-strictness.md)`, exit 1 (exit 0 under `--warn`), because the rule says a type-stripped run is preceded by `tsc --noEmit` and here nothing can run it. Proven on deliberately invalid fixtures: `strict` missing in a base config inherited through `extends`; `noEmitOnError` missing with emit; `--max-warnings` absent; a stripped-TS test script without `tsc --noEmit`; a caret range with no `.npmrc`; a stale `eslint-disable`; and one VALID fixture with a hoisted install — `tsc` only in the parent's `node_modules`, the `tsconfig.json` in a workspace package — which must pass, not report INCOMPLETE; the `.ts`-without-project fixture above with its exact expected line and exit code; a .NET fixture whose `Directory.Build.props` omits `Nullable` (finding) and one with no SDK on `PATH` (INCOMPLETE) | check ↔ check |
+| **Resource limits:** `tools/build-flags-check.mjs` — `Directory.Build.rsp` exists and says `-nr:false`; no `-noautorsp`; a repository with no C# passes without opinion (the measured worker-pool problem, `csharp/dotnet-build.md`) | none — P8: no measured Node counterpart | deliberately absent |
+| **Compiler properties and suppressions — the .NET half of `tools/strictness-check.mjs`** (new; named `node-strictness-check.mjs` until ledger 1.1 gave it this half; it COMPLEMENTS `build-flags-check` and its hook, which enforce resource limits, and replaces neither — E3 owns it on both stacks): for every `*.csproj` outside the skip set, `dotnet msbuild <project> -getProperty:TreatWarningsAsErrors -getProperty:Nullable -getProperty:NoWarn -getProperty:WarningsNotAsErrors -m:4` must answer `true` and `enable` (the EFFECTIVE values, `Directory.Build.props` inheritance included — probed § 14), and the effective `NoWarn` and `WarningsNotAsErrors` may hold nothing the REPOSITORY added: SDK defaults are told apart two ways, both required — the effective value is compared with a clean-project baseline captured for the pinned SDK (`tools/fixtures/strictness/sdk-baseline.json`, keyed by `global.json`'s SDK; probed on 10.0.114: a clean project answers `NoWarn` `1701;1702`, `WarningsNotAsErrors` empty — § 15), and the repository's own props and csproj files are read for a `<NoWarn>` or `<WarningsNotAsErrors>` element, which is a finding wherever it sits; INCOMPLETE when projects exist and no `dotnet` SDK resolves, or the pinned SDK has no baseline; a repository with no project passes without opinion | **The TypeScript half, under ONE predicate** (ledger 1.3): `isTypeScriptRepository(dir)` = any `tsconfig*.json` outside `node_modules`, OR any `package.json` whose `dependencies`/`devDependencies` name `typescript`; the same predicate decides which files are walked and whether a missing `tsc` is INCOMPLETE. For every `tsconfig*.json` the predicate found, the compiler's own merged view (`tsc --showConfig -p <file>`, so `extends`, nested packages, excludes and overrides resolve as `tsc` resolves them) has `strict: true`, where **`tsc` is found through package resolution, never a fixed path** (plan round 1, finding 3): `createRequire(<the tsconfig's package dir>/package.json).resolve("typescript/bin/tsc")`, falling back to a walk up the parents' `node_modules/.bin` — the resolution that covers a hoisted workspace install, pnpm and yarn shims; **INCOMPLETE is reported only when no TypeScript resolves at all**, and `noEmitOnError: true` unless `noEmit: true`; the `lint` script runs eslint with `--max-warnings 0` and the config sets `reportUnusedDisableDirectives: "error"`; a `test` script that runs `node` on a `.ts` file is preceded by `tsc --noEmit`; every `package.json` with dependencies has an `.npmrc` beside it or above it saying `save-exact=true`; `--warn` first, as every check here lands ([README.md](../README.md) § *tools*); a repository the predicate calls non-TypeScript passes that half without opinion; **a TypeScript repository (by the predicate) where no `typescript` package resolves is INCOMPLETE, never green**; and `.ts` files outside any project — `.ts` present, no `tsconfig*.json`, no `typescript` dependency — are a FINDING, not INCOMPLETE and not a pass: `strictness-check: N .ts file(s) and no TypeScript project — nothing type-checks them (compiler-strictness.md)`, exit 1 (exit 0 under `--warn`), because the rule says a type-stripped run is preceded by `tsc --noEmit` and here nothing can run it. Proven on deliberately invalid fixtures: `strict` missing in a base config inherited through `extends`; `noEmitOnError` missing with emit; `--max-warnings` absent; a stripped-TS test script without `tsc --noEmit`; a caret range with no `.npmrc`; a stale `eslint-disable`; and one VALID fixture with a hoisted install — `tsc` only in the parent's `node_modules`, the `tsconfig.json` in a workspace package — which must pass, not report INCOMPLETE; the `.ts`-without-project fixture above with its exact expected line and exit code; .NET fixtures: `Directory.Build.props` omitting `Nullable` (finding); no SDK on `PATH` (INCOMPLETE); a VALID project with `TreatWarningsAsErrors=true`, `Nullable=enable` and only the SDK's default `NoWarn` (must pass); an INVALID project with the same two properties plus a repository `<NoWarn>` (must fail naming the file and the codes); an INVALID one with `<WarningsNotAsErrors>` (must fail) | check ↔ check |
 | `settings/hooks/build-flags.mjs`: a `PreToolUse` hook refusing a `dotnet build` without `-m:N` | **none** — the hook exists for a measured resource problem (`csharp/dotnet-build.md` § *Measured 2026-09-11*). The candidate Node hook — refuse `npm install <pkg>` without `--save-exact` — is unnecessary once `.npmrc` carries `save-exact=true`, which is a FILE the check verifies (measured: the setting is honoured). What a Node hook would need to earn its place: a measured cost that no file can carry | deliberately absent; stated in `research/module_rules.md` |
 | `dotnet build` with `TreatWarningsAsErrors` + `Nullable enable` | the composite gate `tsc --noEmit` (or with `noEmitOnError`) + lint `--max-warnings 0` + tests, named in `compiler-strictness.md` as ONE gate the CI step runs | gate ↔ gate |
 | `tools/http-coverage.mjs` reads `Map*` and `.route(`; `--routes` preferred | the same tool; a Node application prints its route table for `--routes` (D10) | one tool |
 
-Consumers wire the new check as one CI step beside `build-flags-check` ([ROLLOUT.md](../ROLLOUT.md) § CI); a .NET-only
-consumer may add it for uniformity because it passes without opinion (Q8).
+**Every consumer of kind `dotnet`, `typescript` or `mixed` wires the check** as one CI step beside `build-flags-check`
+([ROLLOUT.md](../ROLLOUT.md) § CI) — required, not optional: P2's equality is delivered only where both halves run
+(re-review, § 15; the first revision's "a .NET-only consumer may add it for uniformity" is superseded). The `rust`
+kind is Q8's only remaining subject.
 
 ### 4.7 Versions (D7)
 
@@ -529,7 +560,7 @@ plus one story line on that side (its ledger has not opened — its status says 
 | The rule catalog: 3 + 5 + 3 new `typescript/` files, 5 new `csharp/` files, 3 new `rust/` files, 1 new `common/` file; ≈ 12 KB of new text, ≈ 10 KB moved | ≈ 56 rules, ≈ 400 KB of 4 MiB (`LIMITS.catalog`); 256-file limit far | the single-read and core tests bound the loaded part; a rule that stops being true is edited, never appended to | a half-landed rule set is a red `rule-bodies` suite — nothing partial reaches `release` |
 | `research/parity-matrix.json` | ≈ 8 KB, one row per P/R entry | edited with the rules; its test retires a stale row | — |
 | `research/parity-inventory.json` | ≈ 4 KB, one entry per requirement and both-sides gap | edited with the matrix; the one-to-one test refuses an orphan on either side | — |
-| `research/moved-blocks.json` | ≈ 3 KB, one entry per moved block (≈ 14) | append-only while the plan is open; an entry whose destination file is later edited is re-recorded with the new commit | — |
+| `research/moved-blocks.json` | ≈ 3 KB, one entry per moved block (≈ 14), plus provenance entries | immutable historical evidence: original source hashes and lengths are never edited; a later move or edit appends a provenance entry that supersedes, never replaces, the earlier one (§ 4.3) | — |
 | `research/consumers.json` | < 2 KB, one entry per consumer | edited with `README.md` § *Consumers*; the equality test refuses drift | — |
 | `research/2026-10-31_node_behaviour_probes.md` | one file, ≈ 14 KB, kept forever as the dated evidence | never pruned; superseded probes are re-run and the new date added (D1) | — |
 | `tools/fixtures/node-strictness/` | ≈ 8 small fixture trees, < 60 KB | live as long as the check | — |
@@ -580,9 +611,11 @@ the lifecycle as the three cornerstones.
   right before each move (§ 4.3), the `http-coverage` test that a Node route table in the `--routes` shape is read and
   compared, the new check's fixtures (§ 4.6; a repository with no TypeScript passes; the hoisted-install fixture passes;
   a TypeScript repository where no `typescript` package resolves is INCOMPLETE; `.ts` files with no project are a
-  finding with the exact line of § 4.6; the .NET half's two fixtures), the moved-blocks manifest test (destination bytes
-  against `sha256` and `length`; no git history read), the `consumers.json` ↔ `README.md` § *Consumers* equality test,
-  the `stronger-*`-needs-a-reason rule of the matrix test, and — at every story — the catalog loads with every
+  finding with the exact line of § 4.6; the .NET half's five fixtures, the defaults-only VALID one and the two
+  suppression INVALID ones among them), the moved-blocks manifest test (a `planned` entry: schema and source bytes only;
+  an activated entry: destination bytes against `sha256` and `length`; no git history read), the
+  `consumers.json` ↔ `README.md` § *Consumers* equality test, the `stronger-*`-needs-a-reason rule and the
+  `planned`-needs-an-owning-epic rule of the matrix test, and — at every story — the catalog loads with every
   placeholder file's front matter valid.
 - `node tools/rule-bodies.mjs` in step.
 - `node tools/ownership-check.mjs` passes with no baseline file.
@@ -600,8 +633,13 @@ the lifecycle as the three cornerstones.
 
 ## 11. Definition of Done
 
-- [ ] Every row of § 3 is closed in the text of the rule it names, or recorded as deliberately absent in
-      `research/module_rules.md` with the reason; `research/parity-matrix.json` carries the same rows and its test is green.
+- [ ] Every row of § 3 is closed as `equal` in the text of the rule it names, recorded as `deliberately-absent` in
+      `research/module_rules.md` with the reason, or is one of the accepted `stronger-*` exceptions listed in the next
+      box; `research/parity-matrix.json` carries the same rows, **no row is `planned`**, and its test is green.
+- [ ] **The accepted `stronger-*` exceptions are exactly these**, and the permission is bounded to the rows reviewed
+      and listed here: **P4** (`stronger-ts` — complexity ≤ 4 is lint-enforced in TypeScript and prose in C#, because a
+      C# analyzer package is a dependency decision for every .NET consumer, Q7). Any other `stronger-*` row is a plan
+      change, not an exception.
 - [ ] No existing rule sentence was removed or shortened (D1); every moved block is byte-equal in its destination against
       the commit right before its move (the test of E1.S4); the one wording change was its own commit in the source file,
       with `rule-bodies.mjs --update`, before the move, and is listed in the pull request as wording.
@@ -622,8 +660,10 @@ the lifecycle as the three cornerstones.
       is recorded.
 - [ ] `tools/strictness-check.mjs` exists with both halves, finds `tsc` through package resolution (and passes the
       hoisted-install fixture), applies one TypeScript-repository predicate, reads the effective configuration on both
-      sides (`tsc --showConfig`; `dotnet msbuild -getProperty`), is proven on the invalid fixtures of § 4.6, is in
-      `README.md` § *tools* and `ROLLOUT.md`, and the reason Node has a check and no hook is in `research/module_rules.md`.
+      sides (`tsc --showConfig`; `dotnet msbuild -getProperty`, `NoWarn` and `WarningsNotAsErrors` included, SDK defaults
+      told apart by the baseline and the repository's own declarations), is proven on the invalid and the defaults-only
+      fixtures of § 4.6, is in `README.md` § *tools* and `ROLLOUT.md` as the complement of `build-flags-check`, and the
+      reason Node has a check and no hook is in `research/module_rules.md`.
 - [ ] `tools/http-coverage.mjs` reads a Node route table through `--routes`; `http-contracts.md:166` says so.
 - [ ] `rule-bodies.json`, `ownership-check`, `plan-lifecycle`, `npm test` green on the merged commit.
 - [ ] Each of E1–E6 went through `mcp__coai__review_plan` → `mcp__coai__review_code` with every finding resolved, and its
@@ -635,8 +675,8 @@ the lifecycle as the three cornerstones.
 - [ ] Bump pull requests in every consumer of `research/consumers.json` (derived from `README.md` § *Consumers*; eight
       at the time of writing: `dew_flow_rag_qln`, `dew_flow_mcp`, `dew_flow_sidecar_rust`, `dew_flow_benchmark`,
       `dew_flow_creds_for_devs`, `dew_flow_connect_other_ais`, `wsl_care`, `dew_flow_vscode_kit`) — the pinned-by
-      repository last, each with `pin-check` green after its commit; the `typescript` and `mixed` kinds add the check
-      step with `--warn`.
+      repository last, each with `pin-check` green after its commit; the `dotnet`, `typescript` and `mixed` kinds add
+      the `strictness-check` step with `--warn` (required — P2's equality is delivered by the wiring; `rust` per Q8).
 - [ ] `research/consumers.json` exists, equals the README table, and every consumer count in this plan is derived
       from it; `research/moved-blocks.json` holds one entry per moved block.
 - [ ] The experiment's task repository pins the release (reported by the other plan's E0.S3); the sha here and there
@@ -664,7 +704,7 @@ Not settled here; the owner or the named epic decides. No answer is invented.
   Fastify), or the shape only ("`app.<verb>(path)` grouped by the registered prefix")?
 - **Q7 A C# complexity analyzer.** Keep complexity ≤ 4 as prose on the C# side while TS enforces it by lint, or name an
   analyzer package (a dependency decision for every .NET consumer)?
-- **Q8 Who wires the strictness check.** The `typescript` and `mixed` kinds of `research/consumers.json` only (four today), or every consumer, since it passes without
+- **Q8 Does the `rust` consumer wire the strictness check?** The `dotnet`, `typescript` and `mixed` kinds wire it by § 4.6 (seven today); the question is now the `rust` kind only (one today): wire it for uniformity, since it passes without
   opinion where there is no TypeScript?
 - **Q9 One pull request per epic (E1–E6) or fewer?** Six keep each diff reviewable; fewer land the release sooner.
 - **Q10 Coverage thresholds** stay absent on both sides (§ 3.3). Confirm.
@@ -719,6 +759,31 @@ the plan's work until re-approval; the re-review, its consult and planning docum
 {"TreatWarningsAsErrors":"true","Nullable":"enable","LangVersion":"14.0"}}`, exit 0 — the effective values, so a
 `Directory.Build.props` that sets them is seen through the project that inherits them, which is what the .NET half reads.
 
+## 15. Re-review revision for epoch 2 (2026-10-31, consult `58f05c75`)
+
+Step 4 of the full stop: the whole plan revised against what is known now, after the consultant's two turns (both
+verified against this text before adoption). These revisions are the baseline the next plan round approves — **not
+ledger entries**. Nothing is cut; every change below adds an obligation, which is why the re-review record says
+`Narrowed: no`.
+
+| # | Revision | Where |
+|---|---|---|
+| R-1 | **P2's equality is delivered, not offered.** Every consumer of kind `dotnet`, `typescript` or `mixed` wires `strictness-check` as a CI step; Q8 keeps only the `rust` kind. E3 owns compiler-property and suppression enforcement on both stacks; the check COMPLEMENTS `build-flags-check` and its hook (resource limits) and replaces neither. § 4.6's first table row is split into a resource row and a compiler row | § 4.6, Q8, § 11, E3, E7 |
+| R-2 | **`moved-blocks.json` is immutable historical evidence.** Original hashes and lengths are never edited; a later move or edit appends a provenance entry. Why it differs from `rule-bodies.json` (current whole body vs a historical slice); both kept; extraction and normalisation shared through `tools/lib/rule-body.mjs` | § 4.3, § 7 |
+| R-3 | **E1 exits green before any destination exists** by validating `planned` matrix rows and move entries STRUCTURALLY only — schema, an existing source and range, an owning epic, the SOURCE bytes' hash; the destination's `id`/`section` and bytes are checked by the owning epic when it lands the move (live destination-byte validation deferred, not only reference existence). § 11 requires zero `planned` items | § 4.1, E1.S3–S4, E2–E6 done-when, § 11 |
+| R-4 | **The suppression check.** The .NET half also reads the effective `NoWarn` and `WarningsNotAsErrors`; a repository-added entry is a finding. SDK defaults are told apart two ways, both required: a clean-project baseline captured per pinned SDK, and the repository's own props/csproj declarations. Fixtures: VALID defaults-only (must pass); INVALID with a repository `<NoWarn>` beside `TreatWarningsAsErrors=true` and `Nullable=enable` (must fail); INVALID with `<WarningsNotAsErrors>` (must fail) | § 3.4, § 4.6, § 10, § 11, E3.S2 |
+| R-5 | E4 depends on E3 as well as E1, matching *Order, and why* | E4 |
+| R-6 | § 11 enumerates the accepted `stronger-*` exceptions — today only P4 with Q7's reason — and bounds the permission to the rows listed; any other `stronger-*` row is a plan change | § 11 |
+
+**Probe for R-4** (SDK 10.0.114, 2026-10-31, the same scratch project): a clean project with no `NoWarn` anywhere
+answers `dotnet msbuild probe.csproj -getProperty:NoWarn -getProperty:WarningsNotAsErrors -m:4` →
+`"NoWarn": "1701;1702"`, `"WarningsNotAsErrors": ""` — the SDK's own defaults, which is why a raw non-empty `NoWarn`
+cannot be the finding. With a `Directory.Build.props` carrying `<NoWarn>CS1591;$(NoWarn)</NoWarn>` and
+`<WarningsNotAsErrors>CS8600</WarningsNotAsErrors>` the same call answers `"NoWarn": "CS1591;"`,
+`"WarningsNotAsErrors": "CS8600"` (note: the SDK's `1701;1702` did NOT survive the override — the effective value is
+what the repository wrote, so comparing against the clean baseline shows the difference in both directions). Both
+readings exit 0.
+
 ## Epics
 
 Seven epics on the build order of § 9, each one branch, one reviewable diff and a usable state at its end. Stories are
@@ -747,17 +812,21 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
 - **Stories:** S1 the gate key: semantics, errors, `reasons`, tests · S2 the selection/budget matrix of § 4.1 measured
   and recorded, with the per-scope id-list tests · S3 `parity-matrix.json` with every P/R row and its test against the
   catalog and the recorded sections, and `parity-inventory.json` with the one-to-one test (an orphan on either side is
-  red — observed, then fixed), and `consumers.json` with its equality test against `README.md` § *Consumers* ·
-  S4 the moved-block byte-equality test and its manifest: `tools/moved-blocks.mjs --record <source> <from>-<to>
+  red — observed, then fixed; a `planned` row is validated structurally — schema, an existing source, an owning epic
+  among E2–E6 — and its destination `id`/`section` only once its epic activates it, § 4.1), and `consumers.json` with
+  its equality test against `README.md` § *Consumers* ·
+  S4 the moved-block byte-equality test and its manifest (a `planned` entry: schema and SOURCE bytes only; the
+  destination's bytes when the owning epic lands the move): `tools/moved-blocks.mjs --record <source> <from>-<to>
   <commit>` reads the block with `git show` at the commit RIGHT BEFORE the move and writes `sha256`, `length`, source,
   lines, commit and destination into `research/moved-blocks.json`; the test compares each destination's bytes with the
   manifest and reads no history (green at `fetch-depth: 1`), so an anonymisation commit before the move is the recorded
   "before" and a move folded into a wording change is a red test; the first entries are the blocks of § 4.3 as
   re-measured (testing `:12-31` 1,113 B and the 115 B Rust sentence among them) · S5 the byte allowances of § 5 written
   into `module_rules.md` and the single-read list of D5.
-- **Depends on:** nothing. **Done when:** `npm test` green with the new tests; the matrix test is red when a row names a
-  missing id or section (observed, then fixed); every tight scope's headroom is in `module_rules.md`; one pull request
-  through both gates.
+- **Depends on:** nothing. **Done when:** `npm test` green with the new tests; the matrix test is red when an ACTIVATED
+  row names a missing id or section, and when a `planned` row names no owning epic (both observed, then fixed); every
+  `planned` row and move entry passes its structural check with its source bytes recorded; every tight scope's headroom
+  is in `module_rules.md`; one pull request through both gates.
 
 ### E2 — Dependency policy (parallel after E1)
 
@@ -769,26 +838,31 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   reproducible install, each with its probe line · S4 selection tests, manifest entries, the `inspect --file src/x.csproj`
   measurement.
 - **Depends on:** E1. **Done when:** `dependencies --file package.json` selects `common.dependencies` and
-  `typescript.npm-packages` and not `csharp.nuget-packages`; the byte-equality test passes for the four moved blocks;
-  one pull request through both gates.
+  `typescript.npm-packages` and not `csharp.nuget-packages`; E2's matrix rows and move entries are activated (no longer
+  `planned`) and the byte-equality test passes for the four moved blocks against their recorded source hashes; one pull
+  request through both gates.
 
 ### E3 — Compiler/lint enforcement contract (cornerstone area 1)
 
-- **Goal:** P2–P4, § 3.4, D7, D8; `Nullable enable` for C# in the same epic.
+- **Goal:** P2–P4, § 3.4, D7, D8; `Nullable enable` for C# in the same epic. **E3 owns compiler-property and
+  suppression enforcement on both stacks** (R-1, R-4): the check COMPLEMENTS `build-flags-check` and its hook, which
+  enforce resource limits, and replaces neither.
 - **Scope:** `typescript/compiler-strictness.md` (new, ≤ 3,300 B), `csharp/doctrine.md` § 1 (+ `Nullable enable`),
   `tools/strictness-check.mjs` (both halves) + tests + fixtures, `README.md` § *tools*, `ROLLOUT.md`.
 - **Stories:** S1 the rule text: the composite gate, the toolchain as one combination with its read date, the
   suppression policy (**cornerstone**) · S2 the check, both halves: the one TypeScript-repository predicate; `tsc`
   resolved through `createRequire(...).resolve("typescript/bin/tsc")` or a walk up the parents' `node_modules/.bin`;
   effective configuration via `tsc --showConfig`; the .NET half via `dotnet msbuild -getProperty:TreatWarningsAsErrors
-  -getProperty:Nullable -m:4` per project; the six invalid fixtures, the hoisted-install fixture that must pass, the
-  `.ts`-without-project fixture with its exact expected line and exit, the two .NET fixtures; INCOMPLETE only when the
-  predicate says TypeScript and nothing resolves, or projects exist and no SDK resolves; `--warn` ·
+  -getProperty:Nullable -getProperty:NoWarn -getProperty:WarningsNotAsErrors -m:4` per project, with the SDK baseline
+  file and the props/csproj declaration read (R-4); the six invalid TypeScript fixtures, the hoisted-install fixture that
+  must pass, the `.ts`-without-project fixture with its exact expected line and exit, the five .NET fixtures (the
+  defaults-only VALID one, the two suppression INVALID ones among them); INCOMPLETE only when the predicate says
+  TypeScript and nothing resolves, or projects exist and no SDK (or no baseline for the pinned SDK) resolves; `--warn` ·
   S3 the C# § 1 line and the `gpu --file src/x.cs` measurement ·
   S4 the documents and the dry-run command for E7.
-- **Depends on:** E1. **Done when:** each invalid fixture fails naming the file; a grep-only check is shown insufficient
-  by a fixture whose `strict` sits in an `extends` base; `storage --file tsconfig.json` ≤ 32,768 B; one pull request
-  through both gates.
+- **Depends on:** E1. **Done when:** each invalid fixture fails naming the file and the defaults-only .NET fixture
+  passes; a grep-only check is shown insufficient by a fixture whose `strict` sits in an `extends` base; `storage --file
+  tsconfig.json` ≤ 32,768 B; E3's matrix rows are activated; one pull request through both gates.
 
 ### E4 — TypeScript design doctrine parity (cornerstone area 2)
 
@@ -808,10 +882,11 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   `typescript/output-encoding.md` and `typescript/testing.md`, each created with its full front matter (`id`, `load`,
   `paths`, `path_tasks`, `depends`) and its manifest entry, byte-equal against commit (a) · S3 the C# Definition of Done
   and the `gpu` measurement (Q3 if over) · S4 the selectors and the pinned scopes.
-- **Depends on:** E1. **Done when:** `inspect --file ui/a.ts` and `inspect --file src/a.mjs` ≤ 30,116 B; the matrix rows
-  P5–P7 point at § 0's sections; the byte-equality test is green for the three moved blocks against commit (a); the
-  catalog loaded and `npm test` was green after each of the two commits; the ownership check finds no name; one pull
-  request through both gates.
+- **Depends on:** E1, E3 (the strictness line § 0 carries points at E3's rule — R-5). **Done when:** `inspect --file
+  ui/a.ts` and `inspect --file src/a.mjs` ≤ 30,116 B; the matrix rows P5–P7 are activated and point at § 0's sections;
+  the three move entries are activated and the byte-equality test is green against their recorded source hashes from
+  commit (a); the catalog loaded and `npm test` was green after each of the two commits; the ownership check finds no
+  name; one pull request through both gates.
 
 ### E5 — Runtime lifecycle (cornerstone area 3)
 
@@ -826,7 +901,8 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   `tools/lib/proc.mjs` as the shipped shape (**cornerstone**) · S3 the C# moves, byte-equal, and the reliability DoD read
   against the Node text · S4 the core's two phrases within the ≤ 300 B allowance.
 - **Depends on:** E1, E4 (the doctrine's § 0 points here). **Done when:** every Node sentence traces to a probe line; the
-  always core ≤ 16,384 B; the common rule still states the invariant and the pointer; one pull request through both gates.
+  always core ≤ 16,384 B; the common rule still states the invariant and the pointer; E5's matrix rows and move entries
+  are activated and byte-equal; one pull request through both gates.
 
 ### E6 — Application contracts, with their C# and Rust counterparts
 
@@ -843,8 +919,9 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   pair and the Rust clock file (`storage` measured) · S4 the output-encoding pair (the webview escape module anonymised;
   Razor's `MarkupString`/`Html.Raw`) · S5 the one-line additions of D6 and the route-table path of D10 with its test ·
   S6 the Rust files and `rust/doctrine.md`'s pointer (Q13).
-- **Depends on:** E1, E4, E5. **Done when:** every moved block is byte-equal; every Node sentence traces to a probe line
-  or a cited document; `storage` (no file) ≤ 32,768 B; one pull request through both gates.
+- **Depends on:** E1, E4, E5. **Done when:** every moved block of E6 is activated and byte-equal; every Node sentence
+  traces to a probe line or a cited document; `storage` (no file) ≤ 32,768 B; after E6 no matrix row and no move entry
+  is `planned`; one pull request through both gates.
 
 ### E7 — Dry run, release, consumer adoption, the per-arm record
 
@@ -855,7 +932,7 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
 - **Stories:** S1 the dry run: the new check with `--warn` and `explain` for the representative scopes against each
   consumer's checkout, findings recorded · S2 `mcp__coai__review_feature` over the seven epics · S3 the promotion
   (`README.md:100-122`) and the `release-distance` read · S4 the bumps, each with `pin-check` green after its commit, the
-  `typescript` and `mixed` kinds adding the check step with `--warn` · S5 the sha and the per-arm record commands handed to the
+  `dotnet`, `typescript` and `mixed` kinds adding the `strictness-check` step with `--warn` (R-1) · S5 the sha and the per-arm record commands handed to the
   experiment's E0.S3 and confirmed equal · S6 this plan promoted with deviations.
 - **Depends on:** E1–E6 merged. **Done when:** every box of § 11 is ticked.
 
