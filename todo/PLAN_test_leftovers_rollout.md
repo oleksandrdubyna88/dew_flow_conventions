@@ -81,6 +81,17 @@ is in [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_co
 
 Order: the merged core first, then R1–R5 of the remainder plan, then the epics below. Disjoint: neither edits a consumer repository.
 
+## Wave 1 — the stories re-split against the release (2026-10-31)
+
+The owner runs the epics two repositories at a time: E3 + E4, then E5 + E2, then E6 + E7. Before any of them, every consumer's sweep-only stage is
+recorded or merged (the barrier). The stories documents of E3 (dew_flow_mcp #53) and E4 (dew_flow_sidecar_rust #61) were written on 2026-10-16
+against E1; an Opus delta check against `115bbf8` found the name, the creation order, the claim record, liveness, the sweep and the guard changed, so
+both are re-split before any producer code. The entries below still say E1 and `testsToDelete-<repo>-…`: read them through
+`common/test-leftovers.md` at `115bbf8` (`testsToDelete-<owner>-<repo>-…`). Three owner decisions of 2026-10-31 apply to every port, recorded in
+[R6 of the remainder plan](PLAN_test_leftovers_merged_core_release.md): a pin bump may merge alone; a Windows kernel owner needs the profile AND the
+owner SID; the `owner-blind` class in C# and Rust flags any bare-prefix literal outside the helper's file. E6 and E7.S3 wait for E3's merged producer
+stage, not for "E3.S2".
+
 ## Epics
 
 Seven epics, E = 7, so the cornerstone quota is Q = ⌈2·7/5⌉ = 3 ([common/subagent-models.md](../common/subagent-models.md)).
@@ -382,8 +393,8 @@ spends 78 855 of coai's 80 000-byte budget, `src_mcp/tests/StageRulesTests.cs:14
 | E3 | mcp | E1 | nineteen sites, zero cleanup, no Docker: the smallest full adoption and the C# template — runs before E2's C# helper story |
 | E4 | sidecar_rust | E1 — independent of the other consumer epics | seven not-panic-safe removals, two pre-clean-only; the Rust shape of the helper |
 | E5 | coai | E1 — independent of the other consumer epics | the largest site count and a live-data sweep; needs the contract's concurrency sentence |
-| E6 | benchmark | E1; E6 waits for E3.S2 (its C# helper ports E3's merged S2 — E6's amended order) | the Testcontainers fixture and decision 2b's first use |
-| E7 | rag_qln | E1; E7.S3 waits for E3's merged helper | the shared-store contradiction must be settled before any rename, and needs 2a's wording |
+| E6 | benchmark | the merged-core release (R5); E6 waits for E3's merged producer stage (its C# helper ports E3's merged helper — E6's amended order; the producer stage is one PR since 2026-10-31) | the Testcontainers fixture and decision 2b's first use |
+| E7 | rag_qln | the merged-core release (R5); E7.S3 waits for E3's merged producer stage | the shared-store contradiction must be settled before any rename, and needs 2a's wording |
 
 ### Cornerstone areas
 

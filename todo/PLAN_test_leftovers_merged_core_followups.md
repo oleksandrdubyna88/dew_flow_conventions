@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28.** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31.** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -448,9 +448,22 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
 - **When.** Before the barrier is declared closed on a shared machine, or at the next change to `OWNER_START_RE`.
 - **Anchor.** `tools/lib/sweeper-scan.mjs:43` (`OWNER_START_RE`); the traced half is `tools/lib/prefix-bindings.mjs` (`PLACEHOLDER`, `expandReadings`).
 
+## F16 — `owned.mjs` judges a Windows kernel owner by the profile path alone (found 2026-10-31)
+
+- **What.** On Windows, `isMine` (`tools/lib/owned.mjs:209-228`) returns true for any resolved path inside the caller's profile and never reads the
+  file's owner. Rule §3 says "on Windows the caller is the file's owner, bash `-O`", and the janitor reads the file owner. A folder or claim inside the
+  profile that another account owns (an elevated run's `Administrators`, an account given access) counts as the caller's.
+- **Why.** Scope evidence comes from the kernel, not from the name or the path. Path containment is stricter outside the profile and looser inside it.
+- **Fix.** Both keys: inside the profile AND the owner SID is the caller's user SID; either one unreadable fails closed (listed, never touched). RED
+  first: a fixture inside the profile whose owner is another SID, on the Windows run of F9.
+- **Found by.** The question consultant (GPT, consult `0cf2d245`), verified against the code on 2026-10-31. The C# and Rust ports (E3, E4 of the
+  rollout), not built yet, must check both keys: a criterion of their producer stage (owner decision 2026-10-31, R6 of the remainder plan).
+- **When.** With F9, before a Windows machine's janitor switch.
+- **Anchor.** `tools/lib/owned.mjs:209-228` (`isInsideProfile`, `isMine`); `tools/owned.test.mjs` (the path-boundary tests, no foreign-owner case).
+
 ## Definition of Done
 
-- [ ] Each of F1 to F15 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
+- [ ] Each of F1 to F16 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.

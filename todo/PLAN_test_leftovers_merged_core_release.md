@@ -141,6 +141,19 @@ cache or a process.
 - **When.** Sweep-only stages: any time. Producer stages: after R5 and after every sweep-only stage.
 - **Done when.** The rollout plan's own Definition of Done.
 - **Sweep-only stage, 2026-10-27.** This repository's barrier scan (`tools/sweeper-scan.mjs` at `72ae2f3`) over the default branch of each of the private sibling's ten consumers found no enabled owner-blind sweeper: six had no line at all; in four, the lines it listed only count, match or validate names, and one removes one fixed file it has just made. Corrected later on 2026-10-27, after the private sibling's stories were rewritten: of its ten consumers, one had already merged its sweep-only stage, two need one (one removes a sweep that deletes by age with a name built from a variable — a shape this repository's scan missed, F12; one rewrites two listed text lines so the machine-wide scan lists nothing), and seven have an empty stage A. Each other listed line is a guard finding for that consumer's producer stage. This repository's own seven consumers are not checked out on the machine that ran the scan, so their sweep-only stage is not recorded yet.
+- **Owner decisions, 2026-10-31** (wave 1 of R6: E3 in dew_flow_mcp, E4 in dew_flow_sidecar_rust; the question consultant `0cf2d245` first,
+  then the owner):
+  1. **A pin bump may merge alone** in a consumer that has no owner-blind sweeper and emits no owner form: a pin bump creates no owner-form
+     name, so it does not cross the barrier, and a required `pin-check` stays red on every pull request of that consumer until the pin moves.
+     The producer stage is then the rename plus the helper/guard port in one commit. Both consultants agreed. Applied: dew_flow_benchmark #120
+     (2026-10-30, before this record), dew_flow_mcp #57, dew_flow_sidecar_rust #63.
+  2. **The Windows kernel owner in a ported helper** is judged by both keys: the path is inside the caller's profile AND the file's owner SID is
+     the caller's; either one unreadable fails closed. The reference helper checks the profile alone ([F16 of the follow-ups](PLAN_test_leftovers_merged_core_followups.md)).
+  3. **The `owner-blind` class in C# and Rust source** is checked on literals, with no binding tracer: any literal of the bare prefix outside the
+     helper's own file is a finding, so a constant cannot carry the prefix to a sweep (the shape of F12). Scripts keep the shipped tracer.
+- **Sweep-only stage, 2026-10-31.** dew_flow_mcp (`b352881`) and dew_flow_sidecar_rust (`1c1282e`): `tools/sweeper-scan.mjs` at `115bbf8` found
+  none (103 and 104 files read); their stage A is empty. Their stories documents (mcp #53, sidecar_rust #61) were written against E1 and are
+  re-split against `115bbf8` before any producer code.
 
 ## Build order
 
