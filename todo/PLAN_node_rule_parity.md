@@ -1,20 +1,48 @@
 # PLAN — C#/Node rule parity: every C# requirement has a Node/TypeScript counterpart of equal strength, and the reverse
 
-> Status: **plan only, nothing implemented yet, 2026-10-31.** Scope: the shared rule corpus (`common/`, `csharp/`,
-> `typescript/`), its selection metadata, `research/rule-bodies.json`, the selection and size tests in
-> `tools/rules.test.mjs`, two tools (`tools/http-coverage.mjs` gains Node routes; a new `tools/node-strictness-check.mjs`),
-> the documents that describe them, one `release` promotion and the bump pull requests of the consumers. It changes no
-> consumer's code. The `## Plan changes` ledger opens at this plan's first approval
-> ([plan-change-control.md](../common/plan-change-control.md)); until then the plan has none.
+> Status: **plan only, nothing implemented yet, 2026-10-31 (revised the same day after the question consultants,
+> consult `ce61c905`, and the operator's "we only add" rule — § 0).** Scope: the shared rule corpus (`common/`,
+> `csharp/`, `rust/`, `typescript/`), its selection metadata and one new metadata key in the resolver
+> (`tools/lib/rule-catalog.mjs`), `research/rule-bodies.json`, a machine-readable parity matrix and its test, the
+> selection and size tests in `tools/rules.test.mjs`, two tools (`tools/http-coverage.mjs`'s `--routes` path for Node; a
+> new `tools/node-strictness-check.mjs`), the documents that describe them, one `release` promotion and the bump pull
+> requests of the consumers. It changes no consumer's code. The `## Plan changes` ledger opens at this plan's first
+> approval ([plan-change-control.md](../common/plan-change-control.md)); until then the plan has none.
 >
 > Related docs: [csharp/doctrine.md](../csharp/doctrine.md), [typescript/doctrine.md](../typescript/doctrine.md),
 > [rust/doctrine.md](../rust/doctrine.md), [csharp/nuget-packages.md](../csharp/nuget-packages.md),
 > [common/testing.md](../common/testing.md), [common/reliability.md](../common/reliability.md),
 > [common/logging-serilog.md](../common/logging-serilog.md), [common/utc-timestamps.md](../common/utc-timestamps.md),
 > [common/security.md](../common/security.md), [common/http-contracts.md](../common/http-contracts.md),
-> [research/module_rules.md](../research/module_rules.md), [README.md](../README.md) § *Consumers*, § *How `release` moves*.
+> [research/module_rules.md](../research/module_rules.md), [README.md](../README.md) § *Consumers*, § *How `release` moves*,
+> [tools/lib/proc.mjs](../tools/lib/proc.mjs) (the lifecycle precedent).
 > The other side of the boundary is a plan in another repository, cited as a path (§ 6):
 > `dew_flow_benchmark · todo/PLAN_lang_comparison_v2.md` (branch `docs/plan-lang-comparison-v2`, read at `aa5e413`).
+
+## 0. Decisions
+
+Rows marked "operator" are the operator's, recorded as given; "consultants" are the question consultants' answers
+(consult `ce61c905`: one reviewer read the repositories, one answered without file access; both agreed), each verified
+against the tree before adoption; "this plan" are proposals for the owner's approval. A decision this revision replaced
+stays in the document, marked **superseded** with a pointer to its replacement (D1).
+
+| # | Decision | Who, when |
+|---|---|---|
+| D1 | **"Everything collected before must stay; we only add."** No existing rule text is removed or shortened. A move keeps the text word for word, the common rule keeps the neutral invariant plus a one-line pointer, and the moved bytes are shown equal to the source bytes. Evidence, dates and caveats travel with the text. The size budget is solved by placement only: language-scoped selection, moving tight tasks from single-read to split-read where the rules allow, new rules selected narrowly. A scope that cannot fit without a deletion is an open question with its numbers, never a deletion. Research records, measurements and earlier decisions are never removed; a changed decision is marked superseded with a pointer | operator, 2026-10-31 |
+| D2 | **Common rules state only the language-neutral invariant; the language mechanics live in language-scoped rules**, so a single-language task never loads the other language's mechanics. The C# mechanics now in common rules move (verbatim, D1) to `csharp/`-scoped rules; the Node mechanics are written into `typescript/`-scoped rules; the Rust sections follow the same principle (§ 4.3) | consultants, 2026-10-31; verified § 4.3 |
+| D3 | **Task-gated path selection** — a new metadata key so a path-selected mechanics rule loads only in a scope that also names one of the tasks its source rule listed (§ 4.2). Without it every language-scoped mechanics rule would land in every `inspect`/`ui`/`gpu`/`storage` scope with a language file (measured § 5: `inspect --file src/x.cs` 28,820 B + ≈ 8 KB of mechanics) | this plan |
+| D4 | **The two doctrines are both DESIGN doctrines, selected on every language file.** `typescript/doctrine.md` gains the design counterparts of `csharp/doctrine.md` § 1–§ 7 by meaning; its four traps move verbatim (D1) to the gated rules that own their topics (§ 4.4) | consultants (the doctrine is its own deliverable), 2026-10-31; the placement: this plan |
+| D5 | **The `ui` task with a language file leaves the single-read list** (`tools/rules.test.mjs:252`), because the webview trap is a `ui` trap by definition and the scope cannot hold it in one read without a deletion (§ 5). `ui` with no file stays single-read. `gpu --file src/x.cs` stays single-read on the estimate (105 B of headroom after the additions) and leaves the list only if the measurement says so — Q3 | this plan |
+| D6 | **Placement exceptions, stated:** a one-line table row or a one-phrase list item that names a language stays in its common rule (`http-contracts.md:31-35`, `local-cpu-budget.md:31,:36`, `security.md:18,:26`'s parenthetical, `platform-limits.md:43`'s `GetByteCount`) and gains the other language's row or phrase beside it; moving one table row into a file of its own costs more than it saves. Prose paragraphs, subsections and code blocks move | this plan |
+| D7 | **The TypeScript toolchain is stated as one tested combination** — compiler + parser + lint — never "the newest TypeScript": measured 2026-10-31, `typescript-eslint@8.72.1` peers `typescript >=4.8.4 <6.1.0`, so lint is impossible on `typescript@7.0.2`. The rule states the newest TypeScript the pinned typescript-eslint supports (today 6.0.x), recorded in the repository; the choice TS 6.0.x with full lint versus TS 7 without type-aware lint is the operator's — Q2 | consultants, 2026-10-31; verified by `npm view` |
+| D8 | **Enforcement for TypeScript is a composite gate** — `tsc --noEmit` (or `noEmitOnError`) + lint `--max-warnings 0` + tests — the counterpart of `dotnet build` with warnings as errors; the check reads the EFFECTIVE configuration (`tsc --showConfig`), and is proven on deliberately invalid fixtures. A grep for `"strict": true` or a successful `node app.ts` proves nothing (measured: a type error ran with exit 0). Node has a check and no hook (§ 4.6) | consultants, 2026-10-31; verified § 4.3 of the probe table |
+| D9 | **Runtime lifecycle's invariant is "ownership through completion"**: who cancels, who observes the rejection, who terminates descendants, who drains streams and bounds the shutdown. The rule decides by `signal.aborted` and by WHO aborted, never by the reason's name; `unhandledRejection` gets an explicit shutdown policy, not "log and continue". Precedent: `tools/lib/proc.mjs` | consultants, 2026-10-31; verified by the probes of § 4.3 |
+| D10 | **HTTP coverage for Node goes through `--routes`** (the application's own route table, `tools/http-coverage.mjs:11, :27`), not through source regexes for Node frameworks | consultants, 2026-10-31; verified against the tool's usage |
+| D11 | **Output encoding is decided by the output context.** The webview escape module one consumer already has (anonymised) is the counterpart of Razor's `MarkupString`/`Html.Raw`; both live in gated `output-encoding` rules per language, the invariant stays in `security.md` | consultants, 2026-10-31 |
+| D12 | **The parity table is a file with a test**: `research/parity-matrix.json`, every row naming a rule id and section on both sides, asserted against the catalog and `rule-bodies.json`'s recorded sections. The body manifest hashes bodies after front matter, so a green body freeze does not prove selection is unchanged — selection tests pin which rules each representative scope selects (§ 4.1) | consultants, 2026-10-31; verified: `tools/lib/rule-body.mjs:24` strips the front matter |
+| D13 | **The release epic starts with a consumer dry run**, and the record per benchmark arm carries the conventions sha, the selected rule ids and hashes per stack, the toolchain versions and the effective checks — equal source ownership does not prove equal instructions reached the agents | consultants, 2026-10-31 |
+| D14 | **The dependency epic runs in parallel once E1 fixes placement**; the NuGet rule keeps central versions and the coupled-version exceptions; npm distinguishes the declared range, the lock's resolution and the reproducible install | consultants, 2026-10-31 |
+| D15 | **The commit trailer names the model that wrote the commit** (Fable 5.1); the former Q11 is closed | coordinator, 2026-10-31 |
 
 ## 1. The symptom, before any solution
 
@@ -35,12 +63,12 @@ What the corpus holds today (every point re-verified against this worktree at `f
 | `csharp/nuget-packages.md` | central pins, publisher/freshness table, *licence before version* "in any ecosystem" (`:25`), monthly bump, zero-reference projects; `tasks: ["dependencies"]` (`:5`) | A TypeScript agent on `--task dependencies` reads NuGet text and nothing about npm (measured: `dependencies --file package.json` selects `csharp.nuget-packages`, § 5) |
 | `typescript/doctrine.md` | four traps measured in one VS Code extension (`<script>` interpolation, backticks in template literals, `as` casts in fixtures, `tsc` emits despite errors), a Definition of Done; `paths` `**/*.ts,tsx,mts,cts` (`:4`) | `.js/.mjs/.cjs`, `package.json` and `tsconfig*.json` select **no** language rule, and `ENTRY.md:57-58` forbids inventing one. The traps' evidence names three source files and "a real vault" (`:33-36`) — a path and a product shape [rule-ownership.md](../common/rule-ownership.md) says to anonymise |
 | `common/testing.md:12-33` | the xUnit v3 / MTP runner section, "never `dotnet test`"; `:32` exempts the Rust runner by name; `:354` "Architecture is a test" reads assembly references; `:368` DoD "the runner executable was used" | No Node runner section; the DoD's first box cannot be ticked by a Node agent |
-| `common/logging-serilog.md` | Serilog, the contract, `:153` the C# shape, `:172-186` a **Rust** section, `:190` "never `Console.WriteLine`" | No Node section; a TypeScript agent is told about `ILogger<T>` and nothing about `console.log` or pino |
-| `common/reliability.md:47-69, :95-132` | `BackgroundService`, `TaskScheduler.UnobservedTaskException` (`:59`), `CancellationToken` end-to-end (`:97`), `PosixSignalRegistration` (`:100`), `OperationCanceledException` vs `TaskCanceledException` (`:104-132`) | No `AbortSignal`, `unhandledRejection`, `SIGTERM`, timer-keeps-the-loop-alive, promise-without-catch — the exact mechanics the experiment's daemon tasks test |
+| `common/logging-serilog.md` | Serilog, the contract, `:61-90` the Serilog colour measurement, `:153` the C# shape, `:172-186` a **Rust** section, `:190` "never `Console.WriteLine`" | No Node section; a TypeScript agent is told about `ILogger<T>` and nothing about `console.log` or pino |
+| `common/reliability.md:47-69, :95-132` | `BackgroundService`, `TaskScheduler.UnobservedTaskException` (`:59`), `CancellationToken` end-to-end (`:97`), `PosixSignalRegistration` (`:100`), `OperationCanceledException` vs `TaskCanceledException` (`:104-132`); the DoD at `:234-250` names the token's state as the decider | No `AbortSignal`, `unhandledRejection`, `SIGTERM`, timer-keeps-the-loop-alive, promise-without-catch — the exact mechanics the experiment's daemon tasks test |
 | `common/security.md:18, :26` (always loaded) | `dotnet user-secrets`; `Process.Kill(entireProcessTree: true)` | No Node form of either, and Node has no tree-kill primitive (measured § 4.3) |
-| `common/utc-timestamps.md` | `DateTimeOffset`, `TimeProvider.GetUtcNow()` (`:35`), `:65` a **Rust** section | No `Date`/`Temporal` section; JavaScript's calendar-day trap is the **inverse** of .NET's (measured § 4.3) |
+| `common/utc-timestamps.md` | `DateTimeOffset`, `TimeProvider.GetUtcNow()` (`:35`), a C# code block in rule 3, `:65` a **Rust** section | No `Date`/`Temporal` section; JavaScript's calendar-day trap is the **inverse** of .NET's (measured § 4.3) |
 | `common/platform-limits.md:43` | `Encoding.UTF8.GetByteCount` | no `Buffer.byteLength` |
-| `common/http-contracts.md:31-35` and `tools/http-coverage.mjs:45-49` | ASP.NET and axum rows; the scanner reads `Map*` and `.route(` (`http-contracts.md:166`) | No Node framework row; the scanner is blind to every Node route although `.ts/.js/.mjs` are in its extension set (`http-coverage.mjs:41`) |
+| `common/http-contracts.md:31-35` and `tools/http-coverage.mjs:45-49` | ASP.NET and axum rows; the scanner reads `Map*` and `.route(` (`http-contracts.md:166`); `--routes` takes the application's own table (`:11, :27`) | No Node framework row; the scanner is blind to every Node route although `.ts/.js/.mjs` are in its extension set (`http-coverage.mjs:41`), and nothing says a Node application should feed `--routes` |
 | `common/post-deploy-checks.md:49`, `common/coding-style.md:32` | "a package (NuGet, ghcr, crates.io)"; "the C#-specific shape is in csharp/doctrine" | no npm; no pointer to the TypeScript shape |
 | Balanced already | `common/local-cpu-budget.md:31, :36` (`node --test` and xUnit rows), `common/test-leftovers.md` (bash, Node and C# named together), `common/development-workflow.md:46, :56` (a `tsc` trap and a `dotnet` trap) | — |
 
@@ -53,141 +81,209 @@ requires.
 the Razor shape is `MarkupString`/`Html.Raw`), test-fixture casts (`:66`; the C# shape is `null!`/`default!`), and a
 Definition of Done.
 
+**Suppression is not equal today either** (consultants, verified 2026-10-31): the two TypeScript consumers both run
+eslint at complexity 4, but one carries 270 `eslint-disable` lines and ignores a typed-fixtures folder, the other 16 and
+ignores `scripts/**` and `src/generated/**`; neither has a baseline file. The three .NET consumers' `Directory.Build.props`
+carry no `NoWarn` and no `WarningsNotAsErrors`, and no `#pragma warning disable` was found in two server trees. "Both run
+a linter" is therefore not equal enforcement; the parity matrix carries an *exemptions and suppression* column (§ 3.4).
+
 The house precedent for a language mirror is `rust/doctrine.md:8` ("The Rust mirror of csharp/doctrine.md. Written down
 from what the family's Rust crate already practices") and the `## Rust` sections of `logging-serilog.md:172` and
 `utc-timestamps.md:65`.
 
 ## 2. Goal
 
-1. A **parity table** (§ 3) in which every C#-specific requirement, and every C#-only section of a common rule, has a
-   Node/TypeScript counterpart of equal strength, and every TypeScript requirement has a C# counterpart; a gap on both
-   sides is either raised on both or recorded as deliberately absent, with the reason.
-2. The rules that close the table, released through `promote-release` **before** the experiment's pre-registration, and
+1. A **parity matrix** (§ 3, and the file `research/parity-matrix.json` with its test — D12) in which every C#-specific
+   requirement, and every C#-only section of a common rule, has a Node/TypeScript counterpart of equal strength, and
+   every TypeScript requirement has a C# counterpart; a gap on both sides is either raised on both or recorded as
+   deliberately absent, with the reason.
+2. The rules that close the matrix, released through `promote-release` **before** the experiment's pre-registration, and
    pinned by the experiment's task repository (the other plan's E0.S3).
 3. Every Node claim in a rule rests on a **run** recorded in this repository or a **cited document** — never on memory
    (§ 4.3, § 11).
-4. Every size budget the resolver's tests pin stays green, with the numbers measured before and after (§ 5).
+4. Every size budget the resolver's tests pin stays green **without deleting a word** (D1), with the numbers measured
+   before and after (§ 5).
+5. A single-language scope never loads the other language's mechanics (D2), measured per representative scope (§ 4.1).
 
 **Equal strength, defined.** Two requirements are of equal strength when (a) they are selected for the same kind of
 scope (a language file, a manifest, a task) — a rule one agent gets on every source file and the other gets only on a
 task is not equal; (b) they have the same mood — MANDATORY against MANDATORY, a Definition of Done box against a box;
-(c) they have the same enforcement class — a file a check verifies, a command a hook refuses, or prose alone; and (d)
-the consequence is the same — a warning that fails the build on one side fails it on the other. The table below carries
-the class in the *strength* column.
+(c) they have the same enforcement class — a file a check verifies, a command a hook refuses, or prose alone; (d) the
+consequence is the same — a warning that fails the build on one side fails it on the other; and (e) **the exemption
+policy is the same** — what may be suppressed, where (inline only, naming the rule and the reason), and that no baseline
+of accepted violations exists. The matrix carries (c) and (e) as columns.
 
 ## 3. The parity table
 
-Direction `C# → Node` first, then `TS → C#`, then the gaps on both sides. *Where* names the file that will carry each
-side after this plan; *strength* is the class of § 2.
+Direction `C# → Node` first, then `TS → C#`, then the gaps on both sides, then suppression. *Where* names the file that
+will carry each side after this plan under D2; *strength* is the class of § 2. The same rows, with rule ids and section
+headings, are the content of `research/parity-matrix.json` (E1).
 
 ### 3.1 C# requirements → Node/TypeScript counterparts
 
-| # | C# requirement (where today) | Node/TypeScript counterpart (where after) | Strength |
+| # | C# requirement (where today → where after) | Node/TypeScript counterpart (where after) | Strength |
 |---|---|---|---|
-| P1 | ".NET 10, latest C#" (`csharp/doctrine.md:10`) | "Node 26 (the current LTS line), TypeScript 7" stated the same way in `typescript/doctrine.md` § 0 and `typescript/compiler-strictness.md` (§ 4.1); the toolchain caveat of § 4.6 | prose, on every language file — equal |
-| P2 | `TreatWarningsAsErrors` (`:10`) | `"strict": true`, `"noEmitOnError": true` wherever `tsc` emits, and the lint run at `--max-warnings 0` — `typescript/compiler-strictness.md`, selected by `**/tsconfig*.json`; the one-line statement also in the doctrine's § 0 so a `.ts` scope sees it | file + a CI check (`tools/node-strictness-check.mjs`, § 4.5) — **stronger than C#**, which has prose only; C# gains nothing here because MSBuild already fails the build on a warning once the property is set, which is the check |
-| P3 | `Nullable enable` — absent from the rule, present in every consumer | `strictNullChecks` (inside `strict`) — the same rule | raised on **both**: `csharp/doctrine.md` § 1 gains `Nullable enable` |
-| P4 | complexity ≤ 4, `private static` where no state is read (`:75-78`) | the same number as a lint rule (`complexity: ["error", 4]`, `max-lines-per-function` 50, `max-lines` 800, `no-console`) — the shape two TypeScript consumers already run (read 2026-10-31) — in `compiler-strictness.md` | prose ↔ lint-enforced: TS stronger; C# stays prose (an analyzer rule for complexity needs a package the family has not adopted — recorded, § 10 Q7) |
-| P5 | records for data, typed values, no primitive obsession, no null in business logic (§ 2–4) | `readonly` object types and `Readonly<T>`, branded types for ids, `undefined` only at the edges, discriminated unions for outcomes — `typescript/doctrine.md` § 0 one sentence each, pointing at the C# doctrine for the reasoning ("the idea is the rule and the language is the accent", `rust/doctrine.md`) | prose ↔ prose; bytes bounded by § 5 |
-| P6 | § 4a a DTO field the client omitted is `null` | a `JSON.parse` result is `any`: a field the client omitted is `undefined` whatever the declared type says; validate at the single road in (a schema, or a typed parser) — `typescript/doctrine.md` § 0; the 64-bit id trap (`JSON.parse` rounds `9007199254740993` to `…992`, measured § 4.3) beside it | prose ↔ prose |
-| P7 | `Outcome<T>`, never `throw` for control flow (§ 5) | a discriminated union result; `throw` only for the unexpected; the shared outcome shape once per repository — `typescript/doctrine.md` § 0; `coding-style.md:32` points at BOTH doctrines | prose ↔ prose |
-| P8 | `dotnet-build.md`: the worker pool, hook + check | **No Node counterpart.** The rule exists for a measured resource problem (72 MSBuild workers, 10 775 MB) that Node builds do not have; a hook is added for a measurement, not for symmetry (§ 4.5). Node's enforced rule is P2's check instead | deliberately absent; stated in `research/module_rules.md` |
-| P9 | `nuget-packages.md`: central pins; publisher/freshness; licence before version; monthly bump; zero-reference projects | `typescript/npm-packages.md` (§ 4.2): exact pins (`save-exact=true` in `.npmrc`; measured: a bare `--save-dev` writes `^5.9.3`), a committed `package-lock.json`, `npm ci --ignore-scripts` as the only install in CI (measured: it refuses a lock out of step), `npm outdated` and `npm audit` on the monthly bump, `engines.node`, `node:` built-ins before a package; the neutral text (publisher table, licence, monthly bump, prefer nothing) moves to `common/dependencies.md` | prose ↔ prose, each selected by its own manifest; the shared part on `--task dependencies` only |
-| P10 | `testing.md:12-33` the runner section; `:368` "the runner executable was used" | a `## Running tests — Node` section: `node --test` (built in) or vitest, run by a script that computes the concurrency cap (`local-cpu-budget.md:31`); the flags table (`--test-name-pattern`, `--test-only`, `--test-timeout`, `--test-concurrency`); the compile-then-run contract and the exit code that must be read (`typescript/doctrine.md:80`); the DoD box becomes "the repository's documented runner was used (the MTP executable, `cargo test`, `node --test`) — never `dotnet test`" | prose ↔ prose; both split-read tasks |
-| P11 | `testing.md:354` architecture tests read assembly references | the same section gains one sentence: a Node repository asserts its layer rules over the import graph (one scan of `import`/`require` statements kept as a test) | prose ↔ prose |
-| P12 | `logging-serilog.md`: the contract, the C# shape, the Rust section | a `## Node` section after `## Rust`: pino or a one-file equivalent; the same path shape, UTC, level from configuration, 14-day prune at startup, coloured console with a plain file; a stdio-protocol host logs to **stderr** (`:91`, the MCP-server case); "never `console.log` for a log" beside "never `Console.WriteLine`" (`:190`) | prose ↔ prose |
-| P13 | `reliability.md:47-69, :95-132` | Node paragraphs in the same sections: every detached promise ends in a `catch` that logs; `process.on('unhandledRejection')` as the net under the net (the default is a crash, measured); `AbortSignal` end-to-end, `AbortSignal.any` to combine; a `SIGTERM` handler on every host, CLIs included (the default is exit 143 with no cleanup, measured); a bounded shutdown with `.unref()`; "a timeout is not a cancellation — and Node spells them **differently**": `AbortSignal.timeout` rejects with `TimeoutError`, a caller's abort with `AbortError` (measured) — filter on the reason's `name`, or on the caller's own `signal.aborted` when signals are combined | prose ↔ prose |
-| P14 | `security.md:18` `dotnet user-secrets` | "…`dotnet user-secrets`, an uncommitted `.env` read with `node --env-file` (measured), or a secret manager" | always core — equal |
-| P15 | `security.md:26` `Process.Kill(entireProcessTree: true)` | Node has no tree kill: spawn the child in its own process group (`detached: true`) and kill the group (`process.kill(-child.pid)`; Windows `taskkill /T`); `child.kill()` alone leaves the grandchildren (measured: 2 of 2 left, against 0 for the group kill) | always core — equal, and the asymmetry stated |
-| P16 | `utc-timestamps.md` .NET bullets and `:65` Rust | a `## Node` section: `Date` parses a date-only string as **UTC** and a date-time string without an offset as **local** (measured in two zones) — the inverse of the .NET trap, so the rule is "stamp the day; never give a day a time of day"; the clock is an injected function, never `Date.now()` in code that writes a row; `Temporal` is present on Node 26 (`typeof Temporal === "object"`, measured) and `Temporal.PlainDate` is the typed calendar day | prose ↔ prose; bounded by the `storage` single-read cap (§ 5) |
-| P17 | `platform-limits.md:43` `Encoding.UTF8.GetByteCount` | "…(`Buffer.byteLength(path, "utf8")` in Node — measured: a 7-character string with one two-byte character is 8 bytes)" | one clause |
-| P18 | `http-contracts.md:31-35` ASP.NET and axum rows; `http-coverage.mjs:45-49` | two rows: a Fastify/Express style `app.<verb>(path)` grouped by the plugin or router registered under a prefix; `fastify.route({ url })`; the scanner gains a `NODE_ROUTE` and a prefix pattern (`register(…, { prefix })`, `app.use('/p', router)`) with the three-line companion test; `:166` is rewritten to say what the scanner now reads | rows ↔ rows; scanner ↔ scanner |
+| P1 | ".NET 10, latest C#" (`csharp/doctrine.md:10`, stays) | the toolchain line of D7 in `typescript/doctrine.md` § 0 and `typescript/compiler-strictness.md` | prose, on every language file — equal |
+| P2 | `TreatWarningsAsErrors` (`:10`, stays) | `"strict": true`, `"noEmitOnError": true` wherever `tsc` emits, lint at `--max-warnings 0`, `tsc --noEmit` before a type-stripped run — `typescript/compiler-strictness.md`, selected by `**/tsconfig*.json`; the one-line statement also in the doctrine's § 0 | file + CI check (`tools/node-strictness-check.mjs`, § 4.6) — **stronger than C#**, which has prose only; C# gains nothing here because MSBuild already fails the build on a warning once the property is set, which is the check |
+| P3 | `Nullable enable` — absent from the rule, present in every consumer | `strictNullChecks` (inside `strict`) — the same rule | raised on **both**: `csharp/doctrine.md` § 1 gains `Nullable enable` (≈ 20 B, no removal) |
+| P4 | complexity ≤ 4, `private static` where no state is read (`:75-78`, stays) | the same number as a lint rule (`complexity: ["error", 4]`, `max-lines-per-function` 50, `max-lines` 800, `no-console`) — the shape two TypeScript consumers already run (read 2026-10-31) — in `compiler-strictness.md`; the suppression policy of § 3.4 | prose ↔ lint-enforced: TS stronger; C# stays prose (an analyzer rule for complexity needs a package the family has not adopted — Q7) |
+| P5 | records for data, typed values, no primitive obsession, no null in business logic (§ 2–4, stay) | `typescript/doctrine.md` § 0 (E4, by meaning): `readonly` data contracts and `Readonly<T>`/`ReadonlyArray<T>` in public shapes; validated or branded domain types (`type CommitSha = string & { readonly __brand: … }` with a parsing factory returning a result, never a throwing constructor); `undefined`/`null` only at the edges, absence as a typed state ("not captured" and "empty" are different facts) | prose ↔ prose; cites, anonymised, one consumer's readonly outcome type that separates refusal, timeout and mechanism failure |
+| P6 | § 4a a DTO field the client omitted is `null` (stays) | § 0: a `JSON.parse` result is `any` and a declared type is a promise the parser never checked; validate at the single road in (a schema or a typed parser); the 64-bit id trap (`JSON.parse` rounds `9007199254740993` to `…992`, measured) beside it | prose ↔ prose |
+| P7 | `Outcome<T>`, never `throw` for control flow (§ 5, stays) | § 0: a discriminated union result (`Result<T, E>`), `throw` only for the unexpected, one outcome shape per repository; `coding-style.md:32` points at BOTH doctrines | prose ↔ prose |
+| P8 | `dotnet-build.md`: the worker pool, hook + check | **No Node counterpart.** The rule exists for a measured resource problem (72 MSBuild workers, 10 775 MB) that Node builds do not have; a hook is added for a measurement, not for symmetry (§ 4.6). Node's enforced rule is P2's check instead | deliberately absent; stated in `research/module_rules.md` |
+| P9 | `nuget-packages.md`: central pins; publisher/freshness; licence before version; monthly bump; zero-reference projects | `typescript/npm-packages.md` (§ 4.5, D14): the declared range (`save-exact=true` in `.npmrc`; measured: a bare `--save-dev` writes `^5.9.3`), the lock's resolution (`package-lock.json` committed), the reproducible install (`npm ci --ignore-scripts` as the only install in CI; measured: it refuses a lock that does not SATISFY `package.json`, and accepts one that does), `npm outdated` and `npm audit` on the monthly bump, `engines.node`, `node:` built-ins before a package; the neutral text moves verbatim to `common/dependencies.md` | prose ↔ prose, each selected by its own manifest; the shared part on `--task dependencies` only |
+| P10 | `testing.md:12-34` the runner section (1,267 B) → `csharp/testing.md` verbatim; `:368` DoD box | `typescript/testing.md`: `node --test` (built in) or vitest, run by a script that computes the concurrency cap (`local-cpu-budget.md:31`); the flags table (`--test-name-pattern`, `--test-only`, `--test-timeout`, `--test-concurrency`, `--test-skip-pattern` — present, measured); the compile-then-run contract and the exit code that must be read (the doctrine's § 4, moved here verbatim); `common/testing.md` keeps the invariant "run the repository's documented runner and read its exit; a result over a failed build is no result" and the pointer; the DoD box becomes neutral with the language box in each language rule | prose ↔ prose; gated on testing's tasks |
+| P11 | `testing.md:354-358` architecture tests read assembly references (252 B) → `csharp/testing.md` verbatim | `typescript/testing.md`: a Node repository asserts its layer rules over the import graph (one scan of `import`/`require` statements kept as a test); the common rule keeps "architecture is a test, not a review comment" | prose ↔ prose |
+| P12 | `logging-serilog.md:61-90` the Serilog colour measurement (1,640 B), `:153-171` the C# shape (497 B) → `csharp/logging.md` verbatim (paths `**/Program.cs` kept); `:190` "never `Console.WriteLine`" (a one-line Never — stays, D6) | `typescript/logging.md`: pino or a one-file equivalent; the same path shape, UTC, level from configuration, 14-day prune at startup, coloured console with a plain file; a stdio-protocol host logs to **stderr** (`:91`, the MCP-server case); "never `console.log` for a log" beside the C# line in the common Never list | prose ↔ prose; gated on logging's tasks |
+| P13 | `reliability.md:104-133` the OCE/TCE subsection (1,698 B) and every sentence of `:47-70` and `:95-103` that names a .NET type → `csharp/lifecycle.md` verbatim; the DoD boxes at `:243-245` stay neutral ("the token's state decides" is the invariant) | `typescript/lifecycle.md` (D9): ownership through completion — every detached promise has an owner who observes it; `unhandledRejection` handler = log, set `exitCode`, begin the bounded shutdown (the default is a crash, measured; "log and continue" is forbidden); `AbortSignal` end-to-end, `AbortSignal.any` to combine; decide by `signal.aborted` and by who aborted — a reason may be any value (`abort(new RangeError())` → `RangeError`, `abort("text")` → a string with no `name`, measured), so no classifier on `reason.name`; a pre-aborted signal rejects at once (measured); `SIGTERM` handler on every host, CLIs included (default exit 143 with no cleanup, measured); a bounded shutdown timer `.unref()`'d; an ignored `SIGTERM` defeats the supervisor too (measured: `timeout 2` waited past two minutes); descendants holding pipes keep `close` from firing (measured: `exit` at 4 ms, `close` at 1,508 ms); kill the group, not the child (measured) | prose ↔ prose; gated on reliability's tasks; the Node paragraph is checked against the .NET checklist at `:243-245` and contradicts none of it |
+| P14 | `security.md:18` `dotnet user-secrets` (stays, D6) | "…`dotnet user-secrets`, an uncommitted `.env` read with `node --env-file` (measured), or a secret manager" — the same list | always core — equal |
+| P15 | `security.md:26` `Process.Kill(entireProcessTree: true)` (the parenthetical stays, D6) | the core sentence gains "Node has no tree kill: the process group — `typescript/lifecycle.md`"; the mechanics (spawn `detached: true`, `process.kill(-child.pid)`, Windows `taskkill /T`; `child.kill()` left 2 of 2 grandchildren, the group kill 0 — measured; `tools/lib/proc.mjs:18-31` is the shipped shape) live in `typescript/lifecycle.md`; the .NET parenthetical's mechanics (`Process.Kill`, `WaitForExitAsync`) are already in `reliability.md:38-46` and move with P13 | always core — equal, and the asymmetry stated |
+| P16 | `utc-timestamps.md:25-48` the .NET sentences and the C# code block (≈ 900 B of the 1,643 B rule) → `csharp/utc-timestamps.md` verbatim; `:65-69` Rust (219 B) → `rust/utc-timestamps.md` verbatim | `typescript/utc-timestamps.md`: `Date` parses a date-only string as **UTC** and a date-time string without an offset as **local** (measured in two zones) — the inverse of the .NET trap, so the rule is "stamp the day; never give a day a time of day"; the clock is an injected function, never `Date.now()` in code that writes a row; `Temporal` is present on Node 26 (`typeof Temporal === "object"`, measured) and `Temporal.PlainDate` is the typed calendar day | prose ↔ prose; gated on utc's tasks (`storage` is single-read: § 5) |
+| P17 | `platform-limits.md:43` `Encoding.UTF8.GetByteCount` (stays, D6) | "…(`Buffer.byteLength(path, "utf8")` in Node — measured: a 7-character string with one two-byte character is 8 bytes)" in the same sentence | one clause |
+| P18 | `http-contracts.md:31-35` ASP.NET and axum rows (stay, D6); `http-coverage.mjs:45-49` | two rows: a Fastify/Express style `app.<verb>(path)` grouped by the plugin or router registered under a prefix; a Node application **prints its route table** (Fastify `printRoutes()`/`routes`, Express's router stack) into the JSON shape `--routes` already takes (`http-coverage.mjs:11, :27`) — D10; `:166` is extended to say so. **Superseded:** the first revision's `NODE_ROUTE` source regex (kept at § 4.8 for the record) | rows ↔ rows; the scanner's preferred path ↔ the same path |
 | P19 | `post-deploy-checks.md:49` "(NuGet, ghcr, crates.io)" | "(NuGet, npm, ghcr, crates.io)" | one word |
-| P20 | selection: `**/*.cs`, `**/*.razor`, `**/*.csproj` select the C# doctrine; `.csproj`, `Directory.*.props`, `NuGet.Config` select the package rule | `**/*.ts,tsx,mts,cts` **and** `**/*.js,mjs,cjs` select the TypeScript doctrine; `**/tsconfig*.json` selects `compiler-strictness`; `**/package.json` selects `npm-packages` | selector ↔ selector (§ 4.4) |
+| P20 | selection: `**/*.cs`, `**/*.razor`, `**/*.csproj` select the C# doctrine; `.csproj`, `Directory.*.props`, `NuGet.Config` select the package rule; nothing is task-gated | `**/*.ts,tsx,mts,cts` **and** `**/*.js,mjs,cjs` select the TypeScript doctrine; `**/tsconfig*.json` selects `compiler-strictness`; `**/package.json` selects `npm-packages`; the mechanics rules of both languages are path-selected and task-gated alike (§ 4.2) | selector ↔ selector |
 
 ### 3.2 TypeScript requirements → C# counterparts
 
-| # | TypeScript requirement (where today) | C# counterpart (where after) | Strength |
+| # | TypeScript requirement (where today → where after) | C# counterpart (where after) | Strength |
 |---|---|---|---|
-| R1 | § 1 `JSON.stringify` into `<script>` is a break-out; one shared escaper; a scan test (`typescript/doctrine.md:15-47`) | `csharp/doctrine.md` § 8: `MarkupString` and `Html.Raw` are the same door — a value they wrap reaches the page unescaped; JSON for a `<script>` goes through ONE helper that also closes `</script>` and `<!--`; the general rule is `security.md` § *A measure applied at SOME of its sites* | MANDATORY ↔ MANDATORY |
-| R2 | § 3 an `as` cast in a fixture (`:66-78`) | the same § 8: `null!` and `default!` in a fixture are the same promise — a typed factory with real defaults instead; adding a required member is the moment to grep for them | prose ↔ prose |
-| R3 | a Definition of Done (`:98`) | `csharp/doctrine.md` gains a Definition of Done (typed values, no `throw` for control flow, complexity, immutable contracts, `Nullable enable` and `TreatWarningsAsErrors` set, no `MarkupString` outside the helper) | box ↔ box |
-| R4 | § 4 `tsc` emits despite errors | no C# counterpart needed: the C# compiler emits nothing on an error. Stated once in the TypeScript rule as a difference, not a gap | deliberately absent |
-| R5 | § 2 backticks in template literals | C# raw string literals have no comparable trap (`"""` cannot be ended by a shorter run) — stated in § 4's placement note | deliberately absent |
+| R1 | § 1 `JSON.stringify` into `<script>` is a break-out; one shared escaper; a scan test (`typescript/doctrine.md:15-48`, 2,042 B) → `typescript/output-encoding.md` verbatim (anonymised wording, § 4.4) | `csharp/output-encoding.md`: `MarkupString` and `Html.Raw` are the same door — a value they wrap reaches the page unescaped; JSON for a `<script>` goes through ONE helper that also closes `</script>` and `<!--`; the general rule stays `security.md` § *A measure applied at SOME of its sites* | MANDATORY ↔ MANDATORY; gated on implement, test, audit, ui, http |
+| R2 | § 3 an `as` cast in a fixture (`:66-79`, 932 B) → `typescript/testing.md` verbatim | `csharp/testing.md`: `null!` and `default!` in a fixture are the same promise — a typed factory with real defaults instead; adding a required member is the moment to grep for them | prose ↔ prose; typed-fixture discipline side by side |
+| R3 | a Definition of Done (`:98-105`; each box moves with its section, the § 2 box stays) | a Definition of Done in `csharp/doctrine.md` (typed values, no `throw` for control flow, complexity, immutable contracts, `Nullable enable` and `TreatWarningsAsErrors` set) — and in every new rule of both sides | box ↔ box |
+| R4 | § 4 `tsc` emits despite errors (`:80-97`, 1,151 B) → `typescript/testing.md` verbatim, with `compiler-strictness.md` carrying the flag | no C# counterpart needed: the C# compiler emits nothing on an error. Stated once in the TypeScript rule as a difference, not a gap | deliberately absent |
+| R5 | § 2 backticks in template literals (`:49-65`, 755 B, stays in the doctrine) | C# raw string literals have no comparable trap (`"""` cannot be ended by a shorter run) — stated in § 2's placement note | deliberately absent |
 
 ### 3.3 Gaps on both sides — raised or recorded
 
 | Gap | Decision | Why |
 |---|---|---|
-| Analyzer / lint requirement | **Raise both, asymmetrically named**: TS lint at zero warnings (P2, P4); C# `TreatWarningsAsErrors` + `Nullable enable` + `AnalysisLevel` latest in `csharp/doctrine.md` § 1 | The compiler is the C# analyzer the family already pays for; an extra analyzer package is a dependency decision for the consumers, not a shared rule (Q7) |
+| Analyzer / lint requirement | **Raise both, asymmetrically named**: TS lint at zero warnings (P2, P4); C# `TreatWarningsAsErrors` + `Nullable enable` in `csharp/doctrine.md` § 1 | The compiler is the C# analyzer the family already pays for; an extra analyzer package is a dependency decision for the consumers, not a shared rule (Q7) |
 | Lock file + locked restore | **Raise TS (lock + `npm ci`), record .NET**: central exact pins of direct packages exist today; `packages.lock.json` with `--locked-mode` is not required | Imposing lock files on six .NET consumers is a consumer change this plan does not own; the asymmetry (npm's lock also fixes transitives) is stated in `common/dependencies.md` and is Q1 for the owner |
 | Vulnerability scan | **Raise both** in `common/dependencies.md`: the monthly bump runs the ecosystem's scanner (`npm audit`; `dotnet list package --vulnerable --include-transitive`; `cargo audit` where installed) and records the result beside the pins | Cheap, equal, and both commands exist today (npm measured) |
-| Coverage thresholds | **Deliberately absent on both** | `testing.md` governs what a test may claim; a number is gamed the week it lands. Stated in `common/dependencies.md`? No — in `research/module_rules.md`, because it is a decision about the corpus, not a rule |
+| Coverage thresholds | **Deliberately absent on both** | `testing.md` governs what a test may claim; a number is gamed the week it lands. Stated in `research/module_rules.md`, because it is a decision about the corpus, not a rule |
 | CI steps per language | **Deliberately absent as shared rules** | `testing.md:16-18`: each repository's own instructions and CI name the exact commands. Shared text would be an inventory |
-| A runtime version statement | **Raise TS** (P1) | C# has one; TS gets one of the same shape |
+| A runtime version statement | **Raise TS** (P1, D7) | C# has one; TS gets one of the same shape, as one tested combination |
+
+### 3.4 Exemptions and suppression — the column both sides need
+
+| | C# | TypeScript | Equal? |
+|---|---|---|---|
+| Where a suppression may live | inline `#pragma warning disable <id>` with the reason on the same line; never `<NoWarn>`/`<WarningsNotAsErrors>` in a props file, never `GlobalSuppressions.cs` | inline `// eslint-disable-next-line <rule> -- <reason>`; never a file-wide disable, never `ignores` of production folders; `reportUnusedDisableDirectives: "error"` so a stale suppression fails | equal once written: today C# has no rule and TS has two divergent configs |
+| A baseline of accepted violations | none (none found in three consumers) | none (none found; one consumer ignores a typed-fixtures folder that is MEANT not to compile — a legitimate exclusion the rule names as such) | equal |
+| Who may widen it | a rule change here, never a repository | the same | equal |
+| Where it is checked | the build (`TreatWarningsAsErrors`) | `tools/node-strictness-check.mjs` reads the effective lint and compiler configuration | equal class (file + build/check) |
 
 ## 4. Design
 
-### 4.1 New files in `typescript/`
+### 4.1 E1 first: the delivery contract — where every text lives, before any text is written
 
-The directory name is the namespace, not the file type — as `csharp/` holds `dotnet-build.md` and `nuget-packages.md`.
-`tools/lib/rule-catalog.mjs:29` and `tools/rule-bodies.mjs:39` walk `common, csharp, rust, typescript`; nothing is added
-to either list.
+A selection/budget matrix over representative scopes, measured before the first rule edit and re-measured after every
+epic, kept in `research/module_rules.md`:
 
-**`typescript/compiler-strictness.md`** — id `typescript.compiler-strictness`, `paths: ["**/tsconfig*.json"]`, no
-`tasks`. ≤ 3,300 B (§ 5). Content: the version line (P1); `strict`; `noEmitOnError` where the project emits (measured
-on tsc 5.9.3: without it a type error exits 2 **and writes `out/a.js`**; with it exits 1 and writes nothing); when Node
-runs `.ts` directly (type stripping, no build), the TEST script runs `tsc --noEmit` first, because stripping checks
-nothing (measured: a file with `const n: number = "x"` ran and exited 0) and `erasableSyntaxOnly` is on (measured:
-`enum` is refused with `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`); the lint set at `--max-warnings 0` with the four numeric
-rules of P4 and `reportUnusedDisableDirectives: "error"` — the shape two consumers run; a Definition of Done.
+| Scope | Files | Why it is representative |
+|---|---|---|
+| C# | `src/x.cs`; `src/x.csproj`; `Directory.Build.props` | the doctrine; the package rule |
+| TypeScript | `ui/a.ts` | the doctrine |
+| JavaScript | `src/a.mjs` | selects no language rule today |
+| Mixed | `src/x.cs` + `ui/a.ts` | the two mixed consumers; measured today `inspect` 34,729 B — already a split read |
+| Config-only | `package.json`; `tsconfig.json`; `.npmrc` | the manifests the new rules select on |
+| Browser/webview | `src/webview/page.ts` | **the resolver cannot tell a webview file from a Node file by path** — the matrix records that the output-encoding rule reaches it through the `ui` gate, not through a selector |
+| Rust | `src/main.rs` | the third language, same principle |
 
-**`typescript/npm-packages.md`** — id `typescript.npm-packages`, `paths: ["**/package.json"]`, no `tasks` (§ 4.4 says
-why not `package-lock.json` or `.npmrc`). ≤ 3,500 B — the size class of the trimmed NuGet rule. Content: P9; the
-pointer "licence before version, publisher and freshness, the monthly bump: [common/dependencies.md]"; the typescript-eslint
-peer-range constraint as the family's worked example of a recorded transitive constraint (§ 4.6), anonymised to the shape.
+× every single-read task (`inspect`, `ui`, `gpu`, `storage`) and the split-read `implement`, `test`, `audit`, `logging`,
+`dependencies`. The exit criterion of E1: the headroom of every tight scope is recorded, and every later epic has a byte
+allowance it may not exceed (§ 5).
 
-### 4.2 The shared dependency rule, and the NuGet rule after it
+**Selection tests pin which rules each scope selects** (D12): the body manifest (`tools/rules.test.mjs:151`) hashes
+bodies after the front matter (`tools/lib/rule-body.mjs:24`), so a changed `paths:` or `tasks:` line passes the freeze.
+E1 adds one test per representative scope asserting the exact id list, in the style of `:176-200`.
 
-**`common/dependencies.md`** — id `common.dependencies`, `tasks: ["dependencies"]`, no `paths`, no `depends`. Holds what
-`csharp/nuget-packages.md` says that is true of every ecosystem: *Before adding any package* (the publisher/freshness
-table, reworded without "nuget.org"), *Licence before version* (`:25-27`, moved verbatim), *Bumping* (monthly, latest
-stable, never a preview, the suite run, the transitive-constraint comment), the vulnerability scan (§ 3.3), *Prefer
-nothing*, and the lock/pin asymmetry sentence. `dependencies` is a split-read task (`tools/rules.test.mjs:204`), so the
-rule has no single-read cap; target ≤ 4,000 B.
+**The parity matrix as a file**: `research/parity-matrix.json` — one row per P/R entry: `topic`, `csharp: { id, section }`,
+`typescript: { id, section }`, `strength`, `suppression`, `status` (`equal`, `stronger-ts`, `stronger-cs`,
+`deliberately-absent`). A test asserts every `id` exists in the catalog and every `section` is in that rule's recorded
+`sections` in `research/rule-bodies.json`; a row with `deliberately-absent` names the side and the reason. A rule renamed
+or a section retitled without the matrix is a red suite — the drift protection the consultants asked for.
 
-**`csharp/nuget-packages.md`** loses `tasks: ["dependencies"]` (so `package.json` work no longer reads NuGet text; the
-file is then selected by `.csproj`, `Directory.Packages.props`, `Directory.Build.props`, `NuGet.Config` only — the test at
-`tools/rules.test.mjs:176` still passes), keeps central pins, the two family-wide decisions (FluentAssertions 7.2.2, the
-Aspire pair), the two `dotnet` commands and the zero-reference box, and carries the one-line pointer to the shared rule.
-Expected size ≈ 2,000 B (from 3,081), which widens the `inspect --file src/x.csproj` headroom (§ 5).
+### 4.2 Task-gated path selection — the resolver change (D3)
 
-**Why a new common rule and not `development-workflow.md`**: that rule is selected by nine tasks (`:4`) and would deliver
-package policy to a `docs` scope; `dependencies` alone is the scope that needs it. Why no `depends:` from the two
-ecosystem rules: `inspect --file src/x.csproj` has 867 B of headroom and a dependency would bring ≈ 4,000 B into it
-(§ 5). An agent adding a package names `--task dependencies` (`ENTRY.md` step 5: every relevant task) and gets the
-shared rule; one inspecting a manifest gets the ecosystem rule and its pointer.
+Today selection is paths OR tasks (`ENTRY.md` step 7; `tools/lib/rule-catalog.mjs`). A language-scoped mechanics rule
+(`csharp/lifecycle.md`, selected by `**/*.cs`) would then load in `inspect --file src/x.cs`, which has 3,948 B of
+headroom, and in `gpu --file src/x.cs`, which has 475 B. One new metadata key:
 
-### 4.3 Node sections in the common rules — the Rust precedent — and the evidence behind each claim
+```yaml
+id: "csharp.lifecycle"
+load: "conditional"
+paths: ["**/*.cs"]
+path_tasks: ["implement","audit","test","deploy","benchmark"]
+```
 
-Each Node sentence enters a common rule the way the Rust sections did: a `## Node` section where the rule has a `## Rust`
-one (`logging-serilog.md`, `utc-timestamps.md`), a Node paragraph inside the section whose C# paragraph it mirrors
-(`reliability.md`, `testing.md`, `security.md`, `platform-limits.md`), a table row where there is a table
-(`http-contracts.md`). No section is written from memory; this table is what E3 records in
-`research/2026-10-31_node_behaviour_probes.md` (the record the rules cite by date), extended with every probe the stories
-add. **Measured on this machine, Node v26.12.1, npm 11.20.0, 2026-10-31**, from the scratch directory, every command
-and its output kept in the record:
+`path_tasks` means: the `paths` select this rule only when the scope also names one of these tasks. `tasks` (plain)
+still select regardless of files; `depends` is unaffected and still mandatory. A rule with `path_tasks` and no `paths`
+is a metadata error. The list is the source rule's own `tasks:` line, so a C# agent on `implement` meets exactly the
+mechanics it met inside `reliability.md` yesterday, and an `inspect` agent meets none — as today. `KEYS`
+(`rule-catalog.mjs:30`) gains the key; `selectRules` applies it; `module_rules.md` documents it; `ENTRY.md` step 7's
+sentence becomes "Selection is paths (optionally gated by `path_tasks`) OR tasks, plus always rules and transitive
+dependencies". Tests: a gated rule is selected with path + gated task, not with path alone, not with the task alone; the
+error case; the explain output names the gate in `reasons`.
+
+**Why not the alternatives.** Without the gate, the mechanics rules select on every task: `inspect --file src/x.cs`
+becomes ≈ 37 KB and every single-read task with a language file leaves the list (D1 forbids the deletion that would
+avoid it). Keeping the mechanics in common rules is what the consultants rejected (cross-language context pollution, and
+the benchmark bias of a C# agent reading Node mechanics). `depends:` cannot express "when this task".
+
+### 4.3 D2 applied: which text moves where, verbatim, and the evidence behind each Node claim
+
+**Moves (word for word, byte-equal — a test in E1 compares each moved block's bytes in the source commit with the bytes
+in the destination file; the record is `research/module_rules.md` § *Moves*):**
+
+| From (lines at `f46982f`, bytes by `Buffer.byteLength`) | To | Gate (= the source's `tasks`) |
+|---|---|---|
+| `common/testing.md:12-34` (1,267 B), `:354-358` (252 B) | `csharp/testing.md` (paths `**/*.cs`, `**/*.csproj`) | implement, test, audit, policy, release |
+| `common/testing.md:32-33` the Rust sentence (inside the 1,267 B block; stays part of the moved text, and `rust/testing.md` quotes it) | `rust/testing.md` (paths `**/*.rs`, `**/Cargo.toml`) | the same |
+| `common/reliability.md:104-133` (1,698 B); the sentences of `:47-70` and `:95-103` naming `BackgroundService`, `CreateAsyncScope`, `TaskScheduler.UnobservedTaskException`, `CancellationToken`, `PosixSignalRegistration`/`Console.CancelKeyPress` (≈ 1,100 B of 2,394 B); `:38-46`'s .NET launcher sentence | `csharp/lifecycle.md` (paths `**/*.cs`) | implement, audit, test, deploy, benchmark |
+| `common/logging-serilog.md:61-90` (1,640 B), `:153-171` (497 B) | `csharp/logging.md` (paths `**/*.cs`, `**/Program.cs`) | logging, implement, audit |
+| `common/logging-serilog.md:172-187` (875 B) | `rust/logging.md` (paths `**/*.rs`, `**/main.rs`) | the same |
+| `common/utc-timestamps.md:25-48`'s .NET sentences and the C# block (≈ 900 B); its Never/DoD lines naming `DateTime.Now` | `csharp/utc-timestamps.md` (paths `**/*.cs`) | storage, implement, audit |
+| `common/utc-timestamps.md:65-69` (219 B) | `rust/utc-timestamps.md` | the same |
+| `typescript/doctrine.md:15-48` (2,042 B) + its DoD box | `typescript/output-encoding.md` (paths `**/*.ts,tsx,mts,cts,js,mjs,cjs`) | implement, test, audit, ui, http |
+| `typescript/doctrine.md:66-79` (932 B), `:80-97` (1,151 B) + their DoD boxes | `typescript/testing.md` (paths as above) | implement, test, audit, policy, release |
+| `csharp/nuget-packages.md:12-23` (824 B), `:25-37` (760 B), `:39-47` (436 B minus the two `dotnet`/`Invoke-RestMethod` lines, which stay), `:50-54` (287 B) | `common/dependencies.md` (tasks `dependencies`) | — |
+
+Each source keeps its neutral invariant (already present as the section's opening sentences in every case above) and
+gains one pointer line ("the .NET mechanics: `csharp/lifecycle.md`; Node: `typescript/lifecycle.md`"). Nothing is
+shortened; a moved block is removed from the source only because its bytes appear, equal, in the destination — the test
+of E1.S4 is what makes D1's "moves keep the text" checkable.
+
+**Stays, by D6:** `security.md:18` and `:26` (one phrase each; the core gains the Node phrase beside them, § 5),
+`platform-limits.md:43`, the `http-contracts.md:31-35` rows, the `local-cpu-budget.md` rows, `logging-serilog.md:190`
+and the other one-line Never items, `reliability.md:243-245`'s DoD boxes (neutral: "the token's state decides").
+
+**Reliability's .NET cancellation checklist versus the Node paragraph** (verified against `reliability.md:243-245`): the
+checklist says the token's state decides and a wait you own gives up in its own words. The Node rule says the same with
+Node's names — decide by the caller's `signal.aborted`, never by the reason's type or name (measured: a reason can be a
+`RangeError` or a bare string), and a timeout you own is your own typed outcome. The combined-signal probe shows why the
+.NET sentence transfers: with `AbortSignal.any([caller, timeout])`, `caller.signal.aborted` is `true` when the caller
+quit and `false` when the timeout fired, exactly the `IsCancellationRequested` test.
+
+**Measured on this machine, Node v26.12.1, npm 11.20.0, 2026-10-31**, every command and its output to be kept in
+`research/2026-10-31_node_behaviour_probes.md` (E5.S1):
 
 | Claim a rule will carry | Probe | Observed |
 |---|---|---|
 | `AbortSignal.timeout` rejects with a `DOMException` named `TimeoutError`; a caller's `abort()` gives `AbortError` | `AbortSignal.timeout(10)` read after 50 ms; `new AbortController().abort()` | `TimeoutError`, `instanceof DOMException` true; `AbortError` |
-| `AbortSignal.any([caller, timeout])` carries whichever fired first | the two combined, read after 50 ms | reason `TimeoutError` |
+| A reason is whatever the aborter passed — no classifier on its name | `abort(new RangeError("budget spent"))`; `abort("a string reason")` | `RangeError`, `name` `RangeError`; a string, `name` `undefined` |
+| `AbortSignal.any([caller, timeout])` carries whichever fired first; the caller's own signal says who | the two combined, caller aborts first; the two combined, timeout fires first | `caller.signal.aborted` true, reason "caller gave up"; `TimeoutError` |
+| A pre-aborted signal rejects at once | `timers/promises.setTimeout(5000, …, { signal: AbortSignal.abort() })` | `AbortError` after 0 ms |
+| An abort listener with `{ once: true }` runs once for two `abort()` calls | | 1 |
 | `Date` parses a date-only ISO string as UTC and a date-time string without offset as local | `new Date("2026-07-01")`, `new Date("2026-07-01T12:00:00")` under `TZ=Europe/Paris` (offset −120) and `TZ=Europe/Kyiv` | `…T00:00:00.000Z` in both zones; `…T10:00:00.000Z` and `…T09:00:00.000Z` |
 | `Temporal` is available unflagged | `typeof Temporal` | `object` |
 | An unhandled rejection crashes the process by default | `Promise.reject(new Error("boom"))` with a later timer | stack printed, exit 1, the timer never ran |
 | `SIGTERM` with no handler ends the process without cleanup; a handler runs the cleanup | `process.kill(process.pid, "SIGTERM")` with and without a listener | exit 143, nothing printed; "handler ran", "cleanup finished", exit 0 |
+| An ignored `SIGTERM` (an empty handler) defeats the supervisor | `timeout 2 node -e 'process.on("SIGTERM",()=>{}); …setInterval'` | still alive after more than two minutes; ended only by `SIGKILL` |
 | A pending timer keeps the loop alive until `.unref()` | `setTimeout(…, 2000).hasRef()` before and after `unref()` | `true`, then `false` |
 | `child.kill()` does not reach grandchildren; a process-group kill does | `sh -c "sleep & sleep & wait"` spawned twice, once `detached: true`; `child.kill("SIGTERM")` vs `process.kill(-child.pid, "SIGTERM")`; `pgrep -f "^sleep N$"` | before: 2 and 2; after: **2 left** vs **0 left** |
+| A grandchild holding the pipe delays `close` | `sh -c "sleep 1.5 & echo"` with `stdio: "pipe"` | `exit` at 4 ms, `close` at 1,508 ms |
 | `Buffer.byteLength` counts encoded bytes | `"abcdefé"` | `length` 7, bytes 8 |
 | `JSON.parse` rounds a 64-bit id | `JSON.parse('{"id":9007199254740993}').id` | `9007199254740992`; `Number.isSafeInteger` false |
 | `node --env-file` loads an uncommitted secrets file | `node --env-file=.env -e …` | the value read |
@@ -195,130 +291,170 @@ and its output kept in the record:
 | `enum` is refused under type stripping | `enum Color { Red }` | `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX` |
 | `tsc` emits despite errors unless `noEmitOnError` | tsc 5.9.3, `strict`, one type error, with and without the flag | exit 2 and `out/a.js` written; exit 1 and no output directory |
 | `npm install --save-dev x@v` writes a caret range unless `--save-exact` | `typescript@5.9.3`, then `--save-exact picomatch@4.0.3`; `npm config get save-prefix`, `save-exact` | `"^5.9.3"`; `"4.0.3"`; `^`, `false` |
-| `npm ci` refuses a lock out of step with `package.json` | the dev dependency changed to `5.8.3` against a lock at `5.9.3` | `EUSAGE … lock file's typescript@5.9.3 does not satisfy typescript@5.8.3`, exit 1; a range the lock satisfies (`^5.8.0`) is accepted — the refusal is about satisfaction, not equality |
+| `npm ci` refuses a lock out of step with `package.json` | the dev dependency changed to `5.8.3` against a lock at `5.9.3` | `EUSAGE … lock file's typescript@5.9.3 does not satisfy typescript@5.8.3`, exit 1; `^5.8.0` is accepted — the refusal is about satisfaction, not equality |
 | `node --test` carries the flags P10 names | `node --help` | `--test-name-pattern`, `--test-only`, `--test-timeout`, `--test-concurrency`, `--test-skip-pattern` present |
+| typescript-eslint's TypeScript range | `npm view typescript-eslint version peerDependencies.typescript`; `npm view typescript version` | `8.72.1`, `>=4.8.4 <6.1.0`; `7.0.2` |
 
-Claims the stories still owe a run before the text lands (each is an acceptance criterion in E3): `process.exitCode`
-versus `process.exit()` inside a shutdown (`post-deploy-checks.md:154` already records the Windows crash); pino's file
-and console transports writing the family's path shape with UTC; `readline`/stream backpressure under a slow consumer;
-a `node --test` run of a type-stripped `.ts` suite with `--import` of the priority preload; the Windows `taskkill /T`
-half of P15; a Fastify and an Express route formatted across three lines found by the scanner.
+Claims the stories still owe a run before the text lands (acceptance criteria in E5 and E6): `process.exitCode` versus
+`process.exit()` inside a shutdown (`post-deploy-checks.md:154` already records the Windows crash); pino's file and
+console transports writing the family's path shape with UTC; `readline`/stream backpressure under a slow consumer; a
+`node --test` run of a type-stripped `.ts` suite with `--import` of the priority preload; the Windows `taskkill /T` half
+of P15; a Fastify and an Express application printing its route table into the `--routes` shape.
 
-### 4.4 Selectors
+### 4.4 D4 applied: the TypeScript doctrine becomes the design mirror; the traps move to their topics
 
-| File shape | Today | After | Why |
-|---|---|---|---|
-| `**/*.ts,tsx,mts,cts` | `typescript.doctrine` | the same | the two pinned scopes that carry it have 2,652 B and **439 B** of headroom (§ 5), so no second rule may join this selector; the doctrine grows only by what § 4.7 trims |
-| `**/*.js,mjs,cjs` | nothing | `typescript.doctrine` | `ENTRY.md:57-58`: a scope with no language rule invents none; § 1, § 2 and § 0 of the doctrine are true of plain JavaScript. Measured cost: `inspect` 24,207 → 30,116 B, `ui` 26,420 → 32,329 B (the same numbers as `ui/a.ts` today); `gpu` and `storage` with a `.mjs` file land at 33,589 and 35,315 B — exactly where those tasks already stand with a `.ts` file, which the test at `tools/rules.test.mjs:252` does not pin. This repository's own `tools/*.mjs` then load the doctrine on an `inspect`; E2 verifies the scope stays one read. Q5 asks the owner to confirm |
-| `**/tsconfig*.json` | nothing | `typescript.compiler-strictness` | the manifest the rule governs; `storage --file tsconfig.json` is the tightest new scope (29,406 B + the rule) and sets the 3,300 B ceiling |
-| `**/package.json` | `common.local-cpu-budget` (11,202 B; `inspect` scope 35,409 B, already a split read) | `+ typescript.npm-packages` | adding to a scope that is already over 32 KiB crosses no cap; `package-lock.json` and `.npmrc` are **not** selectors — they are what following the rule produces, and each would open a new single-read scope with a 3,362 B ceiling for no reader |
-| `.csproj`, `Directory.*.props`, `NuGet.Config` | `csharp.nuget-packages` (and `--task dependencies`) | paths only | § 4.2 |
-| `--task dependencies` | `csharp.nuget-packages` | `common.dependencies` | § 4.2 |
+After the moves of § 4.3, `typescript/doctrine.md` holds: its front matter and introduction (562 B, unchanged), a new
+`## 0. Language, runtime and design` of about 3,200 B — P1 (D7), P2's one line, P5–P7 by meaning, each a short
+paragraph that names the C# section it mirrors, and which sections apply to plain JavaScript — the existing § 2
+(755 B, unchanged, with its DoD box), three pointer lines to the gated rules that now hold § 1, § 3 and § 4, and a
+Definition of Done for the design section. Estimated size ≈ 4,900 B against 5,910 today — smaller, with nothing
+deleted: 4,125 B of trap text left for the gated rules word for word.
 
-New selection tests in `tools/rules.test.mjs`, in the style of `:176-200`: `tsconfig.json` and `src/tsconfig.build.json`
-select `typescript.compiler-strictness` and `.ts`/`.cs` do not; `package.json` selects `typescript.npm-packages` and not
-`csharp.nuget-packages`; `--task dependencies` with no file selects `common.dependencies` and neither ecosystem rule;
-`src/a.mjs` and `src/a.cjs` select `typescript.doctrine`; `src/x.csproj` still selects both C# rules. The single-read
-scope list at `:252` gains `inspect`/`ui`/`gpu`/`storage` × `tsconfig.json`, `inspect`/`ui` × `src/a.mjs`, and
-`inspect` × `tools/rules.mjs` (this repository's own case).
+**Wording changes, not content** (D1): in the moved § 1, `webauthnPrf.ts` / `entityFormScript.ts` /
+`depPickerScript.ts` become "one module, a second, and a third written beside the fix for the second", "a real vault"
+becomes "a real credential store"; every sentence, number and date stays. Listed as such in the pull request.
 
-### 4.5 Enforcement parity
+Selectors: `paths: ["**/*.ts","**/*.tsx","**/*.mts","**/*.cts","**/*.js","**/*.mjs","**/*.cjs"]`, no gate — like
+`csharp/doctrine.md`. This repository's own `tools/*.mjs` then load the doctrine on an `inspect` (§ 5: 29,087 B, fits).
+
+**`csharp/doctrine.md`** gains `Nullable enable` in § 1 (≈ 20 B) and a Definition of Done (≈ 350 B, R3). Nothing is
+removed. The reverse items by topic (consultants' point 6): `null!`/`default!` → `csharp/testing.md` beside the moved
+`as`-cast section; Razor encoding → `csharp/output-encoding.md`; a Definition of Done → every new rule on both sides.
+
+**Superseded (D1), kept for the record — the first revision's § 4.7:** *"`typescript/doctrine.md` (5,909 B; ceiling
+6,348 B): gains a § 0 of at most 1,000 B … gives up the three source-file names … the second bullet of § 4's
+shared-checkout narrative is folded into one sentence … Target ≤ 6,300 B. `csharp/doctrine.md` (4,613 B; ceiling
+5,088 B) … gives up ≈ 450 B of § 4a's narrative … Target ≤ 5,050 B."* Replaced by the paragraphs above: the ceilings
+came from trimming, and trimming is forbidden; the anonymisation survives as a change of wording only.
+
+### 4.5 The dependency rules (D14) — unchanged in substance from the first revision
+
+**`common/dependencies.md`** — id `common.dependencies`, `tasks: ["dependencies"]`, no `paths`, no `depends`. Holds,
+moved verbatim from `csharp/nuget-packages.md` (§ 4.3's last row): *Before adding any package* (the table; "nuget.org"
+stays in the moved sentence and the rule adds "or the ecosystem's registry" beside it rather than editing it), *Licence
+before version*, *Bumping* (the `dotnet`/`Invoke-RestMethod` lines stay in the NuGet rule), *Prefer nothing*; plus the
+vulnerability scan (§ 3.3) and the lock/pin asymmetry sentence. Target ≤ 4,000 B; `dependencies` is a split-read task.
+
+**`csharp/nuget-packages.md`** loses `tasks: ["dependencies"]` and the moved blocks, keeps central pins, the two
+family-wide decisions (FluentAssertions 7.2.2, the Aspire pair — the coupled-version exceptions D14 names), the two
+`dotnet` commands and the zero-reference box, and gains the pointer. Expected ≈ 1,000 B (from 3,081).
+
+**`typescript/npm-packages.md`** — id `typescript.npm-packages`, `paths: ["**/package.json"]`, no gate (the
+`package.json` scopes are already split reads, § 5). P9's three layers named as D14 asks: the declared range
+(`save-exact=true` in `.npmrc`), the lock's resolution (`package-lock.json`, committed), the reproducible install
+(`npm ci --ignore-scripts`, the only install in CI; what it refuses and what it accepts, measured). `package-lock.json`
+and `.npmrc` are not selectors: they are what following the rule produces, and each would open a new single-read scope.
+
+### 4.6 Enforcement parity (D8)
 
 | .NET | Node | Class |
 |---|---|---|
-| `tools/build-flags-check.mjs`: `Directory.Build.rsp` exists and says `-nr:false`; no `-noautorsp` in workflows, scripts, `package.json`; a repository with no C# passes without opinion | **`tools/node-strictness-check.mjs`** (new): for every `tsconfig*.json` outside `node_modules`, the compiler's own merged view (`<repo>/node_modules/.bin/tsc --showConfig -p <file>`, so `extends` chains resolve as `tsc` resolves them) has `strict: true`, and `noEmitOnError: true` unless `noEmit: true`; every `package.json` with dependencies has an `.npmrc` beside it or above it saying `save-exact=true`; a `test` script that runs `node` on a `.ts` file is preceded by a `tsc --noEmit`; `--warn` first, as every check here lands ([README.md](../README.md) § *tools*); a repository with no `tsconfig*.json` passes without opinion; **a TypeScript repository whose `tsc` is not installed is INCOMPLETE, never green** — the JUnit-reader principle (`README.md` § *tools*) | check ↔ check |
-| `settings/hooks/build-flags.mjs`: a `PreToolUse` hook refusing a `dotnet build` without `-m:N` | **none** — the hook exists for a measured resource problem (`csharp/dotnet-build.md` § *Measured 2026-09-11*). The candidate Node hook — refuse `npm install <pkg>` without `--save-exact` — is unnecessary once `.npmrc` carries `save-exact=true`, which is a FILE the check verifies (measured: the setting is honoured). What a Node hook would need to earn its place: a measured cost that no file can carry, recorded like the MSBuild one | deliberately absent; stated in `research/module_rules.md` |
-| `tools/http-coverage.mjs` reads `Map*` | reads `app.<verb>(` and `route({ url })` too (P18) | one tool |
-| `tools/adapter-check.mjs` compares every hook | unchanged | — |
+| `tools/build-flags-check.mjs`: `Directory.Build.rsp` exists and says `-nr:false`; no `-noautorsp`; a repository with no C# passes without opinion | **`tools/node-strictness-check.mjs`** (new): for every `tsconfig*.json` outside `node_modules`, the compiler's own merged view (`<repo>/node_modules/.bin/tsc --showConfig -p <file>`, so `extends`, nested packages, excludes and overrides resolve as `tsc` resolves them) has `strict: true`, and `noEmitOnError: true` unless `noEmit: true`; the `lint` script runs eslint with `--max-warnings 0` and the config sets `reportUnusedDisableDirectives: "error"`; a `test` script that runs `node` on a `.ts` file is preceded by `tsc --noEmit`; every `package.json` with dependencies has an `.npmrc` beside it or above it saying `save-exact=true`; `--warn` first, as every check here lands ([README.md](../README.md) § *tools*); a repository with no `tsconfig*.json` passes without opinion; **a TypeScript repository whose `tsc` is not installed is INCOMPLETE, never green**. Proven on deliberately invalid fixtures: `strict` missing in a base config inherited through `extends`; `noEmitOnError` missing with emit; `--max-warnings` absent; a stripped-TS test script without `tsc --noEmit`; a caret range with no `.npmrc`; a stale `eslint-disable` | check ↔ check |
+| `settings/hooks/build-flags.mjs`: a `PreToolUse` hook refusing a `dotnet build` without `-m:N` | **none** — the hook exists for a measured resource problem (`csharp/dotnet-build.md` § *Measured 2026-09-11*). The candidate Node hook — refuse `npm install <pkg>` without `--save-exact` — is unnecessary once `.npmrc` carries `save-exact=true`, which is a FILE the check verifies (measured: the setting is honoured). What a Node hook would need to earn its place: a measured cost that no file can carry | deliberately absent; stated in `research/module_rules.md` |
+| `dotnet build` with `TreatWarningsAsErrors` + `Nullable enable` | the composite gate `tsc --noEmit` (or with `noEmitOnError`) + lint `--max-warnings 0` + tests, named in `compiler-strictness.md` as ONE gate the CI step runs | gate ↔ gate |
+| `tools/http-coverage.mjs` reads `Map*` and `.route(`; `--routes` preferred | the same tool; a Node application prints its route table for `--routes` (D10) | one tool |
 
 Consumers wire the new check as one CI step beside `build-flags-check` ([ROLLOUT.md](../ROLLOUT.md) § CI); a .NET-only
 consumer may add it for uniformity because it passes without opinion (Q8).
 
-### 4.6 Versions
+### 4.7 Versions (D7)
 
-`typescript/doctrine.md` § 0 and `typescript/compiler-strictness.md` open the way `csharp/doctrine.md:10` does:
-**"Node 26 (the current LTS line), TypeScript 7, `strict`."** Node 26's LTS status and the newest TypeScript are read
-from the official indexes on the day the text lands and the date is written beside them, as the other plan did
-(`nodejs.org/dist/index.json`: v26.13.0 is LTS "Lithium", read 2026-10-31 there; `npm view typescript version` → 7.0.2,
-read here 2026-10-31).
+`typescript/doctrine.md` § 0 and `typescript/compiler-strictness.md` open the way `csharp/doctrine.md:10` does, as one
+tested combination: **"Node 26 (the current LTS line); TypeScript at the newest version the pinned typescript-eslint
+supports (today 6.0.x — `typescript-eslint@8.72.1` peers `typescript >=4.8.4 <6.1.0`, read 2026-10-31), `strict`."**
+Node 26's LTS status and the versions are read from the official indexes on the day the text lands and the date is
+written beside them (`nodejs.org/dist/index.json`: v26.13.0 is LTS "Lithium", read 2026-10-31 by the other plan;
+`npm view typescript version` → 7.0.2, read here). One consumer records exactly this constraint in its lint config and
+sits on 6.0.3 for it. Q2 puts the alternative — TypeScript 7 without type-aware lint — to the operator.
 
-**The caveat the rule must carry, measured 2026-10-31:** `typescript-eslint@8.72.1` declares
-`peerDependencies.typescript = ">=4.8.4 <6.1.0"`, so a repository that lints with it cannot be on TypeScript 7 today;
-one consumer here records exactly that constraint in its lint config and sits on 6.0.3 for it. The rule therefore says:
-TypeScript 7 **where every tool in the chain accepts it**; otherwise the newest version every tool accepts, with the
-constraining tool and the date to revisit written beside the pin — the same shape `nuget-packages.md` § *Bumping* gives a
-transitive constraint. ".NET 10 … never a preview" has no such caveat because nothing in the .NET chain refuses the
-current SDK. Q2 asks whether the owner prefers the plain statement.
+**Superseded (D7):** the first revision's "TypeScript 7 where every tool in the chain accepts it; otherwise the newest
+version every tool accepts" — the newest TypeScript was the headline and the lint the caveat; D7 inverts that, because a
+toolchain is tested as one combination or not at all.
 
-### 4.7 What the two doctrines gain, and what they give up to fit
+### 4.8 Superseded design of the first revision, kept for the record (D1)
 
-**`typescript/doctrine.md`** (5,909 B; ceiling 6,348 B = the `ui --file ui/a.ts` scope at 32,768): gains a `## 0.
-Language & runtime` section of at most 1,000 B — P1, P2's one line, P5–P7 one sentence each with a pointer to the C#
-doctrine, and which sections apply to plain JavaScript (§ 1, § 2; § 3 and § 4 are TypeScript's). It gives up the three
-source-file names and "a real vault" in § 1 (`:33-36`; anonymised to "three modules, three hands, one shipped build",
-the date kept), and the second bullet of § 4's shared-checkout narrative is folded into one sentence that keeps its
-qualifier (*say so; never work around a red file*) — [knowledge-base.md](../common/knowledge-base.md) § *Shortening a
-rule drops the caveat* governs the trim. Target ≤ 6,300 B, measured.
+- *Node sections inside the common rules* (`## Node` after `## Rust`; Node paragraphs inside reliability's sections) —
+  superseded by D2: the mechanics live in `typescript/`-scoped gated rules, the common rule keeps the invariant and a
+  pointer.
+- *`typescript/doctrine.md` ≤ 6,348 B and `csharp/doctrine.md` ≤ 5,088 B by trimming* — superseded by D1 and § 4.4.
+- *`NODE_ROUTE` and prefix regexes in `http-coverage.mjs`* — superseded by D10 (`--routes`).
+- *The `utc-timestamps.md` Node section ≤ 1,200 B* — superseded by D2: `typescript/utc-timestamps.md`, gated.
+- *Five epics, Q = 2, provisional* — superseded by the `## Epics` section's seven, after the consultants.
 
-**`csharp/doctrine.md`** (4,613 B; ceiling 5,088 B = the `gpu --file src/x.cs` scope at 32,768): gains `Nullable enable`
-and `AnalysisLevel` in § 1 (≈ 80 B), § 8 *Razor output and test fixtures* (R1, R2; ≈ 500 B) and a Definition of Done
-(R3; ≈ 350 B). It gives up ≈ 450 B of § 4a's narrative — the two instances stay as "measured 2026-09-03, two
-repositories, one `.http` suite's first run", the three numbered steps stay whole. Target ≤ 5,050 B, measured.
-
-Both trims are reviewed against the qualifier test: the short form, read by someone who has not seen the long one, must
-not be followable into the failure the original prevented.
-
-## 5. The size plan — measured
+## 5. The size plan — measured, under D1
 
 Budgets, from `tools/lib/rule-catalog.mjs:31` and `tools/rules.test.mjs:250-257`: the always-loaded core ≤ 16,384 B;
 every pinned single-read scope ≤ 32,768 B. Measured on this worktree at `f46982f` with
-`node tools/rules.mjs explain --repo . --task <t> --file <f>` (the `bytes` field; the per-rule `bytes` are the catalog's):
+`node tools/rules.mjs explain --repo . --task <t> --file <f>` (the `bytes` field). "After" is the estimate from the
+block sizes of § 4.3 and the additions of § 4.4; every story measures and writes the number into
+`research/module_rules.md`.
 
-| Scope | Today | Rules in it | Headroom | What this plan adds | Ceiling it sets |
-|---|---|---|---|---|---|
-| always core | **15,055** B (`coding-style` 2,889 + `knowledge-base` 3,564 + `security` 8,602) | — | 1,329 B | P14 ≈ 150 B, P15 ≈ 350 B in `security.md`; P7's pointer ≈ 60 B in `coding-style.md` | ≤ 600 B total, measured |
-| `inspect` (no file) | 24,207 | core + `task-lifecycle` | 8,561 | nothing | — |
-| `inspect --file ui/a.ts` | 30,116 | + `typescript.doctrine` 5,909 | 2,652 | the doctrine's net growth | doctrine ≤ 6,348 B (the tighter `ui` row rules) |
-| `ui --file ui/a.ts` | **32,329** | core + `task-lifecycle` + `durable-status` + doctrine | **439** | the doctrine's net growth | **doctrine ≤ 6,348 B** |
-| `gpu --file src/x.cs` | **32,293** | core + `task-lifecycle` + `gpu-lease` + `csharp.doctrine` | **475** | R1–R3, P3 | **`csharp/doctrine.md` ≤ 5,088 B** |
-| `inspect --file src/x.csproj` | 31,901 | + `csharp.doctrine` + `csharp.nuget-packages` | 867 | the doctrine's growth (≤ 475) minus the NuGet trim (≈ −1,000) | net headroom grows |
-| `ui --file src/x.cs` | 31,033 | | 1,735 | ≤ 475 | fits |
-| `storage` (no file) | 29,406 | core + `task-lifecycle` + `utc-timestamps` 5,199 | 3,362 | P16's `## Node` section | **≤ 1,200 B**, measured |
-| `storage --file tsconfig.json` | 29,406 (nothing selected today) | + `compiler-strictness` | 3,362 | the whole rule | **`compiler-strictness.md` ≤ 3,300 B** |
-| `gpu --file tsconfig.json` | 27,680 | + `compiler-strictness` | 5,088 | | fits under the 3,300 ceiling |
-| `inspect --file src/a.mjs` | 24,207 → 30,116 | + doctrine | 8,561 → 2,652 | the `.js` selector | fits |
-| `ui --file src/a.mjs` | 26,420 → 32,329 | + doctrine | 439 | the `.js` selector | fits, by the doctrine ceiling |
-| `inspect --file package.json` | 35,409 | + `local-cpu-budget` 11,202 | already a split read | + `npm-packages` ≈ 3,500 | no cap crossed; recorded |
-| `dependencies --file package.json` | 171,557 | 19 rules incl. `csharp.nuget-packages` | split read | − NuGet (3,081) + `common.dependencies` + `npm-packages` | recorded |
-| `implement --file ui/a.ts` | 292,834 | 28 rules | split read | the Node sections of `testing`, `logging-serilog`, `reliability`, `platform-limits`, `http-contracts` | recorded per rule |
+| Scope | Today | After (estimate) | Fits one read? | What changes it |
+|---|---|---|---|---|
+| always core | **15,055** B (`coding-style` 2,889 + `knowledge-base` 3,564 + `security` 8,602) | ≈ 15,280 | yes (≈ 1,100 B left) | `security.md` + ≈ 40 B (P14 phrase) + ≈ 120 B (P15 pointer phrase); `coding-style.md` + ≈ 60 B (P7 pointer). Nothing leaves the core |
+| `inspect` (no file; the session-start hook's read) | 24,207 | 24,207 | yes | nothing |
+| `inspect --file src/x.cs` | 28,820 | ≈ 29,190 | yes | `csharp/doctrine.md` + 370 B; the gated mechanics do not load on `inspect` (D3) |
+| `inspect --file src/x.csproj` | 31,901 | ≈ 31,660 | yes | + 370 (doctrine) − 2,300 (NuGet blocks moved) + 150 (pointer) |
+| `inspect --file ui/a.ts` | 30,116 | ≈ 29,090 | yes | the doctrine ≈ 4,900 B after the moves (4,125 B leave, ≈ 3,200 B of design and pointers arrive) |
+| `inspect --file src/a.mjs` | 24,207 (no language rule) | ≈ 29,090 | yes | the `.js` selector |
+| `inspect --file tsconfig.json` | 24,207 | ≤ 27,507 | yes | `compiler-strictness.md` ≤ 3,300 B |
+| `ui` (no file) | 26,420 | 26,420 | yes | nothing |
+| `ui --file ui/a.ts` | **32,329** (439 left) | ≈ 31,300 **+ output-encoding ≈ 2,300 = ≈ 33,600** | **no — leaves the single-read list (D5)** | the webview trap is gated on `ui`; without `ui` in its gate the scope would fit (≈ 31,300) but the trap would not reach the task it was written for — Q3 |
+| `ui --file src/x.cs` | 31,033 | ≈ 31,400 | yes | + 370 |
+| `ui --file src/a.mjs` | 26,420 | ≈ 33,600 | no (as `ui/a.ts`) | the same |
+| `gpu --file src/x.cs` | **32,293** (475 left) | ≈ 32,660 | **yes, by ≈ 105 B — measured before the DoD lands; if over, D1 forbids the cut and `gpu` with a language file leaves the list (Q3)** | `Nullable enable` + the Definition of Done |
+| `gpu --file ui/a.ts` | 33,589 (unpinned, over) | ≈ 32,580 | yes — improves | the doctrine shrinks by the moves |
+| `gpu --file tsconfig.json` | 27,680 | ≤ 30,980 | yes | the compiler rule |
+| `storage` (no file) | 29,406 | ≈ 28,300 | yes | `utc-timestamps.md` loses ≈ 1,100 B to `csharp/` and `rust/` (verbatim moves) |
+| `storage --file tsconfig.json` | 29,406 | ≤ 31,600 | yes | sets the compiler rule's ceiling: **≤ 3,300 B** |
+| `storage --file src/x.cs` | 34,019 (unpinned, over) | ≈ 28,300 + 4,983 + `csharp/utc-timestamps` ≈ 900 ≈ 34,200 | no, as today | the C# clock mechanics are gated on `storage` |
+| `storage --file ui/a.ts` | 35,315 (unpinned, over) | ≈ 28,300 + 4,900 + `typescript/utc-timestamps` ≈ 1,200 ≈ 34,400 | no, as today | the same |
+| mixed `inspect --file src/x.cs --file ui/a.ts` | 34,729 (unpinned, over) | ≈ 34,100 | no, as today | both doctrines |
+| `inspect --file package.json` | 35,409 (`local-cpu-budget` 11,202) | ≈ 38,900 | no, as today | + `npm-packages` ≈ 3,500 |
+| `logging --file src/Program.cs` | 78,866 | ≈ 78,900 | split read | the Serilog blocks leave `common/logging-serilog.md` and arrive in `csharp/logging.md` on the same scope |
+| `logging --file src/server.ts` | 80,162 | ≈ 78,650 | split read | − 3,012 B of Serilog/Rust mechanics + ≈ 1,500 B of `typescript/logging.md` |
+| `implement --file ui/a.ts` | 292,834 (28 rules) | ≈ 291,600 | split read | − ≈ 8,200 B of C# and Rust mechanics; + ≈ 7,000 B of TypeScript mechanics (lifecycle, testing, logging, utc, output-encoding) |
+| `implement --file src/x.cs` | 291,538 (28 rules) | ≈ 292,000 | split read | the C# mechanics move within the scope; + 370 |
+| `implement --file src/main.rs` | 291,304 | ≈ 284,200 | split read | − 8,200 B of C# mechanics; the Rust sections arrive as `rust/*` on the same scope |
+| `dependencies --file package.json` | 171,557 (19 rules, with `csharp.nuget-packages`) | ≈ 175,000 | split read | − NuGet + `common.dependencies` + `npm-packages` |
+| `test --file ui/a.ts` | 285,402 | ≈ 284,000 | split read | as `implement` |
 
-Not pinned today and already over one read with a language file: `gpu --file ui/a.ts` 33,589 B, `storage --file
-ui/a.ts` 35,315 B, `storage --file src/x.cs` 34,019 B. The plan leaves them split reads and pins the new scopes of
-§ 4.4 instead. Every story that touches a rule re-runs the eleven `explain` calls above and writes the after-column
-into `research/module_rules.md` the way the plan-change-control record did (`research/module_rules.md` § *The size
-measurement*).
+**Does every scope fit?** Every scope the test pins today fits except `ui --file ui/a.ts`, which leaves the list by D5
+(an allowed move under D1), and `gpu --file src/x.cs`, which fits by the estimate with ≈ 105 B and is the one number a
+story must measure before the C# Definition of Done lands. Nothing is deleted anywhere; the scopes that are over today
+and unpinned (`gpu`/`storage` with a `.ts`, `storage` with a `.cs`, mixed, `package.json`) get smaller or stay as they
+are. The hook's session-start read (`inspect`, no file) is untouched.
+
+**Byte allowances per epic** (E1's exit criterion): E2 ≤ 4,000 B `common/dependencies.md`, ≤ 3,500 B `npm-packages.md`,
+no cap on the NuGet trim since it only moves bytes out; E3 ≤ 3,300 B `compiler-strictness.md`; E4 `typescript/doctrine.md`
+≤ 5,900 B after the moves (so the `.ts` and `.mjs` single-read scopes stay at or under today's 30,116 B) and
+`csharp/doctrine.md` ≤ 5,088 B (the `gpu` row); E5 and E6 gated rules: no single-read cap, each measured and recorded;
+`typescript/utc-timestamps.md` ≤ 1,200 B so `storage --file ui/a.ts` improves rather than worsens. The core: ≤ 300 B in
+total.
 
 ## 6. Boundary with the experiment's plan (named on both sides)
 
 | Item | Built by | The other plan's part |
 |---|---|---|
-| The parity table, the rules, the tests, the check, the release | this plan | `dew_flow_benchmark · todo/PLAN_lang_comparison_v2.md` E0.S1–S2 name the audit and the rules as a prerequisite story; they point here by path once this plan exists |
-| The task repository's pin at the parity release, on a snapshot branch | the other plan, E0.S3 | this plan reports the release sha (§ 9 E5) |
+| The parity matrix, the rules, the tests, the check, the release | this plan | `dew_flow_benchmark · todo/PLAN_lang_comparison_v2.md` E0.S1–S2 name the audit and the rules as a prerequisite story; they point here by path once this plan exists |
+| The task repository's pin at the parity release, on a snapshot branch | the other plan, E0.S3 | this plan reports the release sha (§ 9 E7) |
+| **The record per benchmark arm (D13):** the conventions sha; the selected rule ids and hashes per stack for the arm's scopes (`explain` output, kept); the toolchain versions (compiler, parser, lint, Node, SDK); the effective checks that ran (the composite gate's commands and exit codes) | this plan provides the `explain` and check commands and their expected shape (§ 10); the other plan runs and records them per session | its T14 says "the bytes read per session are in the record" — this adds ids, hashes and checks, because equal source ownership does not prove equal instructions reached the agents |
 | The record of rule bytes actually read per session (its T14) | the other plan | this plan records the bytes per scope (§ 5) so the two numbers can be compared |
-| The consumers' bump pull requests | this plan (E5) | none — a consumer change the experiment does not see |
+| The consumers' bump pull requests and the dry run | this plan (E7) | none — a consumer change the experiment does not see |
 
 Order: this plan first; its release is a precondition of the other plan's pre-registration (its D23). Disjoint: nothing
 here touches the harness, the tasks or the task repository; nothing there edits a rule. The other plan was read on branch
-`docs/plan-lang-comparison-v2` at `aa5e413`; adding this plan's path to its E0 is a repaired reference on that side
-(its ledger has not opened — its status says so).
+`docs/plan-lang-comparison-v2` at `aa5e413`; adding this plan's path and the D13 record to its E0 is a repaired reference
+plus one story line on that side (its ledger has not opened — its status says so).
 
 ## 7. Growth surface
 
 | Surface | Projected size | Who retires it | Interrupted |
 |---|---|---|---|
-| The rule catalog: 3 new files, ≈ 10 KB; Node sections ≈ 6 KB | 40 rules, ≈ 393 KB of 4 MiB (`LIMITS.catalog`) | the single-read and core tests bound the loaded part; a rule that stops being true is edited, never appended to | a half-landed rule set is a red `rule-bodies` suite — nothing partial reaches `release` |
-| `research/2026-10-31_node_behaviour_probes.md` | one file, ≈ 12 KB, kept forever as the dated evidence | never pruned; superseded probes are re-run and the new date added | — |
-| `tools/fixtures/node-strictness/` | ≈ 6 small fixture trees, < 50 KB | live as long as the check | — |
+| The rule catalog: 3 + 5 + 3 new `typescript/` files, 5 new `csharp/` files, 3 new `rust/` files, 1 new `common/` file; ≈ 12 KB of new text, ≈ 10 KB moved | ≈ 56 rules, ≈ 400 KB of 4 MiB (`LIMITS.catalog`); 256-file limit far | the single-read and core tests bound the loaded part; a rule that stops being true is edited, never appended to | a half-landed rule set is a red `rule-bodies` suite — nothing partial reaches `release` |
+| `research/parity-matrix.json` | ≈ 8 KB, one row per P/R entry | edited with the rules; its test retires a stale row | — |
+| `research/2026-10-31_node_behaviour_probes.md` | one file, ≈ 14 KB, kept forever as the dated evidence | never pruned; superseded probes are re-run and the new date added (D1) | — |
+| `tools/fixtures/node-strictness/` | ≈ 8 small fixture trees, < 60 KB | live as long as the check | — |
 
 No process, table or cache is created.
 
@@ -326,73 +462,90 @@ No process, table or cache is created.
 
 | # | Threat | Control |
 |---|---|---|
-| T1 | **A Node rule written from knowledge rather than measurement.** The TS doctrine's traps are measured; a mirror of the C# runtime mechanics written by analogy will be wrong somewhere (the `Date` trap is the INVERSE of .NET's; `child.kill()` is not a tree kill) | § 4.3: every claim has a probe line or a cited document before the sentence lands; the record is a file in `research/`; the code round is told to check each Node sentence against the record |
-| T2 | **A size budget breaks a test or, worse, an agent's read.** The real-agent migration once got INCOMPLETE and read nothing when a scope passed 32 KiB (`tools/rules.test.mjs:188-192`) | § 5's ceilings per file; the measurement is part of every rule story's acceptance; new scopes are pinned |
-| T3 | **.NET-only consumers receive Node text they do not need** | path-selected rules never load for them; the Node sections of common rules do, as the Rust sections do today — ≈ 6 KB over split-read tasks, recorded in § 5's after column; a .NET consumer's single-read scopes do not change |
-| T4 | **The family's TypeScript practice contradicts the version rule** (typescript-eslint refuses TS 7) | § 4.6 carries the measured caveat; Q2 |
-| T5 | **A mirror written from VS Code extensions does not fit a server.** The family's TypeScript is extensions; the experiment's tasks are daemons and web APIs | the Node sections cover the server shapes the common rules already govern for .NET (stdio hosts to stderr, SIGTERM, backpressure, routes); one consumer's loopback HTTP broker (`http-contracts.md:170-173`) is the server precedent; the owed probes of § 4.3 include a stream under backpressure |
+| T1 | **A Node rule written from knowledge rather than measurement.** The TS doctrine's traps are measured; a mirror of the C# runtime mechanics written by analogy will be wrong somewhere (the `Date` trap is the INVERSE of .NET's; `child.kill()` is not a tree kill; a reason need not be an `Error`) | § 4.3: every claim has a probe line or a cited document before the sentence lands; the record is a file in `research/`; the code round is told to check each Node sentence against the record |
+| T2 | **A size budget breaks a test or, worse, an agent's read.** The real-agent migration once got INCOMPLETE and read nothing when a scope passed 32 KiB (`tools/rules.test.mjs:188-192`) | § 5's per-epic allowances; the measurement is part of every rule story's acceptance; new scopes are pinned; D1 means the answer to "over" is placement or an open question, never a cut |
+| T3 | **.NET-only consumers receive Node text they do not need** | D2: path-selected rules never load for them; the common rules now carry LESS language text than today (the Serilog, MTP and OCE/TCE blocks leave); a .NET consumer's single-read scopes do not change |
+| T4 | **The family's TypeScript practice contradicts the version rule** (typescript-eslint refuses TS 7) | D7 states the toolchain as one tested combination; Q2 |
+| T5 | **A mirror written from VS Code extensions does not fit a server.** The family's TypeScript is extensions; the experiment's tasks are daemons and web APIs | the lifecycle rule's invariant is ownership through completion (D9), stated for hosts, not for webviews; one consumer's loopback HTTP broker (`http-contracts.md:170-173`) and this repository's `tools/lib/proc.mjs` are the server-side precedents; the owed probes include a stream under backpressure and a route table printed for `--routes` |
 | T6 | **Two copies of the neutral dependency text drift** | it lives once, in `common/dependencies.md`; the ecosystem rules carry pointers |
-| T7 | **The bare arm never reads a rule.** Parity matters only to the process arm; over-building here delays a release the experiment waits for | the scope is the table of § 3 and nothing wider; E1–E4 are one pull request each |
-| T8 | **The release reaches eight consumers at once** and reddens every open pull request's `pin-check` | E5 announces, promotes once, bumps the pinned-by repository last ([README.md](../README.md) § *Bumping a pin*) |
-| T9 | **A product name slips into a shared rule** (the TypeScript consumers' names, "the extension", "the vault") | `node tools/ownership-check.mjs` is armed; the doctrine's anonymisation is a story of its own |
-| T10 | **The epic split was made without the question consultants** (`subagent-models.md` step 2) | § 9 marks the split provisional until `mcp__coai__ask_consultants` has been asked what matters most; Fable confirms or re-splits before E1 starts |
+| T7 | **The bare arm never reads a rule.** Parity matters only to the process arm; over-building here delays a release the experiment waits for | the scope is the matrix of § 3 and nothing wider; each epic is one pull request |
+| T8 | **The release reaches eight consumers at once** and reddens every open pull request's `pin-check`; a consumer's CI fails on the new check | E7 dry-runs the check and the rule set against the TypeScript and .NET consumers first (D13) and records what would fail; announces; promotes once; bumps the pinned-by repository last ([README.md](../README.md) § *Bumping a pin*) |
+| T9 | **A product name slips into a shared rule** (the TypeScript consumers' names, "the extension", "the vault") | `node tools/ownership-check.mjs` is armed; the anonymisation is a listed change of wording |
+| T10 | **A move loses a caveat.** A block moved "verbatim" by hand drops a sentence, or a neutral sentence goes with it and the common rule loses its invariant | the byte-equality test of E1.S4 on every moved block; the common rule's remaining section is read as an instruction from someone who has not seen the long one ([knowledge-base.md](../common/knowledge-base.md)) |
+| T11 | **The resolver change (D3) is read as a loophole** — a rule gated to avoid a budget rather than to match its source's tasks | the gate list of every mechanics rule equals its source rule's `tasks:` line and a test asserts it; `module_rules.md` states the one legitimate use |
+| T12 | **Equal source ownership is mistaken for equal instructions reaching the agents** | D13's per-arm record: ids, hashes, toolchain versions, effective checks |
 
 ## 9. Build order
 
-1. **E1** the shared dependency rule and the two ecosystem rules (the selector change that the experiment's package
-   work meets first).
-2. **E2** strictness and the two doctrines (the version statement, the compiler rule, the reverse counterparts).
-3. **E3** the Node sections of the common rules, with the probe record.
-4. **E4** the two tools and the documents.
-5. **E5** gates, pull requests, the release, the bumps, the pin.
+1. **E1** delivery and the parity contract — the resolver gate, the matrix file and test, the selection tests, the
+   measured headroom, the byte allowances; **no new prose**.
+2. **E2** dependency policy — in parallel once E1 fixes placement.
+3. **E3** compiler/lint enforcement contract (cornerstone).
+4. **E4** TypeScript design doctrine parity (cornerstone).
+5. **E5** runtime lifecycle (cornerstone).
+6. **E6** application contracts with their C# and Rust counterparts.
+7. **E7** consumer dry run, release, consumer adoption, the per-arm record.
 
-E1–E4 each end in one pull request through the coai plan and code gates; at most three are open at once
-([pull-requests.md](../common/pull-requests.md) § 7). E5 has no diff of its own except the consumer bumps.
+Each of E1–E6 ends in one pull request through the coai plan and code gates; at most three are open at once
+([pull-requests.md](../common/pull-requests.md) § 7). E7 has no diff of its own except the consumer bumps.
+
+**Superseded order (first revision):** dependency rules → doctrines → Node sections → tools → release. Replaced because
+placement (E1) must precede every text, and because the consultants ranked the compiler gate, the design doctrine and
+the lifecycle as the three cornerstones.
 
 ## 10. Test plan
 
-- `npm test` green at every story: the manifest test (`tools/rules.test.mjs:151`, every body recorded), the selection
-  tests of § 4.4, the single-read scope test with the new scopes, the always-core budget, the `http-coverage` three-line
-  companion for a Node route, the new check's fixtures (a strict repository passes; a missing `strict`, a missing
-  `noEmitOnError` with emit, a type-stripped test script without `tsc --noEmit`, a `package.json` without `save-exact`
-  each fail naming the file; a repository with no TypeScript passes; a TypeScript repository without `tsc` installed is
-  INCOMPLETE).
-- `node tools/rule-bodies.mjs` in step; new ids added by hand with `bodySha256` and `sections`
-  (`tools/rule-bodies.mjs:186`).
+- `npm test` green at every story: the manifest test (`tools/rules.test.mjs:151`, every body recorded; new ids added
+  by hand, `tools/rule-bodies.mjs:186`), the gate's selection tests (§ 4.2), the per-scope id-list tests (§ 4.1), the
+  single-read scope test with the list of D5 and the new config scopes, the always-core budget, the parity-matrix test
+  (§ 4.1), the byte-equality test over the moved blocks (§ 4.3), the `http-coverage` test that a Node route table in the
+  `--routes` shape is read and compared, the new check's fixtures (§ 4.6; a repository with no TypeScript passes; a
+  TypeScript repository without `tsc` is INCOMPLETE).
+- `node tools/rule-bodies.mjs` in step.
 - `node tools/ownership-check.mjs` passes with no baseline file.
 - `node tools/plan-lifecycle.mjs` clean.
-- The eleven `explain` measurements of § 5, before and after, in `research/module_rules.md`.
-- The new check run against the four TypeScript-bearing consumers' checkouts with `--warn`, its findings listed in E4's
-  pull request (a finding is information, not a consumer change this plan makes).
+- The measurements of § 5, before and after each epic, in `research/module_rules.md`.
+- The dry run (E7.S1): the new check with `--warn` and the resolver's `explain` for the representative scopes against
+  the four TypeScript-bearing and four .NET-only consumers' checkouts; findings listed in E7's record (a finding is
+  information, not a consumer change this plan makes).
 - One bounded smoke the way `research/module_tests.md` records them: a real session on `inspect --file ui/a.ts`,
-  `inspect --file tsconfig.json` and `dependencies --file package.json` reads the selected rules to their END markers.
+  `implement --file ui/a.ts` (split read, `--only` per rule), `inspect --file tsconfig.json` and
+  `dependencies --file package.json` reads the selected rules to their END markers.
+- The per-arm record's commands (D13): `explain` for the arm's scopes with ids and hashes; the composite gate's commands
+  and their exit codes; the toolchain versions — written once here, run there.
 
 ## 11. Definition of Done
 
 - [ ] Every row of § 3 is closed in the text of the rule it names, or recorded as deliberately absent in
-      `research/module_rules.md` with the reason.
+      `research/module_rules.md` with the reason; `research/parity-matrix.json` carries the same rows and its test is green.
+- [ ] No existing rule sentence was removed or shortened (D1); every moved block is byte-equal in its destination (the
+      test of E1.S4), and the wording changes are listed in the pull request as such.
 - [ ] Every Node sentence in a rule has a line in `research/2026-10-31_node_behaviour_probes.md` (a run with its output)
       or a cited document with its read date.
-- [ ] `typescript/compiler-strictness.md`, `typescript/npm-packages.md`, `common/dependencies.md` exist with the metadata
-      of § 4; `csharp/nuget-packages.md` has no `tasks`; the selectors of § 4.4 are in place and tested.
-- [ ] `typescript/doctrine.md` ≤ 6,348 B, `csharp/doctrine.md` ≤ 5,088 B, `compiler-strictness.md` ≤ 3,300 B, the
-      `utc-timestamps` Node section ≤ 1,200 B, the always core ≤ 16,384 B; every pinned single-read scope ≤ 32,768 B;
-      the before/after table is in `research/module_rules.md`.
-- [ ] Node 26 and TypeScript 7 are stated in the TypeScript rules the way `.NET 10` is in the C# one, with the measured
-      toolchain caveat and its date.
-- [ ] `tools/node-strictness-check.mjs` exists, is tested over fixtures, is in `README.md` § *tools* and `ROLLOUT.md`,
-      and the reason Node has a check and no hook is in `research/module_rules.md`.
-- [ ] `tools/http-coverage.mjs` finds a Node route, including one formatted across three lines;
-      `http-contracts.md:166` says what it now reads.
+- [ ] The resolver's `path_tasks` key exists, is tested, documented in `research/module_rules.md` and `ENTRY.md` step 7,
+      and every gated rule's gate equals its source rule's `tasks:` line (asserted).
+- [ ] The language-scoped rules of § 4.3 exist with the metadata of § 4; `csharp/nuget-packages.md` has no `tasks`; the
+      selectors of § 4.4–4.5 are in place and the per-scope id lists are tested.
+- [ ] The always core ≤ 16,384 B; every scope in the single-read list ≤ 32,768 B, the list being D5's; `gpu --file
+      src/x.cs` measured, and either in the list or recorded out of it with its number; the before/after table is in
+      `research/module_rules.md`.
+- [ ] The TypeScript toolchain is stated as one tested combination with its read date (D7); the operator's answer to Q2
+      is recorded.
+- [ ] `tools/node-strictness-check.mjs` exists, reads the effective configuration, is proven on the invalid fixtures of
+      § 4.6, is in `README.md` § *tools* and `ROLLOUT.md`, and the reason Node has a check and no hook is in
+      `research/module_rules.md`.
+- [ ] `tools/http-coverage.mjs` reads a Node route table through `--routes`; `http-contracts.md:166` says so.
 - [ ] `rule-bodies.json`, `ownership-check`, `plan-lifecycle`, `npm test` green on the merged commit.
-- [ ] Each of E1–E4 went through `mcp__coai__review_plan` → `mcp__coai__review_code` with every finding resolved, and its
-      pull request records what the reviewers said that was not acted on.
+- [ ] Each of E1–E6 went through `mcp__coai__review_plan` → `mcp__coai__review_code` with every finding resolved, and its
+      pull request records what the reviewers said that was not acted on; the plan's `mcp__coai__review_feature` ran once
+      after E7's last epic (seven epics ≥ three).
+- [ ] The dry run ran against the eight consumers and its findings are recorded before the promotion.
 - [ ] `release` promoted once to the merged sha through `promote-release` with a `reason`; the sha is in this plan.
 - [ ] Bump pull requests in the eight consumers of `README.md` § *Consumers* — `dew_flow_rag_qln`, `dew_flow_mcp`,
       `dew_flow_sidecar_rust`, `dew_flow_benchmark`, `dew_flow_creds_for_devs`, `dew_flow_connect_other_ais`, `wsl_care`,
       `dew_flow_vscode_kit` — the pinned-by repository last, each with `pin-check` green after its commit.
 - [ ] The experiment's task repository pins the release (reported by the other plan's E0.S3); the sha here and there
-      agree.
+      agree; the per-arm record's commands (D13) are handed over.
 - [ ] This plan promoted to `research/` with its deviations, in the same task as the last bump.
 
 ## 12. Open questions
@@ -401,11 +554,13 @@ Not settled here; the owner or the named epic decides. No answer is invented.
 
 - **Q1 .NET lock files.** Raise .NET to `packages.lock.json` + `dotnet restore --locked-mode` (a change in six consumers),
   or record the asymmetry (npm's lock fixes transitives; central pins fix directs) as § 3.3 proposes?
-- **Q2 The version statement.** "TypeScript 7 where every tool accepts it, otherwise the newest they all accept, recorded"
-  (§ 4.6), or the plain "TypeScript 7" with the lint constraint carried only in the consumer that has it?
-- **Q3 The single-read tasks.** `gpu` and `ui` with a language file leave 475 B and 439 B. Trim the doctrines to fit
-  (§ 4.7), or move `gpu` and `ui` to the split-read side of `tools/rules.test.mjs:204-205`, which frees ≈ 5 KB per
-  language and changes what a `ui` session reads in one call?
+- **Q2 The TypeScript toolchain (D7).** TypeScript 6.0.x with full type-aware lint (the tested combination the rule
+  states), or TypeScript 7 without type-aware lint until typescript-eslint supports it — and if the latter, what stands in
+  for `no-floating-promises` and the complexity rule meanwhile?
+- **Q3 The single-read list.** D5 takes `ui --file ui/a.ts` out of it so the webview trap reaches `ui`. Numbers: with
+  `ui` in the output-encoding gate ≈ 33,600 B; without, ≈ 31,300 B and the trap does not load for the task it was written
+  for. `gpu --file src/x.cs` is estimated at ≈ 32,660 B (105 B left) once the C# Definition of Done lands; if the
+  measurement says over, does `gpu` with a language file leave the list too (D1 forbids the alternative)?
 - **Q4 The check's reader.** `tsc --showConfig` from the consumer's own `node_modules` (the compiler resolves `extends`;
   INCOMPLETE when absent), or a JSONC parser of our own (a new dependency, and a second implementation of `extends`)?
 - **Q5 `.js/.mjs/.cjs` select the TypeScript doctrine** — including this repository's own `tools/`. Confirm, or leave
@@ -416,85 +571,139 @@ Not settled here; the owner or the named epic decides. No answer is invented.
   analyzer package (a dependency decision for every .NET consumer)?
 - **Q8 Who wires the Node check.** The four TypeScript-bearing consumers only, or every consumer, since it passes without
   opinion where there is no TypeScript?
-- **Q9 One pull request per epic (E1–E4) or one for all four?** Four keep each diff reviewable; one lands the release
-  sooner.
+- **Q9 One pull request per epic (E1–E6) or fewer?** Six keep each diff reviewable; fewer land the release sooner.
 - **Q10 Coverage thresholds** stay absent on both sides (§ 3.3). Confirm.
-- **Q11 The commit trailer.** This plan was written by a Fable model and its commit says so; the brief asked for an Opus
-  trailer. Which is wanted on the implementation commits?
+- **Q11** — closed by D15 (the trailer names the model that wrote the commit).
+- **Q12 The gate key's name.** `path_tasks` is this plan's; a reader may prefer `when_tasks` or `paths_for_tasks`. The
+  semantics are fixed by § 4.2 whatever the spelling.
+- **Q13 Rust's doctrine.** `rust/doctrine.md` § 9 points at "the Rust section of logging-serilog.md"; after the move it
+  points at `rust/logging.md`. Does the owner want the Rust sections moved in this plan (D2 applied to all three
+  languages, as § 4.3 proposes) or left where they are with the principle stated for Rust as a later change?
 
 ## Epics
 
-Five epics on the build order of § 9. Stories are written one epic at a time into `todo/PLAN_node_rule_parity_E<n>.md`
-when the epic starts ([planning-docs.md](../common/planning-docs.md) § *A plan split into epics and stories*); that
-document links back here. The intended stories are listed per epic so the size is visible. **The split is provisional**
-(T10): the question consultants have not yet been asked what is important; Fable confirms or re-splits before E1 starts.
-Cornerstone areas: (1) the compiler-strictness rule and its check — the strongest C# requirement's counterpart, and the
-text the experiment's Node agent reads first (E2, E4); (2) the Node paragraphs of `reliability.md` — the mechanics the
-experiment's daemon tasks test (E3). Q = ⌈2·5/5⌉ = 2.
+Seven epics on the build order of § 9, each one branch, one reviewable diff and a usable state at its end. Stories are
+written one epic at a time into `todo/PLAN_node_rule_parity_E<n>.md` when the epic starts
+([planning-docs.md](../common/planning-docs.md) § *A plan split into epics and stories*); that document links back here.
+The intended stories are listed per epic so the size is visible. **The split is final**: the question consultants were
+asked (consult `ce61c905`, 2026-10-31) and both answers agreed on the order and the three cornerstone areas; Fable made
+the split from them. Cornerstone areas, ranked: (1) the compiler/lint enforcement contract — the strongest C#
+requirement's counterpart, and the first text the experiment's Node agent is judged by (E3); (2) the TypeScript design
+doctrine — the mirror of `csharp/doctrine.md` § 1–§ 7 by meaning (E4); (3) the runtime lifecycle — the mechanics the
+experiment's daemon tasks test (E5). Q = ⌈2·7/5⌉ = 3, at most one per epic.
 
-Cornerstones: 0 of 2 — none marked yet; the stories documents mark them within the areas above
+Cornerstones: 0 of 3 — none marked yet; the stories documents of E3, E4 and E5 mark one each within the areas above
 
-### E1 — The shared dependency rule and the two ecosystem rules
+**Superseded split (first revision, before the consultants; kept by D1):** E1 the shared dependency rule and the two
+ecosystem rules · E2 compiler strictness and the two doctrines · E3 Node sections in the common rules and the probe
+record · E4 the two tools and the documents · E5 gates, release, bumps, the pin; Q = 2, areas: the compiler rule and
+`reliability.md`'s Node paragraphs. Replaced by the seven below.
 
-- **Goal:** a TypeScript agent adding a package reads npm text; a C# agent reads NuGet text; both read the neutral rule.
-- **Scope:** `common/dependencies.md` (new), `csharp/nuget-packages.md` (trimmed, paths only), `typescript/npm-packages.md`
-  (new); selection tests; the manifest; `research/module_rules.md`.
-- **Stories:** S1 the shared rule text (moved paragraphs verbatim, the scan and the lock sentence added) · S2 the NuGet
-  trim and the pointer · S3 the npm rule with its probe lines (`save-exact`, `npm ci`) · S4 selection tests and the
-  manifest entries · S5 the size measurement before/after.
-- **Depends on:** nothing. **Done when:** `dependencies --file package.json` selects `common.dependencies` and
-  `typescript.npm-packages` and not `csharp.nuget-packages`; `inspect --file src/x.csproj` ≤ 32,768 B with more headroom
-  than today; `npm test`, `rule-bodies`, `ownership-check` green; one pull request through both gates.
+### E1 — Delivery and the parity contract (no new prose)
 
-### E2 — Compiler strictness and the two doctrines
+- **Goal:** every later text has a place, a selector, a gate and a byte allowance before it is written; the parity
+  matrix is a file with a test; selection is pinned per representative scope.
+- **Scope:** `tools/lib/rule-catalog.mjs` (`path_tasks`), `tools/rules.test.mjs`, `research/parity-matrix.json` and its
+  test, the byte-equality test for moved blocks, `research/module_rules.md`, `ENTRY.md` step 7.
+- **Stories:** S1 the gate key: semantics, errors, `reasons`, tests · S2 the selection/budget matrix of § 4.1 measured
+  and recorded, with the per-scope id-list tests · S3 `parity-matrix.json` with every P/R row and its test against the
+  catalog and the recorded sections · S4 the moved-block byte-equality test (reads the block from the base commit by
+  line range, compares with the destination) · S5 the byte allowances of § 5 written into `module_rules.md` and the
+  single-read list of D5.
+- **Depends on:** nothing. **Done when:** `npm test` green with the new tests; the matrix test is red when a row names a
+  missing id or section (observed, then fixed); every tight scope's headroom is in `module_rules.md`; one pull request
+  through both gates.
 
-- **Goal:** P1–P7, R1–R3, P20's `.js` selector.
-- **Scope:** `typescript/compiler-strictness.md` (new), `typescript/doctrine.md` (§ 0, the anonymisation, the trim, the
-  selector), `csharp/doctrine.md` (§ 1, § 8, the DoD, the § 4a trim), `common/coding-style.md:32`.
-- **Stories:** S1 the compiler rule (**cornerstone area 1**: its contract is what the Node agent's `tsconfig` is judged
-  by) · S2 the TypeScript doctrine's § 0 and anonymisation, measured ≤ 6,348 B · S3 the C# doctrine's § 8 and DoD,
-  measured ≤ 5,088 B · S4 the selectors and the pinned scopes · S5 the version caveat with its registry read.
-- **Depends on:** E1 (the manifest and tests move together). **Done when:** every pinned scope ≤ 32,768 B; the ownership
-  check finds no name in either doctrine; one pull request through both gates.
+### E2 — Dependency policy (parallel after E1)
 
-### E3 — Node sections in the common rules, and the probe record
+- **Goal:** P9 and § 3.3's dependency rows; D14.
+- **Scope:** `common/dependencies.md` (new), `csharp/nuget-packages.md` (blocks moved out, paths only),
+  `typescript/npm-packages.md` (new), the manifest, the selection tests.
+- **Stories:** S1 the shared rule (moved blocks verbatim; the scan and the lock sentence added) · S2 the NuGet rule after
+  the move, with the pointer and the coupled-version exceptions kept · S3 the npm rule: declared range, lock resolution,
+  reproducible install, each with its probe line · S4 selection tests, manifest entries, the `inspect --file src/x.csproj`
+  measurement.
+- **Depends on:** E1. **Done when:** `dependencies --file package.json` selects `common.dependencies` and
+  `typescript.npm-packages` and not `csharp.nuget-packages`; the byte-equality test passes for the four moved blocks;
+  one pull request through both gates.
 
-- **Goal:** P10–P19, each sentence with its evidence.
-- **Scope:** `common/testing.md`, `logging-serilog.md`, `reliability.md`, `utc-timestamps.md`, `platform-limits.md`,
-  `security.md`, `http-contracts.md` (rows), `post-deploy-checks.md`; `research/2026-10-31_node_behaviour_probes.md`.
-- **Stories:** S1 the probe record with the table of § 4.3 and the owed probes run · S2 `reliability.md`'s Node
-  paragraphs (**cornerstone area 2**) · S3 `testing.md`'s runner section and DoD box · S4 `logging-serilog.md` `## Node`
-  with a pino shape measured against the path contract · S5 `utc-timestamps.md` `## Node` ≤ 1,200 B · S6 the three
-  one-clause edits (`security.md` P14–P15 within the core budget, `platform-limits.md`, `post-deploy-checks.md`) ·
-  S7 the `http-contracts.md` rows.
-- **Depends on:** E2 (the doctrine's § 0 points at these sections). **Done when:** the always core ≤ 16,384 B; `storage`
-  ≤ 32,768 B; every Node sentence traces to a probe line; one pull request through both gates.
+### E3 — Compiler/lint enforcement contract (cornerstone area 1)
 
-### E4 — The two tools and the documents
+- **Goal:** P2–P4, § 3.4, D7, D8; `Nullable enable` for C# in the same epic.
+- **Scope:** `typescript/compiler-strictness.md` (new, ≤ 3,300 B), `csharp/doctrine.md` § 1 (+ `Nullable enable`),
+  `tools/node-strictness-check.mjs` + tests + fixtures, `README.md` § *tools*, `ROLLOUT.md`.
+- **Stories:** S1 the rule text: the composite gate, the toolchain as one combination with its read date, the
+  suppression policy (**cornerstone**) · S2 the check: effective configuration via `tsc --showConfig`, the six invalid
+  fixtures, INCOMPLETE without `tsc`, `--warn` · S3 the C# § 1 line and the `gpu --file src/x.cs` measurement ·
+  S4 the documents and the dry-run command for E7.
+- **Depends on:** E1. **Done when:** each invalid fixture fails naming the file; a grep-only check is shown insufficient
+  by a fixture whose `strict` sits in an `extends` base; `storage --file tsconfig.json` ≤ 32,768 B; one pull request
+  through both gates.
 
-- **Goal:** enforcement parity (§ 4.5) and the scanner's Node routes (P18); the repository's documents say what changed.
-- **Scope:** `tools/node-strictness-check.mjs` + tests + fixtures; `tools/http-coverage.mjs` + the three-line test;
-  `README.md` § *tools*, `ROLLOUT.md`, `research/module_rules.md`, `research/module_tests.md`, `research/architecture.md`;
-  `http-contracts.md:166`.
-- **Stories:** S1 the check's contract and fixtures (**cornerstone area 1**) · S2 the check run over the four
-  TypeScript-bearing consumers with `--warn`, findings listed · S3 the scanner's Node patterns and test ·
-  S4 the documents, including why Node has a check and no hook, and the deliberately-absent decisions of § 3.3.
-- **Depends on:** E2 (the rule the check enforces). **Done when:** the check fails each bad fixture naming the file,
-  passes a repository with no TypeScript, reports INCOMPLETE without `tsc`; the scanner finds a three-line Node route; one
-  pull request through both gates.
+### E4 — TypeScript design doctrine parity (cornerstone area 2)
 
-### E5 — Gates, release, bumps, the pin
+- **Goal:** D4, P1, P5–P7, R3; the doctrine becomes the mirror of `csharp/doctrine.md` § 1–§ 7 by meaning.
+- **Scope:** `typescript/doctrine.md` (§ 0 added; § 1, § 3, § 4 moved out verbatim to the E5/E6 files, which this epic
+  creates as placeholders holding exactly the moved text so no byte is in flight), `csharp/doctrine.md` (the Definition of
+  Done), `common/coding-style.md:32`, the selectors (`.js/.mjs/.cjs`).
+- **Stories:** S1 § 0: readonly contracts, branded domain types with parsing factories, discriminated outcome and absence
+  states, boundary validation of untrusted JSON, pure functions and immutability, complexity ≤ 4 — each paragraph naming
+  the C# section it mirrors and the anonymised precedents (one consumer's readonly outcome type separating refusal,
+  timeout and mechanism failure; two consumers' complexity 4) (**cornerstone**) · S2 the moves of § 1, § 3, § 4 with
+  their DoD boxes, byte-equal, and the wording-only anonymisation listed · S3 the C# Definition of Done and the `gpu`
+  measurement (Q3 if over) · S4 the selectors and the pinned scopes.
+- **Depends on:** E1. **Done when:** `inspect --file ui/a.ts` and `inspect --file src/a.mjs` ≤ 30,116 B; the matrix rows
+  P5–P7 point at § 0's sections; the ownership check finds no name; one pull request through both gates.
 
-- **Goal:** the rules reach the consumers and the experiment.
-- **Scope:** `promote-release` with a `reason`; bump pull requests in the eight consumers (pinned-by last); the report of
-  the release sha to the other plan; this plan's promotion.
-- **Stories:** S1 the promotion (`README.md:100-122`) and the `release-distance` read · S2 the bumps, each with `pin-check`
-  green after its commit, the TypeScript-bearing ones adding the check step with `--warn` · S3 the sha handed to the
-  experiment's E0.S3 and confirmed equal · S4 this plan promoted with deviations.
-- **Depends on:** E1–E4 merged. **Done when:** every box of § 11 is ticked.
+### E5 — Runtime lifecycle (cornerstone area 3)
+
+- **Goal:** P13, P15; D9.
+- **Scope:** `typescript/lifecycle.md` (new, gated), `csharp/lifecycle.md` (the moved reliability blocks), the pointer
+  lines and the Node phrase in `common/reliability.md` and `common/security.md`,
+  `research/2026-10-31_node_behaviour_probes.md`.
+- **Stories:** S1 the probe record: the table of § 4.3 plus the owed probes (pre-aborted signals, custom reasons,
+  cleanup, an ignored `SIGTERM`, descendants holding pipes — all run; backpressure and `taskkill /T` to run) · S2 the
+  Node rule: ownership through completion — who cancels, who observes the rejection, who terminates descendants, who
+  drains streams and bounds the shutdown; the `unhandledRejection` shutdown policy; `signal.aborted` and who aborted;
+  `tools/lib/proc.mjs` as the shipped shape (**cornerstone**) · S3 the C# moves, byte-equal, and the reliability DoD read
+  against the Node text · S4 the core's two phrases within the ≤ 300 B allowance.
+- **Depends on:** E1, E4 (the doctrine's § 0 points here). **Done when:** every Node sentence traces to a probe line; the
+  always core ≤ 16,384 B; the common rule still states the invariant and the pointer; one pull request through both gates.
+
+### E6 — Application contracts, with their C# and Rust counterparts
+
+- **Goal:** P10–P12, P14, P16–P19, R1, R2, R4, R5; D6, D10, D11.
+- **Scope:** `typescript/testing.md`, `typescript/logging.md`, `typescript/utc-timestamps.md`,
+  `typescript/output-encoding.md` (new, gated); `csharp/testing.md`, `csharp/logging.md`, `csharp/utc-timestamps.md`,
+  `csharp/output-encoding.md` (new, gated; the moved blocks plus the reverse items); `rust/testing.md`, `rust/logging.md`,
+  `rust/utc-timestamps.md` (the moved Rust sections; `rust/doctrine.md` § 9's pointer updated); the invariant and
+  pointer lines in `common/testing.md`, `logging-serilog.md`, `utc-timestamps.md`; the rows and phrases of D6 in
+  `http-contracts.md`, `platform-limits.md`, `post-deploy-checks.md`, `security.md:18`; `tools/http-coverage.mjs`'s
+  `--routes` documentation and test for a Node table; `http-contracts.md:166`.
+- **Stories:** S1 the testing pair (runner sections, import-graph test, typed-fixture discipline side by side, the neutral
+  DoD box) · S2 the logging pair (pino shape measured against the path contract; the Serilog blocks moved) · S3 the clock
+  pair and the Rust clock file (`storage` measured) · S4 the output-encoding pair (the webview escape module anonymised;
+  Razor's `MarkupString`/`Html.Raw`) · S5 the one-line additions of D6 and the route-table path of D10 with its test ·
+  S6 the Rust files and `rust/doctrine.md`'s pointer (Q13).
+- **Depends on:** E1, E4, E5. **Done when:** every moved block is byte-equal; every Node sentence traces to a probe line
+  or a cited document; `storage` (no file) ≤ 32,768 B; one pull request through both gates.
+
+### E7 — Dry run, release, consumer adoption, the per-arm record
+
+- **Goal:** the rules reach the consumers and the experiment without a red build nobody expected (D13).
+- **Scope:** the dry run over the eight consumers; `promote-release` with a `reason`; bump pull requests (pinned-by
+  last); the per-arm record's commands handed to the other plan; this plan's promotion.
+- **Stories:** S1 the dry run: the new check with `--warn` and `explain` for the representative scopes against each
+  consumer's checkout, findings recorded · S2 `mcp__coai__review_feature` over the seven epics · S3 the promotion
+  (`README.md:100-122`) and the `release-distance` read · S4 the bumps, each with `pin-check` green after its commit, the
+  TypeScript-bearing ones adding the check step with `--warn` · S5 the sha and the per-arm record commands handed to the
+  experiment's E0.S3 and confirmed equal · S6 this plan promoted with deviations.
+- **Depends on:** E1–E6 merged. **Done when:** every box of § 11 is ticked.
 
 ### Order, and why
 
-E1 first because the experiment's agents meet package work before anything else and because its selector change is
-the one that removes text rather than adding it. E2 before E3 because the doctrine's § 0 is the index the Node sections
-are reached from. E4 after E2 because a check enforces a rule that exists. E5 last, once.
+E1 first because every text needs a place, a gate and an allowance before it is written, and because its tests are what
+make D1's "moves keep the text" checkable. E2 in parallel because its placement is settled by E1 alone. E3 before E4
+because the gate is what the design doctrine's strictness line points at. E4 before E5 and E6 because the doctrine's § 0
+is the index the gated rules are reached from, and because its moves create the files E5 and E6 fill. E7 last, once,
+with the dry run before the promotion.
