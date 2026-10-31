@@ -226,7 +226,7 @@ epic, kept in `research/module_rules.md`:
 | JavaScript | `src/a.mjs` | selects no language rule today |
 | Mixed | `src/x.cs` + `ui/a.ts` | the two mixed consumers; measured today `inspect` 34,729 B — already a split read |
 | Config-only | `package.json`; `tsconfig.json`; `.npmrc` | the manifests the new rules select on |
-| Browser/webview | `src/webview/page.ts` | **the resolver cannot tell a webview file from a Node file by path** — the matrix records that the output-encoding rule reaches it through the `ui` gate, not through a selector |
+| Browser/webview | `src/webview/page.ts` | **the resolver cannot tell a webview file from a Node file by path** — the matrix records that the boundaries rule (output encoding) reaches it through the `ui` gate, not through a selector |
 | Rust | `src/main.rs` | the third language, same principle |
 
 × every single-read task (`inspect`, `ui`, `gpu`, `storage`) and the split-read `implement`, `test`, `audit`, `logging`,
@@ -550,7 +550,7 @@ block sizes of § 4.3 and the additions of § 4.4; every story measures and writ
 | `inspect --file package.json` | 35,409 (`local-cpu-budget` 11,202) | ≈ 38,900 | no, as today | + `npm-packages` ≈ 3,500 |
 | `logging --file src/Program.cs` | 78,866 | ≈ 78,900 | split read | the Serilog blocks leave `common/logging-serilog.md` and arrive in `csharp/logging.md` on the same scope |
 | `logging --file src/server.ts` | 80,162 | ≈ 78,650 | split read | − 3,012 B of Serilog/Rust mechanics + ≈ 1,500 B of `typescript/logging.md` |
-| `implement --file ui/a.ts` | 292,834 (28 rules) | ≈ 291,600 | split read | − ≈ 8,200 B of C# and Rust mechanics; + ≈ 7,000 B of TypeScript mechanics (lifecycle, testing, logging, utc, output-encoding) |
+| `implement --file ui/a.ts` | 292,834 (28 rules) | ≈ 291,600 | split read | − ≈ 8,200 B of C# and Rust mechanics; + ≈ 7,000 B of TypeScript mechanics (lifecycle, testing, logging, utc, boundaries) |
 | `implement --file src/x.cs` | 291,538 (28 rules) | ≈ 292,000 | split read | the C# mechanics move within the scope; + 370 |
 | `implement --file src/main.rs` | 291,304 | ≈ 284,200 | split read | − 8,200 B of C# mechanics; the Rust sections arrive as `rust/*` on the same scope |
 | `dependencies --file package.json` | 171,557 (19 rules, with `csharp.nuget-packages`) | ≈ 175,000 | split read | − NuGet + `common.dependencies` + `npm-packages` |
