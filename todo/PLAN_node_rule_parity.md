@@ -1,10 +1,10 @@
 # PLAN — C#/Node rule parity: every C# requirement has a Node/TypeScript counterpart of equal strength, and the reverse
 
-> Status: **plan only, nothing implemented yet; epoch 3 open with 0 changes, 2026-10-31 — epoch 2 closed at its second
-> change (the E1 stories writer's open points, § 17), the re-review revised the whole plan (§ 17, consults `1f4d8688`
-> and `e1c58f6d`) and the epoch 3 plan round returned `proceed` with both reviewers answering (§ 18); epoch 1 had closed
-> at its own second change (§ 14), its re-review is § 15–§ 16; revised the same day after the question consultants,
-> consult `ce61c905`, and the operator's "we only add" rule — § 0.** Scope: the shared rule corpus (`common/`,
+> Status: **plan only, nothing implemented yet; stopped for re-review, 2026-10-31 — epoch 3 reached its second change
+> with the cadence consult for epics 1–3 (`69c2eb3f`: entries 3.2–3.4, § 19) after its one allowed change (3.1); epoch 2
+> had closed at its own second change (§ 17) and epoch 1 at its own (§ 14); the epoch 3 plan round had returned
+> `proceed` with both reviewers answering (§ 18); revised the same day after the question consultants, consult
+> `ce61c905`, and the operator's "we only add" rule — § 0.** Scope: the shared rule corpus (`common/`,
 > `csharp/`, `rust/`, `typescript/`), its selection metadata and one new metadata key in the resolver
 > (`tools/lib/rule-catalog.mjs`), `research/rule-bodies.json`, a machine-readable parity matrix and its test, the
 > selection and size tests in `tools/rules.test.mjs`, two tools (`tools/http-coverage.mjs`'s `--routes` path for Node; a
@@ -70,9 +70,14 @@ Narrowed: no — judged against the epoch 2 baseline `400d878` + `01d1bbf`: G2 i
 |---|---|---|---|
 | The E1 stories document (planning work, not on main; nothing was built) | `feat/rule-parity-e1`, `72aaf8c` | fits | kept — to be reconciled with the epoch 3 revision (§ 17: E1.S0b, the provenance gates, the normalised equality, the exact ranges, the fixtures) when E1 starts; judged by the team lead as the Opus judge, 2026-10-31 |
 
-> Epoch 3 · approved 2026-10-31 · by reviewers · state: open
+> Epoch 3 · approved 2026-10-31 · by reviewers · state: stopped
 
 - 3.1 · 2026-10-31 · agent · contract — E1 stories O1: `typescript/testing.md`'s gate had no form the provenance rule accepts (its first text is doctrine § 2–§ 4, whose source has no `tasks:` line, so it would mirror as "no gate"); approved as the fifth declared gate, `implement, test, audit, policy, release` — the trap texts are test-and-fixture discipline that loads where tests are written or reviewed, and the gate preserves § 5's `.ts` budgets
+- 3.2 · 2026-10-31 · agent · contract — cadence consult `69c2eb3f`: the equality model cannot express a requirement that lives in different rule locations per side; P2, P3 and P4's C# side is `csharp/doctrine.md` (`.cs/.razor/.csproj`) and their TypeScript side is `typescript.compiler-strictness` (`tsconfig*.json`), so the normalised-selection test that compares source-file sets can never pass the real rows
+  (This second change stopped the plan. The two entries below were found by the same consult and are recorded one per
+  cause, as the rule asks. The re-review's revision for epoch 4 is § 19.)
+- 3.3 · 2026-10-31 · agent · contract — cadence consult `69c2eb3f`: E3's applicability predicate (a TypeScript project or dependency) skips exactly the plain-JavaScript repository whose lint subset § 4.4 promises — `package.json` + `src/app.mjs` with `console.log`, no `tsconfig`, no TypeScript dependency, no lint script passes without a finding
+- 3.4 · 2026-10-31 · agent · epics — cadence consult `69c2eb3f`: E1 front-loads work E2 and E3 do not need — recording every E4–E6 move, their gate provenance, the consumer inventory and the lock fixtures E2 owns
 
 ## 0. Decisions
 
