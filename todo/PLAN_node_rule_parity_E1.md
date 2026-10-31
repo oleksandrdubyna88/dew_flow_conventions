@@ -406,25 +406,29 @@ its comment).
 "reason"?, "scopedAbsences"? } ] }` — `status` `counterpart|deliberately-absent|planned`; `epic` iff planned; `reason`
 (≥ 20 chars) iff deliberately absent, the one home of those reasons; `scopedAbsences` `[ { "scope", "reason" } ]` (P5,
 § 4.1 `:347-351`). `research/parity-matrix.json` `{ "note", "rows": [ { "inventory", "topic", "status", "epic"?,
-"reason"?, "strength", "suppression", "csharp": <side>, "typescript": <side> } ] }` — `status`
-`planned|equal|stronger-ts|stronger-cs|deliberately-absent`; `reason` iff `stronger-*`. A `<side>` is `{ "absent": true }`,
-or `{ "planned": "E2".."E6", "delivery"?: [ { "id", "section"? } ] }` (intended locations where the plan names them,
-unchecked), or an active side `{ "delivery": [ { "id", "section" } ], "enforcement": [ { "class": "prose" } | { "class":
+"reason"?, "strength", "csharp": <side>, "typescript": <side> } ] }` — `status`
+`planned|equal|stronger-ts|stronger-cs|deliberately-absent`; `reason` iff `stronger-*`; the row carries no
+`suppression` — it lives on each active side, one place. A `<side>` is one of four variants: `{ "absent": true }`; or
+`{ "planned": "E2".."E6", "delivery"?: [ { "id", "section"? } ] }` (intended locations where the plan names them,
+unchecked); or the **present side of a deliberately-absent row**, `{ "delivery": [ { "id", "section" } ] }` and nothing
+else, valid ONLY in a `deliberately-absent` row (P8, R4, R5); or an active side `{ "delivery": [ { "id", "section" } ], "enforcement": [ { "class": "prose" } | { "class":
 "test", "test" } | { "class": "check", "tool" } | { "class": "hook", "hook" } ], "selectors": [ { "id", "paths",
 "path_tasks", "tasks" } ], "mood": "MUST|SHOULD", "consequence": "none|test-fails|check-fails|build-fails|hook-refuses",
 "suppression": "none|inline-with-reason" }`.
 
 **The rules** (`parityFindings`): (1) inventory ids `^[PRG][1-9][0-9]*$` unique, fields as the schema; (2) one-to-one,
-equal topics; (3) every delivery location of an active side: `id` in the catalog, `section` among its recorded sections;
+equal topics; (3) every delivery location of an active side and of a deliberately-absent row's present side: `id` in the catalog,
+`section` among its recorded sections; the present-side variant anywhere but a `deliberately-absent` row is a finding;
 (4) a planned side: epic E2–E6, intended ids well-formed; (5) row status: `planned` ⇔ some side planned, none absent,
-`epic` the latest; `deliberately-absent` ⇔ some side absent, none planned, no `reason`; `equal`/`stronger-*` ⇔ both
+`epic` the latest; `deliberately-absent` ⇔ some side absent, none planned, the other side absent or the present-side variant, no
+`reason`; `equal`/`stronger-*` ⇔ both
 active; (6) `STRONGER_EXCEPTIONS = ["P4"]`: another `stronger-*` row is a finding with or without a reason; P4 needs a
 reason; `equal` carries none; (7) inventory ↔ row status and epic agree; (8) a `planned` row of a landed epic is a
 finding; (9) **equality**, every `equal` row: the correspondence pairs are none ↔ none, `src/x.cs` ↔ `ui/a.ts`,
 `src/a.mjs`, `src/webview/page.ts`, and `src/x.csproj` ↔ `package.json`; for each of the nine tasks and each pair, the
 C# side's delivery UNION (any of its locations' rules selected) holds exactly when the TypeScript side's union holds on
 each corresponding file set; the configuration kind is not compared (§ 4.1 `:326-331`); then `mood`,
-`enforcement[].class` (as sets), `consequence`, `suppression` equal; (10) **against reality**, every active side: each
+`enforcement[].class` (as sets), `consequence` and each side's `suppression` equal; (10) **against reality**, every active side: each
 `selectors` item equals its rule's catalog `paths`/`pathTasks`/`tasks` as sets; `mood` is `MUST` exactly when a heading
 carrying `(MANDATORY)` is found walking from the section's own heading to each preceding heading of a lower level up to
 the H1; `check` → `tools/<tool>.mjs` exports `CHECKED_RULES` containing the row's delivery ids of that side; `hook` →
@@ -471,16 +475,16 @@ G4 `deliberately absent on both sides: a coverage number is gamed the week it la
 `deliberately absent as shared rules: each repository's own CI names the exact commands (plan section 3.3)`; P5's
 `scopedAbsences` `[{ "scope": "javascript-without-project", "reason": "nothing checks a type there: the typed parts are
 absent and the doctrine's JavaScript paragraph states the enforceable subset (plan section 3.1 P5, section 18 finding
-5)" }]`. Topics, `strength` and `suppression`: one short phrase each from the plan's § 3 rows (`suppression` for P2, P4,
-G1, P21 `plan section 3.4: inline only, with the rule or warning id and a same-line reason; no baseline`; otherwise
-`none: a prose rule has nothing to suppress`).
+5)" }]`. Topics and `strength`: one short phrase each from the plan's § 3 rows. `suppression` is written by the epic that
+activates a side, on that side (P2, P4, G1, P21 will take `inline-with-reason`, the policy of the plan's § 3.4; the
+other rows `none`); a planned or deliberately-absent side carries none.
 
 **The fixtures.**
 
 | # | Given | When | Then |
 |---|---|---|---|
-| 3.1 | the real files, catalog, sections, `LANDED_EPICS` | `parityFindings` | `[]` |
-| 3.2 | **the real-row proof**: an owned folder holding the real `csharp/doctrine.md`, a `typescript/doctrine.md` whose front matter is E3's planned one (`paths` `**/*.ts`, `**/*.tsx`, `**/*.mts`, `**/*.cts`, `**/*.js`, `**/*.mjs`, `**/*.cjs`, `**/package.json`), a `typescript/compiler-strictness.md` (`paths` `**/tsconfig*.json`), the core, and P2 and P3 as `equal` rows with these delivery sets, enforcement `check: strictness-check` on both sides (a fixture tool exporting `CHECKED_RULES`), mood, consequence `check-fails`, suppression `inline-with-reason` | `parityFindings` | `[]` — the union holds on source and manifest scopes, the configuration kind apart |
+| 3.1 | the real files, catalog, sections, `LANDED_EPICS` | `parityFindings` | `[]` — and the present-side variant (P8, R4, R5) is accepted ONLY on a `deliberately-absent` row: the same variant on a `planned` or `equal` row, or a row-level `suppression`, is a finding (fixture cases) |
+| 3.2 | **the real-row proof**: an owned folder holding the real `csharp/doctrine.md`, a `typescript/doctrine.md` whose front matter is E3's planned one (`paths` `**/*.ts`, `**/*.tsx`, `**/*.mts`, `**/*.cts`, `**/*.js`, `**/*.mjs`, `**/*.cjs`, `**/package.json`), a `typescript/compiler-strictness.md` (`paths` `**/tsconfig*.json`), the core, and P2 and P3 as `equal` rows with these delivery sets, enforcement `check: strictness-check` on both sides (a fixture tool exporting `CHECKED_RULES`), mood, consequence `check-fails`, and `suppression: "inline-with-reason"` on each side (not on the row) | `parityFindings` | `[]` — the union holds on source and manifest scopes, the configuration kind apart |
 | 3.3 | 3.2 with the TypeScript delivery reduced to `typescript.compiler-strictness` | | findings naming P2 and P3, a task and the pair `src/x.cs` ↔ `ui/a.ts` — a `.ts` scope would deliver nothing |
 | 3.4 | 3.2 with P4 `stronger-ts` and its reason / P2 `stronger-ts` with a reason | | `[]` / a whitelist finding |
 | 3.5 | an `equal` row naming `csharp.missing` / a missing section | | one finding each — the ACTIVATED-row red |
@@ -533,8 +537,9 @@ id>"` — the only field ever added to an existing entry.
   `destinationLines` by scanning the working-tree destination (refused if the block is not there exactly once); if they
   differ, it requires `--supersedes` and `--justified-by`, verifies with git that the commit exists and touches only the
   block's source file (recording `justifiedFiles`), appends the superseding entry and adds `supersededBy` to the old one.
-- Refuses, writing nothing: a range not `^[1-9]\d*-[1-9]\d*$` with from ≤ to (a column form such as `32:1-33:14`
-  included) — `a move is whole lines; split the line by whitespace first (E1.S0b)`; a range whose preceding line or last
+- Accepts a range `^[1-9]\d*(-[1-9]\d*)?$` with from ≤ to, normalising a single line `N` to `N-N` (F8's
+  `csharp/nuget-packages.md` `39` is recorded as given). Refuses, writing nothing: any other form — a column range such
+  as `32:1-33:14` included — — `a move is whole lines; split the line by whitespace first (E1.S0b)`; a range whose preceding line or last
   line ends inside a fence (F5) — `the range would split a fenced block; move the whole fence or split by whitespace first
   (E1.S0b)`; lines past the end; an unknown commit; an existing id; a superseding without both flags; a `justifiedBy`
   commit touching any other file.
@@ -561,6 +566,7 @@ only.
 | # | Given (an owned git repository; `src.md`: six lines, `é` on 3, two-space indent on 4, then a fence `` ```js `` · one line · `` ``` `` on 8–10; destination `common/d.md`) | When | Then |
 |---|---|---|---|
 | 4.1 | the sample committed | `--baseline src.md 2-4 <c> E4 b1` | one baseline; 40-hex commit; `length`/`sha256` with `é` as 2 bytes — **the exact range** |
+| 4.1b | the same | `--baseline src.md 5 <c> E4 b5` | recorded with `lines: "5-5"` — a single line is a whole-line range |
 | 4.2 | the same | `--baseline src.md 7-9 …` / `9-11 …`; `8-10` | refused with the fence message / recorded — **the fence-balanced refusal** |
 | 4.3 | the same | `--baseline src.md 2:1-4:5 …` | refused naming E1.S0b — **the mid-line refusal** |
 | 4.4 | `b1`; lines 2–4 placed in `common/d.md`, removed from `src.md` (working tree) | `--record src.md 2-4 <c> common/d.md E4 a1` | an activation `a1` with `destinationLines`; verify after committing: no findings |
@@ -645,7 +651,8 @@ the required tools · lock fixtures job`, so that job is where it runs (O3).
 
 with a comment above it saying what it proves and why it is its own job (the plan's § 10). The `Selftest` step gains
 `env: LOCK_FIXTURES_JOB: "tools · lock fixtures"`. `.github/branch-protection.json`: `tools · lock fixtures` in
-`release`'s contexts beside `tools · selftest` and `workflows · actionlint`, and in `main`'s (O4); the change is applied
+`release`'s contexts beside `tools · selftest` and `workflows · actionlint` — `release` only, as § 19 and E1 approve; the
+job RUNS on every pull request through `ci.yml` (O4); the change is applied
 by an admin with `--apply` after the job has reported once on this pull request (the file's own rule: a required check
 that never reports blocks every merge).
 
@@ -691,10 +698,10 @@ folders); then expect exit 0 from the stale locked restore → 4b.2 fails with N
   is missing" (`:947-948`), and `npm test` in `tools · selftest` has no SDK (F6). S4b names the dedicated job in that
   step's environment, and the NuGet case defers to it by name there; it runs, never skipped, in `tools · lock fixtures`.
   (The alternative, `setup-dotnet` in `tools · selftest` too, would run the fixture twice.)
-- **O4 — required on `release` only, or on every pull request? NOT a change.** § 19 (`:1275`) and E1 (`:1393-1394`) add
-  `tools · lock fixtures` to `release`'s required checks; § 10 (`:943-946`) calls it "a REQUIRED job … running the two lock
-  fixtures on every pull request". S4b adds it to `main`'s contexts as well, which is what makes it required on a pull
-  request.
+- **O4 — § 10's "required on every pull request" is a stale sentence. NOT a change — a repair.** § 10 (`:943-946`)
+  calls `tools · lock fixtures` "a REQUIRED job … running the two lock fixtures on every pull request"; § 19 (`:1275`)
+  and E1 (`:1393-1394`) approve it as required on `release`. The job RUNS on every pull request (`ci.yml`) and is
+  REQUIRED on `release`; S4b adds it to `release`'s contexts only. Adding it to `main`'s would be a plan change.
 - **O5 — `npm-packages.md` is 3,500 B in one sentence, 3,300 B in three. NOT a change.** § 5's allowance paragraph
   (`:825`) still says ≤ 3,500 B; the "after E3" table (`:798`), the pin list (`:814`) and E2 (`:1418`) set the hard cap at
   3,300 B. S2 tests 3,300 B. A stale sentence.
