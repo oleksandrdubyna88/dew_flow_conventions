@@ -666,6 +666,8 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   matrix is a file with a test; selection is pinned per representative scope.
 - **Scope:** `tools/lib/rule-catalog.mjs` (`path_tasks`), `tools/rules.test.mjs`, `research/parity-matrix.json` and its
   test, the byte-equality test for moved blocks, `research/module_rules.md`, `ENTRY.md` step 7.
+- **Stories document:** [PLAN_node_rule_parity_E1.md](PLAN_node_rule_parity_E1.md) — written by Opus when the epic
+  started (2026-10-31); no story is a cornerstone (E1 holds no cornerstone area), so the ledger line above is unchanged.
 - **Stories:** S1 the gate key: semantics, errors, `reasons`, tests · S2 the selection/budget matrix of § 4.1 measured
   and recorded, with the per-scope id-list tests · S3 `parity-matrix.json` with every P/R row and its test against the
   catalog and the recorded sections, and `parity-inventory.json` with the one-to-one test (an orphan on either side is
