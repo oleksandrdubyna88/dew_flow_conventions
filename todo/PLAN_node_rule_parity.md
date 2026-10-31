@@ -1,9 +1,10 @@
 # PLAN — C#/Node rule parity: every C# requirement has a Node/TypeScript counterpart of equal strength, and the reverse
 
-> Status: **plan only, nothing implemented yet; epoch 2 open with 0 changes, 2026-10-31 — epoch 1 closed at its
-> second change (the PR #94 review, § 14), the re-review revised the whole plan (§ 15, § 16) and the coai document
-> gate over `e055974` returned `proceed`; revised the same day after the question consultants, consult `ce61c905`,
-> and the operator's "we only add" rule — § 0.** Scope: the shared rule corpus (`common/`,
+> Status: **plan only, nothing implemented yet; epoch 3 open with 0 changes, 2026-10-31 — epoch 2 closed at its second
+> change (the E1 stories writer's open points, § 17), the re-review revised the whole plan (§ 17, consults `1f4d8688`
+> and `e1c58f6d`) and the epoch 3 plan round returned `proceed` with both reviewers answering (§ 18); epoch 1 had closed
+> at its own second change (§ 14), its re-review is § 15–§ 16; revised the same day after the question consultants,
+> consult `ce61c905`, and the operator's "we only add" rule — § 0.** Scope: the shared rule corpus (`common/`,
 > `csharp/`, `rust/`, `typescript/`), its selection metadata and one new metadata key in the resolver
 > (`tools/lib/rule-catalog.mjs`), `research/rule-bodies.json`, a machine-readable parity matrix and its test, the
 > selection and size tests in `tools/rules.test.mjs`, two tools (`tools/http-coverage.mjs`'s `--routes` path for Node; a
@@ -48,7 +49,27 @@ Narrowed: no — judged against the gate-approved epoch 1 baseline `ac798a0` wit
 |---|---|---|---|
 | The E1 stories document (planning work, not on main; nothing was built) | `feat/rule-parity-e1` | fits | kept as the input to E1 — judged by the team lead as the Opus judge, 2026-10-31 |
 
-> Epoch 2 · approved 2026-10-31 · by reviewers · state: open
+> Epoch 2 · approved 2026-10-31 · by reviewers · state: closed
+
+- 2.1 · 2026-10-31 · agent · contract — E1 stories O1: G2 (the lock file) had no admissible status; the question consultants (consult `1f4d8688`, the owner away) and the team lead put G2 on the exception whitelist as `stronger-ts` with its reason; Q1 closed, for the owner to confirm 2026-11-01
+- 2.2 · 2026-10-31 · agent · contract — E1 stories O3: T11 ("every gate equals its source rule's `tasks:` line") cannot hold for the four planned gated files that have no source rule
+  (This second change stopped the plan. The four entries below were found in the same stories document and are
+  recorded one per cause, as the rule asks; O2 and O8–O12 of that document are repaired references and fixes that only
+  satisfy the plan as written, not entries. The re-review's revision for epoch 3 is § 17.)
+- 2.3 · 2026-10-31 · agent · contract — E1 stories O4: the doctrine rows P1, P5, P7 and P20 cannot be `equal` under § 2 (a) while `csharp/doctrine.md` also selects `.csproj` and the TypeScript doctrine selects source files only
+- 2.4 · 2026-10-31 · agent · approach — E1 stories O5: four § 4.3 moves were not exact line ranges (reliability's sentences, the .NET text of `utc-timestamps`, the NuGet `:39-47` split inside a code fence), so E1 could not record them
+- 2.5 · 2026-10-31 · agent · contract — E1 stories O6: whether `MANDATORY` is read from the section's own heading only or inherited from an ancestor heading (P13's C# section carries none of its own)
+- 2.6 · 2026-10-31 · agent · contract — E1 stories O7: "the list of D5 and the new config scopes" named no exact single-read list; six scopes that fit today were unpinned without a reason
+
+### Re-review for epoch 3
+
+Narrowed: no — judged against the epoch 2 baseline `400d878` + `01d1bbf`: G2 is RAISED on the .NET side to a committed lock and a locked-mode restore (option A, consult `e1c58f6d`), so the whitelist stays exactly the baseline's `['P4']` and nothing is admitted against it; the gate test keeps every assertion and gains the provenance rule, declared gates with reasons and pinned positive/negative cases; the doctrine gains a selector; the moves become exact whole-line ranges with every word staying in place (a whitespace-only split, D1-checked); the single-read list gains six pins and drops none; no guarantee, scope, Definition-of-Done box or merge condition of epoch 2 is removed (§ 17)
+
+| Work | Where | Verdict | Action |
+|---|---|---|---|
+| The E1 stories document (planning work, not on main; nothing was built) | `feat/rule-parity-e1`, `72aaf8c` | fits | kept — to be reconciled with the epoch 3 revision (§ 17: E1.S0b, the provenance gates, the normalised equality, the exact ranges, the fixtures) when E1 starts; judged by the team lead as the Opus judge, 2026-10-31 |
+
+> Epoch 3 · approved 2026-10-31 · by reviewers · state: open
 
 ## 0. Decisions
 
@@ -138,7 +159,11 @@ from what the family's Rust crate already practices") and the `## Rust` sections
 
 **Equal strength, defined.** Two requirements are of equal strength when (a) they are selected for the same kind of
 scope (a language file, a manifest, a task) — a rule one agent gets on every source file and the other gets only on a
-task is not equal; (b) they have the same mood — MANDATORY against MANDATORY, a Definition of Done box against a box;
+task is not equal; **"the same kind of scope" is defined** (§ 17, O4) as *selected by the stack's SOURCE files plus the
+stack's PROJECT MANIFEST, gated alike where gated*: `**/*.cs`, `**/*.razor` + `**/*.csproj` on one side, the
+`.ts/.tsx/.mts/.cts/.js/.mjs/.cjs` set + `**/package.json` on the other; a compiler-configuration file
+(`tsconfig*.json`, `Directory.Build.props`) is a kind of its own and is compared with its own counterpart, never with a
+source-file selector; (b) they have the same mood — MANDATORY against MANDATORY, a Definition of Done box against a box;
 (c) they have the same enforcement class — a file a check verifies, a command a hook refuses, or prose alone; (d) the
 consequence is the same — a warning that fails the build on one side fails it on the other; and (e) **the exemption
 policy is the same** — what may be suppressed, where (inline only, naming the rule and the reason), and that no baseline
@@ -147,8 +172,9 @@ of accepted violations exists. The matrix carries (c) and (e) as columns.
 **A stronger side is allowed only as a recorded exception** (PR #94 review, comment 1 — ledger 1.1; tightened by the
 epoch 2 review, § 16): a matrix row whose `status` is `stronger-ts` or `stronger-cs` carries a non-empty `reason`
 naming what the weaker side would need and why it is not taken now, AND its id is in the explicit whitelist the matrix
-test holds (today `['P4']`, § 11); any other row with that status fails the suite, with or without a reason, so a new
-exception is a reviewed edit of the test and of § 11, never a field in a JSON file. Equality is preferred where it is cheap: P2 is made equal by giving the strictness check a .NET half (§ 4.6); P4
+test holds (today `['P4']`, § 11 — ledger 2.1 had put G2 there; the epoch 3 re-review reversed that and made G2
+`equal`, § 17); any other row with that status fails the suite, with or without a reason, so a new exception is a
+reviewed edit of the test and of § 11, never a field in a JSON file. Equality is preferred where it is cheap: P2 is made equal by giving the strictness check a .NET half (§ 4.6); P4
 stays `stronger-ts` with its reason (an analyzer package is a dependency decision for every .NET consumer — Q7).
 
 ## 3. The parity table
@@ -165,7 +191,7 @@ headings, are the content of `research/parity-matrix.json` (E1).
 | P2 | `TreatWarningsAsErrors` (`:10`, stays) | `"strict": true`, `"noEmitOnError": true` wherever `tsc` emits, lint at `--max-warnings 0`, `tsc --noEmit` before a type-stripped run — `typescript/compiler-strictness.md`, selected by `**/tsconfig*.json`; the one-line statement also in the doctrine's § 0 | file + CI check on BOTH sides (`tools/strictness-check.mjs`, § 4.6): its .NET half reads the EFFECTIVE `TreatWarningsAsErrors` and `Nullable` of every project with `dotnet msbuild <project> -getProperty:TreatWarningsAsErrors -getProperty:Nullable -m:4` (probed 2026-10-31, SDK 10.0.114: `"true"`, `"enable"`, `LangVersion` `"14.0"` — inherited props resolved as MSBuild resolves them), INCOMPLETE when no SDK resolves; status `equal`. **Superseded (ledger 1.1):** the first revision's "stronger than C#, which has prose only; MSBuild already fails the build once the property is set" — true of the build, but nothing checked that the property WAS set |
 | P3 | `Nullable enable` — absent from the rule, present in every consumer | `strictNullChecks` (inside `strict`) — the same rule | raised on **both**: `csharp/doctrine.md` § 1 gains `Nullable enable` (≈ 20 B, no removal) |
 | P4 | complexity ≤ 4, `private static` where no state is read (`:75-78`, stays) | the same number as a lint rule (`complexity: ["error", 4]`, `max-lines-per-function` 50, `max-lines` 800, `no-console`) — the shape two TypeScript consumers already run (read 2026-10-31) — in `compiler-strictness.md`; the suppression policy of § 3.4 | prose ↔ lint-enforced: status `stronger-ts`, reason recorded in the matrix: "a C# complexity rule needs an analyzer package the family has not adopted; a dependency decision for every .NET consumer (Q7), not a shared-rule edit" |
-| P5 | records for data, typed values, no primitive obsession, no null in business logic (§ 2–4, stay) | `typescript/doctrine.md` § 0 (E4, by meaning): `readonly` data contracts and `Readonly<T>`/`ReadonlyArray<T>` in public shapes; validated or branded domain types (`type CommitSha = string & { readonly __brand: … }` with a parsing factory returning a result, never a throwing constructor); `undefined`/`null` only at the edges, absence as a typed state ("not captured" and "empty" are different facts) | prose ↔ prose; cites, anonymised, one consumer's readonly outcome type that separates refusal, timeout and mechanism failure |
+| P5 | records for data, typed values, no primitive obsession, no null in business logic (§ 2–4, stay) | `typescript/doctrine.md` § 0 (E4, by meaning): `readonly` data contracts and `Readonly<T>`/`ReadonlyArray<T>` in public shapes; validated or branded domain types (`type CommitSha = string & { readonly __brand: … }` with a parsing factory returning a result, never a throwing constructor); `undefined`/`null` only at the edges, absence as a typed state ("not captured" and "empty" are different facts) | prose ↔ prose; cites, anonymised, one consumer's readonly outcome type that separates refusal, timeout and mechanism failure. **Plain JavaScript** (§ 18, finding 5): `.js/.mjs/.cjs` inside a TypeScript project are type-checked (`allowJs` + `checkJs` under `strict`, JSDoc types — the compiler enforces it, so the typed doctrine applies and the row is `equal` there); in a repository with NO TypeScript project the typed parts (branded types, typed results) are `deliberately-absent` with the reason in the inventory ("nothing checks a type there"), and the enforceable subset stated in § 0's JavaScript paragraph applies — `Object.freeze` at the boundary, Result objects, validation at the boundary, complexity ≤ 4 and `no-console` by lint — enforced by the check's lint half |
 | P6 | § 4a a DTO field the client omitted is `null` (stays); the gated `csharp/boundaries.md` **gains** (not § 4a itself — that file loads under `gpu`, § 16) the large-identifier mirror: `System.Text.Json` reads a `long` exactly and a `double` target or `JsonElement.GetDouble()` loses precision (measured: `{"id":9007199254740993}` → `long` 9007199254740993, `double` 9007199254740992, `GetInt64` exact, `GetDouble` …992, `GetRawText` exact, `decimal` exact; `2^63` into `long` throws `JsonException`); and the casing trap the same probe met: the default binder is case-sensitive, so `Id` against `"id"` bound to **0 with no error** — § 4a's silent default, in another door | § 0: a `JSON.parse` result is `any` and a declared type is a promise the parser never checked; validate at the single road in (a schema or a typed parser). **Identifiers that can exceed 2^53 travel as JSON strings, or are parsed losslessly before any conversion to `Number`**: `JSON.parse` rounds `{"id":9007199254740993}` to `9007199254740992` (measured); the lossless option exists on Node 26 — the reviver's third argument carries the source text (`JSON.parse(text, (k, v, context) => … BigInt(context.source))` → `9007199254740993n`, measured), and `JSON.rawJSON` writes such a value back unquoted (measured) while `JSON.stringify` of a bare `BigInt` throws `TypeError` (measured) | prose ↔ prose; both sides name the exact and the lossy readers |
 | P7 | `Outcome<T>`, never `throw` for control flow (§ 5, stays) | § 0: a discriminated union result (`Result<T, E>`), `throw` only for the unexpected, one outcome shape per repository; `coding-style.md:32` points at BOTH doctrines | prose ↔ prose |
 | P8 | `dotnet-build.md`: the worker pool, hook + check | **No Node counterpart.** The rule exists for a measured resource problem (72 MSBuild workers, 10 775 MB) that Node builds do not have; a hook is added for a measurement, not for symmetry (§ 4.6). Node's enforced rule is P2's check instead | deliberately absent; stated in `research/module_rules.md` |
@@ -180,7 +206,7 @@ headings, are the content of `research/parity-matrix.json` (E1).
 | P17 | `platform-limits.md:43` `Encoding.UTF8.GetByteCount` (stays, D6) | "…(`Buffer.byteLength(path, "utf8")` in Node — measured: a 7-character string with one two-byte character is 8 bytes)" in the same sentence | one clause |
 | P18 | `http-contracts.md:31-35` ASP.NET and axum rows (stay, D6); `http-coverage.mjs:45-49` | two rows: a Fastify/Express style `app.<verb>(path)` grouped by the plugin or router registered under a prefix; a Node application **prints its route table** (Fastify `printRoutes()`/`routes`, Express's router stack) into the JSON shape `--routes` already takes (`http-coverage.mjs:11, :27`) — D10; `:166` is extended to say so. **Superseded:** the first revision's `NODE_ROUTE` source regex (kept at § 4.8 for the record) | rows ↔ rows; the scanner's preferred path ↔ the same path |
 | P19 | `post-deploy-checks.md:49` "(NuGet, ghcr, crates.io)" | "(NuGet, npm, ghcr, crates.io)" | one word |
-| P20 | selection: `**/*.cs`, `**/*.razor`, `**/*.csproj` select the C# doctrine; `.csproj`, `Directory.*.props`, `NuGet.Config` select the package rule; nothing is task-gated | `**/*.ts,tsx,mts,cts` **and** `**/*.js,mjs,cjs` select the TypeScript doctrine; `**/tsconfig*.json` selects `compiler-strictness`; `**/package.json` selects `npm-packages`; the mechanics rules of both languages are path-selected and task-gated alike (§ 4.2) | selector ↔ selector |
+| P20 | selection: `**/*.cs`, `**/*.razor`, `**/*.csproj` select the C# doctrine; `.csproj`, `Directory.*.props`, `NuGet.Config` select the package rule; nothing is task-gated | `**/*.ts,tsx,mts,cts`, `**/*.js,mjs,cjs` **and `**/package.json`** select the TypeScript doctrine (the manifest ↔ `.csproj`); `**/tsconfig*.json` selects `compiler-strictness`; **`**/package.json` and `**/.npmrc`** select `npm-packages` (↔ `.csproj`/`Directory.*.props`/`NuGet.Config`); the mechanics rules of both languages are path-selected and task-gated alike (§ 4.2). **Symmetric through the correspondence table** (§ 18, finding 3): `dependencies --file package.json` and `dependencies --file src/x.csproj` each select the same rule KINDS — the shared dependency rule, the ecosystem's package rule, the stack's doctrine | selector ↔ selector, checked by the normalised-selection test (§ 4.1) |
 
 ### 3.2 TypeScript requirements → C# counterparts
 
@@ -188,7 +214,7 @@ headings, are the content of `research/parity-matrix.json` (E1).
 |---|---|---|---|
 | R1 | § 1 `JSON.stringify` into `<script>` is a break-out; one shared escaper; a scan test (`typescript/doctrine.md:15-48`, 2,042 B) → `typescript/boundaries.md` verbatim (anonymised wording, § 4.4) | `csharp/boundaries.md`: `MarkupString` and `Html.Raw` are the same door — a value they wrap reaches the page unescaped; JSON for a `<script>` goes through ONE helper that also closes `</script>` and `<!--`; the general rule stays `security.md` § *A measure applied at SOME of its sites* | MANDATORY ↔ MANDATORY; gated on implement, test, audit, ui, http |
 | R2 | § 3 an `as` cast in a fixture (`:66-79`, 932 B) → `typescript/testing.md` verbatim | `csharp/testing.md`: `null!` and `default!` in a fixture are the same promise — a typed factory with real defaults instead; adding a required member is the moment to grep for them | prose ↔ prose; typed-fixture discipline side by side |
-| R3 | a Definition of Done (`:98-105`; each box moves with its section, the § 2 box stays) | a Definition of Done in `csharp/doctrine.md` (typed values, no `throw` for control flow, complexity, immutable contracts, `Nullable enable` and `TreatWarningsAsErrors` set) — and in every new rule of both sides | box ↔ box |
+| R3 | a Definition of Done (`:98-105`; each of the four boxes moves with its section — the § 2 box to `typescript/testing.md` with § 2, § 17 O10) | a Definition of Done for the C# doctrine in the gated `csharp/definition-of-done.md` (typed values, no `throw` for control flow, complexity, immutable contracts, `Nullable enable` and `TreatWarningsAsErrors` set), mirrored by `typescript/definition-of-done.md` for § 0 — and a box in every new rule of both sides | box ↔ box, same gate |
 | R4 | § 4 `tsc` emits despite errors (`:80-97`, 1,151 B) → `typescript/testing.md` verbatim, with `compiler-strictness.md` carrying the flag | no C# counterpart needed: the C# compiler emits nothing on an error. Stated once in the TypeScript rule as a difference, not a gap | deliberately absent |
 | R5 | § 2 backticks in template literals (`:49-65`, 755 B, stays in the doctrine) | C# raw string literals have no comparable trap (`"""` cannot be ended by a shorter run) — stated in § 2's placement note | deliberately absent |
 
@@ -197,7 +223,7 @@ headings, are the content of `research/parity-matrix.json` (E1).
 | Gap | Decision | Why |
 |---|---|---|
 | Analyzer / lint requirement | **Raise both, asymmetrically named**: TS lint at zero warnings (P2, P4); C# `TreatWarningsAsErrors` + `Nullable enable` in `csharp/doctrine.md` § 1 | The compiler is the C# analyzer the family already pays for; an extra analyzer package is a dependency decision for the consumers, not a shared rule (Q7) |
-| Lock file + locked restore | **Raise TS (lock + `npm ci`), record .NET**: central exact pins of direct packages exist today; `packages.lock.json` with `--locked-mode` is not required | Imposing lock files on six .NET consumers is a consumer change this plan does not own; the asymmetry (npm's lock also fixes transitives) is stated in `common/dependencies.md` and is Q1 for the owner |
+| Lock file + locked restore (**G2**) | **Raise BOTH — option A: G2 is `equal`.** TypeScript: `package-lock.json` committed, `npm ci` the only install in CI. .NET: every project restores with `RestorePackagesWithLockFile=true` (in `Directory.Build.props`), `packages.lock.json` committed, and CI restores in locked mode (`RestoreLockedMode=true` under `CI`, or `dotnet restore --locked-mode`). Decided in the epoch 3 re-review (consult `e1c58f6d`, the owner away; **for the owner to confirm 2026-11-01**). The whitelist stays `['P4']` | **Observed, SDK 10.0.114, 2026-10-31** (the scratch project of P6's probe): `dotnet restore -m:4` with `RestorePackagesWithLockFile` wrote `packages.lock.json`; the declaration changed from `10.0.0` to `9.0.0` without regenerating → `dotnet restore --locked-mode -m:4` **failed, `NU1004`** ("the package reference … version has changed … the packages lock file is inconsistent … pass `--force-evaluate`"), exit 1; `--force-evaluate` regenerated it and locked mode passed, exit 0 — the mirror of `npm ci`'s `EUSAGE` (§ 4.3). **Why the first decision was reversed:** "NuGet resolves to the lowest applicable version, so exact pins already make the graph deterministic" is refuted — the resolution changes when a missing version is published later or a package is unlisted, which is why Microsoft documents lock files for repeatable restores (devblogs, *Enable repeatable package restores using a lock file*); and admitting G2 as an exception against epoch 2's explicit "only P4" would have been a narrowing needing the owner. **Adoption cost, honestly:** one `packages.lock.json` per project in the six .NET-bearing consumers (generated once, committed, regenerated with `--force-evaluate` on every bump), one property pair in each `Directory.Build.props`, one CI flag — E2 writes the rule, E7's dry run generates the locks and the bumps commit them. **Superseded, kept as history:** ledger 2.1's whitelisting of G2 as `stronger-ts` (its text stays in the ledger) and the first revision's "record .NET … Q1 for the owner" |
 | Vulnerability scan | **Raise both** in `common/dependencies.md`: the monthly bump runs the ecosystem's scanner (`npm audit`; `dotnet list package --vulnerable --include-transitive`; `cargo audit` where installed) and records the result beside the pins | Cheap, equal, and both commands exist today (npm measured) |
 | Coverage thresholds | **Deliberately absent on both** | `testing.md` governs what a test may claim; a number is gamed the week it lands. Recorded, like every deliberately-absent reason, in `research/parity-inventory.json` (`status: "deliberately-absent"`, `reason`) — the one home; `research/module_rules.md` points there (§ 16, stories-writer point 9: the first revision's "in `research/module_rules.md`" is superseded) |
 | CI steps per language | **Deliberately absent as shared rules** | `testing.md:16-18`: each repository's own instructions and CI name the exact commands. Shared text would be an inventory |
@@ -207,7 +233,7 @@ headings, are the content of `research/parity-matrix.json` (E1).
 
 | | C# | TypeScript | Equal? |
 |---|---|---|---|
-| Where a suppression may live | inline `#pragma warning disable <id>` with the reason on the same line; never `<NoWarn>`/`<WarningsNotAsErrors>` in a props file, never `GlobalSuppressions.cs` | inline `// eslint-disable-next-line <rule> -- <reason>`; never a file-wide disable, never `ignores` of production folders; `reportUnusedDisableDirectives: "error"` so a stale suppression fails | equal once written: today C# has no rule and TS has two divergent configs |
+| Where a suppression may live | inline `#pragma warning disable <id>` with the reason on the same line; never `<NoWarn>`/`<WarningsNotAsErrors>` in a props file, never `GlobalSuppressions.cs`. **Checked by `strictness-check`** (§ 18, finding 4): a `#pragma warning disable` with no warning id, or without a same-line `// <reason>`, is a finding | inline `// eslint-disable-next-line <rule> -- <reason>`; never a file-wide disable, never `ignores` of production folders; `reportUnusedDisableDirectives: "error"` so a stale suppression fails. **Checked by `strictness-check`** (§ 18, finding 4): a file-wide `/* eslint-disable */` with no rule id, or any `eslint-disable` line without a same-line `-- <reason>`, is a finding | equal **by the check, not by prose**: fixtures for both violations and a valid form on each side (§ 4.6); today C# has no rule and TS has two divergent configs |
 | A baseline of accepted violations | none (none found in three consumers) | none (none found; one consumer ignores a typed-fixtures folder that is MEANT not to compile — a legitimate exclusion the rule names as such) | equal |
 | Who may widen it | a rule change here, never a repository | the same | equal |
 | Where it is checked | the build (`TreatWarningsAsErrors`), and `tools/strictness-check.mjs`'s .NET half reads the effective `TreatWarningsAsErrors`/`Nullable` per project AND the effective `NoWarn`/`WarningsNotAsErrors` — a repository-added entry in either is a finding (§ 4.6; SDK defaults such as `1701;1702` are told apart by a clean-project baseline for the pinned SDK and by the repository's own props/csproj declarations) | `tools/strictness-check.mjs`'s TypeScript half reads the effective lint and compiler configuration, `reportUnusedDisableDirectives` included | equal class (file + check) |
@@ -239,16 +265,30 @@ E1 adds one test per representative scope asserting the exact id list, in the st
 
 **The parity matrix as a file**: `research/parity-matrix.json` — one row per P/R entry: `topic`, `csharp: { id, section }`,
 `typescript: { id, section }`, `strength`, `suppression`, `status` (`equal`, `stronger-ts`, `stronger-cs`,
-`deliberately-absent`) and `reason` (required and non-empty for `stronger-ts`, `stronger-cs` and
-`deliberately-absent`; refused on an `equal` row — ledger 1.1), and the exception whitelist of § 2 (`stronger-*` only
-for the ids the test lists, today `['P4']`; any other such row fails — § 16). **Equality is checkable, not asserted**
+`deliberately-absent`) and `reason` (required and non-empty for `stronger-ts` and `stronger-cs`; refused on an
+`equal` row — ledger 1.1; **a `deliberately-absent` row carries NO matrix reason — its reason lives in the inventory,
+§ 3.3 and § 11, the one home** — § 17, O2), and the exception whitelist of § 2 (`stronger-*` only for the ids the test
+lists, today `['P4']` — G2 is `equal` since the epoch 3 re-review; any other such row fails — § 16, § 17). **Equality is checkable, not asserted**
 (§ 16): every `equal` row records, PER SIDE, `selectors` (`paths`, `path_tasks`, `tasks`), `mood` (`MUST`/`SHOULD`),
-`enforcement` (`prose`, `test`, `check`, `hook`), `consequence` (what fails) and `suppression` (the policy of § 3.4); one
-test compares the two sides' fields and fails on any mismatch, and a second test checks the recorded fields against the
-world — the selectors against the rule's actual front matter, the mood against the section's heading (`MANDATORY`),
-and the enforcement against the actual tool (a side recorded as `check: strictness-check` must be named in that tool's
-exported rule list; a side recorded as `hook` must be matched by a hook under `settings/hooks/`). A test asserts every `id` exists in the catalog and every `section` is in that rule's recorded
-`sections` in `research/rule-bodies.json`; a row with `deliberately-absent` names the side and the reason. A rule renamed
+`enforcement` (`prose`, `test`, `check`, `hook`), `consequence` (what fails) and `suppression` (the policy of § 3.4).
+**The sides are compared by NORMALISED selection behaviour, never by literal selector fields** (§ 17, consult
+`e1c58f6d`): `.cs` and `.ts` globs necessarily differ, so the test maps each side's selectors through the correspondence
+table — C# source globs (`**/*.cs`, `**/*.razor`) ↔ TypeScript source globs (`**/*.ts,tsx,mts,cts,js,mjs,cjs`);
+`**/*.csproj` ↔ `**/package.json` (the project manifests); the C# project configuration (`Directory.Build.props`,
+`Directory.Packages.props`, `NuGet.Config`) ↔ the TypeScript compiler configuration (`tsconfig*.json`, `.npmrc`), a
+kind of its own whose requirements are stated per counterpart — and then asks the catalog which REPRESENTATIVE scopes
+(§ 4.1's matrix: source file, manifest, configuration, each under the nine tasks) select each side; two sides are equal
+in (a) when the selected-scope sets correspond row for row under the table and the gates agree. One test compares that
+normalised behaviour plus the `mood`, `enforcement`, `consequence` and `suppression` fields and fails on any mismatch,
+and a second test checks the recorded fields against the
+world — the selectors against the rule's actual front matter, the mood against the **nearest ancestor heading that
+carries a marker** — the section's own heading, else its parent's, up to the H1, so `MANDATORY` is inherited (§ 17,
+O6: `common/reliability.md`'s H1 carries it and its `### A timeout is not a cancellation` section, P13's C# side, does
+not; the test reads it that way) — and the enforcement against the actual tool (a side recorded as `check:
+strictness-check` must be named in that tool's exported rule list; a side recorded as `hook` must be matched by a hook
+under `settings/hooks/`). A test asserts every `id` exists in the catalog and every `section` is in that rule's recorded
+`sections` in `research/rule-bodies.json`; a row with `deliberately-absent` names the side, and its reason is the
+inventory's. A rule renamed
 or a section retitled without the matrix is a red suite — the drift protection the consultants asked for.
 
 **The inventory as a file, so the matrix is complete and not only consistent** (plan round 1, finding 4):
@@ -263,7 +303,10 @@ the machine-readable form of § 3; the prose table is the human one, and the tes
 destination is not yet written has `status: "planned"` and names its owning epic (`epic: "E4"`); a move entry in
 `research/moved-blocks.json` whose destination does not yet exist is `planned` too. **E1 validates `planned` items
 STRUCTURALLY only**: the schema, an existing source file and line range, an owning epic among E2–E6, and — for a move —
-the SOURCE bytes' `sha256` and `length`, recorded now from the commit the move will be made from. E1 does NOT check a
+the SOURCE bytes' `sha256` and `length`, **recorded at E1's own recording commit** — which is "the commit right before
+the move" in every way that matters, because the `planned` check also requires those bytes to be still present,
+unchanged, at the source range until the move happens, so any edit of the source in between is a red test, not a
+silently different "before" (§ 17, O11). E1 does NOT check a
 destination's bytes or a destination's `id`/`section`: there is nothing to check yet. **Each owning epic activates its
 items when it lands them**: the status becomes `counterpart` (or `deliberately-absent`/`stronger-*` with a reason), the
 reference test then requires the `id` and `section` to exist, and the move test then compares the destination's live
@@ -342,18 +385,44 @@ typescript.doctrine` — and it lands BEFORE E1.S4 records `research/moved-block
 the anonymised text; E4.S2's move is then one commit, byte for byte equal to that recorded hash. A move and a wording
 change in one commit would leave nothing for the test to compare against.
 
-| From (lines at `f46982f`, bytes by `Buffer.byteLength`) | To | Gate (= the source's `tasks`) |
+**A move is a list of EXACT line ranges** (§ 17, O5 — ledger 2.4): every range below is whole lines, measured with
+`Buffer.byteLength` on this worktree, and each range is its own entry in `research/moved-blocks.json`; where a range
+would split a code fence, the whole fenced block stays on one side. The count of moves anywhere in this plan is the
+manifest's count, never a hand-typed number. A dated audit sentence that shares a paragraph with a neutral invariant
+(for example `reliability.md:38-46`'s .NET launcher sentence, and the .NET names inside `utc-timestamps.md`'s rules 1
+and 2) is **evidence inside the invariant and stays** (the D6 kind), with the Node form added beside it; only whole
+bullets, subsections and fenced blocks move.
+
+**A mixed-content line is split by whitespace only, before anything is recorded** (§ 17, consult `e1c58f6d` turn 2):
+where one line or paragraph holds a sentence that moves and a sentence that stays, E1.S0b inserts a line break or a
+blank line between them in the SOURCE — nothing else — in its own commit next to the anonymisation, before E1.S4
+records any hash. The check that it is no shortening (D1): the file with all whitespace removed is byte-identical
+before and after. Two such splits today: `common/testing.md:33` ("Everything below applies everywhere." goes on its
+own line) and `csharp/nuget-packages.md:41-43` (the .NET-only sentence "Monthly, to the latest **stable** — never a
+preview; the family is strictly .NET 10." becomes its own paragraph). The ranges are then whole lines, recorded at
+E1.S4's commit in the post-split numbering, and the original words stay in place on whichever side they belong.
+
+**Gates follow the REQUIREMENT'S PROVENANCE, not the file's age** (§ 17, O3 revised by consult `e1c58f6d`): a gate
+MIRRORS when the requirement's text comes from an existing rule — its `path_tasks` equals that source's `tasks:` line,
+and a source with no `tasks:` (a path-only rule such as `typescript/doctrine.md`) mirrors as "no gate". A gate is
+DECLARED only when the requirement is new, or when its applicability is changed on purpose; the declaration in
+`research/selection-matrix.json` (`gates: { "<id>": { path_tasks, reason } }`) carries the reason, and a change of
+applicability is approved explicitly in this plan (§ 4.4 names the four). Independently of any declaration, the same
+file pins POSITIVE and NEGATIVE selection cases per gated rule (scope → selected / not selected), so that editing both
+the declaration and the front matter cannot make a wrong gate pass.
+
+| From (lines at `f46982f`, bytes by `Buffer.byteLength`) | To | Gate (mirrors the source's `tasks:`; a declared gate says so and names its reason in `selection-matrix.json`) |
 |---|---|---|
 | `common/testing.md:12-31` (1,113 B — re-measured after PR #94 comment 5; the first revision listed `:12-34`, 1,267 B, which included the Rust sentence), `:354-358` (252 B) | `csharp/testing.md` (paths `**/*.cs`, `**/*.csproj`) | implement, test, audit, policy, release |
-| `common/testing.md:32-33` up to ".NET-specific." — the Rust sentence, 115 B; the 37 B that follow, "Everything below applies everywhere.", are the invariant and stay | `rust/testing.md` (paths `**/*.rs`, `**/Cargo.toml`) | the same |
-| `common/reliability.md:104-133` (1,698 B); the sentences of `:47-70` and `:95-103` naming `BackgroundService`, `CreateAsyncScope`, `TaskScheduler.UnobservedTaskException`, `CancellationToken`, `PosixSignalRegistration`/`Console.CancelKeyPress` (≈ 1,100 B of 2,394 B); `:38-46`'s .NET launcher sentence | `csharp/lifecycle.md` (paths `**/*.cs`) | implement, audit, test, deploy, benchmark |
+| `common/testing.md:32-33` AFTER E1.S0b's whitespace split — the two whole lines of the Rust sentence (116 B with their line ends; 153 B today for the unsplit `:32-33`); "Everything below applies everywhere." stays on its own new line `:34` as the invariant — **superseded:** "up to '.NET-specific.' (115 B)", a mid-line range the whole-line recorder refuses | `rust/testing.md` (paths `**/*.rs`, `**/Cargo.toml`) | the same |
+| `common/reliability.md:104-133` (1,698 B, the OCE/TCE subsection); the whole bullets `:49-54` (433 B, `CreateAsyncScope`/`BackgroundServiceExceptionBehavior`), `:55-59` (436 B, `Task.Run`/`TaskScheduler.UnobservedTaskException`), `:66-69` (375 B, `ExecuteAsync`), `:97-98` (160 B, `CancellationToken`), `:99-102` (322 B, `PosixSignalRegistration`/`Console.CancelKeyPress`) — **superseded (2.4):** "the sentences of `:47-70` and `:95-103` … (≈ 1,100 B)" and "`:38-46`'s .NET launcher sentence", which were not ranges; `:38-46`, `:60-62` and `:63-65` stay whole (neutral invariants with dated evidence) and the common section keeps its heading, the remaining bullets, one neutral sentence per moved bullet and the pointer | `csharp/lifecycle.md` (paths `**/*.cs`) | implement, audit, test, deploy, benchmark |
 | `common/logging-serilog.md:61-90` (1,640 B), `:153-171` (497 B) | `csharp/logging.md` (paths `**/*.cs`, `**/Program.cs`) | logging, implement, audit |
 | `common/logging-serilog.md:172-187` (875 B) | `rust/logging.md` (paths `**/*.rs`, `**/main.rs`) | the same |
-| `common/utc-timestamps.md:25-48`'s .NET sentences and the C# block (≈ 900 B); its Never/DoD lines naming `DateTime.Now` | `csharp/utc-timestamps.md` (paths `**/*.cs`) | storage, implement, audit |
+| `common/utc-timestamps.md:41-47` (311 B — the whole C# fenced block of rule 3, opened at `:41` and closed at `:47`) — **superseded (2.4):** "`:25-48`'s .NET sentences and the C# block (≈ 900 B); its Never/DoD lines", not a range; rules 1 and 2 (`:30-36`) and the Never/DoD lines stay whole, their .NET names being evidence inside neutral sentences (the D6 kind), with the Node forms added beside them | `csharp/utc-timestamps.md` (paths `**/*.cs`) | storage, implement, audit |
 | `common/utc-timestamps.md:65-69` (219 B) | `rust/utc-timestamps.md` | the same |
 | `typescript/doctrine.md:15-48` (2,042 B) + its DoD box | `typescript/boundaries.md` (paths `**/*.ts,tsx,mts,cts,js,mjs,cjs`) | implement, test, audit, ui, http |
 | `typescript/doctrine.md:49-65` (755 B, § 2 — its guard is a test, § 16 point 6), `:66-79` (932 B), `:80-97` (1,151 B) + their DoD boxes | `typescript/testing.md` (paths as above) | implement, test, audit, policy, release |
-| `csharp/nuget-packages.md:12-23` (824 B), `:25-37` (760 B), `:39-47` (436 B minus the two `dotnet`/`Invoke-RestMethod` lines, which stay), `:50-54` (287 B) | `common/dependencies.md` (tasks `dependencies`) | — |
+| `csharp/nuget-packages.md:12-23` (824 B, *Before adding any package*); `:25-29` (334 B, the *Licence before version* heading and its "in any ecosystem" paragraph) — **`:31-37` (425 B, the two family-wide NuGet decisions: FluentAssertions 7.2.2, the Aspire pair) STAYS in the NuGet rule**, they are NuGet facts (§ 17, consult `e1c58f6d`; the earlier "`:25-37` (760 B)" is superseded); after E1.S0b's split of `:41-43`, the `## Bumping` heading `:39` and the neutral cadence paragraph ("Bump the whole set together … not a silent downgrade.") move, while the .NET-only sentence ("Monthly … strictly .NET 10.") stays in the NuGet rule under a new heading `## Bumping — the NuGet cadence and commands` together with the `powershell` fence `:45-48` (153 B), so both files keep their fences balanced and every word stays where it belongs (bytes recorded at E1.S4 in the post-split numbering; today `:39-43` is 286 B); `:50-54` (286 B — O9: 287 B counted the blank `:55`, *Prefer nothing*) — the count of entries is the manifest's | `common/dependencies.md` (tasks `dependencies`) | — |
 
 Each source keeps its neutral invariant (already present as the section's opening sentences in every case above) and
 gains one pointer line ("the .NET mechanics: `csharp/lifecycle.md`; Node: `typescript/lifecycle.md`"). Nothing is
@@ -412,11 +481,13 @@ of P15; a Fastify and an Express application printing its route table into the `
 ### 4.4 D4 applied: the TypeScript doctrine becomes the design mirror; the traps move to their topics
 
 After the moves of § 4.3, `typescript/doctrine.md` holds: its front matter and introduction (562 B, unchanged), a new
-`## 0. Language, runtime and design` of about 3,200 B — P1 (D7), P2's one line, P5–P7 by meaning, each a short
-paragraph that names the C# section it mirrors, and which sections apply to plain JavaScript — the existing § 2
-(755 B, unchanged, with its DoD box), three pointer lines to the gated rules that now hold § 1, § 3 and § 4, and a
-Definition of Done for the design section. Estimated size ≈ 4,900 B against 5,910 today — smaller, with nothing
-deleted: 4,125 B of trap text left for the gated rules word for word.
+`## 0. Language, runtime and design` of at most 3,800 B — P1 (D7), P2's one line, P5–P7 by meaning, each a short
+paragraph that names the C# section it mirrors, and which sections apply to plain JavaScript — and four pointer lines
+to the gated rules that now hold § 1, § 2, § 3 and § 4 (the design section's checklist is the gated
+`typescript/definition-of-done.md`, § 16). Size ≤ 4,700 B against 5,910 today — smaller, with nothing deleted: all
+4,880 B of trap text (§ 1 2,042 + § 2 755 + § 3 932 + § 4 1,151) and the four DoD boxes leave for the gated rules word
+for word. **Superseded (§ 17, O10):** the first revision's "the existing § 2 (755 B, unchanged, with its DoD box) …
+three pointer lines … ≈ 4,900 B" — § 2 moves too (§ 4.3, § 5, § 16 point 6), and this paragraph had not caught up.
 
 **Wording changes, not content** (D1), **in the source, as E1.S0's own commit, before E1.S4 records anything** (plan
 round 1; placed in E1 by § 16): in `typescript/doctrine.md` § 1 as it stands, `webauthnPrf.ts` / `entityFormScript.ts`
@@ -431,8 +502,17 @@ for the C# doctrine lives in `csharp/definition-of-done.md` (id `csharp.definiti
 `**/*.cs`, `**/*.razor`, `**/*.csproj`, `path_tasks: ["implement","test","audit","release","policy"]`) — the tasks at
 whose completion a checklist is read, never `gpu`, `ui`, `storage` or `inspect`. Its TypeScript mirror is
 `typescript/definition-of-done.md` with the same gate, holding the design section's checklist (§ 0), so the two boxes
-have the same scope kind (equal strength (a)); the doctrine's existing § 2 box stays in the doctrine, as its section
-does. `csharp/doctrine.md` therefore grows by the `Nullable enable` line only (≈ 20 B).
+have the same scope kind (equal strength (a)); the doctrine's § 2 box moves with § 2 to `typescript/testing.md` (O10).
+`csharp/doctrine.md` therefore grows by the `Nullable enable` line only (≈ 20 B). **The four gated files whose gates
+are DECLARED rather than mirrored, by provenance** (§ 4.3; § 17, O3 as revised by consult `e1c58f6d` — ledger 2.2):
+the Definition-of-Done pair holds NEW requirements (no source rule) and declares `implement, test, audit, release,
+policy` ("a checklist is read at task completion"); `typescript/boundaries.md` inherits existing doctrine text whose
+source has no `tasks:` (it loads on every `.ts` today), so its mirror would be "no gate" — **this plan changes its
+applicability on purpose** to `implement, test, audit, ui, http` ("output reaches a page or a wire on these tasks; `ui`
+because the webview trap is a `ui` trap"), approved here as the explicit exception the provenance rule requires, with
+the reason recorded in the declaration; `csharp/boundaries.md` holds a new requirement (R1's C# side) and declares the
+same gate. Every other gated file mirrors its source's `tasks:` line. All four, and every mirrored file, carry positive
+and negative selection cases in `research/selection-matrix.json`.
 
 **Placeholder files created by a move carry valid front matter from their first commit** (plan round 1, finding 2):
 `typescript/boundaries.md` and `typescript/testing.md` are created by E4.S2 with `id`, `load`, `paths`,
@@ -441,8 +521,28 @@ does. `csharp/doctrine.md` therefore grows by the `Nullable enable` line only (�
 story, and no byte is ever in flight between two commits. The same holds for every file a later move creates
 (`csharp/*.md`, `rust/*.md`).
 
-Selectors: `paths: ["**/*.ts","**/*.tsx","**/*.mts","**/*.cts","**/*.js","**/*.mjs","**/*.cjs"]`, no gate — like
-`csharp/doctrine.md`. This repository's own `tools/*.mjs` then load the doctrine on an `inspect` (§ 5: 29,087 B, fits).
+Selectors: `paths: ["**/*.ts","**/*.tsx","**/*.mts","**/*.cts","**/*.js","**/*.mjs","**/*.cjs","**/package.json"]`,
+no gate — like `csharp/doctrine.md`, whose `**/*.csproj` is the project manifest; `**/package.json` is Node's (§ 2 (a)
+as defined by § 17, O4 — ledger 2.3), and it costs nothing a budget sees: every `package.json` scope is already a split
+read (§ 5). `tsconfig*.json` is NOT added — it is the compiler configuration, a kind of its own, and adding ≈ 4,700 B to
+every `tsconfig.json` scope would break three of the pins of § 5 (`ui`, `gpu`, `storage` with `tsconfig.json`). This
+repository's own `tools/*.mjs` then load the doctrine on an `inspect` (§ 5: ≈ 29,060 B, fits). **Symmetric manifest
+selectors** (§ 18, finding 3): the doctrines select the stack's project manifest on both sides (`.csproj` ↔
+`package.json`), the package rules select the stack's package configuration on both sides (`.csproj`, `Directory.*.props`,
+`NuGet.Config` ↔ `package.json`, `.npmrc`), so a `dependencies` scope on either manifest evaluates the same rule kinds
+— the shared dependency rule, the ecosystem's package rule and the stack's doctrine — and § 4.1's normalised-selection
+test asserts exactly that correspondence.
+
+**The typed doctrine and plain JavaScript** (§ 18, finding 5, chosen by enforceability): § 0 says which of its
+requirements are TYPED (branded domain types, typed results, `readonly` contracts) and that for `.js/.mjs/.cjs` they
+hold **inside a TypeScript project**, where `allowJs` + `checkJs` under `strict` with JSDoc types makes the compiler
+enforce them — the check's TypeScript half requires `checkJs` when a project's `include` reaches a `.js/.mjs/.cjs` file
+(§ 4.6). In a repository with NO TypeScript project nothing checks a type, so the typed parts are `deliberately-absent`
+there (the inventory holds the reason) and § 0's JavaScript paragraph states the enforceable subset: `Object.freeze` at
+the boundary for `readonly`, Result objects for outcomes, validation at the boundary, complexity ≤ 4 and `no-console`
+by lint — all enforced by the lint half. Option (b), a separate short JavaScript rule, was not taken: it would be a
+second body for the same ideas (the drift [knowledge-base.md](../common/knowledge-base.md) warns of) and a new selector
+competing for the same single-read scopes; the JavaScript paragraph is part of § 0's ≤ 3,800 B.
 
 **`csharp/doctrine.md`** gains `Nullable enable` in § 1 (≈ 20 B). Its Definition of Done (≈ 350 B, R3) is the gated
 `csharp/definition-of-done.md` above — **superseded (§ 16):** the sentence "and a Definition of Done (≈ 350 B, R3)" in
@@ -458,38 +558,53 @@ came from trimming, and trimming is forbidden; the anonymisation survives as a c
 ### 4.5 The dependency rules (D14) — unchanged in substance from the first revision
 
 **`common/dependencies.md`** — id `common.dependencies`, `tasks: ["dependencies"]`, no `paths`, no `depends`. Holds,
-moved verbatim from `csharp/nuget-packages.md` (§ 4.3's last row): *Before adding any package* (the table; "nuget.org"
-stays in the moved sentence and the rule adds "or the ecosystem's registry" beside it rather than editing it), *Licence
-before version*, *Bumping* (the `dotnet`/`Invoke-RestMethod` lines stay in the NuGet rule), *Prefer nothing*; plus the
-vulnerability scan (§ 3.3) and the lock/pin asymmetry sentence. Target ≤ 4,000 B; `dependencies` is a split-read task.
+moved verbatim from `csharp/nuget-packages.md` (§ 4.3's last row, as settled by the epoch 3 re-review): *Before adding
+any package* (the table; "nuget.org" stays in the moved sentence and the rule adds "or the ecosystem's registry" beside
+it rather than editing it), the *Licence before version* heading and its "in any ecosystem" paragraph (`:25-29`), the
+*Bumping* heading and its neutral cadence paragraph (after E1.S0b's split), *Prefer nothing*; plus the vulnerability scan
+(§ 3.3) and **the lock-file requirement for both ecosystems (G2, § 3.3): a committed lock and a locked restore in CI,
+with each ecosystem's mechanism named in its own rule**. **Superseded (consult `e1c58f6d`):** the first revision's
+"the lock/pin asymmetry sentence" — there is no asymmetry to state once G2 is `equal`. Target ≤ 4,000 B; `dependencies`
+is a split-read task.
 
-**`csharp/nuget-packages.md`** loses `tasks: ["dependencies"]` and the moved blocks, keeps central pins, the two
+**`csharp/nuget-packages.md`** loses `tasks: ["dependencies"]` and the moved blocks, **gains the .NET lock-file
+mechanics (G2 option A): `RestorePackagesWithLockFile=true` in `Directory.Build.props`, `packages.lock.json` committed
+per project, `RestoreLockedMode=true` when `CI` is set (or `dotnet restore --locked-mode`), `--force-evaluate` as the
+only way to move a lock — with the observed `NU1004` fixture of § 3.3**, keeps central pins, the two
 family-wide decisions (FluentAssertions 7.2.2, the Aspire pair — the coupled-version exceptions D14 names), the two
 `dotnet` commands and the zero-reference box, and gains the pointer. Expected ≈ 1,000 B (from 3,081).
 
-**`typescript/npm-packages.md`** — id `typescript.npm-packages`, `paths: ["**/package.json"]`, no gate (the
-`package.json` scopes are already split reads, § 5). P9's three layers named as D14 asks: the declared range
-(`save-exact=true` in `.npmrc`), the lock's resolution (`package-lock.json`, committed), the reproducible install
-(`npm ci --ignore-scripts`, the only install in CI; what it refuses and what it accepts, measured). `package-lock.json`
-and `.npmrc` are not selectors: they are what following the rule produces, and each would open a new single-read scope.
+**`typescript/npm-packages.md`** — id `typescript.npm-packages`, `paths: ["**/package.json","**/.npmrc"]`, no gate
+(the `package.json` scopes are already split reads; the `.npmrc` scopes are pinned and fit with the rule's ≤ 3,500 B —
+§ 5). P9's three layers named as D14 asks: the declared range (`save-exact=true` in `.npmrc`), the lock's resolution
+(`package-lock.json`, committed), the reproducible install (`npm ci --ignore-scripts`, the only install in CI; what it
+refuses and what it accepts, measured). **Superseded (§ 18, finding 3):** "`package-lock.json` and `.npmrc` are not
+selectors: they are what following the rule produces" — `.npmrc` IS a selector, the counterpart of `Directory.*.props`
+and `NuGet.Config` through the correspondence table; `package-lock.json` stays unselected, as `packages.lock.json` is
+on the other side.
 
 ### 4.6 Enforcement parity (D8)
 
 | .NET | Node | Class |
 |---|---|---|
 | **Resource limits:** `tools/build-flags-check.mjs` — `Directory.Build.rsp` exists and says `-nr:false`; no `-noautorsp`; a repository with no C# passes without opinion (the measured worker-pool problem, `csharp/dotnet-build.md`) | none — P8: no measured Node counterpart | deliberately absent |
-| **Compiler properties and suppressions — the .NET half of `tools/strictness-check.mjs`** (new; named `node-strictness-check.mjs` until ledger 1.1 gave it this half; it COMPLEMENTS `build-flags-check` and its hook, which enforce resource limits, and replaces neither — E3 owns it on both stacks): for every `*.csproj` outside the skip set, `dotnet msbuild <project> -getProperty:TreatWarningsAsErrors -getProperty:Nullable -getProperty:NoWarn -getProperty:WarningsNotAsErrors -m:4` must answer `true` and `enable` (the EFFECTIVE values, `Directory.Build.props` inheritance included — probed § 14), and the effective `NoWarn` and `WarningsNotAsErrors` may hold nothing the REPOSITORY added: SDK defaults are told apart two ways, both required — the effective value is compared with a clean-project baseline captured for the pinned SDK (`tools/fixtures/strictness/sdk-baseline.json`, keyed by `global.json`'s SDK; probed on 10.0.114: a clean project answers `NoWarn` `1701;1702`, `WarningsNotAsErrors` empty — § 15), and the repository's own props and csproj files are read for a `<NoWarn>` or `<WarningsNotAsErrors>` element, which is a finding wherever it sits; INCOMPLETE when projects exist and no `dotnet` SDK resolves, or the pinned SDK has no baseline; a repository with no project passes without opinion | **The TypeScript half, under ONE predicate** (ledger 1.3): `isTypeScriptRepository(dir)` = any `tsconfig*.json` outside `node_modules`, OR any `package.json` whose `dependencies`/`devDependencies` name `typescript`; the same predicate decides which files are walked and whether a missing `tsc` is INCOMPLETE. For every `tsconfig*.json` the predicate found, the compiler's own merged view (`tsc --showConfig -p <file>`, so `extends`, nested packages, excludes and overrides resolve as `tsc` resolves them) has `strict: true`, where **`tsc` is found through package resolution, never a fixed path** (plan round 1, finding 3): `createRequire(<the tsconfig's package dir>/package.json).resolve("typescript/bin/tsc")`, falling back to a walk up the parents' `node_modules/.bin` — the resolution that covers a hoisted workspace install, pnpm and yarn shims; **INCOMPLETE is reported only when no TypeScript resolves at all**, and `noEmitOnError: true` unless `noEmit: true`; the `lint` script runs eslint with `--max-warnings 0` and the config sets `reportUnusedDisableDirectives: "error"`; a `test` script that runs `node` on a `.ts` file is preceded by `tsc --noEmit`; every `package.json` with dependencies has an `.npmrc` beside it or above it saying `save-exact=true`; `--warn` first, as every check here lands ([README.md](../README.md) § *tools*); a repository the predicate calls non-TypeScript passes that half without opinion; **a TypeScript repository (by the predicate) where no `typescript` package resolves is INCOMPLETE, never green**; and `.ts` files outside any project — `.ts` present, no `tsconfig*.json`, no `typescript` dependency — are a FINDING, not INCOMPLETE and not a pass: `strictness-check: N .ts file(s) and no TypeScript project — nothing type-checks them (compiler-strictness.md)`, exit 1 (exit 0 under `--warn`), because the rule says a type-stripped run is preceded by `tsc --noEmit` and here nothing can run it. Proven on deliberately invalid fixtures: `strict` missing in a base config inherited through `extends`; `noEmitOnError` missing with emit; `--max-warnings` absent; a stripped-TS test script without `tsc --noEmit`; a caret range with no `.npmrc`; a stale `eslint-disable`; and one VALID fixture with a hoisted install — `tsc` only in the parent's `node_modules`, the `tsconfig.json` in a workspace package — which must pass, not report INCOMPLETE; the `.ts`-without-project fixture above with its exact expected line and exit code; .NET fixtures: `Directory.Build.props` omitting `Nullable` (finding); no SDK on `PATH` (INCOMPLETE); a VALID project with `TreatWarningsAsErrors=true`, `Nullable=enable` and only the SDK's default `NoWarn` (must pass); an INVALID project with the same two properties plus a repository `<NoWarn>` (must fail naming the file and the codes); an INVALID one with `<WarningsNotAsErrors>` (must fail) | check ↔ check |
+| **Compiler properties and suppressions — the .NET half of `tools/strictness-check.mjs`** (new; named `node-strictness-check.mjs` until ledger 1.1 gave it this half; it COMPLEMENTS `build-flags-check` and its hook, which enforce resource limits, and replaces neither — E3 owns it on both stacks): for every `*.csproj` outside the skip set, `dotnet msbuild <project> -getProperty:TreatWarningsAsErrors -getProperty:Nullable -getProperty:NoWarn -getProperty:WarningsNotAsErrors -m:4` must answer `true` and `enable` (the EFFECTIVE values, `Directory.Build.props` inheritance included — probed § 14), and the effective `NoWarn` and `WarningsNotAsErrors` may hold nothing the REPOSITORY added: SDK defaults are told apart two ways, both required — the effective value is compared with a clean-project baseline captured for the pinned SDK (`tools/fixtures/strictness/sdk-baseline.json`, keyed by `global.json`'s SDK; probed on 10.0.114: a clean project answers `NoWarn` `1701;1702`, `WarningsNotAsErrors` empty — § 15), and the repository's own props and csproj files are read for a `<NoWarn>` or `<WarningsNotAsErrors>` element, which is a finding wherever it sits; INCOMPLETE when projects exist and no `dotnet` SDK resolves, or the pinned SDK has no baseline; a repository with no project passes without opinion. **The properties are read only after a successful LOCKED restore** of the solution or project (`dotnet restore --locked-mode -m:4` — § 18, finding 2): MSBuild evaluation of an unrestored project can answer defaults or fail on missing assets, so without a successful restore the half reports INCOMPLETE and never a finding; fixtures: an unrestored project (INCOMPLETE, naming the restore) and a restored one (evaluated). **Inline suppressions** (§ 18, finding 4): every `#pragma warning disable` in a source file carries at least one warning id AND a same-line `// <reason>`, or it is a finding; fixtures: no id, no reason, and the valid form | **The TypeScript half, under ONE predicate** (ledger 1.3): `isTypeScriptRepository(dir)` = any `tsconfig*.json` outside `node_modules`, OR any `package.json` whose `dependencies`/`devDependencies` name `typescript`; the same predicate decides which files are walked and whether a missing `tsc` is INCOMPLETE. For every `tsconfig*.json` the predicate found, the compiler's own merged view (`tsc --showConfig -p <file>`, so `extends`, nested packages, excludes and overrides resolve as `tsc` resolves them) has `strict: true`, where **`tsc` is found through package resolution, never a fixed path** (plan round 1, finding 3): `createRequire(<the tsconfig's package dir>/package.json).resolve("typescript/bin/tsc")`, falling back to a walk up the parents' `node_modules/.bin` — the resolution that covers a hoisted workspace install, pnpm and yarn shims; **INCOMPLETE is reported only when no TypeScript resolves at all**, and `noEmitOnError: true` unless `noEmit: true`; the `lint` script runs eslint with `--max-warnings 0` and the config sets `reportUnusedDisableDirectives: "error"`; **inline suppressions** (§ 18, finding 4): a file-wide `/* eslint-disable */` with no rule id, or any `eslint-disable` / `eslint-disable-next-line` / `eslint-disable-line` without a same-line `-- <reason>`, is a finding (fixtures: the bare file-wide disable, a line without a reason, and the valid `// eslint-disable-next-line <rule> -- <reason>`); **plain JavaScript in a TypeScript project** (§ 18, finding 5): when the project's `include` reaches a `.js/.mjs/.cjs` file, the effective configuration has `allowJs` and `checkJs` (fixture: a project including `.mjs` files without `checkJs` is a finding); a `test` script that runs `node` on a `.ts` file is preceded by `tsc --noEmit`; every `package.json` with dependencies has an `.npmrc` beside it or above it saying `save-exact=true`; `--warn` first, as every check here lands ([README.md](../README.md) § *tools*); a repository the predicate calls non-TypeScript passes that half without opinion; **a TypeScript repository (by the predicate) where no `typescript` package resolves is INCOMPLETE, never green**; and `.ts` files outside any project — `.ts` present, no `tsconfig*.json`, no `typescript` dependency — are a FINDING, not INCOMPLETE and not a pass: `strictness-check: N .ts file(s) and no TypeScript project — nothing type-checks them (compiler-strictness.md)`, exit 1 (exit 0 under `--warn`), because the rule says a type-stripped run is preceded by `tsc --noEmit` and here nothing can run it. Proven on deliberately invalid fixtures: `strict` missing in a base config inherited through `extends`; `noEmitOnError` missing with emit; `--max-warnings` absent; a stripped-TS test script without `tsc --noEmit`; a caret range with no `.npmrc`; a stale `eslint-disable`; and one VALID fixture with a hoisted install — `tsc` only in the parent's `node_modules`, the `tsconfig.json` in a workspace package — which must pass, not report INCOMPLETE; the `.ts`-without-project fixture above with its exact expected line and exit code; .NET fixtures: `Directory.Build.props` omitting `Nullable` (finding); no SDK on `PATH` (INCOMPLETE); a VALID project with `TreatWarningsAsErrors=true`, `Nullable=enable` and only the SDK's default `NoWarn` (must pass); an INVALID project with the same two properties plus a repository `<NoWarn>` (must fail naming the file and the codes); an INVALID one with `<WarningsNotAsErrors>` (must fail) | check ↔ check |
 | `settings/hooks/build-flags.mjs`: a `PreToolUse` hook refusing a `dotnet build` without `-m:N` | **none** — the hook exists for a measured resource problem (`csharp/dotnet-build.md` § *Measured 2026-09-11*). The candidate Node hook — refuse `npm install <pkg>` without `--save-exact` — is unnecessary once `.npmrc` carries `save-exact=true`, which is a FILE the check verifies (measured: the setting is honoured). What a Node hook would need to earn its place: a measured cost that no file can carry | deliberately absent; stated in `research/module_rules.md` |
 | `dotnet build` with `TreatWarningsAsErrors` + `Nullable enable` | the composite gate `tsc --noEmit` (or with `noEmitOnError`) + lint `--max-warnings 0` + tests, named in `compiler-strictness.md` as ONE gate the CI step runs | gate ↔ gate |
 | `tools/http-coverage.mjs` reads `Map*` and `.route(`; `--routes` preferred | the same tool; a Node application prints its route table for `--routes` (D10) | one tool |
 
 **Every consumer of kind `dotnet`, `typescript` or `mixed` wires the check** as one CI step beside `build-flags-check`
 ([ROLLOUT.md](../ROLLOUT.md) § CI) — required, not optional: P2's equality is delivered only where both halves run
-(re-review, § 15; the first revision's "a .NET-only consumer may add it for uniformity" is superseded). **The CI step
-runs in ENFORCING mode** — a finding is a non-zero exit and a red build (§ 16, finding 6); `--warn` exists for E7.S1's
-pre-release dry run and for nothing else, which supersedes the "`--warn` first, as every check here lands" sentence above
-for this check: the dry run is where the backfill is found, before the pin moves. The `rust` kind is Q8's only remaining
-subject.
+(re-review, § 15; the first revision's "a .NET-only consumer may add it for uniformity" is superseded). **The CI step's
+END state is ENFORCING mode** — a finding is a non-zero exit and a red build (§ 16, finding 6; § 11's box) — **reached
+by the README's own adoption rule** ([README.md](../README.md) § *tools*: "`--warn` first, so the finding is visible
+without a red build, then the flag comes off once the backfill is done"; § 18, finding 1): no consumer meets the
+suppression and lock requirements today (one TypeScript consumer carries 270 `eslint-disable` lines; no .NET consumer
+has a `packages.lock.json`), so E7.S1's dry run lists each consumer's findings with `--warn`, E7.S1b's remediation
+stories clean them per consumer, and only then does that consumer's CI step flip to enforcing. **Superseded (§ 18):**
+"`--warn` exists for E7.S1's pre-release dry run and for nothing else" — it also covers each consumer's CI between its
+bump and the merge of its remediation story; what never changes is the end state. The `rust` kind is Q8's only
+remaining subject.
 
 ### 4.7 Versions (D7)
 
@@ -547,7 +662,7 @@ block sizes of § 4.3 and the additions of § 4.4; every story measures and writ
 | `storage --file src/x.cs` | 34,019 (unpinned, over) | ≈ 28,300 + 4,983 + `csharp/utc-timestamps` ≈ 900 ≈ 34,200 | no, as today | the C# clock mechanics are gated on `storage` |
 | `storage --file ui/a.ts` | 35,315 (unpinned, over) | ≈ 28,300 + 4,900 + `typescript/utc-timestamps` ≈ 1,200 ≈ 34,400 | no, as today | the same |
 | mixed `inspect --file src/x.cs --file ui/a.ts` | 34,729 (unpinned, over) | ≈ 34,100 | no, as today | both doctrines |
-| `inspect --file package.json` | 35,409 (`local-cpu-budget` 11,202) | ≈ 38,900 | no, as today | + `npm-packages` ≈ 3,500 |
+| `inspect --file package.json` | 35,409 (`local-cpu-budget` 11,202) | ≈ 43,600 | no, as today | + `npm-packages` ≤ 3,500 + the TypeScript doctrine ≤ 4,700 (the manifest selector, § 18 finding 3) |
 | `logging --file src/Program.cs` | 78,866 | ≈ 78,900 | split read | the Serilog blocks leave `common/logging-serilog.md` and arrive in `csharp/logging.md` on the same scope |
 | `logging --file src/server.ts` | 80,162 | ≈ 78,650 | split read | − 3,012 B of Serilog/Rust mechanics + ≈ 1,500 B of `typescript/logging.md` |
 | `implement --file ui/a.ts` | 292,834 (28 rules) | ≈ 291,600 | split read | − ≈ 8,200 B of C# and Rust mechanics; + ≈ 7,000 B of TypeScript mechanics (lifecycle, testing, logging, utc, boundaries) |
@@ -563,6 +678,23 @@ on the list at ≤ 32,613 B (the gpu number: 32,293 + 20 + ≤ 300), because the
 Nothing is deleted anywhere and no guarantee is removed; the scopes that are over today and unpinned (`gpu`/`storage`
 with a `.ts`, `storage` with a `.cs`, mixed, `package.json`) get smaller or stay as they are. The hook's session-start
 read (`inspect`, no file) grows by the core's ≤ 300 B only.
+
+**The single-read list, exactly** (§ 17, O7 — ledger 2.6; this replaces "the list of D5 and the new config scopes").
+The test at `tools/rules.test.mjs:252` pins these scopes and no others; each must be ≤ 32,768 B, the numbers are the
+after-estimates above and E1.S5 writes the measured ones:
+
+| Task | Pinned files | After (B) | Note |
+|---|---|---|---|
+| `inspect` | none · `src/x.cs` · `src/x.csproj` · `ui/a.ts` · `tsconfig.json` · `.npmrc` · `Directory.Build.props` · `src/a.mjs` · `src/webview/page.ts` | ≤ 24,507 · ≤ 29,140 · ≈ 30,070 · ≈ 29,060 · ≤ 27,810 · ≤ 28,007 (`.npmrc` now selects `npm-packages` ≤ 3,500 B, § 18) · ≈ 25,660 · ≈ 29,060 · ≈ 29,060 | the four kept from today, plus `tsconfig.json`/`.npmrc` (E1's), plus the three that fit today and were unpinned without a reason — pinned now (adding a guarantee is allowed; `.npmrc` selects nothing and `src/webview/page.ts` equals `ui/a.ts` by selector, both pinned so a later selector cannot change that silently) |
+| `ui` | none · `tsconfig.json` · `.npmrc` · `Directory.Build.props` | ≤ 26,720 · ≤ 30,020 · ≤ 30,220 · ≈ 27,870 | `ui` with a language file is off the list by D5 (approved baseline) |
+| `gpu` | none · `src/x.cs` · `tsconfig.json` · `.npmrc` · `Directory.Build.props` | ≤ 27,980 · **≤ 32,613** · ≤ 31,280 · ≤ 31,480 · ≈ 29,130 | `gpu --file src/x.cs` stays, § 16 |
+| `storage` | none · `tsconfig.json` · `.npmrc` · `Directory.Build.props` | ≈ 28,600 · ≤ 31,900 · ≤ 32,100 (the tightest `.npmrc` pin: it sets `npm-packages.md` ≤ 3,500 B as a hard cap) · ≈ 29,750 | `storage` with a language file is over today and stays unpinned |
+
+Twenty-two pins. `Directory.Build.props` selects `csharp.nuget-packages` (≈ 1,000 B after E2's moves, 3,081 B today — so
+the four `Directory.Build.props` scopes fit today too: 27,288 / 29,501 / 30,761 / 32,487). Every other scope that fits
+after this plan but is not in the list is one of: a `gpu`/`storage` scope with a `.ts`/`.mjs`/`.cs` file (over today, § 5),
+a mixed scope (over today), a `package.json` scope (over today), or a Rust scope (over today); none fits today, so
+none is a guarantee the baseline gave, and each is named in the table above with its number.
 
 **Byte allowances per epic** (E1's exit criterion): E2 ≤ 4,000 B `common/dependencies.md`, ≤ 3,500 B `npm-packages.md`,
 no cap on the NuGet trim since it only moves bytes out; E3 ≤ 3,300 B `compiler-strictness.md`; E4 `typescript/doctrine.md`
@@ -583,6 +715,7 @@ E5 and E6 gated rules: no single-read cap, each measured and recorded; `typescri
 | **The record per benchmark arm (D13):** the conventions sha; the selected rule ids and hashes per stack for the arm's scopes (`explain` output, kept); the toolchain versions (compiler, parser, lint, Node, SDK); the effective checks that ran (the composite gate's commands and exit codes) | this plan provides the `explain` and check commands and their expected shape (§ 10); the other plan runs and records them per session | its T14 says "the bytes read per session are in the record" — this adds ids, hashes and checks, because equal source ownership does not prove equal instructions reached the agents |
 | The record of rule bytes actually read per session (its T14) | the other plan | this plan records the bytes per scope (§ 5) so the two numbers can be compared |
 | The consumers' bump pull requests and the dry run | this plan (E7) | none — a consumer change the experiment does not see |
+| **The C# task workspaces are prepared and LOCKED before measurement** (G2 option A, § 3.3): `packages.lock.json` generated and committed in every `csharp/<task>/` workspace at the pinned task-repository sha, `RestorePackagesWithLockFile` and `RestoreLockedMode` in place, so a C# agent inherits a locked restore exactly as a TypeScript agent inherits `package-lock.json` and `npm ci` — neither pays a migration during a measured session | the other plan's E1 (the task repository's workspaces), using the rule this plan ships | this plan names the requirement and the fixture; the other plan's pre-registration records both locks' hashes beside the package-set hashes |
 
 Order: this plan first; its release is a precondition of the other plan's pre-registration (its D23). Disjoint: nothing
 here touches the harness, the tasks or the task repository; nothing there edits a rule. The other plan was read on branch
@@ -618,7 +751,7 @@ No process, table or cache is created.
 | T8 | **The release reaches every consumer in `research/consumers.json` at once** (eight today, from the README) and reddens every open pull request's `pin-check`; a consumer's CI fails on the new check | E7 dry-runs the check and the rule set against the TypeScript and .NET consumers first (D13) and records what would fail; announces; promotes once; bumps the pinned-by repository last ([README.md](../README.md) § *Bumping a pin*) |
 | T9 | **A product name slips into a shared rule** (the TypeScript consumers' names, "the extension", "the vault") — or the anonymisation and a move land in one commit, leaving the byte-equality test nothing to compare against | `node tools/ownership-check.mjs` is armed; the anonymisation is a separate, documented commit in the SOURCE file first (`rule-bodies.mjs --update`), listed as wording with no lesson removed, and the move follows byte for byte (§ 4.3, § 4.4, E4.S2) |
 | T10 | **A move loses a caveat.** A block moved "verbatim" by hand drops a sentence, or a neutral sentence goes with it and the common rule loses its invariant | the byte-equality test of E1.S4 on every moved block; the common rule's remaining section is read as an instruction from someone who has not seen the long one ([knowledge-base.md](../common/knowledge-base.md)) |
-| T11 | **The resolver change (D3) is read as a loophole** — a rule gated to avoid a budget rather than to match its source's tasks | the gate list of every mechanics rule equals its source rule's `tasks:` line and a test asserts it; `module_rules.md` states the one legitimate use |
+| T11 | **The resolver change (D3) is read as a loophole** — a rule gated to avoid a budget rather than to match its source's tasks | gates follow the requirement's PROVENANCE (§ 4.3): a gate that MIRRORS existing rule text equals that source's `tasks:` line, asserted by the test; a gate is DECLARED only for a new requirement or an applicability changed on purpose and approved in this plan (the two `definition-of-done` files, the two `boundaries` files — § 4.4 names which is which), with a reason in `research/selection-matrix.json`; and every gated rule has positive and negative selection cases pinned there, so editing the declaration and the front matter together cannot make a wrong gate pass — an undeclared, unreasoned or case-less gate is red (§ 17, O3 — ledger 2.2; the first wording, "every gate equals its source", could not hold for a file with no source, and "new file" as the criterion was wrong too: `typescript/boundaries.md` inherits doctrine text); `module_rules.md` states both legitimate uses |
 | T12 | **Equal source ownership is mistaken for equal instructions reaching the agents** | D13's per-arm record: ids, hashes, toolchain versions, effective checks |
 
 ## 9. Build order
@@ -643,7 +776,7 @@ the lifecycle as the three cornerstones.
 
 - `npm test` green at every story: the manifest test (`tools/rules.test.mjs:151`, every body recorded; new ids added
   by hand, `tools/rule-bodies.mjs:186`), the gate's selection tests (§ 4.2), the per-scope id-list tests (§ 4.1), the
-  single-read scope test with the list of D5 and the new config scopes, the always-core budget, the parity-matrix test
+  single-read scope test with the exact twenty-two-scope list of § 5, the always-core budget, the parity-matrix test
   and the inventory↔matrix one-to-one test (§ 4.1), the byte-equality test over the moved blocks against the commit
   right before each move (§ 4.3), the `http-coverage` test that a Node route table in the `--routes` shape is read and
   compared, the new check's fixtures (§ 4.6; a repository with no TypeScript passes; the hoisted-install fixture passes;
@@ -657,6 +790,22 @@ the lifecycle as the three cornerstones.
   match; the recorded fields must match the rule's real front matter, its heading's mood and the check tool's exported
   rule list), the `selection-matrix.json` regeneration test, and — at every story — the catalog loads with every
   placeholder file's front matter valid.
+- **One concrete fixture per contract, green before E2's stories begin** (E1's Done-when; § 17, consult `e1c58f6d`),
+  so the next stories writer does not stop the plan again: selection — one positive and one negative case per gated
+  rule (scope → selected / not selected); equality normalisation — one `equal` pair that passes through the
+  correspondence table and one deliberate mismatch that fails; heading inheritance — a section marked only by its H1
+  (`common/reliability.md`'s `### A timeout…`) read as MANDATORY, and a section with no marker anywhere above it read as
+  SHOULD; moves — one exact whole-line range entry, one fence-balanced case (a block that would split a fence is
+  refused), one mid-line case (refused by the whole-line recorder, with E1.S0b's whitespace split as the remedy);
+  G2's enforcement — a NuGet fixture whose `packages.lock.json` is stale against its declaration fails
+  `dotnet restore --locked-mode -m:4` with `NU1004` and passes after `--force-evaluate` (observed, § 3.3), and an npm
+  fixture whose lock does not satisfy `package.json` fails `npm ci` with `EUSAGE` (observed, § 4.3).
+- The epoch 3 round's fixtures (§ 18): an unrestored .NET project → INCOMPLETE and a restored one → evaluated (finding 2);
+  the inline-suppression fixtures on both sides — a file-wide `eslint-disable` without a rule id, an `eslint-disable`
+  line without a same-line reason, the valid form; a `#pragma warning disable` without an id, one without a same-line
+  reason, the valid form (finding 4); a TypeScript project including `.mjs` files without `checkJs` → a finding
+  (finding 5); the normalised-selection test's manifest case: `dependencies --file package.json` and `dependencies --file
+  src/x.csproj` select the same rule kinds (finding 3).
 - `node tools/rule-bodies.mjs` in step.
 - `node tools/ownership-check.mjs` passes with no baseline file.
 - `node tools/plan-lifecycle.mjs` clean.
@@ -679,8 +828,15 @@ the lifecycle as the three cornerstones.
       `research/parity-matrix.json` carries the same rows, **no row is `planned`**, and its test is green.
 - [ ] **The accepted `stronger-*` exceptions are exactly these**, and the permission is bounded to the rows reviewed
       and listed here: **P4** (`stronger-ts` — complexity ≤ 4 is lint-enforced in TypeScript and prose in C#, because a
-      C# analyzer package is a dependency decision for every .NET consumer, Q7). The matrix test holds the same list
-      (`['P4']`) and fails any other row with that status; any other `stronger-*` row is a plan change, not an exception.
+      C# analyzer package is a dependency decision for every .NET consumer, Q7). **G2 is `equal`** (the epoch 3
+      re-review reversed ledger 2.1's whitelisting: .NET consumers commit `packages.lock.json` and restore in locked
+      mode, for the owner to confirm 2026-11-01). The matrix test holds the same list (`['P4']`) and fails any other
+      row with that status; any other `stronger-*` row is a plan change, not an exception.
+- [ ] G2 delivered on both sides: every .NET-bearing consumer has `RestorePackagesWithLockFile`, a committed
+      `packages.lock.json` per project and a locked-mode restore in CI; every TypeScript-bearing consumer has its
+      committed `package-lock.json` and `npm ci`; both enforcement fixtures of § 10 are green.
+- [ ] The fixtures of § 10 (selection, equality normalisation, heading inheritance, the three move cases, the two lock
+      fixtures) were green before E2's stories document was written.
 - [ ] Every `equal` row records both sides' `selectors`, `mood`, `enforcement`, `consequence` and `suppression`; the
       side-to-side test and the fields-versus-reality test (front matter, heading mood, the check tool's rule list) are
       green.
@@ -694,12 +850,15 @@ the lifecycle as the three cornerstones.
 - [ ] Every Node sentence in a rule has a line in `research/2026-10-31_node_behaviour_probes.md` (a run with its output)
       or a cited document with its read date.
 - [ ] The resolver's `path_tasks` key exists, is tested, documented in `research/module_rules.md` and `ENTRY.md` step 7,
-      and every gated rule's gate equals its source rule's `tasks:` line (asserted).
+      and every gated rule's gate mirrors its requirement's source `tasks:` line — or, where the requirement is new or
+      its applicability was changed on purpose in this plan, equals the gate declared with a reason in
+      `research/selection-matrix.json` — and every gated rule has its positive and negative selection cases pinned
+      there (all asserted, § 17 O3).
 - [ ] The language-scoped rules of § 4.3 exist with the metadata of § 4; `csharp/nuget-packages.md` has no `tasks`; the
       selectors of § 4.4–4.5 are in place and the per-scope id lists are tested.
-- [ ] The always core ≤ 16,384 B with its additions ≤ 300 B; every scope in the single-read list ≤ 32,768 B, the list
-      being D5's with `gpu --file src/x.cs` ON it (measured ≤ 32,613 B after E3's `Nullable enable` line and E5's core
-      phrases, § 5); the before/after table is in `research/module_rules.md`.
+- [ ] The always core ≤ 16,384 B with its additions ≤ 300 B; every scope in the exact twenty-two-scope single-read list
+      of § 5 ≤ 32,768 B, `gpu --file src/x.cs` among them (measured ≤ 32,613 B after E3's `Nullable enable` line and
+      E5's core phrases); the before/after table is in `research/module_rules.md`.
 - [ ] The TypeScript toolchain is stated as one tested combination with its read date (D7); the operator's answer to Q2
       is recorded.
 - [ ] `tools/strictness-check.mjs` exists with both halves, finds `tsc` through package resolution (and passes the
@@ -720,8 +879,13 @@ the lifecycle as the three cornerstones.
       at the time of writing: `dew_flow_rag_qln`, `dew_flow_mcp`, `dew_flow_sidecar_rust`, `dew_flow_benchmark`,
       `dew_flow_creds_for_devs`, `dew_flow_connect_other_ais`, `wsl_care`, `dew_flow_vscode_kit`) — the pinned-by
       repository last, each with `pin-check` green after its commit; the `dotnet`, `typescript` and `mixed` kinds add
-      the `strictness-check` step in ENFORCING mode — non-zero on findings — (required — P2's equality is delivered by
-      the wiring; `--warn` was E7.S1's dry run only; `rust` per Q8).
+      the `strictness-check` step — with `--warn` in the bump, flipped to ENFORCING mode (non-zero on findings) in the
+      same pull request that merges that consumer's remediation story (E7.S1b), the README's adoption rule — so that
+      at the end of E7 every such consumer runs it enforcing (required — P2's equality is delivered by the wiring;
+      `rust` per Q8).
+- [ ] Every consumer's remediation story (E7.S1b) merged: locks generated and committed, suppressions registered or
+      justified per § 3.4, the `tsconfig` flags and `.npmrc` in place — counted against the dry run's findings list,
+      which is the budget.
 - [ ] `research/consumers.json` exists, equals the README table, and every consumer count in this plan is derived
       from it; `research/moved-blocks.json` holds one entry per moved block.
 - [ ] The experiment's task repository pins the release (reported by the other plan's E0.S3); the sha here and there
@@ -732,15 +896,23 @@ the lifecycle as the three cornerstones.
 
 Not settled here; the owner or the named epic decides. No answer is invented.
 
-- **Q1 .NET lock files.** Raise .NET to `packages.lock.json` + `dotnet restore --locked-mode` (a change in six consumers),
-  or record the asymmetry (npm's lock fixes transitives; central pins fix directs) as § 3.3 proposes?
+- **Q1 .NET lock files — decided A under owner absence, for the owner to confirm 2026-11-01** (§ 3.3 G2, § 17): .NET
+  is raised to `packages.lock.json` + a locked-mode restore (`RestorePackagesWithLockFile`, `RestoreLockedMode`/
+  `--locked-mode`), G2 is `equal`, the whitelist stays `['P4']`. **History:** ledger 2.1 first closed Q1 the other way
+  (G2 whitelisted `stronger-ts`, "NuGet's lowest-applicable resolution already makes the graph deterministic"); the
+  epoch 3 re-review (consult `e1c58f6d`) refuted that — resolution changes when a missing version is published later
+  or a package is unlisted, Microsoft documents lock files for repeatable restores — and found that admitting G2 as an
+  exception against epoch 2's explicit "only P4" would itself be a narrowing. The question as first asked: *raise .NET
+  to `packages.lock.json` + `dotnet restore --locked-mode` (a change in six consumers), or record the asymmetry?*
 - **Q2 The TypeScript toolchain (D7).** TypeScript 6.0.x with full type-aware lint (the tested combination the rule
   states), or TypeScript 7 without type-aware lint until typescript-eslint supports it — and if the latter, what stands in
   for `no-floating-promises` and the complexity rule meanwhile?
 - **Q3 The single-read list.** D5 takes `ui --file ui/a.ts` out of it so the webview trap reaches `ui`. Numbers: with
   `ui` in the boundaries rule's gate ≈ 33,570 B; without, ≈ 31,300 B and the trap does not load for the task it was written
-  for. `gpu --file src/x.cs` is estimated at ≈ 32,660 B (105 B left) once the C# Definition of Done lands; if the
-  measurement says over, does `gpu` with a language file leave the list too (D1 forbids the alternative)?
+  for. **Superseded in part (§ 16):** "`gpu --file src/x.cs` is estimated at ≈ 32,660 B (105 B left) once the C#
+  Definition of Done lands" — the Definition of Done is gated away from `gpu` and the scope is ≤ 32,613 B, on the list;
+  what remains open is only whether the owner wants `ui --file ui/a.ts` back on the list at the price of the webview
+  trap not loading for `ui`.
 - **Q4 The check's reader.** `tsc --showConfig` from the consumer's own `node_modules` (the compiler resolves `extends`;
   INCOMPLETE when absent), or a JSONC parser of our own (a new dependency, and a second implementation of `extends`)?
 - **Q5 `.js/.mjs/.cjs` select the TypeScript doctrine** — including this repository's own `tools/`. Confirm, or leave
@@ -855,6 +1027,53 @@ same baseline:
 `npm test` on the owner's machine showed six janitor failures (S4-23, 34, 35, 37, 38, 46) on `d986710` with nothing
 changed; they do not come from this plan and are investigated separately.
 
+## 17. Epoch 2's stop and the re-review revision for epoch 3 (2026-10-31)
+
+The Opus E1 stories writer (`feat/rule-parity-e1`, `72aaf8c`, `todo/PLAN_node_rule_parity_E1.md` § *Open points*)
+found that the plan could not be built as written in twelve places. Six are changes (a contract, an approach — one
+cause each, ledger 2.1–2.6; the second stopped the plan, step 1 in commit `347d08b`); six are repaired references or
+fixes that only satisfy the plan as written (O2, O8–O12), applied here without an entry. This section is step 4 of the
+full stop: the whole plan revised for epoch 3. Its decisions are the baseline the next round approves, not entries.
+O1 was decided by the question consultants (consult `1f4d8688`: one reviewer chose raising .NET, one chose the
+whitelist; the team lead chose the whitelist and verified the resolution fact) because the owner was away — marked for
+the owner to confirm on 2026-11-01.
+
+| # | Open point | Decision (where) |
+|---|---|---|
+| O1 (2.1) | G2 had no admissible status | **Revised in this re-review (consult `e1c58f6d`): option A.** Ledger 2.1 had whitelisted G2 as `stronger-ts` on "NuGet's lowest-applicable resolution already makes the graph deterministic"; the consultant refuted it — the resolution changes when a missing version is published later or a package is unlisted, and Microsoft documents lock files for repeatable restores — and admitting G2 against epoch 2's explicit "only P4" would have been a narrowing. So .NET consumers commit `packages.lock.json` (`RestorePackagesWithLockFile`) and CI restores in locked mode; G2 is `equal`; the whitelist stays `['P4']`; the enforcement was observed (`NU1004` on a stale lock, pass after `--force-evaluate`); the benchmark's C# workspaces are locked before measurement (§ 6). 2.1's text stays in the ledger as history. Q1 reads "decided A under owner absence, for the owner to confirm 2026-11-01" (§ 2, § 3.3, § 4.5, § 6, § 10, § 11, Q1, E2, E7) |
+| O2 (not an entry) | § 4.1 still required a matrix `reason` for `deliberately-absent` | § 3.3/§ 11 win: a `deliberately-absent` row carries no matrix reason; the inventory holds it (§ 4.1) |
+| O3 (2.2, the stop) | T11 cannot hold for four planned gated files with no source rule | Gates by the requirement's PROVENANCE, not the file's age (consult `e1c58f6d`): a gate MIRRORS when the text comes from an existing rule (its `path_tasks` = the source's `tasks:`; a path-only source mirrors as no gate); a gate is DECLARED only for a new requirement or an applicability changed on purpose and approved in the plan, with a reason — `typescript/boundaries.md` inherits doctrine text, so its gate is the approved applicability change, not a "new file"; positive and negative selection cases are pinned per gated rule independently of the declaration (§ 4.3, § 4.4, T11, § 10, § 11, E1.S5) |
+| O4 (2.3) | The doctrine rows cannot be `equal` while one doctrine selects a project file and the other does not | "The same kind of scope" is defined as the stack's source files plus its project manifest; `typescript/doctrine.md` gains `**/package.json` (its `package.json` scopes are split reads already, so no budget moves); `tsconfig*.json` stays a kind of its own because adding it would break three pins (§ 2, § 4.4) |
+| O5 (2.4) | Four moves were not exact ranges; a NuGet split would unbalance a fence | A move is a list of exact whole-line ranges, each its own manifest entry; reliability moves the whole bullets `:49-54`, `:55-59`, `:66-69`, `:97-98`, `:99-102` (and `:104-133`), utc the whole fenced block `:41-47`; dated audit sentences inside neutral paragraphs stay (the D6 kind); every count of moves is the manifest's. **Refined by consult `e1c58f6d` turn 2:** a mixed-content line is split by WHITESPACE ONLY in E1.S0b (the no-shortening check: the text with all whitespace removed is identical before and after), so `common/testing.md:33`'s "Everything below applies everywhere." and `csharp/nuget-packages.md:41-43`'s .NET-only cadence sentence each get their own line/paragraph and whole-line ranges follow, with every original word staying in place — this replaces "add a new neutral sentence". The NuGet contract settled: `:25-29` (licence, "in any ecosystem") moves, `:31-37` (the FluentAssertions and Aspire decisions — NuGet facts) stays, the `## Bumping` heading and its neutral paragraph move, the .NET sentence and the `powershell` fence `:45-48` stay under a new heading (§ 4.3, § 4.5, E1.S0b, E1.S4, E2, E4) |
+| O6 (2.5) | `MANDATORY` on the section heading only, or inherited | Inherited from the nearest ancestor heading that carries a marker, the H1 included; the fields-against-reality test reads it so (§ 4.1) |
+| O7 (2.6) | No exact single-read list | § 5 names the list: twenty-two pins with their bytes — the eight kept from today, `tsconfig.json` and `.npmrc` under each single-read task, and the six fitting scopes the stories found unpinned (`Directory.Build.props` ×4, `inspect --file src/a.mjs`, `inspect --file src/webview/page.ts`), pinned now; every other fitting scope is named with the reason it is not a baseline guarantee (§ 5, § 10, § 11, E1.S5) |
+| O8 (not an entry) | Two names the anonymisation list missed | E1.S0's list gains `:37` "a synced vault" → "a synced credential store" and `:39` `scriptInterpolation.test.ts` → "the scan test" (E1) |
+| O9 (not an entry) | `:50-54` is 286 B | Corrected; 287 B counted the blank `:55` (§ 4.3) |
+| O10 (not an entry) | Leftover sentences kept § 2 in the doctrine or counted three moves | § 2 and its box move to `typescript/testing.md`; every count is the manifest's (§ 4.4, R3, E4) |
+| O11 (not an entry) | "the commit right before the move" vs "recorded now" | Equivalent: a planned entry is recorded at E1's commit, and the planned check requires the bytes to be still present and unchanged at the source until the move (§ 4.1, E1.S4) |
+| O12 (not an entry) | E1's scope line was short; E6 listed `typescript/boundaries.md` as new | E1's scope names the inventory, consumers, selection-matrix and moved-blocks files, `tools/moved-blocks.mjs`, `tools/selection-matrix.mjs`, `tools/lib/parity-epics.mjs`; E6 fills the two files E4 created (E1, E4, E6) |
+
+**The consult for step 3 — the problem text as sent**, quoting every change of epoch 2 as evidence:
+
+> The plan `todo/PLAN_node_rule_parity.md` (epoch 2, approved 2026-10-31 by reviewers at `400d878`+`01d1bbf`) stopped
+> at its second change the same day. The six changes, verbatim from the ledger: *2.1 · contract — E1 stories O1: G2
+> (the lock file) had no admissible status; … whitelisted as `stronger-ts` with its reason; Q1 closed, for the owner to
+> confirm 2026-11-01.* *2.2 · contract — E1 stories O3: T11 ("every gate equals its source rule's `tasks:` line") cannot
+> hold for the four planned gated files that have no source rule.* *2.3 · contract — E1 stories O4: the doctrine rows P1,
+> P5, P7 and P20 cannot be `equal` under § 2 (a) while `csharp/doctrine.md` also selects `.csproj` and the TypeScript
+> doctrine selects source files only.* *2.4 · approach — E1 stories O5: four § 4.3 moves were not exact line ranges
+> (reliability's sentences, the .NET text of `utc-timestamps`, the NuGet `:39-47` split inside a code fence), so E1 could
+> not record them.* *2.5 · contract — E1 stories O6: whether `MANDATORY` is read from the section's own heading only or
+> inherited from an ancestor heading.* *2.6 · contract — E1 stories O7: "the list of D5 and the new config scopes" named
+> no exact single-read list; six scopes that fit today were unpinned without a reason.* The question for the re-review:
+> does the plan's model of the work drift — six build-time contradictions found by the first stories writer in one
+> reading — or are these the ordinary gap between a plan's prose and a test's contract? Specifically: (1) is "a NEW gated
+> file declares its gate with a reason, and the test checks the declaration" a loophole in T11 or its correct form;
+> (2) is "source files + project manifest" the right definition of equal scope kind, given that `tsconfig*.json` cannot
+> join the doctrine without breaking three single-read pins; (3) is whitelisting G2 as `stronger-ts` (NuGet lowest-wins
+> vs npm highest-wins) sound, or should .NET be raised to a locked restore; (4) is anything in the epoch 3 revision
+> (§ 17) a narrowing against the epoch 2 baseline?
+
 **Probe for R-4** (SDK 10.0.114, 2026-10-31, the same scratch project): a clean project with no `NoWarn` anywhere
 answers `dotnet msbuild probe.csproj -getProperty:NoWarn -getProperty:WarningsNotAsErrors -m:4` →
 `"NoWarn": "1701;1702"`, `"WarningsNotAsErrors": ""` — the SDK's own defaults, which is why a raw non-empty `NoWarn`
@@ -863,6 +1082,20 @@ cannot be the finding. With a `Directory.Build.props` carrying `<NoWarn>CS1591;$
 `"WarningsNotAsErrors": "CS8600"` (note: the SDK's `1701;1702` did NOT survive the override — the effective value is
 what the repository wrote, so comparing against the clean baseline shows the difference in both directions). Both
 readings exit 0.
+
+## 18. Epoch 3 plan round (2026-10-31) — five findings, the baseline, and the resume
+
+`mcp__coai__review_plan` over the epoch 3 revision (`9cf6649`): verdict **`proceed`**, both reviewers answering, five
+findings — all accepted and applied as the re-review baseline, not entries. Step 8 of the full stop then resumed the
+plan: epoch 2 `closed`, epoch 3 `open` at 0 changes.
+
+| # | Finding | What changed |
+|---|---|---|
+| 1 | No consumer meets the suppression and lock requirements yet; enforcing on day one would redden every build | E7 follows the README's own adoption rule: S1's dry run lists findings per consumer with `--warn`; **S1b remediation stories** (one per consumer kind, split per consumer in E7's stories document) generate the locks, register or justify suppressions per § 3.4, add the `tsconfig` flags and `.npmrc`; each flips that consumer's CI step to enforcing in the same pull request; enforcing stays the END state and § 11's box; the budget is the dry run's findings list, seeded with today's counts (270 + 16 `eslint-disable` lines, one missing `noEmitOnError`, four `.npmrc` files, zero .NET locks across six consumers, zero `NoWarn` found) (§ 4.6, § 11, E7) |
+| 2 | `dotnet msbuild -getProperty` on an unrestored project can answer defaults or fail | The .NET half runs it only after a successful locked restore; otherwise INCOMPLETE, never a false finding; fixtures for an unrestored and a restored project (§ 4.6, § 10, E3.S2) |
+| 3 | Manifest selectors were asymmetric | Mapped through the correspondence table: the doctrines select `.csproj` ↔ `package.json`; the package rules select `.csproj`/`Directory.*.props`/`NuGet.Config` ↔ `package.json`/`.npmrc`; a `dependencies` scope on either manifest evaluates the same rule kinds, asserted by the normalised-selection test; the `.npmrc` pins re-measured (`storage --file .npmrc` ≤ 32,100 B sets `npm-packages.md` ≤ 3,500 B as a hard cap; `inspect --file package.json` ≈ 43,600 B, a split read as before) (P20, § 4.1, § 4.4, § 4.5, § 5) |
+| 4 | Suppression equality held by prose only | `strictness-check` rejects a file-wide `eslint-disable` without a rule id and any `eslint-disable` line without a same-line `-- reason`; a `#pragma warning disable` without a warning id or without a same-line `// reason`; fixtures for both violations and the valid form on each side (§ 3.4, § 4.6, § 10, E3.S2) |
+| 5 | The typed doctrine (branded types, typed results) cannot apply to plain JavaScript as written | Chosen by enforceability: option (a) — JavaScript inside a TypeScript project is type-checked (`allowJs` + `checkJs` under `strict`, JSDoc types) and follows the doctrine, `equal`; the check requires `checkJs` where a project includes `.js/.mjs/.cjs`; in a repository with no TypeScript project the typed parts are `deliberately-absent` with the reason in the inventory and § 0's JavaScript paragraph states the enforceable subset (`Object.freeze` at the boundary, Result objects, boundary validation, complexity ≤ 4 and `no-console` by lint); option (b), a separate JavaScript rule, rejected as a second body and a competing selector (P5, § 4.4, § 4.6) |
 
 ## Epics
 
@@ -887,13 +1120,22 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
 
 - **Goal:** every later text has a place, a selector, a gate and a byte allowance before it is written; the parity
   matrix is a file with a test; selection is pinned per representative scope.
-- **Scope:** `tools/lib/rule-catalog.mjs` (`path_tasks`), `tools/rules.test.mjs`, `research/parity-matrix.json` and its
-  test, the byte-equality test for moved blocks, `research/module_rules.md`, `ENTRY.md` step 7.
-- **Stories document:** [PLAN_node_rule_parity_E1.md](PLAN_node_rule_parity_E1.md) — written by Opus when the epic
-  started (2026-10-31), reconciled with epoch 2; no story is a cornerstone, so the ledger line above is unchanged.
+- **Scope:** `tools/lib/rule-catalog.mjs` (`path_tasks`), `tools/rules.test.mjs`, `research/parity-matrix.json`,
+  `research/parity-inventory.json`, `research/consumers.json`, `research/selection-matrix.json` (the pinned id lists and
+  the declared gates of new files), `research/moved-blocks.json` and the two tools that write and check them —
+  `tools/moved-blocks.mjs` (with `tools/lib/moved-blocks.mjs`) and `tools/selection-matrix.mjs` — plus
+  `tools/lib/parity-epics.mjs` (the owning-epic vocabulary the activation tests share), their tests,
+  `research/module_rules.md`, `ENTRY.md` step 7 (§ 17, O12 — the first scope line named neither the consumers file nor
+  the tools).
 - **Stories:** S0 the preparatory wording-only anonymisation of `typescript/doctrine.md` § 1 (§ 4.4) — its own commit,
   `rule-bodies.mjs --update typescript.doctrine`, listed as wording with no lesson removed, BEFORE S4 records a hash
-  (§ 16, finding 3) · S1 the gate key: semantics, errors, `reasons`, tests · S2 the selection/budget matrix of § 4.1
+  (§ 16, finding 3); the list is the three file names, "a real vault", **and the two the first list missed** (§ 17,
+  O8): `:37` "a **synced** vault" → "a **synced** credential store", `:39` `scriptInterpolation.test.ts` → "the
+  scan test" · **S0b the whitespace-only splits** (§ 4.3): a line break before "Everything below applies everywhere."
+  in `common/testing.md:33` and a paragraph break after the .NET-only cadence sentence in `csharp/nuget-packages.md:41-43`,
+  its own commit, `rule-bodies.mjs --update common.testing csharp.nuget-packages`, with the D1 check in the commit
+  message (the two files with all whitespace removed are byte-identical before and after), BEFORE S4 records a hash ·
+  S1 the gate key: semantics, errors, `reasons`, tests · S2 the selection/budget matrix of § 4.1
   measured and recorded, with the per-scope id-list tests · S3 `parity-matrix.json` with every P/R row and its test
   against the catalog and the recorded sections — the `stronger-*` whitelist `['P4']` (any other such row fails, reason
   or not), the per-side `selectors`/`mood`/`enforcement`/`consequence`/`suppression` fields on every `equal` row with
@@ -908,27 +1150,43 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   lines, commit and destination into `research/moved-blocks.json`; the test compares each destination's bytes with the
   manifest and reads no history — **CI stays at `actions/checkout`'s `fetch-depth: 1`; the manifest is the evidence,
   and a `fetch-depth: 0` is not adopted** (§ 16, stories-writer point 1); the recording happens AFTER S0, so the `typescript/doctrine.md`
-  § 1 entry hashes the anonymised text and a move folded into a wording change is a red test; the first entries are the
-  blocks of § 4.3 as re-measured (testing `:12-31` 1,113 B and the 115 B Rust sentence among them) · S5 the byte
-  allowances of § 5 written into `module_rules.md` and the single-read list of D5 (with `gpu --file src/x.cs` on it).
+  § 1 entry hashes the anonymised text and a move folded into a wording change is a red test; the entries are the EXACT
+  ranges of § 4.3 (every one whole lines, fences unsplit — reliability `:104-133`, `:49-54`, `:55-59`, `:66-69`,
+  `:97-98`, `:99-102`; utc `:41-47`, `:65-69`; testing `:12-31`, `:354-358`, and the Rust sentence's two whole lines
+  after S0b's split; logging `:61-90`, `:153-171`, `:172-187`; the doctrine's `:15-48`, `:49-65`, `:66-79`, `:80-97` and
+  their DoD boxes; NuGet `:12-23`, `:25-29`, the `## Bumping` heading and its neutral paragraph after S0b's split,
+  `:50-54`), one entry each, recorded at this story's commit in the post-split numbering (O11); the recorder REFUSES a
+  range that is not whole lines or that would split a code fence, naming S0b as the remedy; and the gate declarations
+  with their positive and negative selection cases go into `selection-matrix.json` · S5 the byte allowances
+  of § 5 written into `module_rules.md` and the exact twenty-two-scope single-read list of § 5 (with `gpu --file
+  src/x.cs` on it), plus the declared gates of the four new gated files in `selection-matrix.json` (O3).
 - **Depends on:** nothing. **Done when:** `npm test` green with the new tests; the matrix test is red when an ACTIVATED
   row names a missing id or section, and when a `planned` row names no owning epic (both observed, then fixed); every
   `planned` row and move entry passes its structural check with its source bytes recorded; every tight scope's headroom
-  is in `module_rules.md`; one pull request through both gates.
+  is in `module_rules.md`; **the fixtures of § 10 are green — selection (one positive, one negative case per gated
+  rule), equality normalisation (one `equal` pair through the correspondence table, one mismatch that fails), heading
+  inheritance (MANDATORY from an ancestor H1; a section with none), the three move cases (an exact range, a
+  fence-balanced refusal, a mid-line refusal), and the two lock fixtures (`NU1004`, `EUSAGE`)** — before E2's stories
+  document is written; one pull request through both gates.
 
 ### E2 — Dependency policy (parallel after E1)
 
 - **Goal:** P9 and § 3.3's dependency rows; D14.
-- **Scope:** `common/dependencies.md` (new), `csharp/nuget-packages.md` (blocks moved out, paths only),
-  `typescript/npm-packages.md` (new), the manifest, the selection tests.
-- **Stories:** S1 the shared rule (moved blocks verbatim; the scan and the lock sentence added) · S2 the NuGet rule after
-  the move, with the pointer and the coupled-version exceptions kept · S3 the npm rule: declared range, lock resolution,
-  reproducible install, each with its probe line · S4 selection tests, manifest entries, the `inspect --file src/x.csproj`
-  measurement.
+- **Scope:** `common/dependencies.md` (new), `csharp/nuget-packages.md` (blocks moved out, paths only; **the .NET
+  lock-file mechanics added — G2 option A**), `typescript/npm-packages.md` (new), the manifest, the selection tests, the
+  two lock-enforcement fixtures.
+- **Stories:** S1 the shared rule (moved blocks verbatim; the scan and the both-sides lock requirement added) · S2 the
+  NuGet rule after the move, with the pointer, the coupled-version exceptions kept (`:31-37` never moves), the .NET
+  sentence and the `powershell` fence under their new heading, and the lock mechanics (`RestorePackagesWithLockFile`,
+  `packages.lock.json` committed, `RestoreLockedMode` under `CI`, `--force-evaluate` to move a lock) with the
+  **observed fixture**: a stale lock fails `dotnet restore --locked-mode` with `NU1004`, passes after `--force-evaluate`
+  (§ 3.3) · S3 the npm rule: declared range, lock resolution, reproducible install, each with its probe line, the
+  `EUSAGE` fixture among them · S4 selection tests, manifest entries, the `inspect --file src/x.csproj` measurement.
 - **Depends on:** E1. **Done when:** `dependencies --file package.json` selects `common.dependencies` and
   `typescript.npm-packages` and not `csharp.nuget-packages`; E2's matrix rows and move entries are activated (no longer
-  `planned`) and the byte-equality test passes for the four moved blocks against their recorded source hashes; one pull
-  request through both gates.
+  `planned`) and the byte-equality test passes for every move entry E2 owns against its recorded source hash — the count
+  is `moved-blocks.json`'s, never a number typed here; both lock fixtures are in the suite and green; one pull request
+  through both gates.
 
 ### E3 — Compiler/lint enforcement contract (cornerstone area 1)
 
@@ -942,11 +1200,16 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   suppression policy (**cornerstone**) · S2 the check, both halves: the one TypeScript-repository predicate; `tsc`
   resolved through `createRequire(...).resolve("typescript/bin/tsc")` or a walk up the parents' `node_modules/.bin`;
   effective configuration via `tsc --showConfig`; the .NET half via `dotnet msbuild -getProperty:TreatWarningsAsErrors
-  -getProperty:Nullable -getProperty:NoWarn -getProperty:WarningsNotAsErrors -m:4` per project, with the SDK baseline
-  file and the props/csproj declaration read (R-4); the six invalid TypeScript fixtures, the hoisted-install fixture that
-  must pass, the `.ts`-without-project fixture with its exact expected line and exit, the five .NET fixtures (the
-  defaults-only VALID one, the two suppression INVALID ones among them); INCOMPLETE only when the predicate says
-  TypeScript and nothing resolves, or projects exist and no SDK (or no baseline for the pinned SDK) resolves; `--warn` ·
+  -getProperty:Nullable -getProperty:NoWarn -getProperty:WarningsNotAsErrors -m:4` per project — **only after a
+  successful locked restore, else INCOMPLETE** (§ 18, finding 2) — with the SDK baseline file and the props/csproj
+  declaration read (R-4); the inline-suppression readers on both sides (`eslint-disable` without rule id or same-line
+  reason; `#pragma warning disable` without id or same-line reason — § 18, finding 4); the `checkJs` requirement for a
+  project that includes `.js/.mjs/.cjs` (finding 5); the six invalid TypeScript fixtures, the hoisted-install fixture
+  that must pass, the `.ts`-without-project fixture with its exact expected line and exit, the `.mjs`-without-`checkJs`
+  fixture, the three suppression fixtures per side (no id, no reason, valid), the .NET fixtures (the defaults-only
+  VALID one, the two props-suppression INVALID ones, the unrestored project → INCOMPLETE, the restored project →
+  evaluated); INCOMPLETE only when the predicate says TypeScript and nothing resolves, or projects exist and no SDK (or
+  no baseline for the pinned SDK) resolves, or the locked restore did not succeed; `--warn` ·
   S3 the C# § 1 line and the `gpu --file src/x.cs` measurement ·
   S4 the documents and the dry-run command for E7.
 - **Depends on:** E1. **Done when:** each invalid fixture fails naming the file and the defaults-only .NET fixture
@@ -957,8 +1220,9 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
 
 - **Goal:** D4, P1, P5–P7, R3 (as two gated Definition-of-Done rules, § 4.4); the doctrine becomes the mirror of
   `csharp/doctrine.md` § 1–§ 7 by meaning.
-- **Scope:** `typescript/doctrine.md` (§ 0 added; § 1, § 3, § 4 moved out verbatim to the E5/E6 files, which this epic
-  creates as placeholders holding exactly the moved text so no byte is in flight), `csharp/definition-of-done.md` and
+- **Scope:** `typescript/doctrine.md` (§ 0 added; § 1, § 2, § 3, § 4 moved out verbatim to `typescript/boundaries.md`
+  and `typescript/testing.md`, which this epic creates as placeholders holding exactly the moved text so no byte is in
+  flight — O10; `csharp/boundaries.md` is created here too, by S5), `csharp/definition-of-done.md` and
   `typescript/definition-of-done.md` (the two gated checklists, § 4.4 — the C# one NOT in `csharp/doctrine.md`, so
   `gpu --file src/x.cs` stays one read), `common/coding-style.md:32`, the selectors (`.js/.mjs/.cjs`).
 - **Stories:** S1 § 0: readonly contracts, branded domain types with parsing factories, discriminated outcome and absence
@@ -968,7 +1232,7 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   its two measured readers and the typed fixture of § 14 item 4 — `json-lossless.d.ts` declaring the reviver's
   `context` and `JSON.rawJSON`/`isRawJSON`, a `parseLossless` wrapper as the single road in, compiled under the pinned
   TypeScript and run on Node 26 against `{"id":9007199254740993}` (**cornerstone**) · S2 ONE commit: the moves of
-  § 1 (already anonymised by E1.S0), § 3, § 4 with their DoD boxes into `typescript/boundaries.md` and
+  § 1 (already anonymised by E1.S0), § 2, § 3, § 4 with their four DoD boxes into `typescript/boundaries.md` and
   `typescript/testing.md`, each created with its full front matter (`id`, `load`, `paths`, `path_tasks`, `depends`) and
   its manifest entry, byte-equal to the hashes E1.S4 recorded (the first revision's two-commit shape (a)+(b) is
   superseded by § 16, finding 3: (a) is now E1.S0) · S3 the two gated Definition-of-Done rules (`csharp/definition-of-done.md`,
@@ -980,8 +1244,8 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   on the wire or the lossless reviver, with § 0 keeping one pointer line.
 - **Depends on:** E1, E3 (the strictness line § 0 carries points at E3's rule — R-5). **Done when:** `inspect --file
   ui/a.ts` and `inspect --file src/a.mjs` ≤ 30,116 B; the matrix rows P5–P7 are activated and point at § 0's sections;
-  the three move entries are activated and the byte-equality test is green against the source hashes E1.S4 recorded
-  after E1.S0; `gpu --file src/x.cs` ≤ 32,768 B with the Definition of Done gated; the catalog loaded and `npm test` was
+  E4's move entries (`moved-blocks.json`'s count — four ranges today, § 1–§ 4 — O10) are activated and the
+  byte-equality test is green against the source hashes E1.S4 recorded after E1.S0; `gpu --file src/x.cs` ≤ 32,768 B with the Definition of Done gated; the catalog loaded and `npm test` was
   green after the commit; the ownership check finds no name; one pull request through both gates.
 
 ### E5 — Runtime lifecycle (cornerstone area 3)
@@ -1003,9 +1267,10 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
 ### E6 — Application contracts, with their C# and Rust counterparts
 
 - **Goal:** P10–P12, P14, P16–P19, R1, R2, R4, R5; D6, D10, D11.
-- **Scope:** `typescript/testing.md`, `typescript/logging.md`, `typescript/utc-timestamps.md`,
-  `typescript/boundaries.md` (new, gated); `csharp/testing.md`, `csharp/logging.md`, `csharp/utc-timestamps.md`,
-  `csharp/boundaries.md` (new, gated; the moved blocks plus the reverse items); `rust/testing.md`, `rust/logging.md`,
+- **Scope:** `typescript/logging.md`, `typescript/utc-timestamps.md` (new, gated); `typescript/testing.md` and
+  `typescript/boundaries.md` (created by E4.S2 as placeholders holding the moved doctrine sections — E6 FILLS them, O12);
+  `csharp/testing.md`, `csharp/logging.md`, `csharp/utc-timestamps.md` (new, gated; the moved blocks plus the reverse
+  items); `csharp/boundaries.md` (created by E4.S5 with P6's C# half — E6 adds R1's Razor output encoding); `rust/testing.md`, `rust/logging.md`,
   `rust/utc-timestamps.md` (the moved Rust sections; `rust/doctrine.md` § 9's pointer updated); the invariant and
   pointer lines in `common/testing.md`, `logging-serilog.md`, `utc-timestamps.md`; the rows and phrases of D6 in
   `http-contracts.md`, `platform-limits.md`, `post-deploy-checks.md`, `security.md:18`; `tools/http-coverage.mjs`'s
@@ -1026,11 +1291,27 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   `reason`; bump pull requests (pinned-by last); the per-arm record's commands handed to the other plan; this plan's
   promotion.
 - **Stories:** S1 the dry run: the new check with `--warn` and `explain` for the representative scopes against each
-  consumer's checkout, findings recorded · S2 `mcp__coai__review_feature` over the seven epics · S3 the promotion
-  (`README.md:100-122`) and the `release-distance` read · S4 the bumps, each with `pin-check` green after its commit, the
-  `dotnet`, `typescript` and `mixed` kinds adding the `strictness-check` step in ENFORCING mode — non-zero on findings, no
-  `--warn` (R-1; § 16, finding 6 — the dry run of S1 is the only `--warn` run, and its findings are fixed or recorded
-  before the bump) · S5 the sha and the per-arm record commands handed to the
+  consumer's checkout, findings recorded; **for every .NET-bearing consumer (`dotnet` and `mixed` kinds), the NuGet
+  locks generated in the dry run (`RestorePackagesWithLockFile`, one `packages.lock.json` per project) and the
+  locked-mode restore tried, so the bump pull request carries a lock that already restores — the adoption cost (G2
+  option A) recorded per consumer: projects, lock sizes, any `NU1004` met and how it was resolved**; the dry run's
+  findings list per consumer IS the remediation budget · **S1b remediation, one story per consumer kind in E7's stories
+  document (split per consumer there), following the README's adoption rule (§ 18, finding 1):** the .NET-bearing kinds
+  (six consumers: the three `dotnet` and the three `mixed`) — `RestorePackagesWithLockFile` in `Directory.Build.props`,
+  one `packages.lock.json` per project generated and committed (one of them has seven projects by the README; the rest
+  counted in S1), `RestoreLockedMode` under `CI`, every `#pragma warning disable` given its id and same-line reason (none
+  found in two server trees on 2026-10-31; S1 counts the rest), no `<NoWarn>`/`<WarningsNotAsErrors>` in props (none
+  found in three); the TypeScript-bearing kinds (four consumers: one `typescript`, three `mixed`) — every `eslint-disable`
+  line given a rule id and a same-line reason or removed (measured 2026-10-31: 270 lines in one consumer, 16 in another,
+  the other two counted in S1), the typed-fixtures `ignores` kept as the legitimate exclusion § 3.4 names, `noEmitOnError`
+  where it is missing (one consumer today), `--max-warnings 0` in every `lint` script, `.npmrc` with `save-exact=true`
+  beside every `package.json` (four files), `checkJs` where a project includes `.mjs`; each story ends by flipping that
+  consumer's CI step from `--warn` to enforcing in the same pull request · S2 `mcp__coai__review_feature` over the seven
+  epics · S3 the promotion (`README.md:100-122`) and the `release-distance` read · S4 the bumps, each with `pin-check`
+  green after its commit, the `dotnet`, `typescript` and `mixed` kinds adding the `strictness-check` step with `--warn`
+  (R-1; § 16, finding 6 — ENFORCING is the end state, reached per consumer when its S1b story merges; § 18 superseded
+  "no `--warn` in the bump"), **and the .NET-bearing kinds committing their `packages.lock.json` files with
+  `RestoreLockedMode` wired under `CI`** (G2) · S5 the sha and the per-arm record commands handed to the
   experiment's E0.S3 and confirmed equal · S6 this plan promoted with deviations.
 - **Depends on:** E1–E6 merged. **Done when:** every box of § 11 is ticked.
 
