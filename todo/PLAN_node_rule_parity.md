@@ -1,10 +1,11 @@
 # PLAN — C#/Node rule parity: every C# requirement has a Node/TypeScript counterpart of equal strength, and the reverse
 
-> Status: **plan only, nothing implemented yet; stopped for re-review, 2026-10-31 — epoch 3 reached its second change
-> with the cadence consult for epics 1–3 (`69c2eb3f`: entries 3.2–3.4, § 19) after its one allowed change (3.1); epoch 2
-> had closed at its own second change (§ 17) and epoch 1 at its own (§ 14); the epoch 3 plan round had returned
-> `proceed` with both reviewers answering (§ 18); revised the same day after the question consultants, consult
-> `ce61c905`, and the operator's "we only add" rule — § 0.** Scope: the shared rule corpus (`common/`,
+> Status: **plan only, nothing implemented yet; epoch 4 open with 0 changes, 2026-10-31 — epoch 3 closed at its second
+> change (the cadence consult for epics 1–3, entries 3.2–3.4, § 19) after its one allowed change (3.1); the re-review
+> revised the whole plan (§ 19, consults `69c2eb3f`, `354b1a67`), its plan round returned `proceed` and the second full
+> reading by the document gate returned `proceed` with all four reviewers (§ 20); epoch 2 had closed at its own second
+> change (§ 17) and epoch 1 at its own (§ 14); revised the same day after the question consultants, consult `ce61c905`,
+> and the operator's "we only add" rule — § 0.** Scope: the shared rule corpus (`common/`,
 > `csharp/`, `rust/`, `typescript/`), its selection metadata and one new metadata key in the resolver
 > (`tools/lib/rule-catalog.mjs`), `research/rule-bodies.json`, a machine-readable parity matrix and its test, the
 > selection and size tests in `tools/rules.test.mjs`, two tools (`tools/http-coverage.mjs`'s `--routes` path for Node; a
@@ -14,8 +15,8 @@
 > ([plan-change-control.md](../common/plan-change-control.md); the round is recorded in § 13); the PR #94 review of the
 > same day is entries 1.1–1.5 and the stop (§ 14); the re-review's revision of the whole plan — the epoch 2 baseline,
 > consult `58f05c75` — is § 15, its review round (the interim path, `mcp__coai__review_document`, verdict `proceed`,
-> six findings accepted as baseline) is § 16; epoch 2 closed at its second change (§ 17); epoch 3 stopped at its second
-> change after 3.1, and the re-review's revision for epoch 4 is § 19; the owner's approval is still to come.
+> six findings accepted as baseline) is § 16; epoch 2 closed at its second change (§ 17); epoch 3 closed at its second
+> change after 3.1, its re-review is § 19–§ 20 and epoch 4 is open at 0 changes; the owner's approval is still to come.
 >
 > Related docs: [csharp/doctrine.md](../csharp/doctrine.md), [typescript/doctrine.md](../typescript/doctrine.md),
 > [rust/doctrine.md](../rust/doctrine.md), [csharp/nuget-packages.md](../csharp/nuget-packages.md),
@@ -70,7 +71,7 @@ Narrowed: no — judged against the epoch 2 baseline `400d878` + `01d1bbf`: G2 i
 |---|---|---|---|
 | The E1 stories document (planning work, not on main; nothing was built) | `feat/rule-parity-e1`, `72aaf8c` | fits | kept — to be reconciled with the epoch 3 revision (§ 17: E1.S0b, the provenance gates, the normalised equality, the exact ranges, the fixtures) when E1 starts; judged by the team lead as the Opus judge, 2026-10-31 |
 
-> Epoch 3 · approved 2026-10-31 · by reviewers · state: stopped
+> Epoch 3 · approved 2026-10-31 · by reviewers · state: closed
 
 - 3.1 · 2026-10-31 · agent · contract — E1 stories O1: `typescript/testing.md`'s gate had no form the provenance rule accepts (its first text is doctrine § 2–§ 4, whose source has no `tasks:` line, so it would mirror as "no gate"); approved as the fifth declared gate, `implement, test, audit, policy, release` — the trap texts are test-and-fixture discipline that loads where tests are written or reviewed, and the gate preserves § 5's `.ts` budgets
 - 3.2 · 2026-10-31 · agent · contract — cadence consult `69c2eb3f`: the equality model cannot express a requirement that lives in different rule locations per side; P2, P3 and P4's C# side is `csharp/doctrine.md` (`.cs/.razor/.csproj`) and their TypeScript side is `typescript.compiler-strictness` (`tsconfig*.json`), so the normalised-selection test that compares source-file sets can never pass the real rows
@@ -86,6 +87,8 @@ Narrowed: no — judged against the epoch 3 baseline `2ee02c4` + 3.1: every guar
 | Work | Where | Verdict | Action |
 |---|---|---|---|
 | The E1 stories document (planning work, not on main; nothing was built) | `feat/rule-parity-e1`, `3b7d7db` | fits | kept as the input to E1; to be rewritten to the slimmed E1 of § 19 (the baseline hashes, the real-row proof, the lock fixtures kept) when E1 starts — judged by the team lead as the Opus judge, 2026-10-31 |
+
+> Epoch 4 · approved 2026-10-31 · by reviewers · state: open
 
 ## 0. Decisions
 
@@ -439,7 +442,13 @@ let a wording change folded into a move pass the preservation check, so the entr
 the commit that changed the source block OUTSIDE the move (its own commit, a recorded wording change such as E1.S0's,
 or a commit named by a ledger entry) — and the checker verifies that the cited commit exists in the repository and
 touches only the source file(s) of the block; **a move commit may never also change the block's words** — a destination
-whose bytes differ from the newest entry fails whatever the commit message says. The recorder writes the
+whose bytes differ from the newest entry fails whatever the commit message says. **The activation of an UNCHANGED
+baseline entry** (the second full reading, § 20): when the owning epic moves a block whose bytes still equal E1's
+baseline, it appends a DESTINATION record that references the baseline by id (`activates: "<baseline id>"`, with the
+destination file, the destination range and the move commit); the checker pairs the two, the baseline stays immutable,
+and a paired baseline is no longer counted as `planned`; an UNPAIRED baseline whose owning epic has landed (its id in
+the test's `LANDED_EPICS`) is a finding. The superseding procedure above is for CHANGED blocks; activation is for
+unchanged ones — every baseline entry ends in exactly one of the two. The recorder writes the
 file as one JSON array, inserting the separating comma between entries (E1's plan round, brief fix 1), so an append
 never produces an unparsable file — the same stance `research/shared-rules-migration-map.json` takes for
 the 24 migrated bodies. It differs from `research/rule-bodies.json` on purpose: `recordFor()` there hashes the CURRENT
@@ -832,6 +841,7 @@ E5 and E6 gated rules: no single-read cap, each measured and recorded; `typescri
 | **The record per benchmark arm (D13):** the conventions sha; the selected rule ids and hashes per stack for the arm's scopes (`explain` output, kept); the toolchain versions (compiler, parser, lint, Node, SDK); the effective checks that ran (the composite gate's commands and exit codes) | this plan provides the `explain` and check commands and their expected shape (§ 10); the other plan runs and records them per session | its T14 says "the bytes read per session are in the record" — this adds ids, hashes and checks, because equal source ownership does not prove equal instructions reached the agents |
 | The record of rule bytes actually read per session (its T14) | the other plan | this plan records the bytes per scope (§ 5) so the two numbers can be compared |
 | The consumers' bump pull requests and the dry run | this plan (E7) | none — a consumer change the experiment does not see |
+| **The TypeScript toolchain — a conflict the owner must reconcile (Q2):** this plan's D7 binds the family to ONE tested combination, Node 26 LTS + TypeScript 6.0.x + typescript-eslint 8.72.x (peers `<6.1`); the other plan's D6 pins **TypeScript 7.0.2** for the Node stack today | the owner, through Q2's override: either the experiment's Node arm runs TypeScript 7 without type-aware lint (a recorded change here with its parity consequence — the lint rows of P2/P3 become `deliberately-absent` with that reason) or the other plan moves to the D7 combination | the other plan's pre-registration records whichever the owner chose and why; until then D7 holds here and nothing blocks E3/E4 (§ 20) |
 | **The C# task workspaces are prepared and LOCKED before measurement** (G2 option A, § 3.3): `packages.lock.json` generated and committed in every `csharp/<task>/` workspace at the pinned task-repository sha, `RestorePackagesWithLockFile` and `RestoreLockedMode` in place, so a C# agent inherits a locked restore exactly as a TypeScript agent inherits `package-lock.json` and `npm ci` — neither pays a migration during a measured session | the other plan's E1 (the task repository's workspaces), using the rule this plan ships | this plan names the requirement and the fixture; the other plan's pre-registration records both locks' hashes beside the package-set hashes |
 
 Order: this plan first; its release is a precondition of the other plan's pre-registration (its D23). Disjoint: nothing
@@ -1000,10 +1010,14 @@ the lifecycle as the three cornerstones.
 - [ ] The always core ≤ 16,384 B with its additions ≤ 300 B; every scope in the exact twenty-two-scope single-read list
       of § 5 ≤ 32,768 B, `gpu --file src/x.cs` among them (measured ≤ 32,613 B after E3's `Nullable enable` line and
       E5's core phrases); the before/after table is in `research/module_rules.md`.
-- [ ] The TypeScript toolchain is stated as one tested combination with its read date (D7); the operator's answer to Q2
-      is recorded.
+- [ ] The TypeScript rules state and the consumers adhere to D7's pinned combination — Node 26 LTS, TypeScript 6.0.x,
+      typescript-eslint 8.72.x (peers `<6.1`) — with its read date; D7 is binding (§ 20). Q2 is an OWNER OVERRIDE only:
+      if the owner chooses TypeScript 7 without type-aware lint, that is a recorded change with its parity consequence
+      (the lint rows of P2/P3 become `deliberately-absent` with that reason); the conflict with the benchmark plan's
+      TypeScript 7.0.2 pin is named in § 6 for the owner to reconcile.
 - [ ] `tools/strictness-check.mjs` exists with both halves, finds `tsc` through package resolution (and passes the
-      hoisted-install fixture), applies one TypeScript-repository predicate, reads the effective configuration on both
+      hoisted-install fixture), applies two predicates (the compiler predicate and the JavaScript-lint predicate — § 4.6,
+      § 19, P21), reads the effective configuration on both
       sides (`tsc --showConfig`; `dotnet msbuild -getProperty`, `NoWarn` and `WarningsNotAsErrors` included, SDK defaults
       told apart by the baseline and the repository's own declarations), is proven on the invalid and the defaults-only
       fixtures of § 4.6, is in `README.md` § *tools* and `ROLLOUT.md` as the complement of `build-flags-check`, and the
@@ -1045,9 +1059,13 @@ Not settled here; the owner or the named epic decides. No answer is invented.
   or a package is unlisted, Microsoft documents lock files for repeatable restores — and found that admitting G2 as an
   exception against epoch 2's explicit "only P4" would itself be a narrowing. The question as first asked: *raise .NET
   to `packages.lock.json` + `dotnet restore --locked-mode` (a change in six consumers), or record the asymmetry?*
-- **Q2 The TypeScript toolchain (D7).** TypeScript 6.0.x with full type-aware lint (the tested combination the rule
-  states), or TypeScript 7 without type-aware lint until typescript-eslint supports it — and if the latter, what stands in
-  for `no-floating-promises` and the complexity rule meanwhile?
+- **Q2 The TypeScript toolchain — an OWNER OVERRIDE, not an open decision** (§ 20). D7 is binding: Node 26 LTS,
+  TypeScript 6.0.x, typescript-eslint 8.72.x (peers `<6.1`), one tested combination, and nothing in E3/E4 waits on this
+  question. The owner MAY override it and choose TypeScript 7 without type-aware lint; that is a recorded plan change
+  with its parity consequence (the lint rows of P2/P3 become `deliberately-absent` with that reason), and it would also
+  have to say what stands in for `no-floating-promises` and the complexity rule meanwhile. **The reason the question
+  stays open:** the benchmark plan (`dew_flow_benchmark · todo/PLAN_lang_comparison_v2.md`, D6) pins TypeScript 7.0.2
+  for the Node stack today, which conflicts with D7 — § 6 names it for the owner to reconcile.
 - **Q3 The single-read list.** D5 takes `ui --file ui/a.ts` out of it so the webview trap reaches `ui`. Numbers: with
   `ui` in the boundaries rule's gate ≈ 33,570 B; without, ≈ 31,300 B and the trap does not load for the task it was written
   for. **Superseded in part (§ 16):** "`gpu --file src/x.cs` is estimated at ≈ 32,660 B (105 B left) once the C#
@@ -1056,8 +1074,10 @@ Not settled here; the owner or the named epic decides. No answer is invented.
   trap not loading for `ui`.
 - **Q4 The check's reader.** `tsc --showConfig` from the consumer's own `node_modules` (the compiler resolves `extends`;
   INCOMPLETE when absent), or a JSONC parser of our own (a new dependency, and a second implementation of `extends`)?
-- **Q5 `.js/.mjs/.cjs` select the TypeScript doctrine** — including this repository's own `tools/`. Confirm, or leave
-  plain JavaScript with the always core only, as `ENTRY.md:57-58` allows?
+- **Q5 — closed 2026-10-31 in the epoch 4 re-review (§ 19, § 20):** `.js/.mjs/.cjs` and `**/package.json` select the
+  TypeScript doctrine, landing in E3 with the minimal P2/P3 statement (consult `354b1a67`); this repository's own
+  `tools/*.mjs` then load the doctrine on an `inspect` (§ 5). E3 waits on nothing here. The question as first asked:
+  *confirm, or leave plain JavaScript with the always core only, as `ENTRY.md:57-58` allows?*
 - **Q6 Framework names in `http-contracts.md`.** Rows named "Fastify / Express" (the experiment's Node web stack is
   Fastify), or the shape only ("`app.<verb>(path)` grouped by the registered prefix")?
 - **Q7 A C# complexity analyzer.** Keep complexity ≤ 4 as prose on the C# side while TS enforces it by lint, or name an
@@ -1277,6 +1297,20 @@ rejected on O6's repair) is folded in where the plan states those things.
 > right fix for the plain-JavaScript gap, or should the JavaScript floor be a rule of its own; (3) does moving the
 > recording, the declarations, the lock fixtures and the consumer inventory out of E1 lose any guarantee E1's green
 > exit gave; (4) is anything in the epoch 4 revision a narrowing against the epoch 3 baseline `2ee02c4` + 3.1?
+
+## 20. Epoch 4's second full reading (2026-10-31) — four findings, the baseline, and the resume
+
+The epoch 4 re-review's plan round (§ 19) had `proceed` from one reviewer with the whole plan; the second full reading,
+through the document gate with all four reviewers, returned **`proceed`**. Four findings accepted as baseline (not
+entries); one — "the file is truncated" — rejected, because the file is whole and that reviewer had received a cut copy.
+Step 8 of the full stop then resumed the plan: epoch 3 `closed`, epoch 4 `open` at 0 changes.
+
+| # | Finding | What changed |
+|---|---|---|
+| 1 | How an UNCHANGED baseline move entry is activated was undefined | A destination record with `activates: "<baseline id>"`; the checker pairs it with the immutable baseline, a paired baseline is no longer `planned`, an unpaired baseline whose epic has landed is a finding; the superseding procedure stays for changed blocks (§ 4.3) |
+| 2 | Q5 was still open although the re-review decided it | Q5 closed with the pointer: the JavaScript and manifest selectors land in E3 (§ 19); E3 waits on nothing (Q5) |
+| 3 | § 11 made the toolchain depend on "the operator's answer to Q2" while D7 states one tested combination | D7 is binding — Node 26 LTS, TypeScript 6.0.x, typescript-eslint 8.72.x — and § 11 requires adherence to it; Q2 is rephrased as an OWNER OVERRIDE (TypeScript 7 without type-aware lint = a recorded change with its parity consequence: P2/P3's lint rows `deliberately-absent` with that reason); the conflict with the benchmark plan's TypeScript 7.0.2 pin (its D6) is named in § 6 for the owner to reconcile; until then nothing blocks E3/E4 (§ 6, § 11, Q2) |
+| 4 | § 11's strictness-check item still said "one TypeScript-repository predicate" | "applies two predicates (the compiler predicate and the JavaScript-lint predicate)", matching § 4.6, § 19 and P21 (§ 11) |
 
 ## Epics
 
