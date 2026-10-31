@@ -457,7 +457,7 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
 - **Fix.** Both keys: inside the profile AND the owner SID is the caller's user SID; either one unreadable fails closed (listed, never touched). RED
   first: a fixture inside the profile whose owner is another SID, on the Windows run of F9.
 - **Found by.** The question consultant (GPT, consult `0cf2d245`), verified against the code on 2026-10-31. The C# and Rust ports (E3, E4 of the
-  rollout) check both keys from the start (owner decision 2026-10-31, R6 of the remainder plan).
+  rollout), not built yet, must check both keys: a criterion of their producer stage (owner decision 2026-10-31, R6 of the remainder plan).
 - **When.** With F9, before a Windows machine's janitor switch.
 - **Anchor.** `tools/lib/owned.mjs:209-228` (`isInsideProfile`, `isMine`); `tools/owned.test.mjs` (the path-boundary tests, no foreign-owner case).
 

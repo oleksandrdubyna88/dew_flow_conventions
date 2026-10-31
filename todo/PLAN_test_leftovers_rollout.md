@@ -393,8 +393,8 @@ spends 78 855 of coai's 80 000-byte budget, `src_mcp/tests/StageRulesTests.cs:14
 | E3 | mcp | E1 | nineteen sites, zero cleanup, no Docker: the smallest full adoption and the C# template — runs before E2's C# helper story |
 | E4 | sidecar_rust | E1 — independent of the other consumer epics | seven not-panic-safe removals, two pre-clean-only; the Rust shape of the helper |
 | E5 | coai | E1 — independent of the other consumer epics | the largest site count and a live-data sweep; needs the contract's concurrency sentence |
-| E6 | benchmark | E1; E6 waits for E3.S2 (its C# helper ports E3's merged S2 — E6's amended order) | the Testcontainers fixture and decision 2b's first use |
-| E7 | rag_qln | E1; E7.S3 waits for E3's merged helper | the shared-store contradiction must be settled before any rename, and needs 2a's wording |
+| E6 | benchmark | the merged-core release (R5); E6 waits for E3's merged producer stage (its C# helper ports E3's merged helper — E6's amended order; the producer stage is one PR since 2026-10-31) | the Testcontainers fixture and decision 2b's first use |
+| E7 | rag_qln | the merged-core release (R5); E7.S3 waits for E3's merged producer stage | the shared-store contradiction must be settled before any rename, and needs 2a's wording |
 
 ### Cornerstone areas
 
