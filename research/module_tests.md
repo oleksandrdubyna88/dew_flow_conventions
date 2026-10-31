@@ -1377,3 +1377,30 @@ case; dropping the CLI field fails the explain case; dropping the set comparison
 Not proved: that any real rule is correctly gated. No real rule carries `path_tasks` in the first epic; the selection
 baseline (`research/selection-matrix.json`) is the control that a later gate does not drop a rule from a scope silently.
 
+## The selection baseline (rule-parity E1.S2)
+
+`tools/selection-matrix.test.mjs` (six cases) and the new cases of `tools/rules.test.mjs`:
+
+- The committed `research/selection-matrix.json` equals what `render(catalog)` produces from the real catalog, byte for byte.
+- The file holds the 108 scopes once each in the tool's order, sorted unique ids, exactly the 22 pins (9, 4, 5, 4 per
+  single-read task), a reason of at least 10 characters on every other single-read scope, and no `ui` scope with a language
+  file on the list (D5).
+- A copy of the corpus with `tasks: ["dependencies"]` removed from `csharp/nuget-packages.md`: `idDrift` names
+  `dependencies (no file)` and `csharp.nuget-packages`, while `drifted` of the body freeze answers `[]` — the point of D12.
+- The tool on a copy: exit 0 `in step`; after a hand edit exit 1 naming the scope; `--write` restores the committed bytes and
+  leaves no `.tmp`; `--bytes` equals `bytesTable`; an unknown argument is usage, exit 2.
+- `gates` is `{}` (E1 declares nothing); the test is renamed when the first epic writes a record.
+- `rules.test.mjs`: every pin (read from the matrix file) selects at most 32,768 B (the original test name kept); every cap
+  of `CAPS` holds on the real catalog; a cap is red one byte over, for the core, for a rule, and for a rule capped from an
+  epic that has not landed (`typescript.doctrine`); `caseFindings`: the selection fixture of a positive and the defined
+  negatives passes, each missing negative and a case the selector contradicts is one finding, an ungated mirror needs its
+  no-path negative, an unknown task or a non-root-relative file is a finding.
+
+Observed RED: both files fail to load while the tool is missing. Mutations, each red in the named case: deleting one id from
+the recorded file (the byte-equality case and the tool case); pinning `inspect package.json` (the pins case, 35,409 B, and
+the 22-pin count); pinning `ui ui/a.ts` (the pins case, D5, while the one-read test stays green); lowering the core cap to
+15,054 B (the cap cases).
+
+Not proved: that the 108 scopes are the right ones (they are the representative file sets of the plan, not every path), that
+a pinned scope is the best list, or that a gate record's cases are sufficient for a rule's whole path list.
+

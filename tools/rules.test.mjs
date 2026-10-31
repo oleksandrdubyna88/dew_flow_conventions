@@ -5,7 +5,8 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { loadCatalog, selectRules, sha256, TASKS } from "./lib/rule-catalog.mjs";
-import { provenanceFindings } from "./lib/gates.mjs";
+import { provenanceFindings, caseFindings } from "./lib/gates.mjs";
+import { LANDED_EPICS } from "./lib/parity-epics.mjs";
 import {run} from "./lib/rule-cli.mjs";
 import {bodyOf, sectionsOf} from "./lib/rule-body.mjs";
 import { ownedDir } from "./lib/owned.mjs";
@@ -249,11 +250,15 @@ test("the rule brings planning-docs where planning-docs' own tasks do not reach"
 });
 
 test("every single-read scope of the four excluded tasks still fits one read",()=>{
+  // The pins are the single-read scopes recorded in research/selection-matrix.json (the 22 of plan section 5), not a list
+  // kept here: the matrix test fails when the file and the selection disagree, so this reads one source of truth.
   const catalog=loadCatalog(sourceRoot);
-  const scopes={inspect:[[],["src/x.cs"],["src/x.csproj"],["ui/a.ts"]],ui:[[],["src/x.cs"],["ui/a.ts"]],gpu:[[],["src/x.cs"]],storage:[[]]};
-  for(const [task,fileSets] of Object.entries(scopes))for(const files of fileSets){
-    const bytes=selectRules(catalog,[task],files).reduce((sum,rule)=>sum+rule.bytes,0);
-    assert.ok(bytes<=32768,`${task} [${files.join(",")}] selects ${bytes} B, over the 32768 B read`);
+  const matrix=JSON.parse(fs.readFileSync(path.join(sourceRoot,"research/selection-matrix.json"),"utf8"));
+  const pins=matrix.scopes.filter(scope=>scope.oneRead===true);
+  assert.ok(pins.length>0,"no pins recorded — the loop below would prove nothing");
+  for(const scope of pins){
+    const bytes=selectRules(catalog,scope.tasks,scope.files).reduce((sum,rule)=>sum+rule.bytes,0);
+    assert.ok(bytes<=32768,`${scope.name} selects ${bytes} B, over the 32768 B read`);
   }
 });
 
@@ -489,4 +494,106 @@ test("the real catalog carries no path_tasks gate and no gate record at E1",()=>
   const catalog=loadCatalog(sourceRoot);
   assert.deepEqual(catalog.filter(rule=>rule.pathTasks.length).map(rule=>rule.id),[],"E1 gates no real rule");
   assert.deepEqual(provenanceFindings(catalog,{},[]),[]);
+});
+
+// ---- the byte caps (E1.S2): a ceiling per scope, rule or core, from plan section 5 -------------------------------------
+// A rule cap applies whenever the rule exists; a cap with `from` applies once that epic is in LANDED_EPICS. The numbers are
+// the plan's: the always core 15,055 B + 300; `gpu --file src/x.cs` 32,293 + 20 + 300; the single-sentence and
+// three-sentence allowances of the dependency and compiler-strictness rules (O5: 3,300 B, not 3,500 B).
+const CAPS=Object.freeze([
+  {what:"the always core",core:true,max:15355},
+  {what:"gpu --file src/x.cs",tasks:["gpu"],files:["src/x.cs"],max:32613},
+  {what:"csharp.doctrine",rule:"csharp.doctrine",max:4633},
+  {what:"typescript.npm-packages",rule:"typescript.npm-packages",max:3300},
+  {what:"typescript.compiler-strictness",rule:"typescript.compiler-strictness",max:3300},
+  {what:"common.dependencies",rule:"common.dependencies",max:4000},
+  {what:"typescript.utc-timestamps",rule:"typescript.utc-timestamps",max:1200},
+  {what:"csharp.boundaries",rule:"csharp.boundaries",max:1400},
+  {what:"typescript.doctrine",rule:"typescript.doctrine",max:4700,from:"E4"},
+]);
+
+function capFindings(catalog,caps,landedEpics){
+  const byId=new Map(catalog.map(rule=>[rule.id,rule]));
+  const closure=new Set();
+  const addCore=id=>{ if(closure.has(id))return; closure.add(id); byId.get(id).depends.forEach(addCore); };
+  catalog.filter(rule=>rule.load==="always").forEach(rule=>addCore(rule.id));
+  const findings=[];
+  for(const cap of caps){
+    if(cap.from&&!landedEpics.includes(cap.from))continue;
+    let bytes;
+    if(cap.core)bytes=[...closure].reduce((sum,id)=>sum+byId.get(id).bytes,0);
+    else if(cap.rule){ if(!byId.has(cap.rule))continue; bytes=byId.get(cap.rule).bytes; }
+    else bytes=selectRules(catalog,cap.tasks,cap.files).reduce((sum,rule)=>sum+rule.bytes,0);
+    if(bytes>cap.max)findings.push(`${cap.what} is ${bytes} B, over its cap of ${cap.max} B`);
+  }
+  return findings;
+}
+
+// A rule file of EXACTLY `total` bytes (front matter included — the catalog's `bytes` is the whole folded file).
+function sizedRule(put,file,metadata,total){
+  const head=`---\n${metadata}\n---\n`;
+  put(file,metadata,"x".repeat(total-Buffer.byteLength(head)));
+}
+
+test("every cap holds on the real catalog",()=>{
+  assert.deepEqual(capFindings(loadCatalog(sourceRoot),CAPS,LANDED_EPICS),[]);
+});
+
+test("a cap is red one byte over: the core, a rule, and a rule whose cap starts at its epic",t=>{
+  const over=(file,metadata,total,landed=[])=>{
+    const {root,put}=fixture(t);
+    sizedRule(put,file,metadata,total);
+    return capFindings(loadCatalog(root),CAPS,landed);
+  };
+  assert.deepEqual(over("common/core.md","id: common.core\nload: always",15355),[],"the cap itself is allowed");
+  assert.equal(over("common/core.md","id: common.core\nload: always",15356).length,1);
+  assert.deepEqual(over("typescript/npm-packages.md",'id: typescript.npm-packages\nload: conditional\ntasks: ["dependencies"]',3300),[]);
+  assert.equal(over("typescript/npm-packages.md",'id: typescript.npm-packages\nload: conditional\ntasks: ["dependencies"]',3301).length,1);
+  const doctrine='id: typescript.doctrine\nload: conditional\ntasks: ["audit"]';
+  assert.deepEqual(over("typescript/doctrine.md",doctrine,4701,[]),[],"typescript.doctrine is capped from E4");
+  assert.equal(over("typescript/doctrine.md",doctrine,4701,["E4"]).length,1);
+});
+
+// ---- the selection cases of a gate record: a positive and the defined negatives (plan section 4.4) --------------------
+
+const CASE_RULE="csharp.mech";
+function caseFixture(t,record){
+  const {root}=provenanceFixture(t);
+  return caseFindings(loadCatalog(root),record);
+}
+const POSITIVE={tasks:["implement"],files:["src/x.cs"],selected:true};
+const OUT_OF_GATE={tasks:["inspect"],files:["src/x.cs"],selected:false};
+const NO_PATH={tasks:["implement"],files:["ui/a.ts"],selected:false};
+const gatedRecord=cases=>({[CASE_RULE]:{mirrors:"common.src",epic:"E2",cases}});
+
+test("a gated rule's record needs a positive, a negative outside the gate and a negative with no matching file",t=>{
+  assert.deepEqual(caseFixture(t,gatedRecord([POSITIVE,OUT_OF_GATE,NO_PATH])),[],"the selection fixture: a positive and the defined negatives");
+});
+
+test("a gated rule's record is red without each negative, and when a case does not hold under the selector",t=>{
+  const without=cases=>caseFixture(t,gatedRecord(cases));
+  const noOut=without([POSITIVE,NO_PATH]);
+  assert.equal(noOut.length,1);
+  assert.match(noOut[0],/csharp\.mech/);
+  assert.match(noOut[0],/outside the gate/);
+  const noPath=without([POSITIVE,OUT_OF_GATE]);
+  assert.equal(noPath.length,1);
+  assert.match(noPath[0],/no matching file/);
+  const wrong=without([POSITIVE,OUT_OF_GATE,NO_PATH,{tasks:["gpu"],files:["src/x.cs"],selected:true}]);
+  assert.equal(wrong.length,1);
+  assert.match(wrong[0],/gpu src\/x\.cs/);
+  assert.match(without([OUT_OF_GATE,NO_PATH]).join("\n"),/positive/);
+});
+
+test("an ungated mirror needs a negative with no matching file",t=>{
+  const record=cases=>({"typescript.doc":{mirrors:"csharp.plain",epic:"E2",cases}});
+  const positive={tasks:["inspect"],files:["ui/a.ts"],selected:true};
+  assert.deepEqual(caseFixture(t,record([positive,{tasks:["inspect"],files:["src/x.cs"],selected:false}])),[]);
+  assert.equal(caseFixture(t,record([positive])).length,1);
+});
+
+test("a case with an unknown task or a path that is not root-relative is a finding",t=>{
+  const bad=caseFixture(t,gatedRecord([POSITIVE,OUT_OF_GATE,NO_PATH,{tasks:["imlpement"],files:["src/x.cs"],selected:false},{tasks:["inspect"],files:["../x.cs"],selected:false}]));
+  assert.ok(bad.some(finding=>/imlpement/.test(finding)));
+  assert.ok(bad.some(finding=>/\.\.\/x\.cs/.test(finding)));
 });
