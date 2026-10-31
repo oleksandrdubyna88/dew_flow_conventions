@@ -63,8 +63,9 @@
         "is a forward move, and it need never have been on main. Required checks apply to a DIRECT PUSH,",
         "not only to a merge, so a hand-pushed commit that never ran ci is now refused by GitHub itself.",
         "",
-        "The two contexts are the ones ci.yml ACTUALLY reports on a push to main — measured, not read out",
-        "of the workflow. `strict` is false: it means `up to date with the base branch`, which a ref moved",
+        "The contexts are the ones ci.yml ACTUALLY reports on a push to main — measured, not read out",
+        "of the workflow. `tools · lock fixtures` is the third: it runs the two lock fixtures on every push and pull",
+        "request, is required HERE and not on main, and is applied only after the job has reported once. `strict` is false: it means `up to date with the base branch`, which a ref moved",
         "by direct push has no use for. This cannot break a legitimate promotion: promote-release.mjs",
         "already refuses a sha whose `ci` run is absent, unfinished or red, so every sha GitHub would",
         "reject here is one the gate refuses anyway. The two agree rather than overlap.",
@@ -84,7 +85,8 @@
         "strict": false,
         "contexts": [
           "tools · selftest",
-          "workflows · actionlint"
+          "workflows · actionlint",
+          "tools · lock fixtures"
         ]
       },
       "required_pull_request_reviews": null,

@@ -1471,3 +1471,37 @@ append-only case); changing one byte of line 110 of the reliability rule (the re
 Not proved: that no entry was edited after it was written (the diff and the review are the control); that a block moved to a
 destination keeps its meaning there (only its bytes).
 
+## The two lock fixtures and their required job (rule-parity E1.S4b)
+
+`tools/lock-fixtures.test.mjs` (five cases) over `tools/fixtures/locks/` (about 1.2 KB). Each fixture is copied into an owned
+folder and its commands run with a cleared environment plus `PATH`, its own `HOME`, npm cache and NuGet cache, so nothing is
+written to the checkout or to the real caches.
+
+- **npm.** `package.json` asks `picomatch` 4.0.6 and `package-lock.json` says 4.0.7: `npm ci --ignore-scripts --offline` exits 1
+  with `EUSAGE` and `lock file's picomatch@4.0.7 does not satisfy picomatch@4.0.6`, and installs nothing. The same project with
+  an honest lock installs, so the refusal is the lock's. **Deviation recorded:** the 4.0.6 is a local stub
+  (`file:./picomatch`) rather than a registry version. Resolving a registry spec needs its packument, which a cold npm cache
+  does not have offline (`ENOTCACHED`, measured here with an empty cache; the refusal the plan probed came from a warm
+  cache), while a local directory resolves from disk and the refusal text is identical.
+- **NuGet.** Two projects restored with a lock file; a project reference then makes the lock stale. A locked restore exits 1
+  with `NU1004`, `--force-evaluate` exits 0, a locked restore exits 0. No package source is contacted (a project reference, no
+  package). The SDK is the one `global.json` asks for.
+- **The case never goes quiet.** With no SDK it is a failure under `CI` (`dotnet SDK missing under CI — the NU1004 fixture must
+  run here`), a named skip otherwise, and a named skip whenever `LOCK_FIXTURES_JOB` is set. `ci.yml` sets that variable in
+  the `Selftest` step of `tools · selftest`, which has no SDK, so the NuGet case runs only in the new `tools · lock fixtures`
+  job (`actions/setup-dotnet` pinned by sha, the SDK taken from the fixture's `global.json`). A test reads `ci.yml` and the
+  protection file: the job, the sha pin of every `uses:`, the selftest variable, the context on `release` and not on `main`.
+
+The job runs on every push and pull request. It is required on `release` only, in `.github/branch-protection.json`; applying
+that file (`node .github/scripts/branch-protection.mjs --apply`) is an administrator's action after the job has reported once,
+because a required check that never reports blocks every merge. `node .github/scripts/branch-protection.mjs --selftest` stays
+green.
+
+Observed RED: both fixture folders missing (the test's own message). Mutations, each red: no project reference added (the
+stale restore returns 0, the NuGet case fails); the npm lock set to 4.0.6 (the refusal text changes, the npm case fails);
+`dotnet` removed from `PATH` with `CI=true` (the NuGet case fails with the SDK message), without `CI` (a named skip), with
+`LOCK_FIXTURES_JOB` set (a named skip).
+
+Not proved: a consumer's real lock (that is the dependency epic's policy and the final epic's remediation); that the job
+reports green on GitHub (it is observed on the pull request, not here).
+
