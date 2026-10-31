@@ -889,6 +889,8 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   matrix is a file with a test; selection is pinned per representative scope.
 - **Scope:** `tools/lib/rule-catalog.mjs` (`path_tasks`), `tools/rules.test.mjs`, `research/parity-matrix.json` and its
   test, the byte-equality test for moved blocks, `research/module_rules.md`, `ENTRY.md` step 7.
+- **Stories document:** [PLAN_node_rule_parity_E1.md](PLAN_node_rule_parity_E1.md) — written by Opus when the epic
+  started (2026-10-31), reconciled with epoch 2; no story is a cornerstone, so the ledger line above is unchanged.
 - **Stories:** S0 the preparatory wording-only anonymisation of `typescript/doctrine.md` § 1 (§ 4.4) — its own commit,
   `rule-bodies.mjs --update typescript.doctrine`, listed as wording with no lesson removed, BEFORE S4 records a hash
   (§ 16, finding 3) · S1 the gate key: semantics, errors, `reasons`, tests · S2 the selection/budget matrix of § 4.1
