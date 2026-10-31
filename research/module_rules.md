@@ -277,3 +277,40 @@ The plan already approves five declarations, each written by the epic named, and
 `typescript/lifecycle.md` by E5, `typescript/logging.md` and `typescript/utc-timestamps.md` by E6. Every other gated file
 mirrors the `tasks:` line of the rule its requirement came from.
 
+## The parity matrix
+
+`research/parity-inventory.json` lists every requirement of `todo/PLAN_node_rule_parity.md` section 3 (P: C# requirements,
+R: TypeScript requirements, G: gaps on both sides; 31 entries) with a status of `counterpart`, `planned` (and its owning
+epic, E2 to E6) or `deliberately-absent` (and its reason, at least 20 characters). `research/parity-matrix.json` has exactly
+one row per entry. A row carries a topic, a strength phrase, a status (`planned`, `equal`, `stronger-ts`, `stronger-cs`,
+`deliberately-absent`) and two sides. In the first epic every real row is `planned` or `deliberately-absent`; an owning epic
+turns its rows into active sides in the commit that lands the text.
+
+A side is one of four shapes: `{ "absent": true }`; `{ "planned": "E2".."E6", "delivery"?: [...] }` (intended locations, not
+checked); the **present side of a deliberately-absent row**, `{ "delivery": [ { "id", "section" } ] }` and nothing else, valid
+only in a `deliberately-absent` row (the existing text of P8, R4 and R5); or an **active** side with `delivery` (rule id and
+section heading), `enforcement` (classes `prose`, `test` with a file, `check` with a tool, `hook` with a hook), `selectors`
+(a rule's `paths`, `path_tasks` and `tasks`), `mood` (`MUST` or `SHOULD`), `consequence` and `suppression`
+(`none` or `inline-with-reason`, written on each active side and never on the row).
+
+`tools/parity-matrix.test.mjs` holds `parityFindings`, the check the owning epics run. In one sentence each: inventory ids and
+fields are well formed; the inventory and the matrix are one to one with equal topics; every delivery location of an active
+side, and of a deliberately-absent row's present side, names a catalog rule and one of its recorded sections; a planned side
+names an owning epic; a row's status follows from its sides, its epic is the latest of its planned sides, and a planned row of
+a landed epic (`LANDED_EPICS`) is a finding; only P4 may be `stronger-*`, and then with a reason; the inventory and the row
+agree on status and epic; and, for an active side, each `selectors` item equals the rule's front matter, `mood` is `MUST`
+exactly when a heading carrying (MANDATORY) is found from the section's own heading up through each preceding heading of a
+lower level to the H1, a `check` tool exports `CHECKED_RULES` containing the side's delivery ids, a `hook` is a file under
+`settings/hooks/`, and a `test` file exists.
+
+**Equality is a union over the correspondence table.** For an `equal` row, and for each of the nine tasks of the selection
+baseline, the C# side's delivery (any of its rules selected) must hold exactly when the TypeScript side's does, on each pair of
+corresponding file sets: none and none, `src/x.cs` with `ui/a.ts`, `src/a.mjs` and `src/webview/page.ts`, and `src/x.csproj`
+with `package.json`. The configuration kind (the compiler's own file, `tsconfig.json`) is not paired and not compared. Then
+`mood`, the set of enforcement classes, `consequence` and each side's `suppression` must be equal. A union, not a single rule,
+because the same requirement may be delivered by a source-file statement and a configuration-file rule together. The
+real-row proof runs on fixtures that carry the planned selectors of P2 and P3; without the TypeScript source-file statement it
+fails, because a `.ts` scope would deliver nothing.
+
+The deliberately-absent reasons are the inventory's; this document keeps no copy.
+
