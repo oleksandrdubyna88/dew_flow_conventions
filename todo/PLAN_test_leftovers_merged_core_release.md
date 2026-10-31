@@ -175,6 +175,12 @@ cache or a process.
   held that an attestation does not open the barrier; removing the worktrees (branches kept) was refused by the permission system as another
   session's work, so it is the owner's. **No producer stage merges until a rescan finds no deleting copy and every place it cannot read is read or attested by name** (the three
   vllm assets above are attested).
+- **The barrier opened, 2026-10-31.** The owner removed the 13 stale worktrees; the rescan (`tools/sweeper-scan.mjs --root ~/git`) finds no
+  deleting copy — every listed line is one of the non-removing lines above (the experiment copies of coai list the same stderr assertion at
+  `:629`), and the three unreadable places are the attested vllm asset. **Wave 1 merged:** E3 as dew_flow_mcp #58 (`4feb245`) and E4 as
+  dew_flow_sidecar_rust #64 (`5478109`), each after its coai plan and code gates, an Opus review and green Linux and Windows legs. The
+  one-time hand clean-up on this machine is recorded on each PR as retained: 682 old `mcp-*` folders and `outside.txt`, and old
+  `bge-log-*`/`bge-seed-*` folders, all the owner's to remove by hand.
 
 ## Build order
 
