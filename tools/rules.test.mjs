@@ -484,6 +484,17 @@ test("provenance: a record for an absent rule is allowed only while its epic has
   assert.match(landed[0],/csharp\.later/);
 });
 
+test("provenance: a gate record names its owning epic, E2 to E6",t=>{
+  const {catalog}=provenanceFixture(t);
+  const withEpic=epic=>({"csharp.mech":{mirrors:"common.src",...(epic===undefined?{}:{epic})}});
+  assert.deepEqual(provenanceFindings(catalog(),withEpic("E6"),[]),[]);
+  for(const epic of [undefined,"E1","E9","e2"]){
+    const findings=provenanceFindings(catalog(),withEpic(epic),[]);
+    assert.equal(findings.length,1,String(epic));
+    assert.match(findings[0],/csharp\.mech: .*owning epic/);
+  }
+});
+
 test("provenance: a path-only source mirrors as no gate, and a tasks source cannot be mirrored by an ungated rule",t=>{
   const {catalog}=provenanceFixture(t);
   assert.deepEqual(provenanceFindings(catalog(),{"csharp.plain":{mirrors:"typescript.doc",epic:"E2"},"csharp.mech":{mirrors:"common.src",epic:"E2"}},[]),[]);

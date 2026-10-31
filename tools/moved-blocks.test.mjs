@@ -162,7 +162,34 @@ test("a supersession is refused when its justifying commit touches another file 
   assert.equal(w.manifestText(), before, "a refusal writes nothing");
 });
 
-test("a supersession whose destination holds the baseline's OLD bytes fails the checker", t => {
+test("a supersession is refused for another epic than its baseline's, and a merge commit cannot justify one", t => {
+  const w = world(t);
+  w.baseline("2-4");
+  w.commit("record the baseline");
+  const before = w.manifestText();
+  const base = w.git("rev-parse", "--abbrev-ref", "HEAD");
+  w.git("checkout", "-q", "-b", "side");
+  fs.writeFileSync(w.file("other.md"), "side\n");
+  w.commit("a side commit");
+  w.git("checkout", "-q", base);
+  fs.writeFileSync(w.file("src.md"), SRC.replace("café two", "café three"));
+  w.commit("fix a word in the block");
+  w.git(...IDENTITY, "merge", "-q", "--no-ff", "-m", "merge the side branch", "side");
+  const merge = w.git("rev-parse", "HEAD");
+  const changed = BLOCK.replace("café two", "café three");
+  fs.writeFileSync(w.file("common/d.md"), `# Destination\n${changed}tail\n`);
+  refusal(() => w.move("2-4", "s1", { supersedes: "b1", justifiedBy: merge }, merge), /merge commit/);
+  const plain = w.git("rev-parse", "HEAD^1");
+  assert.equal(w.manifestText(), before);
+  const wrongEpic = () => recordMove(w.root, { source: "src.md", range: "2-4", commit: plain, destination: "common/d.md", epic: "E5", id: "s2", supersedes: "b1", justifiedBy: plain });
+  refusal(wrongEpic, /belongs to E4, not E5/);
+  assert.equal(w.manifestText(), before);
+  // Control: the same move justified by the plain commit and the right epic is accepted, so both refusals were about their cause.
+  w.move("2-4", "s1", { supersedes: "b1", justifiedBy: plain }, plain);
+  assert.equal(w.entries()[0].supersededBy, "s1");
+});
+
+test("a supersession whose destination holds the baseline\'s OLD bytes fails the checker", t => {
   const w = world(t);
   w.baseline("2-4");
   w.commit("record the baseline");

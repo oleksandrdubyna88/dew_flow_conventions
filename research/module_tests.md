@@ -1455,7 +1455,7 @@ indented line 4, a fence on lines 8-10) and a destination:
   nothing. `fenceDepth` (added to `tools/lib/rule-body.mjs`) has its own case, including a longer fence not closed by a shorter run.
 - An unchanged block is activated (the destination lines found in the working tree) and verifies after the move commit; a
   changed block is superseded, the new entry carries `justifiedBy` and `justifiedFiles`, and the old entry gains `supersededBy`
-  and no other byte changes; a justifying commit that also touches another file, a missing flag, and a destination holding the
+  and no other byte changes; a justifying commit that also touches another file or is a merge commit, a different epic from the baseline's, a missing flag, and a destination holding the
   old words are each refused or a checker finding.
 - The checker: an unpaired baseline survives two lines inserted above it and fails on one changed byte or a landed epic; an
   activation is one finding each for the block twice, mid-line, changed, absent in the destination, or left in the source;

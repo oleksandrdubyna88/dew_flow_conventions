@@ -322,7 +322,11 @@ export function recordMove(root, { source, range, commit, destination, epic, id,
   if (!justifiedBy) throw new Refusal(`superseding ${supersedes} needs --justified-by <commit>, the commit that changed the block's words`);
   const old = unpaired.find(entry => entry.id === supersedes);
   if (!old) throw new Refusal(`${supersedes} is not an unpaired baseline of ${source}`);
+  if (epic !== old.epic) throw new Refusal(`${old.id} belongs to ${old.epic}, not ${epic}`);
   const justifying = resolveCommit(root, justifiedBy);
+  // A merge commit's own diff is a combination of its parents', so what it "touches" is not one file's change.
+  const parents = gitOutput(root, ["rev-list", "--parents", "-n", "1", justifying]).trim().split(/\s+/).length - 1;
+  if (parents > 1) throw new Refusal(`commit ${justifying} is a merge commit (${parents} parents); a justifying commit is one ordinary commit that changed the block's source file`);
   const touched = gitOutput(root, ["show", "--name-only", "--pretty=format:", "--no-renames", justifying]).split("\n").map(line => line.trim()).filter(Boolean);
   const others = touched.filter(file => file !== source);
   if (others.length || !touched.includes(source)) {

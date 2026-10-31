@@ -10,6 +10,7 @@
 import { TASKS, matchesPaths, selectRules, targetPath } from "./rule-catalog.mjs";
 
 export const MIN_REASON = 20;
+const OWNING_EPICS = Object.freeze(["E2", "E3", "E4", "E5", "E6"]);
 
 const sameSet = (a, b) => a.length === b.length && new Set(a).size === new Set(b).size && a.every(item => b.includes(item));
 const listed = items => `[${items.join(", ")}]`;
@@ -31,6 +32,7 @@ export function provenanceFindings(catalog, gates, landedEpics) {
     if (hasMirrors === hasDeclared) {
       findings.push(`${id}: a gate record has exactly one of mirrors and declared (found ${hasMirrors ? "both" : "neither"})`);
     }
+    if (!OWNING_EPICS.includes(entry.epic)) findings.push(`${id}: a gate record names its owning epic among ${OWNING_EPICS.join(", ")} (found ${entry.epic === undefined ? "none" : entry.epic})`);
     const rule = byId.get(id);
     if (!rule) {
       if (landedEpics.includes(entry.epic)) findings.push(`${id}: a gate record for a rule that does not exist, and its epic ${entry.epic} has landed`);
