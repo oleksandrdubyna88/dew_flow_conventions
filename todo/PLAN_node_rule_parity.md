@@ -6,8 +6,9 @@
 > (`tools/lib/rule-catalog.mjs`), `research/rule-bodies.json`, a machine-readable parity matrix and its test, the
 > selection and size tests in `tools/rules.test.mjs`, two tools (`tools/http-coverage.mjs`'s `--routes` path for Node; a
 > new `tools/node-strictness-check.mjs`), the documents that describe them, one `release` promotion and the bump pull
-> requests of the consumers. It changes no consumer's code. The `## Plan changes` ledger opens at this plan's first
-> approval ([plan-change-control.md](../common/plan-change-control.md)); until then the plan has none.
+> requests of the consumers. It changes no consumer's code. The `## Plan changes` ledger opened at the plan round of
+> 2026-10-31, whose verdict was `proceed` ([plan-change-control.md](../common/plan-change-control.md); the round is
+> recorded in § 13); the owner's approval is still to come, and a change the owner asks for is entry 1.1.
 >
 > Related docs: [csharp/doctrine.md](../csharp/doctrine.md), [typescript/doctrine.md](../typescript/doctrine.md),
 > [rust/doctrine.md](../rust/doctrine.md), [csharp/nuget-packages.md](../csharp/nuget-packages.md),
@@ -18,6 +19,13 @@
 > [tools/lib/proc.mjs](../tools/lib/proc.mjs) (the lifecycle precedent).
 > The other side of the boundary is a plan in another repository, cited as a path (§ 6):
 > `dew_flow_benchmark · todo/PLAN_lang_comparison_v2.md` (branch `docs/plan-lang-comparison-v2`, read at `aa5e413`).
+
+## Plan changes
+
+> Epoch 1 · approved 2026-10-31 · by reviewers · state: open
+
+  (The six findings of that round were accepted inside the round, before the verdict, and are part of the approved
+  baseline — § 13. They are not entries. The owner has not yet approved; an owner's request is counted like any other.)
 
 ## 0. Decisions
 
@@ -128,7 +136,7 @@ headings, are the content of `research/parity-matrix.json` (E1).
 | P3 | `Nullable enable` — absent from the rule, present in every consumer | `strictNullChecks` (inside `strict`) — the same rule | raised on **both**: `csharp/doctrine.md` § 1 gains `Nullable enable` (≈ 20 B, no removal) |
 | P4 | complexity ≤ 4, `private static` where no state is read (`:75-78`, stays) | the same number as a lint rule (`complexity: ["error", 4]`, `max-lines-per-function` 50, `max-lines` 800, `no-console`) — the shape two TypeScript consumers already run (read 2026-10-31) — in `compiler-strictness.md`; the suppression policy of § 3.4 | prose ↔ lint-enforced: TS stronger; C# stays prose (an analyzer rule for complexity needs a package the family has not adopted — Q7) |
 | P5 | records for data, typed values, no primitive obsession, no null in business logic (§ 2–4, stay) | `typescript/doctrine.md` § 0 (E4, by meaning): `readonly` data contracts and `Readonly<T>`/`ReadonlyArray<T>` in public shapes; validated or branded domain types (`type CommitSha = string & { readonly __brand: … }` with a parsing factory returning a result, never a throwing constructor); `undefined`/`null` only at the edges, absence as a typed state ("not captured" and "empty" are different facts) | prose ↔ prose; cites, anonymised, one consumer's readonly outcome type that separates refusal, timeout and mechanism failure |
-| P6 | § 4a a DTO field the client omitted is `null` (stays) | § 0: a `JSON.parse` result is `any` and a declared type is a promise the parser never checked; validate at the single road in (a schema or a typed parser); the 64-bit id trap (`JSON.parse` rounds `9007199254740993` to `…992`, measured) beside it | prose ↔ prose |
+| P6 | § 4a a DTO field the client omitted is `null` (stays); **gains** the large-identifier mirror: `System.Text.Json` reads a `long` exactly and a `double` target or `JsonElement.GetDouble()` loses precision (measured: `{"id":9007199254740993}` → `long` 9007199254740993, `double` 9007199254740992, `GetInt64` exact, `GetDouble` …992, `GetRawText` exact, `decimal` exact; `2^63` into `long` throws `JsonException`); and the casing trap the same probe met: the default binder is case-sensitive, so `Id` against `"id"` bound to **0 with no error** — § 4a's silent default, in another door | § 0: a `JSON.parse` result is `any` and a declared type is a promise the parser never checked; validate at the single road in (a schema or a typed parser). **Identifiers that can exceed 2^53 travel as JSON strings, or are parsed losslessly before any conversion to `Number`**: `JSON.parse` rounds `{"id":9007199254740993}` to `9007199254740992` (measured); the lossless option exists on Node 26 — the reviver's third argument carries the source text (`JSON.parse(text, (k, v, context) => … BigInt(context.source))` → `9007199254740993n`, measured), and `JSON.rawJSON` writes such a value back unquoted (measured) while `JSON.stringify` of a bare `BigInt` throws `TypeError` (measured) | prose ↔ prose; both sides name the exact and the lossy readers |
 | P7 | `Outcome<T>`, never `throw` for control flow (§ 5, stays) | § 0: a discriminated union result (`Result<T, E>`), `throw` only for the unexpected, one outcome shape per repository; `coding-style.md:32` points at BOTH doctrines | prose ↔ prose |
 | P8 | `dotnet-build.md`: the worker pool, hook + check | **No Node counterpart.** The rule exists for a measured resource problem (72 MSBuild workers, 10 775 MB) that Node builds do not have; a hook is added for a measurement, not for symmetry (§ 4.6). Node's enforced rule is P2's check instead | deliberately absent; stated in `research/module_rules.md` |
 | P9 | `nuget-packages.md`: central pins; publisher/freshness; licence before version; monthly bump; zero-reference projects | `typescript/npm-packages.md` (§ 4.5, D14): the declared range (`save-exact=true` in `.npmrc`; measured: a bare `--save-dev` writes `^5.9.3`), the lock's resolution (`package-lock.json` committed), the reproducible install (`npm ci --ignore-scripts` as the only install in CI; measured: it refuses a lock that does not SATISFY `package.json`, and accepts one that does), `npm outdated` and `npm audit` on the monthly bump, `engines.node`, `node:` built-ins before a package; the neutral text moves verbatim to `common/dependencies.md` | prose ↔ prose, each selected by its own manifest; the shared part on `--task dependencies` only |
@@ -205,6 +213,14 @@ E1 adds one test per representative scope asserting the exact id list, in the st
 `sections` in `research/rule-bodies.json`; a row with `deliberately-absent` names the side and the reason. A rule renamed
 or a section retitled without the matrix is a red suite — the drift protection the consultants asked for.
 
+**The inventory as a file, so the matrix is complete and not only consistent** (plan round 1, finding 4):
+`research/parity-inventory.json` — one entry per requirement of § 3 (`P1`…`P20`, `R1`…`R5`, and one entry per
+both-sides gap of § 3.3), each with `id`, `topic`, `side` (`csharp`, `typescript`, `both`) and `status`: `counterpart`
+(the matrix row closes it), `deliberately-absent` (with the reason), or `planned` (the epic that will close it). A test
+asserts that every inventory entry has exactly one matrix row and every matrix row maps to one inventory entry, so a
+requirement added to the inventory without a row — or a row without a requirement — fails the suite. The two files are
+the machine-readable form of § 3; the prose table is the human one, and the test is what keeps them one.
+
 ### 4.2 Task-gated path selection — the resolver change (D3)
 
 Today selection is paths OR tasks (`ENTRY.md` step 7; `tools/lib/rule-catalog.mjs`). A language-scoped mechanics rule
@@ -234,8 +250,13 @@ the benchmark bias of a C# agent reading Node mechanics). `depends:` cannot expr
 
 ### 4.3 D2 applied: which text moves where, verbatim, and the evidence behind each Node claim
 
-**Moves (word for word, byte-equal — a test in E1 compares each moved block's bytes in the source commit with the bytes
-in the destination file; the record is `research/module_rules.md` § *Moves*):**
+**Moves (word for word, byte-equal — the E1.S4 test compares each moved block's bytes in the destination file with the
+same line range of the source file at the commit RIGHT BEFORE the move, named per block in `research/module_rules.md`
+§ *Moves*).** Where a block also needs a wording change (today only `typescript/doctrine.md` § 1, § 4.4), the order is
+fixed by plan round 1 (findings 1–2): **first** a separate, documented commit that makes the wording change inside the
+SOURCE file and records its body with `node tools/rule-bodies.mjs --update <id>`; **then** the move, byte for byte from
+that anonymised source; the byte-equality test's "before" commit is the anonymisation commit. A move and a wording change
+in one commit would leave nothing for the test to compare against.
 
 | From (lines at `f46982f`, bytes by `Buffer.byteLength`) | To | Gate (= the source's `tasks`) |
 |---|---|---|
@@ -286,6 +307,9 @@ quit and `false` when the timeout fired, exactly the `IsCancellationRequested` t
 | A grandchild holding the pipe delays `close` | `sh -c "sleep 1.5 & echo"` with `stdio: "pipe"` | `exit` at 4 ms, `close` at 1,508 ms |
 | `Buffer.byteLength` counts encoded bytes | `"abcdefé"` | `length` 7, bytes 8 |
 | `JSON.parse` rounds a 64-bit id | `JSON.parse('{"id":9007199254740993}').id` | `9007199254740992`; `Number.isSafeInteger` false |
+| The reviver's third argument carries the source text (lossless parse) | `JSON.parse(text, (k, v, context) => k === "id" ? BigInt(context.source) : v)` | `context` = `{"source":"9007199254740993"}`; result `9007199254740993n`, a `bigint` |
+| `JSON.rawJSON` writes a large id back unquoted; a bare `BigInt` does not stringify | `JSON.stringify({ id: JSON.rawJSON("9007199254740993") })`; `JSON.stringify({ id: 9007199254740993n })` | `{"id":9007199254740993}`; `TypeError` |
+| **C# mirror** (SDK 10.0.114, `System.Text.Json`, `TreatWarningsAsErrors`, `-m:4`): a `long` target reads exactly, a `double` target or `GetDouble()` loses precision; the case-sensitive default binds nothing and says nothing | `Deserialize<record(long Id)>`, `Deserialize<record(double Id)>` with `PropertyNameCaseInsensitive`; `JsonElement.GetInt64/GetDouble/GetRawText`; `Deserialize<decimal>`; `Deserialize<long>("9223372036854775808")`; the same `long` record WITHOUT the option against `"id"` | 9007199254740993; 9007199254740992; exact / …992 / exact; exact; `JsonException`; **0, no error** |
 | `node --env-file` loads an uncommitted secrets file | `node --env-file=.env -e …` | the value read |
 | Node runs a `.ts` file with a type error (stripping checks nothing) | `const n: number = "not a number"` | ran, exit 0, `typeof n` `string` |
 | `enum` is refused under type stripping | `enum Color { Red }` | `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX` |
@@ -310,9 +334,19 @@ paragraph that names the C# section it mirrors, and which sections apply to plai
 Definition of Done for the design section. Estimated size ≈ 4,900 B against 5,910 today — smaller, with nothing
 deleted: 4,125 B of trap text left for the gated rules word for word.
 
-**Wording changes, not content** (D1): in the moved § 1, `webauthnPrf.ts` / `entityFormScript.ts` /
-`depPickerScript.ts` become "one module, a second, and a third written beside the fix for the second", "a real vault"
-becomes "a real credential store"; every sentence, number and date stays. Listed as such in the pull request.
+**Wording changes, not content** (D1), **in the source, as their own commit, before the move** (plan round 1): in
+`typescript/doctrine.md` § 1 as it stands, `webauthnPrf.ts` / `entityFormScript.ts` / `depPickerScript.ts` become
+"one module, a second, and a third written beside the fix for the second", and "a real vault" becomes "a real credential
+store"; every sentence, number and date stays — a recorded wording change with no lesson removed, its body hash updated
+by `node tools/rule-bodies.mjs --update typescript.doctrine` in that commit, listed in the pull request as wording. The
+move of § 1 to `typescript/output-encoding.md` follows in the next commit, byte for byte from the anonymised text.
+
+**Placeholder files created by a move carry valid front matter from their first commit** (plan round 1, finding 2):
+`typescript/output-encoding.md` and `typescript/testing.md` are created by E4.S2 with `id`, `load`, `paths`,
+`path_tasks` and `depends` exactly as § 4.3 names them, holding exactly the moved text and nothing else, with their
+`rule-bodies.json` entries added by hand in the same commit — so the catalog loads and `npm test` is green at every
+story, and no byte is ever in flight between two commits. The same holds for every file a later move creates
+(`csharp/*.md`, `rust/*.md`).
 
 Selectors: `paths: ["**/*.ts","**/*.tsx","**/*.mts","**/*.cts","**/*.js","**/*.mjs","**/*.cjs"]`, no gate — like
 `csharp/doctrine.md`. This repository's own `tools/*.mjs` then load the doctrine on an `inspect` (§ 5: 29,087 B, fits).
@@ -349,7 +383,7 @@ and `.npmrc` are not selectors: they are what following the rule produces, and e
 
 | .NET | Node | Class |
 |---|---|---|
-| `tools/build-flags-check.mjs`: `Directory.Build.rsp` exists and says `-nr:false`; no `-noautorsp`; a repository with no C# passes without opinion | **`tools/node-strictness-check.mjs`** (new): for every `tsconfig*.json` outside `node_modules`, the compiler's own merged view (`<repo>/node_modules/.bin/tsc --showConfig -p <file>`, so `extends`, nested packages, excludes and overrides resolve as `tsc` resolves them) has `strict: true`, and `noEmitOnError: true` unless `noEmit: true`; the `lint` script runs eslint with `--max-warnings 0` and the config sets `reportUnusedDisableDirectives: "error"`; a `test` script that runs `node` on a `.ts` file is preceded by `tsc --noEmit`; every `package.json` with dependencies has an `.npmrc` beside it or above it saying `save-exact=true`; `--warn` first, as every check here lands ([README.md](../README.md) § *tools*); a repository with no `tsconfig*.json` passes without opinion; **a TypeScript repository whose `tsc` is not installed is INCOMPLETE, never green**. Proven on deliberately invalid fixtures: `strict` missing in a base config inherited through `extends`; `noEmitOnError` missing with emit; `--max-warnings` absent; a stripped-TS test script without `tsc --noEmit`; a caret range with no `.npmrc`; a stale `eslint-disable` | check ↔ check |
+| `tools/build-flags-check.mjs`: `Directory.Build.rsp` exists and says `-nr:false`; no `-noautorsp`; a repository with no C# passes without opinion | **`tools/node-strictness-check.mjs`** (new): for every `tsconfig*.json` outside `node_modules`, the compiler's own merged view (`tsc --showConfig -p <file>`, so `extends`, nested packages, excludes and overrides resolve as `tsc` resolves them) has `strict: true`, where **`tsc` is found through package resolution, never a fixed path** (plan round 1, finding 3): `createRequire(<the tsconfig's package dir>/package.json).resolve("typescript/bin/tsc")`, falling back to a walk up the parents' `node_modules/.bin` — the resolution that covers a hoisted workspace install, pnpm and yarn shims; **INCOMPLETE is reported only when no TypeScript resolves at all**, and `noEmitOnError: true` unless `noEmit: true`; the `lint` script runs eslint with `--max-warnings 0` and the config sets `reportUnusedDisableDirectives: "error"`; a `test` script that runs `node` on a `.ts` file is preceded by `tsc --noEmit`; every `package.json` with dependencies has an `.npmrc` beside it or above it saying `save-exact=true`; `--warn` first, as every check here lands ([README.md](../README.md) § *tools*); a repository with no `tsconfig*.json` passes without opinion; **a TypeScript repository whose `tsc` is not installed is INCOMPLETE, never green**. Proven on deliberately invalid fixtures: `strict` missing in a base config inherited through `extends`; `noEmitOnError` missing with emit; `--max-warnings` absent; a stripped-TS test script without `tsc --noEmit`; a caret range with no `.npmrc`; a stale `eslint-disable`; and one VALID fixture with a hoisted install — `tsc` only in the parent's `node_modules`, the `tsconfig.json` in a workspace package — which must pass, not report INCOMPLETE | check ↔ check |
 | `settings/hooks/build-flags.mjs`: a `PreToolUse` hook refusing a `dotnet build` without `-m:N` | **none** — the hook exists for a measured resource problem (`csharp/dotnet-build.md` § *Measured 2026-09-11*). The candidate Node hook — refuse `npm install <pkg>` without `--save-exact` — is unnecessary once `.npmrc` carries `save-exact=true`, which is a FILE the check verifies (measured: the setting is honoured). What a Node hook would need to earn its place: a measured cost that no file can carry | deliberately absent; stated in `research/module_rules.md` |
 | `dotnet build` with `TreatWarningsAsErrors` + `Nullable enable` | the composite gate `tsc --noEmit` (or with `noEmitOnError`) + lint `--max-warnings 0` + tests, named in `compiler-strictness.md` as ONE gate the CI step runs | gate ↔ gate |
 | `tools/http-coverage.mjs` reads `Map*` and `.route(`; `--routes` preferred | the same tool; a Node application prints its route table for `--routes` (D10) | one tool |
@@ -453,6 +487,7 @@ plus one story line on that side (its ledger has not opened — its status says 
 |---|---|---|---|
 | The rule catalog: 3 + 5 + 3 new `typescript/` files, 5 new `csharp/` files, 3 new `rust/` files, 1 new `common/` file; ≈ 12 KB of new text, ≈ 10 KB moved | ≈ 56 rules, ≈ 400 KB of 4 MiB (`LIMITS.catalog`); 256-file limit far | the single-read and core tests bound the loaded part; a rule that stops being true is edited, never appended to | a half-landed rule set is a red `rule-bodies` suite — nothing partial reaches `release` |
 | `research/parity-matrix.json` | ≈ 8 KB, one row per P/R entry | edited with the rules; its test retires a stale row | — |
+| `research/parity-inventory.json` | ≈ 4 KB, one entry per requirement and both-sides gap | edited with the matrix; the one-to-one test refuses an orphan on either side | — |
 | `research/2026-10-31_node_behaviour_probes.md` | one file, ≈ 14 KB, kept forever as the dated evidence | never pruned; superseded probes are re-run and the new date added (D1) | — |
 | `tools/fixtures/node-strictness/` | ≈ 8 small fixture trees, < 60 KB | live as long as the check | — |
 
@@ -470,7 +505,7 @@ No process, table or cache is created.
 | T6 | **Two copies of the neutral dependency text drift** | it lives once, in `common/dependencies.md`; the ecosystem rules carry pointers |
 | T7 | **The bare arm never reads a rule.** Parity matters only to the process arm; over-building here delays a release the experiment waits for | the scope is the matrix of § 3 and nothing wider; each epic is one pull request |
 | T8 | **The release reaches eight consumers at once** and reddens every open pull request's `pin-check`; a consumer's CI fails on the new check | E7 dry-runs the check and the rule set against the TypeScript and .NET consumers first (D13) and records what would fail; announces; promotes once; bumps the pinned-by repository last ([README.md](../README.md) § *Bumping a pin*) |
-| T9 | **A product name slips into a shared rule** (the TypeScript consumers' names, "the extension", "the vault") | `node tools/ownership-check.mjs` is armed; the anonymisation is a listed change of wording |
+| T9 | **A product name slips into a shared rule** (the TypeScript consumers' names, "the extension", "the vault") — or the anonymisation and a move land in one commit, leaving the byte-equality test nothing to compare against | `node tools/ownership-check.mjs` is armed; the anonymisation is a separate, documented commit in the SOURCE file first (`rule-bodies.mjs --update`), listed as wording with no lesson removed, and the move follows byte for byte (§ 4.3, § 4.4, E4.S2) |
 | T10 | **A move loses a caveat.** A block moved "verbatim" by hand drops a sentence, or a neutral sentence goes with it and the common rule loses its invariant | the byte-equality test of E1.S4 on every moved block; the common rule's remaining section is read as an instruction from someone who has not seen the long one ([knowledge-base.md](../common/knowledge-base.md)) |
 | T11 | **The resolver change (D3) is read as a loophole** — a rule gated to avoid a budget rather than to match its source's tasks | the gate list of every mechanics rule equals its source rule's `tasks:` line and a test asserts it; `module_rules.md` states the one legitimate use |
 | T12 | **Equal source ownership is mistaken for equal instructions reaching the agents** | D13's per-arm record: ids, hashes, toolchain versions, effective checks |
@@ -498,9 +533,11 @@ the lifecycle as the three cornerstones.
 - `npm test` green at every story: the manifest test (`tools/rules.test.mjs:151`, every body recorded; new ids added
   by hand, `tools/rule-bodies.mjs:186`), the gate's selection tests (§ 4.2), the per-scope id-list tests (§ 4.1), the
   single-read scope test with the list of D5 and the new config scopes, the always-core budget, the parity-matrix test
-  (§ 4.1), the byte-equality test over the moved blocks (§ 4.3), the `http-coverage` test that a Node route table in the
-  `--routes` shape is read and compared, the new check's fixtures (§ 4.6; a repository with no TypeScript passes; a
-  TypeScript repository without `tsc` is INCOMPLETE).
+  and the inventory↔matrix one-to-one test (§ 4.1), the byte-equality test over the moved blocks against the commit
+  right before each move (§ 4.3), the `http-coverage` test that a Node route table in the `--routes` shape is read and
+  compared, the new check's fixtures (§ 4.6; a repository with no TypeScript passes; the hoisted-install fixture passes;
+  a TypeScript repository where no `typescript` package resolves is INCOMPLETE), and — at every story — the catalog
+  loads with every placeholder file's front matter valid.
 - `node tools/rule-bodies.mjs` in step.
 - `node tools/ownership-check.mjs` passes with no baseline file.
 - `node tools/plan-lifecycle.mjs` clean.
@@ -518,8 +555,13 @@ the lifecycle as the three cornerstones.
 
 - [ ] Every row of § 3 is closed in the text of the rule it names, or recorded as deliberately absent in
       `research/module_rules.md` with the reason; `research/parity-matrix.json` carries the same rows and its test is green.
-- [ ] No existing rule sentence was removed or shortened (D1); every moved block is byte-equal in its destination (the
-      test of E1.S4), and the wording changes are listed in the pull request as such.
+- [ ] No existing rule sentence was removed or shortened (D1); every moved block is byte-equal in its destination against
+      the commit right before its move (the test of E1.S4); the one wording change was its own commit in the source file,
+      with `rule-bodies.mjs --update`, before the move, and is listed in the pull request as wording.
+- [ ] `research/parity-inventory.json` lists every requirement and both-sides gap of § 3 with a status, and the
+      one-to-one test against `parity-matrix.json` is green.
+- [ ] Every file a move created carried valid front matter and a manifest entry from its first commit; `npm test` was
+      green at every story.
 - [ ] Every Node sentence in a rule has a line in `research/2026-10-31_node_behaviour_probes.md` (a run with its output)
       or a cited document with its read date.
 - [ ] The resolver's `path_tasks` key exists, is tested, documented in `research/module_rules.md` and `ENTRY.md` step 7,
@@ -531,9 +573,9 @@ the lifecycle as the three cornerstones.
       `research/module_rules.md`.
 - [ ] The TypeScript toolchain is stated as one tested combination with its read date (D7); the operator's answer to Q2
       is recorded.
-- [ ] `tools/node-strictness-check.mjs` exists, reads the effective configuration, is proven on the invalid fixtures of
-      § 4.6, is in `README.md` § *tools* and `ROLLOUT.md`, and the reason Node has a check and no hook is in
-      `research/module_rules.md`.
+- [ ] `tools/node-strictness-check.mjs` exists, finds `tsc` through package resolution (and passes the hoisted-install
+      fixture), reads the effective configuration, is proven on the invalid fixtures of § 4.6, is in `README.md`
+      § *tools* and `ROLLOUT.md`, and the reason Node has a check and no hook is in `research/module_rules.md`.
 - [ ] `tools/http-coverage.mjs` reads a Node route table through `--routes`; `http-contracts.md:166` says so.
 - [ ] `rule-bodies.json`, `ownership-check`, `plan-lifecycle`, `npm test` green on the merged commit.
 - [ ] Each of E1–E6 went through `mcp__coai__review_plan` → `mcp__coai__review_code` with every finding resolved, and its
@@ -579,6 +621,25 @@ Not settled here; the owner or the named epic decides. No answer is invented.
 - **Q13 Rust's doctrine.** `rust/doctrine.md` § 9 points at "the Rust section of logging-serilog.md"; after the move it
   points at `rust/logging.md`. Does the owner want the Rust sections moved in this plan (D2 applied to all three
   languages, as § 4.3 proposes) or left where they are with the principle stated for Rust as a later change?
+- **Q14 The wire contract for 64-bit identifiers (P6).** Both doctrines will say "strings on the wire, or a lossless
+  parse before any `Number`/`double`". Should the shared `http-contracts.md` go further and REQUIRE identifiers above
+  2^53 to travel as JSON strings in every API this family serves (one neutral sentence, both stacks equal), or is the
+  per-language reader guidance enough? Measured both ways in § 4.3: Node has the lossless reader (`context.source`) and
+  .NET has `long`/`GetInt64`, so either answer is implementable.
+
+## 13. Plan round 1 (2026-10-31) — findings and what changed
+
+`mcp__coai__review_plan` over `ac798a0`: verdict **`proceed`**; six findings, all accepted inside the round and applied
+in the commit that carries this section (gate-round edits before the owner's approval; the ledger opened at the verdict,
+with no entry — the findings are the baseline).
+
+| # | Finding | What changed |
+|---|---|---|
+| 1–2 | A byte-equal move and an anonymisation cannot share a commit; the test needs a "before" | § 4.3, § 4.4, E1.S4, E4.S2, T9: the wording change is its own commit in the source with `rule-bodies.mjs --update`, the move follows byte for byte, the test compares against the commit right before the move |
+| 2 | A placeholder file created by a move needs valid front matter, or the catalog is red between stories | § 4.4, § 10, § 11, E4.S2: `id`, `load`, `paths`, `path_tasks`, `depends` and the manifest entry in the creating commit |
+| 3 | The check must find `tsc` through package resolution, not a fixed `node_modules/.bin` path | § 4.6, § 10, § 11, E3.S2: `createRequire(...).resolve("typescript/bin/tsc")` or a walk up; INCOMPLETE only when nothing resolves; a hoisted-install fixture that must pass |
+| 4 | The matrix is consistent but nothing proves it is complete | § 4.1, § 7, § 10, § 11, E1.S3: `research/parity-inventory.json` with a status per requirement and a one-to-one test against the matrix |
+| 5 | P6 must say how identifiers above 2^53 travel, with the precision example, the lossless option if Node has one, and the C# mirror | P6, the probe table, Q14: strings on the wire or a lossless parse; `context.source` exists on Node 26 and `JSON.rawJSON` writes back; `System.Text.Json` `long` exact, `double`/`GetDouble` lossy, `decimal` exact, the case-sensitive default's silent 0 |
 
 ## Epics
 
@@ -607,9 +668,11 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   test, the byte-equality test for moved blocks, `research/module_rules.md`, `ENTRY.md` step 7.
 - **Stories:** S1 the gate key: semantics, errors, `reasons`, tests · S2 the selection/budget matrix of § 4.1 measured
   and recorded, with the per-scope id-list tests · S3 `parity-matrix.json` with every P/R row and its test against the
-  catalog and the recorded sections · S4 the moved-block byte-equality test (reads the block from the base commit by
-  line range, compares with the destination) · S5 the byte allowances of § 5 written into `module_rules.md` and the
-  single-read list of D5.
+  catalog and the recorded sections, and `parity-inventory.json` with the one-to-one test (an orphan on either side is
+  red — observed, then fixed) · S4 the moved-block byte-equality test: for each block, the destination file's bytes
+  against the source file's line range at the commit RIGHT BEFORE the move (named per block in `module_rules.md`), so an
+  anonymisation commit before the move is the "before" and a move folded into a wording change is a red test · S5 the
+  byte allowances of § 5 written into `module_rules.md` and the single-read list of D5.
 - **Depends on:** nothing. **Done when:** `npm test` green with the new tests; the matrix test is red when a row names a
   missing id or section (observed, then fixed); every tight scope's headroom is in `module_rules.md`; one pull request
   through both gates.
@@ -633,8 +696,10 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
 - **Scope:** `typescript/compiler-strictness.md` (new, ≤ 3,300 B), `csharp/doctrine.md` § 1 (+ `Nullable enable`),
   `tools/node-strictness-check.mjs` + tests + fixtures, `README.md` § *tools*, `ROLLOUT.md`.
 - **Stories:** S1 the rule text: the composite gate, the toolchain as one combination with its read date, the
-  suppression policy (**cornerstone**) · S2 the check: effective configuration via `tsc --showConfig`, the six invalid
-  fixtures, INCOMPLETE without `tsc`, `--warn` · S3 the C# § 1 line and the `gpu --file src/x.cs` measurement ·
+  suppression policy (**cornerstone**) · S2 the check: `tsc` resolved through `createRequire(...).resolve("typescript/bin/tsc")`
+  or a walk up the parents' `node_modules/.bin`, effective configuration via `tsc --showConfig`, the six invalid
+  fixtures and the hoisted-install fixture that must pass, INCOMPLETE only when no TypeScript resolves, `--warn` ·
+  S3 the C# § 1 line and the `gpu --file src/x.cs` measurement ·
   S4 the documents and the dry-run command for E7.
 - **Depends on:** E1. **Done when:** each invalid fixture fails naming the file; a grep-only check is shown insufficient
   by a fixture whose `strict` sits in an `extends` base; `storage --file tsconfig.json` ≤ 32,768 B; one pull request
@@ -649,11 +714,17 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
 - **Stories:** S1 § 0: readonly contracts, branded domain types with parsing factories, discriminated outcome and absence
   states, boundary validation of untrusted JSON, pure functions and immutability, complexity ≤ 4 — each paragraph naming
   the C# section it mirrors and the anonymised precedents (one consumer's readonly outcome type separating refusal,
-  timeout and mechanism failure; two consumers' complexity 4) (**cornerstone**) · S2 the moves of § 1, § 3, § 4 with
-  their DoD boxes, byte-equal, and the wording-only anonymisation listed · S3 the C# Definition of Done and the `gpu`
-  measurement (Q3 if over) · S4 the selectors and the pinned scopes.
+  timeout and mechanism failure; two consumers' complexity 4), including the large-identifier paragraph of P6 with
+  its two measured readers (**cornerstone**) · S2 in TWO commits, in this order: (a) the wording-only anonymisation of
+  § 1 inside `typescript/doctrine.md`, documented as wording with no lesson removed, `rule-bodies.mjs --update
+  typescript.doctrine` in the same commit; (b) the moves of § 1, § 3, § 4 with their DoD boxes into
+  `typescript/output-encoding.md` and `typescript/testing.md`, each created with its full front matter (`id`, `load`,
+  `paths`, `path_tasks`, `depends`) and its manifest entry, byte-equal against commit (a) · S3 the C# Definition of Done
+  and the `gpu` measurement (Q3 if over) · S4 the selectors and the pinned scopes.
 - **Depends on:** E1. **Done when:** `inspect --file ui/a.ts` and `inspect --file src/a.mjs` ≤ 30,116 B; the matrix rows
-  P5–P7 point at § 0's sections; the ownership check finds no name; one pull request through both gates.
+  P5–P7 point at § 0's sections; the byte-equality test is green for the three moved blocks against commit (a); the
+  catalog loaded and `npm test` was green after each of the two commits; the ownership check finds no name; one pull
+  request through both gates.
 
 ### E5 — Runtime lifecycle (cornerstone area 3)
 
