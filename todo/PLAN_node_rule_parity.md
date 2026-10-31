@@ -777,7 +777,7 @@ block sizes of § 4.3 and the additions of § 4.4; every story measures and writ
 | `storage --file src/x.cs` | 34,019 (unpinned, over) | ≈ 28,300 + 4,983 + `csharp/utc-timestamps` ≈ 900 ≈ 34,200 | no, as today | the C# clock mechanics are gated on `storage` |
 | `storage --file ui/a.ts` | 35,315 (unpinned, over) | ≈ 28,300 + 4,900 + `typescript/utc-timestamps` ≈ 1,200 ≈ 34,400 | no, as today | the same |
 | mixed `inspect --file src/x.cs --file ui/a.ts` | 34,729 (unpinned, over) | ≈ 34,100 | no, as today | both doctrines |
-| `inspect --file package.json` | 35,409 (`local-cpu-budget` 11,202) | ≈ 43,600 | no, as today | + `npm-packages` ≤ 3,500 + the TypeScript doctrine ≤ 4,700 (the manifest selector, § 18 finding 3) |
+| `inspect --file package.json` | 35,409 (`local-cpu-budget` 11,202) | ≈ 43,400 | no, as today | + `npm-packages` ≤ 3,300 + the TypeScript doctrine ≤ 4,700 (the manifest selector, § 18 finding 3) |
 | `logging --file src/Program.cs` | 78,866 | ≈ 78,900 | split read | the Serilog blocks leave `common/logging-serilog.md` and arrive in `csharp/logging.md` on the same scope |
 | `logging --file src/server.ts` | 80,162 | ≈ 78,650 | split read | − 3,012 B of Serilog/Rust mechanics + ≈ 1,500 B of `typescript/logging.md` |
 | `implement --file ui/a.ts` | 292,834 (28 rules) | ≈ 291,600 | split read | − ≈ 8,200 B of C# and Rust mechanics; + ≈ 7,000 B of TypeScript mechanics (lifecycle, testing, logging, utc, boundaries) |
