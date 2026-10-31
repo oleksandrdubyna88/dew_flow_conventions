@@ -580,7 +580,7 @@
     {
       "id": "typescript.doctrine",
       "source": "typescript/doctrine.md",
-      "bodySha256": "6e74f803ba385f184be20cc276d59e17d07ebfc6bc414196ed887d71407fc680",
+      "bodySha256": "142f2a93f3760d4f5e4d691858c1de632ae80e696cad2eb35a3477822722972e",
       "sections": [
         "# TypeScript — the four traps that have actually cost us",
         "## 1. Never interpolate into a `<script>` element with `JSON.stringify` (MANDATORY)",
