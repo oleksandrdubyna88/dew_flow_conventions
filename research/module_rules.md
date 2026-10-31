@@ -16,9 +16,12 @@ disabled. These capabilities were absent from the existing tools; a second custo
 parser or glob engine was avoided. Existing lexical path validation is reused from
 `tools/lib/paths.mjs`, supplemented with real-path checks for instruction sources.
 
-Metadata keys: `id`, `load`, optional `paths`, `tasks`, `depends`. Unknown fields/tasks,
-duplicate ids/keys, empty bodies, missing dependencies and cycles are errors even in
-unselected rules. All Markdown in the four rule directories must declare metadata.
+Metadata keys: `id`, `load`, optional `paths`, `tasks`, `depends`, `path_tasks`. Unknown
+fields/tasks, duplicate ids/keys, empty bodies, missing dependencies and cycles are errors
+even in unselected rules. `path_tasks` has four errors of its own: it is refused on a
+`load: always` rule (`applies to a conditional rule only`), when empty (`must name at least one
+task`), when it names a task outside the vocabulary (the legal ones are listed), and when
+the rule has no `paths` (`path_tasks needs paths`). All Markdown in the four rule directories must declare metadata.
 Local rules use the same schema and `local.*` ids. The migration inventory records every
 original rule section and body hash; it is historical evidence, not a second selector.
 
@@ -132,3 +135,34 @@ References: [yaml parser](https://eemeli.org/yaml/),
 [picomatch](https://github.com/micromatch/picomatch),
 [Codex instructions](https://learn.chatgpt.com/docs/agent-configuration/agents-md),
 [Claude imports](https://code.claude.com/docs/en/memory#agentsmd).
+
+## Task-gated path selection — `path_tasks`
+
+A rule's `paths` select it for any scope that names a matching file. `path_tasks` narrows that:
+the paths select the rule only in a scope that also names one of the listed tasks, and the
+selection reason says so (`path:src/x.cs (**/*.cs) when task:implement`). Plain `tasks` and
+dependencies ignore the gate (a dependency arrives whatever its own conditions say), a gate
+without `paths` is a metadata error because it selects nothing alone, and `explain` names the
+gate in a `path_tasks` field on every rule (an empty list for an ungated one). The selector
+change is `selectRules` in `tools/lib/rule-catalog.mjs`; `matchesPaths(rule, file)` exports the
+same predicate for the case check of the selection baseline.
+
+A gate has two legitimate uses, and `tools/lib/gates.mjs` checks both against a gate record
+(`research/selection-matrix.json`, `gates`, one entry per gated rule, written by the epic that
+lands the rule):
+
+- **Mirrored by provenance.** The gate repeats the `tasks:` line of the rule its requirement's
+  text came from. A source that has no `tasks:` line mirrors as "no gate": the new rule has no
+  `path_tasks` either.
+- **Declared with a reason.** A new requirement, or an applicability the plan changed on purpose,
+  declares its `path_tasks` and a reason of at least 20 characters (plan section 4.3 of
+  `todo/PLAN_node_rule_parity.md`, as plain text).
+
+The record is `"<rule id>": { "mirrors": "<source id>" | "declared": { "path_tasks": [...],
+"reason": "..." }, "epic": "E2".."E6", "cases": [...] }` — exactly one of `mirrors` and
+`declared`. `provenanceFindings(catalog, gates, landedEpics)` reports: a gated rule with no
+record; a record for an absent rule once its epic has landed; a mirror whose source does not
+exist, whose `tasks:` set differs from the rule's `path_tasks`, or that has no `tasks:` line while
+the rule is gated; a declared gate whose set differs, whose reason is short, or that sits on an
+ungated rule; and a record with both keys or neither. No real rule is gated in the first epic
+and no record is written there.

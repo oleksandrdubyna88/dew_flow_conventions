@@ -27,7 +27,7 @@ export const TASKS = Object.freeze({
   ui: "Change user interactions or status displays",
 });
 const DIRECTORIES = ["common", "csharp", "rust", "typescript"];
-const KEYS = new Set(["id", "load", "paths", "tasks", "depends"]);
+const KEYS = new Set(["id", "load", "paths", "tasks", "depends", "path_tasks"]);
 const LIMITS = Object.freeze({ metadata: 2048, file: 256 * 1024, files: 256, catalog: 4 * 1024 * 1024, core: 16 * 1024 });
 export const sha256 = text => createHash("sha256").update(text).digest("hex");
 
@@ -73,6 +73,11 @@ function patternMatcher(pattern) {
   return picomatch(pattern, { dot: true, strictBrackets: true, nonegate: true });
 }
 
+// The one place a rule's `paths` become a predicate, shared by the selector and the gate-case check.
+export function matchesPaths(rule, file) {
+  return rule.paths.some(pattern => patternMatcher(pattern)(targetPath(file)));
+}
+
 function ruleFrom(file, base, namespace) {
   const text = normalizedText(file);
   const match = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/.exec(text);
@@ -89,11 +94,17 @@ function ruleFrom(file, base, namespace) {
   const paths = stringList(metadata,"paths",file);
   const tasks = stringList(metadata,"tasks",file);
   const depends = stringList(metadata,"depends",file);
+  const gated = Object.hasOwn(metadata, "path_tasks");
+  const pathTasks = stringList(metadata, "path_tasks", file);
+  pathTasks.forEach(task => { if (!Object.hasOwn(TASKS,task)) throw new Error(`${file}: unknown path_tasks task ${task}; legal: ${Object.keys(TASKS).join(", ")}`); });
+  if (gated && metadata.load === "always") throw new Error(`${file}: path_tasks applies to a conditional rule only`);
+  if (gated && !pathTasks.length) throw new Error(`${file}: path_tasks must name at least one task`);
+  if (gated && !paths.length) throw new Error(`${file}: path_tasks needs paths — it gates path selection and selects nothing alone`);
   tasks.forEach(task => { if (!Object.hasOwn(TASKS,task)) throw new Error(`${file}: unknown task ${task}; legal: ${Object.keys(TASKS).join(", ")}`); });
   paths.forEach(patternMatcher);
   if (metadata.load === "conditional" && !paths.length && !tasks.length) throw new Error(`${file}: conditional rule needs paths or tasks`);
   if (!match[2].trim()) throw new Error(`${file}: empty rule body`);
-  return { id: metadata.id, load: metadata.load, paths, tasks, depends,
+  return { id: metadata.id, load: metadata.load, paths, tasks, depends, pathTasks,
     source: path.relative(base,file).replaceAll("\\","/"), file, text,
     hash: sha256(text), bytes: Buffer.byteLength(text) };
 }
@@ -157,9 +168,13 @@ export function selectRules(catalog,tasks,files) {
   for (const rule of [...catalog].sort((a,b)=>a.id < b.id ? -1 : 1)) {
     if (rule.load === "always") add(rule,"always");
     tasks.filter(task=>rule.tasks.includes(task)).forEach(task=>add(rule,`task:${task}`));
-    for (const pattern of rule.paths) {
-      const match=patternMatcher(pattern);
-      normalized.filter(file=>match(file)).forEach(file=>add(rule,`path:${file} (${pattern})`));
+    const gate = rule.pathTasks.filter(task => tasks.includes(task));
+    if (!rule.pathTasks.length || gate.length) {
+      const when = rule.pathTasks.length ? ` when task:${gate.join(",")}` : "";
+      for (const pattern of rule.paths) {
+        const match=patternMatcher(pattern);
+        normalized.filter(file=>match(file)).forEach(file=>add(rule,`path:${file} (${pattern})${when}`));
+      }
     }
   }
   return [...selected.values()];

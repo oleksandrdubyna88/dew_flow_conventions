@@ -1357,3 +1357,23 @@ copy of the tree (`git archive` into a scratch repository), because a worktree's
 **Core-text items of the integration.** The rule gained: a store the run owns counts as a container, an old lock-owned name is judged by its old lock, not by age (no tool in this repository matches an old prefix, so text only), the janitor sweeps no images, one helper per test language with the guard checking the token constants, `RUNNER_TEMP` is job-scoped and no `raw-temp` finding (the guard never matched it; a test now pins that), the CI owner pid only for a resource that outlives its step, a workflow `services:` container is the §6(b) shape, `--rm` acts when the container stops, no resource at module load, a child that makes its own temp paths is handed an owned folder, and a store with no lock of its own is lock-owned on one lock server. The one behaviour change is the token check: `leftovers-check.mjs` finds every `REPO_TOKEN` / `RepoToken` constant by shape in the tracked source files (`.mjs .cjs .js .ts .cs .sh .ps1 .py .rs`, comments skipped, `tools/lib` included because the helper lives there) and reports class `token` when two differ or one is not a row of the table that names this repository (RED: two helpers holding `conventions` and `other` were `clean`).
 
 Also in the integration: `leftovers-check.mjs` covers `docker compose -p`/`--project-name` (global options only; `-p` after the subcommand is `--publish`) and `COMPOSE_PROJECT_NAME`, and C#'s `Directory.CreateTempSubdirectory` and `Path.GetTempFileName`; `leftovers-sweep.mjs` judges an orphan claim (`<name>.owner` with no folder, left by a helper that claims first) by its owner instead of by age alone; the token check proves the token BELONGS to this repository (the `## Tokens` row of `REPO_TOKEN` must carry `REPO_ROW`, the helper's statement of which row is this repository's; no identity fails closed — the table holds descriptions, not repository names, so the identity is that constant); the rule's contract text gained the DNS host name and its normalisation, the CI owner pid, the claim-first folder variant, the old-prefix end date and the janitor's `--token` and `JANITOR_MIN_AGE_MINUTES`.
+
+## `path_tasks` and gate provenance (rule-parity E1.S1)
+
+`tools/rules.test.mjs` gains eleven cases beside the original 24 (unchanged, `normalized.filter(file=>match(file))`
+mutation included). Selection: a gated rule is selected by its paths only with a task inside its gate (a task outside, no
+file, a non-matching file, two gate tasks in one reason); an ungated rule with the same paths is unaffected; plain
+`tasks` and dependencies ignore the gate. Metadata: the six refusals (no `paths`, `paths: []`, an empty list, an unknown
+task, a string, a `load: always` rule). `explain` shows `path_tasks` on every rule with the same ids and bytes. The
+provenance cases cover `provenanceFindings` (mirror equal / different tasks / path-only source, declared with a short
+reason or a different set, both or neither key, an absent rule's record before and after its epic lands, the real
+catalog with `gates: {}`).
+
+Observed RED: with the module missing the file does not load; with a stub module the 24 old tests pass and eleven fail
+on `unknown metadata key path_tasks`. Mutations, one at a time, each red in the named case: dropping the gate filter
+fails the selection, ungated-sibling, dependency and explain cases; dropping the `needs paths` check fails the refusals
+case; dropping the CLI field fails the explain case; dropping the set comparison fails the two provenance mirror cases.
+
+Not proved: that any real rule is correctly gated. No real rule carries `path_tasks` in the first epic; the selection
+baseline (`research/selection-matrix.json`) is the control that a later gate does not drop a rule from a scope silently.
+
