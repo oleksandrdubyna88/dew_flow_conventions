@@ -1404,3 +1404,16 @@ the 22-pin count); pinning `ui ui/a.ts` (the pins case, D5, while the one-read t
 Not proved: that the 108 scopes are the right ones (they are the representative file sets of the plan, not every path), that
 a pinned scope is the best list, or that a gate record's cases are sufficient for a rule's whole path list.
 
+## The allowances and the empty gate schema (rule-parity E1.S5)
+
+Two additions to the selection baseline's tests. `the selection matrix carries no gate declaration at E1` asserts the
+recorded `gates` and the tool's `GATES` are both `{}`: E1 ships the schema and the check, every record is written by the epic
+that lands its file, and the test is renamed when the first one is (the comment says what it becomes). `the allowances
+section of research/module_rules.md states every cap the tests enforce` reads the `## Byte allowances per epic` section and
+fails when a cap of `CAPS` is missing from it or an epic E2 to E6 has no row.
+
+Observed: the allowances case failed while the section did not exist, and after the section was written failed again when
+the core's cap was changed to 15,350 B in the prose only; writing one gate record into `GATES` and regenerating the file made
+the no-declaration case red. Not proved: that the interim ("after E3") numbers are what the epics will measure; they are the
+plan's estimates, and each epic replaces them with `--bytes`.
+

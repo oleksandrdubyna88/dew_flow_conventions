@@ -218,3 +218,62 @@ this table, never appends to it.
 | `src/webview/page.ts` | 30,090 | 32,303 | 33,563 | 35,289 | 292,808 | 285,376 | 224,123 | 80,136 | 166,239 |
 | `src/main.rs` | 40,743 | 42,956 | 44,216 | 45,942 | 291,304 | 296,029 | 222,619 | 78,632 | 176,892 |
 
+## Byte allowances per epic
+
+Every later epic of `todo/PLAN_node_rule_parity.md` (section 5, as plain text) writes against a byte budget that the
+suite already holds, so a story measures against this table before its text lands. The always core is 15,055 B today and its
+total allowance is **300 B over it, a hard cap of 15,355 B**: the core loads under `gpu` too, and the cap is what keeps
+`gpu --file src/x.cs` readable in one read. The budget of one read is 32,768 B; the 22 pins of the selection baseline are
+each held under it.
+
+| Owner | Rule | Allowance | Scope it protects |
+|---|---|---|---|
+| E2 | `common/dependencies.md` | at most 4,000 B | a split read (`dependencies --file package.json`); no single-read pin, the number keeps the rule one page |
+| E2 | `typescript/npm-packages.md` | at most 3,300 B (not 3,500 B: the three-sentence allowance is the hard cap) | `storage --file .npmrc`, the tightest pin at E3's exit |
+| E3 | `typescript/compiler-strictness.md` | at most 3,300 B | `storage --file tsconfig.json` (at most 31,900 B once E6 has moved the clock mechanics) |
+| E3 | the P2/P3 statement in `typescript/doctrine.md` | at most 250 B | `inspect` and `gpu` with a `.ts` or `.mjs` file, split reads until E4 |
+| E3 | `csharp/doctrine.md` | at most 4,633 B (4,613 B plus the `Nullable enable` line; its Definition of Done is gated, never loaded under `gpu`) | `gpu --file src/x.cs`, at most 32,613 B |
+| E4 | `typescript/doctrine.md` | at most 4,700 B after the moves | `gpu --file ui/a.ts` and `gpu --file src/a.mjs`, at most 32,680 B |
+| E4, E6 | `csharp/boundaries.md` | at most 1,400 B | `ui --file src/x.cs`, measured by E6 (off the single-read list by decision D5) |
+| E6 | `typescript/utc-timestamps.md` | at most 1,200 B | `storage --file ui/a.ts`, which must improve rather than worsen |
+| E5, E6 | the gated mechanics rules (`lifecycle`, `logging`, `testing`, `definition-of-done`) | measured and recorded, no single-read cap | split reads only |
+| E3 to E6 | the core | in total at most 300 B over today, at most 15,355 B | every scope: the core is in all of them |
+
+**After E3, before E4 — the interim budget.** E3 adds prose and selectors before E4 moves the trap sections out, so the 22
+pins are held against that catalog too (E2 assumed merged, the core unchanged until E5, `utc-timestamps.md` unchanged until
+E6). In the order of the pin list, in bytes: `inspect` 24,207 · 28,840 · about 29,840 · 30,366 · 27,507 · at most 27,507 ·
+about 25,207 · 30,366 · 30,366; `ui` 26,420 · 29,720 · at most 29,720 · about 27,420; `gpu` 27,680 · 32,313 · 30,980 · at
+most 30,980 · about 28,680; `storage` 29,406 · at most 32,706 · at most 32,706 · about 30,406. The `storage` pins leave 62 B of
+headroom until E6 moves about 1,100 B out of `utc-timestamps.md`; that is why the `.npmrc` rule is capped at 3,300 B. The
+unpinned JavaScript scopes are split reads in the interim and improve at E4 (`gpu --file src/a.mjs` about 33,839 B after E3,
+32,380 B or less after E4; `storage --file src/a.mjs` about 35,565 B after E3 and about 33,300 B after E6).
+
+Each epic re-measures with `node tools/selection-matrix.mjs --bytes` and replaces the table in the previous section. The
+caps above are enforced by `CAPS` in `tools/rules.test.mjs`, which a test compares with this section.
+
+## Gate declarations — the schema, and what each epic will declare
+
+A gate record is written by the epic that lands the gated file, in `GATES` of `tools/selection-matrix.mjs` (rendered into
+`research/selection-matrix.json` under `gates`); the first epic declares none. The record, keyed by the rule id:
+
+```json
+"csharp.definition-of-done": {
+  "mirrors": "<source rule id>",
+  "epic": "E5",
+  "cases": [ { "tasks": ["implement"], "files": ["src/x.cs"], "selected": true } ]
+}
+```
+
+A record has exactly one of `mirrors` (the source rule whose `tasks:` line the gate repeats; a source with no `tasks:` line
+mirrors as "no gate") and `declared` (`{ "path_tasks": [...], "reason": "<at least 20 characters>" }`, for a new
+requirement or an applicability the plan changed on purpose). `provenanceFindings` checks the gate against its source or its
+reason, and `caseFindings` holds the cases to the definition in the previous sections: at least one case that selects the
+rule, for a gated rule a negative with a matching file and every task outside the gate and a negative with a task inside the
+gate and no matching file, for an ungated mirror a negative with no matching file.
+
+The plan already approves five declarations, each written by the epic named, and nothing else is declared: the two
+`definition-of-done` files and the two `boundaries` files (E4 and E4/E6 — the plan's section 4.4), and
+`typescript/testing.md` (E4, ledger entry 3.1). The new mechanics files are declared by the epics that create them:
+`typescript/lifecycle.md` by E5, `typescript/logging.md` and `typescript/utc-timestamps.md` by E6. Every other gated file
+mirrors the `tasks:` line of the rule its requirement came from.
+

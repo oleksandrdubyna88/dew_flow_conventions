@@ -597,3 +597,15 @@ test("a case with an unknown task or a path that is not root-relative is a findi
   assert.ok(bad.some(finding=>/imlpement/.test(finding)));
   assert.ok(bad.some(finding=>/\.\.\/x\.cs/.test(finding)));
 });
+
+test("the allowances section of research/module_rules.md states every cap the tests enforce, with the epic that owns it",()=>{
+  // The prose is where an epic reads its budget before it writes; a cap changed here and not there is a story that
+  // plans against a number the suite no longer holds.
+  const text=fs.readFileSync(path.join(sourceRoot,"research/module_rules.md"),"utf8");
+  const start=text.indexOf("## Byte allowances per epic");
+  assert.ok(start>=0,"research/module_rules.md has no `## Byte allowances per epic` section");
+  const end=text.indexOf("\n## ",start+1);
+  const section=text.slice(start,end<0?undefined:end);
+  for(const cap of CAPS)assert.ok(section.includes(`${cap.max.toLocaleString("en-US")} B`),`the allowances section does not state ${cap.what} at ${cap.max.toLocaleString("en-US")} B`);
+  for(const epic of ["E2","E3","E4","E5","E6"])assert.ok(section.includes(epic),`${epic} has no allowance row`);
+});

@@ -115,10 +115,11 @@ test("the tool prints the bytes table and refuses an unknown argument with usage
   assert.match(usage.stderr, /usage/i);
 });
 
-test("the matrix carries no gate declaration at E1", () => {
-  // E1 ships the schema and the check, empty of entries. When the first epic writes a record this becomes "every gate
-  // record belongs to a landed or unlanded owning epic": each record's epic is E2..E6, and an epic in LANDED_EPICS has
-  // its rule in the catalog.
+test("the selection matrix carries no gate declaration at E1", () => {
+  // E1 ships the schema and the check, empty of entries: every gate record is written by the epic that lands its file.
+  // When the first epic writes one this test becomes "every gate record belongs to a landed or unlanded owning epic" —
+  // each record's `epic` is E2..E6, an epic in LANDED_EPICS has its rule in the catalog, and the record passes
+  // provenanceFindings and caseFindings (tools/lib/gates.mjs).
   assert.deepEqual(parsed().gates, {});
   assert.deepEqual(GATES, {});
 });
