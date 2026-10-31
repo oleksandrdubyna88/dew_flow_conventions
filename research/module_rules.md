@@ -298,7 +298,7 @@ fields are well formed; the inventory and the matrix are one to one with equal t
 side, and of a deliberately-absent row's present side, names a catalog rule and one of its recorded sections; a planned side
 names an owning epic; a row's status follows from its sides, its epic is the latest of its planned sides, and a planned row of
 a landed epic (`LANDED_EPICS`) is a finding; only P4 may be `stronger-*`, and then with a reason; the inventory and the row
-agree on status and epic; and, for an active side, each `selectors` item equals the rule's front matter, `mood` is `MUST`
+agree on status and epic; and, for an active side, its `selectors` name exactly its delivery rules and each item equals the rule's front matter, `mood` is `MUST`
 exactly when a heading carrying (MANDATORY) is found from the section's own heading up through each preceding heading of a
 lower level to the H1, a `check` tool exports `CHECKED_RULES` containing the side's delivery ids, a `hook` is a file under
 `settings/hooks/`, and a `test` file exists.

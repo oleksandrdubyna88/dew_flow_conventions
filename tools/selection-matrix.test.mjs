@@ -70,6 +70,22 @@ test("the matrix holds 108 scopes once each, sorted unique ids, the 22 pins and 
   }
 });
 
+// The 22 pins of plan section 5, named. A literal on purpose and independent of the tool's own PINNED table: counts and
+// the D5 rule cannot tell one pin from another, so swapping a pinned scope for an unpinned one of the same task kept every
+// count green. Adding or dropping a pin is a decision of the plan, and this list is where a reviewer sees it.
+const PINS = [
+  "inspect (no file)", "inspect src/x.cs", "inspect src/x.csproj", "inspect ui/a.ts", "inspect tsconfig.json", "inspect .npmrc",
+  "inspect Directory.Build.props", "inspect src/a.mjs", "inspect src/webview/page.ts",
+  "ui (no file)", "ui tsconfig.json", "ui .npmrc", "ui Directory.Build.props",
+  "gpu (no file)", "gpu src/x.cs", "gpu tsconfig.json", "gpu .npmrc", "gpu Directory.Build.props",
+  "storage (no file)", "storage tsconfig.json", "storage .npmrc", "storage Directory.Build.props",
+];
+
+test("the 22 single-read pins are exactly the scopes the plan names", () => {
+  assert.equal(new Set(PINS).size, 22);
+  assert.deepEqual(parsed().scopes.filter(scope => scope.oneRead === true).map(scope => scope.name).sort(), [...PINS].sort());
+});
+
 test("a selector edit moves a recorded id list but passes the body freeze — the matrix is the control that notices it", t => {
   // D12's point. Removing `tasks: ["dependencies"]` from a rule changes what 'dependencies' selects and no body byte.
   const { root } = toolCopy(t);

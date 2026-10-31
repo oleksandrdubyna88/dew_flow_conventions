@@ -222,6 +222,10 @@ export async function parityFindings({ inventory, matrix, catalog, sectionsById,
     // (10) an active side against reality
     const active = Object.entries(sides).filter(([name]) => kinds[name] === "active");
     for (const [name, side] of active) {
+      if (!Array.isArray(side.selectors) || !same(side.selectors.map(item => item?.id), idsOf(side))) {
+        findings.push(`${id}: the ${name} side's selectors name [${(side.selectors ?? []).map(item => item?.id).join(", ")}] but its delivery is [${idsOf(side).join(", ")}] — every delivery rule's selectors, and no other`);
+        continue;
+      }
       for (const item of side.selectors) {
         const rule = byId.get(item?.id);
         if (!rule) { findings.push(`${id}: the ${name} side lists selectors for ${item?.id}, which is not a rule`); continue; }
@@ -368,7 +372,16 @@ test("the present-side variant on an equal row is a finding", async t => {
 });
 
 test("the real-row proof: P2 and P3 as equal rows pass the union comparison on source and manifest scopes", async t => {
-  assert.deepEqual(await parityFindings(proofWorld(t)), []);
+  const world = proofWorld(t);
+  assert.deepEqual(await parityFindings(world), []);
+  // The proof proves the REAL rows only if its delivery sets are the real rows' (planned for E3 in the matrix): read them
+  // from the matrix, so editing P2's or P3's delivery there without the proof noticing is a red test.
+  const real = realWorld();
+  for (const id of ["P2", "P3"]) {
+    for (const side of ["csharp", "typescript"]) {
+      assert.deepEqual([...idsOf(rowOf(world, id)[side])].sort(), [...idsOf(rowOf(real, id)[side])].sort(), `${id} ${side}: the fixture's delivery set is the real row's`);
+    }
+  }
 });
 
 test("without the TypeScript source-file statement, P2 and P3 fail the union: a .ts scope would deliver nothing", async t => {
@@ -494,6 +507,17 @@ test("an active side is held to reality: its selectors, its check tool's CHECKED
   const noHook = await parityFindings(hook);
   assert.equal(noHook.length, 1, noHook.join("\n"));
   assert.match(noHook[0], /P2: the typescript side's hook "nope"/);
+});
+
+test("an active side's selectors are exactly its delivery ids: an empty list is a finding", async t => {
+  const empty = proofWorld(t);
+  rowOf(empty, "P2").csharp.selectors = [];
+  const findings = await parityFindings(empty);
+  assert.equal(findings.length, 1, findings.join("\n"));
+  assert.match(findings[0], /P2: the csharp side's selectors name \[\] but its delivery is \[csharp\.doctrine\]/);
+  const extra = proofWorld(t);
+  rowOf(extra, "P3").typescript.selectors = rowOf(extra, "P3").typescript.selectors.slice(1);
+  assert.ok(named(await parityFindings(extra), /P3: the typescript side's selectors name/));
 });
 
 test("a planned row of an epic that has landed is a finding", async () => {

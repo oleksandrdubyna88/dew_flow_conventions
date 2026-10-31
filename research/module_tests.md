@@ -1389,6 +1389,7 @@ baseline (`research/selection-matrix.json`) is the control that a later gate doe
   `dependencies (no file)` and `csharp.nuget-packages`, while `drifted` of the body freeze answers `[]` — the point of D12.
 - The tool on a copy: exit 0 `in step`; after a hand edit exit 1 naming the scope; `--write` restores the committed bytes and
   leaves no `.tmp`; `--bytes` equals `bytesTable`; an unknown argument is usage, exit 2.
+- The 22 pins are named as a literal list in the test, independent of the tool's own table: swapping a pinned scope for an unpinned one of the same task keeps every count green and fails that list.
 - `gates` is `{}` (E1 declares nothing); the test is renamed when the first epic writes a record.
 - `rules.test.mjs`: every pin (read from the matrix file) selects at most 32,768 B (the original test name kept); every cap
   of `CAPS` holds on the real catalog; a cap is red one byte over, for the core, for a rule, and for a rule capped from an
@@ -1424,7 +1425,7 @@ plan's estimates, and each epic replaces them with `--bytes`.
 - The real files: 31 entries and 31 rows, one to one, no finding against the catalog, the section records and
   `LANDED_EPICS`; every row `planned` or `deliberately-absent` (P8, R4, R5, G4, G5); the present side of P8, R4 and R5 is
   accepted only on a deliberately-absent row, and a row-level `suppression` or a reason on the wrong row is a finding.
-- The real-row proof, on an owned folder holding the real C# doctrine, the always core, a TypeScript doctrine with E3's planned
+- The real-row proof (its delivery sets are asserted equal to the real P2 and P3 rows of the matrix), on an owned folder holding the real C# doctrine, the always core, a TypeScript doctrine with E3's planned
   front matter, a compiler-strictness rule and a fixture check tool: P2 and P3 as `equal` rows pass the union on source and
   manifest scopes, and the same rows without the TypeScript source-file statement fail, naming the task and the pair.
 - P4 may be `stronger-ts` with a reason; P2 may not.
@@ -1433,7 +1434,7 @@ plan's estimates, and each epic replaces them with `--bytes`.
   or a deliberately-absent row with a reason is one finding each; a planned row of a landed epic is a finding.
 - Heading inheritance on the real sections: `MUST` on a subsection of the reliability rule (its H1 is marked) passes and
   `SHOULD` there is a finding; `SHOULD` on a section of the testing rule passes and `MUST` there is a finding.
-- An active side against reality: a selectors item that differs from the front matter, a check tool that does not list a
+- An active side against reality: a `selectors` list that is not exactly its delivery ids (an empty list is a finding), a selectors item that differs from the front matter, a check tool that does not list a
   delivery id, a hook naming no file.
 
 Observed RED: with the data files absent the real-file cases fail with the test's own message. On the real files, giving P10
