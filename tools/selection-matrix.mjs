@@ -17,6 +17,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadCatalog, selectRules } from "./lib/rule-catalog.mjs";
+import { folded } from "./lib/rule-body.mjs";
 
 export const MATRIX_FILE = "research/selection-matrix.json";
 
@@ -139,7 +140,8 @@ export function main(argv, root = path.resolve(path.dirname(fileURLToPath(import
     console.log(`selection-matrix: ${MATRIX_FILE} written (${SCOPES.length} scopes). The diff beside the rule change is what a reviewer reads.`);
     return 0;
   }
-  const current = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  // Line endings folded, as every other reader of the corpus does: `core.autocrlf` rewrites a checkout on Windows.
+  const current = fs.existsSync(file) ? folded(fs.readFileSync(file, "utf8")) : "";
   if (current === text) { console.log(`selection-matrix: in step — ${SCOPES.length} scopes.`); return 0; }
   let parsed = {};
   try { parsed = JSON.parse(current); } catch { /* an unreadable file is reported below */ }

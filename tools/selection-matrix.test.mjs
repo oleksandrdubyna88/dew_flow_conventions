@@ -19,6 +19,7 @@ import { render, idDrift, bytesTable, SCOPES, FILE_SETS, TASKS_PINNED, ONE_READ,
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MATRIX = path.join(sourceRoot, "research/selection-matrix.json");
 const committed = () => fs.readFileSync(MATRIX, "utf8");
+const committedLf = () => committed().replaceAll("\r\n", "\n");
 const parsed = () => JSON.parse(committed());
 const SINGLE_READ_TASKS = ["inspect", "ui", "gpu", "storage"];
 const LANGUAGE_FILES = ["src/x.cs", "src/x.csproj", "ui/a.ts", "src/a.mjs", "src/webview/page.ts"];
@@ -39,7 +40,7 @@ function toolCopy(t) {
 }
 
 test("the committed selection matrix is exactly what the tool renders from the real catalog", () => {
-  assert.equal(committed(), render(loadCatalog(sourceRoot)), "run `node tools/selection-matrix.mjs --write` and read the diff");
+  assert.equal(committedLf(), render(loadCatalog(sourceRoot)), "run `node tools/selection-matrix.mjs --write` and read the diff");
 });
 
 test("the matrix holds 108 scopes once each, sorted unique ids, the 22 pins and a reason for every other single-read scope", () => {
@@ -117,6 +118,15 @@ test("the tool verifies in step, fails on a hand edit naming it, and --write res
   assert.equal(fs.readFileSync(file, "utf8"), committed());
   assert.equal(fs.existsSync(`${file}.tmp`), false, "the temporary file is renamed away");
   assert.equal(tool().status, 0);
+});
+
+test("a CRLF checkout of the recorded file (core.autocrlf) is still in step", t => {
+  const { root, tool } = toolCopy(t);
+  const file = path.join(root, "research/selection-matrix.json");
+  fs.writeFileSync(file, committed().replaceAll("\n", "\r\n"));
+  const result = tool();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(committed().includes("\r"), false, "the committed file itself is LF");
 });
 
 test("the tool prints the bytes table and refuses an unknown argument with usage", t => {
