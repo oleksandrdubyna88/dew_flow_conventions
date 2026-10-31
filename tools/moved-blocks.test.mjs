@@ -189,6 +189,45 @@ test("a supersession is refused for another epic than its baseline's, and a merg
   assert.equal(w.entries()[0].supersededBy, "s1");
 });
 
+test("a block that matches an already paired baseline is refused by saying so, not as 'differs from every unpaired baseline'", t => {
+  const w = world(t);
+  w.baseline("2-4");
+  w.commit("record the baseline");
+  w.placeBlock();
+  w.move("2-4", "a1");
+  const before = w.manifestText();
+  refusal(() => w.move("2-4", "a2"), /baseline b1 is already activated by a1/);
+  assert.equal(w.manifestText(), before);
+  // and after a supersession: the old bytes name the superseding entry
+  const v = world(t);
+  v.baseline("2-4");
+  v.commit("record the baseline");
+  const changed = BLOCK.replace("café two", "café three");
+  fs.writeFileSync(v.file("src.md"), SRC.replace("café two", "café three"));
+  const j = v.commit("fix a word in the block");
+  fs.writeFileSync(v.file("common/d.md"), `# Destination\n${changed}tail\n`);
+  v.move("2-4", "s1", { supersedes: "b1", justifiedBy: j }, j);
+  refusal(() => v.move("2-4", "s2", {}, v.c), /baseline b1 is already superseded by s1/);
+});
+
+test("markSuperseded finds a baseline written with other spacing and leaves valid JSON", t => {
+  const w = world(t);
+  w.baseline("2-4");
+  w.commit("record the baseline");
+  fs.writeFileSync(w.file(MANIFEST), w.manifestText().replace('"id": "b1"', '"id"  :   "b1"').replace(/"length": (\d+)/, '"length"   :  $1'));
+  assert.match(w.manifestText(), /"length"   :  \d+/);
+  w.commit("hand-format the manifest");
+  const changed = BLOCK.replace("café two", "café three");
+  fs.writeFileSync(w.file("src.md"), SRC.replace("café two", "café three"));
+  const j = w.commit("fix a word in the block");
+  fs.writeFileSync(w.file("common/d.md"), `# Destination\n${changed}tail\n`);
+  fs.writeFileSync(w.file("src.md"), fs.readFileSync(w.file("src.md"), "utf8").replace(changed, ""));
+  w.move("2-4", "s1", { supersedes: "b1", justifiedBy: j }, j);
+  assert.equal(w.entries()[0].supersededBy, "s1");
+  assert.equal(w.entries().length, 2);
+  assert.deepEqual(w.verify(), []);
+});
+
 test("a supersession whose destination holds the baseline\'s OLD bytes fails the checker", t => {
   const w = world(t);
   w.baseline("2-4");

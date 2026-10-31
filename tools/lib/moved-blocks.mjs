@@ -242,9 +242,12 @@ export function appendEntry(text, entry) {
 
 /** The one in-place edit the file ever gets: a superseded baseline gains `supersededBy`, after its last field. */
 export function markSuperseded(text, id, by) {
-  const at = text.indexOf(`"id": ${JSON.stringify(id)}`);
-  if (at < 0 || text.indexOf(`"id": ${JSON.stringify(id)}`, at + 1) >= 0) throw new Refusal(`${id} is not exactly one entry of ${MANIFEST}`);
-  const tail = /"length": \d+/.exec(text.slice(at));
+  // Tolerant of spacing: the file is append-only and may have been hand-formatted, and the key order is the only thing relied on.
+  const own = new RegExp(`"id"\\s*:\\s*${JSON.stringify(id).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "g");
+  const found = [...text.matchAll(own)];
+  if (found.length !== 1) throw new Refusal(`${id} is not exactly one entry of ${MANIFEST}`);
+  const at = found[0].index;
+  const tail = /"length"\s*:\s*\d+/.exec(text.slice(at));
   if (!tail) throw new Refusal(`${id} has no length field to append after`);
   const end = at + tail.index + tail[0].length;
   return `${text.slice(0, end)},\n    "supersededBy": ${JSON.stringify(by)}${text.slice(end)}`;
@@ -318,6 +321,15 @@ export function recordMove(root, { source, range, commit, destination, epic, id,
     return entry;
   }
 
+  // A block that equals a baseline which is already paired is not "a changed block": say which pairing took it.
+  const taken = entries.find(entry => entry.status === "planned" && entry.source === source && paired.has(entry.id) && entry.sha256 === block.sha256 && entry.length === block.length)
+    ?? entries.find(entry => entry.status === "planned" && entry.source === source && Object.hasOwn(entry, "supersededBy") && entry.sha256 === block.sha256 && entry.length === block.length);
+  if (taken) {
+    const by = entries.find(entry => entry.activates === taken.id);
+    const over = entries.find(entry => entry.supersedes === taken.id);
+    const how = by ? `activated by ${by.id}` : `superseded by ${over?.id ?? taken.supersededBy}`;
+    throw new Refusal(`baseline ${taken.id} is already ${how}; a block moves once — to move it again, record the new location as a new baseline from the destination`);
+  }
   if (!supersedes) throw new Refusal(`the block differs from every unpaired baseline of ${source}: a changed block needs --supersedes <baseline id> and --justified-by <commit>`);
   if (!justifiedBy) throw new Refusal(`superseding ${supersedes} needs --justified-by <commit>, the commit that changed the block's words`);
   const old = unpaired.find(entry => entry.id === supersedes);
