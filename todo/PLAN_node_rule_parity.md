@@ -1,9 +1,9 @@
 # PLAN — C#/Node rule parity: every C# requirement has a Node/TypeScript counterpart of equal strength, and the reverse
 
-> Status: **plan only, nothing implemented yet; epoch 2 open with 0 changes, 2026-10-31 — epoch 1 closed at its
-> second change (the PR #94 review, § 14), the re-review revised the whole plan (§ 15, § 16) and the coai document
-> gate over `e055974` returned `proceed`; revised the same day after the question consultants, consult `ce61c905`,
-> and the operator's "we only add" rule — § 0.** Scope: the shared rule corpus (`common/`,
+> Status: **plan only, nothing implemented yet; stopped for re-review, 2026-10-31 — epoch 2 reached its second change
+> with the E1 stories writer's open points (O1–O7, § 17); epoch 1 had closed at its own second change (the PR #94
+> review, § 14), its re-review is § 15–§ 16 and the coai document gate over `e055974` returned `proceed`; revised the
+> same day after the question consultants, consult `ce61c905`, and the operator's "we only add" rule — § 0.** Scope: the shared rule corpus (`common/`,
 > `csharp/`, `rust/`, `typescript/`), its selection metadata and one new metadata key in the resolver
 > (`tools/lib/rule-catalog.mjs`), `research/rule-bodies.json`, a machine-readable parity matrix and its test, the
 > selection and size tests in `tools/rules.test.mjs`, two tools (`tools/http-coverage.mjs`'s `--routes` path for Node; a
@@ -48,7 +48,17 @@ Narrowed: no — judged against the gate-approved epoch 1 baseline `ac798a0` wit
 |---|---|---|---|
 | The E1 stories document (planning work, not on main; nothing was built) | `feat/rule-parity-e1` | fits | kept as the input to E1 — judged by the team lead as the Opus judge, 2026-10-31 |
 
-> Epoch 2 · approved 2026-10-31 · by reviewers · state: open
+> Epoch 2 · approved 2026-10-31 · by reviewers · state: stopped
+
+- 2.1 · 2026-10-31 · agent · contract — E1 stories O1: G2 (the lock file) had no admissible status; the question consultants (consult `1f4d8688`, the owner away) and the team lead put G2 on the exception whitelist as `stronger-ts` with its reason; Q1 closed, for the owner to confirm 2026-11-01
+- 2.2 · 2026-10-31 · agent · contract — E1 stories O3: T11 ("every gate equals its source rule's `tasks:` line") cannot hold for the four planned gated files that have no source rule
+  (This second change stopped the plan. The four entries below were found in the same stories document and are
+  recorded one per cause, as the rule asks; O2 and O8–O12 of that document are repaired references and fixes that only
+  satisfy the plan as written, not entries. The re-review's revision for epoch 3 is § 17.)
+- 2.3 · 2026-10-31 · agent · contract — E1 stories O4: the doctrine rows P1, P5, P7 and P20 cannot be `equal` under § 2 (a) while `csharp/doctrine.md` also selects `.csproj` and the TypeScript doctrine selects source files only
+- 2.4 · 2026-10-31 · agent · approach — E1 stories O5: four § 4.3 moves were not exact line ranges (reliability's sentences, the .NET text of `utc-timestamps`, the NuGet `:39-47` split inside a code fence), so E1 could not record them
+- 2.5 · 2026-10-31 · agent · contract — E1 stories O6: whether `MANDATORY` is read from the section's own heading only or inherited from an ancestor heading (P13's C# section carries none of its own)
+- 2.6 · 2026-10-31 · agent · contract — E1 stories O7: "the list of D5 and the new config scopes" named no exact single-read list; six scopes that fit today were unpinned without a reason
 
 ## 0. Decisions
 
