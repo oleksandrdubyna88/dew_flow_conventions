@@ -1443,3 +1443,31 @@ union by an intersection failed the P2/P3 proof, the missing-rule case and the r
 Not proved: that any real row is correct once it is active (none is in the first epic); the first real-catalog proof is the
 third epic's. The correspondence pairs are the plan's file sets, not every path a language can name.
 
+## The move verifier (rule-parity E1.S4)
+
+`tools/moved-blocks.test.mjs` (nineteen cases) runs in an owned git repository with a ten-line source (`é` on line 3, an
+indented line 4, a fence on lines 8-10) and a destination:
+
+- Baselines record the exact range (the commit as 40 hex, `é` as two bytes, a single line as `N-N`); a range that starts or ends
+  inside the fence is refused with the fence message and the whole fence is recorded; a column range and every other form is
+  refused naming E1.S0b; lines past the end, an unknown commit, an existing id and a bad epic are refused, and a refusal writes
+  nothing. `fenceDepth` (added to `tools/lib/rule-body.mjs`) has its own case, including a longer fence not closed by a shorter run.
+- An unchanged block is activated (the destination lines found in the working tree) and verifies after the move commit; a
+  changed block is superseded, the new entry carries `justifiedBy` and `justifiedFiles`, and the old entry gains `supersededBy`
+  and no other byte changes; a justifying commit that also touches another file, a missing flag, and a destination holding the
+  old words are each refused or a checker finding.
+- The checker: an unpaired baseline survives two lines inserted above it and fails on one changed byte or a landed epic; an
+  activation is one finding each for the block twice, mid-line, changed, absent in the destination, or left in the source;
+  two activations, an activation with a supersession, and a dangling reference are one finding each.
+- Append-only: a hand-formatted first entry is still byte for byte there after a fourth is appended. A copy of the fixture with
+  no `.git` gives the same findings. The real manifest holds exactly the 25 baselines, none activated, with F8's byte lengths in
+  F8's order; the tool prints `moved-blocks: OK — 25 baseline(s), 0 activated, 0 superseded`.
+
+Observed RED: the module missing. Mutations, each red in the named case: dropping the fence check (the fence case); accepting
+column ranges (the mid-line case and the command-line case); judging an unpaired baseline by its line numbers (the
+unpaired-baseline case); dropping the `justifiedFiles` check (the supersession-refusal case); re-serialising on append (the
+append-only case); changing one byte of line 110 of the reliability rule (the real-manifest case, naming `reliability-timeout`).
+
+Not proved: that no entry was edited after it was written (the diff and the review are the control); that a block moved to a
+destination keeps its meaning there (only its bytes).
+

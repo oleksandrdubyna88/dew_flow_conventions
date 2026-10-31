@@ -314,3 +314,41 @@ fails, because a `.ts` scope would deliver nothing.
 
 The deliberately-absent reasons are the inventory's; this document keeps no copy.
 
+## Moves
+
+Text that the parity work moves between rule files moves **verbatim**, and `research/moved-blocks.json` is the record that it
+did. It is one JSON array, append-only, of three entry shapes: a **baseline** (`status: "planned"`, the owning epic, the
+source file, the line range, the commit it was read at, and the `sha256` and byte `length` of its text); an **activation**
+(an owning epic placed the unchanged bytes in a destination: `activates`, `destination`, `destinationLines`); and a
+**superseding** entry (the bytes changed, justified by a commit that touched only the block's source file: `supersedes`,
+`justifiedBy`, `justifiedFiles`, the new bytes and their destination). Entries are immutable: the one field ever added to an
+existing entry is `supersededBy` on a superseded baseline.
+
+A block is **whole lines and whole fences**. A range is `N` or `N-M`; a column range, a range that starts or ends inside a
+fenced block, or lines past the end are refused, and the remedy for a sentence that shares a line with the block's boundary is
+to split the line by whitespace first (the whitespace-only splits of E1.S0b are exactly that, and the numbering this file
+records is the numbering after them; the anonymised first section of the TypeScript doctrine is E1.S0's, so its hash is the
+anonymised one). The text hashed is the folded lines of the range with a closing line end, measured in bytes (`é` is two).
+
+- `node tools/moved-blocks.mjs` verifies and prints `moved-blocks: OK — N baseline(s), A activated, S superseded`, or one
+  finding per line (exit 1).
+- `node tools/moved-blocks.mjs --baseline <source> <from>-<to> <commit> <epic> <id>` appends a baseline, reading the text from
+  `git show <commit>:<source>`.
+- `node tools/moved-blocks.mjs --record <source> <from>-<to> <commit> <destination> <epic> <id> [--supersedes <baseline id>
+  --justified-by <commit>]` is run by the owning epic after placing the block in the destination's working tree and before
+  committing. If the bytes equal an unpaired baseline of that source it appends an activation, finding the destination lines by
+  scanning the working tree (refused unless the block is there exactly once). If they differ it requires both flags, verifies
+  with git that the justifying commit exists and touches only the source file, appends the superseding entry and adds
+  `supersededBy` to the old one. A refusal writes nothing. The file is written by inserting the new entry before the closing
+  bracket, never by re-serialising, through a temporary file and a rename.
+
+The checker reads no git history, so it runs in a depth-1 CI checkout: it finds a block by its hash anywhere in the file, which
+means a section added above a planned block does not break the check while a changed byte does. An unpaired baseline needs its
+text in the source exactly once and its epic not yet landed (`LANDED_EPICS`); an activation needs the destination lines to hash
+to the baseline, the block exactly once in the destination, and none left in the source; a superseding entry the same for its
+own bytes, a 40-hex `justifiedBy` and `justifiedFiles` of exactly the source; a baseline is paired at most once. The facts that
+need history (the commit exists, the files it touched) are checked by the recorder when the entry is written and are recorded
+in the entry. This is not `research/rule-bodies.json`: that file freezes what a whole rule body IS now and is updated with every
+edit, this one records where named pieces went and is only ever appended to. The first epic records the 25 baselines and no
+destination; the owning epics (E2, E4, E5, E6) activate them.
+
