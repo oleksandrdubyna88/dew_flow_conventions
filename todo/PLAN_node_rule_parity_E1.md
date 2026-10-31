@@ -1,39 +1,28 @@
 # PLAN — C#/Node rule parity, E1: delivery and the parity contract (no new prose)
 
-> Status: **plan only, nothing implemented yet, 2026-10-31 — reconciled with the parent's epoch 3 (main `2ee02c4`).**
-> Scope: the stories of epic E1 — the wording-only anonymisation of `typescript/doctrine.md` § 1 (S0); the
-> whitespace-only splits in `common/testing.md` and `csharp/nuget-packages.md` (S0b); the `path_tasks` key and the
-> provenance check of gates (S1); `tools/selection-matrix.mjs` and `research/selection-matrix.json` (S2); the 22-pin
-> single-read list, the byte caps and the four declared gates (S5); the parity inventory, matrix and consumers files with
-> the normalised-equality, heading-inheritance and lock fixtures (S3); `tools/moved-blocks.mjs` and the immutable manifest
-> `research/moved-blocks.json` (S4); `ENTRY.md` step 7, `research/module_rules.md`, `research/module_tests.md`,
-> `README.md` § *tools*.
+> Status: **plan only, nothing implemented yet, 2026-10-31 — rewritten to the slimmed E1 of the parent's epoch 4 (main
+> `b396902`).** Scope: the wording-only anonymisation (S0) and the whitespace-only splits (S0b); the `path_tasks` key
+> with provenance gates (S1); the selection baseline — `tools/selection-matrix.mjs`, `research/selection-matrix.json`,
+> the 22 pins, the caps, the negative-case definition (S2); the allowances and the empty gate schema (S5); a minimal
+> parity matrix and inventory with the completeness test and the real-row proof on fixtures (S3); the reusable move
+> verifier with its baseline (S4); the two lock fixtures and their required CI job (S4b).
 >
 > Stories of epic E1 of [PLAN_node_rule_parity.md](PLAN_node_rule_parity.md) (§ *Epics*, E1). Written by Opus on
-> 2026-10-31 (`3392fb2`), reconciled with epoch 2 (`72aaf8c`), whose open points O1–O12 stopped that epoch (parent
-> ledger 2.1–2.6, § 17), and now reconciled with epoch 3 (§ 17, § 18). This document keeps no change ledger: a change to
-> E1's approved work is an entry in the parent's `## Plan changes` — epoch 3, at 0 changes, where a second change stops
-> the plan again. E1 holds no cornerstone area: no story is marked `model: fable`, and the parent's ledger line stays
-> `Cornerstones: 0 of 3`. What the parent still leaves unbuildable or unclear is in § *Open points*, each classified as a
-> change or not, and not decided in the stories.
+> 2026-10-31 and reconciled with each epoch since (`3392fb2`, `72aaf8c`, `3b7d7db`); the re-review for epoch 4 kept that
+> version as the input and slimmed E1 (ledger 3.4, § 19, § 20). This document keeps no change ledger: a change to E1's
+> approved work is an entry in the parent's `## Plan changes` — epoch 4, at 0 changes. E1 holds no cornerstone area: no
+> story is marked `model: fable`; the parent's ledger line stays `Cornerstones: 0 of 3`. What the parent leaves
+> unbuildable or unclear is in § *Open points*, classified; nothing there is decided by a story beyond what the plan as
+> written already requires.
 
-Done when (the parent's E1, `todo/PLAN_node_rule_parity.md:1163-1170`): `npm test` green with the new tests; the matrix
-test observed red when an ACTIVATED row names a missing id or section, and when a `planned` row names no owning epic,
-then fixed; every `planned` row and move entry passes its structural check with its source bytes recorded; every tight
-scope's headroom is in `research/module_rules.md`; **the fixtures of the parent's § 10 (`:793-808`) are green — one per
-contract**:
-
-| Contract | Fixture | Story |
-|---|---|---|
-| selection | one positive and one negative case per gated rule | S1 (fixture catalog), S5 (the four declared gates) |
-| equality normalisation | one `equal` pair passing through the correspondence table; one mismatch that fails | S3 |
-| the manifest case | `dependencies --file package.json` and `dependencies --file src/x.csproj` select the same rule kinds | S3 |
-| heading inheritance | `common/reliability.md`'s `### A timeout…` read as MANDATORY from its H1; a section with no marker above it read as SHOULD | S3 |
-| moves | an exact whole-line range recorded; a fence-splitting range refused; a mid-line range refused, naming S0b | S4 |
-| G2's enforcement | a stale `packages.lock.json` fails a locked restore with `NU1004` and passes after `--force-evaluate`; an unsatisfied `package-lock.json` fails `npm ci` with `EUSAGE` | S3 |
-
-— all before E2's stories document is written; one pull request through both gates. The commands, from the worktree
-root, after the locked install (`npm test` does not run the family checks):
+Done when (the parent's E1, `todo/PLAN_node_rule_parity.md:1395-1405`): `npm test` green with the new tests; the matrix
+test observed red when an ACTIVATED row names a missing id or section and when a `planned` row names no owning epic,
+then fixed; the P2/P3 real-row fixture passes the union comparison and its negative fails; every tight scope's headroom
+is in `research/module_rules.md`; E1's fixtures green — selection (a positive and the defined negatives per gated rule),
+the real-row equality and its negative, heading inheritance, the verifier's four cases, and the two lock fixtures, the
+NuGet one exercised in the REQUIRED `tools · lock fixtures` job on this pull request and never skipped there — before
+E2's stories document is written; `research/moved-blocks.json` holds exactly the 25 baseline `planned` entries, no
+destination; `research/selection-matrix.json` carries no gate declaration; one pull request through both gates.
 
 ```bash
 npm ci --ignore-scripts
@@ -46,64 +35,48 @@ node tools/plan-lifecycle.mjs .
 
 ## Gates, models, branch
 
-- **Branch.** `feat/rule-parity-e1` (main merged in at `a5dc95b`). One commit per story, `npm test` green after each —
-  the six janitor cases that fail on this machine on a clean `main` aside (parent § 16, `:1027-1028`): name them, never
-  fold them into a story's verdict. One pull request for the epic.
-- **S0 and S0b are their own commits**, each carrying only its rule files and `research/rule-bodies.json`, listed in the
-  pull request as **wording, no lesson removed** (S0) and **whitespace only** (S0b) (parent § 4.3 `:396-403`, § 4.4
-  `:492-498`, § 11 `:843-845`).
-- **Gates.** `open` on this branch with `callerModel`; `review_plan` with this document as the scope of epic 1 of 7;
-  `resolve` every finding, rejecting in round one what is wrong; build in the order below; `review_code` over the epic's
-  diff with `baseRef` = the merge base with `main` at that time (`2ee02c4` today) and an Opus review, both at once. A
-  reply's `commands` are followed and named; a cadence-consultation order is made as written.
-- **Models.** Scenarios and briefs: Opus (this document). Code, data, tests, documents: a Sonnet coder per story,
-  re-discovering nothing. Review: Opus. Fixes: Sonnet. S0 and S0b may be done by the main session only if it bounds each
-  to its files and lines before the first edit; a Sonnet coder is always correct.
+- **Branch** `feat/rule-parity-e1` (main merged at `97ee28f`); one commit per story, `npm test` green after each (the six
+  janitor cases that fail on this machine on a clean `main` aside — parent § 16 — named, never folded into a verdict);
+  one pull request.
+- **S0 and S0b are their own commits**, each only its rule files and `research/rule-bodies.json`, listed as *wording, no
+  lesson removed* and *whitespace only* (parent § 4.3 `:474-481`, § 4.4, § 11 `:994-996`).
+- **Gates.** `open` with `callerModel`; `review_plan` with this document as the scope of epic 1 of 7; `resolve` every
+  finding, rejecting in round one what is wrong; `review_code` over the epic's diff (`baseRef` = the merge base with
+  `main`, `b396902` today) and an Opus review, both at once. A reply's `commands` are followed and named.
+- **Models.** Briefs: Opus (this document). Code, data, tests, documents: a Sonnet coder per story. Review: Opus. Fixes:
+  Sonnet. S0 and S0b may be done by the main session only under a bound declared before the first edit.
 
-## Facts the stories rest on (read 2026-10-31; the rule files are unchanged from `f46982f` to `a5dc95b`)
+## Facts (read 2026-10-31; the rule files are unchanged from `f46982f` to `97ee28f`)
 
-- **F1 — selection.** `selectRules` (`tools/lib/rule-catalog.mjs:141-166`) adds a rule for `load: always`, for each scope
-  task in its `tasks`, for each (file, pattern) match of its `paths`; dependencies first, reason `dependency:<id>`,
-  ignoring their own conditions. An unknown metadata key throws in `ruleFrom` (`:85`).
-- **F2 — the explain manifest** lists per rule `id, source, hash, bytes, load, paths, tasks, depends, reasons`
-  (`tools/lib/rule-cli.mjs:103`); `bytes` is the whole file text, front matter included (`rule-catalog.mjs:98`).
-- **F3 — the body freeze** hashes the body after the front matter (`tools/lib/rule-body.mjs:24`); a changed `paths:`,
-  `tasks:`, `depends:` or `path_tasks:` line passes it (`tools/rules.test.mjs:151-174`; `drifted` is exported by
-  `tools/rule-bodies.mjs:72`) — D12's reason for the id-list pins.
-- **F4 — a mutation test depends on a literal.** `tools/rules.test.mjs:322` replaces `normalized.filter(file=>match(file))`
-  in `rule-catalog.mjs`; S1 keeps that substring byte for byte.
-- **F5 — the single-read pin today** is `tools/rules.test.mjs:250-257`: `inspect` ×{none, `src/x.cs`, `src/x.csproj`,
-  `ui/a.ts`}, `ui` ×{none, `src/x.cs`, `ui/a.ts`}, `gpu` ×{none, `src/x.cs`}, `storage` none.
-- **F6 — section strings** in `research/rule-bodies.json` are whole heading lines with their `#` marks
-  (`sectionsOf`, `rule-body.mjs:89`). The fence rule (CommonMark, any indent 0–3) is `FENCE_OPEN`/`FENCE_CLOSE` in the
-  same file (`:30-31`).
-- **F7 — CI reads no history.** Squash merges and `actions/checkout`'s default depth 1 (`.github/workflows/ci.yml:23-25`);
-  epoch 3 keeps both (§ 4.3 `:363-371`).
-- **F8 — S0 and S0b, measured on a copy** (2026-10-31): S0 removes 26 B from `typescript.doctrine` (5,909 → 5,883 B; § 1
-  `15-48` becomes 2,016 B; the line count is unchanged); S0b's `common/testing.md` split replaces one space by one line
-  end (+0 B, +1 line after `:33`) and its `csharp/nuget-packages.md` split replaces one space by a blank line (+1 B,
-  +2 lines after `:41`). With all whitespace removed, both files are byte-identical before and after.
-- **F9 — the exact ranges after S0 and S0b**, whole lines, `Buffer.byteLength` of the folded text, every range starting
-  and ending outside a fence (measured with the F6 rule):
+- **F1** `selectRules` (`tools/lib/rule-catalog.mjs:141-166`): always, `tasks`, `paths`; dependencies first, ignoring
+  their own conditions; an unknown metadata key throws (`:85`); `patternMatcher` (`:69`) is private.
+- **F2** The explain manifest's rule fields (`tools/lib/rule-cli.mjs:103`); `bytes` is the whole file, front matter
+  included.
+- **F3** The body freeze hashes after the front matter (`tools/lib/rule-body.mjs:24`): a selector edit passes it
+  (`drifted`, `tools/rule-bodies.mjs:72`) — D12.
+- **F4** `tools/rules.test.mjs:322` mutates the literal `normalized.filter(file=>match(file))`; keep it byte for byte.
+- **F5** Fences: `FENCE_OPEN`/`FENCE_CLOSE` in `tools/lib/rule-body.mjs:30-31`; sections are whole heading lines
+  (`sectionsOf`, `:89`).
+- **F6** CI: squash merges, `actions/checkout` at depth 1 (`.github/workflows/ci.yml:23-25`); jobs `tools · selftest`
+  (Node 22, `npm test`) and `workflows · actionlint`; `.github/branch-protection.json` lists the required contexts per
+  branch (main: five; release: `tools · selftest`, `workflows · actionlint`), applied by an admin with
+  `node .github/scripts/branch-protection.mjs --apply`.
+- **F7** S0 and S0b measured on a copy: `typescript.doctrine` 5,909 → 5,883 B, its line count unchanged;
+  `common/testing.md` +0 B, +1 line after `:33`; `csharp/nuget-packages.md` +1 B, +2 lines after `:41`; both splits
+  whitespace-identical.
+- **F8** The 25 move ranges after S0 and S0b — whole lines, outside any fence at both ends, `Buffer.byteLength` of the
+  folded text — and their owning epics (§ 4.3 `:492-…`, E1 `:1387-1389`):
 
-| Source | Lines | Bytes | Destination | Epic |
-|---|---|---:|---|---|
-| `common/testing.md` | 12-31 | 1,113 | `csharp/testing.md` | E6 |
-| `common/testing.md` | 32-33 (the Rust sentence's two lines; `:34` "Everything below applies everywhere." stays) | 116 | `rust/testing.md` | E6 |
-| `common/testing.md` | 355-359 (`## Architecture is a test…`; `:354-358` before S0b) | 252 | `csharp/testing.md` | E6 |
-| `common/reliability.md` | 49-54 · 55-59 · 66-69 · 97-98 · 99-102 · 104-133 | 433 · 436 · 375 · 160 · 322 · 1,698 | `csharp/lifecycle.md` | E5 |
-| `common/logging-serilog.md` | 61-90 · 153-171 | 1,640 · 497 | `csharp/logging.md` | E6 |
-| `common/logging-serilog.md` | 172-187 | 875 | `rust/logging.md` | E6 |
-| `common/utc-timestamps.md` | 41-47 (the whole indented C# fence of rule 3) | 311 | `csharp/utc-timestamps.md` | E6 |
-| `common/utc-timestamps.md` | 65-69 | 219 | `rust/utc-timestamps.md` | E6 |
-| `typescript/doctrine.md` | 15-48 (§ 1, after S0) · 100-101 (its box) | 2,016 · 166 | `typescript/boundaries.md` | E4 |
-| `typescript/doctrine.md` | 49-65 (§ 2) · 66-79 (§ 3) · 80-97 (§ 4) · 102-105 (their boxes) | 755 · 932 · 1,151 · 278 | `typescript/testing.md` | E4 |
-| `csharp/nuget-packages.md` | 12-23 · 25-29 · 39 (`## Bumping`) · 43-45 (the neutral cadence paragraph, after S0b) · 52-56 (*Prefer nothing*; `:50-54` before S0b) | 824 · 334 · 11 · 187 · 286 | `common/dependencies.md` | E2 |
+| Source | Lines → bytes | Owning epic |
+|---|---|---|
+| `common/testing.md` | 12-31 → 1,113 · 32-33 → 116 · 355-359 → 252 | E6 |
+| `common/reliability.md` | 49-54 → 433 · 55-59 → 436 · 66-69 → 375 · 97-98 → 160 · 99-102 → 322 · 104-133 → 1,698 | E5 |
+| `common/logging-serilog.md` | 61-90 → 1,640 · 153-171 → 497 · 172-187 → 875 | E6 |
+| `common/utc-timestamps.md` | 41-47 → 311 · 65-69 → 219 | E6 |
+| `typescript/doctrine.md` | 15-48 → 2,016 · 49-65 → 755 · 66-79 → 932 · 80-97 → 1,151 · 100-101 → 166 · 102-105 → 278 | E4 |
+| `csharp/nuget-packages.md` | 12-23 → 824 · 25-29 → 334 · 39 → 11 · 43-45 → 187 · 52-56 → 286 | E2 |
 
-  25 entries. What stays, by the parent: `common/testing.md:34`; `reliability.md:38-46`, `:60-62`, `:63-65`;
-  `utc-timestamps.md:30-36` and its Never/DoD lines; `nuget-packages.md:31-37`, `:41` (the .NET-only sentence) and the
-  `powershell` fence `:47-50` (§ 4.3 `:418-425`).
-- **F10 — the measured matrix after S0 and S0b** (summed `bytes` of `selectRules(catalog, [task], files)` on the copy):
+- **F9** The matrix after S0 and S0b (summed `bytes`; 108 scopes, 1,509 ids):
 
 | Files | `inspect` | `ui` | `gpu` | `storage` | `implement` | `test` | `audit` | `logging` | `dependencies` |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -120,85 +93,57 @@ node tools/plan-lifecycle.mjs .
 | `src/webview/page.ts` | 30,090 | 32,303 | 33,563 | 35,289 | 292,808 | 285,376 | 224,123 | 80,136 | 166,239 |
 | `src/main.rs` | 40,743 | 42,956 | 44,216 | 45,942 | 291,304 | 296,029 | 222,619 | 78,632 | 176,892 |
 
-  108 scopes, 1,509 ids. The always core is 15,055 B; `csharp/doctrine.md` 4,613 B.
-- **F11 — the consumers.** `README.md:188-199` lists eight; kinds are the parent's (`:322-327`); mounts read from each
-  local checkout's `.gitmodules` on 2026-10-31: `.claude/rules/shared` for `dew_flow_rag_qln`, `dew_flow_mcp`,
-  `dew_flow_sidecar_rust`, `dew_flow_creds_for_devs`; `.agents/conventions` for `dew_flow_benchmark`,
-  `dew_flow_connect_other_ais`, `wsl_care`, `dew_flow_vscode_kit`.
-- **F12 — both lock refusals are offline**, probed here 2026-10-31. npm 11: a `package.json` asking `picomatch` `4.0.6`
-  against a lock at `4.0.7` → `npm ci --ignore-scripts --offline` exit 1, `npm error code EUSAGE`, `Invalid: lock file's
-  picomatch@4.0.7 does not satisfy picomatch@4.0.6`. SDK 10.0.114: two projects with `RestorePackagesWithLockFile`,
-  restored, then a `ProjectReference` added → `dotnet restore --locked-mode -m:4` exit 1, `error NU1004: A new project
-  reference to lib was found …`; `dotnet restore --force-evaluate -m:4` then locked-mode → exit 0. No package source is
-  contacted: the projects reference no package.
+- **F10** Both lock refusals are offline, probed here 2026-10-31: npm 11 `npm ci --ignore-scripts --offline` against a
+  lock at `picomatch@4.0.7` for a `package.json` asking `4.0.6` → exit 1, `EUSAGE`, `lock file's picomatch@4.0.7 does
+  not satisfy picomatch@4.0.6`; SDK 10.0.114, two projects with `RestorePackagesWithLockFile`, restored, then a
+  `ProjectReference` added → `dotnet restore --locked-mode -m:4` exit 1 `NU1004`; `--force-evaluate` then locked mode →
+  exit 0. No package source is contacted.
 
 ## Order
 
-**S0 → S0b → S1 → S2 → S5 → S3 → S4.** S0 and S0b first because every later number and every S4 hash is taken after
-them; S1 is the resolver change and the gate check; S2 pins what the resolver selects; S5 adds the single-read flags, the
-caps and the four declared gates to S2's tool and creates `tools/lib/parity-epics.mjs`; S3 and S4 then reuse it. Each
-story writes its tests first and watches them fail for the reason its RED step names.
+**S0 → S0b → S1 → S2 → S5 → S3 → S4 → S4b.** S0 and S0b before anything measures or hashes; S1 the resolver change; S2
+the baseline it is pinned by (and `tools/lib/parity-epics.mjs`); S5 the allowances and the empty gate schema; S3 and S4
+then reuse the epic vocabulary; S4b last because its CI job runs the suite's lock test. Each story's tests come first and
+fail for the reason its RED step names.
 
 ## Growth
 
-The parent's § 7 (`:725-738`) carries the data files. E1 adds besides: two tools and three libraries
-(`tools/selection-matrix.mjs`, `tools/moved-blocks.mjs`, `tools/lib/moved-blocks.mjs`, `tools/lib/gates.mjs`,
-`tools/lib/parity-epics.mjs`), two lock fixtures under `tools/fixtures/locks/` (< 4 KB), their tests (≈ 1,500 lines), and
-≈ 5 KB in `research/module_rules.md`, a PROJECT `requires` source read at every session start — its measured table is
-REPLACED at each re-measurement, never appended. Every temporary folder of the new tests is an owned folder (`ownedDir`);
-the lock fixtures are copied into one before any `npm`/`dotnet` command writes there.
+The parent's § 7 holds the data files. E1 adds: `tools/selection-matrix.mjs`, `tools/moved-blocks.mjs`,
+`tools/lib/moved-blocks.mjs`, `tools/lib/gates.mjs`, `tools/lib/parity-epics.mjs`, two lock fixtures under
+`tools/fixtures/locks/` (< 4 KB), their tests (≈ 1,300 lines), one CI job, and ≈ 4 KB in `research/module_rules.md`
+(a PROJECT `requires` source; its measured table is replaced at each re-measurement, never appended). Every temporary
+folder is an owned folder (`ownedDir`); the lock fixtures are copied into one before `npm`/`dotnet` write anything.
 
-## Not in E1
+## Not in E1 (moved to the owning epics — ledger 3.4)
 
-- No rule text changes except S0's wording and S0b's whitespace; no rule gains `path_tasks`.
-- No destination is written and no move entry is `landed`: S4 records 25 `planned` entries.
-- The mirrored gates and their cases are declared by the epic that creates each gated file (E4–E6); E1 declares the four
-  the parent names (§ 4.4 `:506-515`).
+- The destination record of every move (E2 the NuGet ranges, E4 the doctrine's, E5 reliability's, E6 the rest) — E1
+  records the baseline only.
+- Every gate declaration and its selection cases — each written by the epic that lands its file; E1 ships the schema and
+  the check, empty of entries.
+- `research/consumers.json` and its test — E7.S0.
+- Every row activation — E1's matrix holds `planned` and `deliberately-absent` rows only; the real-row proof runs on
+  fixtures (E3 runs the first real-catalog proof).
 
 ---
 
 ## E1.S0 — The wording-only anonymisation of `typescript/doctrine.md` § 1
 
-- **Size.** S — six lines of one rule, its body record.
-- **Models.** Brief: Opus. Edit: a Sonnet coder (or the main session under a declared bound). Review: Opus.
-- **Goal.** Parent § 4.4 (`:492-498`) and E1 (`:1130-1134`; § 17 O8): § 1's three file names, "a real vault", "a
-  **synced** vault" and `scriptInterpolation.test.ts` become "one module", "a second", "a third", "a real credential
-  store", "a **synced** credential store" and "the scan test" — every sentence, number and date kept — in the source, as
-  its own commit, with the body recorded, so S4 hashes the anonymised text and E4.S2's move is byte-equal to it.
+- **Size** S. **Goal** parent § 4.4 and E1 (`:1358-1362`): the three file names, "a real vault", "a **synced** vault" and
+  `scriptInterpolation.test.ts` become "one module", "a second", "a third", "a real credential store", "a **synced**
+  credential store" and "the scan test", every sentence, number and date kept, before S4 hashes § 1.
 
-### Scenarios
+| # | Given / When | Then |
+|---|---|---|
+| 0.1 | the edit of the brief | `git diff --stat`: `typescript/doctrine.md` (6 lines) and `research/rule-bodies.json` only |
+| 0.2 | before `--update` | `node tools/rule-bodies.mjs` exit 1, `DRIFT typescript.doctrine` |
+| 0.3 | `--update typescript.doctrine` | `OK — 39 rule(s)`, the sections unchanged |
+| 0.4 | `grep -nE 'webauthnPrf|entityFormScript|depPickerScript|scriptInterpolation|vault' typescript/doctrine.md` | no line |
+| 0.5 | the file | the same line count; § 1 still `15-48`, 2,016 B; the file 5,883 B |
+| 0.6 | `npm test`, `node tools/ownership-check.mjs` | green; OK |
 
-| # | Given | When | Then |
-|---|---|---|---|
-| 0.1 | `typescript/doctrine.md` at `a5dc95b` | lines 33–37 and 39 are replaced as the brief says | `git diff --stat`: that file (6 lines) and `research/rule-bodies.json`; nothing else |
-| 0.2 | the edit, before the record moves | `node tools/rule-bodies.mjs` | exit 1, `DRIFT typescript.doctrine — its body changed without the record moving` |
-| 0.3 | `--update typescript.doctrine` | `node tools/rule-bodies.mjs` | `typescript.doctrine — <old> → <new>, 6 heading(s)`, then `OK — 39 rule(s)`; the sections unchanged |
-| 0.4 | the edited file | `grep -nE 'webauthnPrf|entityFormScript|depPickerScript|scriptInterpolation|vault' typescript/doctrine.md` | no line |
-| 0.5 | the edited file | its line count; lines 15–48 | unchanged count; § 1 still 15–48, 2,016 B (F9); the file 5,883 B (F8) |
-| 0.6 | — | `npm test`, `node tools/ownership-check.mjs` | green (the six known janitor cases aside); OK |
+**RED → GREEN → RED.** 0.2 before the record; 0.3 after; revert line 39 alone → DRIFT again; restore.
 
-### Files
-
-`typescript/doctrine.md` (lines 33–37, 39), `research/rule-bodies.json` (by the tool).
-
-### Acceptance criteria
-
-0.1–0.6; the commit carries only the two files; its message says *wording only, no lesson removed* and names the six
-replacements.
-
-### RED → GREEN → RED
-
-1. **RED.** After the edit, before `--update`: 0.2. Record the line.
-2. **GREEN.** `--update typescript.doctrine`; 0.3; `npm test`.
-3. **RED again.** Revert line 39 alone → `rule-bodies` names `typescript.doctrine`; restore → OK.
-
-### Docs to update
-
-None besides the record; S4's section of `research/module_tests.md` names this commit as the source of § 1's hash.
-
-### The brief (for the Sonnet coder)
-
-In `typescript/doctrine.md`, replace exactly lines 33–36, which read
+**The brief.** Replace lines 33–36 of `typescript/doctrine.md`:
 
 ```
 **Three instances, three different people, one of them shipped.** `webauthnPrf.ts` escaped by
@@ -207,7 +152,7 @@ hand; `entityFormScript.ts` did not; `depPickerScript.ts` reintroduced it in new
 real vault for an hour before it was found. The values were folder and entry names arriving from
 ```
 
-with exactly
+by
 
 ```
 **Three instances, three different people, one of them shipped.** One module escaped by hand; a
@@ -216,154 +161,94 @@ second did not; a third reintroduced it in new code written *beside* the fix for
 before it was found. The values were folder and entry names arriving from
 ```
 
-and, on line 37, `a **synced** vault,` with `a **synced** credential store,`; on line 39,
-`` `scriptInterpolation.test.ts` scans `` with `The scan test scans`. No other byte changes. Then
-`node tools/rule-bodies.mjs --update typescript.doctrine`, `node tools/rule-bodies.mjs`, `npm test`,
-`node tools/ownership-check.mjs`. Stage the two files by path (`git diff --staged --stat`: 2 files). Commit:
-`docs(rules): typescript/doctrine.md § 1 — wording only, no lesson removed: three file names, two "vault"s and a test
-file name anonymised (todo/PLAN_node_rule_parity.md § 4.4, § 17 O8)`, the body listing the six replacements and the two
-`rule-bodies` lines observed.
+and on line 37 `a **synced** vault,` by `a **synced** credential store,`, on line 39 `` `scriptInterpolation.test.ts`
+scans `` by `The scan test scans`. Nothing else. `node tools/rule-bodies.mjs --update typescript.doctrine`; verify; stage
+the two files by path; commit `docs(rules): typescript/doctrine.md § 1 — wording only, no lesson removed` with the six
+replacements and the observed lines in the body. **Docs:** none besides the record.
 
 ---
 
-## E1.S0b — The whitespace-only splits, D1-checked, before anything records a hash
+## E1.S0b — The whitespace-only splits, D1-checked
 
-- **Size.** S — one character in each of two rules, their body records, the D1 check.
-- **Models.** Brief: Opus. Edit: a Sonnet coder (or the main session under a declared bound). Review: Opus.
-- **Goal.** Parent § 4.3 (`:396-403`), § 17 O5, E1 (`:1134-1137`): where one line holds a sentence that moves and one
-  that stays, a line break or a blank line goes between them in the SOURCE — nothing else — so every move is whole lines
-  (F9) and every word stays where it belongs. The check that it is no shortening: each file with all whitespace removed
-  is byte-identical before and after.
+- **Size** S. **Goal** parent § 4.3 (`:474-481`), E1 (`:1362-1365`): a line break before "Everything below applies
+  everywhere." in `common/testing.md:33`, a blank line after "… strictly .NET 10." in `csharp/nuget-packages.md:41`, so
+  every planned move is whole lines; each file with all whitespace removed byte-identical before and after.
 
-### Scenarios
+| # | Given / When | Then |
+|---|---|---|
+| 0b.1 | the testing split | `:33` is `.NET-specific.`, `:34` `Everything below applies everywhere.`; same byte length |
+| 0b.2 | the NuGet split | `:41` ends `.NET 10.`, `:42` empty, `:43` begins `Bump the whole set`; +1 B |
+| 0b.3 | the D1 check (brief) | two `whitespace-only` lines, exit 0 |
+| 0b.4 | a scratch copy with one word also deleted | the check exits 1 naming the file |
+| 0b.5 | `--update common.testing csharp.nuget-packages` | `OK — 39 rule(s)`, sections unchanged; `npm test`, `npm run check` green |
 
-| # | Given | When | Then |
-|---|---|---|---|
-| 0b.1 | `common/testing.md:33` reads `.NET-specific. Everything below applies everywhere.` | the space after `specific.` becomes one line end | line 33 is `.NET-specific.`, line 34 `Everything below applies everywhere.`; the file is the same byte length (F8) |
-| 0b.2 | `csharp/nuget-packages.md:41` reads `… the family is strictly .NET 10. Bump the whole set` | the space after `10.` becomes a blank line (`"\n\n"`) | line 41 ends `.NET 10.`, line 42 is empty, line 43 begins `Bump the whole set`; the file is 1 B longer |
-| 0b.3 | both edits | the D1 check (brief) | `testing: whitespace-only` and `nuget-packages: whitespace-only`, exit 0 |
-| 0b.4 | a copy where one word is also deleted | the D1 check | exit 1, naming the file — the check has teeth |
-| 0b.5 | the edits | `--update common.testing csharp.nuget-packages`, then `node tools/rule-bodies.mjs` | both moved, the sections unchanged; `OK — 39 rule(s)` |
-| 0b.6 | — | `npm test`, `npm run check` | green |
+**RED → GREEN → RED.** `DRIFT` for both before the record; OK after; 0b.4 on a scratch copy.
 
-### Files
+**The brief.** (1) In `common/testing.md` replace `.NET-specific. Everything below applies everywhere.` by
+`.NET-specific.` + `"\n"` + `Everything below applies everywhere.`. (2) In `csharp/nuget-packages.md` replace
+`strictly .NET 10. Bump the whole set` by `strictly .NET 10.` + `"\n\n"` + `Bump the whole set`; re-wrap nothing. (3) The
+D1 check, before committing:
 
-`common/testing.md` (`:33`), `csharp/nuget-packages.md` (`:41`), `research/rule-bodies.json`.
+```bash
+node --input-type=module -e 'import {execFileSync} from "node:child_process";import fs from "node:fs";let bad=0;for(const f of process.argv.slice(1)){const w=s=>s.replace(/\s+/g,"");const ok=w(execFileSync("git",["show","HEAD:"+f],{encoding:"utf8"}))===w(fs.readFileSync(f,"utf8"));console.log(`${f}: ${ok?"whitespace-only":"WORDS CHANGED"}`);if(!ok)bad=1;}process.exitCode=bad' common/testing.md csharp/nuget-packages.md
+```
 
-### Acceptance criteria
-
-0b.1–0b.6; the commit holds only these three files; its message carries the D1 check's two output lines.
-
-### RED → GREEN → RED
-
-1. **RED.** After the edits, before `--update`: `node tools/rule-bodies.mjs` → `DRIFT common.testing`, `DRIFT
-   csharp.nuget-packages`. Record.
-2. **GREEN.** `--update`; the D1 check; `npm test`.
-3. **RED again.** 0b.4 on a scratch copy outside the repository's tracked files (the scratchpad or an owned folder).
-
-### Docs to update
-
-None; S4's `## Moves` section in `research/module_rules.md` names this commit as the source of the post-split numbering.
-
-### The brief (for the Sonnet coder)
-
-1. In `common/testing.md`, replace the text `.NET-specific. Everything below applies everywhere.` (line 33, exactly once
-   in the file) by `.NET-specific.` + `"\n"` + `Everything below applies everywhere.`.
-2. In `csharp/nuget-packages.md`, replace `strictly .NET 10. Bump the whole set` (line 41, exactly once) by
-   `strictly .NET 10.` + `"\n\n"` + `Bump the whole set`. Do not re-wrap any other line.
-3. The D1 check, run from the worktree root before committing:
-   ```bash
-   node --input-type=module -e 'import {execFileSync} from "node:child_process";import fs from "node:fs";let bad=0;for(const f of process.argv.slice(1)){const w=s=>s.replace(/\s+/g,"");const before=execFileSync("git",["show","HEAD:"+f],{encoding:"utf8"});const ok=w(before)===w(fs.readFileSync(f,"utf8"));console.log(`${f}: ${ok?"whitespace-only":"WORDS CHANGED"}`);if(!ok)bad=1;}process.exitCode=bad' common/testing.md csharp/nuget-packages.md
-   ```
-4. `node tools/rule-bodies.mjs --update common.testing csharp.nuget-packages`, `node tools/rule-bodies.mjs`,
-   `npm test`, `npm run check`. Commit the three files by path: `docs(rules): whitespace-only splits in
-   common/testing.md and csharp/nuget-packages.md so every planned move is whole lines (todo/PLAN_node_rule_parity.md
-   § 4.3, E1.S0b)`, the body carrying the D1 check's output.
+(4) `--update common.testing csharp.nuget-packages`; `npm test`; `npm run check`; commit the three files by path,
+`docs(rules): whitespace-only splits so every planned move is whole lines`, the check's output in the body. **Docs:**
+none; S4's `## Moves` names this commit as the source of the post-split numbering.
 
 ---
 
-## E1.S1 — `path_tasks`, and the provenance check of every gate
+## E1.S1 — `path_tasks`, and gates by provenance
 
-- **Size.** M — about 30 lines in `rule-catalog.mjs` and `rule-cli.mjs`, a library of about 80 lines, about 220 lines of
-  tests, three documents.
-- **Models.** Brief: Opus (below). Code and tests: a Sonnet coder. Review: Opus.
-- **Goal.** D3 and parent § 4.2 (`:334-359`): the key `path_tasks` gates a rule's `paths` to scopes that name one of its
-  tasks; plain `tasks` and dependencies ignore the gate; a gate without `paths` is a metadata error; explain names the
-  gate. And the provenance rule (§ 4.3 `:405-412`, T11 `:754`, § 11 `:852-856`): every gated rule's gate either MIRRORS
-  the `tasks:` line of the rule its requirement's text came from, or is DECLARED with a reason; every gated rule has at
-  least one positive and one negative selection case, and each case holds. S1 builds the check (`tools/lib/gates.mjs`)
-  and proves it on fixtures; S5 gives it the real declarations.
+- **Size** M. **Goal** D3, parent § 4.2 (`:394-419`) and § 4.3 (`:483-490`), T11: the key `path_tasks` gates a rule's
+  `paths` to scopes that name one of its tasks; plain `tasks` and dependencies ignore it; a gate without `paths` is a
+  metadata error; explain names the gate. A gate MIRRORS the `tasks:` line of the rule its requirement's text came from
+  (a path-only source mirrors as "no gate"), or is DECLARED with a reason; `tools/lib/gates.mjs` checks both against a
+  gate record. S1 proves it on fixtures; no real rule is gated and no record is written in E1.
 
-### The gate record (read by `gateFindings`; S5 writes it into `research/selection-matrix.json` → `gates`)
+**The gate record** (S5 puts the empty map in `research/selection-matrix.json` → `gates`; each owning epic adds its
+entries): `"<rule id>": { "mirrors": "<source id>" | "declared": { "path_tasks": [...], "reason": "<≥ 20 chars>" },
+"epic": "E2".."E6", "cases": [ { "tasks": [t], "files": [f…], "selected": true|false } ] }` — exactly one of `mirrors`
+and `declared`.
 
-`{ "<rule id>": { "mirrors": "<source id>" | "declared": { "path_tasks": [...], "reason": "<≥ 20 chars>" },
-"epic": "E2".."E6", "cases": [ { "tasks": [t], "files": [f…], "selected": true|false }, … ] } }` — exactly one of
-`mirrors` and `declared`; `epic` the epic that creates the rule.
+`provenanceFindings(catalog, gates, landedEpics)`:
 
-`gateFindings(catalog, gates, landedEpics)` → findings:
+1. a rule with `pathTasks` and no record → `<id> carries path_tasks but has no gate record — mirror its source or declare it`;
+2. a record for an absent rule → allowed only while its `epic` has not landed;
+3. `mirrors`: the source exists; if it has `tasks`, the rule's `pathTasks` equals them as a set; if it has none, the rule
+   has no `pathTasks` (mirrors as no gate) — otherwise `<id>: <source> has no tasks: line; declare the applicability
+   change instead`;
+4. `declared`: `path_tasks` equals the rule's `pathTasks` as a set; `reason` ≥ 20 characters; `declared` on an ungated
+   rule is a finding;
+5. both or neither of `mirrors`/`declared` → a finding.
 
-1. A catalog rule with `pathTasks` and no `gates` entry: `<id> carries path_tasks but has no gate record — mirror its source or declare it`.
-2. An entry whose rule is not in the catalog: allowed only while its `epic` is not in `landedEpics` (`<id>: no such rule, and its epic <E> has landed`); its cases are still checked structurally (rule 5).
-3. An entry for a present rule without `pathTasks`: `<id> has a gate record but no path_tasks`.
-4. `mirrors`: the source exists; its `tasks` is non-empty (`<id>: <source> has no tasks: line, so it mirrors as no gate — declare the applicability change instead`); the rule's `pathTasks` equals the source's `tasks` as a set. `declared`: `path_tasks` equals the rule's `pathTasks` as a set; `reason` ≥ 20 characters. Both or neither present: a finding.
-5. `cases`: at least one `selected: true` and one `selected: false`; every task known, every file a root-relative path (`targetPath` of `rule-catalog.mjs`); and, when the rule exists, `selectRules(catalog, case.tasks, case.files)` includes the id exactly when `selected` (`<id>: case <tasks> <files> expected selected|not selected`).
+(The `cases` are S2's — `caseFindings`.)
 
-### Scenarios
-
-Fixtures from the existing `fixture(t)` of `tools/rules.test.mjs`. `G` is `csharp/mech.md`:
-`id: csharp.mech · load: conditional · paths: ["**/*.cs"] · path_tasks: ["implement","test"]`; `common/src.md` has
-`tasks: ["implement","test"]`; `typescript/doc.md` is path-only (`paths: ["**/*.ts"]`).
-
-| # | Given | When | Then |
+| # | Given (fixtures of `fixture(t)`; `G` = `csharp/mech.md`, `paths: ["**/*.cs"]`, `path_tasks: ["implement","test"]`) | When | Then |
 |---|---|---|---|
-| 1.1 | `G` | `selectRules(c, ["implement"], ["src/x.cs"])` | selected; `reasons` exactly `["path:src/x.cs (**/*.cs) when task:implement"]` |
+| 1.1 | `G` | `selectRules(c, ["implement"], ["src/x.cs"])` | selected, reasons `["path:src/x.cs (**/*.cs) when task:implement"]` |
 | 1.2 | `G` | `["inspect"]`, `["src/x.cs"]` | NOT selected |
-| 1.3 | `G` | `["implement"]`, no file | not selected |
-| 1.4 | `G` | `["implement"]`, `["ui/a.ts"]` | not selected |
-| 1.5 | `G` | `["test","implement"]`, `["src/x.cs"]` | ONE reason `… when task:implement,test` (the rule's order) |
-| 1.6 | `G` and an ungated `csharp/plain.md`, same `paths` | `["inspect"]`, `["src/x.cs"]` | `csharp.plain` selected, `csharp.mech` not — the glob matches |
-| 1.7 | a gated rule with `tasks: ["audit"]` | `["audit"]`, no file | selected, `task:audit` |
-| 1.8 | `common/dep.md` (`tasks: ["gpu"]`, `depends: ["csharp.mech"]`) | `["gpu"]`, no file | `csharp.mech` selected, `dependency:common.dep` |
-| 1.9 | `G` with `depends: ["common.b"]` | `["implement"]`, `["src/x.cs"]` | `common.b` first, `dependency:csharp.mech` |
-| 1.10–1.15 | `path_tasks` with no `paths` key / `paths: []` / `path_tasks: []` / `["imlpement"]` / a string / on `load: always` | `loadCatalog` | throws `/path_tasks needs paths/` ×2, `/must name at least one task/`, `/imlpement.*legal: inspect/`, `/must be an array of nonempty strings/`, `/applies to a conditional rule only/`; also when no scope would select the rule |
-| 1.16 | `cliFixture` + `csharp/zz-gated.md` | `explain --task implement --file src/x.cs` / `--task inspect` | `path_tasks: ["implement"]` and the gated reason / absent; `csharp.doctrine` has `path_tasks: []` |
-| 1.17 | `G`, gates `{ "csharp.mech": { mirrors: "common.src", epic: "E5", cases: [+implement src/x.cs, −inspect src/x.cs] } }` | `gateFindings` | `[]` — the positive case |
-| 1.18 | `G`, gates `{}` | | finding rule 1 |
-| 1.19 | `common/src.md` tasks `["implement","audit"]` | | finding rule 4 (the sets differ) |
-| 1.20 | `mirrors: "typescript.doc"` (path-only) | | finding rule 4 (mirrors as no gate) |
-| 1.21 | `declared: { path_tasks: ["implement","test"], reason: "a checklist is read at task completion" }` | | `[]` |
-| 1.22 | `declared` with reason `"x"` / with `path_tasks: ["implement"]` / both `mirrors` and `declared` | | one finding each |
-| 1.23 | the 1.17 cases with the negative removed / with `+gpu src/x.cs` (which does not select) | | one finding each (rule 5) — the selection fixture: one positive and one negative per gated rule |
-| 1.24 | an entry for `csharp.later` (absent), `epic: "E6"`, landed `[]` / landed `["E6"]` | | `[]` / finding rule 2 |
-| 1.25 | an entry for the ungated `csharp.plain` | | finding rule 3 |
+| 1.3 | `G` | `["implement"]`, no file / `["ui/a.ts"]` | not selected |
+| 1.4 | `G` | `["test","implement"]`, `["src/x.cs"]` | one reason `… when task:implement,test` |
+| 1.5 | `G` + an ungated `csharp/plain.md` with the same paths | `["inspect"]`, `["src/x.cs"]` | `csharp.plain` selected, `csharp.mech` not |
+| 1.6 | a gated rule with `tasks: ["audit"]`; a dependent `common/dep.md` (`tasks: ["gpu"]`) | `["audit"]` / `["gpu"]`, no file | `task:audit` / `dependency:common.dep` |
+| 1.7–1.12 | `path_tasks` without `paths` / `paths: []` / `path_tasks: []` / `["imlpement"]` / a string / on `load: always` | `loadCatalog` | throws `/path_tasks needs paths/` ×2, `/must name at least one task/`, `/imlpement.*legal: inspect/`, `/must be an array of nonempty strings/`, `/applies to a conditional rule only/` |
+| 1.13 | `cliFixture` + `csharp/zz-gated.md` | `explain --task implement --file src/x.cs` / `--task inspect` | `path_tasks: ["implement"]` with the gated reason / absent; `csharp.doctrine` has `path_tasks: []` |
+| 1.14 | `G`, `common/src.md` (`tasks: ["implement","test"]`), record `mirrors: "common.src"` | `provenanceFindings` | `[]` |
+| 1.15 | no record / `common/src.md` tasks `["implement","audit"]` / `mirrors` a path-only `typescript/doc.md` | | one finding each (rules 1, 3, 3) |
+| 1.16 | `declared` with a valid reason / reason `"x"` / `path_tasks: ["implement"]` / both keys / `declared` on `csharp.plain` | | `[]` / one finding each |
+| 1.17 | a record for `csharp.later` (absent), `epic: "E6"`, landed `[]` / `["E6"]` | | `[]` / one finding |
+| 1.18 | the real catalog, `gates: {}` | | `[]` |
 
-### Files
+**Files** `tools/lib/rule-catalog.mjs`, `tools/lib/rule-cli.mjs`, `tools/lib/gates.mjs` (new), `tools/rules.test.mjs`,
+`ENTRY.md`, `research/module_rules.md`, `research/module_tests.md`. **Acceptance** every case; the 24 existing tests
+unchanged (`:322` included); explain shows `"path_tasks": []` for every real rule with the same ids and bytes.
+**RED → GREEN → RED** the cases first (they fail on `unknown metadata key path_tasks` or the missing module); then, one
+at a time: drop the gate filter → 1.2; drop "needs paths" → 1.7; drop the CLI field → 1.13; drop the set comparison →
+1.15's second case.
 
-`tools/lib/rule-catalog.mjs`, `tools/lib/rule-cli.mjs`, `tools/lib/gates.mjs` (new), `tools/rules.test.mjs`,
-`ENTRY.md` step 7, `research/module_rules.md`, `research/module_tests.md`.
-
-### Acceptance criteria
-
-Every scenario passes; the 24 existing tests of `tools/rules.test.mjs` pass unchanged (`:322` included); explain prints
-`"path_tasks": []` for every real rule with the same ids and bytes as before; `npm run check`, `rule-bodies` green.
-
-### RED → GREEN → RED
-
-1. **RED.** Write 1.1–1.25 first: the selection and gate cases fail with `unknown metadata key path_tasks` (the key is
-   unsupported) or `Cannot find module …/lib/gates.mjs`; 1.10–1.15 fail on the wrong message. Record.
-2. **GREEN.** The brief; the whole suite.
-3. **RED again**: (a) drop the gate filter → 1.2 fails; (b) drop "needs paths" → 1.10 fails; (c) drop `path_tasks` from
-   the CLI manifest → 1.16 fails; (d) drop the set comparison of rule 4 → 1.19 fails; (e) drop the running of cases in
-   rule 5 → the second half of 1.23 fails.
-
-### Docs to update
-
-`ENTRY.md` step 7; `research/module_rules.md`; `research/module_tests.md`.
-
-### The brief (for the Sonnet coder)
-
-No rule file changes. **1. `tools/lib/rule-catalog.mjs`** — `KEYS` gains `"path_tasks"`; in `ruleFrom`, after the
-`depends` line, in this order and with these messages:
+**The brief.** (1) `rule-catalog.mjs`: `KEYS` gains `"path_tasks"`; in `ruleFrom` after `depends`:
 
 ```js
 const gated = Object.hasOwn(metadata, "path_tasks");
@@ -374,7 +259,8 @@ if (gated && !pathTasks.length) throw new Error(`${file}: path_tasks must name a
 if (gated && !paths.length) throw new Error(`${file}: path_tasks needs paths — it gates path selection and selects nothing alone`);
 ```
 
-the returned object gains `pathTasks`; `selectRules`' path loop becomes (keep `normalized.filter(file=>match(file))`, F4):
+the rule object gains `pathTasks`; export `matchesPaths(rule, file)` (the existing `patternMatcher` over `rule.paths`,
+for S2's case check); the path loop of `selectRules` becomes (F4 literal kept):
 
 ```js
 const gate = rule.pathTasks.filter(task => tasks.includes(task));
@@ -387,660 +273,446 @@ if (!rule.pathTasks.length || gate.length) {
 }
 ```
 
-**2. `tools/lib/rule-cli.mjs:103`** — emit `path_tasks:pathTasks` after `depends`.
-
-**3. `tools/lib/gates.mjs`** — `export function gateFindings(catalog, gates, landedEpics)` implementing rules 1–5 above,
-one check per helper, importing `selectRules`, `targetPath`, `TASKS` from `./rule-catalog.mjs`; messages as written.
-
-**4. `tools/rules.test.mjs`** — the scenarios as tests named for their guarantee; 1.16 through `cliFixture(t)` and
-`run([...,"--repo",root],root)` with the extra rule written into the copy's `csharp/`.
-
-**5. `ENTRY.md` step 7** reads:
-
-```
-7. Dependencies are mandatory even when their own paths/tasks do not match. Selection is
-   paths (optionally gated by `path_tasks`) OR tasks, plus always rules and transitive
-   dependencies, deduplicated by id. A rule with `path_tasks` is selected by its paths only
-   in a scope that also names one of those tasks.
-   Metadata in each rule is the only selection source; todo, research, fixtures and tool
-   comments are not policy catalogs. Local rules belong in `.agents/rules` with `local.*` ids.
-```
-
-**6. `research/module_rules.md`** — the metadata paragraph (`:19-23`) names `path_tasks` and its four errors; a section
-`## Task-gated path selection — path_tasks (2026-10-31)`: the semantics and reason text; the two legitimate uses (a gate
-that mirrors its requirement's source `tasks:` line; a gate declared with a reason for a new requirement or an
-applicability the plan changed on purpose — cite `todo/PLAN_node_rule_parity.md` § 4.3 as plain text); the per-rule
-positive and negative cases; `tools/lib/gates.mjs` and the record it reads (S5 points it at `research/selection-matrix.json`).
-
-**7. `research/module_tests.md`** — the new tests, one line each, and *what it does not prove: that a gated rule's TEXT
-is its source's — that is `research/moved-blocks.json`.*
+(2) `rule-cli.mjs:103` emits `path_tasks:pathTasks`. (3) `tools/lib/gates.mjs` exports `provenanceFindings` (rules 1–5).
+(4) The cases in `tools/rules.test.mjs`, named for their guarantee. (5) `ENTRY.md` step 7: *Selection is paths
+(optionally gated by `path_tasks`) OR tasks, plus always rules and transitive dependencies, deduplicated by id. A rule
+with `path_tasks` is selected by its paths only in a scope that also names one of those tasks.* (rest unchanged, wrap
+near 90 columns). (6) `research/module_rules.md`: the metadata paragraph (`:19-23`) names `path_tasks` and its four
+errors; a section `## Task-gated path selection — path_tasks` with the semantics, the two legitimate uses (mirrored by
+provenance; declared with a reason for a new requirement or an applicability the plan changed on purpose — cite
+`todo/PLAN_node_rule_parity.md` § 4.3 as plain text) and the record. (7) `research/module_tests.md`: the tests.
 
 ---
 
-## E1.S2 — The selection matrix: every representative scope's id list, regenerated by a tool and compared
+## E1.S2 — The selection baseline: pinned id lists, the 22 pins, the caps, the negative-case definition
 
-- **Size.** M — a tool of about 180 lines, its test, the generated file (≈ 55 KB), the measured table.
-- **Models.** Brief: Opus (below). Tool, data, test, table: a Sonnet coder. Review: Opus.
-- **Goal.** Parent § 4.1 (`:243-264`), D12, § 7 (`:734`), § 10 (`:791`): the ids each of the 108 representative scopes
-  selects are in `research/selection-matrix.json`, produced by `tools/selection-matrix.mjs`; a test regenerates the file
-  and fails on any difference, so a selector change the body freeze cannot see (F3) is red until regenerated, and a hand
-  edit is refused. The file's hand-authored parts — S5's `oneRead`/`why` and `gates` — live as constants in the tool, so
-  the whole file is generated. The bytes of every scope are recorded in `research/module_rules.md` with the command that
-  re-measures them.
+- **Size** M. **Goal** parent § 4.1 (`:264-285`), § 4.4 (`:607-610`), § 5 (`:787-833`), D12, E1 (`:1366-1368`): the ids
+  of the 108 representative scopes in `research/selection-matrix.json`, generated by `tools/selection-matrix.mjs` and
+  compared by a test (a hand edit or an unregenerated selector change is red); the 22 single-read pins; the caps; and the
+  case check that holds every gated rule to the defined positive and negatives.
 
-### The scopes
+**The scopes.** 12 file sets (none · `src/x.cs` · `src/x.csproj` · `Directory.Build.props` · `ui/a.ts` · `src/a.mjs` ·
+`src/x.cs` + `ui/a.ts` · `package.json` · `tsconfig.json` · `.npmrc` · `src/webview/page.ts` · `src/main.rs`) × 9 tasks
+(`inspect`, `ui`, `gpu`, `storage`, `implement`, `test`, `audit`, `logging`, `dependencies`); name `<task> <files joined
+by " + ">` or `<task> (no file)`. Today's single-read lists: base `common.coding-style`, `common.knowledge-base`,
+`common.security`, `common.task-lifecycle` (+ `common.durable-status` for `ui`, `common.gpu-lease` for `gpu`,
+`common.utc-timestamps` for `storage`); `src/x.cs` + `csharp.doctrine`; `src/x.csproj` + `csharp.doctrine`,
+`csharp.nuget-packages`; `Directory.Build.props` + `csharp.nuget-packages`; `ui/a.ts`, `src/webview/page.ts` +
+`typescript.doctrine`; mixed + both doctrines; `package.json` + `common.local-cpu-budget`; `src/main.rs` +
+`common.logging-serilog`, `rust.doctrine`; `src/a.mjs`, `tsconfig.json`, `.npmrc` nothing more.
 
-12 file sets × 9 tasks, in this order: none · `src/x.cs` · `src/x.csproj` · `Directory.Build.props` · `ui/a.ts` ·
-`src/a.mjs` · `src/x.cs` + `ui/a.ts` · `package.json` · `tsconfig.json` · `.npmrc` · `src/webview/page.ts` ·
-`src/main.rs`; tasks `inspect`, `ui`, `gpu`, `storage`, `implement`, `test`, `audit`, `logging`, `dependencies`. A name
-is `<task> <files joined by " + ">` or `<task> (no file)`. The expected single-read lists today: base `inspect` =
-`common.coding-style`, `common.knowledge-base`, `common.security`, `common.task-lifecycle`; `ui` adds
-`common.durable-status`, `gpu` `common.gpu-lease`, `storage` `common.utc-timestamps`; then `src/x.cs` adds
-`csharp.doctrine`; `src/x.csproj` adds `csharp.doctrine`, `csharp.nuget-packages`; `Directory.Build.props` adds
-`csharp.nuget-packages`; `ui/a.ts` and `src/webview/page.ts` add `typescript.doctrine`; mixed adds both doctrines;
-`package.json` adds `common.local-cpu-budget`; `src/main.rs` adds `common.logging-serilog`, `rust.doctrine`;
-`src/a.mjs`, `tsconfig.json`, `.npmrc` add nothing.
+**The 22 pins** (§ 5 `:809-814`; today's bytes from F9):
 
-### Scenarios
-
-| # | Given | When | Then |
-|---|---|---|---|
-| 2.1 | the real catalog and the committed file | `render(catalog)` against the file | byte-equal — the regeneration test |
-| 2.2 | the file | read | 108 scopes, names unique, `tasks` known, `ids` sorted and unique, every (task, file set) of `SCOPES` once |
-| 2.3 | a copy of the rule directories and `research/rule-bodies.json` in an owned folder, `tasks: ["dependencies"]` deleted from the copy's `csharp/nuget-packages.md` | `idDrift(loadCatalog(copy), file)` / `drifted(copy, manifest)` | contains `dependencies (no file): the matrix lists csharp.nuget-packages, which it no longer selects` / `[]` — D12's point, one test |
-| 2.4 | a copy with a body sentence of `csharp/doctrine.md` changed | `drifted` / `idDrift` | names `csharp.doctrine` / `[]` |
-| 2.5 | the file with one id deleted in memory | `idDrift` | one finding: scope, id, direction |
-| 2.6 | `node tools/selection-matrix.mjs` on a clean copy / after a hand edit of the copy's file | | exit 0, `selection-matrix: in step — 108 scope(s)` / exit 1, the finding and `regenerate with --write after reading why` |
-
-### Files
-
-`tools/selection-matrix.mjs`, `tools/selection-matrix.test.mjs`, `research/selection-matrix.json` (new);
-`research/module_rules.md`, `research/module_tests.md`, `README.md` § *tools*.
-
-### Acceptance criteria
-
-2.1–2.6; the single-read lists equal the text above; the bytes table equals F10 (re-measured with `--bytes`; a
-difference reported, not smoothed), with its commit (after S0b) and date.
-
-### RED → GREEN → RED
-
-1. **RED.** The test before the tool: `Cannot find module …/selection-matrix.mjs`.
-2. **GREEN.** The tool, `--write`, all pass.
-3. **RED again.** Delete one id from the file → 2.1 and 2.6 fail; restore. Make `idDrift` ignore one direction → 2.3
-   fails; restore.
-
-### Docs to update
-
-`research/module_rules.md`; `research/module_tests.md`; `README.md` § *tools* (one row).
-
-### The brief (for the Sonnet coder)
-
-**1. `tools/selection-matrix.mjs`** exports `FILE_SETS`, `TASKS_PINNED`, `SCOPES` (`{ name, tasks: [task], files }`),
-`ONE_READ = Object.freeze({})` and `GATES = Object.freeze({})` (both filled by S5), `render(catalog)`,
-`idDrift(catalog, parsedFile)`, `bytesTable(catalog)`; and a CLI: no argument → verify (exit 0/1); `--write` → atomic
-write (temporary file + rename, as `tools/rule-bodies.mjs:98-112`); `--bytes` → the F10 table in markdown; else usage,
-exit 2. `render` writes, in this order: `note`; `scopes`, one entry per scope on two lines —
-`{"name": …, "tasks": […], "files": […],` followed by S5's ` "oneRead": …,` and ` "why": …,` when set, then a second
-line `"ids": [ … ]}`, ids `selectRules(catalog, s.tasks, s.files).map(r=>r.id).sort()`; and `gates`, `JSON.stringify` of
-`GATES` with two-space indent nested at its level. The note: *The exact rule ids each representative scope selects, the
-single-read flags and the gate records (todo/PLAN_node_rule_parity.md section 4.1, section 4.3, D12). Generated by
-tools/selection-matrix.mjs --write from the catalog and the tool's constants; tools/selection-matrix.test.mjs fails
-when the catalog selects a different list or the file was edited by hand.*
-
-**2. `tools/selection-matrix.test.mjs`** — the scenarios, `ownedDir(t, "selection matrix")` for every copy (never
-`mkdtemp`/`os.tmpdir()`); 2.6 runs the copy's tool with `spawnSync(process.execPath, [tool], {cwd, timeout: GUARD_MS})`.
-
-**3. `research/module_rules.md`** — `## The selection/budget matrix (todo/PLAN_node_rule_parity.md § 4.1, measured
-2026-10-31 at <sha>)`: what is pinned, the tool and the test, the table `--bytes` prints, the F10 facts (`src/main.rs`
-selects `common.logging-serilog`; `src/a.mjs` no language rule until E4), and *each later epic re-runs `--bytes` and
-REPLACES this table, naming its commit*.
-
-**4. `README.md` § *tools*** — one row: `tools/selection-matrix.mjs` | the pinned id list of every representative scope,
-the single-read flags and the gate records (D12) — regenerated, never hand-edited | `node tools/selection-matrix.mjs`,
-`--write`, `--bytes` (this repository only).
-
----
-
-## E1.S5 — The 22-pin single-read list, the caps, and the four declared gates
-
-- **Size.** M — the tool's three constants, a new library constant, the single-read test rewritten, the cap test, the
-  regenerated file, two sections of `module_rules.md`.
-- **Models.** Brief: Opus (below). Code, data, text: a Sonnet coder. Review: Opus.
-- **Goal.** Parent § 5 (`:682-707`), § 11 (`:852-861`), E1 (`:1160-1162`): the exact 22 pins as `oneRead: true`, every
-  other single-read-task scope with a `why`; the caps of § 5 as tests; the allowances recorded; the four declared gates
-  with their reasons and their positive and negative cases in `GATES`; `tools/lib/parity-epics.mjs`.
-
-### The 22 pins (parent `:686-691`)
-
-| Task | `oneRead: true` (today's bytes, F10) |
+| Task | `oneRead: true` |
 |---|---|
 | `inspect` | none 24,207 · `src/x.cs` 28,820 · `src/x.csproj` 31,902 · `ui/a.ts` 30,090 · `tsconfig.json` 24,207 · `.npmrc` 24,207 · `Directory.Build.props` 27,289 · `src/a.mjs` 24,207 · `src/webview/page.ts` 30,090 |
 | `ui` | none 26,420 · `tsconfig.json` 26,420 · `.npmrc` 26,420 · `Directory.Build.props` 29,502 |
 | `gpu` | none 27,680 · `src/x.cs` 32,293 · `tsconfig.json` 27,680 · `.npmrc` 27,680 · `Directory.Build.props` 30,762 |
 | `storage` | none 29,406 · `tsconfig.json` 29,406 · `.npmrc` 29,406 · `Directory.Build.props` 32,488 |
 
-The other 26 single-read-task scopes are `oneRead: false` with a `why`, exactly:
+Every other single-read-task scope is `oneRead: false` with a `why`: the six `ui` scopes with a language file
+(`src/x.cs`, `src/x.csproj`, `ui/a.ts`, `src/a.mjs`, mixed, `src/webview/page.ts`) `D5: ui with a language file is off
+the single-read list (plan section 5)`, adding `; over one read today: <bytes> B` for `src/x.csproj` (34,115) and mixed
+(36,916); the 18 over-today scopes (`inspect` mixed, `package.json`, `src/main.rs`; `ui` `package.json`, `src/main.rs`;
+`gpu` `src/x.csproj`, `ui/a.ts`, mixed, `package.json`, `src/webview/page.ts`, `src/main.rs`; `storage` `src/x.cs`,
+`src/x.csproj`, `ui/a.ts`, mixed, `package.json`, `src/webview/page.ts`, `src/main.rs`) `over one read today: <bytes> B`
+with F9's number; `gpu src/a.mjs` `fits today (27,680 B); a split read after E3 (about 33,839 B), 32,380 B or less after
+E4; unpinned by the plan (section 5)`; `storage src/a.mjs` `fits today (29,406 B); about 35,565 B after E3 and about
+33,300 B after E6 — over one read, unpinned (plan section 5)`.
 
-| Scopes | `why` |
-|---|---|
-| `ui src/x.cs`, `ui ui/a.ts`, `ui src/a.mjs`, `ui src/webview/page.ts` | `D5: ui with a language file is off the single-read list (plan section 5)` |
-| `ui src/x.csproj`, `ui src/x.cs + ui/a.ts` | the D5 text + `; over one read today: <bytes> B` (34,115; 36,916) |
-| the 18 over-today scopes: `inspect` mixed, `package.json`, `src/main.rs`; `ui` `package.json`, `src/main.rs`; `gpu` `src/x.csproj`, `ui/a.ts`, mixed, `package.json`, `src/webview/page.ts`, `src/main.rs`; `storage` `src/x.cs`, `src/x.csproj`, `ui/a.ts`, mixed, `package.json`, `src/webview/page.ts`, `src/main.rs` | `over one read today: <bytes> B` with its F10 number; `inspect src/main.rs` adds `; about 38,030 B after the plan, still over (plan section 5)`; `inspect package.json` adds `; about 43,600 B after the plan (plan section 5)`; `gpu ui/a.ts` adds `; 32,680 B or less after E4 (plan section 5)` |
-| `gpu src/a.mjs` | `fits today (27,680 B) and 32,680 B or less after E4; unpinned by the plan (section 5) — named because E4's .js selector creates it` |
-| `storage src/a.mjs` | `fits today (29,406 B); about 33,300 B once E4 makes .mjs select the TypeScript doctrine — over one read, unpinned (plan section 5)` |
+**The caps** (`CAPS`; a rule cap applies whenever the rule exists, a "from" cap once that epic is in `LANDED_EPICS`):
+the always core ≤ 15,355 B; `gpu --file src/x.cs` ≤ 32,613 B; `csharp.doctrine` ≤ 4,633 B; `typescript.npm-packages` ≤
+3,300 B (§ 5 `:798`, `:814`, E2 `:1418` — O5); `typescript.compiler-strictness` ≤ 3,300 B; `common.dependencies` ≤
+4,000 B; `typescript.utc-timestamps` ≤ 1,200 B; `csharp.boundaries` ≤ 1,400 B; `typescript.doctrine` ≤ 4,700 B from E4.
 
-### The caps (tested from E1 on) and the allowances (recorded)
-
-`CAPS` in `tools/rules.test.mjs` — a rule cap applies whenever the rule exists, except where an epic is named, which
-holds from that epic's landing (`LANDED_EPICS`):
-
-| Cap | Max | From | Source |
-|---|---:|---|---|
-| the always core (load-always rules and their dependency closure) | 15,355 B | now | § 5 `:643`, `:706-707` — the hard cap |
-| `gpu --file src/x.cs` | 32,613 B | now | § 5 `:654`, § 11 `:859-861` |
-| `csharp.doctrine` | 4,633 B | now | § 5 `:704` |
-| `typescript.npm-packages` | 3,500 B | when present | § 5 `:691`, `:699`; § 18 finding 3 (the `.npmrc` pins) |
-| `typescript.compiler-strictness` | 3,300 B | when present | § 5 `:661`, `:700` |
-| `common.dependencies` | 4,000 B | when present | § 5 `:699` |
-| `typescript.utc-timestamps` | 1,200 B | when present | § 5 `:705` |
-| `csharp.boundaries` | 1,400 B | when present | § 5 `:652` |
-| `typescript.doctrine` | 4,700 B | E4 landed | § 5 `:700-703` (5,883 B after S0, so not before E4) |
-
-Recorded in `research/module_rules.md` beside them: E5 and E6 gated rules carry no single-read cap and are measured and
-recorded by their epics.
-
-### The four declared gates (parent § 4.4 `:506-515`; all `epic: "E4"`)
-
-| Rule | `path_tasks` | `reason` | cases |
-|---|---|---|---|
-| `csharp.definition-of-done` | implement, test, audit, release, policy | `a new requirement: a checklist is read at task completion, never on gpu, ui, storage or inspect (plan section 4.4)` | + `implement src/x.cs`; + `test src/x.cs`; − `gpu src/x.cs`; − `inspect src/x.cs` |
-| `typescript.definition-of-done` | implement, test, audit, release, policy | the same text | + `implement ui/a.ts`; − `gpu ui/a.ts`; − `inspect ui/a.ts` |
-| `typescript.boundaries` | implement, test, audit, ui, http | `applicability changed on purpose and approved in the plan (section 4.4): doctrine text that loaded on every .ts file now loads where output reaches a page or a wire; ui because the webview trap is a ui trap` | + `ui ui/a.ts`; + `implement src/webview/page.ts`; − `inspect ui/a.ts`; − `gpu ui/a.ts` |
-| `csharp.boundaries` | implement, test, audit, ui, http | `a new requirement (R1's C# side and P6's large-identifier mirror): output reaches a page or a wire on these tasks (plan section 4.4)` | + `ui src/x.cs`; + `http src/x.cs`; − `inspect src/x.cs`; − `gpu src/x.cs` |
-
-### Scenarios
+**The negative-case definition** (§ 4.4 `:607-610`), `caseFindings(catalog, gates)` in `tools/lib/gates.mjs`: every
+record has ≥ 1 `selected: true` case; for a gated rule, ≥ 1 negative whose file matches the rule's paths
+(`matchesPaths`) with every task outside the gate, and ≥ 1 negative with a task inside the gate and no file matching;
+for an ungated rule (a mirror of a path-only source), ≥ 1 negative with no matching file; every task known and every
+file root-relative; and, when the rule exists, each case holds under `selectRules`. Messages name the rule, the case and
+what is missing or wrong.
 
 | # | Given | When | Then |
 |---|---|---|---|
-| 5.1 | the `oneRead: true` scopes | selected on the real catalog | each ≤ 32,768 B |
-| 5.2 | the matrix | read | exactly the 22 pins above are `true`; every other single-read-task entry has a `why` ≥ 10 chars; no split-read entry is `true` |
-| 5.3 | the matrix | D5 | no `ui` entry with a `.cs`, `.razor`, `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.mjs` or `.cjs` file is `true` |
-| 5.4 | an inline entry `inspect package.json` with `oneRead: true` | `oneReadFindings` | `inspect package.json selects 35409 B, over the 32768 B read` |
-| 5.5 | the real catalog | `capFindings(catalog, CAPS, LANDED_EPICS)` | `[]` |
-| 5.6 | fixtures: a core of 15,356 B / a `typescript.npm-packages` of 3,501 B / a `typescript.doctrine` of 4,701 B with landed `[]` and with `["E4"]` | `capFindings` | one finding / one finding / `[]` and one finding |
-| 5.7 | the real catalog, `GATES`, `LANDED_EPICS` | `gateFindings` (S1) | `[]` — the four entries are absent rules of an unlanded epic, their cases structurally valid |
-| 5.8 | `GATES` | read | the four entries exactly as the table above |
-| 5.9 | `tools/lib/parity-epics.mjs` | imported | `LANDED_EPICS` is a frozen empty array at E1 |
+| 2.1 | the real catalog and the committed file | `render(catalog)` against the file | byte-equal |
+| 2.2 | the file | read | 108 scopes once each, ids sorted and unique, exactly the 22 pins `true`, every other single-read-task scope a `why` ≥ 10 chars, no `ui` + language-file scope `true` |
+| 2.3 | a copy with `tasks: ["dependencies"]` removed from `csharp/nuget-packages.md` | `idDrift` / `drifted` | names `dependencies (no file)` and `csharp.nuget-packages` / `[]` — D12's point |
+| 2.4 | `node tools/selection-matrix.mjs` on a clean copy / after a hand edit | | exit 0 `in step` / exit 1 with the finding |
+| 2.5 | the pins | each selected | ≤ 32,768 B |
+| 2.6 | the real catalog | `capFindings(catalog, CAPS, LANDED_EPICS)` | `[]` |
+| 2.7 | fixtures: core 15,356 B / `typescript.npm-packages` 3,301 B / `typescript.doctrine` 4,701 B with landed `[]` and `["E4"]` | `capFindings` | finding / finding / `[]` and finding |
+| 2.8 | the S1 fixture `G` with cases + `implement src/x.cs`, − `inspect src/x.cs`, − `implement ui/a.ts` | `caseFindings` | `[]` — **the selection fixture: a positive and the defined negatives** |
+| 2.9 | the same without the out-of-gate negative / without the no-path negative / with `+gpu src/x.cs` | | one finding each |
+| 2.10 | a mirror-as-no-gate record on an ungated fixture rule with + `inspect ui/a.ts`, − `inspect src/x.cs` | | `[]`; without the negative, a finding |
 
-### Files
+**Files** `tools/selection-matrix.mjs`, `tools/selection-matrix.test.mjs`, `research/selection-matrix.json`,
+`tools/lib/parity-epics.mjs` (new); `tools/lib/gates.mjs` (`caseFindings`); `tools/rules.test.mjs` (`:250-257` reads the
+pins; `CAPS`); `research/module_rules.md`, `research/module_tests.md`, `README.md` § *tools*. **Acceptance** 2.1–2.10;
+the bytes table in `module_rules.md` equals F9 with its commit (after S0b). **RED → GREEN → RED** the tests before the
+tool (`Cannot find module`); then: delete an id → 2.1/2.4; flip `inspect package.json` to `true` → 2.5 (35,409 B); flip
+`ui ui/a.ts` → 2.2 while 2.5 passes (D5, not the budget); lower the core cap to 15,054 → 2.6.
 
-`tools/selection-matrix.mjs` (`ONE_READ`, `GATES`), `research/selection-matrix.json` (regenerated),
-`tools/lib/parity-epics.mjs` (new), `tools/rules.test.mjs` (`:250-257` rewritten, `CAPS`, the gate test on real data),
-`tools/selection-matrix.test.mjs`, `research/module_rules.md`, `research/module_tests.md`.
-
-### Acceptance criteria
-
-5.1–5.9; 22 `true`, 26 `why`; the caps and allowances in `research/module_rules.md`.
-
-### RED → GREEN → RED
-
-1. **RED.** The rewritten single-read test, 5.2–5.9 before filling the constants: 5.1 fails with `no oneRead scopes in
-   research/selection-matrix.json — the single-read pin has nothing to check`; 5.2, 5.8, 5.9 fail on the missing data.
-2. **GREEN.** Fill `ONE_READ`, `GATES`, write `parity-epics.mjs`, `--write`.
-3. **RED again.** Flip `inspect package.json` to `true` → 5.1 fails (35,409 B); `ui ui/a.ts` to `true` → 5.3 fails while
-   5.1 passes (32,303 B: D5, not the budget); drop the negative cases of `csharp.boundaries` → 5.7 fails; lower the core
-   cap to 15,054 → 5.5 fails. Restore each.
-
-### Docs to update
-
-`research/module_rules.md`: `### The single-read list (D5 and § 5)` — the list is the `oneRead: true` entries, set in
-the tool; the three test-held numbers (32,768 per pin, 15,355 core, 32,613 `gpu src/x.cs`); every other scope says why;
-a scope leaves the list only by a decision with its number, never by a deletion (D1) — and `### Byte caps and
-allowances (the plan's § 5)` with the two tables above and *each epic measures before its pull request and writes the
-numbers here; an allowance it cannot keep goes to the owner with the numbers*. `research/module_tests.md`: the changed
-and new tests.
-
-### The brief (for the Sonnet coder)
-
-**1.** `tools/selection-matrix.mjs`: fill `ONE_READ` with the 48 single-read-task names (`{ oneRead: true }` or
-`{ oneRead: false, why }`, texts from the tables, numbers from F10); every split-read scope renders `"oneRead": false`
-with no `why`. Fill `GATES` with the four entries (the S1 record shape: `declared: { path_tasks, reason }`, `epic`,
-`cases` as `{ tasks: [t], files: [f], selected }`). `--write`; the diff shows 108 `oneRead`, 26 `why`, 4 gates.
-
-**2.** `tools/lib/parity-epics.mjs`: `export const LANDED_EPICS = Object.freeze([]);` and a comment: *the last story of
-each epic of todo/PLAN_node_rule_parity.md adds its id here in its own pull request; a planned item of a listed epic is
-a red suite (plan § 4.1).*
-
-**3.** `tools/rules.test.mjs`: the test at `:250-257` keeps its name, reads the matrix's `oneRead: true` scopes and
-asserts at least one and `oneReadFindings` empty; add `CAPS` and `capFindings` (the table above), `the plan's byte caps
-hold` (5.5) and the fixture case 5.6; add `every gated rule mirrors its source or is declared, and its selection cases
-hold` running `gateFindings(loadCatalog(sourceRoot), matrix.gates, LANDED_EPICS)` (5.7). `tools/selection-matrix.test.mjs`:
-5.2, 5.3, 5.8. A comment above the single-read test: the list is § 5's, set in the tool; a scope leaves it only with a
-`why` (D1).
+**The brief.** (1) `tools/selection-matrix.mjs` exports `FILE_SETS`, `TASKS_PINNED`, `SCOPES`, `ONE_READ` (the 48
+single-read names → `{ oneRead: true }` or `{ oneRead: false, why }` from the texts above), `GATES =
+Object.freeze({})`, `render(catalog)`, `idDrift(catalog, parsed)`, `bytesTable(catalog)`; CLI: verify (exit 0/1),
+`--write` (temporary file + rename), `--bytes` (the F9 table), else usage exit 2. `render` writes `note`; `scopes` — one
+entry per scope on two lines, `{"name", "tasks", "files", "oneRead", "why"?,` then `"ids": [...]}`; and `gates`. The
+note: *The exact ids each representative scope selects, the single-read pins and the gate records
+(todo/PLAN_node_rule_parity.md sections 4.1, 4.3, 5; D12). Generated by tools/selection-matrix.mjs --write; the test
+fails on a hand edit or a selection the file does not record. Owning epics add gate records to GATES in the tool.*
+(2) `tools/lib/parity-epics.mjs`: `export const LANDED_EPICS = Object.freeze([]);` with *the last story of each epic of
+todo/PLAN_node_rule_parity.md adds its id here in its own pull request; a planned item of a listed epic is red*.
+(3) `caseFindings` in `tools/lib/gates.mjs` as defined. (4) Tests: `tools/selection-matrix.test.mjs` (2.1–2.4, 2.2's
+pins), `tools/rules.test.mjs` (2.5 keeps the test name `every single-read scope of the four excluded tasks still fits
+one read`, 2.6–2.10). Copies in `ownedDir(t, "selection matrix")`; the tool run with `spawnSync(process.execPath,
+[tool], {cwd, timeout: GUARD_MS})`. (5) `research/module_rules.md` § *The selection baseline*: the file, the tool, the
+bytes table from `--bytes` with its commit, the pins, the caps, the negative-case definition, and *each later epic
+re-runs `--bytes` and replaces this table*. (6) `README.md` § *tools*: one row for `tools/selection-matrix.mjs`.
 
 ---
 
-## E1.S3 — The parity inventory, matrix and consumers; the equality, inheritance and lock fixtures
+## E1.S5 — The allowances, and the empty gate schema
 
-- **Size.** L — three data files (30 entries, 30 rows, 8 consumers), two lock fixtures, three test files (≈ 600 lines).
-- **Models.** Brief: Opus (below — the data decided here from the parent). Data and tests: a Sonnet coder. Review: Opus.
-- **Goal.** Parent § 2 (`:146-180`), § 3, § 4.1 (`:266-332`), § 10 (`:785-808`), § 11 (`:825-847`): the inventory lists
-  every requirement (P1–P20, R1–R5, G1–G5); the matrix holds one row per requirement; the tests prove one-to-one, real
-  locations, the whitelist `['P4']`, the five per-side fields, equality by NORMALISED selection behaviour through the
-  correspondence table, MANDATORY inherited from the nearest ancestor heading, structural `planned` rows with their
-  epic, and no `planned` row past its epic; `research/consumers.json` equals `README.md` § *Consumers*; and G2's two
-  lock fixtures are green.
+- **Size** S. **Goal** parent § 5 (`:825-833`), E1 (`:1395-1397`): every later epic's byte allowance written into
+  `research/module_rules.md` with the scope it protects; the gate-declaration and selection-case schema documented
+  beside S2's empty `gates`, with the five gates the plan already approves named as what their owning epics will
+  declare.
 
-### The schema
+| # | Given | Then |
+|---|---|---|
+| 5.1 | `research/module_rules.md` | a table: E2 `common/dependencies.md` ≤ 4,000 B, `typescript/npm-packages.md` ≤ 3,300 B (the `.npmrc` pins after E3); E3 `typescript/compiler-strictness.md` ≤ 3,300 B, the P2/P3 statement ≤ 250 B, `csharp/doctrine.md` ≤ 4,633 B; E4 `typescript/doctrine.md` ≤ 4,700 B; E4/E6 `csharp/boundaries.md` ≤ 1,400 B; E6 `typescript/utc-timestamps.md` ≤ 1,200 B; the core ≤ 300 B over the plan; E5/E6 gated rules measured, no single-read cap — each with its protected scope and § 5's "after E3" interim numbers |
+| 5.2 | `research/selection-matrix.json` | `gates` is `{}` (asserted by a test: E1 declares nothing) |
+| 5.3 | the schema section | the record shape of S1, the case definition of S2, and the approved declarations each epic will write (§ 4.4): the two `definition-of-done` files and the two `boundaries` files (E4, E4/E6), `typescript/testing.md` (E4, ledger 3.1); the new mechanics files declared by their epics (`typescript/lifecycle.md` E5, `typescript/logging.md`, `typescript/utc-timestamps.md` E6); every other gated file mirrors |
 
-`research/parity-inventory.json` — `{ "note", "entries": [ { "id", "topic", "side", "status", "epic"?, "reason"?,
-"scopedAbsences"? } ] }`: `side` `csharp|typescript|both`; `status` `counterpart|deliberately-absent|planned`; `epic`
-exactly when `planned`; `reason` (≥ 20 chars) exactly when `deliberately-absent` — **the one home of every
-deliberately-absent reason** (§ 4.1 `:269-270`, § 11 `:825-827`); `scopedAbsences` — `[ { "where", "reason" } ]` — for a
-requirement that is met in one setting and deliberately absent in another (P5's plain JavaScript, § 18 finding 5; O4).
+**Files** `research/module_rules.md`, `tools/selection-matrix.test.mjs` (5.2). **The brief.** Write the two sections
+from 5.1 and 5.3, citing the plan as plain text; add the test `the selection matrix carries no gate declaration at E1`
+(it becomes `every gate record belongs to a landed or unlanded owning epic` once the first epic writes one — say so in
+its comment).
 
-`research/parity-matrix.json` — `{ "note", "rows": [ { "inventory", "topic", "status", "epic"?, "reason"?, "strength",
-"suppression", "csharp": <side>, "typescript": <side> } ] }`: `status` `planned|equal|stronger-ts|stronger-cs|
-deliberately-absent`; `epic` exactly when `planned`; `reason` exactly when `stronger-*` (a `deliberately-absent` row
-carries none — § 17 O2). A `<side>` is **present** `{ "id", "section" }`, plus, in an `equal` or `stronger-*` row, the
-five fields — `selectors` `{ paths, path_tasks, tasks }`, `mood` `MUST|SHOULD`, `enforcement` `{ "class": "prose" }` |
-`{ "class": "test", "test": "<path>" }` | `{ "class": "check", "tool": "<name>" }` | `{ "class": "hook", "hook": "<name>" }`,
-`consequence` `none|test-fails|check-fails|build-fails|hook-refuses`, `suppression` `none|inline-with-reason`; or
-**planned** `{ "planned": "E2".."E6", "id", "section"? }`; or **absent** `{ "absent": true }`.
+---
 
-`research/consumers.json` — `{ "note", "consumers": [ { "repo", "kind", "mount", "notes" } ] }`.
+## E1.S3 — The minimal parity matrix and inventory, and the real-row proof
 
-### The rules the matrix test enforces (`parityFindings`)
+- **Size** M. **Goal** parent § 2, § 4.1 (`:286-373`), E1 (`:1369-1377`), ledger 3.2: the schema with per-side
+  `delivery` and `enforcement` sets; the completeness test (one-to-one with the inventory; the whitelist `['P4']`;
+  `planned` rows structural, with an owning epic among E2–E6); the fields-versus-reality test (front matter, MANDATORY
+  inherited from the nearest marked ancestor heading, the check tool's exported rule list, `settings/hooks/`); and the
+  equality machinery — the UNION of a side's delivery locations' selection behaviour over the correspondence table, the
+  configuration kind apart — PROVEN on fixtures carrying P2/P3's actual planned selectors: they pass, and the negative
+  without the TypeScript source-file statement fails. P4 is asserted as the whitelisted exception. In the real files
+  every row is `planned` or `deliberately-absent`.
 
-1. Inventory: ids `^[PRG][1-9][0-9]*$`, unique; `topic`; `side`, `status` from their sets; `epic`, `reason`,
-   `scopedAbsences` (each `where` and `reason` ≥ 20 chars) as the schema says.
-2. One-to-one: every entry exactly one row, every row an entry; equal `topic`.
-3. A **present** side, in any row: `id` in the catalog, `section` one of its recorded sections (`research/rule-bodies.json`).
-4. A **planned** side: `planned` ∈ E2–E6, `id` `^(common|csharp|rust|typescript)\.[a-z0-9-]+$`, `section` starting with
-   `#` if given; not checked against the catalog. An absent side is exactly `{ "absent": true }`.
-5. Row status: `planned` ⇔ some side planned and none absent, `epic` = the latest planned side's; `deliberately-absent`
-   ⇔ some side absent, none planned, no `reason`; `equal`/`stronger-*` ⇔ both present with the five fields.
-6. `STRONGER_EXCEPTIONS = ["P4"]` (a test-file constant citing § 2 and § 11): any other `stronger-*` row is a finding,
-   with or without a reason; P4 needs a non-empty `reason`; an `equal` row carries none.
-7. Inventory ↔ row: `counterpart` ⇔ `equal`/`stronger-*`; `deliberately-absent` ⇔ the row is; `planned` ⇔ the row is,
-   same `epic`.
-8. A `planned` row or entry whose epic is in `LANDED_EPICS` is a finding.
-9. **Equality by normalised selection behaviour** (§ 4.1 `:274-282`), for every `equal` row. The correspondence table
-   pairs representative file sets of § 4.1: none ↔ none; `src/x.cs` ↔ `ui/a.ts`, `src/a.mjs`, `src/webview/page.ts` (the
-   source kind); `src/x.csproj` ↔ `package.json` (the project manifest). For each of the nine tasks and each pair, the C#
-   side's rule is selected on its file set exactly when the TypeScript side's rule is selected on each corresponding
-   file set (`selectRules`, so dependencies count); and the two sides' `path_tasks` agree as sets. The configuration
-   kind (`Directory.Build.props`, `Directory.Packages.props`, `NuGet.Config` ↔ `tsconfig*.json`, `.npmrc`) is "a kind of
-   its own whose requirements are stated per counterpart" (`:278-279`) and is not in the mechanical comparison (O3).
-   Then `mood`, `enforcement.class`, `consequence` and `suppression` must be equal. Literal selector fields are never
-   compared side to side.
-10. **The manifest case** (§ 10 `:807-808`, P20): once `LANDED_EPICS` holds both E2 and E4, `dependencies --file
-    package.json` and `dependencies --file src/x.csproj` must each select the three kinds — `common.dependencies`; the
-    ecosystem's package rule (`typescript.npm-packages` ↔ `csharp.nuget-packages`); the stack's doctrine
-    (`typescript.doctrine` ↔ `csharp.doctrine`). Before that it runs on the fixture of 3.15 only, and the real-data test
-    says so in a diagnostic.
-11. **Against reality** (every side of an `equal`/`stronger-*` row): `selectors` equal the rule's catalog `paths`,
-    `pathTasks`, `tasks` as sets; `mood` is `MUST` exactly when the nearest heading carrying `(MANDATORY)` exists among
-    the section's own heading and its ancestors — each preceding heading of a lower level, up to the H1 (§ 4.1
-    `:284-287`, § 17 O6); `check` → `tools/<tool>.mjs` exports a `CHECKED_RULES` array holding the side's id (E3's
-    `tools/strictness-check.mjs` provides it); `hook` → `settings/hooks/<hook>.mjs` exists; `test` → the named file exists.
+**The schema.** `research/parity-inventory.json` `{ "note", "entries": [ { "id", "topic", "side", "status", "epic"?,
+"reason"?, "scopedAbsences"? } ] }` — `status` `counterpart|deliberately-absent|planned`; `epic` iff planned; `reason`
+(≥ 20 chars) iff deliberately absent, the one home of those reasons; `scopedAbsences` `[ { "scope", "reason" } ]` (P5,
+§ 4.1 `:347-351`). `research/parity-matrix.json` `{ "note", "rows": [ { "inventory", "topic", "status", "epic"?,
+"reason"?, "strength", "suppression", "csharp": <side>, "typescript": <side> } ] }` — `status`
+`planned|equal|stronger-ts|stronger-cs|deliberately-absent`; `reason` iff `stronger-*`. A `<side>` is `{ "absent": true }`,
+or `{ "planned": "E2".."E6", "delivery"?: [ { "id", "section"? } ] }` (intended locations where the plan names them,
+unchecked), or an active side `{ "delivery": [ { "id", "section" } ], "enforcement": [ { "class": "prose" } | { "class":
+"test", "test" } | { "class": "check", "tool" } | { "class": "hook", "hook" } ], "selectors": [ { "id", "paths",
+"path_tasks", "tasks" } ], "mood": "MUST|SHOULD", "consequence": "none|test-fails|check-fails|build-fails|hook-refuses",
+"suppression": "none|inline-with-reason" }`.
 
-### The data (decided here from the parent; copy exactly)
+**The rules** (`parityFindings`): (1) inventory ids `^[PRG][1-9][0-9]*$` unique, fields as the schema; (2) one-to-one,
+equal topics; (3) every delivery location of an active side: `id` in the catalog, `section` among its recorded sections;
+(4) a planned side: epic E2–E6, intended ids well-formed; (5) row status: `planned` ⇔ some side planned, none absent,
+`epic` the latest; `deliberately-absent` ⇔ some side absent, none planned, no `reason`; `equal`/`stronger-*` ⇔ both
+active; (6) `STRONGER_EXCEPTIONS = ["P4"]`: another `stronger-*` row is a finding with or without a reason; P4 needs a
+reason; `equal` carries none; (7) inventory ↔ row status and epic agree; (8) a `planned` row of a landed epic is a
+finding; (9) **equality**, every `equal` row: the correspondence pairs are none ↔ none, `src/x.cs` ↔ `ui/a.ts`,
+`src/a.mjs`, `src/webview/page.ts`, and `src/x.csproj` ↔ `package.json`; for each of the nine tasks and each pair, the
+C# side's delivery UNION (any of its locations' rules selected) holds exactly when the TypeScript side's union holds on
+each corresponding file set; the configuration kind is not compared (§ 4.1 `:326-331`); then `mood`,
+`enforcement[].class` (as sets), `consequence`, `suppression` equal; (10) **against reality**, every active side: each
+`selectors` item equals its rule's catalog `paths`/`pathTasks`/`tasks` as sets; `mood` is `MUST` exactly when a heading
+carrying `(MANDATORY)` is found walking from the section's own heading to each preceding heading of a lower level up to
+the H1; `check` → `tools/<tool>.mjs` exports `CHECKED_RULES` containing the row's delivery ids of that side; `hook` →
+`settings/hooks/<hook>.mjs` exists; `test` → the file exists.
 
-At E1 every row is `planned` or `deliberately-absent`. CD = `csharp.doctrine`, TD = `typescript.doctrine`, NP =
-`csharp.nuget-packages` in this table only.
+**The real data** — 31 entries and rows, P1…P21, R1…R5, G1…G5; every row `planned` except P8, R4, R5, G4, G5
+(`deliberately-absent`, O6):
 
-| Inv. | side | topic | C# side | TypeScript side | row status | epic |
-|---|---|---|---|---|---|---|
-| P1 | csharp | runtime and compiler version statement | present CD `## 1. Language & runtime` | planned E4 TD `## 0. Language, runtime and design` | planned | E4 |
-| P2 | csharp | warnings fail the build, checked | present CD `## 1. Language & runtime` | planned E3 `typescript.compiler-strictness` | planned | E3 |
-| P3 | both | nullability is checked by the compiler | planned E3 CD `## 1. Language & runtime` | planned E3 `typescript.compiler-strictness` | planned | E3 |
-| P4 | csharp | complexity and function size bounds | present CD `## 6. Pure functions, small methods` | planned E3 `typescript.compiler-strictness` | planned | E3 |
-| P5 | csharp | data contracts, typed values, absence as a state | present CD `## 2. Records for data, classes for services` | planned E4 TD `## 0. Language, runtime and design` | planned | E4 |
-| P6 | csharp | untrusted JSON is validated; identifiers above 2^53 keep their precision | planned E4 `csharp.boundaries` | planned E4 `typescript.boundaries` | planned | E4 |
-| P7 | csharp | expected failures are values | present CD `## 5. Expected failures are values, not exceptions` | planned E4 TD `## 0. Language, runtime and design` | planned | E4 |
-| P8 | csharp | the build worker pool is bounded | present `csharp.dotnet-build` ``# `dotnet build` — bound the worker pool, because several sessions build at once`` | absent | deliberately-absent | — |
-| P9 | csharp | package approval, freshness, licence, pins | present NP `## Before adding any package` | planned E2 `typescript.npm-packages` | planned | E2 |
-| P10 | csharp | the test runner and its exit code | present `common.testing` ``## Running tests — executables only, never `dotnet test` (MANDATORY)`` | planned E6 `typescript.testing` | planned | E6 |
-| P11 | csharp | layer rules are a test | present `common.testing` `## Architecture is a test, not a review comment` | planned E6 `typescript.testing` | planned | E6 |
-| P12 | csharp | the logging library and its shape | present `common.logging-serilog` `## The shape (C#)` | planned E6 `typescript.logging` | planned | E6 |
-| P13 | csharp | cancellation, timeouts and shutdown | present `common.reliability` `### A timeout is not a cancellation — and .NET spells them the same` | planned E5 `typescript.lifecycle` | planned | E5 |
-| P14 | csharp | secrets outside the source | present `common.security` `## Secret management` | planned E6 `common.security` `## Secret management` | planned | E6 |
-| P15 | csharp | a timed-out child takes its tree with it | present `common.security` `## External processes` | planned E5 `typescript.lifecycle` | planned | E5 |
-| P16 | csharp | instants are UTC; a calendar day is stamped | present `common.utc-timestamps` `## The rule` | planned E6 `typescript.utc-timestamps` | planned | E6 |
-| P17 | csharp | limits counted in encoded bytes | present `common.platform-limits` `## 1. A platform limit is the KERNEL's number, in the KERNEL's unit — and one adapter owns it` | planned E6 `common.platform-limits`, the same section | planned | E6 |
-| P18 | csharp | HTTP route groups and route coverage | present `common.http-contracts` `## Where the files live` | planned E6 `common.http-contracts`, the same section | planned | E6 |
-| P19 | csharp | the published package registry is checked after a release | present `common.post-deploy-checks` `## What "prod" is, per repository — and nobody is exempt` | planned E6 `common.post-deploy-checks`, the same section | planned | E6 |
-| P20 | csharp | which files select the language rules | present CD `# C# doctrine — the family's code rules` | planned E4 TD (no section) | planned | E4 |
-| R1 | typescript | data serialised into a script element | planned E6 `csharp.boundaries` | present TD ``## 1. Never interpolate into a `<script>` element with `JSON.stringify` (MANDATORY)`` | planned | E6 |
-| R2 | typescript | a fixture cast hides a shape | planned E6 `csharp.testing` | present TD ``## 3. An `as` cast is a promise to maintain a shape by hand — and it comes due silently`` | planned | E6 |
-| R3 | typescript | a Definition of Done | planned E4 `csharp.definition-of-done` | planned E4 `typescript.definition-of-done` | planned | E4 |
-| R4 | typescript | the compiler emits despite errors | absent | present TD ``## 4. `tsc` emits despite errors — so a green suite can be green against stale output`` | deliberately-absent | — |
-| R5 | typescript | a backtick ends a template literal | absent | present TD `## 2. A backtick inside a template literal ends it — including inside a comment` | deliberately-absent | — |
-| G1 | both | an analyzer or lint requirement | present CD `## 1. Language & runtime` | planned E3 `typescript.compiler-strictness` | planned | E3 |
-| G2 | both | a committed lock file and a locked restore | planned E2 NP (the lock-file mechanics, § 4.5) | planned E2 `typescript.npm-packages` | planned | E2 |
-| G3 | both | a vulnerability scan on the monthly bump | planned E2 `common.dependencies` | planned E2 `common.dependencies` | planned | E2 |
-| G4 | both | coverage thresholds | absent | absent | deliberately-absent | — |
-| G5 | both | CI steps per language | absent | absent | deliberately-absent | — |
+| Inv. | side | C# side | TypeScript side | status · epic |
+|---|---|---|---|---|
+| P1 | csharp | planned E4 | planned E4 | planned · E4 |
+| P2, P3 | csharp, both | planned E3, delivery `csharp.doctrine` `## 1. Language & runtime` | planned E3, delivery `typescript.doctrine`, `typescript.compiler-strictness` | planned · E3 |
+| P4, G1 | csharp, both | planned E3, delivery `csharp.doctrine` (`## 6. Pure functions, small methods` for P4, `## 1. Language & runtime` for G1) | planned E3, delivery `typescript.compiler-strictness` | planned · E3 |
+| P5, P7, P20 | csharp | planned E4, delivery `csharp.doctrine` | planned E4, delivery `typescript.doctrine` | planned · E4 |
+| P6 | csharp | planned E4, delivery `csharp.boundaries` | planned E4, delivery `typescript.boundaries` | planned · E4 |
+| P8 | csharp | the existing text (the note below) | absent | deliberately-absent |
+| P9, G2 | csharp, both | planned E2, delivery `csharp.nuget-packages` | planned E2, delivery `typescript.npm-packages` | planned · E2 |
+| G3 | both | planned E2, delivery `common.dependencies` | planned E2, delivery `common.dependencies` | planned · E2 |
+| P10, P11 | csharp | planned E6, delivery `csharp.testing` | planned E6, delivery `typescript.testing` | planned · E6 |
+| P12 | csharp | planned E6, delivery `csharp.logging` | planned E6, delivery `typescript.logging` | planned · E6 |
+| P13, P15 | csharp | planned E5, delivery `csharp.lifecycle` (P15: `common.security`) | planned E5, delivery `typescript.lifecycle` | planned · E5 |
+| P14 | csharp | planned E6, delivery `common.security` | planned E6, delivery `common.security` | planned · E6 |
+| P16 | csharp | planned E6, delivery `csharp.utc-timestamps` | planned E6, delivery `typescript.utc-timestamps` | planned · E6 |
+| P17, P18, P19 | csharp | planned E6, delivery `common.platform-limits` / `common.http-contracts` / `common.post-deploy-checks` | planned E6, the same | planned · E6 |
+| P21 | both | planned E3, delivery `csharp.doctrine` | planned E3 | planned · E3 |
+| R1 | typescript | planned E6, delivery `csharp.boundaries` | planned E4, delivery `typescript.boundaries` | planned · E6 |
+| R2 | typescript | planned E6, delivery `csharp.testing` | planned E4, delivery `typescript.testing` | planned · E6 |
+| R3 | typescript | planned E4, delivery `csharp.definition-of-done` | planned E4, delivery `typescript.definition-of-done` | planned · E4 |
+| R4, R5 | typescript | absent | the existing text (the note below) | deliberately-absent |
+| G4, G5 | both | absent | absent | deliberately-absent |
 
-Reasons (inventory only): **P8** `no Node counterpart: the rule exists for a measured MSBuild worker-pool problem Node
+**P8, R4, R5 — the present side of a deliberately-absent row.** A `deliberately-absent` row's non-absent side is the
+existing text: P8 C# `{ "delivery": [ { "id": "csharp.dotnet-build", "section": "# `dotnet build` — bound the worker
+pool, because several sessions build at once" } ] }`; R4 TS `{ "delivery": [ { "id": "typescript.doctrine", "section":
+"## 4. `tsc` emits despite errors — so a green suite can be green against stale output" } ] }`; R5 TS likewise with `## 2.
+A backtick inside a template literal ends it — including inside a comment`. Rule 3 checks these locations; rules 9–10 do
+not apply (they are not `equal`), so no other field is needed. When E4 moves § 2 and § 4, E4 re-points R4/R5.
+
+Reasons (inventory only): P8 `no Node counterpart: the rule exists for a measured MSBuild worker-pool problem Node
 builds do not have; a hook is added for a measurement, not for symmetry, and Node's enforced rule is P2's check (plan
-section 3.1 P8, section 4.6)`; **R4** `no C# counterpart needed: the C# compiler emits nothing on an error; the
-TypeScript rule states it as a difference, not a gap (plan section 3.2 R4)`; **R5** `no comparable C# trap: a raw
-string literal cannot be ended by a shorter run of quotes (plan section 3.2 R5)`; **G4** `deliberately absent on both
-sides: the testing rule governs what a test may claim, and a coverage number is gamed the week it lands (plan section
-3.3; the owner confirms in Q10)`; **G5** `deliberately absent as shared rules: each repository's own instructions and CI
-name the exact commands, and a shared list would be an inventory (plan section 3.3)`. P5's `scopedAbsences`: where
-`a repository with no TypeScript project (plain JavaScript only)`, reason `nothing checks a type there: the typed parts
-(branded domain types, typed results) are absent, and the doctrine's JavaScript paragraph states the enforceable subset
-(plan section 3.1 P5, section 18 finding 5)`.
+section 3.1 P8, section 4.6)`; R4 `no C# counterpart needed: the C# compiler emits nothing on an error (plan section 3.2
+R4)`; R5 `no comparable C# trap: a raw string literal cannot be ended by a shorter run of quotes (plan section 3.2 R5)`;
+G4 `deliberately absent on both sides: a coverage number is gamed the week it lands (plan section 3.3; Q10)`; G5
+`deliberately absent as shared rules: each repository's own CI names the exact commands (plan section 3.3)`; P5's
+`scopedAbsences` `[{ "scope": "javascript-without-project", "reason": "nothing checks a type there: the typed parts are
+absent and the doctrine's JavaScript paragraph states the enforceable subset (plan section 3.1 P5, section 18 finding
+5)" }]`. Topics, `strength` and `suppression`: one short phrase each from the plan's § 3 rows (`suppression` for P2, P4,
+G1, P21 `plan section 3.4: inline only, with the rule or warning id and a same-line reason; no baseline`; otherwise
+`none: a prose rule has nothing to suppress`).
 
-`strength` (short, from § 3): P1 `prose, selected on every language file and its project manifest`; P2 `file and check
-on both sides (tools/strictness-check.mjs, both halves)`; P3 `raised on both: Nullable enable and strictNullChecks
-inside strict`; P4 `C#: prose; TypeScript: lint-enforced (complexity 4, max-lines-per-function 50, max-lines 800,
-no-console); the one accepted exception, Q7`; P5 `prose and prose; in plain JavaScript inside a TypeScript project by
-checkJs`; P6 `prose and prose in the gated boundaries pair; both name the exact and the lossy readers`; P7, P11 `prose
-and prose`; P8 `C#: hook and check for a measured resource problem; Node: none`; P9 `prose and prose, each selected by
-its own package configuration; the shared part on --task dependencies`; P10, P12, P13, P16 `prose and prose; gated on
-their source rule's tasks`; P14 `always core, equal`; P15 `always core, equal; the asymmetry stated (Node has no tree
-kill)`; P17 `one clause in the same sentence`; P18 `rows and rows; the route table through --routes`; P19 `one word in
-the same list`; P20 `selector and selector, symmetric through the correspondence table`; R1 `MANDATORY and MANDATORY;
-the declared boundaries gate on both sides`; R2 `prose and prose; typed-fixture discipline side by side`; R3 `a gated
-Definition of Done on both sides, the same declared gate`; R4, R5 `TypeScript: prose; C#: none needed`; G1 `C#: the
-compiler at TreatWarningsAsErrors with Nullable enable; TypeScript: lint at zero warnings; both checked`; G2 `a
-committed lock and a locked restore on both sides (packages.lock.json and locked mode; package-lock.json and npm ci)`;
-G3 `the same sentence for every ecosystem`; G4, G5 `none on either side`. `suppression`: P2, P4, G1 `plan section 3.4:
-inline only, with the rule or warning id and a same-line reason; no baseline on either side`; every other row `none: a
-prose rule has nothing to suppress`.
-
-`research/consumers.json` (F11; kinds from `:322-327`), README order: `dew_flow_rag_qln` dotnet `.claude/rules/shared`;
-`dew_flow_mcp` dotnet `.claude/rules/shared`; `dew_flow_sidecar_rust` rust `.claude/rules/shared`; `dew_flow_benchmark`
-dotnet `.agents/conventions`; `dew_flow_creds_for_devs` mixed `.claude/rules/shared`; `dew_flow_connect_other_ais` mixed
-`.agents/conventions`; `wsl_care` mixed `.agents/conventions`; `dew_flow_vscode_kit` typescript `.agents/conventions`.
-`notes`: `mount read from the local checkout's .gitmodules, 2026-10-31`, plus for `dew_flow_sidecar_rust` `the check
-passes without opinion; wired only if Q8 says every consumer does`. The coder re-reads each `.gitmodules` and reports a
-difference.
-
-### The lock fixtures (F12)
-
-- `tools/fixtures/locks/npm-unsatisfied/`: `package.json` `{"name":"probe","version":"1.0.0","private":true,
-  "devDependencies":{"picomatch":"4.0.6"}}` and a `package-lock.json` (`lockfileVersion` 3) whose root and
-  `node_modules/picomatch` entries say `4.0.7`. The test copies it into an owned folder and runs
-  `npm ci --ignore-scripts --offline` (timeout `GUARD_MS`, `npm_config_cache` set to an owned folder): exit 1, stderr
-  `/EUSAGE/` and `/does not satisfy picomatch@4\.0\.6/`.
-- `tools/fixtures/locks/nuget-stale/`: `lib/lib.csproj` and `app/app.csproj` (`Microsoft.NET.Sdk`,
-  `RestorePackagesWithLockFile` true, no package references), `Directory.Build.rsp` holding `-nr:false`
-  (`csharp/dotnet-build.md`), and the target framework written by the test as `net<major>.0` from `dotnet --version`,
-  so any installed SDK runs it. The test copies it into an owned folder; `dotnet restore -m:4 --disable-build-servers` in
-  `app/` writes the lock; it adds `<ProjectReference Include="../lib/lib.csproj" />` to `app.csproj`; `dotnet restore
-  --locked-mode -m:4 --disable-build-servers` → exit 1 with `/NU1004/`; `dotnet restore --force-evaluate -m:4
-  --disable-build-servers` then `--locked-mode` → exit 0. Environment: `DOTNET_CLI_TELEMETRY_OPTOUT=1`,
-  `DOTNET_NOLOGO=1`, `NUGET_PACKAGES` an owned folder. Where `dotnet` does not resolve, the test is skipped with
-  `t.skip("no dotnet SDK on PATH — the NU1004 fixture needs one")`, never passed (O6).
-
-### Scenarios
+**The fixtures.**
 
 | # | Given | When | Then |
 |---|---|---|---|
 | 3.1 | the real files, catalog, sections, `LANDED_EPICS` | `parityFindings` | `[]` |
-| 3.2 | a minimal positive fixture: a fake catalog `csharp.x` (paths `**/*.cs`, `path_tasks` implement), `typescript.y` (paths `**/*.ts`, `**/*.mjs`, `path_tasks` implement), both with a section `## One` under an H1 marked `(MANDATORY)`; one `equal` row, five fields each | | `[]` — **the equality-normalisation pass**: literal paths differ, behaviour corresponds |
-| 3.3 | the same with `typescript.y` lacking `**/*.mjs` (so `src/a.mjs` does not select it while `src/x.cs` selects `csharp.x`) | | a finding naming the task and the pair — **the mismatch that fails** |
-| 3.4 | `typescript.y` gated `implement,test` | | a finding: the gates disagree |
-| 3.5–3.7 | an entry with no row / a row with no entry / two rows | | one finding each |
-| 3.8 | an `equal` row naming `csharp.missing` / `## Gone` | | one finding each — the ACTIVATED-row red of E1's done-when |
-| 3.9 | a `planned` row with no `epic` / `E9` / a planned side `E1` | | one finding each — the no-owning-epic red |
-| 3.10 | a planned row whose planned side names an absent id / whose present side names a missing section | | `[]` / a finding |
-| 3.11 | `stronger-ts` on `P2` with a reason, and without / on `P4` without a reason / an `equal` row with a reason | | one finding each; `P4` with a reason passes |
-| 3.12 | sides differing in `mood` / `enforcement.class` / `consequence` / `suppression` | | one finding each |
-| 3.13 | against reality: `selectors.paths` ≠ the catalog's / `check` naming a missing tool / a tool whose `CHECKED_RULES` lacks the id / `hook` naming no file | | one finding each (tool and hook files in an owned folder) |
-| 3.14 | **heading inheritance**: `mood: "MUST"` for `common.reliability` `### A timeout is not a cancellation — and .NET spells them the same` (real sections); `mood: "SHOULD"` for `common.testing` `## Every feature ships with tests, in the same task` (no marker on it or the H1 `# Testing`); and each flipped | `isMandatory` / rule 11 | the two pass; each flip is a finding |
-| 3.15 | **the manifest case** on a fake catalog with `common.dependencies` (tasks dependencies), `csharp.nuget-packages` (`**/*.csproj`), `typescript.npm-packages` (`**/package.json`), the two doctrines (`**/*.csproj` / `**/package.json` among their paths), landed `["E2","E4"]` | rule 10 | `[]`; with `typescript.doctrine` lacking `**/package.json`, a finding |
-| 3.16 | `deliberately-absent` with a `reason` / with no absent side / an absent side in an `equal` row | | one finding each |
-| 3.17 | entry `counterpart` beside a `planned` row / epic mismatch / `deliberately-absent` without `reason` / a `scopedAbsences` item with a 5-char reason | | one finding each |
-| 3.18 | a row planned for E3 with landed `["E3"]` | | one finding |
-| 3.19 | `research/consumers.json` and `README.md` | the backticked first cells of the `## Consumers` table | equal sets, 8; kinds in their set |
-| 3.20 | consumers missing one / with one extra / kind `java` | | one finding each |
-| 3.21 | the npm lock fixture | `npm ci --ignore-scripts --offline` | exit 1, `EUSAGE`, `does not satisfy picomatch@4.0.6` |
-| 3.22 | the NuGet lock fixture | the four restores | exit 0; exit 1 with `NU1004`; exit 0; exit 0 |
+| 3.2 | **the real-row proof**: an owned folder holding the real `csharp/doctrine.md`, a `typescript/doctrine.md` whose front matter is E3's planned one (`paths` `**/*.ts`, `**/*.tsx`, `**/*.mts`, `**/*.cts`, `**/*.js`, `**/*.mjs`, `**/*.cjs`, `**/package.json`), a `typescript/compiler-strictness.md` (`paths` `**/tsconfig*.json`), the core, and P2 and P3 as `equal` rows with these delivery sets, enforcement `check: strictness-check` on both sides (a fixture tool exporting `CHECKED_RULES`), mood, consequence `check-fails`, suppression `inline-with-reason` | `parityFindings` | `[]` — the union holds on source and manifest scopes, the configuration kind apart |
+| 3.3 | 3.2 with the TypeScript delivery reduced to `typescript.compiler-strictness` | | findings naming P2 and P3, a task and the pair `src/x.cs` ↔ `ui/a.ts` — a `.ts` scope would deliver nothing |
+| 3.4 | 3.2 with P4 `stronger-ts` and its reason / P2 `stronger-ts` with a reason | | `[]` / a whitelist finding |
+| 3.5 | an `equal` row naming `csharp.missing` / a missing section | | one finding each — the ACTIVATED-row red |
+| 3.6 | a `planned` row with no epic / `E9` / a side `E1` | | one finding each — the no-owning-epic red |
+| 3.7 | an entry with no row / a row with no entry / two rows / mismatched status or epic / a `deliberately-absent` row with a reason | | one finding each |
+| 3.8 | **heading inheritance**: `mood: "MUST"` on `common.reliability` `### A timeout is not a cancellation — and .NET spells them the same`; `mood: "SHOULD"` on `common.testing` `## Every feature ships with tests, in the same task` (real sections); each flipped | rule 10 | the two pass; each flip a finding |
+| 3.9 | a `selectors` item differing from the front matter / a `check` tool without the id / a `hook` naming no file | | one finding each |
+| 3.10 | a row planned for E3 with landed `["E3"]` | | a finding |
 
-### Files
+**Files** `research/parity-inventory.json`, `research/parity-matrix.json`, `tools/parity-matrix.test.mjs` (new);
+`research/module_rules.md`, `research/module_tests.md`. **Acceptance** 3.1–3.10; 31 entries and rows. **RED → GREEN →
+RED** the test first (3.1 fails on the missing files, by the test's own message); then on the real files: give P10 an
+active `equal` shape with a C# delivery `common.testng` → named; drop P13's `epic` → named; restore. On 3.2: replace the
+union by an intersection → 3.2 fails; restore.
 
-`research/parity-inventory.json`, `research/parity-matrix.json`, `research/consumers.json`,
-`tools/fixtures/locks/npm-unsatisfied/*`, `tools/fixtures/locks/nuget-stale/*`, `tools/parity-matrix.test.mjs`,
-`tools/consumers.test.mjs`, `tools/lock-fixtures.test.mjs` (all new); `research/module_rules.md`,
-`research/module_tests.md`.
-
-### Acceptance criteria
-
-3.1–3.22 pass (3.22 observed on a machine with an SDK; its output in the commit body); 30 entries, 30 rows, 8 consumers.
-
-### RED → GREEN → RED
-
-1. **RED.** The tests first: 3.1 fails `research/parity-inventory.json is missing`; 3.19 `research/consumers.json is
-   missing`; 3.21/3.22 fail on the missing fixture folders. The fixture cases carry `parityFindings` in the same file and
-   pass with it.
-2. **GREEN.** The files and fixtures.
-3. **RED again on real data** (E1's "observed, then fixed"): P10's row set `equal` with both sides present and the five
-   fields, its C# `id` → `common.testng` → 3.1 names it; P13's `epic` removed → named; P2 `stronger-ts` with a reason →
-   the whitelist finding; the G3 row removed → named. On the fixtures: change the NuGet fixture's expectation to exit 0 →
-   3.22 fails with NU1004's text; change the npm fixture's lock to `4.0.6` → 3.21 fails (the install proceeds and fails
-   offline for another reason, or passes — either way not `EUSAGE`). Restore each.
-
-### Docs to update
-
-`research/module_rules.md` — `## The parity matrix (todo/PLAN_node_rule_parity.md § 3, D12)`: the files, the side
-shapes, the eleven rules in one paragraph each sentence long, the correspondence table, *the deliberately-absent reasons
-are the inventory's — the one home; this document keeps no copy*; `### The consumers` — derived from `README.md`
-§ *Consumers*, which stays the one list. `research/module_tests.md` — the three test files and what they do not prove
-(that a present location's text meets its requirement — the review's; the configuration kind's correspondence, stated
-per counterpart).
-
-### The brief (for the Sonnet coder)
-
-**1.** The three files from the tables (`JSON.stringify(…, null, 2)`, trailing newline, P1…P20, R1…R5, G1…G5); ids
-written out; sections copied from `research/rule-bodies.json`, any difference reported. Each `note`: the machine-readable
-form of the plan's § 3 (plain text `todo/PLAN_node_rule_parity.md`), what its test keeps true, and that an owning epic
-activates its rows in the commit that writes their text.
-
-**2. `tools/parity-matrix.test.mjs`** — `parityFindings({ inventory, matrix, catalog, sectionsById, landedEpics, root })`
-as a plain function with small helpers (`sideShape`, `epicNumber`, `behaviour(catalog, id)` — the selected/not-selected
-grid over the correspondence pairs × nine tasks, `isMandatory(sections, section)` — walk back from the section to each
-preceding heading of a lower `#` level up to the H1, true when one carries `(MANDATORY)`, `checkedRules(root, tool)` — a
-dynamic `import()` whose missing file or export is a finding). The correspondence pairs and `STRONGER_EXCEPTIONS` are
-constants with a comment citing the plan. Real data: `loadCatalog(sourceRoot)`, `research/rule-bodies.json`,
-`LANDED_EPICS`. Fixtures: a factory, `structuredClone` per case, `ownedDir(t, "parity matrix")` for tool and hook files.
-
-**3. `tools/consumers.test.mjs`** — parse `README.md`'s `## Consumers` table; compare; 3.20 inline.
-
-**4. `tools/lock-fixtures.test.mjs`** — 3.21 and 3.22 as described, each fixture copied into `ownedDir(t, "lock
-fixture")` (`fs.cpSync`), every child through `spawnSync` with `timeout: GUARD_MS` and a cleared environment plus the
-named variables and `PATH`; the skip only when `dotnet --version` fails to run.
+**The brief.** Write the files from the tables (`JSON.stringify(…, null, 2)`, trailing newline; sections copied from
+`research/rule-bodies.json`). `tools/parity-matrix.test.mjs`: `parityFindings({ inventory, matrix, catalog,
+sectionsById, landedEpics, root })` with small helpers (`sideShape`, `epicNumber`, `union(catalog, ids, tasks, files)`,
+`isMandatory(sections, section)`, `checkedRules(root, tool)` — a dynamic `import()` whose missing file or export is a
+finding); `STRONGER_EXCEPTIONS` and the correspondence pairs as constants citing the plan. 3.2's catalog is built in
+`ownedDir(t, "parity proof")` with `fs.cpSync` of the real `csharp/doctrine.md` and `common/` core and the two written
+TypeScript files; `loadCatalog` of that folder. `research/module_rules.md` § *The parity matrix*: the files, the side
+shapes, the rules in one sentence each, the union over the correspondence table with the configuration kind apart, and
+*the deliberately-absent reasons are the inventory's; this document keeps no copy*.
 
 ---
 
-## E1.S4 — The moved-block manifest: exact whole-line ranges, immutable, checked without history
+## E1.S4 — The reusable move verifier, and the baseline
 
-- **Size.** L — a tool and a library (≈ 350 lines), a self-test (≈ 350 lines), 25 recorded entries.
-- **Models.** Brief: Opus (below). Code, tests, the recording: a Sonnet coder. Review: Opus.
-- **Goal.** Parent § 4.3 (`:363-430`), § 4.1 (`:302-314`), § 10 (`:785-786`, `:798-799`), E1 (`:1147-1160`), ledger 1.2,
-  2.4: `research/moved-blocks.json` holds one entry per exact whole-line range — `source`, `lines`, `beforeCommit`,
-  `sha256`, `length`, `destination` — recorded once by `tools/moved-blocks.mjs --record` from `git show <commit>:<source>`
-  at E1's recording commit in the post-split numbering; the recorder REFUSES a range that is not whole lines or that
-  would split a fence, naming S0b as the remedy; the test reads no history (CI stays at `fetch-depth: 1`); the manifest
-  is immutable and append-only.
+- **Size** L. **Goal** parent § 4.1 (`:356-373`), § 4.3 (`:423-481`), § 10 (`:920-928`), E1 (`:1377-1390`), ledger 1.2,
+  2.4, 3.4, § 20 finding 1: `tools/moved-blocks.mjs` (the recorder) and `tools/lib/moved-blocks.mjs` (the checker) over
+  `research/moved-blocks.json`, one JSON array, append-only; whole-line ranges only, fences unsplit; the baseline of the
+  25 ranges as `planned` entries with no destination; the activation pairing for an unchanged block and the superseding
+  procedure for a changed one, both proven on fixtures; the checker reads no history (CI stays at depth 1).
 
-### The entry, and what the test checks
+**The entries.** *Baseline*: `{ "id", "status": "planned", "epic", "source", "lines": "<from>-<to>", "beforeCommit",
+"sha256", "length" }`. *Activation* (an owning epic, unchanged bytes): `{ "id", "activates": "<baseline id>",
+"destination", "destinationLines", "beforeCommit" }`. *Superseding* (an owning epic, changed bytes): `{ "id",
+"supersedes": "<baseline id>", "justifiedBy": "<40-hex>", "justifiedFiles": [ … ], "epic", "source", "lines",
+"beforeCommit", "sha256", "length", "destination", "destinationLines" }`, and the old entry gains `"supersededBy": "<new
+id>"` — the only field ever added to an existing entry.
 
-`{ "note", "entries": [ { "id", "status": "planned|landed", "epic": "E2".."E6", "source", "lines": "<from>-<to>",
-"beforeCommit", "sha256", "length", "destination", "supersedes"? } ] }`.
+**The recorder** (`node tools/moved-blocks.mjs`):
 
-- The block is lines `from`–`to` of the source at `beforeCommit`, CRLF folded (`folded`), each line ending in `"\n"`.
-- **`--record` refuses** (exit 1, nothing written): a range not matching `^[1-9]\d*-[1-9]\d*$` with from ≤ to — any
-  column form such as `32:1-33:14` included — with `a move is whole lines; split the line by whitespace first (E1.S0b)`;
-  a range where the line before `from` ends inside a fence, or line `to` ends inside one (F6's rule), with `the range
-  would split a fenced block; move the whole fence or split by whitespace first (E1.S0b)`; lines past the end at that
-  commit; an unknown commit; an existing id; an unknown `--supersedes`.
-- **Schema**: `id` `^[a-z0-9][a-z0-9-]*$` unique; `status`, `epic` from their sets; `source`/`destination` relative paths
-  under `common/`, `csharp/`, `rust/`, `typescript/`, ending `.md`; `lines` as above; `beforeCommit` 40 hex; `sha256` 64
-  hex; `length` > 0; `supersedes` an EARLIER id.
-- **`planned`**: the epic not in `LANDED_EPICS`; the source holds exactly one run of `length` bytes hashing to `sha256`
-  that starts at a line start — anywhere in the file (E4's § 0 may land above § 1), while any edit of those bytes is red
-  (§ 4.1 `:306-309`).
-- **`landed`**: the destination holds exactly one such run at a line start; the source holds none (a move, not a copy).
-  `status` moves once, `planned` → `landed`, in the owning epic's move commit; no other field ever changes.
-- **Superseded** entries are evidence only. **No git call in the test.**
+- `--baseline <source> <from>-<to> <commit> <epic> <id>` — reads `git show <commit>:<source>` (the commit resolved to 40
+  hex), appends a baseline.
+- `--record <source> <from>-<to> <commit> <destination> <epic> <id> [--supersedes <baseline id> --justified-by
+  <commit>]` (the parent's form, `:426`) — run by the owning epic after placing the block in the destination's working
+  tree and before committing: if the bytes equal an unpaired baseline of that source, it appends an ACTIVATION, finding
+  `destinationLines` by scanning the working-tree destination (refused if the block is not there exactly once); if they
+  differ, it requires `--supersedes` and `--justified-by`, verifies with git that the commit exists and touches only the
+  block's source file (recording `justifiedFiles`), appends the superseding entry and adds `supersededBy` to the old one.
+- Refuses, writing nothing: a range not `^[1-9]\d*-[1-9]\d*$` with from ≤ to (a column form such as `32:1-33:14`
+  included) — `a move is whole lines; split the line by whitespace first (E1.S0b)`; a range whose preceding line or last
+  line ends inside a fence (F5) — `the range would split a fenced block; move the whole fence or split by whitespace first
+  (E1.S0b)`; lines past the end; an unknown commit; an existing id; a superseding without both flags; a `justifiedBy`
+  commit touching any other file.
+- Writes by inserting the new entry's text before the closing `]` of the file — with the separating comma — never by
+  re-serialising, so earlier bytes stay; the `supersededBy` insertion is the one in-place edit. Temporary file + rename.
 
-### The 25 entries
+**The checker** (`verifyManifest(root, entries, landedEpics)`; `node tools/moved-blocks.mjs` with no argument; no git):
+schema per shape; ids unique; references (`activates`, `supersedes`, `supersededBy`) resolve to earlier/later entries as
+their direction requires; a baseline is paired by at most one activation OR superseded, never both; an unpaired,
+unsuperseded baseline: its epic not landed (else `unpaired baseline whose epic has landed`) and its source holding
+exactly one line-start run of `length` bytes hashing to `sha256` — anywhere, so a section added above it does not break
+the check while a changed byte does; an activation: the destination's `destinationLines` hash to the baseline and the
+source holds the run no more; a superseding entry: its destination holds its own bytes at `destinationLines`, the source
+holds them no more, `justifiedBy` is 40 hex and `justifiedFiles` is exactly `[source]`; a superseded baseline is evidence
+only.
 
-Exactly F9's table, one entry per range, recorded from ONE commit after S0 and S0b. Ids: `testing-runner`,
-`testing-runner-rust`, `testing-architecture`, `reliability-scope`, `reliability-fire-and-forget`,
+**The baseline E1 records** — F8's 25 ranges, from ONE commit after S0b, `--baseline` each, ids in F8's order:
+`testing-runner`, `testing-runner-rust`, `testing-architecture`, `reliability-scope`, `reliability-fire-and-forget`,
 `reliability-sweep-at-start`, `reliability-token`, `reliability-signals`, `reliability-timeout`, `logging-colour`,
-`logging-shape`, `logging-rust`, `utc-csharp-fence`, `utc-rust`, `ts-script`, `ts-script-box`, `ts-backtick`, `ts-cast`,
-`ts-tsc`, `ts-boxes-testing`, `nuget-before`, `nuget-licence`, `nuget-bumping-heading`, `nuget-bumping-cadence`,
-`nuget-prefer` — in F9's order (the reliability ranges in line order: `49-54`, `55-59`, `66-69`, `97-98`, `99-102`,
-`104-133`).
+`logging-shape`, `logging-rust`, `utc-csharp-fence`, `utc-rust`, `ts-script`, `ts-backtick`, `ts-cast`, `ts-tsc`,
+`ts-script-box`, `ts-boxes-testing`, `nuget-before`, `nuget-licence`, `nuget-bumping-heading`, `nuget-bumping-cadence`,
+`nuget-prefer`; epics as F8.
 
-### Scenarios
-
-Fixtures in `ownedDir(t, "moved blocks")`; `--record` cases build a git repository there with `gitWith({timeoutMs:
-GUARD_MS})` and a fixed identity. The sample source: six lines (line 3 carries `é`, line 4 indented two spaces), then a
-fenced block (`` ```js `` / one line / `` ``` ``) as lines 8–10.
-
-| # | Given | When | Then |
+| # | Given (an owned git repository; `src.md`: six lines, `é` on 3, two-space indent on 4, then a fence `` ```js `` · one line · `` ``` `` on 8–10; destination `common/d.md`) | When | Then |
 |---|---|---|---|
-| 4.1 | the sample committed | `--record src.md 2-4 <commit> --destination common/d.md --epic E4 --id m1` | one `planned` entry; full 40-hex `beforeCommit`; `length`/`sha256` of lines 2–4, `é` as 2 bytes — **the exact-range fixture** |
-| 4.2 | the same | `--record src.md 8-10 …` | recorded (the whole fence) |
-| 4.3 | the same | `--record src.md 7-9 …` / `9-11 …` | refused, the fence message — **the fence-balanced refusal** |
-| 4.4 | the same | `--record src.md 2:1-4:5 …` | refused, the whole-lines message naming E1.S0b — **the mid-line refusal** |
-| 4.5 | `m1` present | `--id m1` again / `--supersedes nosuch` / `4-2` / past the end / an unknown commit | each refused; the file byte-identical |
-| 4.6 | three entries, a fourth with `--supersedes m1` | the file before and after | the first three byte-identical — append-only |
-| 4.7 | `planned m1`, source unchanged / two lines inserted above / one byte of the block changed | `verify` | none / none / a finding |
-| 4.8 | `planned m1` whose epic is landed | | a finding |
-| 4.9 | `landed m1`, block cut and appended to the destination / twice / mid-line / one byte changed / destination absent / CRLF destination / block still in the source | | none / finding / finding / finding / finding / none / copy finding |
-| 4.10 | `m1` superseded by `m3` | | `m1` not checked; `m3` checked |
-| 4.11 | schema faults (bad id, duplicate, `E9`, `status: "moved"`, 7-hex commit, `length: 0`, destination outside the rule folders, `supersedes` naming a later entry) | | one finding each |
-| 4.12 | a copy of a fixture with no `.git` | `verify` | the same results — no history read |
-| 4.13 | the real manifest, tree, `LANDED_EPICS` | `verify` | no findings; 25 entries, all `planned` |
-| 4.14 | the real `ts-script` | its hash against lines 15–48 of `git show <S0's parent>:typescript/doctrine.md`, by hand | different — the evidence is the anonymised text; both hashes in the commit body |
-| 4.15 | `node tools/moved-blocks.mjs` | | exit 0, `moved-blocks: OK — 25 entries, 25 planned, 0 landed` |
+| 4.1 | the sample committed | `--baseline src.md 2-4 <c> E4 b1` | one baseline; 40-hex commit; `length`/`sha256` with `é` as 2 bytes — **the exact range** |
+| 4.2 | the same | `--baseline src.md 7-9 …` / `9-11 …`; `8-10` | refused with the fence message / recorded — **the fence-balanced refusal** |
+| 4.3 | the same | `--baseline src.md 2:1-4:5 …` | refused naming E1.S0b — **the mid-line refusal** |
+| 4.4 | `b1`; lines 2–4 placed in `common/d.md`, removed from `src.md` (working tree) | `--record src.md 2-4 <c> common/d.md E4 a1` | an activation `a1` with `destinationLines`; verify after committing: no findings |
+| 4.5 | `b1`; line 3 changed in a commit `j` that touches only `src.md`; the new lines placed in `common/d.md` | `--record src.md 2-4 <j> common/d.md E4 s1 --supersedes b1 --justified-by <j>` | `s1` appended, `b1` gains `supersededBy: "s1"` and nothing else (byte-compare the rest) — **the superseding entry with its `justifiedBy`** |
+| 4.6 | 4.5 with a `j` that also touches another file / without `--justified-by` / a destination holding `b1`'s OLD bytes | | refused / refused / a checker finding (a move may never change the block's words) |
+| 4.7 | `b1` unpaired, source unchanged / two lines inserted above / one byte changed / its epic landed | verify | none / none / finding / finding |
+| 4.8 | an activation whose destination holds the block twice, mid-line, changed, absent; the block also left in the source | | one finding each |
+| 4.9 | two activations of one baseline / an activation and a supersession of one baseline / a dangling `activates` | | one finding each |
+| 4.10 | three entries, then a fourth appended | the file | the first three byte-identical; the array parses |
+| 4.11 | a copy of the fixture folder with no `.git` | verify | the same results — no history read |
+| 4.12 | the real manifest, tree, `LANDED_EPICS` | verify | no findings; exactly 25 baselines, no destination |
+| 4.13 | `node tools/moved-blocks.mjs` | | exit 0, `moved-blocks: OK — 25 baseline(s), 0 activated, 0 superseded` |
 
-### Files
+**Files** `tools/moved-blocks.mjs`, `tools/lib/moved-blocks.mjs`, `tools/moved-blocks.test.mjs`,
+`research/moved-blocks.json` (new); `tools/lib/rule-body.mjs` (export `fenceDepth(text)` — per line, true when the line
+ends inside an open fence, by the existing `FENCE_OPEN`/`FENCE_CLOSE`; `outsideFencedBlocks` untouched unless it can use
+it with no output change); `research/module_rules.md`, `research/module_tests.md`, `README.md` § *tools*.
+**Acceptance** 4.1–4.13; the 25 lengths equal F8 (a difference reported, not recorded over); the recording commit after
+S0b; `node tools/rule-bodies.mjs` OK. **RED → GREEN → RED** the test first (`Cannot find module`); then: drop the fence
+check → 4.2; accept column ranges → 4.3; use line numbers in the planned check → 4.7's second case; drop the
+`justifiedFiles` check → 4.6's first; re-serialise on append → 4.10; edit a byte of `common/reliability.md:110` → 4.12
+names `reliability-timeout`.
 
-`tools/moved-blocks.mjs`, `tools/lib/moved-blocks.mjs`, `tools/moved-blocks.test.mjs`, `research/moved-blocks.json`
-(new); `tools/lib/rule-body.mjs` (one export, below); `research/module_rules.md`, `research/module_tests.md`,
-`README.md` § *tools*. `.github/workflows/ci.yml` does not change.
+**The brief.** Build the library and the tool as specified, git calls through `gitOutput` of `tools/lib/git.mjs` with its
+timeout, `LANDED_EPICS` from `tools/lib/parity-epics.mjs`; start the file as `[\n]\n`; record the 25 with
+`C=$(git rev-parse HEAD)` and one `--baseline` per row; tests in `ownedDir(t, "moved blocks")` with `gitWith({timeoutMs:
+GUARD_MS})` and a fixed identity. `research/module_rules.md` § *Moves*: the three shapes, immutability and the one
+added field, whole lines and unsplit fences with S0b as the remedy and the source of the post-split numbering (S0 for
+§ 1's anonymised hash), the checks, the commands, why it differs from `research/rule-bodies.json`, and that a depth-1
+checkout is enough. `README.md` § *tools*: one row for `tools/moved-blocks.mjs`. `research/module_tests.md`: the test
+and what it does not prove (that no entry was edited — the diff and review are the control).
 
-### Acceptance criteria
+---
 
-4.1–4.15; the 25 entries equal F9 (any printed length that differs is reported, not recorded over); the recording commit
-is after S0b's; `node tools/rule-bodies.mjs` still OK after the `rule-body.mjs` change (no recorded heading list moves).
+## E1.S4b — The two lock fixtures, and the required CI job that runs them
 
-### RED → GREEN → RED
+- **Size** M. **Goal** parent § 10 (`:936-951`), § 11 (`:987-990`), § 19 (the epoch 4 round), E1 (`:1390-1395`): an npm
+  fixture whose lock does not satisfy `package.json` fails `npm ci` with `EUSAGE`; a NuGet fixture whose
+  `packages.lock.json` is stale fails a locked restore with `NU1004` and passes after `--force-evaluate`; green at E1's
+  exit; the NuGet one runs in a REQUIRED CI job with `actions/setup-dotnet` pinned by sha, is a named `t.skip` only
+  LOCALLY where no SDK exists, and FAILS under `CI` when `dotnet` is missing.
 
-1. **RED.** The test first: `Cannot find module …/lib/moved-blocks.mjs`.
-2. **GREEN.** The library, the tool, the fixtures; record the 25; 4.13, 4.15.
-3. **RED again.** Drop the fence check → 4.3 passes wrongly (fails as a test); accept column ranges → 4.4 fails; use
-   recorded line numbers in the planned check → 4.7's middle case fails; skip the copy check → 4.9's last fails; let
-   `--record` re-serialise the array → 4.6 fails; edit a byte of `common/reliability.md:110` → 4.13 names
-   `reliability-timeout`. Restore each.
+**The fixtures** (F10). `tools/fixtures/locks/npm-unsatisfied/`: `package.json` `{"name":"probe","version":"1.0.0",
+"private":true,"devDependencies":{"picomatch":"4.0.6"}}` and a `package-lock.json` (v3) whose root and
+`node_modules/picomatch` entries say `4.0.7`. `tools/fixtures/locks/nuget-stale/`: `global.json`
+`{"sdk":{"version":"10.0.100","rollForward":"latestPatch"}}`, `Directory.Build.rsp` with `-nr:false`, `lib/lib.csproj`
+and `app/app.csproj` (`Microsoft.NET.Sdk`, `net10.0`, `RestorePackagesWithLockFile` true, no package references).
 
-### Docs to update
+**The test** `tools/lock-fixtures.test.mjs`: each fixture copied into `ownedDir(t, "lock fixture")`; children through
+`spawnSync` with `timeout: GUARD_MS` and a cleared environment plus `PATH`, `HOME` (an owned folder),
+`npm_config_cache`/`NUGET_PACKAGES` (owned folders), `DOTNET_CLI_TELEMETRY_OPTOUT=1`, `DOTNET_NOLOGO=1`. npm:
+`npm ci --ignore-scripts --offline` → exit 1, `/EUSAGE/`, `/does not satisfy picomatch@4\.0\.6/`. NuGet, in `app/`:
+`dotnet restore -m:4 --disable-build-servers` → 0; add `<ProjectReference Include="../lib/lib.csproj" />`;
+`--locked-mode` → 1 with `/NU1004/`; `--force-evaluate` → 0; `--locked-mode` → 0. When `dotnet --version` cannot run:
+under `CI` the test FAILS (`dotnet SDK missing under CI — the NU1004 fixture must run here`); otherwise `t.skip("no dotnet
+SDK on PATH — NU1004 not exercised locally; CI's tools · lock fixtures job runs it")`. In the `tools · selftest` job
+(`npm test`, no SDK) the step sets `LOCK_FIXTURES_JOB: "tools · lock fixtures"` and the NuGet case skips with `runs in
+the required tools · lock fixtures job`, so that job is where it runs (O3).
 
-`research/module_rules.md` — `## Moves`: the manifest's role and immutability; whole lines only, fences unsplit, S0b's
-whitespace splits as the remedy and the source of the post-split numbering (S0 for § 1's anonymised hash); the planned
-and landed checks; the two commands; why it differs from `research/rule-bodies.json`; that CI's depth-1 checkout is
-enough. No table of entries — the JSON is the record. `research/module_tests.md` — the test and what it does not prove
-(that no entry was ever edited — the diff and review are the control; that the moved text reads correctly in its new
-place). `README.md` § *tools* — one row.
+**The job** (`.github/workflows/ci.yml`, after `tools`):
 
-### The brief (for the Sonnet coder)
+```yaml
+  locks:
+    name: tools · lock fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: tools/fixtures/locks/nuget-stale/global.json
+      - name: Lock fixtures
+        run: |
+          npm ci --ignore-scripts
+          node --test tools/lock-fixtures.test.mjs
+```
 
-**1. `tools/lib/rule-body.mjs`** — add `export function fenceDepth(text)` → an array, per line of the folded text, of
-`true` when the line ENDS inside an open fence (the opener counts as inside, the closer as outside), computed with the
-existing `FENCE_OPEN`/`FENCE_CLOSE` exactly as `outsideFencedBlocks` walks; refactor `outsideFencedBlocks` to use it only
-if no output changes (`node tools/rule-bodies.mjs` OK, the rule-body tests green); otherwise leave it as it is.
+with a comment above it saying what it proves and why it is its own job (the plan's § 10). The `Selftest` step gains
+`env: LOCK_FIXTURES_JOB: "tools · lock fixtures"`. `.github/branch-protection.json`: `tools · lock fixtures` in
+`release`'s contexts beside `tools · selftest` and `workflows · actionlint`, and in `main`'s (O4); the change is applied
+by an admin with `--apply` after the job has reported once on this pull request (the file's own rule: a required check
+that never reports blocks every merge).
 
-**2. `tools/lib/moved-blocks.mjs`** — imports `node:fs`, `node:path`, `node:crypto`, `folded` and `fenceDepth` from
-`./rule-body.mjs`. Exports `parseRange(text)` (the whole-lines grammar; throws the S0b message), `blockOf(text, from, to)`,
-`fenceSplit(text, from, to)` (true when the line before `from` or line `to` ends inside a fence), `runsAt(text,
-{length, sha256})`, `schemaFindings(manifest)`, `verifyEntry(root, entry, {superseded, landedEpics})`,
-`verifyManifest(root, manifest, landedEpics)`; messages start `` `${entry.id}: ` ``.
+| # | Given | Then |
+|---|---|---|
+| 4b.1 | the npm fixture | exit 1, `EUSAGE`, `does not satisfy picomatch@4.0.6` |
+| 4b.2 | the NuGet fixture with an SDK | 0, then 1 with `NU1004`, then 0, 0 |
+| 4b.3 | no SDK, `CI` unset / `CI=true` / `LOCK_FIXTURES_JOB` set | named skip / failure / named skip |
+| 4b.4 | the job on this pull request | green; 4b.2's four exit codes in its log |
+| 4b.5 | `workflows · actionlint`; `node .github/scripts/branch-protection.mjs --selftest` | green |
 
-**3. `tools/moved-blocks.mjs`** — no argument: verify (`LANDED_EPICS` from `./lib/parity-epics.mjs`; the OK line of 4.15,
-exit 0/1). `--record <source> <from>-<to> <commit> --destination <path> --epic <En> --id <id> [--supersedes <id>]`:
-`git rev-parse --verify <commit>^{commit}` and `git show <full>:<source>` through `gitOutput` of `./lib/git.mjs`; every
-refusal of the entry section; append the entry as `planned` by inserting its text before the closing `]` of the file's
-text — never by re-serialising the parsed array; the result must parse; temporary file and rename. Export
-`main(argv, root)` for the fixtures. Unknown arguments: usage, exit 2.
-
-**4. Record the 25** after S0b is committed: `C=$(git rev-parse HEAD)`, then one `--record` per row of F9, e.g.
-`node tools/moved-blocks.mjs --record common/testing.md 32-33 $C --destination rust/testing.md --epic E6 --id
-testing-runner-rust`. Start the file as `{\n  "note": "<note>",\n  "entries": [\n  ]\n}\n`; the note: *Historical
-evidence of every block todo/PLAN_node_rule_parity.md moves out of a rule (D1: word for word), one entry per exact
-whole-line range. Recorded once by tools/moved-blocks.mjs --record; never edited — a later move or edit appends an
-entry that supersedes, and status moves once, planned to landed. The test reads no git history.* Then 4.14 by hand.
-
-**5.** The docs as above; the `README.md` row: `tools/moved-blocks.mjs` | the evidence that a moved block is word for
-word (D1) — whole-line ranges in an immutable manifest, checked without history | `node tools/moved-blocks.mjs`,
-`--record …` (this repository only).
+**Files** the two fixture folders, `tools/lock-fixtures.test.mjs`, `.github/workflows/ci.yml`,
+`.github/branch-protection.json`, `research/module_tests.md`. **RED → GREEN → RED** the test before the fixtures (missing
+folders); then expect exit 0 from the stale locked restore → 4b.2 fails with NU1004's text; set the npm lock to `4.0.6`
+→ 4b.1 fails (no EUSAGE); unset `PATH`'s dotnet with `CI=true` → 4b.3 fails as specified. **Docs** `research/module_tests.md`
+— the fixtures, the job, and what they do not prove (a consumer's real lock; that is E2's policy and E7's remediation).
 
 ---
 
 ## Warnings for every coder of this epic
 
-- **No rule file changes in E1 except S0's wording and S0b's whitespace.** `node tools/rule-bodies.mjs` prints OK with 39
-  rules after every story.
-- **Temporary folders only through `ownedDir`**; the guard run by `npm test` refuses `mkdtemp`, `os.tmpdir()`, a bare
-  `git worktree add`, and a `dotnet`/`npm` write anywhere but an owned copy.
-- **Keep `normalized.filter(file=>match(file))` byte for byte** (F4).
-- **No product or repository name** in a rule; data files cite the plan as plain text; `research/consumers.json` names
-  repositories because it is the derived index of `README.md` § *Consumers*.
-- **Stage by path**, read `git diff --staged --stat`, one commit per story, the observed numbers in the body.
-- **Report both observations** of every RED step, and the runner's totals with the six known janitor failures named.
+- No rule file changes in E1 except S0's wording and S0b's whitespace; `node tools/rule-bodies.mjs` OK with 39 rules
+  after every story.
+- Temporary folders only through `ownedDir`; never `mkdtemp`, `os.tmpdir()`, a bare `git worktree add`, or an
+  `npm`/`dotnet` write outside an owned copy.
+- Keep `normalized.filter(file=>match(file))` byte for byte (F4).
+- Every `uses:` pinned by a 40-hex sha with its version comment; no new action beyond `actions/setup-dotnet`.
+- No product or repository name in a rule; data files cite the plan as plain text.
+- Stage by path (never `git add -A`), read `git diff --staged --stat`, one commit per story, observed numbers in the body.
 
-## Open points — classified; none decided in the stories
+## Open points — classified (none decided beyond what the plan as written requires)
 
-Epoch 3 has 0 changes; a second would stop the plan. Each point says whether it is a change (by
-`common/plan-change-control.md` § *What counts as a change*) in this writer's judgement — the coordinator judges.
+- **O1 — the checker cannot verify `justifiedBy` without history. NOT a change.** § 4.3 (`:443-444`) has "the checker
+  verifies that the cited commit exists in the repository and touches only the source file(s)", while the same section
+  (`:427-428`) and E1 (`:1381-1382`) say the checker reads no history and passes at depth 1, where that commit (often a
+  squashed branch commit) is absent. S4 does the git verification in the RECORDER, when the entry is written and history
+  is at hand, records the touched files as `justifiedFiles`, and the checker verifies their shape — both sentences hold.
+- **O2 — an activation cannot name its own move commit. NOT a change.** § 4.3 (`:446-448`) puts "the move commit" in the
+  activation record; a commit cannot contain its own sha, and E2 activates "in the same commit as its move" (`:1418`). S4
+  records `beforeCommit` (the commit right before the move) and the destination range; the move commit is the one that
+  adds the record.
+- **O3 — the suite's lock test would fail in `tools · selftest`. NOT a change.** "Under `CI` the test FAILS when `dotnet`
+  is missing" (`:947-948`), and `npm test` in `tools · selftest` has no SDK (F6). S4b names the dedicated job in that
+  step's environment, and the NuGet case defers to it by name there; it runs, never skipped, in `tools · lock fixtures`.
+  (The alternative, `setup-dotnet` in `tools · selftest` too, would run the fixture twice.)
+- **O4 — required on `release` only, or on every pull request? NOT a change.** § 19 (`:1275`) and E1 (`:1393-1394`) add
+  `tools · lock fixtures` to `release`'s required checks; § 10 (`:943-946`) calls it "a REQUIRED job … running the two lock
+  fixtures on every pull request". S4b adds it to `main`'s contexts as well, which is what makes it required on a pull
+  request.
+- **O5 — `npm-packages.md` is 3,500 B in one sentence, 3,300 B in three. NOT a change.** § 5's allowance paragraph
+  (`:825`) still says ≤ 3,500 B; the "after E3" table (`:798`), the pin list (`:814`) and E2 (`:1418`) set the hard cap at
+  3,300 B. S2 tests 3,300 B. A stale sentence.
+- **O6 — "every other row `planned`". NOT a change.** E1 (`:1345-1346`, `:1376-1377`) says every row but the proof is
+  `planned`; P8, R4, R5, G4, G5 are already decided `deliberately-absent` (§ 3) and have no owning epic among E2–E6, so S3
+  records them as such.
+- **O7 — stale sentences. NOT a change.** § 10 (`:913-914`) still lists the `consumers.json` equality test among `npm
+  test`'s at every story (it is E7's now, ledger 3.4); § 7 projects "≈ 14" move entries (F8 counts 25; the count is the
+  manifest's).
 
-- **O1 — `typescript/testing.md`'s gate has no admissible form. CHANGE.** Its first text is the doctrine's § 2–§ 4
-  (§ 4.3 `:424`), whose source `typescript/doctrine.md` has no `tasks:` — so by the provenance rule it mirrors as "no
-  gate" (`:405-408`), yet § 4.3 gives it `implement, test, audit, policy, release`. That is an applicability change, and
-  "a change of applicability is approved explicitly in this plan (§ 4.4 names the four)" (`:409-410`); § 4.4 (`:506-515`)
-  and T11 (`:754`) name only the two `boundaries` and two `definition-of-done` files. E1 is not blocked (it declares the
-  four); E4.S2 will be refused by S1's check when it creates the file. Either a fifth approved declaration or an ungated
-  `typescript/testing.md` (which changes § 5's numbers for every `.ts` single-read scope).
-- **O2 — the new TypeScript mechanics files declare, not mirror. NOT a change.** `typescript/lifecycle.md`,
-  `typescript/logging.md`, `typescript/utc-timestamps.md` (and the E6 Node runner text in `typescript/testing.md`) are
-  new requirements — no existing rule text — so `:408-409` makes them DECLARED with a reason (no plan approval needed for
-  a new requirement), while § 4.4 `:514` says "every other gated file mirrors its source's `tasks:` line". The gates
-  themselves are § 4.3's; only `:514` and T11's "(the two `definition-of-done` files, the two `boundaries` files)"
-  undercount. A repaired sentence; E5/E6 declare them.
-- **O3 — the configuration kind is outside the mechanical equality test. NOT a change, if the reading holds.** § 4.1
-  (`:277-281`) maps `Directory.Build.props`/`Directory.Packages.props`/`NuGet.Config` ↔ `tsconfig*.json`/`.npmrc` as "a
-  kind of its own whose requirements are stated per counterpart", then compares "the selected-scope sets … row for row
-  under the table". Compared mechanically, P2 (the doctrine on the C# side, `compiler-strictness` on `tsconfig.json`)
-  and P9 (`NuGet` on `Directory.Build.props` against `npm-packages` on `.npmrc` but not `tsconfig.json`) could never be
-  `equal`. S3's rule 9 leaves the configuration kind out of the mechanical comparison; if "stated per counterpart" is
-  meant as a per-row mapping the test should check, the matrix needs a field the plan does not define — that would be a
-  change.
-- **O4 — P5 is `equal` in one setting and deliberately absent in another. NOT a change.** § 3.1 P5 and § 18 finding 5
-  (`:194`, `:1098`) put both on one requirement; one inventory status cannot hold both, so S3 adds an optional
-  `scopedAbsences` field that carries the plain-JavaScript reason in the inventory, as § 18 says. An implementation of
-  the plan as written; a separate inventory id would be the change.
-- **O5 — § 5's "none fits today" is not true for two scopes. NOT a change.** `:693-697` says every unpinned scope that
-  fits after the plan is over today; `gpu --file src/a.mjs` (27,680 B) and `storage --file src/a.mjs` (29,406 B) fit
-  today. Both have their reasons in § 5's own rows (`:656-657`), and S5 records them as `why`. A repaired sentence.
-- **O6 — the NU1004 fixture needs a .NET SDK; CI installs none explicitly. NOT a change, if a visible skip is accepted.**
-  `.github/workflows/ci.yml` sets up Node only; S3's fixture writes its target framework from whatever SDK resolves
-  (`net<major>.0`) and needs no package source (F12), so it runs on any runner image that ships an SDK, and is a named
-  `t.skip` where none resolves. If E1's done-when requires the fixture to RUN in CI, a `setup-dotnet` step joins E1's
-  scope — a scope change.
-- **O7 — the lock fixtures belong to no listed E1 story. NOT a change.** E1's done-when (`:1169`) requires them; its story
-  list (`:1130-1162`) assigns them nowhere; S3 (which owns G2's row) carries them.
-- **O8 — the gate declarations are listed under both S4 and S5. NOT a change.** `:1159-1160` (S4) and `:1162` (S5); S5
-  carries them.
-- **O9 — stale sentences, all repaired references. NOT a change.** The status paragraph still says "epoch 2 is open at 0
-  changes" (`:17`); § 4.4 (`:492-496`) lists S0's replacements without the two O8 added (E1 `:1132-1134` has them);
-  § 4.3 (`:365-366`) and E1 (`:1148`) give `--record` without its destination, epic and id arguments; § 7 (`:732`)
-  projects "≈ 14" move entries where F9 counts 25 (the count is the manifest's, `:391`).
+## Risk items for the gate (the whole plan, at most three)
+
+1. **E7.S3–S4 — the `release` promotion and the eight consumer bumps** (public contract, hard to reverse). One promotion
+   changes what every consumer's agents load; a moved `release` is not rolled back without reddening every pin
+   (`README.md` § *How `release` moves*), and the bumps flip a new CI gate to enforcing in eight repositories.
+2. **E2.S3 — the exception to `npm ci --ignore-scripts`** (security). The allow-list decides which packages may run
+   install-time code in every consumer's CI; a wildcard, a wrong name or a check that misses one turns the family's
+   default supply-chain guard into an open door (§ 19, the epoch 4 round, finding 2).
+3. **E1.S1 — the `path_tasks` resolver change** (public contract). Every consumer's agents receive their rules through
+   `selectRules`; a gating mistake drops rules from a scope silently — nothing fails, an agent simply never reads them —
+   so the selection baseline (S2) is the only control, and it must land in the same pull request.

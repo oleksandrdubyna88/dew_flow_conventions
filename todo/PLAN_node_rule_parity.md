@@ -1352,6 +1352,9 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   owning epic records right before it moves), the gate declarations (each owning epic declares when it lands the file),
   `research/consumers.json` and its equality test (E7, where the dry run first needs it). (The lock fixtures were moved
   to E2 in the first epoch 4 draft and RESTORED to E1 by consult `354b1a67`: moving them relaxed a DoD timing condition.)
+- **Stories document:** [PLAN_node_rule_parity_E1.md](PLAN_node_rule_parity_E1.md) — written by Opus when the epic
+  started (2026-10-31), rewritten to the slimmed E1 of epoch 4; no story is a cornerstone, so the ledger line above is
+  unchanged.
 - **Stories:** S0 the preparatory wording-only anonymisation of `typescript/doctrine.md` § 1 (§ 4.4) — its own commit,
   `rule-bodies.mjs --update typescript.doctrine`, listed as wording with no lesson removed, BEFORE S4 records a hash
   (§ 16, finding 3); the list is the three file names, "a real vault", **and the two the first list missed** (§ 17,
