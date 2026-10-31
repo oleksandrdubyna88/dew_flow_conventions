@@ -1486,11 +1486,16 @@ written to the checkout or to the real caches.
 - **NuGet.** Two projects restored with a lock file; a project reference then makes the lock stale. A locked restore exits 1
   with `NU1004`, `--force-evaluate` exits 0, a locked restore exits 0. No package source is contacted (a project reference, no
   package). The SDK is the one `global.json` asks for.
-- **The case never goes quiet.** With no SDK it is a failure under `CI` (`dotnet SDK missing under CI — the NU1004 fixture must
-  run here`), a named skip otherwise, and a named skip whenever `LOCK_FIXTURES_JOB` is set. `ci.yml` sets that variable in
-  the `Selftest` step of `tools · selftest`, which has no SDK, so the NuGet case runs only in the new `tools · lock fixtures`
-  job (`actions/setup-dotnet` pinned by sha, the SDK taken from the fixture's `global.json`). A test reads `ci.yml` and the
-  protection file: the job, the sha pin of every `uses:`, the selftest variable, the context on `release` and not on `main`.
+- **The case never goes quiet.** The SDK is probed inside the copied fixture, where `global.json` applies, so an image that
+  carries only other SDK bands counts as having none. With no compatible SDK the case is a failure under `CI` (`dotnet SDK
+  missing under CI — the NU1004 fixture must run here`), a named skip otherwise, and a named skip whenever `LOCK_FIXTURES_JOB`
+  is set. The jobs that run the whole suite without pinning the SDK (`Selftest` in `tools · selftest`, and the coverage step of
+  `SonarCloud Scan`) set that variable; the runner image ships .NET 8, 9 and 10 but not necessarily the fixture's band. So the
+  NuGet case runs only in the `tools · lock fixtures` job (`actions/setup-dotnet` pinned by sha, the SDK taken from the
+  fixture's `global.json`). A test reads the workflows and the protection file: the job, the sha pin of every `uses:`, the
+  variable in each suite-running step, the variable ABSENT from the workflow-level env, the locks job env and every locks step
+  env (so the required job can never skip its own case), and the context on `release` and not on `main`. The children get
+  `TMPDIR`, `TEMP` and `TMP` in an owned folder, so the SDK's scratch files never reach the shared temp root.
 
 The job runs on every push and pull request. It is required on `release` only, in `.github/branch-protection.json`; applying
 that file (`node .github/scripts/branch-protection.mjs --apply`) is an administrator's action after the job has reported once,

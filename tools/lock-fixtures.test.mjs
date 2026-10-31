@@ -11,9 +11,11 @@
 // and no package, so no package source is contacted. Every command runs in a copy under an owned folder with a cleared
 // environment, its own HOME and its own package caches; nothing is written to the checkout or to the user's real caches.
 //
-// The NuGet case needs the .NET SDK. Under CI a missing SDK is a FAILURE, not a skip: the point of the case is that it runs
-// there. The `tools · selftest` job has no SDK by design and names the dedicated job in `LOCK_FIXTURES_JOB`, where the case
-// defers by name; it runs, never skipped, in `tools · lock fixtures`. Locally, with no SDK, it is a named skip.
+// The NuGet case needs the SDK the fixture's global.json asks for, and "usable" is judged INSIDE the copied fixture, where
+// that file applies: an image that carries only other SDK bands has no compatible SDK for this fixture. Under CI that is a
+// FAILURE, not a skip: the point of the case is that it runs there. The jobs that do not pin the SDK (`tools · selftest`, the
+// SonarCloud scan) name the dedicated job in `LOCK_FIXTURES_JOB`, where the case defers by name; it runs, never skipped, in
+// `tools · lock fixtures`. Locally, with no compatible SDK, it is a named skip.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -35,7 +37,7 @@ function nugetPlan({ dotnetUsable, env }) {
   if (env.LOCK_FIXTURES_JOB) return { skip: `runs in the required ${JOB} job` };
   if (dotnetUsable) return { run: true };
   if (env.CI) return { fail: "dotnet SDK missing under CI — the NU1004 fixture must run here" };
-  return { skip: `no dotnet SDK on PATH — NU1004 not exercised locally; CI's ${JOB} job runs it` };
+  return { skip: `no compatible dotnet SDK for the fixture's global.json — NU1004 not exercised locally; CI's ${JOB} job runs it` };
 }
 
 // A cleared environment plus PATH: nothing of the developer's configuration (registries, proxies, caches) leaks in.
@@ -43,8 +45,12 @@ function cleanEnv(t) {
   const home = ownedDir(t, "lock fixture home");
   const cache = ownedDir(t, "lock fixture cache");
   const packages = ownedDir(t, "lock fixture nuget");
+  const tmp = ownedDir(t, "lock fixture tmp");
   return {
     PATH: process.env.PATH, HOME: home, npm_config_cache: cache, NUGET_PACKAGES: packages,
+    // Scratch files npm, dotnet and the MSBuild children write land in an owned folder, not in the shared temp root
+    // (common/test-leftovers.md section 2: a child that makes temp paths of its own is handed an owned folder).
+    TMPDIR: tmp, TEMP: tmp, TMP: tmp,
     DOTNET_CLI_TELEMETRY_OPTOUT: "1", DOTNET_NOLOGO: "1", DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1",
   };
 }
@@ -85,13 +91,13 @@ test("the npm fixture is a real mismatch, not an unrelated failure: the same pro
 
 test("a NuGet lock made stale by a project reference fails a locked restore with NU1004 and passes after --force-evaluate", t => {
   const env = cleanEnv(t);
-  const probe = ownedDir(t, "lock fixture probe");
-  const version = run("dotnet", ["--version"], probe, env);
+  const root = copyOf(t, "nuget-stale");
+  // Probed where global.json applies: "an SDK exists" is not "a compatible SDK exists".
+  const version = run("dotnet", ["--version"], root, env);
   const plan = nugetPlan({ dotnetUsable: version.status === 0 && !version.error, env: process.env });
   if (plan.skip) { t.skip(plan.skip); return; }
   if (plan.fail) assert.fail(plan.fail);
 
-  const root = copyOf(t, "nuget-stale");
   const app = path.join(root, "app");
   const restore = (...extra) => run("dotnet", ["restore", "-m:4", "--disable-build-servers", ...extra], app, env);
   const shown = result => `${result.stdout}\n${result.stderr}`;
@@ -110,12 +116,14 @@ test("a NuGet lock made stale by a project reference fails a locked restore with
   assert.equal(forced.status, 0, shown(forced));
   const locked = restore("--locked-mode");
   assert.equal(locked.status, 0, shown(locked));
+  assert.match(path.basename(env.TMPDIR), /^testsToDelete-/, "TMPDIR is an owned folder");
+  assert.ok(fs.readdirSync(env.TMPDIR).length > 0, "the SDK's scratch files went to the owned TMPDIR, not the shared temp root");
 });
 
 test("the NuGet case runs, skips by name or fails by the environment — never silently", () => {
   const cases = [
     [{ dotnetUsable: true, env: {} }, { run: true }],
-    [{ dotnetUsable: false, env: {} }, { skip: `no dotnet SDK on PATH — NU1004 not exercised locally; CI's ${JOB} job runs it` }],
+    [{ dotnetUsable: false, env: {} }, { skip: `no compatible dotnet SDK for the fixture's global.json — NU1004 not exercised locally; CI's ${JOB} job runs it` }],
     [{ dotnetUsable: false, env: { CI: "true" } }, { fail: "dotnet SDK missing under CI — the NU1004 fixture must run here" }],
     [{ dotnetUsable: false, env: { CI: "true", LOCK_FIXTURES_JOB: JOB } }, { skip: `runs in the required ${JOB} job` }],
     [{ dotnetUsable: true, env: { CI: "true", LOCK_FIXTURES_JOB: JOB } }, { skip: `runs in the required ${JOB} job` }],
@@ -144,4 +152,20 @@ test("the lock fixtures run in a required job on release: sha-pinned setup-dotne
   const protection = JSON.parse(fs.readFileSync(path.join(sourceRoot, ".github/branch-protection.json"), "utf8"));
   assert.deepEqual(protection.branches.release.required_status_checks.contexts, ["tools · selftest", "workflows · actionlint", JOB]);
   assert.ok(!protection.branches.main.required_status_checks.contexts.includes(JOB), "main is untouched: adding it there would be a plan change");
+});
+
+test("the required job never skips the NuGet case: LOCK_FIXTURES_JOB is in no env that reaches the locks job", () => {
+  const workflow = parse(fs.readFileSync(path.join(sourceRoot, ".github/workflows/ci.yml"), "utf8"));
+  assert.ok(!Object.hasOwn(workflow.env ?? {}, "LOCK_FIXTURES_JOB"), "not at workflow level: it would reach the locks job and skip its own case");
+  const locks = workflow.jobs.locks;
+  assert.ok(!Object.hasOwn(locks.env ?? {}, "LOCK_FIXTURES_JOB"), "not in the locks job env");
+  for (const step of locks.steps) assert.ok(!Object.hasOwn(step.env ?? {}, "LOCK_FIXTURES_JOB"), `not in the env of the step ${step.name ?? step.uses}`);
+  // The jobs that run the whole suite without the pinned SDK name the dedicated job, so the case defers by name there.
+  for (const file of ["ci.yml", "sonarcloud.yml"]) {
+    const other = parse(fs.readFileSync(path.join(sourceRoot, ".github/workflows", file), "utf8"));
+    const steps = Object.entries(other.jobs).filter(([name]) => name !== "locks").flatMap(([, job]) => job.steps ?? []);
+    const runsSuite = steps.filter(step => /npm (run )?test/.test(step.run ?? ""));
+    assert.ok(runsSuite.length > 0, `${file} runs the suite somewhere — otherwise this check proves nothing`);
+    for (const step of runsSuite) assert.equal(step.env?.LOCK_FIXTURES_JOB, JOB, `${file}: the step ${step.name} runs the suite and must name ${JOB}`);
+  }
 });

@@ -74,9 +74,10 @@ jobs:
       - name: Branch protection selftest
         run: node .github/scripts/branch-protection.mjs --selftest
 
-      # This job has no .NET SDK by design, so the NuGet case of tools/lock-fixtures.test.mjs cannot run here. The
-      # variable names the job where it does, and the case skips by that name rather than failing on a missing SDK.
-      # Everywhere else under CI a missing SDK is a failure, never a skip.
+      # The runner image ships .NET 8, 9 and 10, but this job does not pin the SDK the lock fixture's global.json asks
+      # for; the dedicated job below does. So the NuGet case of tools/lock-fixtures.test.mjs runs there and defers here:
+      # the variable names that job, and the case skips by that name. Everywhere else under CI a missing or
+      # incompatible SDK is a failure, never a skip.
       - name: Selftest
         env:
           LOCK_FIXTURES_JOB: "tools · lock fixtures"
@@ -89,8 +90,8 @@ jobs:
   # A lock that does not satisfy its manifest must FAIL the install, not heal itself. Two fixtures prove the refusals
   # this repository's dependency policy relies on: `npm ci` on a lock that disagrees with package.json (EUSAGE), and a
   # locked NuGet restore after a project reference made packages.lock.json stale (NU1004, passing again after
-  # --force-evaluate). The npm half runs in `tools · selftest` too; the NuGet half needs the .NET SDK, which that job does
-  # not install, so it runs HERE and nowhere else — and it is never skipped here: with no SDK on PATH under CI the case
+  # --force-evaluate). The npm half runs in `tools · selftest` too; the NuGet half needs the SDK pinned by the fixture's
+  # global.json, which only this job installs, so it runs HERE and nowhere else — and it is never skipped here: with no SDK on PATH under CI the case
   # fails (plan section 10 of todo/PLAN_node_rule_parity.md). The SDK is the one the fixture's global.json asks for.
   #
   # It runs on every pull request through this file and is REQUIRED on `release` (.github/branch-protection.json), not on

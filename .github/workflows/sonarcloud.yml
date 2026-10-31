@@ -33,7 +33,12 @@ jobs:
       # Node's own runner produces lcov. The file list is DISCOVERED, not written down: this job used
       # to carry its own copy of it, and a pull request that added two suites left them unmeasured
       # while `npm test` ran them, which showed up only as a coverage gate failure.
+      # `npm run test:coverage` runs every suite, the lock-fixture one included. Its NuGet case belongs to the
+      # dedicated `tools · lock fixtures` job of ci.yml (the one that pins the SDK), so this step names that job and the
+      # case defers by name instead of failing on whatever SDK this image happens to carry.
       - name: Test with coverage
+        env:
+          LOCK_FIXTURES_JOB: "tools · lock fixtures"
         run: |
           npm ci --ignore-scripts
           mkdir -p coverage
