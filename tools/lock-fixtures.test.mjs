@@ -116,7 +116,9 @@ test("a NuGet lock made stale by a project reference fails a locked restore with
   assert.equal(forced.status, 0, shown(forced));
   const locked = restore("--locked-mode");
   assert.equal(locked.status, 0, shown(locked));
-  assert.match(path.basename(env.TMPDIR), /^testsToDelete-/, "TMPDIR is an owned folder");
+  assert.notEqual(env.TMPDIR, env.HOME);
+  assert.equal(path.dirname(env.TMPDIR), path.dirname(env.HOME), "TMPDIR is a sibling of the owned HOME, not the shared temp root itself");
+  assert.deepEqual([env.TEMP, env.TMP], [env.TMPDIR, env.TMPDIR]);
   assert.ok(fs.readdirSync(env.TMPDIR).length > 0, "the SDK's scratch files went to the owned TMPDIR, not the shared temp root");
 });
 
