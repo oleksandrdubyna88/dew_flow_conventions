@@ -664,6 +664,20 @@ that never reports blocks every merge).
 | 4b.4 | the job on this pull request | green; 4b.2's four exit codes in its log |
 | 4b.5 | `workflows · actionlint`; `node .github/scripts/branch-protection.mjs --selftest` | green |
 
+**As built — fixes that satisfy the plan as written** (recorded in `research/module_tests.md`, E1.S4b, beside the tests; not plan changes).
+
+- *The npm fixture's 4.0.6 is a local stub.* `package.json` asks `"picomatch": "file:./picomatch"`, a directory holding
+  `{"name":"picomatch","version":"4.0.6"}`, and the lock is the one above (root and `node_modules/picomatch` at 4.0.7). With a
+  COLD npm cache, `npm ci --offline` against a registry spec `4.0.6` stops at `ENOTCACHED`: resolving the spec needs the
+  package's packument, and F10's probe ran on a warm cache. A local directory resolves from disk, the run stays offline and
+  cold-cache safe, and the refusal is the same `EUSAGE` with `Invalid: lock file's picomatch@4.0.7 does not satisfy
+  picomatch@4.0.6`. A control with an honest lock proves the refusal is the lock's.
+- *The SDK is probed inside the copied fixture,* where `global.json` applies, so an image with no compatible SDK band follows
+  the skip/fail table instead of failing at restore; the children get `TMPDIR`, `TEMP` and `TMP` in an owned folder.
+- *Every job that runs the whole suite without the pinned SDK names the dedicated job:* the `Selftest` step of `tools · selftest`
+  and the coverage step of `SonarCloud Scan` set `LOCK_FIXTURES_JOB`; a test asserts it is absent from the workflow env, the
+  `locks` job env and every `locks` step env.
+
 **Files** the two fixture folders, `tools/lock-fixtures.test.mjs`, `.github/workflows/ci.yml`,
 `.github/branch-protection.json`, `research/module_tests.md`. **RED → GREEN → RED** the test before the fixtures (missing
 folders); then expect exit 0 from the stale locked restore → 4b.2 fails with NU1004's text; set the npm lock to `4.0.6`

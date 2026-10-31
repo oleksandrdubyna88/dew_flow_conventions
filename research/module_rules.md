@@ -200,7 +200,8 @@ single-read tasks, whether the scope is a **pin** (`oneRead: true`) or off the l
   The messages name the rule, the case and what is missing.
 
 Summed bytes of the selected rules per scope, as `node tools/selection-matrix.mjs --bytes` prints them. Measured 2026-10-31 at
-the commit that added the whitespace-only splits (E1.S0b), over 39 rules; each later epic re-runs `--bytes` and replaces
+the commit that added the whitespace-only splits (E1.S0b, branch commit `b2c6642`, a commit that is not on `main` itself after a
+squash merge but stays reachable through the pull request's ref), over 39 rules; each later epic re-runs `--bytes` and replaces
 this table, never appends to it.
 
 | Files | inspect | ui | gpu | storage | implement | test | audit | logging | dependencies |
@@ -258,11 +259,14 @@ A gate record is written by the epic that lands the gated file, in `GATES` of `t
 
 ```json
 "csharp.definition-of-done": {
-  "mirrors": "<source rule id>",
-  "epic": "E5",
+  "declared": { "path_tasks": ["implement", "test", "audit", "release", "policy"], "reason": "<at least 20 characters>" },
+  "epic": "E4",
   "cases": [ { "tasks": ["implement"], "files": ["src/x.cs"], "selected": true } ]
 }
 ```
+
+The example is a declaration, as the plan's section 4.4 has it for the two `definition-of-done` files (written by E4). A
+mirrored record has `"mirrors": "<source rule id>"` in place of `declared`.
 
 A record has exactly one of `mirrors` (the source rule whose `tasks:` line the gate repeats; a source with no `tasks:` line
 mirrors as "no gate") and `declared` (`{ "path_tasks": [...], "reason": "<at least 20 characters>" }`, for a new
@@ -338,9 +342,13 @@ anonymised one). The text hashed is the folded lines of the range with a closing
   --justified-by <commit>]` is run by the owning epic after placing the block in the destination's working tree and before
   committing. If the bytes equal an unpaired baseline of that source it appends an activation, finding the destination lines by
   scanning the working tree (refused unless the block is there exactly once). If they differ it requires both flags, verifies
-  with git that the justifying commit exists and touches only the source file, appends the superseding entry and adds
+  with git that the justifying commit exists, is not a merge commit and touches only the source file (and that the epic is the baseline's), appends the superseding entry and adds
   `supersededBy` to the old one. A refusal writes nothing. The file is written by inserting the new entry before the closing
   bracket, never by re-serialising, through a temporary file and a rename.
+
+A `beforeCommit` is the commit the recorder read the text at; for the first epic's 25 baselines it is a commit of the feature
+branch, which a squash merge does not put on `main` but which stays reachable through the pull request's ref. Nothing reads it
+back: it is evidence of where the bytes came from, not an input of the check.
 
 The checker reads no git history, so it runs in a depth-1 CI checkout: it finds a block by its hash anywhere in the file, which
 means a section added above a planned block does not break the check while a changed byte does. An unpaired baseline needs its

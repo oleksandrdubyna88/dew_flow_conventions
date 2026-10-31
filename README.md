@@ -154,8 +154,10 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   were the failures that hurt all six consumers at once — a backwards move makes every pinned sha
   differ from the tip during the incident the rollback exists to end.
 
-  **The ref also requires `tools · selftest` and `workflows · actionlint`** — the two contexts
-  `ci.yml` actually reports on a push to `main`. Required checks apply to a **direct push**, not only
+  **The ref also requires three contexts: `tools · selftest`, `workflows · actionlint` and
+  `tools · lock fixtures`** — the first two are what `ci.yml` actually reports on a push to `main`; the
+  third (the two lock fixtures) is named in the protection file ahead of its first report and is
+  applied by an administrator only after the job has reported once. Required checks apply to a **direct push**, not only
   to a merge, so a commit hand-pushed here without ever running CI is refused by GitHub itself. This
   cannot break a legitimate promotion: `tools/promote-release.mjs` already refuses a sha whose `ci`
   run is absent, unfinished or red, so every sha GitHub would reject is one the gate refuses anyway.
