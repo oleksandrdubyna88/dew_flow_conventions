@@ -154,6 +154,27 @@ cache or a process.
 - **Sweep-only stage, 2026-10-31.** dew_flow_mcp (`b352881`) and dew_flow_sidecar_rust (`1c1282e`): `tools/sweeper-scan.mjs` at `115bbf8` found
   none (103 and 104 files read); their stage A is empty. Their stories documents (mcp #53, sidecar_rust #61) were written against E1 and are
   re-split against `115bbf8` before any producer code.
+- **Sweep-only stage of this repository's seven other consumers, 2026-10-31** (`tools/sweeper-scan.mjs` at `115bbf8` over each default branch,
+  every listed line read by hand):
+  - dew_flow_creds_for_devs `0fa2ee3`, dew_flow_rag_qln `9100184`, dew_flow_vscode_kit `1d2681c`: none found — stage A empty.
+  - dew_flow_connect_other_ais `80b829ef`: two lines, both test assertions (`scripts/lib/transcript-sanitise.test.mjs:686` asserts stderr names no
+    path; `src_vs_code/src/test/runTemp.test.mjs:149` asserts the temp root holds no prefixed entry) — no removal; stage A empty.
+  - wsl_care `2bbd8d3`: two lines, the daemon's never-match protection list (`contracts/config-keys.json:778`) and its test inputs
+    (`TempRulesTests.cs:97`) — the opposite of a sweeper; stage A empty.
+  - dew_flow_benchmark `a504cfe`: ONE enabled owner-blind sweeper, `spikes/minigit-bench/lib/heldout-run.mjs` `sweepLeftovers` (every
+    `<workRoot>/testsToDelete-*` older than a day; `--work-root` reaches it without `assertWorkRoot`). The question consultant (`b5e46ce4`, both
+    rows) held that it closes the barrier and that report-only is the smallest fix. Stage A landed as dew_flow_benchmark #125 (`6a963a4`): the
+    sweep LISTS every `testsToDelete*` entry and never removes it; the scan still lists the listing line (`heldout-run.mjs:95`), which deletes
+    nothing, deliberately not hidden from the scan. The other three listed lines there are a comment, an assertion and a regex check.
+  - dew_flow_mcp and dew_flow_sidecar_rust: empty (above).
+- **The machine scan, 2026-10-31** (`tools/sweeper-scan.mjs --root ~/git` on the operator's WSL machine, every checkout and worktree; no crontab,
+  no user timer touches a sweep): every listed line is one of the non-removing lines above, the doc comment of E3's owner-aware pattern
+  (`Owned.cs:82`), or a copy of the OLD `sweepLeftovers`. The live copies took `main` (#123, #124, `r9700-night`, `ma-e4`, `ma-e4-build`; the main
+  checkout fast-forwarded). Three places the scan could not read are one static HTML asset over 4 MiB in three vllm checkouts (not code).
+  **Open:** 13 stale, clean worktrees of ended sessions under `~/git/dew_flow_benchmark-wt/` still hold the old copy (`lmc-part6`, `ma-e2`,
+  `ma-e2s0`…`ma-e2s8`, `model-arms`, `plan-git-path`; every tip on origin, only `bin/`/`obj/` ignored). The consultant (`46fdf0a4`, both rows)
+  held that an attestation does not open the barrier; removing the worktrees (branches kept) was refused by the permission system as another
+  session's work, so it is the owner's. **No producer stage merges until a rescan finds no deleting copy.**
 
 ## Build order
 
