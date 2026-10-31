@@ -1127,6 +1127,8 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   `tools/lib/parity-epics.mjs` (the owning-epic vocabulary the activation tests share), their tests,
   `research/module_rules.md`, `ENTRY.md` step 7 (§ 17, O12 — the first scope line named neither the consumers file nor
   the tools).
+- **Stories document:** [PLAN_node_rule_parity_E1.md](PLAN_node_rule_parity_E1.md) — written by Opus when the epic
+  started (2026-10-31), reconciled with epoch 3; no story is a cornerstone, so the ledger line above is unchanged.
 - **Stories:** S0 the preparatory wording-only anonymisation of `typescript/doctrine.md` § 1 (§ 4.4) — its own commit,
   `rule-bodies.mjs --update typescript.doctrine`, listed as wording with no lesson removed, BEFORE S4 records a hash
   (§ 16, finding 3); the list is the three file names, "a real vault", **and the two the first list missed** (§ 17,
