@@ -62,11 +62,11 @@ Narrowed: no — judged against the gate-approved epoch 1 baseline `ac798a0` wit
 
 ### Re-review for epoch 3
 
-Narrowed: no — judged against the epoch 2 baseline `400d878` + `01d1bbf`: G2's whitelisting records the .NET side exactly as that baseline already had it ("record .NET, not required"); the gate test gains a declared-gate form for files that have no source and loses no assertion; the doctrine gains a selector; the moves become exact ranges with the same text moving or staying under D6; the single-read list gains six pins and drops none; no guarantee, scope, Definition-of-Done box or merge condition of epoch 2 is removed (§ 17)
+Narrowed: no — judged against the epoch 2 baseline `400d878` + `01d1bbf`: G2 is RAISED on the .NET side to a committed lock and a locked-mode restore (option A, consult `e1c58f6d`), so the whitelist stays exactly the baseline's `['P4']` and nothing is admitted against it; the gate test keeps every assertion and gains the provenance rule, declared gates with reasons and pinned positive/negative cases; the doctrine gains a selector; the moves become exact whole-line ranges with every word staying in place (a whitespace-only split, D1-checked); the single-read list gains six pins and drops none; no guarantee, scope, Definition-of-Done box or merge condition of epoch 2 is removed (§ 17)
 
 | Work | Where | Verdict | Action |
 |---|---|---|---|
-| The E1 stories document (planning work, not on main; nothing was built) | `feat/rule-parity-e1`, `72aaf8c` | — | to be judged by the Opus judge against the epoch 3 revision (§ 17); its O1–O12 are the cause of this re-review |
+| The E1 stories document (planning work, not on main; nothing was built) | `feat/rule-parity-e1`, `72aaf8c` | fits | kept — to be reconciled with the epoch 3 revision (§ 17: E1.S0b, the provenance gates, the normalised equality, the exact ranges, the fixtures) when E1 starts; judged by the team lead as the Opus judge, 2026-10-31 |
 
 ## 0. Decisions
 
@@ -169,9 +169,9 @@ of accepted violations exists. The matrix carries (c) and (e) as columns.
 **A stronger side is allowed only as a recorded exception** (PR #94 review, comment 1 — ledger 1.1; tightened by the
 epoch 2 review, § 16): a matrix row whose `status` is `stronger-ts` or `stronger-cs` carries a non-empty `reason`
 naming what the weaker side would need and why it is not taken now, AND its id is in the explicit whitelist the matrix
-test holds (today `['P4','G2']`, § 11 — G2 joined by ledger 2.1, § 17); any other row with that status fails the
-suite, with or without a reason, so a new exception is a reviewed edit of the test and of § 11, never a field in a JSON
-file. Equality is preferred where it is cheap: P2 is made equal by giving the strictness check a .NET half (§ 4.6); P4
+test holds (today `['P4']`, § 11 — ledger 2.1 had put G2 there; the epoch 3 re-review reversed that and made G2
+`equal`, § 17); any other row with that status fails the suite, with or without a reason, so a new exception is a
+reviewed edit of the test and of § 11, never a field in a JSON file. Equality is preferred where it is cheap: P2 is made equal by giving the strictness check a .NET half (§ 4.6); P4
 stays `stronger-ts` with its reason (an analyzer package is a dependency decision for every .NET consumer — Q7).
 
 ## 3. The parity table
@@ -220,7 +220,7 @@ headings, are the content of `research/parity-matrix.json` (E1).
 | Gap | Decision | Why |
 |---|---|---|
 | Analyzer / lint requirement | **Raise both, asymmetrically named**: TS lint at zero warnings (P2, P4); C# `TreatWarningsAsErrors` + `Nullable enable` in `csharp/doctrine.md` § 1 | The compiler is the C# analyzer the family already pays for; an extra analyzer package is a dependency decision for the consumers, not a shared rule (Q7) |
-| Lock file + locked restore (**G2**) | **Raise TS (lock + `npm ci`); .NET stays at central exact pins. G2 is on the exception whitelist as `stronger-ts`** (ledger 2.1; decided by the question consultants, consult `1f4d8688` — one chose raising .NET, one chose this — and the team lead, who verified the key fact, under owner absence; **for the owner to confirm 2026-11-01**) | The reason, recorded verbatim in the matrix row: NuGet resolves transitive dependencies to the LOWEST applicable version, so exact central pins already make the graph deterministic; npm resolves to the HIGHEST satisfying version, so it needs `package-lock.json` for the same guarantee, and the lock also carries integrity hashes; a required .NET locked restore would add a non-idiomatic per-project failure mode for C# agents. **Superseded (2.1):** the first revision's "record .NET … Q1 for the owner" — Q1 is closed by this decision |
+| Lock file + locked restore (**G2**) | **Raise BOTH — option A: G2 is `equal`.** TypeScript: `package-lock.json` committed, `npm ci` the only install in CI. .NET: every project restores with `RestorePackagesWithLockFile=true` (in `Directory.Build.props`), `packages.lock.json` committed, and CI restores in locked mode (`RestoreLockedMode=true` under `CI`, or `dotnet restore --locked-mode`). Decided in the epoch 3 re-review (consult `e1c58f6d`, the owner away; **for the owner to confirm 2026-11-01**). The whitelist stays `['P4']` | **Observed, SDK 10.0.114, 2026-10-31** (the scratch project of P6's probe): `dotnet restore -m:4` with `RestorePackagesWithLockFile` wrote `packages.lock.json`; the declaration changed from `10.0.0` to `9.0.0` without regenerating → `dotnet restore --locked-mode -m:4` **failed, `NU1004`** ("the package reference … version has changed … the packages lock file is inconsistent … pass `--force-evaluate`"), exit 1; `--force-evaluate` regenerated it and locked mode passed, exit 0 — the mirror of `npm ci`'s `EUSAGE` (§ 4.3). **Why the first decision was reversed:** "NuGet resolves to the lowest applicable version, so exact pins already make the graph deterministic" is refuted — the resolution changes when a missing version is published later or a package is unlisted, which is why Microsoft documents lock files for repeatable restores (devblogs, *Enable repeatable package restores using a lock file*); and admitting G2 as an exception against epoch 2's explicit "only P4" would have been a narrowing needing the owner. **Adoption cost, honestly:** one `packages.lock.json` per project in the six .NET-bearing consumers (generated once, committed, regenerated with `--force-evaluate` on every bump), one property pair in each `Directory.Build.props`, one CI flag — E2 writes the rule, E7's dry run generates the locks and the bumps commit them. **Superseded, kept as history:** ledger 2.1's whitelisting of G2 as `stronger-ts` (its text stays in the ledger) and the first revision's "record .NET … Q1 for the owner" |
 | Vulnerability scan | **Raise both** in `common/dependencies.md`: the monthly bump runs the ecosystem's scanner (`npm audit`; `dotnet list package --vulnerable --include-transitive`; `cargo audit` where installed) and records the result beside the pins | Cheap, equal, and both commands exist today (npm measured) |
 | Coverage thresholds | **Deliberately absent on both** | `testing.md` governs what a test may claim; a number is gamed the week it lands. Recorded, like every deliberately-absent reason, in `research/parity-inventory.json` (`status: "deliberately-absent"`, `reason`) — the one home; `research/module_rules.md` points there (§ 16, stories-writer point 9: the first revision's "in `research/module_rules.md`" is superseded) |
 | CI steps per language | **Deliberately absent as shared rules** | `testing.md:16-18`: each repository's own instructions and CI name the exact commands. Shared text would be an inventory |
@@ -265,10 +265,19 @@ E1 adds one test per representative scope asserting the exact id list, in the st
 `deliberately-absent`) and `reason` (required and non-empty for `stronger-ts` and `stronger-cs`; refused on an
 `equal` row — ledger 1.1; **a `deliberately-absent` row carries NO matrix reason — its reason lives in the inventory,
 § 3.3 and § 11, the one home** — § 17, O2), and the exception whitelist of § 2 (`stronger-*` only for the ids the test
-lists, today `['P4','G2']`; any other such row fails — § 16, § 17). **Equality is checkable, not asserted**
+lists, today `['P4']` — G2 is `equal` since the epoch 3 re-review; any other such row fails — § 16, § 17). **Equality is checkable, not asserted**
 (§ 16): every `equal` row records, PER SIDE, `selectors` (`paths`, `path_tasks`, `tasks`), `mood` (`MUST`/`SHOULD`),
-`enforcement` (`prose`, `test`, `check`, `hook`), `consequence` (what fails) and `suppression` (the policy of § 3.4); one
-test compares the two sides' fields and fails on any mismatch, and a second test checks the recorded fields against the
+`enforcement` (`prose`, `test`, `check`, `hook`), `consequence` (what fails) and `suppression` (the policy of § 3.4).
+**The sides are compared by NORMALISED selection behaviour, never by literal selector fields** (§ 17, consult
+`e1c58f6d`): `.cs` and `.ts` globs necessarily differ, so the test maps each side's selectors through the correspondence
+table — C# source globs (`**/*.cs`, `**/*.razor`) ↔ TypeScript source globs (`**/*.ts,tsx,mts,cts,js,mjs,cjs`);
+`**/*.csproj` ↔ `**/package.json` (the project manifests); the C# project configuration (`Directory.Build.props`,
+`Directory.Packages.props`, `NuGet.Config`) ↔ the TypeScript compiler configuration (`tsconfig*.json`, `.npmrc`), a
+kind of its own whose requirements are stated per counterpart — and then asks the catalog which REPRESENTATIVE scopes
+(§ 4.1's matrix: source file, manifest, configuration, each under the nine tasks) select each side; two sides are equal
+in (a) when the selected-scope sets correspond row for row under the table and the gates agree. One test compares that
+normalised behaviour plus the `mood`, `enforcement`, `consequence` and `suppression` fields and fails on any mismatch,
+and a second test checks the recorded fields against the
 world — the selectors against the rule's actual front matter, the mood against the **nearest ancestor heading that
 carries a marker** — the section's own heading, else its parent's, up to the H1, so `MANDATORY` is inherited (§ 17,
 O6: `common/reliability.md`'s H1 carries it and its `### A timeout is not a cancellation` section, P13's C# side, does
@@ -381,10 +390,28 @@ manifest's count, never a hand-typed number. A dated audit sentence that shares 
 and 2) is **evidence inside the invariant and stays** (the D6 kind), with the Node form added beside it; only whole
 bullets, subsections and fenced blocks move.
 
-| From (lines at `f46982f`, bytes by `Buffer.byteLength`) | To | Gate (= the source's `tasks`; a NEW gated file with no source rule declares its gate in `research/selection-matrix.json` with a reason — § 17, O3) |
+**A mixed-content line is split by whitespace only, before anything is recorded** (§ 17, consult `e1c58f6d` turn 2):
+where one line or paragraph holds a sentence that moves and a sentence that stays, E1.S0b inserts a line break or a
+blank line between them in the SOURCE — nothing else — in its own commit next to the anonymisation, before E1.S4
+records any hash. The check that it is no shortening (D1): the file with all whitespace removed is byte-identical
+before and after. Two such splits today: `common/testing.md:33` ("Everything below applies everywhere." goes on its
+own line) and `csharp/nuget-packages.md:41-43` (the .NET-only sentence "Monthly, to the latest **stable** — never a
+preview; the family is strictly .NET 10." becomes its own paragraph). The ranges are then whole lines, recorded at
+E1.S4's commit in the post-split numbering, and the original words stay in place on whichever side they belong.
+
+**Gates follow the REQUIREMENT'S PROVENANCE, not the file's age** (§ 17, O3 revised by consult `e1c58f6d`): a gate
+MIRRORS when the requirement's text comes from an existing rule — its `path_tasks` equals that source's `tasks:` line,
+and a source with no `tasks:` (a path-only rule such as `typescript/doctrine.md`) mirrors as "no gate". A gate is
+DECLARED only when the requirement is new, or when its applicability is changed on purpose; the declaration in
+`research/selection-matrix.json` (`gates: { "<id>": { path_tasks, reason } }`) carries the reason, and a change of
+applicability is approved explicitly in this plan (§ 4.4 names the four). Independently of any declaration, the same
+file pins POSITIVE and NEGATIVE selection cases per gated rule (scope → selected / not selected), so that editing both
+the declaration and the front matter cannot make a wrong gate pass.
+
+| From (lines at `f46982f`, bytes by `Buffer.byteLength`) | To | Gate (mirrors the source's `tasks:`; a declared gate says so and names its reason in `selection-matrix.json`) |
 |---|---|---|
 | `common/testing.md:12-31` (1,113 B — re-measured after PR #94 comment 5; the first revision listed `:12-34`, 1,267 B, which included the Rust sentence), `:354-358` (252 B) | `csharp/testing.md` (paths `**/*.cs`, `**/*.csproj`) | implement, test, audit, policy, release |
-| `common/testing.md:32-33` up to ".NET-specific." — the Rust sentence, 115 B; the 37 B that follow, "Everything below applies everywhere.", are the invariant and stay | `rust/testing.md` (paths `**/*.rs`, `**/Cargo.toml`) | the same |
+| `common/testing.md:32-33` AFTER E1.S0b's whitespace split — the two whole lines of the Rust sentence (116 B with their line ends; 153 B today for the unsplit `:32-33`); "Everything below applies everywhere." stays on its own new line `:34` as the invariant — **superseded:** "up to '.NET-specific.' (115 B)", a mid-line range the whole-line recorder refuses | `rust/testing.md` (paths `**/*.rs`, `**/Cargo.toml`) | the same |
 | `common/reliability.md:104-133` (1,698 B, the OCE/TCE subsection); the whole bullets `:49-54` (433 B, `CreateAsyncScope`/`BackgroundServiceExceptionBehavior`), `:55-59` (436 B, `Task.Run`/`TaskScheduler.UnobservedTaskException`), `:66-69` (375 B, `ExecuteAsync`), `:97-98` (160 B, `CancellationToken`), `:99-102` (322 B, `PosixSignalRegistration`/`Console.CancelKeyPress`) — **superseded (2.4):** "the sentences of `:47-70` and `:95-103` … (≈ 1,100 B)" and "`:38-46`'s .NET launcher sentence", which were not ranges; `:38-46`, `:60-62` and `:63-65` stay whole (neutral invariants with dated evidence) and the common section keeps its heading, the remaining bullets, one neutral sentence per moved bullet and the pointer | `csharp/lifecycle.md` (paths `**/*.cs`) | implement, audit, test, deploy, benchmark |
 | `common/logging-serilog.md:61-90` (1,640 B), `:153-171` (497 B) | `csharp/logging.md` (paths `**/*.cs`, `**/Program.cs`) | logging, implement, audit |
 | `common/logging-serilog.md:172-187` (875 B) | `rust/logging.md` (paths `**/*.rs`, `**/main.rs`) | the same |
@@ -392,7 +419,7 @@ bullets, subsections and fenced blocks move.
 | `common/utc-timestamps.md:65-69` (219 B) | `rust/utc-timestamps.md` | the same |
 | `typescript/doctrine.md:15-48` (2,042 B) + its DoD box | `typescript/boundaries.md` (paths `**/*.ts,tsx,mts,cts,js,mjs,cjs`) | implement, test, audit, ui, http |
 | `typescript/doctrine.md:49-65` (755 B, § 2 — its guard is a test, § 16 point 6), `:66-79` (932 B), `:80-97` (1,151 B) + their DoD boxes | `typescript/testing.md` (paths as above) | implement, test, audit, policy, release |
-| `csharp/nuget-packages.md:12-23` (824 B), `:25-37` (760 B), `:39-43` (286 B — the `## Bumping` heading and its paragraph, split at the fence boundary: the `powershell` fence `:45-48` (153 B) with the two `dotnet`/`Invoke-RestMethod` lines STAYS in the NuGet rule under a new heading `## Bumping — the NuGet commands`, so both files keep their fences balanced — § 17, O5), `:50-54` (286 B — O9: 287 B counted the blank `:55`) — four ranges, four manifest entries | `common/dependencies.md` (tasks `dependencies`) | — |
+| `csharp/nuget-packages.md:12-23` (824 B, *Before adding any package*); `:25-29` (334 B, the *Licence before version* heading and its "in any ecosystem" paragraph) — **`:31-37` (425 B, the two family-wide NuGet decisions: FluentAssertions 7.2.2, the Aspire pair) STAYS in the NuGet rule**, they are NuGet facts (§ 17, consult `e1c58f6d`; the earlier "`:25-37` (760 B)" is superseded); after E1.S0b's split of `:41-43`, the `## Bumping` heading `:39` and the neutral cadence paragraph ("Bump the whole set together … not a silent downgrade.") move, while the .NET-only sentence ("Monthly … strictly .NET 10.") stays in the NuGet rule under a new heading `## Bumping — the NuGet cadence and commands` together with the `powershell` fence `:45-48` (153 B), so both files keep their fences balanced and every word stays where it belongs (bytes recorded at E1.S4 in the post-split numbering; today `:39-43` is 286 B); `:50-54` (286 B — O9: 287 B counted the blank `:55`, *Prefer nothing*) — the count of entries is the manifest's | `common/dependencies.md` (tasks `dependencies`) | — |
 
 Each source keeps its neutral invariant (already present as the section's opening sentences in every case above) and
 gains one pointer line ("the .NET mechanics: `csharp/lifecycle.md`; Node: `typescript/lifecycle.md`"). Nothing is
@@ -473,12 +500,16 @@ for the C# doctrine lives in `csharp/definition-of-done.md` (id `csharp.definiti
 whose completion a checklist is read, never `gpu`, `ui`, `storage` or `inspect`. Its TypeScript mirror is
 `typescript/definition-of-done.md` with the same gate, holding the design section's checklist (§ 0), so the two boxes
 have the same scope kind (equal strength (a)); the doctrine's § 2 box moves with § 2 to `typescript/testing.md` (O10).
-`csharp/doctrine.md` therefore grows by the `Nullable enable` line only (≈ 20 B). **These two files, and the two
-`boundaries` files, have no source rule whose `tasks:` line a gate could mirror; each declares its gate in
-`research/selection-matrix.json` (`gates: { "<id>": { path_tasks, reason } }`) and the gate test checks the front matter
-against that declaration instead** (§ 17, O3 — ledger 2.2): the Definition-of-Done pair declares `implement, test,
-audit, release, policy` ("a checklist is read at task completion"), the boundaries pair `implement, test, audit, ui,
-http` ("output reaches a page or a wire on these tasks; `ui` because the webview trap is a `ui` trap").
+`csharp/doctrine.md` therefore grows by the `Nullable enable` line only (≈ 20 B). **The four gated files whose gates
+are DECLARED rather than mirrored, by provenance** (§ 4.3; § 17, O3 as revised by consult `e1c58f6d` — ledger 2.2):
+the Definition-of-Done pair holds NEW requirements (no source rule) and declares `implement, test, audit, release,
+policy` ("a checklist is read at task completion"); `typescript/boundaries.md` inherits existing doctrine text whose
+source has no `tasks:` (it loads on every `.ts` today), so its mirror would be "no gate" — **this plan changes its
+applicability on purpose** to `implement, test, audit, ui, http` ("output reaches a page or a wire on these tasks; `ui`
+because the webview trap is a `ui` trap"), approved here as the explicit exception the provenance rule requires, with
+the reason recorded in the declaration; `csharp/boundaries.md` holds a new requirement (R1's C# side) and declares the
+same gate. Every other gated file mirrors its source's `tasks:` line. All four, and every mirrored file, carry positive
+and negative selection cases in `research/selection-matrix.json`.
 
 **Placeholder files created by a move carry valid front matter from their first commit** (plan round 1, finding 2):
 `typescript/boundaries.md` and `typescript/testing.md` are created by E4.S2 with `id`, `load`, `paths`,
@@ -508,12 +539,19 @@ came from trimming, and trimming is forbidden; the anonymisation survives as a c
 ### 4.5 The dependency rules (D14) — unchanged in substance from the first revision
 
 **`common/dependencies.md`** — id `common.dependencies`, `tasks: ["dependencies"]`, no `paths`, no `depends`. Holds,
-moved verbatim from `csharp/nuget-packages.md` (§ 4.3's last row): *Before adding any package* (the table; "nuget.org"
-stays in the moved sentence and the rule adds "or the ecosystem's registry" beside it rather than editing it), *Licence
-before version*, *Bumping* (the `dotnet`/`Invoke-RestMethod` lines stay in the NuGet rule), *Prefer nothing*; plus the
-vulnerability scan (§ 3.3) and the lock/pin asymmetry sentence. Target ≤ 4,000 B; `dependencies` is a split-read task.
+moved verbatim from `csharp/nuget-packages.md` (§ 4.3's last row, as settled by the epoch 3 re-review): *Before adding
+any package* (the table; "nuget.org" stays in the moved sentence and the rule adds "or the ecosystem's registry" beside
+it rather than editing it), the *Licence before version* heading and its "in any ecosystem" paragraph (`:25-29`), the
+*Bumping* heading and its neutral cadence paragraph (after E1.S0b's split), *Prefer nothing*; plus the vulnerability scan
+(§ 3.3) and **the lock-file requirement for both ecosystems (G2, § 3.3): a committed lock and a locked restore in CI,
+with each ecosystem's mechanism named in its own rule**. **Superseded (consult `e1c58f6d`):** the first revision's
+"the lock/pin asymmetry sentence" — there is no asymmetry to state once G2 is `equal`. Target ≤ 4,000 B; `dependencies`
+is a split-read task.
 
-**`csharp/nuget-packages.md`** loses `tasks: ["dependencies"]` and the moved blocks, keeps central pins, the two
+**`csharp/nuget-packages.md`** loses `tasks: ["dependencies"]` and the moved blocks, **gains the .NET lock-file
+mechanics (G2 option A): `RestorePackagesWithLockFile=true` in `Directory.Build.props`, `packages.lock.json` committed
+per project, `RestoreLockedMode=true` when `CI` is set (or `dotnet restore --locked-mode`), `--force-evaluate` as the
+only way to move a lock — with the observed `NU1004` fixture of § 3.3**, keeps central pins, the two
 family-wide decisions (FluentAssertions 7.2.2, the Aspire pair — the coupled-version exceptions D14 names), the two
 `dotnet` commands and the zero-reference box, and gains the pointer. Expected ≈ 1,000 B (from 3,081).
 
@@ -650,6 +688,7 @@ E5 and E6 gated rules: no single-read cap, each measured and recorded; `typescri
 | **The record per benchmark arm (D13):** the conventions sha; the selected rule ids and hashes per stack for the arm's scopes (`explain` output, kept); the toolchain versions (compiler, parser, lint, Node, SDK); the effective checks that ran (the composite gate's commands and exit codes) | this plan provides the `explain` and check commands and their expected shape (§ 10); the other plan runs and records them per session | its T14 says "the bytes read per session are in the record" — this adds ids, hashes and checks, because equal source ownership does not prove equal instructions reached the agents |
 | The record of rule bytes actually read per session (its T14) | the other plan | this plan records the bytes per scope (§ 5) so the two numbers can be compared |
 | The consumers' bump pull requests and the dry run | this plan (E7) | none — a consumer change the experiment does not see |
+| **The C# task workspaces are prepared and LOCKED before measurement** (G2 option A, § 3.3): `packages.lock.json` generated and committed in every `csharp/<task>/` workspace at the pinned task-repository sha, `RestorePackagesWithLockFile` and `RestoreLockedMode` in place, so a C# agent inherits a locked restore exactly as a TypeScript agent inherits `package-lock.json` and `npm ci` — neither pays a migration during a measured session | the other plan's E1 (the task repository's workspaces), using the rule this plan ships | this plan names the requirement and the fixture; the other plan's pre-registration records both locks' hashes beside the package-set hashes |
 
 Order: this plan first; its release is a precondition of the other plan's pre-registration (its D23). Disjoint: nothing
 here touches the harness, the tasks or the task repository; nothing there edits a rule. The other plan was read on branch
@@ -685,7 +724,7 @@ No process, table or cache is created.
 | T8 | **The release reaches every consumer in `research/consumers.json` at once** (eight today, from the README) and reddens every open pull request's `pin-check`; a consumer's CI fails on the new check | E7 dry-runs the check and the rule set against the TypeScript and .NET consumers first (D13) and records what would fail; announces; promotes once; bumps the pinned-by repository last ([README.md](../README.md) § *Bumping a pin*) |
 | T9 | **A product name slips into a shared rule** (the TypeScript consumers' names, "the extension", "the vault") — or the anonymisation and a move land in one commit, leaving the byte-equality test nothing to compare against | `node tools/ownership-check.mjs` is armed; the anonymisation is a separate, documented commit in the SOURCE file first (`rule-bodies.mjs --update`), listed as wording with no lesson removed, and the move follows byte for byte (§ 4.3, § 4.4, E4.S2) |
 | T10 | **A move loses a caveat.** A block moved "verbatim" by hand drops a sentence, or a neutral sentence goes with it and the common rule loses its invariant | the byte-equality test of E1.S4 on every moved block; the common rule's remaining section is read as an instruction from someone who has not seen the long one ([knowledge-base.md](../common/knowledge-base.md)) |
-| T11 | **The resolver change (D3) is read as a loophole** — a rule gated to avoid a budget rather than to match its source's tasks | a gate that MIRRORS a source rule equals that rule's `tasks:` line, asserted by the test; a gated file that is NEW (no source rule: the two `definition-of-done` files, the two `boundaries` files) declares its gate in `research/selection-matrix.json` with a reason, and the test checks the front matter against that declaration — an undeclared or unreasoned gate is red (§ 17, O3 — ledger 2.2; the first wording, "every gate equals its source", could not hold for a file with no source); `module_rules.md` states both legitimate uses |
+| T11 | **The resolver change (D3) is read as a loophole** — a rule gated to avoid a budget rather than to match its source's tasks | gates follow the requirement's PROVENANCE (§ 4.3): a gate that MIRRORS existing rule text equals that source's `tasks:` line, asserted by the test; a gate is DECLARED only for a new requirement or an applicability changed on purpose and approved in this plan (the two `definition-of-done` files, the two `boundaries` files — § 4.4 names which is which), with a reason in `research/selection-matrix.json`; and every gated rule has positive and negative selection cases pinned there, so editing the declaration and the front matter together cannot make a wrong gate pass — an undeclared, unreasoned or case-less gate is red (§ 17, O3 — ledger 2.2; the first wording, "every gate equals its source", could not hold for a file with no source, and "new file" as the criterion was wrong too: `typescript/boundaries.md` inherits doctrine text); `module_rules.md` states both legitimate uses |
 | T12 | **Equal source ownership is mistaken for equal instructions reaching the agents** | D13's per-arm record: ids, hashes, toolchain versions, effective checks |
 
 ## 9. Build order
@@ -719,11 +758,21 @@ the lifecycle as the three cornerstones.
   suppression INVALID ones among them), the moved-blocks manifest test (a `planned` entry: schema and source bytes only;
   an activated entry: destination bytes against `sha256` and `length`; no git history read), the
   `consumers.json` ↔ `README.md` § *Consumers* equality test, the `stronger-*` whitelist rule of the matrix test (an id
-  outside `['P4','G2']` with that status fails, with or without a reason), the `planned`-needs-an-owning-epic rule, the two
+  outside `['P4']` with that status fails, with or without a reason), the `planned`-needs-an-owning-epic rule, the two
   equality tests of § 4.1 (the two sides' recorded `selectors`/`mood`/`enforcement`/`consequence`/`suppression` must
   match; the recorded fields must match the rule's real front matter, its heading's mood and the check tool's exported
   rule list), the `selection-matrix.json` regeneration test, and — at every story — the catalog loads with every
   placeholder file's front matter valid.
+- **One concrete fixture per contract, green before E2's stories begin** (E1's Done-when; § 17, consult `e1c58f6d`),
+  so the next stories writer does not stop the plan again: selection — one positive and one negative case per gated
+  rule (scope → selected / not selected); equality normalisation — one `equal` pair that passes through the
+  correspondence table and one deliberate mismatch that fails; heading inheritance — a section marked only by its H1
+  (`common/reliability.md`'s `### A timeout…`) read as MANDATORY, and a section with no marker anywhere above it read as
+  SHOULD; moves — one exact whole-line range entry, one fence-balanced case (a block that would split a fence is
+  refused), one mid-line case (refused by the whole-line recorder, with E1.S0b's whitespace split as the remedy);
+  G2's enforcement — a NuGet fixture whose `packages.lock.json` is stale against its declaration fails
+  `dotnet restore --locked-mode` with `NU1004` and passes after `--force-evaluate` (observed, § 3.3), and an npm fixture
+  whose lock does not satisfy `package.json` fails `npm ci` with `EUSAGE` (observed, § 4.3).
 - `node tools/rule-bodies.mjs` in step.
 - `node tools/ownership-check.mjs` passes with no baseline file.
 - `node tools/plan-lifecycle.mjs` clean.
@@ -746,12 +795,15 @@ the lifecycle as the three cornerstones.
       `research/parity-matrix.json` carries the same rows, **no row is `planned`**, and its test is green.
 - [ ] **The accepted `stronger-*` exceptions are exactly these**, and the permission is bounded to the rows reviewed
       and listed here: **P4** (`stronger-ts` — complexity ≤ 4 is lint-enforced in TypeScript and prose in C#, because a
-      C# analyzer package is a dependency decision for every .NET consumer, Q7) and **G2** (`stronger-ts` — npm needs
-      `package-lock.json` because it resolves to the highest satisfying version and the lock carries integrity hashes,
-      while NuGet resolves to the lowest applicable version so exact central pins already fix the graph; a required .NET
-      locked restore would add a non-idiomatic per-project failure mode — ledger 2.1, for the owner to confirm
-      2026-11-01). The matrix test holds the same list (`['P4','G2']`) and fails any other row with that status; any
-      other `stronger-*` row is a plan change, not an exception.
+      C# analyzer package is a dependency decision for every .NET consumer, Q7). **G2 is `equal`** (the epoch 3
+      re-review reversed ledger 2.1's whitelisting: .NET consumers commit `packages.lock.json` and restore in locked
+      mode, for the owner to confirm 2026-11-01). The matrix test holds the same list (`['P4']`) and fails any other
+      row with that status; any other `stronger-*` row is a plan change, not an exception.
+- [ ] G2 delivered on both sides: every .NET-bearing consumer has `RestorePackagesWithLockFile`, a committed
+      `packages.lock.json` per project and a locked-mode restore in CI; every TypeScript-bearing consumer has its
+      committed `package-lock.json` and `npm ci`; both enforcement fixtures of § 10 are green.
+- [ ] The fixtures of § 10 (selection, equality normalisation, heading inheritance, the three move cases, the two lock
+      fixtures) were green before E2's stories document was written.
 - [ ] Every `equal` row records both sides' `selectors`, `mood`, `enforcement`, `consequence` and `suppression`; the
       side-to-side test and the fields-versus-reality test (front matter, heading mood, the check tool's rule list) are
       green.
@@ -765,8 +817,10 @@ the lifecycle as the three cornerstones.
 - [ ] Every Node sentence in a rule has a line in `research/2026-10-31_node_behaviour_probes.md` (a run with its output)
       or a cited document with its read date.
 - [ ] The resolver's `path_tasks` key exists, is tested, documented in `research/module_rules.md` and `ENTRY.md` step 7,
-      and every gated rule's gate equals its source rule's `tasks:` line — or, for a new gated file with no source
-      rule, equals the gate declared with a reason in `research/selection-matrix.json` (both asserted, § 17 O3).
+      and every gated rule's gate mirrors its requirement's source `tasks:` line — or, where the requirement is new or
+      its applicability was changed on purpose in this plan, equals the gate declared with a reason in
+      `research/selection-matrix.json` — and every gated rule has its positive and negative selection cases pinned
+      there (all asserted, § 17 O3).
 - [ ] The language-scoped rules of § 4.3 exist with the metadata of § 4; `csharp/nuget-packages.md` has no `tasks`; the
       selectors of § 4.4–4.5 are in place and the per-scope id lists are tested.
 - [ ] The always core ≤ 16,384 B with its additions ≤ 300 B; every scope in the exact twenty-two-scope single-read list
@@ -804,12 +858,14 @@ the lifecycle as the three cornerstones.
 
 Not settled here; the owner or the named epic decides. No answer is invented.
 
-- **Q1 .NET lock files — closed 2026-10-31, decided under owner absence, for the owner to confirm 2026-11-01** (ledger
-  2.1, § 3.3 G2): .NET stays at exact central pins and G2 is whitelisted as `stronger-ts`, because NuGet resolves
-  transitives to the lowest applicable version (the pins already fix the graph) while npm resolves to the highest
-  satisfying version (so it needs the lock, which also carries integrity hashes); a required locked restore would add a
-  non-idiomatic per-project failure mode for C# agents. The question as first asked: *raise .NET to `packages.lock.json`
-  + `dotnet restore --locked-mode` (a change in six consumers), or record the asymmetry?*
+- **Q1 .NET lock files — decided A under owner absence, for the owner to confirm 2026-11-01** (§ 3.3 G2, § 17): .NET
+  is raised to `packages.lock.json` + a locked-mode restore (`RestorePackagesWithLockFile`, `RestoreLockedMode`/
+  `--locked-mode`), G2 is `equal`, the whitelist stays `['P4']`. **History:** ledger 2.1 first closed Q1 the other way
+  (G2 whitelisted `stronger-ts`, "NuGet's lowest-applicable resolution already makes the graph deterministic"); the
+  epoch 3 re-review (consult `e1c58f6d`) refuted that — resolution changes when a missing version is published later
+  or a package is unlisted, Microsoft documents lock files for repeatable restores — and found that admitting G2 as an
+  exception against epoch 2's explicit "only P4" would itself be a narrowing. The question as first asked: *raise .NET
+  to `packages.lock.json` + `dotnet restore --locked-mode` (a change in six consumers), or record the asymmetry?*
 - **Q2 The TypeScript toolchain (D7).** TypeScript 6.0.x with full type-aware lint (the tested combination the rule
   states), or TypeScript 7 without type-aware lint until typescript-eslint supports it — and if the latter, what stands in
   for `no-floating-promises` and the complexity rule meanwhile?
@@ -946,11 +1002,11 @@ the owner to confirm on 2026-11-01.
 
 | # | Open point | Decision (where) |
 |---|---|---|
-| O1 (2.1) | G2 had no admissible status | G2 is whitelisted `stronger-ts` with the NuGet-lowest / npm-highest reason and the integrity-hash fact; Q1 closed under owner absence (§ 2, § 3.3, § 11, Q1) |
+| O1 (2.1) | G2 had no admissible status | **Revised in this re-review (consult `e1c58f6d`): option A.** Ledger 2.1 had whitelisted G2 as `stronger-ts` on "NuGet's lowest-applicable resolution already makes the graph deterministic"; the consultant refuted it — the resolution changes when a missing version is published later or a package is unlisted, and Microsoft documents lock files for repeatable restores — and admitting G2 against epoch 2's explicit "only P4" would have been a narrowing. So .NET consumers commit `packages.lock.json` (`RestorePackagesWithLockFile`) and CI restores in locked mode; G2 is `equal`; the whitelist stays `['P4']`; the enforcement was observed (`NU1004` on a stale lock, pass after `--force-evaluate`); the benchmark's C# workspaces are locked before measurement (§ 6). 2.1's text stays in the ledger as history. Q1 reads "decided A under owner absence, for the owner to confirm 2026-11-01" (§ 2, § 3.3, § 4.5, § 6, § 10, § 11, Q1, E2, E7) |
 | O2 (not an entry) | § 4.1 still required a matrix `reason` for `deliberately-absent` | § 3.3/§ 11 win: a `deliberately-absent` row carries no matrix reason; the inventory holds it (§ 4.1) |
-| O3 (2.2, the stop) | T11 cannot hold for four planned gated files with no source rule | T11 applies to gates that MIRROR a source rule; a NEW gated file declares its gate in `research/selection-matrix.json` with a reason, and the test checks the front matter against the declaration; the four files and their declared gates are named (§ 4.3 header, § 4.4, T11, § 11, E1.S5) |
+| O3 (2.2, the stop) | T11 cannot hold for four planned gated files with no source rule | Gates by the requirement's PROVENANCE, not the file's age (consult `e1c58f6d`): a gate MIRRORS when the text comes from an existing rule (its `path_tasks` = the source's `tasks:`; a path-only source mirrors as no gate); a gate is DECLARED only for a new requirement or an applicability changed on purpose and approved in the plan, with a reason — `typescript/boundaries.md` inherits doctrine text, so its gate is the approved applicability change, not a "new file"; positive and negative selection cases are pinned per gated rule independently of the declaration (§ 4.3, § 4.4, T11, § 10, § 11, E1.S5) |
 | O4 (2.3) | The doctrine rows cannot be `equal` while one doctrine selects a project file and the other does not | "The same kind of scope" is defined as the stack's source files plus its project manifest; `typescript/doctrine.md` gains `**/package.json` (its `package.json` scopes are split reads already, so no budget moves); `tsconfig*.json` stays a kind of its own because adding it would break three pins (§ 2, § 4.4) |
-| O5 (2.4) | Four moves were not exact ranges; a NuGet split would unbalance a fence | A move is a list of exact whole-line ranges, each its own manifest entry; reliability moves the whole bullets `:49-54`, `:55-59`, `:66-69`, `:97-98`, `:99-102` (and `:104-133`), utc the whole fenced block `:41-47`, NuGet `:39-43` with the `powershell` fence `:45-48` staying under a new heading; dated audit sentences inside neutral paragraphs stay (the D6 kind); every count of moves is the manifest's (§ 4.3, E1.S4, E2, E4) |
+| O5 (2.4) | Four moves were not exact ranges; a NuGet split would unbalance a fence | A move is a list of exact whole-line ranges, each its own manifest entry; reliability moves the whole bullets `:49-54`, `:55-59`, `:66-69`, `:97-98`, `:99-102` (and `:104-133`), utc the whole fenced block `:41-47`; dated audit sentences inside neutral paragraphs stay (the D6 kind); every count of moves is the manifest's. **Refined by consult `e1c58f6d` turn 2:** a mixed-content line is split by WHITESPACE ONLY in E1.S0b (the no-shortening check: the text with all whitespace removed is identical before and after), so `common/testing.md:33`'s "Everything below applies everywhere." and `csharp/nuget-packages.md:41-43`'s .NET-only cadence sentence each get their own line/paragraph and whole-line ranges follow, with every original word staying in place — this replaces "add a new neutral sentence". The NuGet contract settled: `:25-29` (licence, "in any ecosystem") moves, `:31-37` (the FluentAssertions and Aspire decisions — NuGet facts) stays, the `## Bumping` heading and its neutral paragraph move, the .NET sentence and the `powershell` fence `:45-48` stay under a new heading (§ 4.3, § 4.5, E1.S0b, E1.S4, E2, E4) |
 | O6 (2.5) | `MANDATORY` on the section heading only, or inherited | Inherited from the nearest ancestor heading that carries a marker, the H1 included; the fields-against-reality test reads it so (§ 4.1) |
 | O7 (2.6) | No exact single-read list | § 5 names the list: twenty-two pins with their bytes — the eight kept from today, `tsconfig.json` and `.npmrc` under each single-read task, and the six fitting scopes the stories found unpinned (`Directory.Build.props` ×4, `inspect --file src/a.mjs`, `inspect --file src/webview/page.ts`), pinned now; every other fitting scope is named with the reason it is not a baseline guarantee (§ 5, § 10, § 11, E1.S5) |
 | O8 (not an entry) | Two names the anonymisation list missed | E1.S0's list gains `:37` "a synced vault" → "a synced credential store" and `:39` `scriptInterpolation.test.ts` → "the scan test" (E1) |
@@ -1023,9 +1079,13 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   `rule-bodies.mjs --update typescript.doctrine`, listed as wording with no lesson removed, BEFORE S4 records a hash
   (§ 16, finding 3); the list is the three file names, "a real vault", **and the two the first list missed** (§ 17,
   O8): `:37` "a **synced** vault" → "a **synced** credential store", `:39` `scriptInterpolation.test.ts` → "the
-  scan test" · S1 the gate key: semantics, errors, `reasons`, tests · S2 the selection/budget matrix of § 4.1
+  scan test" · **S0b the whitespace-only splits** (§ 4.3): a line break before "Everything below applies everywhere."
+  in `common/testing.md:33` and a paragraph break after the .NET-only cadence sentence in `csharp/nuget-packages.md:41-43`,
+  its own commit, `rule-bodies.mjs --update common.testing csharp.nuget-packages`, with the D1 check in the commit
+  message (the two files with all whitespace removed are byte-identical before and after), BEFORE S4 records a hash ·
+  S1 the gate key: semantics, errors, `reasons`, tests · S2 the selection/budget matrix of § 4.1
   measured and recorded, with the per-scope id-list tests · S3 `parity-matrix.json` with every P/R row and its test
-  against the catalog and the recorded sections — the `stronger-*` whitelist `['P4','G2']` (any other such row fails, reason
+  against the catalog and the recorded sections — the `stronger-*` whitelist `['P4']` (any other such row fails, reason
   or not), the per-side `selectors`/`mood`/`enforcement`/`consequence`/`suppression` fields on every `equal` row with
   the side-to-side test and the fields-versus-reality test (front matter, heading mood, the check tool's exported rule
   list; § 16, findings 2 and 5) — and `parity-inventory.json` with the one-to-one test (an orphan on either side is
@@ -1040,29 +1100,41 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   and a `fetch-depth: 0` is not adopted** (§ 16, stories-writer point 1); the recording happens AFTER S0, so the `typescript/doctrine.md`
   § 1 entry hashes the anonymised text and a move folded into a wording change is a red test; the entries are the EXACT
   ranges of § 4.3 (every one whole lines, fences unsplit — reliability `:104-133`, `:49-54`, `:55-59`, `:66-69`,
-  `:97-98`, `:99-102`; utc `:41-47`, `:65-69`; testing `:12-31`, `:354-358`, `:32-33` to ".NET-specific."; logging
-  `:61-90`, `:153-171`, `:172-187`; the doctrine's `:15-48`, `:49-65`, `:66-79`, `:80-97` and their DoD boxes; NuGet
-  `:12-23`, `:25-37`, `:39-43`, `:50-54`), one entry each, recorded at this story's commit (O11) · S5 the byte allowances
+  `:97-98`, `:99-102`; utc `:41-47`, `:65-69`; testing `:12-31`, `:354-358`, and the Rust sentence's two whole lines
+  after S0b's split; logging `:61-90`, `:153-171`, `:172-187`; the doctrine's `:15-48`, `:49-65`, `:66-79`, `:80-97` and
+  their DoD boxes; NuGet `:12-23`, `:25-29`, the `## Bumping` heading and its neutral paragraph after S0b's split,
+  `:50-54`), one entry each, recorded at this story's commit in the post-split numbering (O11); the recorder REFUSES a
+  range that is not whole lines or that would split a code fence, naming S0b as the remedy; and the gate declarations
+  with their positive and negative selection cases go into `selection-matrix.json` · S5 the byte allowances
   of § 5 written into `module_rules.md` and the exact twenty-two-scope single-read list of § 5 (with `gpu --file
   src/x.cs` on it), plus the declared gates of the four new gated files in `selection-matrix.json` (O3).
 - **Depends on:** nothing. **Done when:** `npm test` green with the new tests; the matrix test is red when an ACTIVATED
   row names a missing id or section, and when a `planned` row names no owning epic (both observed, then fixed); every
   `planned` row and move entry passes its structural check with its source bytes recorded; every tight scope's headroom
-  is in `module_rules.md`; one pull request through both gates.
+  is in `module_rules.md`; **the fixtures of § 10 are green — selection (one positive, one negative case per gated
+  rule), equality normalisation (one `equal` pair through the correspondence table, one mismatch that fails), heading
+  inheritance (MANDATORY from an ancestor H1; a section with none), the three move cases (an exact range, a
+  fence-balanced refusal, a mid-line refusal), and the two lock fixtures (`NU1004`, `EUSAGE`)** — before E2's stories
+  document is written; one pull request through both gates.
 
 ### E2 — Dependency policy (parallel after E1)
 
 - **Goal:** P9 and § 3.3's dependency rows; D14.
-- **Scope:** `common/dependencies.md` (new), `csharp/nuget-packages.md` (blocks moved out, paths only),
-  `typescript/npm-packages.md` (new), the manifest, the selection tests.
-- **Stories:** S1 the shared rule (moved blocks verbatim; the scan and the lock sentence added) · S2 the NuGet rule after
-  the move, with the pointer and the coupled-version exceptions kept · S3 the npm rule: declared range, lock resolution,
-  reproducible install, each with its probe line · S4 selection tests, manifest entries, the `inspect --file src/x.csproj`
-  measurement.
+- **Scope:** `common/dependencies.md` (new), `csharp/nuget-packages.md` (blocks moved out, paths only; **the .NET
+  lock-file mechanics added — G2 option A**), `typescript/npm-packages.md` (new), the manifest, the selection tests, the
+  two lock-enforcement fixtures.
+- **Stories:** S1 the shared rule (moved blocks verbatim; the scan and the both-sides lock requirement added) · S2 the
+  NuGet rule after the move, with the pointer, the coupled-version exceptions kept (`:31-37` never moves), the .NET
+  sentence and the `powershell` fence under their new heading, and the lock mechanics (`RestorePackagesWithLockFile`,
+  `packages.lock.json` committed, `RestoreLockedMode` under `CI`, `--force-evaluate` to move a lock) with the
+  **observed fixture**: a stale lock fails `dotnet restore --locked-mode` with `NU1004`, passes after `--force-evaluate`
+  (§ 3.3) · S3 the npm rule: declared range, lock resolution, reproducible install, each with its probe line, the
+  `EUSAGE` fixture among them · S4 selection tests, manifest entries, the `inspect --file src/x.csproj` measurement.
 - **Depends on:** E1. **Done when:** `dependencies --file package.json` selects `common.dependencies` and
   `typescript.npm-packages` and not `csharp.nuget-packages`; E2's matrix rows and move entries are activated (no longer
   `planned`) and the byte-equality test passes for every move entry E2 owns against its recorded source hash — the count
-  is `moved-blocks.json`'s, four ranges today (§ 4.3), never a number typed here; one pull request through both gates.
+  is `moved-blocks.json`'s, never a number typed here; both lock fixtures are in the suite and green; one pull request
+  through both gates.
 
 ### E3 — Compiler/lint enforcement contract (cornerstone area 1)
 
@@ -1162,11 +1234,16 @@ record · E4 the two tools and the documents · E5 gates, release, bumps, the pi
   `reason`; bump pull requests (pinned-by last); the per-arm record's commands handed to the other plan; this plan's
   promotion.
 - **Stories:** S1 the dry run: the new check with `--warn` and `explain` for the representative scopes against each
-  consumer's checkout, findings recorded · S2 `mcp__coai__review_feature` over the seven epics · S3 the promotion
-  (`README.md:100-122`) and the `release-distance` read · S4 the bumps, each with `pin-check` green after its commit, the
-  `dotnet`, `typescript` and `mixed` kinds adding the `strictness-check` step in ENFORCING mode — non-zero on findings, no
-  `--warn` (R-1; § 16, finding 6 — the dry run of S1 is the only `--warn` run, and its findings are fixed or recorded
-  before the bump) · S5 the sha and the per-arm record commands handed to the
+  consumer's checkout, findings recorded; **for every .NET-bearing consumer (`dotnet` and `mixed` kinds), the NuGet
+  locks generated in the dry run (`RestorePackagesWithLockFile`, one `packages.lock.json` per project) and the
+  locked-mode restore tried, so the bump pull request carries a lock that already restores — the adoption cost (G2
+  option A) recorded per consumer: projects, lock sizes, any `NU1004` met and how it was resolved** · S2
+  `mcp__coai__review_feature` over the seven epics · S3 the promotion (`README.md:100-122`) and the `release-distance`
+  read · S4 the bumps, each with `pin-check` green after its commit, the `dotnet`, `typescript` and `mixed` kinds adding
+  the `strictness-check` step in ENFORCING mode — non-zero on findings, no `--warn` (R-1; § 16, finding 6 — the dry run
+  of S1 is the only `--warn` run, and its findings are fixed or recorded before the bump), **and the .NET-bearing kinds
+  committing their `packages.lock.json` files with `RestoreLockedMode` wired under `CI`** (G2) · S5 the sha and the
+  per-arm record commands handed to the
   experiment's E0.S3 and confirmed equal · S6 this plan promoted with deviations.
 - **Depends on:** E1–E6 merged. **Done when:** every box of § 11 is ticked.
 
