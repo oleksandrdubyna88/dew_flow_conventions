@@ -65,17 +65,16 @@ Narrowed: yes — E5's producer PR may merge with the structural guard green-by-
 | dew_flow_connect_other_ais — pin `105d53c` #936 `df375eb` (no `115bbf8` bump) | main of dew_flow_connect_other_ais | fits | kept — its doc figure is corrected on #938 |
 | dew_flow_vscode_kit — pin `105d53c` #20 `7cab547`; wsl_care — pin `105d53c` #182 `23859c4` with the `ActWindowsTests` clock fix (no `115bbf8` bump in either) | main of each | fits | kept — the `ActWindowsTests` clock fix is outside this plan |
 | dew_flow_connect_other_ais #938 — the link target resolved root-down (the doc figure found while pinning #936; the resolved-root walk E5 cites) | pushed, unmerged (open PR) | fits | kept open — work outside this plan (a security fix, no owner-form producer); merges on its own gates, the stop does not hold it |
-| dew_flow_connect_other_ais #850 — E5 stories re-split against `105d53c`, plan gate `proceed`, branch `docs/test-leftovers-e5-stories` at `2c64601a` | pushed, unmerged (open PR) | fits | kept open, unmerged until epoch 2 is approved; fix forward on its branch: cite the F16 disposition (§ *Epoch 2* item 4) in place of its open Q6 once the owner chooses |
+| dew_flow_connect_other_ais #850 — E5 stories re-split against `105d53c`, plan gate `proceed`, branch `docs/test-leftovers-e5-stories` at `2c64601a` | pushed, unmerged (open PR) | fits | kept open, unmerged until epoch 2 is approved; fix forward on its branch: cite the F16 disposition (§ *Epoch 2* item 4) (decided (b)) in place of its open Q6 |
 | dew_flow_creds_for_devs #253 — E2 stories re-split against `105d53c`, plan gate `proceed`, branch `docs/test-leftovers-e2-stories` at `f61358b` | pushed, unmerged (open PR) | fits | kept open, unmerged until epoch 2 is approved; fix forward on its branch: its delta-table row still says stage B is "ONE squash-merged pull request", against its own D8 (five); cite the F16 disposition once chosen |
 | the stop commit `b54adf6` and the ledger correction `6b74a19` (entries 1.1–1.7, state stopped) | pushed, branch `docs/rollout-stop-for-rereview` (PR #105), unmerged | fits | kept — merges before or with epoch 2's line; this branch builds on it |
   (This re-review covers ALL seven entries of epoch 1: the owner's four of 2026-10-31 (1.1–1.4), the agent's one (1.5) and
   the two reviewer entries of 2026-11-01 (1.6, 1.7). The stop belonged at 1.2 on 2026-10-31 and was recorded on 2026-11-01;
   every row above dated 2026-10-31 or later — E3 #58, E4 #64, the R7 release #101/#102 and its eight pin bumps, mcp #59, the
   coai #850 and creds #253 re-split branches — is work done after that unrecorded stop, and is sorted here, not excused.
-  The Verdict and Action columns are `—` placeholders: an Opus judge fills every row with `fits` or `cut` and the
-  action — kept, reverted in a new PR, fixed forward, dropped — as step 5 of the full stop says. Not rows: #86 and #87
+  The Verdict and Action columns were filled by an Opus judge (step 5 of the full stop; the note below). Not rows: #86 and #87
   (the plan-change-control rule, outside this plan), #99 (rule parity, outside this plan), and the re-review commit
-  itself, which is the baseline epoch 2 is approved on, never an entry. The raw-temp baseline plan has no commit yet.)
+  itself, which is the baseline epoch 2 is approved on, never an entry. The raw-temp baseline plan is outside this plan, not a row.)
   (Judged 2026-11-01 by an Opus judge against § *Epoch 2*: 23 rows fit, none is cut. The E3 and E4 merges and mcp #59 came after the unrecorded
   stop of entry 1.2; the content fits the revised plan, the timing is the breach the stop record already names. Note 1: the code and the rule
   never remove an unmarked folder; only that README sentence, left by #77 and not updated by #82, still says so. Note 2: #58 and #64 checked
@@ -281,9 +280,9 @@ tree so; and nothing a sweep or a janitor removes can be a resource a live run s
    waiver of the released rule (round 1 findings 0 and 7); consult `abcaae48` said change the shared rule first. The rule authorises a
    baseline under exact terms (E5's D6): only for sites proven to run inside an owned run folder, matched by file + content hash as a
    multiset, only shrinking, the line number a hint, a stale entry red. It is planned on branch `feat/raw-temp-baseline`
-   (`todo/PLAN_raw_temp_baseline.md`) — **no commit exists there as of this commit**; the worktree is at `2d12d8f`, clean. It must be
-   released (a third promotion), mirrored by the private sibling (its rule spans are byte-identical, R4), and pinned by coai alone.
-   Its own plan gets its own `mcp__coai__review_plan`.
+   (`todo/PLAN_raw_temp_baseline.md`): written 2026-11-01 (`9c3b62c`), its plan gate `proceed` (coai session `c42be871`, all five
+   findings accepted, `f753618`). It must be built, released (a third promotion), mirrored by the private sibling (its rule spans are
+   byte-identical, R4), and pinned by coai alone.
 2. **The owner's Windows machine has no barrier record** (R2: "not tested"; its section in `research/security/machines.md` says closed
    and private-temp-only). Both E2's D8 (c) and E5's D8 (1) make it a condition of the FIRST producer merge in that repository, and they
    are right: the barrier is per machine, and a GitHub-hosted runner is one job's VM, discarded with it (R2), so green hosted Windows
@@ -304,7 +303,7 @@ carries ownership, teardown and start-of-run collection for every resource it in
 sweep; (h) for E5 only, the `raw-temp` baseline rule is released and pinned. A sweep-only PR (E5's S2-A, E6's #125) needs (e) and (f)
 and merges alone; a pin bump needs (f) and merges alone; a drain PR (E5.S7) is not a producer and needs (e) and (f).
 
-### 4. F16 — the disposition (recorded; the choice is the OWNER's, recommendation below)
+### 4. F16 — the disposition (decided 2026-11-01: (b), on the question consultant's two answers)
 
 Owner decision 2 of R6 (both keys on Windows: the profile AND the owner SID, fail closed) is implemented by the PORTS — E3's C#
 `Scope.IsMine` (`WindowsIsMine`: the profile's final path AND the owner SID equals `WindowsIdentity.GetCurrent().User`) and E4's Rust.
@@ -324,8 +323,12 @@ The options, and what each costs:
   `whoami /user`), but each entry's owner SID is a read per resource, which the rule forbids as a child per test process; a native
   addon is a dependency decision. Cost: unmeasured; blocks E2.1 and E5's producer on a Windows run (F9) that has not happened.
 
-**Recommendation: (b)**, recorded as the disposition and carried in the baseline release; (c) when the Windows run of F9 happens;
-never (a) in silence. Whatever the owner chooses is written here as a decision line, and E2's and E5's stories cite it.
+**Decision (2026-11-01): (b)**, carried in the baseline release; (c) when the Windows run of F9 happens; never (a) in silence.
+Asked through the question consultant first (consult `3310f6ba`): both answers chose (b), and the code fact was verified (`owned.mjs`
+`isMine` returns on the profile path alone on `win32`). "Lists" means the sweep changes NOTHING on Windows — no folder or claim
+removal, no quarantine restore or reservation removal, no orphan-claim deletion, no worktree unlock, remove or prune — and reports the
+ownership as unverified; a pre-existing unverified folder never fails a test run. A Windows test of the reference keeps every kind
+unchanged. E2's and E5's stories cite this decision (fix forward on #253 and #850).
 
 ### 5. Build order (revised)
 
@@ -334,7 +337,7 @@ DONE   E1 (the contract) → the merged core → R1–R5 (release 115bbf8) → w
        the Darwin helper) → the E2 and E5 re-splits (plan gates proceed) → the stop (this re-review).
 NEXT   P1 the owner's Windows barrier record            — the owner; blocks the first producer MERGE of E2 and of E5, not their build
        P2 the raw-temp baseline rule                      — this repository (its own plan, gate, PR, release, sibling mirror); then coai's pin bump alone
-       P3 the F16 disposition                             — the owner (§ 4); if (b), one reference change riding P2's release
+       P3 the F16 disposition, decided (b) (§ 4)          — one reference change riding P2's release
        E5 stage A (S2-A, the age-only coai- sweep retired, one PR alone) ∥ E5 S5 (the bare-prefix literals leave the test trees) — may start now
        E2.1 → E2.2 → E2.3 → E2.4 → E2.5 (five stacked, gated PRs; E2.1 merges after P1; the guards switch on in E2.5)
        E5 producer PR (S3 → S2-B → S4 → S6, one squash-merged PR, after P1, P2 and stage A) → E5.S7 the drain (one PR per suite, not a producer)
@@ -354,7 +357,7 @@ and share P1; only E5 waits for P2.
 | (b) "One release, pinned once" and "E2–E7 consume its one release" are stale | yes — R5 `115bbf8`, R7 `105d53c`, every consumer at `105d53c`, E5 needs a third | yes — marked superseded; decision 4 replaces the principle |
 | (c) "E5 independent of the other consumer epics" is stale | yes — E5 and E2 copy E3's helper (dew_flow_mcp #58, #59) | yes — the dependency table is rewritten |
 | (d) the shape rule for stacked producer PRs | checked against E2's D8 (each PR a complete lifecycle; guard findings recorded as evidence) and E5's D8 (the producer and the sweep in one PR, a revert reverts both) — both already satisfy it | yes — decision 6 |
-| (e) F16 contradicts the two-key Windows decision and needs an explicit disposition | yes — `owned.mjs` `isMine` reads no SID; E3's `WindowsIsMine` reads both | yes — § 4, the owner chooses; (b) recommended |
+| (e) F16 contradicts the two-key Windows decision and needs an explicit disposition | yes — `owned.mjs` `isMine` reads no SID; E3's `WindowsIsMine` reads both | yes — § 4, decided (b) through the question consultant (consult `3310f6ba`) |
 | (f) the owner's Windows machine has no barrier record; hosted CI does not open it | yes — R2's record; a hosted runner is out of the barrier's scope by R2's own words | yes — prerequisite P1, merge condition (c) |
 | (g) the scope is wider in prerequisites but the baseline weakens the blanket guard acceptance, so `Narrowed: yes` | partly — see the record: the merge condition of E5's producer PR is smaller; the goal and the DoD are not, because the drain stays inside E5 | yes, with the reason narrowed to what actually got smaller |
 
@@ -371,10 +374,8 @@ keeps the break-it for every new line. What is smaller is the merge condition of
    account, walk the manual items of the merged-core plan's barrier checklist, and record the section in
    `research/security/machines.md` — or state in writing that the machine no longer builds or tests E2's and E5's repositories.
    *Recommended:* run it; it is one scan and a short record, and it is the only thing between E2.1 and its merge.
-3. **The F16 disposition (§ 4).** *Recommended:* (b).
-4. **Who writes the `raw-temp` baseline rule's plan, and when** (P2). *Recommended:* now, on `feat/raw-temp-baseline`, by this
-   repository's main session with its own plan gate; released with the F16 change if (b) is chosen; the `r9700` token row (#103)
-   rides the same promotion.
+   (Settled without the owner, 2026-11-01: the F16 disposition — (b), § 4, consult `3310f6ba`; and P2's plan — written and through
+   its plan gate, item 2.1. The `r9700` token row (#103) rides the same promotion as P2 and the F16 change.)
 
 ## Epics
 
