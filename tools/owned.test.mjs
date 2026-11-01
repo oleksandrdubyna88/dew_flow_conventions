@@ -26,7 +26,7 @@ import { assertNoSuchProcess, unmatchablePid } from "./lib/unmatchable-pid.mjs";
 import {
   MAX_NAME, OWNER_GRAMMAR, PREFIX, REPO_TOKEN, START_TOLERANCE_S,
   asciiLower, auxvWordBytes, classifyName, clockTicksFromAuxv, clockTicksPerSecond, cleanupScope, formatLegacyOwner, formatOwner, gitdirOf, isMine, ownedDir, ownedName, ownedPattern,
-  ownedWorktree, ownerState, ownerToken, parseLegacyOwner, parseOwner, processProbe, readOwner, removeLink, removeQuietly, runRecord,
+  ownedWorktree, ownerState, ownerToken, parseLegacyOwner, parseOwner, processProbe, readClaimText, readOwner, removeLink, removeQuietly, runRecord,
   isInsideProfile, legacyOwnerState, startFromProcStat, tempRoot, thisOwner, thisOwnerToken, windowsOwnerToken,
 } from "./lib/owned.mjs";
 
@@ -965,4 +965,59 @@ test("R2c. a claim the scope key does not own is unreadable foreign-uid on every
   const dir = ownedDir(own, "claim-scope");
   assert.deepEqual(readOwner(dir, "folder", { mine: () => false }), { unreadable: true, reason: "foreign-uid" });
   assert.deepEqual(readOwner(dir, "folder", { mine: () => true }), thisOwner());
+});
+
+// --- F20: the one safe read opens the file it judged -----------------------------------------------------------
+
+/**
+ * `readClaimText(claim)` in a CHILD with a timeout, with `fs.lstatSync` wrapped so that the first look at `claim` is followed at once by the
+ * swap `mode` names (`fifo`: a FIFO takes the name; `regular`: another regular file takes it; `none`). A read that blocks forever on the FIFO
+ * kills only the child. Returns `{ timedOut, answer }`.
+ */
+function readInChild(claim, mode) {
+  const code = `
+    import fsDefault from "node:fs";
+    import { syncBuiltinESMExports } from "node:module";
+    import { execFileSync } from "node:child_process";
+    const { CLAIM, MODE, MODULE } = process.env;
+    const { readClaimText } = await import(MODULE);
+    const lstat = fsDefault.lstatSync;
+    let swapped = false;
+    fsDefault.lstatSync = (file, ...rest) => {
+      const stat = lstat(file, ...rest);
+      if (!swapped && file === CLAIM && MODE !== "none") {
+        swapped = true;
+        if (MODE === "fifo") { fsDefault.unlinkSync(CLAIM); execFileSync("mkfifo", [CLAIM]); }
+        else { fsDefault.writeFileSync(CLAIM + ".new", "swapped in\\n"); fsDefault.renameSync(CLAIM + ".new", CLAIM); }
+      }
+      return stat;
+    };
+    syncBuiltinESMExports();
+    process.stdout.write(JSON.stringify(readClaimText(CLAIM, () => true)));`;
+  const run = spawnSync(process.execPath, ["--input-type=module", "-e", code], {
+    env: { ...process.env, CLAIM: claim, MODE: mode, MODULE: moduleUrl }, encoding: "utf8", timeout: 5000,
+  });
+  return { timedOut: run.error?.code === "ETIMEDOUT", answer: run.stdout === "" ? undefined : JSON.parse(run.stdout), stderr: run.stderr };
+}
+
+test("F20a. readClaimText reads the regular file it judged, and nothing else swapped in at that name", (t) => {
+  const own = lifo(t);
+  const dir = ownedDir(own, "f20-read");
+  const claim = path.join(dir, "claim");
+  fs.writeFileSync(claim, "the claim\n");
+  assert.deepEqual(readInChild(claim, "none"), { timedOut: false, answer: "the claim\n", stderr: "" });
+  const swapped = readInChild(claim, "regular");
+  assert.equal(swapped.timedOut, false);
+  assert.deepEqual(swapped.answer, { unreadable: true }, "another file took the name between the look and the open: its text is no evidence");
+});
+
+test("F20b. a FIFO that takes the claim's name between the look and the open is unreadable at once, and the read does not block", (t) => {
+  if (win32) { t.skip("mkfifo: a FIFO needs a POSIX filesystem"); return; }
+  const own = lifo(t);
+  const dir = ownedDir(own, "f20-fifo");
+  const claim = path.join(dir, "claim");
+  fs.writeFileSync(claim, "the claim\n");
+  const swapped = readInChild(claim, "fifo");
+  assert.equal(swapped.timedOut, false, "readClaimText did not return within 5 s: it blocked on the FIFO");
+  assert.deepEqual(swapped.answer, { unreadable: true });
 });

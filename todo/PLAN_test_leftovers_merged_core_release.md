@@ -182,9 +182,26 @@ cache or a process.
   one-time hand clean-up on this machine is recorded on each PR as retained: 682 old `mcp-*` folders and `outside.txt`, and old
   `bge-log-*`/`bge-seed-*` folders, all the owner's to remove by hand.
 
+### R7 — The second release: the reference hardened before the Node consumers wrap it
+
+- **What.** Owner decision of 2026-11-01 (the question consultant `3ba92abb` first, both rows): before coai (E5) and creds (E2) wrap
+  the shipped Node reference, F17–F20 of the follow-ups plan are fixed here, merged, and released ONCE through the same promotion as R5
+  (the warning to the sessions that own open consumer pull requests first, then `promote-release.yml`, then `release-distance`). The same release carries the split of `common/test-leftovers.md` into a core and a detail companion (owner decision 2026-11-01, consultant `e03cae48`), so coai's reviewers can see the core. Every
+  consumer then bumps its pin to that release (a pin bump alone, as decided for R6). F16 (the Windows owner SID) stays open: Node cannot
+  read a SID without a native addon or a child process.
+- **Also decided 2026-11-01.** The C# helper of E3 gains a Darwin path (lstat with the symbol per CPU, a `kill(pid, 0)` probe, no start
+  time — rule §3 allows it off Linux), measured on a macOS CI leg and back-ported to dew_flow_mcp, because coai and creds run C# suites on
+  macOS; E5 and E2 copy it from there.
+- **Why.** Decision 11 of the merged core: Node consumers wrap and run the reference, never port it. A defect in the reference is a
+  defect in every Node consumer at once; the ports already fixed these.
+- **When.** After F17–F20 merge on `main`; before the producer stage of E5 or E2.
+- **Done when.** `release` is at the merged sha, `release-distance` reports 0, the warning's recipients and date are recorded here, and
+  every consumer's pin bump is listed.
+
 ## Build order
 
-R1 ∥ R2 → R3 → R5 → R6, with R4 running beside R1–R3 and finishing before R5. Nothing is built: each item is a run, a record, a merge or a
+R1 ∥ R2 → R3 → R5 → R6 (sweep-only stages; producer stages except E5 and E2), then R7 (F17–F20 and the core split merged on `main`,
+one promotion, the pin bumps) and the Darwin path in dew_flow_mcp → the producer stages of E5 and E2. R4 running beside R1–R3 and finishing before R5. Nothing is built: each item is a run, a record, a merge or a
 dispatch.
 
 ## Test plan
@@ -211,4 +228,7 @@ checkout of the PR's branch. Their outcome is recorded by hand; the scan itself 
 - [x] R4: the private sibling's confirmation exists (both spans byte-identical; the two consumer files copied with their sha256 pinned).
 - [x] R5: the warning went to the sessions with open consumer pull requests; `release` promoted once; `release-distance` 0.
 - [ ] R6: every sweep-only stage merged before any producer stage; the rollout plan's Definition of Done met.
+- [ ] R7: F17–F20 and the test-leftovers core split released once; every consumer pinned to that release (each pin bump merges alone, after the
+      release and before that consumer's producer stage).
+- [ ] The Darwin path of the C# helper: measured on a macOS CI leg and merged in dew_flow_mcp before E5 and E2 copy the helper.
 - [ ] This plan is promoted to `research/` with its deviations, or deleted with a recorded reason, when R6 is done; its row in `todo/README.md` goes with it.
