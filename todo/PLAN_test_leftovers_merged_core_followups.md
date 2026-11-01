@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31.** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01.** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -461,9 +461,66 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
 - **When.** With F9, before a Windows machine's janitor switch.
 - **Anchor.** `tools/lib/owned.mjs:209-228` (`isInsideProfile`, `isMine`); `tools/owned.test.mjs` (the path-boundary tests, no foreign-owner case).
 
+## F17 — The rename into quarantine can replace an existing empty directory (found 2026-10-31, the E3 and E4 ports)
+
+- **What.** `removeFolderByIdentity` moves a folder into quarantine with `fs.renameSync(dir, quarantine)`
+  (`tools/lib/leftovers-sweep.mjs:208`). POSIX `rename(2)` replaces an existing EMPTY directory at the destination, so a directory
+  that appeared at the drawn quarantine name is destroyed. Rule §4 (R:179-187) and the janitor's rule say a rename never lands on
+  something that appeared there. Both ports measured and fixed it (dew_flow_mcp `Native.RenameExclusively`; dew_flow_sidecar_rust
+  `rename.rs`).
+- **Fix.** One exclusive move for the quarantine and for the restore. POSIX (Node exposes no `renameat2`): reserve the name with an
+  exclusive `fs.mkdirSync(to)` (EEXIST ⇒ draw a new suffix, at most five draws, then keep the folder with one error), capture the
+  placeholder's identity, `fs.renameSync(from, to)` onto it (`rename(2)` replaces an EMPTY directory atomically — here our own), and on a
+  failed rename remove the placeholder only while it is still our empty directory with the reserved identity (`rmdir`, never recursive).
+  `restoreOnto` already reserves this way (S:169-191); the quarantine move reuses it. Windows: the same reservation cannot be used if
+  `fs.renameSync` refuses an existing directory there; the move is then the plain rename, which is exclusive by itself — this is
+  measured on the Windows run of F9, not assumed, and until then Windows keeps the current behaviour with a comment saying so.
+- **RED first.** A hook between the draw and the move plants an empty directory at the quarantine name ⇒ today it is gone after the
+  sweep (RED); after the fix it survives with its identity and the folder is quarantined under a fresh suffix.
+- **Anchor.** `tools/lib/leftovers-sweep.mjs:159-218`.
+
+## F18 — The quarantine pass asks the probe about any pid (found 2026-10-31, the E3 and E4 ports)
+
+- **What.** `restoreQuarantines` calls `context.probe(Number(found[2]))` (`leftovers-sweep.mjs:413`) on the pid text of a quarantine
+  name with no check: `0` (on POSIX `kill(0, …)` addresses the process group), a leading zero, a value past 2^53, and `windows:1` all
+  reach the probe. `ownerState` refuses these as unaskable (`owned.mjs:531-552`, rule §3 R:147-148).
+- **Fix.** One exported predicate `isAskablePid(text, platform)` in `owned.mjs`, used by `ownerState` and by the quarantine pass:
+  canonical digits (no sign, no leading zero), 1 ≤ pid ≤ 2^53−1, and on Windows never 1. An unaskable pid ⇒ the quarantine stays,
+  unlisted beyond its existing `kept` reason.
+- **RED first.** Quarantines named with `-0-`, `-007-`, `-9007199254740993-` and (platform win32) `-1-` and an injected probe that
+  answers `dead` for anything ⇒ today each is restored (RED); after the fix none is, and the probe is never called.
+- **Anchor.** `tools/lib/leftovers-sweep.mjs:406-419`, `tools/lib/owned.mjs:531-552`.
+
+## F19 — The orphan-claim pass can delete the claim of a folder that sits in a quarantine (found 2026-10-31, the E3 and E4 ports)
+
+- **What.** `sweepOrphanClaims` treats a claim whose folder path does not exist as an orphan (`leftovers-sweep.mjs:376-404`). A folder
+  that a LIVE sweep (another process) has moved into its quarantine has no folder at its name for that moment, so its claim is judged
+  and, with a gone record, removed — the quarantine, if it is later restored, is then unmarked forever.
+- **Fix.** Before judging an orphan claim, skip it when a sibling `.<name>.teststodelete-quarantine-<pid>-<hex>` exists for its name
+  (one directory snapshot per pass, not one listing per claim), or when this run's report holds a `quarantine-conflict` for it.
+- **RED first.** A claim with a gone record whose folder is renamed into a quarantine with a live renamer ⇒ today the claim is removed
+  (RED); after the fix it stays and nothing is listed for it.
+- **Anchor.** `tools/lib/leftovers-sweep.mjs:376-404`.
+
+## F20 — `readClaimText` can block on a FIFO swapped in between the check and the open (found 2026-10-31, the E3 and E4 ports)
+
+- **What.** `readClaimText` checks `lstat` (`isFile`) and then opens the path (`owned.mjs:470-492`). A FIFO swapped in between the two
+  makes `openSync(file, "r")` block forever (no writer), hanging the sweep; a different file swapped in is read as if it were the
+  judged one.
+- **Fix.** POSIX: open with `fs.constants.O_RDONLY | O_NONBLOCK | O_NOFOLLOW`, then `fstatSync(fd)` must be a regular file with the
+  lstat's `(dev, ino)`; anything else ⇒ `{ unreadable: true }`. Windows (no `O_NOFOLLOW`): open, then `fstatSync(fd).isFile()` and the
+  same `ino`; a mismatch ⇒ unreadable. Read at most `MAX_CLAIM_BYTES + 1` bytes from that fd.
+- **RED first.** A seam between the lstat and the open replaces the claim with a FIFO ⇒ today the call does not return within 5 s (RED,
+  run in a child with a timeout so the suite cannot hang); after the fix it returns `{ unreadable: true }` at once. A regular file
+  swapped in ⇒ unreadable.
+- **Anchor.** `tools/lib/owned.mjs:465-492`.
+
+F17–F20 land together, with their tests, as one change released once (R7 of the remainder plan); the consumers that wrap the
+reference (coai E5, creds E2, the private sibling) take it with that pin. The ports E3 and E4 already behave this way.
+
 ## Definition of Done
 
-- [ ] Each of F1 to F16 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
+- [ ] Each of F1 to F20 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.
