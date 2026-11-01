@@ -45,29 +45,29 @@ Narrowed: yes — E5's producer PR may merge with the structural guard green-by-
 
 | Work | Where | Verdict | Action |
 |---|---|---|---|
-| E1 — the contract, the Node helper, the sweep, the guard, #77 `2c96f83` | main, released in `115bbf8` | — | — |
-| the merged-core plan #81 `3c82772` (a plan, no code) | main | — | — |
-| the merged core #82 `72ae2f3` — owner segment, kernel ownership, three-valued liveness, one janitor | main, released in `115bbf8` | — | — |
-| R3 record and F10–F13 parked, #88 `f9eca26` | main | — | — |
-| F13 — the clock-tick rate from `AT_CLKTCK`, rule §3's one-child bound, #89 `6c3ebfc` | main, released in `115bbf8` | — | — |
-| F12 — the scan and the guard trace a prefix held in a variable, #90 `2602416` | main, released in `115bbf8` | — | — |
-| R4 record #91 `115bbf8` (the sha `release` was promoted to) | main, released | — | — |
-| R5 record #92 `58e3f46`; R6 wave-1 record #93 `f46982f`; R6 sweep-only record #95 `c31f69d`; the barrier opened, wave 1 merged #100 `7852de2` | main | — | — |
-| F17–F20 — the Node reference hardened, #101 `f996b68` | main, released in `105d53c` | — | — |
-| the core/detail split of `common/test-leftovers.md`, #102 `105d53c` | main, released (the current `release`) | — | — |
-| the `## Tokens` row `r9700`, #103 `bec3df7` | main, unreleased (`release-distance` 1) | — | — |
-| R7 record and the Darwin helper merged, #104 `2d12d8f` | main | — | — |
-| dew_flow_mcp — E3 stories #53 `6457540`; pin `115bbf8` #57 `d2e62cf`; E3 producer stage #58 `4feb245`; the Darwin path #59 `197cc76`; pin `105d53c` #60 `142d8d2` | main of dew_flow_mcp | — | — |
-| dew_flow_sidecar_rust — E4 stories #61 `17b18b3`; pin `115bbf8` #63 `1f55ebc`; E4 producer stage #64 `5478109`; pin `105d53c` #66 `e58be09` | main of dew_flow_sidecar_rust | — | — |
-| dew_flow_benchmark — pin `115bbf8` #120 `44acabc`; E6 stage A (the held-out sweep lists, never removes) #125 `6a963a4`; pin `105d53c` #136 `0e0bdd8` | main of dew_flow_benchmark | — | — |
-| dew_flow_creds_for_devs — pin `115bbf8` #287 `5ea09e7`; pin `105d53c` #289 `47724fd` | main of dew_flow_creds_for_devs | — | — |
-| dew_flow_rag_qln — pin `105d53c` #78 `2936537` (no `115bbf8` bump: it went from an older pin straight to `105d53c`) | main of dew_flow_rag_qln | — | — |
-| dew_flow_connect_other_ais — pin `105d53c` #936 `df375eb` (no `115bbf8` bump) | main of dew_flow_connect_other_ais | — | — |
-| dew_flow_vscode_kit — pin `105d53c` #20 `7cab547`; wsl_care — pin `105d53c` #182 `23859c4` with the `ActWindowsTests` clock fix (no `115bbf8` bump in either) | main of each | — | — |
-| dew_flow_connect_other_ais #938 — the link target resolved root-down (the doc figure found while pinning #936; the resolved-root walk E5 cites) | pushed, unmerged (open PR) | — | — |
-| dew_flow_connect_other_ais #850 — E5 stories re-split against `105d53c`, plan gate `proceed`, branch `docs/test-leftovers-e5-stories` at `2c64601a` | pushed, unmerged (open PR) | — | — |
-| dew_flow_creds_for_devs #253 — E2 stories re-split against `105d53c`, plan gate `proceed`, branch `docs/test-leftovers-e2-stories` at `f61358b` | pushed, unmerged (open PR) | — | — |
-| the stop commit `b54adf6` and the ledger correction `6b74a19` (entries 1.1–1.7, state stopped) | pushed, branch `docs/rollout-stop-for-rereview` (PR #105), unmerged | — | — |
+| E1 — the contract, the Node helper, the sweep, the guard, #77 `2c96f83` | main, released in `115bbf8` | fits | kept — superseded in place by #82 and released; one sentence it wrote is stale: `README.md:265` says the start-of-run sweep removes what is "unmarked and old" — corrected in a NEW PR (note 1) |
+| the merged-core plan #81 `3c82772` (a plan, no code) | main | fits | kept |
+| the merged core #82 `72ae2f3` — owner segment, kernel ownership, three-valued liveness, one janitor | main, released in `115bbf8` | fits | kept — the contract epoch 2 is built on |
+| R3 record and F10–F13 parked, #88 `f9eca26` | main | fits | kept |
+| F13 — the clock-tick rate from `AT_CLKTCK`, rule §3's one-child bound, #89 `6c3ebfc` | main, released in `115bbf8` | fits | kept |
+| F12 — the scan and the guard trace a prefix held in a variable, #90 `2602416` | main, released in `115bbf8` | fits | kept |
+| R4 record #91 `115bbf8` (the sha `release` was promoted to) | main, released | fits | kept |
+| R5 record #92 `58e3f46`; R6 wave-1 record #93 `f46982f`; R6 sweep-only record #95 `c31f69d`; the barrier opened, wave 1 merged #100 `7852de2` | main | fits | kept — #93 records entries 1.1–1.4 and #100 the wave-1 merges; decision 4 adopts both |
+| F17–F20 — the Node reference hardened, #101 `f996b68` | main, released in `105d53c` | fits | kept — decision 5 rests on it |
+| the core/detail split of `common/test-leftovers.md`, #102 `105d53c` | main, released (the current `release`) | fits | kept |
+| the `## Tokens` row `r9700`, #103 `bec3df7` | main, unreleased (`release-distance` 1) | fits | kept — rides the next promotion (P2's release, question 4) |
+| R7 record and the Darwin helper merged, #104 `2d12d8f` | main | fits | kept |
+| dew_flow_mcp — E3 stories #53 `6457540`; pin `115bbf8` #57 `d2e62cf`; E3 producer stage #58 `4feb245`; the Darwin path #59 `197cc76`; pin `105d53c` #60 `142d8d2` | main of dew_flow_mcp | fits | kept — the C# template (§ *Epoch 2* item 1); no unmarked or legacy folder is removed by age; #60 also carries the guard's fix for the moved `## Tokens` table; #58 checked (a)–(d) on one machine (note 2) |
+| dew_flow_sidecar_rust — E4 stories #61 `17b18b3`; pin `115bbf8` #63 `1f55ebc`; E4 producer stage #64 `5478109`; pin `105d53c` #66 `e58be09` | main of dew_flow_sidecar_rust | fits | kept — the sweep keeps unmarked and legacy folders at any age; #66 also carries the guard's fix for the moved `## Tokens` table; #64 checked (a)–(d) on one machine (note 2) |
+| dew_flow_benchmark — pin `115bbf8` #120 `44acabc`; E6 stage A (the held-out sweep lists, never removes) #125 `6a963a4`; pin `105d53c` #136 `0e0bdd8` | main of dew_flow_benchmark | fits | kept — #125 is E6's stage A (lists, never removes a prefixed entry); its age removal of un-prefixed `score-tmp/*` is a question for E6's stories |
+| dew_flow_creds_for_devs — pin `115bbf8` #287 `5ea09e7`; pin `105d53c` #289 `47724fd` | main of dew_flow_creds_for_devs | fits | kept |
+| dew_flow_rag_qln — pin `105d53c` #78 `2936537` (no `115bbf8` bump: it went from an older pin straight to `105d53c`) | main of dew_flow_rag_qln | fits | kept |
+| dew_flow_connect_other_ais — pin `105d53c` #936 `df375eb` (no `115bbf8` bump) | main of dew_flow_connect_other_ais | fits | kept — its doc figure is corrected on #938 |
+| dew_flow_vscode_kit — pin `105d53c` #20 `7cab547`; wsl_care — pin `105d53c` #182 `23859c4` with the `ActWindowsTests` clock fix (no `115bbf8` bump in either) | main of each | fits | kept — the `ActWindowsTests` clock fix is outside this plan |
+| dew_flow_connect_other_ais #938 — the link target resolved root-down (the doc figure found while pinning #936; the resolved-root walk E5 cites) | pushed, unmerged (open PR) | fits | kept open — work outside this plan (a security fix, no owner-form producer); merges on its own gates, the stop does not hold it |
+| dew_flow_connect_other_ais #850 — E5 stories re-split against `105d53c`, plan gate `proceed`, branch `docs/test-leftovers-e5-stories` at `2c64601a` | pushed, unmerged (open PR) | fits | kept open, unmerged until epoch 2 is approved; fix forward on its branch: cite the F16 disposition (§ *Epoch 2* item 4) in place of its open Q6 once the owner chooses |
+| dew_flow_creds_for_devs #253 — E2 stories re-split against `105d53c`, plan gate `proceed`, branch `docs/test-leftovers-e2-stories` at `f61358b` | pushed, unmerged (open PR) | fits | kept open, unmerged until epoch 2 is approved; fix forward on its branch: its delta-table row still says stage B is "ONE squash-merged pull request", against its own D8 (five); cite the F16 disposition once chosen |
+| the stop commit `b54adf6` and the ledger correction `6b74a19` (entries 1.1–1.7, state stopped) | pushed, branch `docs/rollout-stop-for-rereview` (PR #105), unmerged | fits | kept — merges before or with epoch 2's line; this branch builds on it |
   (This re-review covers ALL seven entries of epoch 1: the owner's four of 2026-10-31 (1.1–1.4), the agent's one (1.5) and
   the two reviewer entries of 2026-11-01 (1.6, 1.7). The stop belonged at 1.2 on 2026-10-31 and was recorded on 2026-11-01;
   every row above dated 2026-10-31 or later — E3 #58, E4 #64, the R7 release #101/#102 and its eight pin bumps, mcp #59, the
@@ -76,6 +76,10 @@ Narrowed: yes — E5's producer PR may merge with the structural guard green-by-
   action — kept, reverted in a new PR, fixed forward, dropped — as step 5 of the full stop says. Not rows: #86 and #87
   (the plan-change-control rule, outside this plan), #99 (rule parity, outside this plan), and the re-review commit
   itself, which is the baseline epoch 2 is approved on, never an entry. The raw-temp baseline plan has no commit yet.)
+  (Judged 2026-11-01 by an Opus judge against § *Epoch 2*: 23 rows fit, none is cut. The E3 and E4 merges and mcp #59 came after the unrecorded
+  stop of entry 1.2; the content fits the revised plan, the timing is the breach the stop record already names. Note 1: the code and the rule
+  never remove an unmarked folder; only that README sentence, left by #77 and not updated by #82, still says so. Note 2: #58 and #64 checked
+  (a)–(d) on the operator's WSL machine only; P1's record says whether the owner's Windows machine builds or tests mcp and sidecar_rust.)
 
 ## Symptom
 
