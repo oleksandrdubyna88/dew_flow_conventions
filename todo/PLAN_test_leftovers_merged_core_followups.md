@@ -499,6 +499,9 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   removal (`removed` not empty, the paths changed), `F16 (new run)` on the leftovers removed by the first sweep, `F16 (run-tests)` on `removed 1` and no `unverified:` line.
   Not done: the owner-SID read and both keys (the Fix above), the removal of the list-only gate (its three checks on F9's Windows run), the Windows CI legs of E2.1 and E5, the
   release (P2). The tests run through the `platform` seam on Linux; no Windows machine ran them.
+  Second RED (the Opus review, then the legacy case): each gate removed on its own, the pinned tests failed — the quarantine gate: quarantine and new run; the claim gate: claim and new
+  run; the judge gate (`withheld` in `judge`): folder, worktree, run-tests and new run. The review's minor point added `F16 (legacy)` (a legacy-name folder and a legacy orphan claim, both
+  with a gone owner, read as a win32 reader): it fails with the judge gate off and with the claim gate off, one at a time (legacy and new run fail on the claim gate, legacy on the judge gate too).
 
 ## F17 — The rename into quarantine can replace an existing empty directory (found 2026-10-31, the E3 and E4 ports)
 

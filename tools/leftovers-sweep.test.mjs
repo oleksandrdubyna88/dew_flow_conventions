@@ -1134,7 +1134,10 @@ function snapshotOf(root) {
 
 const lockOf = (wt) => fs.readFileSync(path.join(gitdirOf(wt), "locked"), "utf8");
 
-/** One leftover per kind, each a candidate that a POSIX sweep acts on: `{ tmp, repo, dir, orphan, quarantines, wt }` — `unverified` is what Windows lists. */
+/**
+ * One leftover per kind, each a candidate that a Windows or macOS reader would act on. A builder returns `{ listed, gone, now? }`: `listed` is what win32 reports
+ * `unverified:`, `gone` what a linux sweep deals with, `now` a clock past the quarantine window. `legacy` has `gone: []` and `kept`: a Linux reader keeps every legacy record.
+ */
 const KINDS = {
   folder(own, work, tmp) {
     const dir = folder(own, tmp, "f16-folder", { claim: deadOwnerLine() });
@@ -1154,6 +1157,17 @@ const KINDS = {
     const sitting = folder(own, tmp, "f16-sitting", { claim: formatOwner(thisOwner()) + "\n" });
     fs.mkdirSync(quarantineOf(path.basename(sitting))); // a sweep killed after its reservation, while the folder still sits at its name
     return { listed: [quarantineOf(path.basename(moved)), quarantineOf(path.basename(sitting))], gone: [quarantineOf(path.basename(moved)), quarantineOf(path.basename(sitting))], now: Date.now() + 2 * MIN_AGE_MS };
+  },
+  legacy(own, work, tmp) {
+    const plant = (what) => path.join(tmp, `${"testsTo" + "Delete"}-conventions-${what}-abc123`); // the form before the owner segment, spelled in two pieces
+    const dir = plant("f16-legacy");
+    fs.mkdirSync(dir);
+    fs.writeFileSync(`${dir}.owner`, `${thisOwner().host}:${PRETEND_DEAD}\n`);
+    setOld(dir);
+    const orphan = plant("f16-legacy-orphan"); // a legacy claim with no folder
+    fs.writeFileSync(`${orphan}.owner`, `${thisOwner().host}:${PRETEND_DEAD}\n`);
+    setOld(`${orphan}.owner`);
+    return { listed: [dir, `${orphan}.owner`], gone: [], kept: [dir, `${dir}.owner`, `${orphan}.owner`] };
   },
   worktree(own, work, tmp, repo) {
     const wt = worktree(own, repo, tmp, "f16-wt", { claim: deadOwnerLine() });
@@ -1185,6 +1199,7 @@ for (const [kind, build] of Object.entries(KINDS)) {
     assert.deepEqual(posix.errors, []);
     assert.deepEqual(unverifiedOf(posix), []);
     for (const gone of made.gone) assert.equal(fs.existsSync(gone), false, `${path.basename(gone)} is dealt with on linux`);
+    for (const kept of made.kept ?? []) assert.equal(fs.existsSync(kept), true, `${path.basename(kept)} is kept on linux`);
   });
 }
 
@@ -1212,7 +1227,7 @@ test("F16 (new run). a run beside the listed leftovers of every kind creates, us
   fs.writeFileSync(path.join(dir, "used.txt"), "used\n");
   const wt = ownedWorktree(run, repo, "f16-new-wt", { parent: tmp });
   assert.ok(fs.existsSync(path.join(wt.path, ".git")), "its worktree is usable");
-  const second = sweepLeftovers({ repo, tmp, probe: deadProbe, now, platform: "win32" }); // the run's own fresh resources are young: kept
+  const second = sweepLeftovers({ repo, tmp, probe: deadProbe, now, platform: "win32" }); // the run's own resources are `live` (this process): kept
   assert.equal(unverifiedOf(second).length, unverifiedOf(first).length);
   assert.ok(fs.existsSync(path.join(dir, "used.txt")));
   await run.close();
