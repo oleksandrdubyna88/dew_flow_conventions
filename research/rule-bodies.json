@@ -444,7 +444,7 @@
     {
       "id": "common.test-leftovers",
       "source": "common/test-leftovers.md",
-      "bodySha256": "b40f424e0b4f838c2450595c261bf92705be754ddb8f0b83c8d6d22839997e23",
+      "bodySha256": "d1510b5aabac8e2272cd8f84206ef4d1b5fb4b0c511e910f2b3f49dacb0754a0",
       "sections": [
         "# Test leftovers are named `testsToDelete-<owner>-…`, owned by their run, scoped to their user, and collected (MANDATORY)",
         "## 1. The name",
@@ -463,7 +463,7 @@
     {
       "id": "common.test-leftovers-detail",
       "source": "common/test-leftovers-detail.md",
-      "bodySha256": "16b7a87ef7a3b580d9754567953c3986ca46012c0d6a8862f6963f9e371c8cdf",
+      "bodySha256": "fdb5894a656229f701b27744ed9a6bfd7ddbffff569a456e31e4c84b3d524fe7",
       "sections": [
         "# Test leftovers — the full rule text (the detail of `common/test-leftovers.md`)",
         "## 1. The name — one form, three spellings",

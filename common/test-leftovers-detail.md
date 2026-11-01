@@ -270,6 +270,20 @@ least ten characters and three words and not a placeholder (*needed*, *see above
 `shared-store` it carries `lock:`. A reason-less, class-less or unknown-class exemption is a finding of class
 `exemption`.
 
+**The `raw-temp` baseline — a second pass, for that one class only.** A repository whose test runner makes an
+owned, claimed run folder (§2) and points `TEMP`, `TMP` and `TMPDIR` at it before the first test may carry the
+`raw-temp` sites under that runner in a baseline file instead of exempting each line. *Proven* is three things in
+the tree, named by the file as a scope's proof: the runner makes the folder before the first test; a run that
+cannot make it fails before any test; a test per assembly or package, ordered first, asserts that `TEMP` names the
+run folder and carries `testsToDelete-baseline-proof: <scope root>`. The file — `{ "class": "raw-temp", "scopes":
+[{ "root", "proof" }], "entries": [{ "file", "sha256", "line" }] }` — is a **multiset**: one entry per occurrence,
+keyed by the file and the sha256 of the trimmed line; `line` is a hint, never a key. A guard reads it only when
+told to, passes a key's occurrences up to its entries and no further, and finds an occurrence beyond them
+(`raw-temp`) and, as `baseline`, an entry no line matches, an entry outside every scope, a scope whose proof is
+missing, a class other than `raw-temp` and a malformed file. It **only shrinks**: an entry goes when its site goes;
+after the file's first reviewed commit none is added or re-keyed, a check against the base ref refuses a new key,
+a raised count, a new or wider scope, a changed proof and any creation but the first, and nothing regenerates it.
+
 ## The janitor
 
 The **host-wide** tool — every user, every token, every kind; neither a teardown nor the sweep of §4 — is ONE

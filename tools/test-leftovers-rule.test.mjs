@@ -139,7 +139,7 @@ const BASELINE_PHRASES = ["The `raw-temp` baseline", "testsToDelete-baseline-pro
 test("S1 10 the detail's §7 carries the `raw-temp` baseline paragraph, once, between the exemption grammar and the janitor", () => {
   const text = read(DETAIL);
   const start = text.indexOf("## 7. ");
-  const section = text.slice(start, text.indexOf("## The janitor", start));
+  const section = text.slice(start, text.indexOf("## The janitor", start)).replace(/\s+/g, " "); // wrapped lines read as one
   const missing = BASELINE_PHRASES.filter((phrase) => !section.includes(phrase));
   assert.deepEqual(missing, [], "the baseline paragraph is missing phrases");
   assert.equal(section.split("**The `raw-temp` baseline").length - 1, 1, "the paragraph is there once");
