@@ -18,7 +18,7 @@ import { MAX_CLAIM_BYTES, REPO_ROW, REPO_TOKEN, ownedDir } from "./lib/owned.mjs
 import { EXCLUDED_FILES, LEGACY_NAME_PENDING, isScanned, main, parseArguments, scanRepository, scanText, tokenConstants, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const RULE = path.join(root, "common", "test-leftovers.md");
+const RULE = path.join(root, "common", "test-leftovers-detail.md"); // the rule file that holds the Tokens table since the split
 
 /** A git repository in an owned folder holding `files` (path → text); returns its path. */
 function tree(t, files = {}) {

@@ -250,7 +250,7 @@ test("S8 review 4a. a file with a NUL byte in its first 8 KiB is binary and skip
   fs.mkdirSync(path.join(repo, "scripts"));
   fs.writeFileSync(path.join(repo, "scripts", "blob"), Buffer.concat([Buffer.from([0x7f, 0x45, 0x00, 0x01]), Buffer.from(line)]));
   fs.writeFileSync(path.join(repo, "scripts", "late"), Buffer.concat([Buffer.from(line), Buffer.alloc(8192, 0x20), Buffer.from([0])]));
-  const result = scanRepository({ repo, profile: "node", rule: path.join(root, "common", "test-leftovers.md") });
+  const result = scanRepository({ repo, profile: "node", rule: path.join(root, "common", "test-leftovers-detail.md") });
   const where = result.findings.filter((entry) => entry.cls === "docker-name").map((entry) => entry.file);
   assert.deepEqual(where, ["scripts/late"], "blob is binary (a NUL at byte 2); late holds its first NUL after 8 KiB and is read");
   assert.equal(result.files, 2, "the skipped binary is not counted as scanned: a.test.ts and late");

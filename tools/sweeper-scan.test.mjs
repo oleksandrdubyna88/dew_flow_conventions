@@ -561,6 +561,7 @@ const ALLOWLIST_TEXT = () => fs.readFileSync(path.join(here, "fixtures", "owner-
 test("S5b 1 the proposed rule texts yield no owner-blind line, and this repository is clean", () => {
   const dir = path.join(here, "..");
   assert.deepEqual(broadLines(fs.readFileSync(path.join(dir, "common", "test-leftovers.md"), "utf8")), []);
+  assert.deepEqual(broadLines(fs.readFileSync(path.join(dir, "common", "test-leftovers-detail.md"), "utf8")), []);
   assert.deepEqual(broadLines(fs.readFileSync(path.join(dir, "common", "test-leftovers-janitor.md"), "utf8")), []);
   const result = runScan(["--root", dir]);
   assert.equal(result.code, 0, `${result.out}\n${result.err}`);

@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
- * The two rule texts of the merged core (`common/test-leftovers.md` and its janitor companion) — S1 of the merged-core
- * plan: what the text is made of, that a read of it stays under the per-read cap, and that no line of it is a sweeper
- * that cannot tell one user's leftovers from another's.
+ * The three rule texts of the merged core — `common/test-leftovers.md` (the core, a self-contained summary that must reach
+ * a reviewer on its own), `common/test-leftovers-detail.md` (the full statement, the former text moved whole) and the
+ * janitor companion — S1 of the merged-core plan and the split of 2026-11-01: what each text is made of, that a read of it
+ * stays under the per-read cap, that the core stays under its own cap, that the split lost no line, and that no line of
+ * any of them is a sweeper that cannot tell one user's leftovers from another's.
  *
  * The cap is proven on an INFLATED COPY in a scratch root, never by swapping the real file in place (the real file is
  * shared with every test running beside this one).
@@ -50,15 +52,17 @@ function spansOf(text) {
   }
 }
 
-test("S1 1 the rule has two core spans and its companion one, each non-empty", () => {
+test("S1 1 the core has one core span, the detail two and the companion one, each non-empty", () => {
   const rule = spansOf(read(RULE));
-  assert.equal(rule.length, 2, "common/test-leftovers.md carries two spans");
+  const detail = spansOf(read(DETAIL));
+  assert.equal(rule.length, 1, "common/test-leftovers.md carries one span");
+  assert.equal(detail.length, 2, "common/test-leftovers-detail.md carries two spans, the `## Tokens` table between them");
   assert.equal(spansOf(read(COMPANION)).length, 1, "the companion carries one span");
-  for (const span of [...rule, ...spansOf(read(COMPANION))]) assert.ok(span.trim().length > 1000, "a span is the text, not a marker");
+  for (const span of [...rule, ...detail, ...spansOf(read(COMPANION))]) assert.ok(span.trim().length > 1000, "a span is the text, not a marker");
 });
 
-test("S1 2 a read of the rule refuses above the cap, proven on an inflated copy in a scratch root", (t) => {
-  assert.ok(Buffer.byteLength(bodyOf(read(RULE))) <= CAP, "the real body is under the per-read cap");
+test("S1 2 a read of the detail refuses above the cap, proven on an inflated copy in a scratch root", (t) => {
+  for (const file of [RULE, DETAIL, COMPANION]) assert.ok(Buffer.byteLength(bodyOf(read(file))) <= CAP, `${file}: the real body is under the per-read cap`);
   const root = ownedDir(t, "rule cap copy");
   for (const name of ["common", "csharp", "rust", "typescript", "AGENTS.md", "CLAUDE.md", "ENTRY.md", ".agents", "README.md", "research"]) {
     fs.cpSync(path.join(sourceRoot, name), path.join(root, name), { recursive: true });
@@ -66,26 +70,30 @@ test("S1 2 a read of the rule refuses above the cap, proven on an inflated copy 
   gitGuarded(root, "init", "-q");
   gitGuarded(root, "-c", "user.name=Rule test", "-c", "user.email=rules@example.invalid", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-qm", "fixture");
   const invoke = (args) => run([...args, "--repo", root], root);
-  assert.match(invoke(["read", "--task", "implement", "--only", "common.test-leftovers"]), /END RULE common\.test-leftovers/, "the unchanged copy reads");
-  fs.appendFileSync(path.join(root, RULE), `\n${"A line that only makes the rule longer.\n".repeat(80)}`); // 3 200 B
-  assert.throws(() => invoke(["read", "--task", "implement", "--only", "common.test-leftovers"]), /exceeds 32 KiB per read/);
+  assert.match(invoke(["read", "--task", "implement", "--only", "common.test-leftovers-detail"]), /END RULE common\.test-leftovers-detail/, "the unchanged copy reads");
+  fs.appendFileSync(path.join(root, DETAIL), `\n${"A line that only makes the rule longer.\n".repeat(80)}`); // 3 200 B
+  assert.throws(() => invoke(["read", "--task", "implement", "--only", "common.test-leftovers-detail"]), /exceeds 32 KiB per read/);
 });
 
-test("S1 3 no line of either file is an owner-blind sweep pattern", () => {
-  assert.deepEqual(broadLines(read(RULE)), [], `${RULE} holds a sweep that names no owner`);
-  assert.deepEqual(broadLines(read(COMPANION)), [], `${COMPANION} holds a sweep that names no owner`);
+test("S1 3 no line of any of the three files is an owner-blind sweep pattern", () => {
+  for (const file of [RULE, DETAIL, COMPANION]) assert.deepEqual(broadLines(read(file)), [], `${file} holds a sweep that names no owner`);
 });
 
-test("S1 4 the core's stub names the companion and the companion names the core", () => {
+test("S1 4 the core names the detail and the companion; the detail and the companion name the core", () => {
   const rule = spansOf(read(RULE)).join("\n");
+  const detail = bodyOf(read(DETAIL));
   const companion = spansOf(read(COMPANION)).join("\n");
+  assert.ok(rule.includes("`" + DETAIL + "`"), "the core's header points at the detail by path");
   assert.ok(rule.includes("`" + COMPANION + "`"), "the core's janitor section points at the companion by path");
+  assert.ok(detail.includes("`" + RULE + "`"), "the detail's header points back at the core");
   assert.ok(companion.includes("`" + RULE + "`"), "the companion points back at the core");
-  assert.doesNotMatch(rule + companion, /\]\([^)]+\)/, "no markdown link inside a span");
+  assert.doesNotMatch(rule + spansOf(read(DETAIL)).join("\n") + companion, /\]\([^)]+\)/, "no markdown link inside a span");
+  const pointers = rule.match(/^Detail: /gm) ?? [];
+  assert.equal(pointers.length, (rule.match(/^## /gm) ?? []).length, "every section of the core ends with a pointer to the same section of the detail");
 });
 
 test("S1 5 every example name carries an owner of the grammar; the old form appears only as the legacy name's own description", () => {
-  const text = [...spansOf(read(RULE)), ...spansOf(read(COMPANION))].join("\n");
+  const text = [...spansOf(read(RULE)), ...spansOf(read(DETAIL)), ...spansOf(read(COMPANION))].join("\n");
   const found = [...text.matchAll(/(teststodelete)[-_](<[a-z]+>|[A-Za-z0-9]+)/gi)].filter((match) => match[1] !== "TESTSTODELETE"); // the upper-case spelling is an environment variable, not a name
   assert.ok(found.length > 5, "the texts do carry examples");
   for (const { 2: segment, index } of found) {
@@ -119,7 +127,10 @@ test("S1 8 the core is self-contained under its own cap", () => {
   assert.ok(bytes <= CORE_CAP, `${RULE} is ${bytes} B, over its cap of ${CORE_CAP} B`);
 });
 
-test("S1 6 the companion is its own rule with a conditional load and three tasks", () => {
-  const head = read(COMPANION).split("\n---\n")[0];
-  assert.match(head, /^---\nid: "common\.test-leftovers-janitor"\nload: "conditional"\ntasks: \["audit","policy","release"\]$/);
+test("S1 6 the companion is its own rule with a conditional load and three tasks; the detail shares the core's load and tasks and the core depends on it", () => {
+  const head = (file) => read(file).split("\n---\n")[0];
+  assert.match(head(COMPANION), /^---\nid: "common\.test-leftovers-janitor"\nload: "conditional"\ntasks: \["audit","policy","release"\]$/);
+  const TASKS = '["implement","test","audit","policy","release"]';
+  assert.equal(head(RULE), `---\nid: "common.test-leftovers"\nload: "conditional"\ntasks: ${TASKS}\ndepends: ["common.test-leftovers-detail"]`);
+  assert.equal(head(DETAIL), `---\nid: "common.test-leftovers-detail"\nload: "conditional"\ntasks: ${TASKS}`);
 });

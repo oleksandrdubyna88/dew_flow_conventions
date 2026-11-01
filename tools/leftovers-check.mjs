@@ -95,7 +95,7 @@ export const CURES = Object.freeze({
   "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers.md §6, §7 (shared-store).",
   "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers.md §5, §7 (ryuk-off).",
   exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers.md §7 (the exemption grammar).",
-  token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers.md §1 — and write it, with its row, in this repository's own tools/lib/owned-token.mjs beside the copied owned.mjs (never copy another repository's).",
+  token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers-detail.md § Tokens, common/test-leftovers.md §1 — and write it, with its row, in this repository's own tools/lib/owned-token.mjs beside the copied owned.mjs (never copy another repository's).",
 });
 
 const PREFIX_OK = /^teststodelete[-_][uw][0-9]{1,10}[-_]/i; // the OWNER form: one of the three spellings, then an owner segment
@@ -805,9 +805,15 @@ export function constantFindings(constants, token, ruleText, rulePath, identity 
   return found;
 }
 
-/** The rule text the token is checked against: `--rule`, else the repository's own, else the one beside this tool. */
+/**
+ * The rule text the token is checked against: `--rule`, else the repository's own, else the one beside this tool. The `## Tokens`
+ * table lives in `common/test-leftovers-detail.md` since the split of 2026-11-01; `common/test-leftovers.md` (the core) is tried
+ * after it in each place, for a mount from before the split that still holds the table there.
+ */
 export function resolveRule(repo, rule) {
-  const candidates = rule === undefined ? [path.join(repo, "common", "test-leftovers.md"), path.join(HERE, "..", "common", "test-leftovers.md")] : [rule];
+  const candidates = rule === undefined
+    ? [repo, path.join(HERE, "..")].flatMap((base) => [path.join(base, "common", "test-leftovers-detail.md"), path.join(base, "common", "test-leftovers.md")])
+    : [rule];
   return candidates.find((candidate) => fs.existsSync(candidate));
 }
 

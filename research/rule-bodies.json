@@ -444,9 +444,28 @@
     {
       "id": "common.test-leftovers",
       "source": "common/test-leftovers.md",
-      "bodySha256": "1f835ef94ebb6e89df259385fb7a89eb66261db3f284e06c01820e21c3cdf6d6",
+      "bodySha256": "aeab2a0a0cfa766556a2f68f32e29a36a3521643045043ebc800ccfdef917917",
       "sections": [
         "# Test leftovers are named `testsToDelete-<owner>-…`, owned by their run, scoped to their user, and collected (MANDATORY)",
+        "## 1. The name",
+        "## 2. The helper",
+        "## 3. The owner",
+        "## 4. The start-of-run sweep",
+        "## 5. Containers",
+        "## 6. Stores",
+        "## 7. The guard",
+        "## The janitor",
+        "## The barrier",
+        "## Never",
+        "## Definition of Done"
+      ]
+    },
+    {
+      "id": "common.test-leftovers-detail",
+      "source": "common/test-leftovers-detail.md",
+      "bodySha256": "11ad42dfe4d636d15219d5a677b2118b348d43197f9158904f380e6023b7e1e0",
+      "sections": [
+        "# Test leftovers — the full rule text (the detail of `common/test-leftovers.md`)",
         "## 1. The name — one form, three spellings",
         "## 2. The helper — one per language a repository tests in",
         "## 3. The owner — who may delete what",

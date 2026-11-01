@@ -230,6 +230,30 @@ added later, at the commit that made the baseline reach every rule; the original
 | `api/a.http` | 60,125 | 62,338 | 63,598 | 65,324 | 286,925 | 290,712 | 218,240 | 110,171 | 196,274 | 207,644 | 262,357 |
 | `common/testing.md` | 33,846 | 36,059 | 37,319 | 39,045 | 296,564 | 289,132 | 227,879 | 83,892 | 169,995 | 181,365 | 251,138 |
 
+### The test-leftovers core split (2026-11-01)
+
+A consumer's review gate packs each mounted rule FILE on its own into a reviewer prompt under a 90,000-unit budget whose
+free tail is about 9,990 units, so the 30,556 B `common/test-leftovers.md` could never reach a reviewer. The owner's
+decision (2026-11-01, consultants first): never trim a decision or a rule text, but a companion may hold it. So the rule
+became two files with the same `load` and `tasks` (`implement`, `test`, `audit`, `policy`, `release`):
+
+- `common/test-leftovers.md` (`common.test-leftovers`, **8,437 B**, hard cap 8,500 B in `tools/test-leftovers-rule.test.mjs`
+  S1 8): a self-contained core — the four promises, §1–§7, the janitor, the barrier, Never and the Definition of Done, each
+  section ending with a pointer to the same section of the detail; it `depends` on the detail, so the resolver loads both for
+  an agent while the review gate, which ignores `depends`, packs the core alone (intended).
+- `common/test-leftovers-detail.md` (`common.test-leftovers-detail`, **31,186 B**, body under the 32,768 B read cap): the
+  former text moved whole — both core spans byte for byte, the `## Tokens` registry (now only here, with its `owns:` marker;
+  `tools/leftovers-check.mjs` reads the table from this file first) — under a header that names the core. Test S1 7 holds
+  every non-heading, non-blank body line of the text at `7852de2` (the fixture `tools/fixtures/test-leftovers-base-7852de2.md`)
+  against this file by occurrence count, so the split can lose nothing.
+
+The resolver bundle per task (`explain --repo . --task <t>`, summed rule bytes, no file), before `7852de2` → after the split:
+`implement` 286,925 → 295,992; `test` 279,493 → 288,560; `audit` 218,240 → 227,307; `policy` 251,138 → 260,205;
+`release` 263,288 → 272,355 — each +9,067 B (8,437 + 31,186 − 30,556). The single-read tasks are unchanged and under one
+read: `inspect` 24,207, `ui` 26,420, `gpu` 27,680, `storage` 29,406 (≤ 32,768). In the table above, every cell of the
+`implement`, `test`, `audit` and `policy` columns reads +9,067 B from this commit on; the other seven columns and the 22
+pins are as recorded. `research/selection-matrix.json` was regenerated (the new id joins every scope that selects the core).
+
 ## Byte allowances per epic
 
 Every later epic of `todo/PLAN_node_rule_parity.md` (section 5, as plain text) writes against a byte budget that the
