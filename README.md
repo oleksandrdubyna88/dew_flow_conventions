@@ -154,8 +154,10 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   were the failures that hurt all six consumers at once — a backwards move makes every pinned sha
   differ from the tip during the incident the rollback exists to end.
 
-  **The ref also requires `tools · selftest` and `workflows · actionlint`** — the two contexts
-  `ci.yml` actually reports on a push to `main`. Required checks apply to a **direct push**, not only
+  **The ref also requires three contexts: `tools · selftest`, `workflows · actionlint` and
+  `tools · lock fixtures`** — the first two are what `ci.yml` actually reports on a push to `main`; the
+  third (the two lock fixtures) is named in the protection file ahead of its first report and is
+  applied by an administrator only after the job has reported once. Required checks apply to a **direct push**, not only
   to a merge, so a commit hand-pushed here without ever running CI is refused by GitHub itself. This
   cannot break a legitimate promotion: `tools/promote-release.mjs` already refuses a sha whose `ci`
   run is absent, unfinished or red, so every sha GitHub would reject is one the gate refuses anyway.
@@ -247,6 +249,8 @@ asking in writing to be moved and another had two promoted plans absent from its
 | [`tools/promote-release.mjs`](tools/promote-release.mjs) | The `release` ref moves only to a commit that is on `main` and whose `ci` run finished green — an absent or unfinished run is a refusal, never a pass | `node tools/promote-release.mjs <sha> [--dry-run]` (this repository only) |
 | [`tools/ownership-check.mjs`](tools/ownership-check.mjs) | [`common/rule-ownership.md`](common/rule-ownership.md) — no shared rule names a product, unless the name IS the instruction and says so in an `owns:` marker | `node tools/ownership-check.mjs [--warn]` (this repository only; **armed** — there is no baseline, so any undeclared product reference fails) |
 | [`tools/rule-bodies.mjs`](tools/rule-bodies.mjs) | The other half of the body freeze — it records the body of the rules you NAME, so an edit nobody named stays a red suite | `node tools/rule-bodies.mjs` to verify, `node tools/rule-bodies.mjs --update <id>…` to record (this repository only) |
+| [`tools/selection-matrix.mjs`](tools/selection-matrix.mjs) | The other half of what `rule-bodies.mjs` cannot see — which rules each of 165 representative scopes selects, the 22 single-read pins and the gate records: a `paths`, `tasks` or `path_tasks` edit passes the body freeze and changes what every consumer receives | `node tools/selection-matrix.mjs` to verify, `--write` to regenerate, `--bytes` for the size table (this repository only) |
+| [`tools/moved-blocks.mjs`](tools/moved-blocks.mjs) | Text moved between rule files moves verbatim — `research/moved-blocks.json` records each planned block's bytes and, once moved, its destination; whole lines and whole fences only; the checker reads no git history | `node tools/moved-blocks.mjs` to verify, `--baseline` / `--record` to append (this repository only) |
 | [`tools/release-distance.mjs`](tools/release-distance.mjs) | The compensating detector: `release` is still being moved, and has not quietly stopped while every pin-check stays green | `node tools/release-distance.mjs [--warn]` (this repository only, weekly) |
 | [`tools/adapter-check.mjs`](tools/adapter-check.mjs) | Every adapter hook `settings/` publishes is copied, wired on its own event and matcher, and byte-identical | `node .agents/conventions/tools/adapter-check.mjs` |
 | [`tools/build-flags-check.mjs`](tools/build-flags-check.mjs) | [`csharp/dotnet-build.md`](csharp/dotnet-build.md) — the root `Directory.Build.rsp` exists, says `-nr:false`, and no workflow suppresses it | `node .agents/conventions/tools/build-flags-check.mjs` |

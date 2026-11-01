@@ -5,6 +5,8 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { loadCatalog, selectRules, sha256, TASKS } from "./lib/rule-catalog.mjs";
+import { provenanceFindings, caseFindings } from "./lib/gates.mjs";
+import { LANDED_EPICS } from "./lib/parity-epics.mjs";
 import {run} from "./lib/rule-cli.mjs";
 import {bodyOf, sectionsOf} from "./lib/rule-body.mjs";
 import { ownedDir } from "./lib/owned.mjs";
@@ -248,11 +250,15 @@ test("the rule brings planning-docs where planning-docs' own tasks do not reach"
 });
 
 test("every single-read scope of the four excluded tasks still fits one read",()=>{
+  // The pins are the single-read scopes recorded in research/selection-matrix.json (the 22 of plan section 5), not a list
+  // kept here: the matrix test fails when the file and the selection disagree, so this reads one source of truth.
   const catalog=loadCatalog(sourceRoot);
-  const scopes={inspect:[[],["src/x.cs"],["src/x.csproj"],["ui/a.ts"]],ui:[[],["src/x.cs"],["ui/a.ts"]],gpu:[[],["src/x.cs"]],storage:[[]]};
-  for(const [task,fileSets] of Object.entries(scopes))for(const files of fileSets){
-    const bytes=selectRules(catalog,[task],files).reduce((sum,rule)=>sum+rule.bytes,0);
-    assert.ok(bytes<=32768,`${task} [${files.join(",")}] selects ${bytes} B, over the 32768 B read`);
+  const matrix=JSON.parse(fs.readFileSync(path.join(sourceRoot,"research/selection-matrix.json"),"utf8"));
+  const pins=matrix.scopes.filter(scope=>scope.oneRead===true);
+  assert.ok(pins.length>0,"no pins recorded — the loop below would prove nothing");
+  for(const scope of pins){
+    const bytes=selectRules(catalog,scope.tasks,scope.files).reduce((sum,rule)=>sum+rule.bytes,0);
+    assert.ok(bytes<=32768,`${scope.name} selects ${bytes} B, over the 32768 B read`);
   }
 });
 
@@ -357,4 +363,278 @@ test("the rule's `## Tokens` table in THIS public repository lists only the dew_
   const table=parseTokenTable(fs.readFileSync(path.join(sourceRoot,"common","test-leftovers.md"),"utf8"));
   assert.ok(table.rows.length>0,"the table has rows");
   assert.deepEqual([...new Set(table.rows.map(row=>row.family))],["dew_flow"]);
+});
+
+// ---- path_tasks (E1.S1): a rule's `paths` select only in a scope that also names one of its tasks ----------------
+// Plain `tasks` and dependencies ignore the gate; a gate without `paths` is a metadata error; explain names it.
+
+const GATED='id: csharp.mech\nload: conditional\npaths: ["**/*.cs"]\npath_tasks: ["implement","test"]';
+const reasonsOf=(catalog,tasks,files,id)=>selectRules(catalog,tasks,files).find(rule=>rule.id===id)?.reasons;
+
+function gatedFixture(t) {
+  const f=fixture(t);
+  f.put("csharp/mech.md",GATED);
+  return {...f,catalog:loadCatalog(f.root)};
+}
+
+test("a path_tasks rule is selected by its paths only in a scope that also names one of its tasks",t=>{
+  const {catalog}=gatedFixture(t);
+  assert.deepEqual(reasonsOf(catalog,["implement"],["src/x.cs"],"csharp.mech"),["path:src/x.cs (**/*.cs) when task:implement"]);
+  assert.equal(reasonsOf(catalog,["inspect"],["src/x.cs"],"csharp.mech"),undefined,"the task is outside the gate");
+  assert.equal(reasonsOf(catalog,["implement"],[],"csharp.mech"),undefined,"no file");
+  assert.equal(reasonsOf(catalog,["implement"],["ui/a.ts"],"csharp.mech"),undefined,"no matching file");
+  assert.deepEqual(reasonsOf(catalog,["test","implement"],["src/x.cs"],"csharp.mech"),["path:src/x.cs (**/*.cs) when task:implement,test"]);
+});
+
+test("an ungated rule with the same paths is still selected by an inspect scope beside a gated one",t=>{
+  const {root,put}=fixture(t);
+  put("csharp/mech.md",GATED);
+  put("csharp/plain.md",'id: csharp.plain\nload: conditional\npaths: ["**/*.cs"]');
+  const ids=selectRules(loadCatalog(root),["inspect"],["src/x.cs"]).map(rule=>rule.id);
+  assert.ok(ids.includes("csharp.plain"));
+  assert.ok(!ids.includes("csharp.mech"));
+});
+
+test("plain tasks and dependencies ignore a rule's path_tasks gate",t=>{
+  const {root,put}=fixture(t);
+  put("csharp/mech.md",'id: csharp.mech\nload: conditional\ntasks: ["audit"]\npaths: ["**/*.cs"]\npath_tasks: ["implement"]');
+  put("common/dep.md",'id: common.dep\nload: conditional\ntasks: ["gpu"]\ndepends: ["csharp.mech"]');
+  const catalog=loadCatalog(root);
+  assert.deepEqual(reasonsOf(catalog,["audit"],[],"csharp.mech"),["task:audit"],"a plain task selects the gated rule with no file");
+  assert.deepEqual(reasonsOf(catalog,["gpu"],[],"csharp.mech"),["dependency:common.dep"],"a dependency arrives whatever its own gate says");
+  assert.equal(reasonsOf(catalog,["inspect"],["src/x.cs"],"csharp.mech"),undefined);
+});
+
+test("path_tasks is refused when it repeats a task, so the reason of a selection names each task once",t=>{
+  const {root,put}=fixture(t);
+  put("csharp/g.md",'id: csharp.g\nload: conditional\npaths: ["**/*.cs"]\npath_tasks: ["implement","implement"]');
+  assert.throws(()=>loadCatalog(root),/path_tasks must not repeat a task/);
+  put("csharp/g.md",'id: csharp.g\nload: conditional\npaths: ["**/*.cs"]\npath_tasks: ["implement","test"]');
+  assert.deepEqual(reasonsOf(loadCatalog(root),["implement"],["src/x.cs"],"csharp.g"),["path:src/x.cs (**/*.cs) when task:implement"]);
+});
+
+test("path_tasks is refused when it cannot do its job: no paths, no tasks, an unknown task, a string, an always rule",t=>{
+  const {root,put}=fixture(t);
+  for(const [meta,expected] of [
+    ['id: csharp.g\nload: conditional\ntasks: ["audit"]\npath_tasks: ["implement"]',/path_tasks needs paths/],
+    ['id: csharp.g\nload: conditional\ntasks: ["audit"]\npaths: []\npath_tasks: ["implement"]',/path_tasks needs paths/],
+    ['id: csharp.g\nload: conditional\npaths: ["**/*.cs"]\npath_tasks: []',/must name at least one task/],
+    ['id: csharp.g\nload: conditional\npaths: ["**/*.cs"]\npath_tasks: ["imlpement"]',/imlpement.*legal: inspect/],
+    ['id: csharp.g\nload: conditional\npaths: ["**/*.cs"]\npath_tasks: implement',/must be an array of nonempty strings/],
+    ['id: csharp.g\nload: always\npaths: ["**/*.cs"]\npath_tasks: ["implement"]',/applies to a conditional rule only/],
+  ]) {
+    put("csharp/g.md",meta);
+    assert.throws(()=>loadCatalog(root),expected,meta);
+  }
+});
+
+test("explain names the gate: path_tasks and the gated reason, and an empty list for an ungated rule",t=>{
+  const {root}=cliFixture(t);
+  fs.writeFileSync(path.join(root,"csharp/zz-gated.md"),`---\nid: csharp.zz-gated\nload: conditional\npaths: ["**/*.cs"]\npath_tasks: ["implement"]\n---\nA complete rule.\n`);
+  const explain=(...args)=>JSON.parse(run(["explain",...args,"--repo",root],root)).rules;
+  const gated=explain("--task","implement","--file","src/x.cs").find(rule=>rule.id==="csharp.zz-gated");
+  assert.deepEqual(gated.path_tasks,["implement"]);
+  assert.deepEqual(gated.reasons,["path:src/x.cs (**/*.cs) when task:implement"]);
+  const inspect=explain("--task","inspect","--file","src/x.cs");
+  assert.ok(!inspect.some(rule=>rule.id==="csharp.zz-gated"));
+  assert.deepEqual(inspect.find(rule=>rule.id==="csharp.doctrine").path_tasks,[]);
+});
+
+// ---- the gate record and its provenance (tools/lib/gates.mjs) ----------------------------------------------------
+
+function provenanceFixture(t) {
+  const f=fixture(t);
+  f.put("csharp/mech.md",GATED);
+  f.put("common/src.md",'id: common.src\nload: conditional\ntasks: ["implement","test"]');
+  f.put("typescript/doc.md",'id: typescript.doc\nload: conditional\npaths: ["**/*.ts"]');
+  f.put("csharp/plain.md",'id: csharp.plain\nload: conditional\npaths: ["**/*.cs"]');
+  return {...f,catalog:()=>loadCatalog(f.root)};
+}
+const REASON="the plan changed the applicability on purpose";
+
+test("provenance: a gate that mirrors the tasks line of its source is accepted",t=>{
+  const {catalog}=provenanceFixture(t);
+  assert.deepEqual(provenanceFindings(catalog(),{"csharp.mech":{mirrors:"common.src",epic:"E2"}},[]),[]);
+});
+
+test("provenance: a gated rule with no record, a source with other tasks, and a path-only source are each one finding",t=>{
+  const {root,put,catalog}=provenanceFixture(t);
+  const find=gates=>provenanceFindings(catalog(),gates,[]);
+  const none=find({});
+  assert.equal(none.length,1);
+  assert.match(none[0],/csharp\.mech carries path_tasks but has no gate record/);
+  put("common/src.md",'id: common.src\nload: conditional\ntasks: ["implement","audit"]');
+  assert.equal(find({"csharp.mech":{mirrors:"common.src",epic:"E2"}}).length,1,"the set comparison");
+  assert.equal(find({"csharp.mech":{mirrors:"typescript.doc",epic:"E2"}}).length,1);
+  assert.match(find({"csharp.mech":{mirrors:"typescript.doc",epic:"E2"}})[0],/typescript\.doc has no tasks: line; declare the applicability change instead/);
+  assert.equal(find({"csharp.mech":{mirrors:"common.missing",epic:"E2"}}).length,1,"the source must exist");
+  assert.ok(root);
+});
+
+test("provenance: a declared gate needs the same path_tasks as the rule and a reason of at least 20 characters",t=>{
+  const {catalog}=provenanceFixture(t);
+  const declared=(path_tasks,reason)=>({"csharp.mech":{declared:{path_tasks,reason},epic:"E2"}});
+  const find=gates=>provenanceFindings(catalog(),gates,[]);
+  assert.deepEqual(find(declared(["test","implement"],REASON)),[]);
+  assert.equal(find(declared(["test","implement"],"x")).length,1);
+  assert.equal(find(declared(["implement"],REASON)).length,1);
+  assert.equal(find({"csharp.mech":{mirrors:"common.src",declared:{path_tasks:["implement","test"],reason:REASON},epic:"E2"}}).length,1,"both keys");
+  assert.equal(find({"csharp.mech":{epic:"E2"}}).length,1,"neither key");
+  assert.equal(find({"csharp.plain":{declared:{path_tasks:["implement"],reason:REASON},epic:"E2"},"csharp.mech":{mirrors:"common.src",epic:"E2"}}).length,1,"declared on an ungated rule");
+});
+
+test("provenance: a record for an absent rule is allowed only while its epic has not landed",t=>{
+  const {catalog}=provenanceFixture(t);
+  const gates={"csharp.mech":{mirrors:"common.src",epic:"E2"},"csharp.later":{mirrors:"common.src",epic:"E6"}};
+  assert.deepEqual(provenanceFindings(catalog(),gates,[]),[]);
+  const landed=provenanceFindings(catalog(),gates,["E6"]);
+  assert.equal(landed.length,1);
+  assert.match(landed[0],/csharp\.later/);
+});
+
+test("provenance: a gate record names its owning epic, E2 to E6",t=>{
+  const {catalog}=provenanceFixture(t);
+  const withEpic=epic=>({"csharp.mech":{mirrors:"common.src",...(epic===undefined?{}:{epic})}});
+  assert.deepEqual(provenanceFindings(catalog(),withEpic("E6"),[]),[]);
+  for(const epic of [undefined,"E1","E9","e2"]){
+    const findings=provenanceFindings(catalog(),withEpic(epic),[]);
+    assert.equal(findings.length,1,String(epic));
+    assert.match(findings[0],/csharp\.mech: .*owning epic/);
+  }
+});
+
+test("provenance: a path-only source mirrors as no gate, and a tasks source cannot be mirrored by an ungated rule",t=>{
+  const {catalog}=provenanceFixture(t);
+  assert.deepEqual(provenanceFindings(catalog(),{"csharp.plain":{mirrors:"typescript.doc",epic:"E2"},"csharp.mech":{mirrors:"common.src",epic:"E2"}},[]),[]);
+  assert.equal(provenanceFindings(catalog(),{"csharp.plain":{mirrors:"common.src",epic:"E2"},"csharp.mech":{mirrors:"common.src",epic:"E2"}},[]).length,1);
+});
+
+test("the real catalog carries no path_tasks gate and no gate record at E1",()=>{
+  const catalog=loadCatalog(sourceRoot);
+  assert.deepEqual(catalog.filter(rule=>rule.pathTasks.length).map(rule=>rule.id),[],"E1 gates no real rule");
+  assert.deepEqual(provenanceFindings(catalog,{},[]),[]);
+});
+
+// ---- the byte caps (E1.S2): a ceiling per scope, rule or core, from plan section 5 -------------------------------------
+// A rule cap applies whenever the rule exists; a cap with `from` applies once that epic is in LANDED_EPICS. The numbers are
+// the plan's: the always core 15,055 B + 300; `gpu --file src/x.cs` 32,293 + 20 + 300; the single-sentence and
+// three-sentence allowances of the dependency and compiler-strictness rules (O5: 3,300 B, not 3,500 B).
+const CAPS=Object.freeze([
+  {what:"the always core",core:true,max:15355},
+  {what:"gpu --file src/x.cs",tasks:["gpu"],files:["src/x.cs"],max:32613},
+  {what:"csharp.doctrine",rule:"csharp.doctrine",max:4633},
+  {what:"typescript.npm-packages",rule:"typescript.npm-packages",max:3300},
+  {what:"typescript.compiler-strictness",rule:"typescript.compiler-strictness",max:3300},
+  {what:"common.dependencies",rule:"common.dependencies",max:4000},
+  {what:"typescript.utc-timestamps",rule:"typescript.utc-timestamps",max:1200},
+  {what:"csharp.boundaries",rule:"csharp.boundaries",max:1400},
+  {what:"typescript.doctrine",rule:"typescript.doctrine",max:4700,from:"E4"},
+]);
+
+function capFindings(catalog,caps,landedEpics){
+  const byId=new Map(catalog.map(rule=>[rule.id,rule]));
+  const closure=new Set();
+  const addCore=id=>{ if(closure.has(id))return; closure.add(id); byId.get(id).depends.forEach(addCore); };
+  catalog.filter(rule=>rule.load==="always").forEach(rule=>addCore(rule.id));
+  const findings=[];
+  for(const cap of caps){
+    if(cap.from&&!landedEpics.includes(cap.from))continue;
+    let bytes;
+    if(cap.core)bytes=[...closure].reduce((sum,id)=>sum+byId.get(id).bytes,0);
+    else if(cap.rule){ if(!byId.has(cap.rule))continue; bytes=byId.get(cap.rule).bytes; }
+    else bytes=selectRules(catalog,cap.tasks,cap.files).reduce((sum,rule)=>sum+rule.bytes,0);
+    if(bytes>cap.max)findings.push(`${cap.what} is ${bytes} B, over its cap of ${cap.max} B`);
+  }
+  return findings;
+}
+
+// A rule file of EXACTLY `total` bytes (front matter included — the catalog's `bytes` is the whole folded file).
+function sizedRule(put,file,metadata,total){
+  const head=`---\n${metadata}\n---\n`;
+  put(file,metadata,"x".repeat(total-Buffer.byteLength(head)));
+}
+
+test("every cap holds on the real catalog",()=>{
+  assert.deepEqual(capFindings(loadCatalog(sourceRoot),CAPS,LANDED_EPICS),[]);
+});
+
+test("a cap is red one byte over: the core, a rule, and a rule whose cap starts at its epic",t=>{
+  const over=(file,metadata,total,landed=[])=>{
+    const {root,put}=fixture(t);
+    sizedRule(put,file,metadata,total);
+    return capFindings(loadCatalog(root),CAPS,landed);
+  };
+  assert.deepEqual(over("common/core.md","id: common.core\nload: always",15355),[],"the cap itself is allowed");
+  assert.equal(over("common/core.md","id: common.core\nload: always",15356).length,1);
+  assert.deepEqual(over("typescript/npm-packages.md",'id: typescript.npm-packages\nload: conditional\ntasks: ["dependencies"]',3300),[]);
+  assert.equal(over("typescript/npm-packages.md",'id: typescript.npm-packages\nload: conditional\ntasks: ["dependencies"]',3301).length,1);
+  const doctrine='id: typescript.doctrine\nload: conditional\ntasks: ["audit"]';
+  assert.deepEqual(over("typescript/doctrine.md",doctrine,4701,[]),[],"typescript.doctrine is capped from E4");
+  assert.equal(over("typescript/doctrine.md",doctrine,4701,["E4"]).length,1);
+});
+
+// ---- the selection cases of a gate record: a positive and the defined negatives (plan section 4.4) --------------------
+
+const CASE_RULE="csharp.mech";
+function caseFixture(t,record){
+  const {root}=provenanceFixture(t);
+  return caseFindings(loadCatalog(root),record);
+}
+const POSITIVE={tasks:["implement"],files:["src/x.cs"],selected:true};
+const OUT_OF_GATE={tasks:["inspect"],files:["src/x.cs"],selected:false};
+const NO_PATH={tasks:["implement"],files:["ui/a.ts"],selected:false};
+const gatedRecord=cases=>({[CASE_RULE]:{mirrors:"common.src",epic:"E2",cases}});
+
+test("a gated rule's record needs a positive, a negative outside the gate and a negative with no matching file",t=>{
+  assert.deepEqual(caseFixture(t,gatedRecord([POSITIVE,OUT_OF_GATE,NO_PATH])),[],"the selection fixture: a positive and the defined negatives");
+});
+
+test("a gated rule's record is red without each negative, and when a case does not hold under the selector",t=>{
+  const without=cases=>caseFixture(t,gatedRecord(cases));
+  const noOut=without([POSITIVE,NO_PATH]);
+  assert.equal(noOut.length,1);
+  assert.match(noOut[0],/csharp\.mech/);
+  assert.match(noOut[0],/outside the gate/);
+  const noPath=without([POSITIVE,OUT_OF_GATE]);
+  assert.equal(noPath.length,1);
+  assert.match(noPath[0],/no matching file/);
+  const wrong=without([POSITIVE,OUT_OF_GATE,NO_PATH,{tasks:["gpu"],files:["src/x.cs"],selected:true}]);
+  assert.equal(wrong.length,1);
+  assert.match(wrong[0],/gpu src\/x\.cs/);
+  assert.match(without([OUT_OF_GATE,NO_PATH]).join("\n"),/positive/);
+});
+
+test("a gated rule needs a positive case through the gate, not one that its tasks line selects",t=>{
+  const {put,root}=provenanceFixture(t);
+  put("csharp/mech.md",'id: csharp.mech\nload: conditional\npaths: ["**/*.cs"]\npath_tasks: ["implement","test"]\ntasks: ["audit"]');
+  const throughTasks={tasks:["audit"],files:["src/x.cs"],selected:true};
+  const found=caseFindings(loadCatalog(root),gatedRecord([throughTasks,OUT_OF_GATE,NO_PATH]));
+  assert.equal(found.length,1);
+  assert.match(found[0],/csharp\.mech: no positive case through the gate — a matching file and a gate task/);
+  assert.deepEqual(caseFindings(loadCatalog(root),gatedRecord([throughTasks,POSITIVE,OUT_OF_GATE,NO_PATH])),[],"a positive through the gate beside it is enough");
+});
+
+test("an ungated mirror needs a negative with no matching file",t=>{
+  const record=cases=>({"typescript.doc":{mirrors:"csharp.plain",epic:"E2",cases}});
+  const positive={tasks:["inspect"],files:["ui/a.ts"],selected:true};
+  assert.deepEqual(caseFixture(t,record([positive,{tasks:["inspect"],files:["src/x.cs"],selected:false}])),[]);
+  assert.equal(caseFixture(t,record([positive])).length,1);
+});
+
+test("a case with an unknown task or a path that is not root-relative is a finding",t=>{
+  const bad=caseFixture(t,gatedRecord([POSITIVE,OUT_OF_GATE,NO_PATH,{tasks:["imlpement"],files:["src/x.cs"],selected:false},{tasks:["inspect"],files:["../x.cs"],selected:false}]));
+  assert.ok(bad.some(finding=>/imlpement/.test(finding)));
+  assert.ok(bad.some(finding=>/\.\.\/x\.cs/.test(finding)));
+});
+
+test("the allowances section of research/module_rules.md states every cap the tests enforce, with the epic that owns it",()=>{
+  // The prose is where an epic reads its budget before it writes; a cap changed here and not there is a story that
+  // plans against a number the suite no longer holds.
+  const text=fs.readFileSync(path.join(sourceRoot,"research/module_rules.md"),"utf8");
+  const start=text.indexOf("## Byte allowances per epic");
+  assert.ok(start>=0,"research/module_rules.md has no `## Byte allowances per epic` section");
+  const end=text.indexOf("\n## ",start+1);
+  const section=text.slice(start,end<0?undefined:end);
+  for(const cap of CAPS)assert.ok(section.includes(`${cap.max.toLocaleString("en-US")} B`),`the allowances section does not state ${cap.what} at ${cap.max.toLocaleString("en-US")} B`);
+  for(const epic of ["E2","E3","E4","E5","E6"])assert.ok(section.includes(epic),`${epic} has no allowance row`);
 });

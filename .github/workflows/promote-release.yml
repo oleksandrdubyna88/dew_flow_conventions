@@ -4,7 +4,8 @@ name: promote-release
 # it — not, as of 2026-09-14, the only possible way: anyone with push rights can move it by hand and
 # skip the checks below. Since 2026-09-18 the ref carries branch protection (stated in
 # .github/branch-protection.json): it can no longer be REWOUND, deleted or given a non-linear
-# history, an admin is not exempt, and `tools · selftest` + `workflows · actionlint` are REQUIRED —
+# history, an admin is not exempt, and `tools · selftest`, `workflows · actionlint` and (once it has
+# reported) `tools · lock fixtures` are REQUIRED —
 # required checks apply to a direct push, so a commit hand-pushed here without ever running ci is
 # refused by GitHub itself. That cannot block a legitimate promotion, because the gate below already
 # refuses a sha whose ci run is absent, unfinished or red: every sha GitHub would reject is one this

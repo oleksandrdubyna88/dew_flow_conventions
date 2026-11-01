@@ -1,0 +1,228 @@
+{
+  "note": "One entry per requirement of todo/PLAN_node_rule_parity.md section 3 (P: C# requirements, R: TypeScript requirements, G: gaps on both sides). The matrix has exactly one row per entry; the reasons of the deliberately-absent entries live here and nowhere else. Checked by tools/parity-matrix.test.mjs.",
+  "entries": [
+    {
+      "id": "P1",
+      "topic": "toolchain version statement",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E4"
+    },
+    {
+      "id": "P2",
+      "topic": "warnings are errors",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E3"
+    },
+    {
+      "id": "P3",
+      "topic": "nullability is enforced",
+      "side": "both",
+      "status": "planned",
+      "epic": "E3"
+    },
+    {
+      "id": "P4",
+      "topic": "complexity ceiling and pure functions",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E3"
+    },
+    {
+      "id": "P5",
+      "topic": "records for data, typed values, no null in business logic",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E4",
+      "scopedAbsences": [
+        {
+          "scope": "javascript-without-project",
+          "reason": "nothing checks a type there: the typed parts are absent and the doctrine's JavaScript paragraph states the enforceable subset (plan section 3.1 P5, section 18 finding 5)"
+        }
+      ]
+    },
+    {
+      "id": "P6",
+      "topic": "an omitted wire field is null, and who reads it",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E4"
+    },
+    {
+      "id": "P7",
+      "topic": "expected failures are values, not exceptions",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E4"
+    },
+    {
+      "id": "P8",
+      "topic": "the build worker pool is bounded",
+      "side": "csharp",
+      "status": "deliberately-absent",
+      "reason": "no Node counterpart: the rule exists for a measured MSBuild worker-pool problem Node builds do not have; a hook is added for a measurement, not for symmetry, and Node's enforced rule is P2's check (plan section 3.1 P8, section 4.6)"
+    },
+    {
+      "id": "P9",
+      "topic": "package pinning, freshness and licence",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E2"
+    },
+    {
+      "id": "P10",
+      "topic": "the test runner and its Definition of Done box",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E6"
+    },
+    {
+      "id": "P11",
+      "topic": "architecture tests read assembly references",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E6"
+    },
+    {
+      "id": "P12",
+      "topic": "the logging host shape and the colour measurement",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E6"
+    },
+    {
+      "id": "P13",
+      "topic": "a timeout is not a cancellation",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E5"
+    },
+    {
+      "id": "P14",
+      "topic": "secrets stay out of the repository",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E6"
+    },
+    {
+      "id": "P15",
+      "topic": "a timed-out child is killed with its whole tree",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E5"
+    },
+    {
+      "id": "P16",
+      "topic": "UTC timestamps in the language's own clock",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E6"
+    },
+    {
+      "id": "P17",
+      "topic": "platform limits count UTF-8 bytes",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E6"
+    },
+    {
+      "id": "P18",
+      "topic": "HTTP contract rows and the coverage scanner's path",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E6"
+    },
+    {
+      "id": "P19",
+      "topic": "post-deploy checks name every ecosystem",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E6"
+    },
+    {
+      "id": "P20",
+      "topic": "which files select the language doctrine",
+      "side": "csharp",
+      "status": "planned",
+      "epic": "E4"
+    },
+    {
+      "id": "P21",
+      "topic": "the compiler is the floor under every file",
+      "side": "both",
+      "status": "planned",
+      "epic": "E3"
+    },
+    {
+      "id": "R1",
+      "topic": "no JSON.stringify into a script element",
+      "side": "typescript",
+      "status": "planned",
+      "epic": "E6"
+    },
+    {
+      "id": "R2",
+      "topic": "no as cast in a test fixture",
+      "side": "typescript",
+      "status": "planned",
+      "epic": "E6"
+    },
+    {
+      "id": "R3",
+      "topic": "a Definition of Done per language",
+      "side": "typescript",
+      "status": "planned",
+      "epic": "E4"
+    },
+    {
+      "id": "R4",
+      "topic": "tsc emits despite errors",
+      "side": "typescript",
+      "status": "deliberately-absent",
+      "reason": "no C# counterpart needed: the C# compiler emits nothing on an error (plan section 3.2 R4)"
+    },
+    {
+      "id": "R5",
+      "topic": "a backtick inside a template literal ends it",
+      "side": "typescript",
+      "status": "deliberately-absent",
+      "reason": "no comparable C# trap: a raw string literal cannot be ended by a shorter run of quotes (plan section 3.2 R5)"
+    },
+    {
+      "id": "G1",
+      "topic": "an analyzer or lint requirement",
+      "side": "both",
+      "status": "planned",
+      "epic": "E3"
+    },
+    {
+      "id": "G2",
+      "topic": "a lock file and a locked restore",
+      "side": "both",
+      "status": "planned",
+      "epic": "E2"
+    },
+    {
+      "id": "G3",
+      "topic": "a vulnerability scan at the monthly bump",
+      "side": "both",
+      "status": "planned",
+      "epic": "E2"
+    },
+    {
+      "id": "G4",
+      "topic": "coverage thresholds",
+      "side": "both",
+      "status": "deliberately-absent",
+      "reason": "deliberately absent on both sides: a coverage number is gamed the week it lands (plan section 3.3; Q10)"
+    },
+    {
+      "id": "G5",
+      "topic": "CI steps per language",
+      "side": "both",
+      "status": "deliberately-absent",
+      "reason": "deliberately absent as shared rules: each repository's own CI names the exact commands (plan section 3.3)"
+    }
+  ]
+}

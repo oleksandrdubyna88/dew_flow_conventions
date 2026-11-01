@@ -1,0 +1,673 @@
+{
+  "note": "The parity matrix of todo/PLAN_node_rule_parity.md section 3: one row per inventory entry, a C# side and a TypeScript side. In the first epic every row is planned or deliberately absent; an owning epic turns its rows into active sides (delivery with sections, enforcement, selectors, mood, consequence, suppression) in the commit that lands the text. Checked by tools/parity-matrix.test.mjs.",
+  "rows": [
+    {
+      "inventory": "P1",
+      "topic": "toolchain version statement",
+      "status": "planned",
+      "epic": "E4",
+      "strength": "prose on every language file; equal",
+      "csharp": {
+        "planned": "E4"
+      },
+      "typescript": {
+        "planned": "E4"
+      }
+    },
+    {
+      "inventory": "P2",
+      "topic": "warnings are errors",
+      "status": "planned",
+      "epic": "E3",
+      "strength": "a file plus a CI check on both sides; equal",
+      "csharp": {
+        "planned": "E3",
+        "delivery": [
+          {
+            "id": "csharp.doctrine",
+            "section": "## 1. Language & runtime"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E3",
+        "delivery": [
+          {
+            "id": "typescript.doctrine"
+          },
+          {
+            "id": "typescript.compiler-strictness"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P3",
+      "topic": "nullability is enforced",
+      "status": "planned",
+      "epic": "E3",
+      "strength": "raised on both sides; equal",
+      "csharp": {
+        "planned": "E3",
+        "delivery": [
+          {
+            "id": "csharp.doctrine",
+            "section": "## 1. Language & runtime"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E3",
+        "delivery": [
+          {
+            "id": "typescript.doctrine"
+          },
+          {
+            "id": "typescript.compiler-strictness"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P4",
+      "topic": "complexity ceiling and pure functions",
+      "status": "planned",
+      "epic": "E3",
+      "strength": "prose against lint-enforced; stronger on the TypeScript side",
+      "csharp": {
+        "planned": "E3",
+        "delivery": [
+          {
+            "id": "csharp.doctrine",
+            "section": "## 6. Pure functions, small methods"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E3",
+        "delivery": [
+          {
+            "id": "typescript.compiler-strictness"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P5",
+      "topic": "records for data, typed values, no null in business logic",
+      "status": "planned",
+      "epic": "E4",
+      "strength": "prose and prose",
+      "csharp": {
+        "planned": "E4",
+        "delivery": [
+          {
+            "id": "csharp.doctrine"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E4",
+        "delivery": [
+          {
+            "id": "typescript.doctrine"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P6",
+      "topic": "an omitted wire field is null, and who reads it",
+      "status": "planned",
+      "epic": "E4",
+      "strength": "prose and prose",
+      "csharp": {
+        "planned": "E4",
+        "delivery": [
+          {
+            "id": "csharp.boundaries"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E4",
+        "delivery": [
+          {
+            "id": "typescript.boundaries"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P7",
+      "topic": "expected failures are values, not exceptions",
+      "status": "planned",
+      "epic": "E4",
+      "strength": "prose and prose",
+      "csharp": {
+        "planned": "E4",
+        "delivery": [
+          {
+            "id": "csharp.doctrine"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E4",
+        "delivery": [
+          {
+            "id": "typescript.doctrine"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P8",
+      "topic": "the build worker pool is bounded",
+      "status": "deliberately-absent",
+      "strength": "deliberately absent on the TypeScript side",
+      "csharp": {
+        "delivery": [
+          {
+            "id": "csharp.dotnet-build",
+            "section": "# `dotnet build` — bound the worker pool, because several sessions build at once"
+          }
+        ]
+      },
+      "typescript": {
+        "absent": true
+      }
+    },
+    {
+      "inventory": "P9",
+      "topic": "package pinning, freshness and licence",
+      "status": "planned",
+      "epic": "E2",
+      "strength": "prose and prose, each selected by its own manifest",
+      "csharp": {
+        "planned": "E2",
+        "delivery": [
+          {
+            "id": "csharp.nuget-packages"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E2",
+        "delivery": [
+          {
+            "id": "typescript.npm-packages"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P10",
+      "topic": "the test runner and its Definition of Done box",
+      "status": "planned",
+      "epic": "E6",
+      "strength": "prose and prose, gated on the testing tasks",
+      "csharp": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "csharp.testing"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "typescript.testing"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P11",
+      "topic": "architecture tests read assembly references",
+      "status": "planned",
+      "epic": "E6",
+      "strength": "prose and prose",
+      "csharp": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "csharp.testing"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "typescript.testing"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P12",
+      "topic": "the logging host shape and the colour measurement",
+      "status": "planned",
+      "epic": "E6",
+      "strength": "prose and prose, gated on the logging tasks",
+      "csharp": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "csharp.logging"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "typescript.logging"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P13",
+      "topic": "a timeout is not a cancellation",
+      "status": "planned",
+      "epic": "E5",
+      "strength": "prose and prose, gated on the reliability tasks",
+      "csharp": {
+        "planned": "E5",
+        "delivery": [
+          {
+            "id": "csharp.lifecycle"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E5",
+        "delivery": [
+          {
+            "id": "typescript.lifecycle"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P14",
+      "topic": "secrets stay out of the repository",
+      "status": "planned",
+      "epic": "E6",
+      "strength": "the always core; equal",
+      "csharp": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "common.security"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "common.security"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P15",
+      "topic": "a timed-out child is killed with its whole tree",
+      "status": "planned",
+      "epic": "E5",
+      "strength": "the always core; equal, the asymmetry stated",
+      "csharp": {
+        "planned": "E5",
+        "delivery": [
+          {
+            "id": "common.security"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E5",
+        "delivery": [
+          {
+            "id": "typescript.lifecycle"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P16",
+      "topic": "UTC timestamps in the language's own clock",
+      "status": "planned",
+      "epic": "E6",
+      "strength": "prose and prose, gated on the storage tasks",
+      "csharp": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "csharp.utc-timestamps"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "typescript.utc-timestamps"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P17",
+      "topic": "platform limits count UTF-8 bytes",
+      "status": "planned",
+      "epic": "E6",
+      "strength": "one clause",
+      "csharp": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "common.platform-limits"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "common.platform-limits"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P18",
+      "topic": "HTTP contract rows and the coverage scanner's path",
+      "status": "planned",
+      "epic": "E6",
+      "strength": "rows and rows; the scanner's preferred path and the same path",
+      "csharp": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "common.http-contracts"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "common.http-contracts"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P19",
+      "topic": "post-deploy checks name every ecosystem",
+      "status": "planned",
+      "epic": "E6",
+      "strength": "one word",
+      "csharp": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "common.post-deploy-checks"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "common.post-deploy-checks"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P20",
+      "topic": "which files select the language doctrine",
+      "status": "planned",
+      "epic": "E4",
+      "strength": "selector and selector, checked by the selection baseline",
+      "csharp": {
+        "planned": "E4",
+        "delivery": [
+          {
+            "id": "csharp.doctrine"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E4",
+        "delivery": [
+          {
+            "id": "typescript.doctrine"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "P21",
+      "topic": "the compiler is the floor under every file",
+      "status": "planned",
+      "epic": "E3",
+      "strength": "floor and floor; equal by the check",
+      "csharp": {
+        "planned": "E3",
+        "delivery": [
+          {
+            "id": "csharp.doctrine"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E3"
+      }
+    },
+    {
+      "inventory": "R1",
+      "topic": "no JSON.stringify into a script element",
+      "status": "planned",
+      "epic": "E6",
+      "strength": "mandatory and mandatory, gated on implement, test, audit, ui and http",
+      "csharp": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "csharp.boundaries"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E4",
+        "delivery": [
+          {
+            "id": "typescript.boundaries"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "R2",
+      "topic": "no as cast in a test fixture",
+      "status": "planned",
+      "epic": "E6",
+      "strength": "prose and prose; typed-fixture discipline side by side",
+      "csharp": {
+        "planned": "E6",
+        "delivery": [
+          {
+            "id": "csharp.testing"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E4",
+        "delivery": [
+          {
+            "id": "typescript.testing"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "R3",
+      "topic": "a Definition of Done per language",
+      "status": "planned",
+      "epic": "E4",
+      "strength": "box and box, the same gate",
+      "csharp": {
+        "planned": "E4",
+        "delivery": [
+          {
+            "id": "csharp.definition-of-done"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E4",
+        "delivery": [
+          {
+            "id": "typescript.definition-of-done"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "R4",
+      "topic": "tsc emits despite errors",
+      "status": "deliberately-absent",
+      "strength": "deliberately absent on the C# side",
+      "csharp": {
+        "absent": true
+      },
+      "typescript": {
+        "delivery": [
+          {
+            "id": "typescript.doctrine",
+            "section": "## 4. `tsc` emits despite errors — so a green suite can be green against stale output"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "R5",
+      "topic": "a backtick inside a template literal ends it",
+      "status": "deliberately-absent",
+      "strength": "deliberately absent on the C# side",
+      "csharp": {
+        "absent": true
+      },
+      "typescript": {
+        "delivery": [
+          {
+            "id": "typescript.doctrine",
+            "section": "## 2. A backtick inside a template literal ends it — including inside a comment"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "G1",
+      "topic": "an analyzer or lint requirement",
+      "status": "planned",
+      "epic": "E3",
+      "strength": "raised on both sides, named asymmetrically",
+      "csharp": {
+        "planned": "E3",
+        "delivery": [
+          {
+            "id": "csharp.doctrine",
+            "section": "## 1. Language & runtime"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E3",
+        "delivery": [
+          {
+            "id": "typescript.compiler-strictness"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "G2",
+      "topic": "a lock file and a locked restore",
+      "status": "planned",
+      "epic": "E2",
+      "strength": "raised on both sides; equal",
+      "csharp": {
+        "planned": "E2",
+        "delivery": [
+          {
+            "id": "csharp.nuget-packages"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E2",
+        "delivery": [
+          {
+            "id": "typescript.npm-packages"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "G3",
+      "topic": "a vulnerability scan at the monthly bump",
+      "status": "planned",
+      "epic": "E2",
+      "strength": "raised on both sides, in one shared rule",
+      "csharp": {
+        "planned": "E2",
+        "delivery": [
+          {
+            "id": "common.dependencies"
+          }
+        ]
+      },
+      "typescript": {
+        "planned": "E2",
+        "delivery": [
+          {
+            "id": "common.dependencies"
+          }
+        ]
+      }
+    },
+    {
+      "inventory": "G4",
+      "topic": "coverage thresholds",
+      "status": "deliberately-absent",
+      "strength": "deliberately absent on both sides",
+      "csharp": {
+        "absent": true
+      },
+      "typescript": {
+        "absent": true
+      }
+    },
+    {
+      "inventory": "G5",
+      "topic": "CI steps per language",
+      "status": "deliberately-absent",
+      "strength": "deliberately absent as shared rules",
+      "csharp": {
+        "absent": true
+      },
+      "typescript": {
+        "absent": true
+      }
+    }
+  ]
+}

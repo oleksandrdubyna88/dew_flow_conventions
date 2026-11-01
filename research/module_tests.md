@@ -1357,3 +1357,162 @@ copy of the tree (`git archive` into a scratch repository), because a worktree's
 **Core-text items of the integration.** The rule gained: a store the run owns counts as a container, an old lock-owned name is judged by its old lock, not by age (no tool in this repository matches an old prefix, so text only), the janitor sweeps no images, one helper per test language with the guard checking the token constants, `RUNNER_TEMP` is job-scoped and no `raw-temp` finding (the guard never matched it; a test now pins that), the CI owner pid only for a resource that outlives its step, a workflow `services:` container is the §6(b) shape, `--rm` acts when the container stops, no resource at module load, a child that makes its own temp paths is handed an owned folder, and a store with no lock of its own is lock-owned on one lock server. The one behaviour change is the token check: `leftovers-check.mjs` finds every `REPO_TOKEN` / `RepoToken` constant by shape in the tracked source files (`.mjs .cjs .js .ts .cs .sh .ps1 .py .rs`, comments skipped, `tools/lib` included because the helper lives there) and reports class `token` when two differ or one is not a row of the table that names this repository (RED: two helpers holding `conventions` and `other` were `clean`).
 
 Also in the integration: `leftovers-check.mjs` covers `docker compose -p`/`--project-name` (global options only; `-p` after the subcommand is `--publish`) and `COMPOSE_PROJECT_NAME`, and C#'s `Directory.CreateTempSubdirectory` and `Path.GetTempFileName`; `leftovers-sweep.mjs` judges an orphan claim (`<name>.owner` with no folder, left by a helper that claims first) by its owner instead of by age alone; the token check proves the token BELONGS to this repository (the `## Tokens` row of `REPO_TOKEN` must carry `REPO_ROW`, the helper's statement of which row is this repository's; no identity fails closed — the table holds descriptions, not repository names, so the identity is that constant); the rule's contract text gained the DNS host name and its normalisation, the CI owner pid, the claim-first folder variant, the old-prefix end date and the janitor's `--token` and `JANITOR_MIN_AGE_MINUTES`.
+
+## `path_tasks` and gate provenance (rule-parity E1.S1)
+
+`tools/rules.test.mjs` gains eleven cases beside the original 24 (unchanged, `normalized.filter(file=>match(file))`
+mutation included). Selection: a gated rule is selected by its paths only with a task inside its gate (a task outside, no
+file, a non-matching file, two gate tasks in one reason); an ungated rule with the same paths is unaffected; plain
+`tasks` and dependencies ignore the gate. Metadata: the six refusals (no `paths`, `paths: []`, an empty list, an unknown
+task, a string, a `load: always` rule) and a repeated task (`path_tasks must not repeat a task`, so a selection reason names each
+task once). `explain` shows `path_tasks` on every rule with the same ids and bytes. The
+provenance cases cover `provenanceFindings` (mirror equal / different tasks / path-only source, declared with a short
+reason or a different set, both or neither key, an absent rule's record before and after its epic lands, the real
+catalog with `gates: {}`).
+
+Observed RED: with the module missing the file does not load; with a stub module the 24 old tests pass and eleven fail
+on `unknown metadata key path_tasks`. Mutations, one at a time, each red in the named case: dropping the gate filter
+fails the selection, ungated-sibling, dependency and explain cases; dropping the `needs paths` check fails the refusals
+case; dropping the CLI field fails the explain case; dropping the set comparison fails the two provenance mirror cases.
+
+Not proved: that any real rule is correctly gated. No real rule carries `path_tasks` in the first epic; the selection
+baseline (`research/selection-matrix.json`) is the control that a later gate does not drop a rule from a scope silently.
+
+## The selection baseline (rule-parity E1.S2)
+
+`tools/selection-matrix.test.mjs` (nine cases) and the new cases of `tools/rules.test.mjs`:
+
+- The committed `research/selection-matrix.json` equals what `render(catalog)` produces from the real catalog, byte for byte.
+- Every rule of the catalog appears in the id list of at least one recorded scope. Mutation: restoring the file from before
+  `App.sln`, `api/a.http`, `common/testing.md`, `pr` and `policy` were added names `common.pull-requests`, `common.rule-ownership`
+  and `csharp.dotnet-build`; a scratch `path_tasks: ["audit"]` on `common/http-contracts.md` moves `inspect api/a.http` and eight more scopes.
+- The file holds the 165 scopes once each in the tool's order, sorted unique ids, exactly the 22 pins (9, 4, 5, 4 per
+  single-read task), a reason of at least 10 characters on every other single-read scope, and no `ui` scope with a language
+  file on the list (D5).
+- A copy of the corpus with `tasks: ["dependencies"]` removed from `csharp/nuget-packages.md`: `idDrift` names
+  `dependencies (no file)` and `csharp.nuget-packages`, while `drifted` of the body freeze answers `[]` — the point of D12.
+- The tool on a copy: exit 0 `in step`; after a hand edit exit 1 naming the scope; `--write` restores the committed bytes and
+  leaves no `.tmp`; `--bytes` equals `bytesTable`; an unknown argument is usage, exit 2.
+- The 22 pins are named as a literal list in the test, independent of the tool's own table: swapping a pinned scope for an unpinned one of the same task keeps every count green and fails that list.
+- `gates` is `{}` (E1 declares nothing); the test is renamed when the first epic writes a record.
+- `rules.test.mjs`: every pin (read from the matrix file) selects at most 32,768 B (the original test name kept); every cap
+  of `CAPS` holds on the real catalog; a cap is red one byte over, for the core, for a rule, and for a rule capped from an
+  epic that has not landed (`typescript.doctrine`); `caseFindings`: a gated rule whose only positive is selected by its
+  `tasks:` line (task `audit`, a `.cs` file) has no positive through the gate, one finding; the selection fixture of a positive and the defined
+  negatives passes, each missing negative and a case the selector contradicts is one finding, an ungated mirror needs its
+  no-path negative, an unknown task or a non-root-relative file is a finding.
+
+Observed RED: both files fail to load while the tool is missing. Mutations, each red in the named case: deleting one id from
+the recorded file (the byte-equality case and the tool case); pinning `inspect package.json` (the pins case, 35,409 B, and
+the 22-pin count); pinning `ui ui/a.ts` (the pins case, D5, while the one-read test stays green); lowering the core cap to
+15,054 B (the cap cases).
+
+Not proved: that the 165 scopes are the right ones (they are the representative file sets of the plan, not every path), that
+a pinned scope is the best list, or that a gate record's cases are sufficient for a rule's whole path list.
+
+## The allowances and the empty gate schema (rule-parity E1.S5)
+
+Two additions to the selection baseline's tests. `the selection matrix carries no gate declaration at E1` asserts the
+recorded `gates` and the tool's `GATES` are both `{}`: E1 ships the schema and the check, every record is written by the epic
+that lands its file, and the test is renamed when the first one is (the comment says what it becomes). `the allowances
+section of research/module_rules.md states every cap the tests enforce` reads the `## Byte allowances per epic` section and
+fails when a cap of `CAPS` is missing from it or an epic E2 to E6 has no row.
+
+Observed: the allowances case failed while the section did not exist, and after the section was written failed again when
+the core's cap was changed to 15,350 B in the prose only; writing one gate record into `GATES` and regenerating the file made
+the no-declaration case red. Not proved: that the interim ("after E3") numbers are what the epics will measure; they are the
+plan's estimates, and each epic replaces them with `--bytes`.
+
+## The parity matrix and inventory (rule-parity E1.S3)
+
+`tools/parity-matrix.test.mjs` (twelve cases) over the two data files and `parityFindings`:
+
+- The real files: 31 entries and 31 rows, one to one, no finding against the catalog, the section records and
+  `LANDED_EPICS`; every row `planned` or `deliberately-absent` (P8, R4, R5, G4, G5); the present side of P8, R4 and R5 is
+  accepted only on a deliberately-absent row, and a row-level `suppression` or a reason on the wrong row is a finding.
+- The real-row proof (its delivery sets are asserted equal to the real P2 and P3 rows of the matrix), on an owned folder holding the real C# doctrine, the always core, a TypeScript doctrine with E3's planned
+  front matter, a compiler-strictness rule and a fixture check tool: P2 and P3 as `equal` rows pass the union on source and
+  manifest scopes, and the same rows without the TypeScript source-file statement fail, naming the task and the pair.
+- P4 may be `stronger-ts` with a reason; P2 may not.
+- An equal row naming a missing rule or a missing section is one finding each; a planned row with no epic, with `E9`, or with a
+  side planned for `E1` is one finding each; an entry with no row, a row with no entry, two rows, a different status or epic,
+  or a deliberately-absent row with a reason is one finding each; a planned row of a landed epic is a finding.
+- Heading inheritance on the real sections: `MUST` on a subsection of the reliability rule (its H1 is marked) passes and
+  `SHOULD` there is a finding; `SHOULD` on a section of the testing rule passes and `MUST` there is a finding.
+- An active side against reality: a `selectors` list that is not exactly its delivery ids (an empty list is a finding), a selectors item that differs from the front matter, a check tool that does not list a
+  delivery id, a hook naming no file.
+
+Observed RED: with the data files absent the real-file cases fail with the test's own message. On the real files, giving P10
+an active shape with the delivery `common.testng` failed naming P10; dropping P13's epic failed naming P13. Replacing the
+union by an intersection failed the P2/P3 proof, the missing-rule case and the reality case.
+
+Not proved: that any real row is correct once it is active (none is in the first epic); the first real-catalog proof is the
+third epic's. The correspondence pairs are the plan's file sets, not every path a language can name.
+
+## The move verifier (rule-parity E1.S4)
+
+`tools/moved-blocks.test.mjs` (nineteen cases) runs in an owned git repository with a ten-line source (`é` on line 3, an
+indented line 4, a fence on lines 8-10) and a destination:
+
+- Baselines record the exact range (the commit as 40 hex, `é` as two bytes, a single line as `N-N`); a range that starts or ends
+  inside the fence is refused with the fence message and the whole fence is recorded; a column range and every other form is
+  refused naming E1.S0b; lines past the end, an unknown commit, an existing id and a bad epic are refused, and a refusal writes
+  nothing. `fenceDepth` (added to `tools/lib/rule-body.mjs`) has its own case, including a longer fence not closed by a shorter run.
+- An unchanged block is activated (the destination lines found in the working tree) and verifies after the move commit; a
+  changed block is superseded, the new entry carries `justifiedBy` and `justifiedFiles`, and the old entry gains `supersededBy`
+  and no other byte changes; a justifying commit that also touches another file or is a merge commit, a different epic from the baseline's, a missing flag, and a destination holding the
+  old words are each refused or a checker finding.
+- The checker: an unpaired baseline survives two lines inserted above it and fails on one changed byte or a landed epic; an
+  activation is one finding each for the block twice, mid-line, changed, absent in the destination, or left in the source;
+  two activations, an activation with a supersession, and a dangling reference are one finding each.
+- Append-only: a hand-formatted first entry is still byte for byte there after a fourth is appended. A copy of the fixture with
+  no `.git` gives the same findings. The real manifest holds exactly the 25 baselines, none activated, with F8's byte lengths in
+  F8's order; the tool prints `moved-blocks: OK — 25 baseline(s), 0 activated, 0 superseded`.
+
+Observed RED: the module missing. Mutations, each red in the named case: dropping the fence check (the fence case); accepting
+column ranges (the mid-line case and the command-line case); judging an unpaired baseline by its line numbers (the
+unpaired-baseline case); dropping the `justifiedFiles` check (the supersession-refusal case); re-serialising on append (the
+append-only case); changing one byte of line 110 of the reliability rule (the real-manifest case, naming `reliability-timeout`).
+
+Not proved: that no entry was edited after it was written (the diff and the review are the control); that a block moved to a
+destination keeps its meaning there (only its bytes).
+
+## The two lock fixtures and their required job (rule-parity E1.S4b)
+
+`tools/lock-fixtures.test.mjs` (five cases) over `tools/fixtures/locks/` (about 1.2 KB). Each fixture is copied into an owned
+folder and its commands run with a cleared environment plus `PATH`, its own `HOME`, npm cache and NuGet cache, so nothing is
+written to the checkout or to the real caches.
+
+- **npm.** `package.json` asks `picomatch` 4.0.6 and `package-lock.json` says 4.0.7: `npm ci --ignore-scripts --offline` exits 1
+  with `EUSAGE` and `lock file's picomatch@4.0.7 does not satisfy picomatch@4.0.6`, and installs nothing. The same project with
+  an honest lock installs, so the refusal is the lock's. **Deviation recorded:** the 4.0.6 is a local stub
+  (`file:./picomatch`) rather than a registry version. Resolving a registry spec needs its packument, which a cold npm cache
+  does not have offline (`ENOTCACHED`, measured here with an empty cache; the refusal the plan probed came from a warm
+  cache), while a local directory resolves from disk and the refusal text is identical.
+- **NuGet.** Two projects restored with a lock file; a project reference then makes the lock stale. A locked restore exits 1
+  with `NU1004`, `--force-evaluate` exits 0, a locked restore exits 0. No package source is contacted (a project reference, no
+  package). The SDK is the one `global.json` asks for.
+- **The case never goes quiet.** The SDK is probed inside the copied fixture, where `global.json` applies, so an image that
+  carries only other SDK bands counts as having none. With no compatible SDK the case is a failure under `CI` (`dotnet SDK
+  missing under CI — the NU1004 fixture must run here`), a named skip otherwise, and a named skip whenever `LOCK_FIXTURES_JOB`
+  is set. The jobs that run the whole suite without pinning the SDK (`Selftest` in `tools · selftest`, and the coverage step of
+  `SonarCloud Scan`) set that variable; the runner image ships .NET 8, 9 and 10 but not necessarily the fixture's band. So the
+  NuGet case runs only in the `tools · lock fixtures` job (`actions/setup-dotnet` pinned by sha, the SDK taken from the
+  fixture's `global.json`). A test reads the workflows and the protection file: the job, the sha pin of every `uses:`, the
+  variable in each suite-running step, the variable ABSENT from the workflow-level env, the locks job env and every locks step
+  env (so the required job can never skip its own case), and the context on `release` and not on `main`. The children get
+  `TMPDIR`, `TEMP` and `TMP` in an owned folder, so the SDK's scratch files never reach the shared temp root.
+
+The job runs on every push and pull request. It is required on `release` only, in `.github/branch-protection.json`; applying
+that file (`node .github/scripts/branch-protection.mjs --apply`) is an administrator's action after the job has reported once,
+because a required check that never reports blocks every merge. `node .github/scripts/branch-protection.mjs --selftest` stays
+green.
+
+Observed RED: both fixture folders missing (the test's own message). Mutations, each red: no project reference added (the
+stale restore returns 0, the NuGet case fails); the npm lock set to 4.0.6 (the refusal text changes, the npm case fails);
+`dotnet` removed from `PATH` with `CI=true` (the NuGet case fails with the SDK message), without `CI` (a named skip), with
+`LOCK_FIXTURES_JOB` set (a named skip).
+
+Not proved: a consumer's real lock (that is the dependency epic's policy and the final epic's remediation); that the job
+reports green on GitHub (it is observed on the pull request, not here).
+

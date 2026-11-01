@@ -65,6 +65,32 @@ export function outsideFencedBlocks(text) {
 }
 
 /**
+ * Per line, whether the line ENDS inside an open fence — the opener and the lines between are true, the closer and every line
+ * outside a fence are false. The trailing newline of a text makes one more (false) element, as `split("\n")` does.
+ *
+ * Reads through the same `FENCE_OPEN` / `FENCE_CLOSE` as `outsideFencedBlocks`, so the two cannot disagree about a line. The
+ * move verifier uses it to refuse a range that would start or end inside a fenced block (a move is whole lines and whole
+ * fences). `outsideFencedBlocks` is left as it is: it also blanks the lines, which this does not.
+ */
+export function fenceDepth(text) {
+  let fence = null;
+  return folded(text).split("\n").map((line) => {
+    if (fence === null) {
+      const open = FENCE_OPEN.exec(line);
+      if (open === null || (open[1].startsWith("`") && open[2].includes("`"))) return false;
+      fence = open[1];
+      return true;
+    }
+    const close = FENCE_CLOSE.exec(line);
+    if (close !== null && close[1].startsWith(fence[0]) && close[1].length >= fence.length) {
+      fence = null;
+      return false;
+    }
+    return true;
+  });
+}
+
+/**
  * Text with fenced code blocks AND inline code spans removed.
  *
  * Used for markers, where something inside backticks is being SHOWN rather than GIVEN: the rule that

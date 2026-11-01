@@ -478,7 +478,7 @@
     {
       "id": "common.testing",
       "source": "common/testing.md",
-      "bodySha256": "f09c745c01ba8964f7f92d87c4f51dcbf2ae61f83b7e81bae00b513f5e502738",
+      "bodySha256": "b6449c600fb4c0700668ca97ceb5f3b021c2d9d0d6128ea5fccb1a176fe84d3a",
       "sections": [
         "# Testing",
         "## Running tests — executables only, never `dotnet test` (MANDATORY)",
@@ -550,7 +550,7 @@
     {
       "id": "csharp.nuget-packages",
       "source": "csharp/nuget-packages.md",
-      "bodySha256": "96e982e08345f28163064afe01485a9831688a5a47b87738fd4e0c7a7dd2d0fb",
+      "bodySha256": "38dde186378cef42bc04f0aae0b8d184b68aedb01674523419cc3d9923b5f0e5",
       "sections": [
         "# NuGet packages — approval, freshness, licence",
         "## Before adding any package",
@@ -580,7 +580,7 @@
     {
       "id": "typescript.doctrine",
       "source": "typescript/doctrine.md",
-      "bodySha256": "6e74f803ba385f184be20cc276d59e17d07ebfc6bc414196ed887d71407fc680",
+      "bodySha256": "142f2a93f3760d4f5e4d691858c1de632ae80e696cad2eb35a3477822722972e",
       "sections": [
         "# TypeScript — the four traps that have actually cost us",
         "## 1. Never interpolate into a `<script>` element with `JSON.stringify` (MANDATORY)",
