@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // selection-matrix.mjs — the selection baseline of todo/PLAN_node_rule_parity.md (sections 4.1, 4.3, 5; D12).
 //
-// `research/selection-matrix.json` records the exact ids each of 108 representative scopes selects (12 file sets x 9 tasks),
+// `research/selection-matrix.json` records the exact ids each of 165 representative scopes selects (15 file sets x 11 tasks),
 // the single-read pins (the scopes that must fit one 32 KiB read) and the gate records. The rule-body freeze hashes a rule's
 // body after its front matter, so an edit to `paths`, `tasks` or `path_tasks` — which changes what every consumer's agents
 // receive — passes it. This file is what notices: tools/selection-matrix.test.mjs fails on a hand edit and on a selector
@@ -24,9 +24,10 @@ export const MATRIX_FILE = "research/selection-matrix.json";
 export const FILE_SETS = Object.freeze([
   [], ["src/x.cs"], ["src/x.csproj"], ["Directory.Build.props"], ["ui/a.ts"], ["src/a.mjs"],
   ["src/x.cs", "ui/a.ts"], ["package.json"], ["tsconfig.json"], [".npmrc"], ["src/webview/page.ts"], ["src/main.rs"],
+  ["App.sln"], ["api/a.http"], ["common/testing.md"],
 ].map(files => Object.freeze(files)));
 
-export const TASKS_PINNED = Object.freeze(["inspect", "ui", "gpu", "storage", "implement", "test", "audit", "logging", "dependencies"]);
+export const TASKS_PINNED = Object.freeze(["inspect", "ui", "gpu", "storage", "implement", "test", "audit", "logging", "dependencies", "pr", "policy"]);
 
 const SINGLE_READ_TASKS = Object.freeze(["inspect", "ui", "gpu", "storage"]);
 const scopeName = (task, files) => files.length ? `${task} ${files.join(" + ")}` : `${task} (no file)`;
@@ -41,12 +42,13 @@ const PINNED = {
   storage: ["", "tsconfig.json", ".npmrc", "Directory.Build.props"],
 };
 
-// Bytes of the 18 scopes that were over one read when the baseline was taken (E1, after the whitespace splits).
+// Bytes of the scopes that were over one read when they were first recorded: 18 at the baseline (E1, after the whitespace
+// splits) and 12 more with the file sets App.sln, api/a.http and common/testing.md, added so that every rule is recorded.
 const OVER = {
-  inspect: { "src/x.cs + ui/a.ts": 34703, "package.json": 35409, "src/main.rs": 40743 },
-  ui: { "package.json": 37622, "src/main.rs": 42956 },
-  gpu: { "src/x.csproj": 35375, "ui/a.ts": 33563, "src/x.cs + ui/a.ts": 38176, "package.json": 38882, "src/webview/page.ts": 33563, "src/main.rs": 44216 },
-  storage: { "src/x.cs": 34019, "src/x.csproj": 37101, "ui/a.ts": 35289, "src/x.cs + ui/a.ts": 39902, "package.json": 40608, "src/webview/page.ts": 35289, "src/main.rs": 45942 },
+  inspect: { "src/x.cs + ui/a.ts": 34703, "package.json": 35409, "src/main.rs": 40743, "App.sln": 40676, "api/a.http": 60125, "common/testing.md": 33846 },
+  ui: { "package.json": 37622, "src/main.rs": 42956, "App.sln": 42889, "api/a.http": 62338, "common/testing.md": 36059 },
+  gpu: { "src/x.csproj": 35375, "ui/a.ts": 33563, "src/x.cs + ui/a.ts": 38176, "package.json": 38882, "src/webview/page.ts": 33563, "src/main.rs": 44216, "App.sln": 44149, "api/a.http": 63598, "common/testing.md": 37319 },
+  storage: { "src/x.cs": 34019, "src/x.csproj": 37101, "ui/a.ts": 35289, "src/x.cs + ui/a.ts": 39902, "package.json": 40608, "src/webview/page.ts": 35289, "src/main.rs": 45942, "App.sln": 45875, "api/a.http": 65324, "common/testing.md": 39045 },
 };
 const UI_LANGUAGE = { "src/x.cs": null, "src/x.csproj": 34115, "ui/a.ts": null, "src/a.mjs": null, "src/x.cs + ui/a.ts": 36916, "src/webview/page.ts": null };
 const D5 = "D5: ui with a language file is off the single-read list (plan section 5)";
@@ -56,7 +58,7 @@ const SPLIT = {
 };
 const bytes = number => number.toLocaleString("en-US");
 
-// The 48 single-read scope names -> { oneRead: true } or { oneRead: false, why }.
+// The single-read scope names (4 tasks x every file set) -> { oneRead: true } or { oneRead: false, why }.
 export const ONE_READ = Object.freeze(Object.fromEntries(SINGLE_READ_TASKS.flatMap(task => FILE_SETS.map(files => {
   const key = files.join(" + ");
   const name = scopeName(task, files);

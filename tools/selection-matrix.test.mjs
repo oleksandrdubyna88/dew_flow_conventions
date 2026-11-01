@@ -1,4 +1,4 @@
-// The selection baseline (E1.S2): research/selection-matrix.json records the exact ids each of 108 representative scopes
+// The selection baseline (E1.S2): research/selection-matrix.json records the exact ids each of 165 representative scopes
 // selects, the 22 single-read pins and the gate records. tools/selection-matrix.mjs generates it; these tests make a hand
 // edit, or a selector change nobody regenerated for, a red suite. They are the control that `path_tasks` and the
 // later epics' new rules cannot drop a rule from a scope silently (plan sections 4.1, 4.3, 5; D12).
@@ -43,18 +43,18 @@ test("the committed selection matrix is exactly what the tool renders from the r
   assert.equal(committedLf(), render(loadCatalog(sourceRoot)), "run `node tools/selection-matrix.mjs --write` and read the diff");
 });
 
-test("the matrix holds 108 scopes once each, sorted unique ids, the 22 pins and a reason for every other single-read scope", () => {
+test("the matrix holds 165 scopes once each, sorted unique ids, the 22 pins and a reason for every other single-read scope", () => {
   const file = parsed();
   assert.equal(SCOPES.length, FILE_SETS.length * TASKS_PINNED.length);
   assert.deepEqual(file.scopes.map(scope => scope.name), SCOPES.map(scope => scope.name), "every scope once, in the tool's order");
-  assert.equal(new Set(file.scopes.map(scope => scope.name)).size, 108);
+  assert.equal(new Set(file.scopes.map(scope => scope.name)).size, 165);
   for (const scope of file.scopes) {
     assert.deepEqual(scope.ids, [...new Set(scope.ids)].sort(), `${scope.name}: ids sorted and unique`);
     assert.ok(scope.ids.length > 0, `${scope.name}: a scope that selects nothing records nothing — the always core is always there`);
   }
   const single = file.scopes.filter(scope => SINGLE_READ_TASKS.includes(scope.tasks[0]));
-  assert.equal(single.length, 48);
-  assert.equal(Object.keys(ONE_READ).length, 48);
+  assert.equal(single.length, 60);
+  assert.equal(Object.keys(ONE_READ).length, 60);
   const pins = single.filter(scope => scope.oneRead === true);
   assert.equal(pins.length, 22, "exactly the 22 pins of plan section 5");
   assert.deepEqual(SINGLE_READ_TASKS.map(task => pins.filter(scope => scope.tasks[0] === task).length), [9, 4, 5, 4]);
@@ -81,6 +81,13 @@ const PINS = [
   "gpu (no file)", "gpu src/x.cs", "gpu tsconfig.json", "gpu .npmrc", "gpu Directory.Build.props",
   "storage (no file)", "storage tsconfig.json", "storage .npmrc", "storage Directory.Build.props",
 ];
+
+test("every rule of the catalog appears in the id list of at least one recorded scope", () => {
+  // A rule no scope selects is a rule a path_tasks or paths edit can change without the baseline noticing.
+  const recorded = new Set(parsed().scopes.flatMap(scope => scope.ids));
+  const unrecorded = loadCatalog(sourceRoot).map(rule => rule.id).filter(id => !recorded.has(id));
+  assert.deepEqual(unrecorded, [], "add the file set or the task that selects each, then --write");
+});
 
 test("the 22 single-read pins are exactly the scopes the plan names", () => {
   assert.equal(new Set(PINS).size, 22);
@@ -134,7 +141,7 @@ test("the tool prints the bytes table and refuses an unknown argument with usage
   const bytes = tool("--bytes");
   assert.equal(bytes.status, 0, bytes.stderr);
   assert.equal(bytes.stdout, `${bytesTable(loadCatalog(sourceRoot))}\n`);
-  assert.match(bytes.stdout, /^\| Files \| inspect \| ui \| gpu \| storage \| implement \| test \| audit \| logging \| dependencies \|$/m);
+  assert.match(bytes.stdout, /^\| Files \| inspect \| ui \| gpu \| storage \| implement \| test \| audit \| logging \| dependencies \| pr \| policy \|$/m);
   assert.match(bytes.stdout, /^\| \(no file\) \| [\d,]+ \|/m);
   const usage = tool("--nope");
   assert.equal(usage.status, 2);

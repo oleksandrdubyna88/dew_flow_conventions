@@ -173,9 +173,14 @@ and no record is written there.
 freeze (`research/rule-bodies.json`) cannot see it: it hashes a body after the front matter (D12 of
 `todo/PLAN_node_rule_parity.md`). `research/selection-matrix.json` is the control. `tools/selection-matrix.mjs` generates
 it and `tools/selection-matrix.test.mjs` compares it, so a hand edit and a selector change nobody regenerated for are both
-a red suite. It records, for 108 representative scopes (12 file sets x 9 tasks: `inspect`, `ui`, `gpu`, `storage`,
-`implement`, `test`, `audit`, `logging`, `dependencies`), the sorted ids each selects; for the 48 scopes of the four
-single-read tasks, whether the scope is a **pin** (`oneRead: true`) or off the list with a `why`; and the `gates` map.
+a red suite. It records, for 165 representative scopes (15 file sets x 11 tasks: `inspect`, `ui`, `gpu`, `storage`,
+`implement`, `test`, `audit`, `logging`, `dependencies`, `pr`, `policy`), the sorted ids each selects; for the 60 scopes of
+the four single-read tasks, whether the scope is a **pin** (`oneRead: true`) or off the list with a `why`; and the `gates`
+map. The scopes reach every rule: a test asserts that each rule of the catalog appears in the id list of at least one
+scope, so a `paths` or `path_tasks` edit to any rule moves a recorded list. `App.sln`, `api/a.http`, `common/testing.md`
+and the tasks `pr` and `policy` were added for that (they select `csharp.dotnet-build`, `common.rule-ownership` and
+`common.pull-requests`, which no earlier scope did, and give `common.http-contracts` a scope where its `.http` glob matches
+beyond its tasks); the original 108 scopes are unchanged.
 
 - `node tools/selection-matrix.mjs` verifies (exit 0, or exit 1 naming each scope whose selection moved);
   `--write` regenerates (temporary file, then rename) and its diff is what a reviewer reads beside the rule change;
@@ -186,7 +191,8 @@ single-read tasks, whether the scope is a **pin** (`oneRead: true`) or off the l
   file, `src/x.cs`, `tsconfig.json`, `.npmrc` and `Directory.Build.props` (5); `storage` with no file, `tsconfig.json`,
   `.npmrc` and `Directory.Build.props` (4). `tools/rules.test.mjs` selects each and asserts it still fits. Every other
   single-read-task scope is `oneRead: false` with a reason: `ui` with a language file is off the list by decision D5, the
-  rest were over one read when the baseline was taken, and two `src/a.mjs` scopes fit today but are unpinned by the plan.
+  rest were over one read when the baseline was taken (the 12 scopes of `App.sln`, `api/a.http` and `common/testing.md`
+  are over one read, so none is a pin), and two `src/a.mjs` scopes fit today but are unpinned by the plan.
 - **The caps** (`CAPS` in `tools/rules.test.mjs`): the always core, 15,055 B today, at most 15,355 B; `gpu --file src/x.cs`
   at most 32,613 B; `csharp/doctrine.md` at most 4,633 B; `typescript/npm-packages.md` and
   `typescript/compiler-strictness.md` at most 3,300 B each; `common/dependencies.md` at most 4,000 B;
@@ -202,22 +208,26 @@ single-read tasks, whether the scope is a **pin** (`oneRead: true`) or off the l
 Summed bytes of the selected rules per scope, as `node tools/selection-matrix.mjs --bytes` prints them. Measured 2026-10-31 at
 the commit that added the whitespace-only splits (E1.S0b, branch commit `b2c6642`, a commit that is not on `main` itself after a
 squash merge but stays reachable through the pull request's ref), over 39 rules; each later epic re-runs `--bytes` and replaces
-this table, never appends to it.
+this table, never appends to it. The `App.sln`, `api/a.http` and `common/testing.md` rows and the `pr` and `policy` columns were
+added later, at the commit that made the baseline reach every rule; the original cells did not change.
 
-| Files | inspect | ui | gpu | storage | implement | test | audit | logging | dependencies |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| (no file) | 24,207 | 26,420 | 27,680 | 29,406 | 286,925 | 279,493 | 218,240 | 74,253 | 160,356 |
-| `src/x.cs` | 28,820 | 31,033 | 32,293 | 34,019 | 291,538 | 284,106 | 222,853 | 78,866 | 164,969 |
-| `src/x.csproj` | 31,902 | 34,115 | 35,375 | 37,101 | 294,620 | 287,188 | 225,935 | 81,948 | 164,969 |
-| `Directory.Build.props` | 27,289 | 29,502 | 30,762 | 32,488 | 290,007 | 282,575 | 221,322 | 77,335 | 160,356 |
-| `ui/a.ts` | 30,090 | 32,303 | 33,563 | 35,289 | 292,808 | 285,376 | 224,123 | 80,136 | 166,239 |
-| `src/a.mjs` | 24,207 | 26,420 | 27,680 | 29,406 | 286,925 | 279,493 | 218,240 | 74,253 | 160,356 |
-| `src/x.cs` + `ui/a.ts` | 34,703 | 36,916 | 38,176 | 39,902 | 297,421 | 289,989 | 228,736 | 84,749 | 170,852 |
-| `package.json` | 35,409 | 37,622 | 38,882 | 40,608 | 298,127 | 279,493 | 229,442 | 85,455 | 171,558 |
-| `tsconfig.json` | 24,207 | 26,420 | 27,680 | 29,406 | 286,925 | 279,493 | 218,240 | 74,253 | 160,356 |
-| `.npmrc` | 24,207 | 26,420 | 27,680 | 29,406 | 286,925 | 279,493 | 218,240 | 74,253 | 160,356 |
-| `src/webview/page.ts` | 30,090 | 32,303 | 33,563 | 35,289 | 292,808 | 285,376 | 224,123 | 80,136 | 166,239 |
-| `src/main.rs` | 40,743 | 42,956 | 44,216 | 45,942 | 291,304 | 296,029 | 222,619 | 78,632 | 176,892 |
+| Files | inspect | ui | gpu | storage | implement | test | audit | logging | dependencies | pr | policy |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| (no file) | 24,207 | 26,420 | 27,680 | 29,406 | 286,925 | 279,493 | 218,240 | 74,253 | 160,356 | 171,726 | 251,138 |
+| `src/x.cs` | 28,820 | 31,033 | 32,293 | 34,019 | 291,538 | 284,106 | 222,853 | 78,866 | 164,969 | 176,339 | 255,751 |
+| `src/x.csproj` | 31,902 | 34,115 | 35,375 | 37,101 | 294,620 | 287,188 | 225,935 | 81,948 | 164,969 | 179,421 | 258,833 |
+| `Directory.Build.props` | 27,289 | 29,502 | 30,762 | 32,488 | 290,007 | 282,575 | 221,322 | 77,335 | 160,356 | 174,808 | 254,220 |
+| `ui/a.ts` | 30,090 | 32,303 | 33,563 | 35,289 | 292,808 | 285,376 | 224,123 | 80,136 | 166,239 | 177,609 | 257,021 |
+| `src/a.mjs` | 24,207 | 26,420 | 27,680 | 29,406 | 286,925 | 279,493 | 218,240 | 74,253 | 160,356 | 171,726 | 251,138 |
+| `src/x.cs` + `ui/a.ts` | 34,703 | 36,916 | 38,176 | 39,902 | 297,421 | 289,989 | 228,736 | 84,749 | 170,852 | 182,222 | 261,634 |
+| `package.json` | 35,409 | 37,622 | 38,882 | 40,608 | 298,127 | 279,493 | 229,442 | 85,455 | 171,558 | 182,928 | 262,340 |
+| `tsconfig.json` | 24,207 | 26,420 | 27,680 | 29,406 | 286,925 | 279,493 | 218,240 | 74,253 | 160,356 | 171,726 | 251,138 |
+| `.npmrc` | 24,207 | 26,420 | 27,680 | 29,406 | 286,925 | 279,493 | 218,240 | 74,253 | 160,356 | 171,726 | 251,138 |
+| `src/webview/page.ts` | 30,090 | 32,303 | 33,563 | 35,289 | 292,808 | 285,376 | 224,123 | 80,136 | 166,239 | 177,609 | 257,021 |
+| `src/main.rs` | 40,743 | 42,956 | 44,216 | 45,942 | 291,304 | 296,029 | 222,619 | 78,632 | 176,892 | 188,262 | 267,674 |
+| `App.sln` | 40,676 | 42,889 | 44,149 | 45,875 | 303,394 | 284,760 | 234,709 | 90,722 | 176,825 | 188,195 | 267,607 |
+| `api/a.http` | 60,125 | 62,338 | 63,598 | 65,324 | 286,925 | 290,712 | 218,240 | 110,171 | 196,274 | 207,644 | 262,357 |
+| `common/testing.md` | 33,846 | 36,059 | 37,319 | 39,045 | 296,564 | 289,132 | 227,879 | 83,892 | 169,995 | 181,365 | 251,138 |
 
 ## Byte allowances per epic
 

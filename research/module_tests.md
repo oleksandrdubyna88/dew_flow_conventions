@@ -1379,10 +1379,13 @@ baseline (`research/selection-matrix.json`) is the control that a later gate doe
 
 ## The selection baseline (rule-parity E1.S2)
 
-`tools/selection-matrix.test.mjs` (six cases) and the new cases of `tools/rules.test.mjs`:
+`tools/selection-matrix.test.mjs` (nine cases) and the new cases of `tools/rules.test.mjs`:
 
 - The committed `research/selection-matrix.json` equals what `render(catalog)` produces from the real catalog, byte for byte.
-- The file holds the 108 scopes once each in the tool's order, sorted unique ids, exactly the 22 pins (9, 4, 5, 4 per
+- Every rule of the catalog appears in the id list of at least one recorded scope. Mutation: restoring the file from before
+  `App.sln`, `api/a.http`, `common/testing.md`, `pr` and `policy` were added names `common.pull-requests`, `common.rule-ownership`
+  and `csharp.dotnet-build`; a scratch `path_tasks: ["audit"]` on `common/http-contracts.md` moves `inspect api/a.http` and eight more scopes.
+- The file holds the 165 scopes once each in the tool's order, sorted unique ids, exactly the 22 pins (9, 4, 5, 4 per
   single-read task), a reason of at least 10 characters on every other single-read scope, and no `ui` scope with a language
   file on the list (D5).
 - A copy of the corpus with `tasks: ["dependencies"]` removed from `csharp/nuget-packages.md`: `idDrift` names
@@ -1402,7 +1405,7 @@ the recorded file (the byte-equality case and the tool case); pinning `inspect p
 the 22-pin count); pinning `ui ui/a.ts` (the pins case, D5, while the one-read test stays green); lowering the core cap to
 15,054 B (the cap cases).
 
-Not proved: that the 108 scopes are the right ones (they are the representative file sets of the plan, not every path), that
+Not proved: that the 165 scopes are the right ones (they are the representative file sets of the plan, not every path), that
 a pinned scope is the best list, or that a gate record's cases are sufficient for a rule's whole path list.
 
 ## The allowances and the empty gate schema (rule-parity E1.S5)
