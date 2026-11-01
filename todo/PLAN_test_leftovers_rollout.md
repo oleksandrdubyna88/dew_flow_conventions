@@ -1,9 +1,10 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **stopped for re-review (2026-11-01): the second change after approval came on 2026-10-31 (see Plan changes); the
-> stop was recorded on 2026-11-01, and the work done between the two is sorted in the re-review's table. The whole plan was
-> revised on 2026-11-01 against what is known now (§ *Epoch 2 — the plan as revised at the re-review*); the epoch-2 line is
-> written only when the re-review passes and, because the record says `Narrowed: yes`, only with the OWNER's approval.**
+> Status: **epoch 2 open (2026-11-01), approved by the owner after the re-review.** Epoch 1 stopped at its second change after
+> approval (2026-10-31; see Plan changes); the stop was recorded on 2026-11-01 and the work done between the two is sorted in the
+> re-review's table. The whole plan was revised on 2026-11-01 against what is known now (§ *Epoch 2 — the plan as revised at the
+> re-review*); its plan gate passed (coai session `fd58afe4`, four findings accepted), and because the record says `Narrowed: yes`
+> the owner approved it.
 > Was: **plan only, nothing implemented yet (2026-10-14); split into seven epics 2026-10-15.** Scope (revised 2026-11-01):
 > the test code, scripts and CI of the six consumers, migrated onto the RELEASED merged core (`release` at `105d53c`,
 > every consumer pinned there) in two stages per repository — the sweep-only stage first, the producer stage after the
@@ -19,7 +20,7 @@
 
 ## Plan changes
 
-> Epoch 1 · approved 2026-10-15 · by reviewers · state: stopped
+> Epoch 1 · approved 2026-10-15 · by reviewers · state: closed
 
 - 1.1 · 2026-10-31 · owner · build-order — the epics run two repositories at a time: E3 + E4, then E5 + E2, then E6 + E7
 - 1.2 · 2026-10-31 · owner · merge-conditions — a pin bump may merge alone (R6 of the remainder plan)
@@ -79,6 +80,8 @@ Narrowed: yes — E5's producer PR may merge with the structural guard green-by-
   stop of entry 1.2; the content fits the revised plan, the timing is the breach the stop record already names. Note 1: the code and the rule
   never remove an unmarked folder; only that README sentence, left by #77 and not updated by #82, still says so. Note 2: #58 and #64 checked
   (a)–(d) on the operator's WSL machine only; P1's record says whether the owner's Windows machine builds or tests mcp and sidecar_rust.)
+
+> Epoch 2 · approved 2026-11-01 · by owner · state: open
 
 ## Symptom
 
@@ -369,6 +372,10 @@ call inside an owned run folder creates nothing outside an owned resource, so Do
 keeps the break-it for every new line. What is smaller is the merge condition of one PR, and that alone is enough for `Narrowed: yes`.
 
 ### 7. Questions for the owner (blocking; each with the recommended answer)
+
+**Answered 2026-11-01:** 1 — approved (epoch 2 opens `by owner`); 2 — the owner runs the Windows barrier scan and the checklist and
+hands the output over to be recorded in `research/security/machines.md`; until then the build goes on and only the first producer
+merges of E2 and E5 wait.
 
 1. **Approve epoch 2 as narrowed?** The record says `Narrowed: yes` for the reason given; the rule says a narrowed plan resumes only
    with the owner. *Recommended:* yes — the narrowing is one PR's merge condition, bounded by a shrinking baseline the released rule
