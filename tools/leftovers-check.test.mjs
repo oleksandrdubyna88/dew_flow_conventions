@@ -14,7 +14,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 import { git } from "./lib/git.mjs";
-import { MAX_CLAIM_BYTES, REPO_ROW, REPO_TOKEN, ownedDir } from "./lib/owned.mjs";
+import { MAX_CLAIM_BYTES, OWNER_GRAMMAR, REPO_ROW, REPO_TOKEN, TOKEN_SHAPE, classifyName, ownedDir } from "./lib/owned.mjs";
 import { EXCLUDED_FILES, LEGACY_NAME_PENDING, isScanned, main, parseArguments, resolveRule, scanRepository, scanText, tokenConstants, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -360,17 +360,28 @@ test("3. discovery reads the shapes of the brief and nothing under tools/lib", (
 
 // 3a ---------------------------------------------------------------------------------------------------------------
 
-test("3a. the repository's token is a row of the rule's table; the table is the seven rows of this family", () => {
+test("3a. the repository's token is a row of the rule's table; the table is the eight rows of this family", () => {
   const table = parseTokenTable(fs.readFileSync(RULE, "utf8"));
   assert.deepEqual(table.header.map((cell) => cell.toLowerCase()), ["token", "family", "repository"]);
-  assert.deepEqual(table.rows.map((row) => row.token), ["conventions", "creds", "mcp", "sidecar", "coai", "bench", "qln"]);
-  assert.equal(new Set(table.rows.map((row) => row.token)).size, 7);
+  assert.deepEqual(table.rows.map((row) => row.token), ["conventions", "creds", "mcp", "sidecar", "coai", "bench", "qln", "r9700"]);
+  assert.equal(new Set(table.rows.map((row) => row.token)).size, 8);
   for (const row of table.rows) {
     assert.match(row.token, /^[a-z0-9]{2,12}$/);
   }
   assert.ok(table.rows.some((row) => row.token === REPO_TOKEN));
   assert.deepEqual(tokenFindings(fs.readFileSync(RULE, "utf8"), "conventions"), []);
   assert.deepEqual(tokenFindings(fs.readFileSync(RULE, "utf8"), "qln", undefined, "the code-search product"), [], "qln is a registered token — of the code-search product");
+});
+
+test("3a. a token that ends in digits parses as a token, never as an owner or an id", () => {
+  // r9700 (the R9700 tuning toolkit) is the first registered token with digits: it must not read as the owner
+  // grammar `^[uw][0-9]{1,10}$`, and a name of it must classify with r9700 as its token, whatever follows.
+  assert.equal(OWNER_GRAMMAR.test("r9700"), false);
+  assert.equal(TOKEN_SHAPE.test("r9700"), true);
+  for (const name of ["testsToDelete-u1000-r9700-series-k3f9a1", "teststodelete_w123456_r9700_pg_abc123", "teststodelete-u1000-r9700-9700-000000"]) {
+    assert.deepEqual(classifyName(name), { form: "owner", owner: name.split(/[-_]/)[1].toLowerCase(), token: "r9700" }, name);
+  }
+  assert.deepEqual(tokenFindings(fs.readFileSync(RULE, "utf8"), "r9700", undefined, "the R9700 vLLM tuning toolkit"), [], "r9700 is a registered token — of the R9700 vLLM tuning toolkit");
 });
 
 test("3a. a registered token is not enough: the row of REPO_TOKEN must name THIS repository", () => {

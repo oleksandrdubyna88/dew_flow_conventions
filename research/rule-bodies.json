@@ -463,7 +463,7 @@
     {
       "id": "common.test-leftovers-detail",
       "source": "common/test-leftovers-detail.md",
-      "bodySha256": "11ad42dfe4d636d15219d5a677b2118b348d43197f9158904f380e6023b7e1e0",
+      "bodySha256": "16b7a87ef7a3b580d9754567953c3986ca46012c0d6a8862f6963f9e371c8cdf",
       "sections": [
         "# Test leftovers — the full rule text (the detail of `common/test-leftovers.md`)",
         "## 1. The name — one form, three spellings",

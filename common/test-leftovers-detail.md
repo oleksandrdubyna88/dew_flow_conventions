@@ -320,6 +320,7 @@ containers up for weeks — the backlog this rule names.)
 | `coai` | dew_flow | the multi-model review extension and server |
 | `bench` | dew_flow | the measuring harness |
 | `qln` | dew_flow | the code-search product |
+| `r9700` | dew_flow | the R9700 vLLM tuning toolkit |
 
 <!-- core:begin -->
 ## Never
