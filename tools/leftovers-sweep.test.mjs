@@ -835,6 +835,56 @@ test("16h. a placeholder swapped for another empty directory is never renamed on
   assert.equal(fs.lstatSync(first, { bigint: true }).ino, theirs.ino, "the directory that took the name is still there, untouched");
 });
 
+// 16i-16k (F19: the claim of a folder that sits in a quarantine is not an orphan's) ----------------------------------
+
+test("16i. the claim of a folder that a live renamer holds in a quarantine is kept, and nothing is listed for it (F19)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f19-live-repo");
+  const victim = folder(own, tmp, "f19-live", { claim: deadOwnerLine() });
+  setOld(`${victim}.owner`);
+  const quarantine = quarantineAs(tmp, victim, "0a1b2c3d"); // this process is the renamer: alive, so the quarantine is not restored
+  fs.renameSync(victim, quarantine); // no folder at the name for the moment the sweep looks at its claim
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe });
+  assert.ok(fs.existsSync(`${victim}.owner`), "the claim is still there for the restore or the removal that follows");
+  assert.ok(fs.existsSync(quarantine));
+  assert.deepEqual(result.removed, []);
+  assert.deepEqual(result.preserved, []);
+  assert.deepEqual(result.listed, []);
+  assert.deepEqual(result.errors, []);
+});
+
+test("16j. a quarantine that appears after the pass's snapshot, before the claim is removed, keeps the claim (F19: a fresh check before the deletion)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f19-fresh-repo");
+  const victim = folder(own, tmp, "f19-fresh", { claim: deadOwnerLine() });
+  setOld(`${victim}.owner`);
+  const aside = path.join(work, "fresh-aside");
+  fs.renameSync(victim, aside); // no folder, no quarantine yet: a real orphan at the snapshot
+  const quarantine = quarantineAs(tmp, victim, "0a1b2c3d");
+  let asked = 0;
+  const hooks = { beforeClaimRemoval: () => { asked += 1; fs.renameSync(aside, quarantine); } }; // a live sweep moves the folder in after the snapshot
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, hooks });
+  own.after(() => removeQuietly(quarantine));
+  assert.equal(asked, 1, "the claim was about to be removed");
+  assert.ok(fs.existsSync(`${victim}.owner`), "the fresh look found the quarantine");
+  assert.deepEqual(result.removed, []);
+  assert.deepEqual(result.errors, []);
+});
+
+test("16k. the claim of a quarantine that stays `quarantine-conflict` is kept (F19)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f19-conflict-repo");
+  const victim = folder(own, tmp, "f19-conflict", { claim: deadOwnerLine() });
+  setOld(`${victim}.owner`);
+  const quarantine = path.join(tmp, `.${path.basename(victim)}.teststodelete-quarantine-${PRETEND_DEAD}-0a1b2c3d`);
+  fs.renameSync(victim, quarantine); // a killed sweep's quarantine
+  const hooks = { afterReserve: (original, quarantined) => { fs.rmSync(quarantined, { recursive: true }); fs.writeFileSync(quarantined, "not a folder\n"); } }; // the restore fails: the quarantine stays
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, now: Date.now() + 2 * MIN_AGE_MS, hooks });
+  assert.ok(result.preserved.some((entry) => entry.path === quarantine && entry.reason === "quarantine-conflict"), JSON.stringify(result.preserved));
+  assert.ok(fs.existsSync(`${victim}.owner`), "its claim is not an orphan's");
+  assert.deepEqual(result.removed, []);
+});
+
 // 17 --------------------------------------------------------------------------------------------------------
 
 test("17. a dead-owned WORKTREE is removed through git and its folder is never renamed", (t) => {

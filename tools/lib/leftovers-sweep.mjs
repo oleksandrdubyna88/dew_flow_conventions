@@ -414,9 +414,36 @@ function removeFolder(context, dir, result, captured) {
   }
 }
 
+/** The names that sit in a quarantine, from a listing of the temp root: the `<name>` of each `.<name>.teststodelete-quarantine-<pid>-<hex>`, and of every quarantine this report keeps as a conflict. */
+function quarantinedNames(names, preserved) {
+  const originals = new Set();
+  const conflicts = preserved.filter((entry) => entry.reason === "quarantine-conflict").map((entry) => path.basename(entry.path));
+  for (const name of [...names, ...conflicts]) {
+    const found = QUARANTINE.exec(name);
+    if (found !== null) originals.add(found[1]);
+  }
+  return originals;
+}
+
+/** A fresh look: does a quarantine of `name` sit in the temp root now? A directory that cannot be listed says yes (fail closed: the claim stays). */
+function isQuarantinedNow(tmp, name, preserved) {
+  try {
+    return quarantinedNames(fs.readdirSync(tmp), preserved).has(name);
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * A claim whose folder is not at its name. That is an orphan only when no quarantine holds the folder: a LIVE sweep (another process) that has
+ * moved it aside leaves no folder at the name for that moment, and the claim it still needs must stay — the snapshot of this pass says so, and a
+ * fresh look immediately before the deletion says so again.
+ */
 function sweepOrphanClaims(context) {
   const { tmp, now, minAgeMs, state, result, mine } = context;
-  for (const dirent of fs.readdirSync(tmp, { withFileTypes: true })) {
+  const entries = fs.readdirSync(tmp, { withFileTypes: true });
+  const quarantined = quarantinedNames(entries.map((entry) => entry.name), result.preserved);
+  for (const dirent of entries) {
     if (!dirent.isFile() || !dirent.name.endsWith(OWNER_SUFFIX)) continue;
     const claim = path.join(tmp, dirent.name);
     const folderPath = claim.slice(0, -OWNER_SUFFIX.length);
@@ -426,6 +453,7 @@ function sweepOrphanClaims(context) {
       context.report.foreign("claim", claim, related.nameOwner);
       continue;
     }
+    if (quarantined.has(path.basename(folderPath))) continue; // its folder sits in a quarantine: not an orphan, nothing is listed
     // A claim with no folder is what a helper that claims FIRST leaves when it dies between the claim and the create. It is a
     // claim like any other: its owner decides — gone removes it; live, foreign, unknown and unreadable keep it.
     const verdict = related.relation === "legacy"
@@ -436,6 +464,8 @@ function sweepOrphanClaims(context) {
       continue;
     }
     try {
+      context.hooks.beforeClaimRemoval?.(claim);
+      if (isQuarantinedNow(tmp, path.basename(folderPath), result.preserved)) continue; // a quarantine appeared since the snapshot
       fs.rmSync(claim, { force: true });
       result.removed.push(claim);
     } catch (error) {
@@ -473,7 +503,7 @@ function step(result, label, run) {
 /**
  * Collect what a killed run left behind. `repo` is the repository whose worktrees this sweep may remove; `tmp` the
  * temp root; `probe` the liveness query (a seam for tests), asked at most once per pid; `mine` the kernel-owner question
- * (a seam: a second uid cannot be had in a test); `hooks.afterCapture` / `hooks.afterVerdict` / `hooks.afterRename` / `hooks.afterReserve` (seams: a change between the
+ * (a seam: a second uid cannot be had in a test); `hooks.afterCapture` / `hooks.afterVerdict` / `hooks.afterRename` / `hooks.afterReserve` / `hooks.beforeClaimRemoval` (seams: a change between the
  * capture, the verdict and the removal). Never throws. `result.listed` holds the `foreign:` / `legacy:` / `unmarked:` lines.
  */
 export function sweepLeftovers({ repo, tmp = tempRoot(), now = Date.now(), minAgeMs = MIN_AGE_MS, probe = processProbe, mine = isMine, hooks = {}, platform = process.platform } = {}) {
