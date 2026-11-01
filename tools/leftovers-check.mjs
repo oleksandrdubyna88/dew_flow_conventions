@@ -31,9 +31,21 @@
  *
  *     node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>] [--profile node]
  *     node tools/leftovers-check.mjs --update-allowlist [--repo <dir>]
+ *     node tools/leftovers-check.mjs [--repo <dir>] --baseline <path>
+ *     node tools/leftovers-check.mjs [--repo <dir>] --print-baseline
+ *     node tools/leftovers-check.mjs [--repo <dir>] --baseline-shrinks <path> --base <git-ref> [--allow-create]
  *
  * `--update-allowlist` rewrites the allowlist from the CURRENT `tools/janitor.sh`: every non-comment line the classifier calls
  * broad in that one file, by its line number and hash. The diff is what a reviewer reads; nothing else is ever added.
+ *
+ * `--baseline <path>` names the repository's `raw-temp` baseline (rule §7, `tools/lib/raw-temp-baseline.mjs`): a multiset of `raw-temp` sites — file and the
+ * sha256 of the trimmed line, one entry per occurrence — for sites that run inside an owned run folder; a scope's proof file carries `testsToDelete-baseline-proof: <root>`.
+ * It is read ONLY when named (nothing is discovered in the scanned tree). A site up to its entries passes; one more is `raw-temp`; a stale entry, an entry under no
+ * scope or under a scope whose proof is missing, another class, a malformed file are class `baseline` (exit 1, with the cure). Only an unreadable path is exit 2.
+ * `--print-baseline` prints, to stdout only, the baseline of the current scan's `raw-temp` findings (`scopes` empty, to be written by hand) for the one creation.
+ * `--baseline-shrinks <path> --base <git-ref>` compares the working copy with `git show <ref>:<path>`: a new key, a raised count, a new or wider scope or a changed proof is
+ * exit 1; a creation is exit 1 unless `--allow-create`, which is honoured only while the path has no history; an unresolved base ref or a shallow clone asked about a creation is
+ * exit 2 naming the fetch to run. A CI checkout fetches the base ref first (`git fetch origin <base-branch> --depth=1`). No command writes a baseline.
  *
  * `--identity` is the "repository" column of the token's row in the rule's `## Tokens` table — which repository the token is.
  * It defaults to this repository's own row (`REPO_ROW`) ONLY for this repository's own token; any other `--token` without
@@ -63,6 +75,7 @@ import { fileURLToPath } from "node:url";
 import { gitOutput } from "./lib/git.mjs";
 import { OWNER_GRAMMAR } from "./lib/owned.mjs";
 import { REPO_ROW, REPO_TOKEN } from "./lib/owned-token.mjs";
+import { PROOF_MARKER, baselineShrinks, createApplier, loadBaseline, printBaseline, siteSha256 } from "./lib/raw-temp-baseline.mjs";
 import { JANITOR_FILE, classifyLine, classifyLines, lineSha256 } from "./lib/sweeper-scan.mjs";
 import { isReason } from "./ownership-check.mjs";
 
@@ -105,6 +118,7 @@ export const CURES = Object.freeze({
   "owner-blind": "Match the caller's owner after the prefix (^testsToDelete-<owner>-<repo>-), or delete the sweep and use the shipped janitor; this class takes no exemption — common/test-leftovers-detail.md §7 (owner-blind), the barrier.",
   "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers-detail.md §6, §7 (shared-store).",
   "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers-detail.md §5, §7 (ryuk-off).",
+  baseline: "Remove the stale or out-of-scope entry from the baseline, or move the site into the helper; nothing adds to it — common/test-leftovers-detail.md §7 (the `raw-temp` baseline).",
   exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers-detail.md §7 (the exemption grammar).",
   token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers-detail.md § Tokens (§1 of the rule) — and write it, with its row, in this repository's own tools/lib/owned-token.mjs beside the copied owned.mjs (never copy another repository's).",
 });
@@ -119,8 +133,10 @@ const TOKEN_SHAPE = /^[a-z0-9]{2,12}$/;
 // The prefix is spelled in two pieces below: these are detectors, and the machine scan reads this file too.
 const WORD = "teststo" + "delete";
 const LEGACY_LITERAL = new RegExp(`${WORD}[-_]([a-z0-9]+)`, "gi");
+/** The proof marker of the `raw-temp` baseline (`<prefix>-baseline-proof:`) is a marker word, as `exempt` is, not a name. */
+const isProofMarker = (match) => match.input.slice(match.index).toLowerCase().startsWith(PROOF_MARKER.toLowerCase());
 /** The second segments that are not names: the quarantine sibling (`.<name>.<prefix>-quarantine-…`) and an environment variable (`TESTSTODELETE_OWNER`: upper case, underscore). */
-const notAName = (match) => match[1].toLowerCase() === "exempt" || match[1].toLowerCase() === "quarantine" || new RegExp(`^${WORD.toUpperCase()}_[A-Z]+$`).test(match[0]);
+const notAName = (match) => match[1].toLowerCase() === "exempt" || isProofMarker(match) || match[1].toLowerCase() === "quarantine" || new RegExp(`^${WORD.toUpperCase()}_[A-Z]+$`).test(match[0]);
 const LEGACY_BUILT = new RegExp(`${WORD}[-_]\\$\\{?\\s*(?:REPO_TOKEN|RepoToken|repoToken)\\b`, "i");
 const MARKER = /(?:\/\/|#|--|\/\*|\*|<!--)\s*testsToDelete-exempt:(.*)$/;
 const JS_FILE = /\.(?:mjs|js|cjs)$/;
@@ -395,7 +411,7 @@ function legacyNameHits(line) {
   return LEGACY_BUILT.test(line) ? [...literal, "a prefix built from the repository token"] : literal;
 }
 
-function lineFindings(file, lines, exemptions, allowlist) {
+function lineFindings(file, lines, exemptions, allowlist, baseline) {
   const extra = RAW_TEMP_BY_EXTENSION[path.extname(file)] ?? [];
   const found = [];
   const add = (index, cls, text) => {
@@ -412,7 +428,12 @@ function lineFindings(file, lines, exemptions, allowlist) {
       ["docker-name", composeEnvHits(line)],
       ["legacy-name", LEGACY_NAME_PENDING.includes(file) ? [] : legacyNameHits(line)],
     ];
-    for (const [cls, hits] of checks) if (hits.length > 0) add(index, cls, [...new Set(hits)].map((hit) => `\`${hit}\``).join(", "));
+    for (const [cls, hits] of checks) {
+      if (hits.length === 0) continue;
+      // the baseline passes a `raw-temp` hit up to its entries; a line with a valid exemption is exempt first and consumes none
+      if (cls === "raw-temp" && baseline !== undefined && !isExempt(exemptions, cls, index + 1) && baseline.take(file, siteSha256(line))) continue;
+      add(index, cls, [...new Set(hits)].map((hit) => `\`${hit}\``).join(", "));
+    }
     // owner-blind: no exemption of any kind — the allowlist (file, line, hash) is the one pass
     if (verdicts[index] === "broad") found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
   });
@@ -676,11 +697,11 @@ function dockerFindings(file, lines, text, yaml) {
  * Every finding of one file's text (`file` is the repository-relative path with forward slashes). `yaml` returns the yaml module and is called only
  * for a workflow: by default the guard's own resolution, which throws a `YamlMissingError` when there is none.
  */
-export function scanText(file, text, allowlist = [], yaml = () => loadYaml(undefined)) {
+export function scanText(file, text, allowlist = [], yaml = () => loadYaml(undefined), baseline = undefined) {
   const lines = text.split(/\r?\n/);
   const exemptions = readExemptions(file, lines);
   const docker = dockerFindings(file, lines, text, yaml).filter((entry) => !isExempt(exemptions, entry.cls, entry.line));
-  return [...exemptions.findings, ...lineFindings(file, lines, exemptions, allowlist), ...docker];
+  return [...exemptions.findings, ...lineFindings(file, lines, exemptions, allowlist, baseline), ...docker];
 }
 
 // --- the token ------------------------------------------------------------------------------------------------
@@ -859,14 +880,23 @@ export function updateAllowlist(repo, explicit) {
   return entries;
 }
 
+/** The applier of a baseline given as a path or as `loadBaseline`'s result, its file named in findings by its path relative to the repository. */
+function appliedBaseline(baseline, repo) {
+  const loaded = typeof baseline === "string" ? loadBaseline(baseline) : baseline;
+  const relative = path.relative(repo, loaded.file).split(path.sep).join("/");
+  return createApplier(loaded, repo, relative.startsWith("../") ? loaded.file : relative);
+}
+
 /**
  * Scan a repository: `{ files, findings }`. `files` is how many files were read — zero is a broken discovery. `identity` is the repository column of the token's
  * row: this repository's own for its own token, else blank (fails closed). `profile` is a `--profile` (`node`). `resolvers` is the yaml seam of `loadYaml`.
+ * `baseline` is a `raw-temp` baseline — the loaded one (`loadBaseline`) or its path — or nothing: only a baseline named here is read, never one found in the tree.
  */
-export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "", allowlist, profile, resolvers } = {}) {
+export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "", allowlist, profile, resolvers, baseline } = {}) {
   const files = discover(repo, profile);
   const findings = [];
   const entries = Array.isArray(allowlist) ? allowlist : loadAllowlist(allowlist);
+  const applier = baseline === undefined ? undefined : appliedBaseline(baseline, repo);
   let yamlModule;
   const yaml = () => (yamlModule ??= loadYaml(repo, resolvers)); // read at the first workflow, so a repository with none needs none
   let read = 0;
@@ -876,8 +906,9 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = toke
     const bytes = fs.readFileSync(absolute);
     if (isBinary(bytes)) continue;
     read += 1;
-    findings.push(...scanText(file, bytes.toString("utf8"), entries, yaml));
+    findings.push(...scanText(file, bytes.toString("utf8"), entries, yaml, applier));
   }
+  if (applier !== undefined) findings.push(...applier.finalFindings()); // the global reconcile: every entry no line matched, whatever file it names
   const rulePath = resolveRule(repo, rule);
   const ruleText = rulePath === undefined ? "" : fs.readFileSync(rulePath, "utf8");
   const ruleName = ruleNameOf(rulePath);
@@ -888,22 +919,29 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = toke
 
 // --- the command line ----------------------------------------------------------------------------------------
 
-const USAGE = "usage: node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>] [--profile node] | --update-allowlist   (--identity: the repository column of the token's row; without it only this repository's own token passes; --profile node: a Node consumer's tests and scripts too)";
+const USAGE = "usage: node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>] [--profile node] [--baseline <path>] | --update-allowlist | --print-baseline | --baseline-shrinks <path> --base <git-ref> [--allow-create]   (--identity: the repository column of the token's row; without it only this repository's own token passes; --profile node: a Node consumer's tests and scripts too; --baseline: the raw-temp baseline, read only when named; --print-baseline: print the current raw-temp sites as a baseline to stdout, writes nothing; --baseline-shrinks: refuse a baseline that grew against the base ref — a CI checkout fetches the base ref first: git fetch origin <base-branch> --depth=1; --allow-create passes only the one creation, a path with no history)";
 
-/** Parse the arguments: `{ repo, token, rule, identity, profile }` (`identity` and `profile` stay unset unless given) or `{ error }`. */
+const FLAGS = Object.freeze({ "--update-allowlist": "update", "--print-baseline": "printBaseline", "--allow-create": "allowCreate" });
+const PLAIN_VALUES = ["token", "identity", "profile", "base"]; // taken as written; every other value option is a path
+const VALUE_NAMES = Object.freeze({ repo: "repo", token: "token", identity: "identity", rule: "rule", allowlist: "allowlist", profile: "profile", baseline: "baseline", "baseline-shrinks": "baselineShrinks", base: "base" });
+
+/** Parse the arguments: `{ repo, token, rule, identity, profile, baseline, … }` (everything but `repo` and `token` stays unset unless given) or `{ error }`. */
 export function parseArguments(argv) {
-  const options = { repo: process.cwd(), token: REPO_TOKEN, rule: undefined, identity: undefined, allowlist: undefined, profile: undefined, update: false };
+  const options = { repo: process.cwd(), token: REPO_TOKEN, rule: undefined, identity: undefined, allowlist: undefined, profile: undefined, update: false, baseline: undefined, printBaseline: false, baselineShrinks: undefined, base: undefined, allowCreate: false };
   for (let index = 0; index < argv.length; index += 2) {
     const name = argv[index].replace(/^--/, "");
-    if (argv[index] === "--update-allowlist") {
-      options.update = true;
+    if (Object.hasOwn(FLAGS, argv[index])) {
+      options[FLAGS[argv[index]]] = true;
       index -= 1; // a flag takes no value
       continue;
     }
-    if (!["repo", "token", "identity", "rule", "allowlist", "profile"].includes(name) || !argv[index].startsWith("--") || argv[index + 1] === undefined) return { error: `unknown or incomplete argument \`${argv[index]}\`` };
-    options[name] = ["token", "identity", "profile"].includes(name) ? argv[index + 1] : path.resolve(argv[index + 1]);
+    if (!Object.hasOwn(VALUE_NAMES, name) || !argv[index].startsWith("--") || argv[index + 1] === undefined) return { error: `unknown or incomplete argument \`${argv[index]}\`` };
+    options[VALUE_NAMES[name]] = PLAIN_VALUES.includes(name) ? argv[index + 1] : path.resolve(argv[index + 1]);
   }
   if (options.profile !== undefined && !PROFILES.includes(options.profile)) return { error: `unknown profile \`${options.profile}\` (the only profile is \`${PROFILES.join("`, `")}\`)` };
+  if (options.baselineShrinks !== undefined && options.base === undefined) return { error: "`--baseline-shrinks` needs `--base <git-ref>`" };
+  if (options.baselineShrinks === undefined && (options.base !== undefined || options.allowCreate)) return { error: "`--base` and `--allow-create` belong to `--baseline-shrinks`" };
+  if (options.printBaseline && options.baseline !== undefined) return { error: "`--print-baseline` lists the sites a baseline would carry; it cannot be combined with `--baseline`" };
   return options;
 }
 
@@ -930,6 +968,12 @@ function runUpdate(options, io) {
   }
 }
 
+function runShrinks(options, io) {
+  const { code, lines } = baselineShrinks({ repo: options.repo, file: options.baselineShrinks, base: options.base, allowCreate: options.allowCreate });
+  for (const line of lines) (code === 0 ? io.out : io.err)(`leftovers-check: --baseline-shrinks: ${line}`);
+  return code;
+}
+
 /** Run the guard: the exit code (0 clean, 1 findings, 2 scanned nothing, no yaml or bad arguments). `io` and `resolvers` (where `yaml` is looked for) are seams for tests. */
 export function main(argv = process.argv.slice(2), io = { out: (text) => console.log(text), err: (text) => console.error(text) }, resolvers = undefined) {
   const options = parseArguments(argv);
@@ -938,9 +982,19 @@ export function main(argv = process.argv.slice(2), io = { out: (text) => console
     return 2;
   }
   if (options.update) return runUpdate(options, io);
+  if (options.baselineShrinks !== undefined) return runShrinks(options, io);
+  let baseline;
+  if (options.baseline !== undefined) {
+    try {
+      baseline = loadBaseline(options.baseline);
+    } catch (error) {
+      io.err(`leftovers-check: cannot read the baseline ${options.baseline}: ${error.message.split("\n")[0]}`);
+      return 2;
+    }
+  }
   let result;
   try {
-    result = fs.existsSync(options.repo) ? scanRepository({ ...options, resolvers }) : { files: 0, findings: [] };
+    result = fs.existsSync(options.repo) ? scanRepository({ ...options, baseline, resolvers }) : { files: 0, findings: [] };
   } catch (error) {
     if (error instanceof YamlMissingError) {
       io.err(error.message);
@@ -952,6 +1006,10 @@ export function main(argv = process.argv.slice(2), io = { out: (text) => console
   if (result.files === 0) {
     io.err(`leftovers-check: scanned nothing under ${options.repo} — discovery broke; the repository is not clean`);
     return 2;
+  }
+  if (options.printBaseline) {
+    io.out(JSON.stringify(printBaseline(result.findings, options.repo), null, 2));
+    return 0;
   }
   if (result.findings.length === 0) {
     io.out(`leftovers-check: clean (${result.files} files).`);
