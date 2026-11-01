@@ -30,7 +30,8 @@ Runner flags are xUnit v3 MTP syntax — **not** VSTest (`--filter "FullyQualifi
 | Global timeout | `--timeout 5m` |
 
 The Rust sidecar runs `cargo test` — the executables-only rule is about the VSTest mismatch and is
-.NET-specific. Everything below applies everywhere.
+.NET-specific.
+Everything below applies everywhere.
 
 ## Every feature ships with tests, in the same task
 
