@@ -461,6 +461,26 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   rollout), not built yet, must check both keys: a criterion of their producer stage (owner decision 2026-10-31, R6 of the remainder plan).
 - **When.** With F9, before a Windows machine's janitor switch.
 - **Anchor.** `tools/lib/owned.mjs:209-228` (`isInsideProfile`, `isMine`); `tools/owned.test.mjs` (the path-boundary tests, no foreign-owner case).
+- **Interim disposition, decided 2026-11-01: (b) — on Windows the sweep LISTS and changes nothing until the Fix above lands.** Asked
+  through the question consultant (consult `3310f6ba`, two vendors, both (b)); recorded in the rollout plan's epoch 2 (§ *Epoch 2* item 4,
+  approved by the owner 2026-11-01). Why: the Node consumers E2 and E5 wrap this reference on the elevated hosted Windows runner, where a
+  folder inside the profile can belong to `Administrators`; (a) would remove it on the profile key alone, and the Fix needs F9's Windows
+  run, which has not happened. The janitor already has this shape (`--dry-run` forced on Windows until `JANITOR_WINDOWS_E2E_GREEN`).
+  - **Build.** `sweepLeftovers` (`tools/lib/leftovers-sweep.mjs`, its `platform` seam) on `win32` performs NO mutation in any phase: no
+    quarantine restore and no reservation removal, no worktree unlock, remove or prune, no folder rename or removal, no orphan-claim
+    deletion. Every resource a POSIX sweep would act on is reported in `result.listed` as `unverified: <path> — the owner SID is not read on
+    Windows (F16)`; `removed` stays empty. A pre-existing unverified folder never fails a run: the callers (`tools/run-tests.mjs` and the
+    consumers' wrappers) print the listing and go on, as they do with `foreign:` lines. `isMine` itself is unchanged (other callers ask it
+    about their OWN fresh resources).
+  - **Tests (RED → GREEN → RED each, through the `platform` seam on any OS):** one fixture per kind — a dead owner's folder, an orphan
+    claim, a killed sweep's quarantine (and its placeholder), a worktree this repository lists with a gone owner — swept with `platform:
+    "win32"`: every path is byte-for-byte unchanged (`(dev, ino)`, contents, the claim's text), each is in `listed` with `unverified:`, and
+    `removed` is empty; the same fixtures with `platform: "linux"` are removed as today (the companion); the run-tests caller with a
+    listed unverified folder exits 0.
+  - **Docs.** Rule §4's detail (one sentence: the reference lists only on Windows until F16), the README tool row (which also drops its
+    stale "unmarked and old": the sweep never removes an unmarked folder, the Opus judge's note of the rollout re-review), and this entry.
+  - **Release.** Rides the same promotion as the `raw-temp` baseline rule (P2 of the rollout); E2 and E5 pin that release before their
+    first producer merges.
 
 ## F17 — The rename into quarantine can replace an existing empty directory (found 2026-10-31, the E3 and E4 ports)
 
