@@ -81,6 +81,21 @@ const remover = (extra = {}, command = `docker rm -f -v ${NAME}`) => ({ name: "c
 
 // 1 ---------------------------------------------------------------------------------------------------------------
 
+test("the report names the rule file the scan resolved: the detail where it exists, the core on an older core-only mount", (t) => {
+  const table = "## Tokens\n\n| token | family | repository |\n|---|---|---|\n| `conventions` | dew_flow | the shared-rules repository |\n";
+  const finding = { "tools/x.test.mjs": "import fs from 'node:fs';\nconst d = fs.mkdtempSync('x-');\n" };
+  const old = guard(tree(t, { ...finding, "common/test-leftovers.md": table }));
+  assert.equal(old.code, 1);
+  assert.match(old.text, /see common\/test-leftovers\.md §7/, "the header names the core of an old mount");
+  assert.match(old.text, /raw-temp: .*common\/test-leftovers\.md §7 \(raw-temp\)/, "the cure names the core of an old mount");
+  assert.doesNotMatch(old.text, /test-leftovers-detail\.md/, "an old mount has no detail file to point at");
+  const split = guard(tree(t, { ...finding, "common/test-leftovers.md": "# the core\n", "common/test-leftovers-detail.md": table }));
+  assert.equal(split.code, 1);
+  assert.match(split.text, /see common\/test-leftovers-detail\.md §7/, "the header names the detail where it exists");
+  assert.match(split.text, /raw-temp: .*common\/test-leftovers-detail\.md §7 \(raw-temp\)/, "the cure names the detail where it exists");
+  assert.doesNotMatch(split.text, /raw-temp: .*common\/test-leftovers\.md §7/);
+});
+
 test("1. this repository passes the guard", () => {
   const result = guard(root);
   assert.equal(result.code, 0, result.text);
