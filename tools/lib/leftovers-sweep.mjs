@@ -32,7 +32,7 @@ import * as path from "node:path";
 
 import { git } from "./git.mjs";
 import {
-  REPO_TOKEN, classifyName, gitdirOf, isMine, legacyOwnerState, ownerState, parseLegacyOwner, parseOwner, processProbe, readClaimText, readOwner,
+  REPO_TOKEN, classifyName, gitdirOf, isAskablePid, isMine, legacyOwnerState, ownerState, parseLegacyOwner, parseOwner, processProbe, readClaimText, readOwner,
   removeLink, removeQuietly, tempRoot, thisOwner, thisOwnerToken,
 } from "./owned.mjs";
 
@@ -451,7 +451,8 @@ function restoreQuarantines(context) {
     const found = QUARANTINE.exec(dirent.name);
     if (found === null || !dirent.isDirectory() || relationOf(found[1], context.owner).relation === "other") continue;
     const quarantined = path.join(tmp, dirent.name);
-    if (!mine(quarantined) || context.probe(Number(found[2]))?.state !== "dead") continue; // another uid's, or its renamer may still be working
+    if (!mine(quarantined) || !isAskablePid(found[2], context.platform)) continue; // another uid's, or a pid that is no process: the probe is never asked
+    if (context.probe(Number(found[2]))?.state !== "dead") continue; // its renamer may still be working
     if (!pastWindow(quarantined, context.now, context.minAgeMs)) continue; // a renamer in another pid namespace has a pid this process cannot see: it is "dead" here and may be mid-delete
     const original = path.join(tmp, found[1]);
     if (restoreOnto(quarantined, original, context.hooks)) result.listed.push(`notice: restored ${found[1]} from a quarantine a killed sweep left`);

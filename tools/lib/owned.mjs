@@ -324,6 +324,18 @@ export function isProcessId(pid) {
 }
 
 /**
+ * May the probe be asked about the pid that `text` spells (a record's, or a quarantine name's)? ASCII digits written canonically (no sign, no
+ * leading zero: `007` could be a real process, and the janitor compares the text), 1 to 2^53-1 (0 addresses a process GROUP, the rest nothing),
+ * and on Windows never 1 (it has no pid 1; a bash started by a native process reports it for itself). `platform` is a `process.platform` value.
+ * What is not askable is `unknown` before any question is asked, never `gone`.
+ */
+export function isAskablePid(text, platform = process.platform) {
+  if (typeof text !== "string" || !/^(0|[1-9][0-9]*)$/.test(text)) return false;
+  const pid = Number(text);
+  return isProcessId(pid) && !(platform === "win32" && pid === 1);
+}
+
+/**
  * Is `pid` alive on this machine? Three NAMED answers, never a flag with an invisible third value:
  * `{ state: "dead" }` (no such process — the ONE answer that means gone), `{ state: "unknown" }` (the query was
  * refused or failed, or `pid` is not a process id at all: nothing is known), or `{ state: "live", start? }` —
@@ -537,8 +549,8 @@ export function ownerState(owner, probe = processProbe, facts = {}) {
   if (facts.kernelMine === false) return "unknown";
   if (owner.host.toLowerCase() !== me.host.toLowerCase()) return "unknown";
   if (me.host.toLowerCase().endsWith("@linux") && (owner.ns === undefined || owner.ns !== me.ns)) return "unknown"; // two namespaces can share a host name, never a pid space
-  if (!isProcessId(owner.pid)) return "unknown"; // pid 0, a negative, a fraction or one past 2^53 is no process: never asked, never gone
-  if (owner.pid === 1 && owner.host.toLowerCase().endsWith("@windows")) return "unknown"; // Windows has no pid 1; a bash started by a native process reports it for itself and its parent
+  // pid 0, a negative, a fraction or one past 2^53 is no process, and Windows has no pid 1 (a bash started by a native process reports it for itself and its parent): never asked, never gone
+  if (typeof owner.pid !== "number" || !isAskablePid(String(owner.pid), owner.host.toLowerCase().endsWith("@windows") ? "win32" : "linux")) return "unknown";
   let seen;
   try {
     seen = probe(owner.pid);
@@ -696,7 +708,7 @@ function worktreeFor(token, scope, repo, what, { ref = "HEAD", parent = tempRoot
 // A test enumerates the module's own exports against this list and the six bound ones, so a function added above and forgotten here is red.
 const TOKEN_FREE = {
   tempRoot, asciiLower, windowsOwnerToken, ownerToken, thisOwnerToken, classifyName, isInsideProfile, isMine, cleanupScope, startFromProcStat, auxvWordBytes, clockTicksFromAuxv, clockTicksPerSecond,
-  readPidNamespace, isProcessId, processProbe, hidepidActive, hostName, hostId, thisOwner, formatOwner, formatLegacyOwner, parseOwner,
+  readPidNamespace, isProcessId, isAskablePid, processProbe, hidepidActive, hostName, hostId, thisOwner, formatOwner, formatLegacyOwner, parseOwner,
   parseLegacyOwner, runRecord, writeOwner, removeClaimIfStill, gitdirOf, readClaimText, readOwner, ownerState, legacyOwnerState, removeLink,
   removeQuietly, removeClaim,
 };
