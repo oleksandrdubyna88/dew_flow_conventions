@@ -463,7 +463,7 @@
     {
       "id": "common.test-leftovers-detail",
       "source": "common/test-leftovers-detail.md",
-      "bodySha256": "fdb5894a656229f701b27744ed9a6bfd7ddbffff569a456e31e4c84b3d524fe7",
+      "bodySha256": "eb98b4ca25cd595298d8a6fc33cefa3a6aad5331b16a18628b5f8d01d8994249",
       "sections": [
         "# Test leftovers — the full rule text (the detail of `common/test-leftovers.md`)",
         "## 1. The name — one form, three spellings",
@@ -492,6 +492,18 @@
         "## What a copy must keep",
         "## Never",
         "## Definition of Done"
+      ]
+    },
+    {
+      "id": "common.test-leftovers-baseline",
+      "source": "common/test-leftovers-baseline.md",
+      "bodySha256": "bceea493e164b59e43864e8460546a87cc312e6cc743811ef39f2cd0fc3a6252",
+      "sections": [
+        "# The `raw-temp` baseline — one ratcheting file for sites inside an owned run folder",
+        "## The file",
+        "## What a guard does with it",
+        "## The ratchet",
+        "## Never"
       ]
     },
     {

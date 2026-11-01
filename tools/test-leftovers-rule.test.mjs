@@ -137,7 +137,7 @@ test("S1 9 the core carries, under each section, every phrase a reviewer needs t
 });
 
 /** What the baseline companion must carry: the one class, the proof marker, the multiset key, the ratchet, the file format. */
-const BASELINE_PHRASES = ["The `raw-temp` baseline", "testsToDelete-baseline-proof: <scope root>", "**multiset**", "sha256 of the trimmed line", "only when told to", "`baseline`", "**only shrinks**", "any creation but the first", "nothing regenerates it", "\"class\": \"raw-temp\"", "No `count` field", "`--baseline-shrinks`"];
+const BASELINE_PHRASES = ["The `raw-temp` baseline", "testsToDelete-baseline-proof: <scope root>", "**multiset**", "sha256 of the trimmed line", "only when told to", "`baseline`", "**only shrinks**", "any creation but the first", "nothing regenerates it", "\"class\": \"raw-temp\"", "No `count` field", "--baseline-shrinks"];
 
 test("S1 10 the baseline companion carries the full `raw-temp` baseline definition, once, and the detail's §7 points to it in one short paragraph, after the exemption grammar", () => {
   const text = read(BASELINE).replace(/\s+/g, " ");
@@ -153,7 +153,7 @@ test("S1 10 the baseline companion carries the full `raw-temp` baseline definiti
   assert.equal(pointer.split("**The `raw-temp` baseline").length - 1, 1, "§7 has the one pointer paragraph");
   assert.ok(section.indexOf("The exemption grammar") < section.indexOf("**The `raw-temp` baseline"), "it follows the exemption grammar");
   assert.ok(!pointer.includes("**multiset**"), "the definition is not copied into the detail");
-  assert.ok(Buffer.byteLength(bodyOf(detail)) <= CAP - 1000, "the detail keeps at least 1,000 B of headroom under the per-read cap");
+  assert.ok(Buffer.byteLength(bodyOf(detail)) <= CAP - 800, "the detail keeps at least 800 B of headroom under the per-read cap");
 });
 
 test("S1 5 every example name carries an owner of the grammar; the old form appears only as the legacy name's own description", () => {

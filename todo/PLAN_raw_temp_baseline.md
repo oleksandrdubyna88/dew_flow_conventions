@@ -1,6 +1,6 @@
 # PLAN — The `raw-temp` baseline: rule §7 authorises one ratcheting, membership-keyed baseline for sites proven to run inside an owned run folder
 
-> Status: **plan only, nothing implemented yet, 2026-11-01.** Scope: one sentence in the core
+> Status: **S1–S3 built on branch `feat/raw-temp-baseline`, 2026-11-01; the release (S4), the C# reader and the pin bumps are NOT done** — see § *Build progress*. Scope: one sentence in the core
 > `common/test-leftovers.md` §7, one paragraph in the detail `common/test-leftovers-detail.md` §7, the Node guard
 > `tools/leftovers-check.mjs` (a `--baseline` pass, a `--baseline-shrinks` check, a `--print-baseline` listing, the
 > class `baseline`) with its tests, the rule tests' caps, the research record, one release, and the pin bumps. It
@@ -304,15 +304,15 @@ node tools/release-distance.mjs                     # after S4 only
 
 ## Definition of Done
 
-- [ ] The core carries the sentence verbatim; the core is ≤ 9,000 B and ≥ its text at `2d12d8f` (nothing lost); the
-      detail carries the paragraph and reads under 32 KiB with `--only`; `MUST_CARRY` holds the phrase.
-- [ ] `tools/lib/raw-temp-baseline.mjs` and the guard's `--baseline`, `--print-baseline`, `--baseline-shrinks`,
+- [x] The core carries the sentence verbatim; the core is ≤ 9,000 B and ≥ its text at `2d12d8f` (nothing lost); the
+      full paragraph is in the companion (N1) and the detail reads under 32 KiB with `--only`; `MUST_CARRY` holds the phrase.
+- [x] `tools/lib/raw-temp-baseline.mjs` and the guard's `--baseline`, `--print-baseline`, `--baseline-shrinks`,
       `--base`, `--allow-create` exist and are in the header and `USAGE`; class `baseline` has its cure.
-- [ ] The fourteen behaviours were each watched RED, then GREEN, then RED again where the table says — the global
+- [x] The fourteen behaviours were each watched RED, then GREEN, then RED again where the table says — the global
       reconcile (a deleted file, hits at zero), the malformed file as a `baseline` finding, the unresolved base ref's
       fetch sentence, scope widening and re-creation among them; the default run over the fixture tree and over this
       repository is unchanged; this repository ships no baseline file.
-- [ ] `rule-bodies.json` re-recorded; `research/module_tests.md` § *Test leftovers* names the three arguments and the
+- [x] `rule-bodies.json` re-recorded; `research/module_tests.md` § *Test leftovers* names the three arguments and the
       class; `ownership-check` passes with no baseline file of its own.
 - [ ] The C# recommendation was handed to the template's owner with the format and the behaviours; the
       boundary is written in `dew_flow_mcp`'s plan and in coai's E5 (both sides).
@@ -320,6 +320,37 @@ node tools/release-distance.mjs                     # after S4 only
       alone; the other consumers' pin bumps listed here.
 - [ ] `node tools/plan-lifecycle.mjs` clean; this plan promoted to `research/` with its deviations when S4 is done,
       its `todo/README.md` row going with it.
+
+## Build progress
+
+Built on `feat/raw-temp-baseline` (local commits, nothing pushed, nothing released). Every behaviour of the test
+table was written as a failing test first (`test(...)` commit), then the code, then watched RED again with the code
+stashed and with a targeted break (14 mutations of the module, each failing exactly the test that names it).
+
+- [x] S1 the rule: core sentence (8,876 B, cap 9,000), companion `common/test-leftovers-baseline.md` (5,910 B) with the
+      detail's pointer (31,546 B) — see N1; `CORE_CAP` 9000; `MUST_CARRY` holds "`raw-temp` baseline"; bodies re-recorded;
+      the selection baseline `research/selection-matrix.json` regenerated (the new id joins the scopes that select the janitor).
+- [x] S2 `tools/lib/raw-temp-baseline.mjs`; the guard's `--baseline`, `--print-baseline`, `--baseline-shrinks`, `--base`,
+      `--allow-create`; class `baseline` and its cure; header and `USAGE`; `tools/raw-temp-baseline.test.mjs` (the
+      fourteen behaviours and a fifteenth, below).
+- [x] S3 `research/module_tests.md` § *Test leftovers*, `research/rule-bodies.json`, the README tool row.
+- [ ] S4 the release, the warning, the pin bumps (not started — a later step).
+- [ ] The C# reader in the template (the template owner's plan; nothing here).
+
+Deviations from the plan as written, each with its reason:
+
+1. **A fifteenth behaviour.** The proof marker `<prefix>-baseline-proof:` would be a `legacy-name` finding in the very
+   test file that carries it (second segment `baseline`). The guard now treats that exact marker as a marker word, as
+   it treats `exempt` (test 15). The rule-test S1 5 allows the segment `baseline` for the same reason.
+2. **`--allow-create` and `git log --all`.** Read literally, `git log --all -- <path>` would also see the creation PR's
+   own commit, so the one creation could never pass in CI. The check uses the history behind the base ref
+   (`git log <base> -- <path>`) plus every other ref not in HEAD (`git log --all --not HEAD`): a path that ever existed
+   behind the base, or on another branch, is a re-creation; the creation commits above the base are the creation.
+3. **The shallow-clone fail-closed applies when history is consulted** (a creation with `--allow-create`), not to
+   every shrink check: a CI checkout is shallow by default and the plain check needs only the base ref's blob.
+4. **An entry under no scope, or under a scope whose proof does not hold, clears nothing** (the site stays a
+   `raw-temp` finding as well as the `baseline` finding): the plan says "a site outside a proven runner … is a finding".
+5. Test 4's duplicate line sits at line 10 (not 9) because the fixture's source has four lines before the padding.
 
 ## Open questions
 
@@ -330,9 +361,15 @@ Blocking: none open.
 
 Non-blocking (the defaults below were kept by the gate round; a different answer is one edit):
 
-- **N1 — the full definition in the detail (as instructed; 32,712 of 32,768 B) or in a companion file now?**
-  Default: the detail. If the owner prefers headroom, the companion of R1 is written in S1 instead and the detail
-  carries only its first sentence (≈ 330 B).
+- **N1 — DECIDED at build (2026-11-01, coordinator instruction): a COMPANION, not the detail.** The F16 branch
+  (`fix/f16-windows-list-only`, merging first) adds 131 B to the detail's §4 (31,241 → 31,372 B); the plan's
+  paragraph (+1,471 B) would make the detail 32,843 B, over the 32,768 B per-read cap. So the FULL definition lives in
+  the new `common/test-leftovers-baseline.md` (id `common.test-leftovers-baseline`, `load: conditional`, tasks
+  `audit`, `policy`, `release` — the janitor companion's frontmatter pattern), and the detail's §7 carries a 3-line
+  pointer paragraph. Bytes: core 8,876 (unchanged, the sentence stays in the core); detail 31,546 (+305 on 31,241;
+  with F16's +131 it is 31,677, 1,091 B under the cap); companion 5,910. The companion holds the plan's paragraph
+  verbatim plus the file format and the guard behaviour; no other text of the detail was touched. R1's mitigation
+  is thereby done, not deferred.
 - **N2 — `count` field or repeated entries?** Default: repeated entries (one shape, one validator). coai's E5 text
   says `{ file, sha256, line, count }`; coai reads the released form, so its S6 follows this.
 - **N3 — one `--baseline` per run or repeatable?** Default: one; a repository with several files runs the guard once
