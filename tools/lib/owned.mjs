@@ -475,22 +475,35 @@ export function gitdirOf(dir) {
 }
 
 /**
+ * Open `file` for the claim read. POSIX: `O_RDONLY | O_NONBLOCK | O_NOFOLLOW` (when the platform defines them) — a FIFO swapped in since the
+ * look opens at once instead of waiting for a writer, and a link is refused. Windows has no `O_NOFOLLOW`: a plain open, the check on the descriptor follows.
+ */
+function openForClaim(file) {
+  const { O_RDONLY, O_NONBLOCK, O_NOFOLLOW } = fs.constants;
+  if (process.platform !== "win32" && O_NONBLOCK !== undefined && O_NOFOLLOW !== undefined) return fs.openSync(file, O_RDONLY | O_NONBLOCK | O_NOFOLLOW);
+  return fs.openSync(file, "r");
+}
+
+/**
  * The raw text of a claim or lock file, through the ONE safe read: `null` when there is no file, `{ unreadable: true }` when it is
- * no regular file (a FIFO would block a read forever) or cannot be read, `{ unreadable: true, reason: "foreign-uid" }` when the
- * scope key (`mine`) says the caller does not own it — a stranger's claim is no evidence. At most `MAX_CLAIM_BYTES + 1` bytes are read.
+ * no regular file (a FIFO would block a read forever), cannot be read, or is not the file that was looked at (the descriptor is a regular file
+ * with the lstat's `(dev, ino)`, checked BEFORE any byte is read), `{ unreadable: true, reason: "foreign-uid" }` when the
+ * scope key (`mine`) says the caller does not own it — a stranger's claim is no evidence. At most `MAX_CLAIM_BYTES + 1` bytes are read, from that descriptor.
  */
 export function readClaimText(file, mine = isMine, { checkOwner = true } = {}) {
   let stat;
   try {
-    stat = fs.lstatSync(file);
+    stat = fs.lstatSync(file, { bigint: true });
   } catch (error) {
     return error?.code === "ENOENT" ? null : { unreadable: true };
   }
   if (!stat.isFile()) return { unreadable: true };
   if (checkOwner && !mine(file)) return { unreadable: true, reason: "foreign-uid" };
   try {
-    const fd = fs.openSync(file, "r");
+    const fd = openForClaim(file);
     try {
+      const opened = fs.fstatSync(fd, { bigint: true });
+      if (!opened.isFile() || opened.dev !== stat.dev || opened.ino !== stat.ino) return { unreadable: true }; // another entry took the name since the look
       const buffer = Buffer.alloc(MAX_CLAIM_BYTES + 1);
       const read = fs.readSync(fd, buffer, 0, buffer.length, 0);
       return buffer.toString("utf8", 0, read);
