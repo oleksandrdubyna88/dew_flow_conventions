@@ -478,6 +478,7 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
 - **RED first.** A hook between the draw and the move plants an empty directory at the quarantine name ⇒ today it is gone after the
   sweep (RED); after the fix it survives with its identity and the folder is quarantined under a fresh suffix.
 - **Anchor.** `tools/lib/leftovers-sweep.mjs:159-218`.
+- **Fixed** 2026-11-01, 556550c, RED observed: `tools/leftovers-sweep.test.mjs` 16e failed with `ENOENT … lstat '…quarantine-<pid>-aaaaaaaa'` (the empty directory planted at the drawn name was replaced and removed), 16f with `0 !== 1` errors (five taken names destroyed instead of one error); 16g and 16h (the placeholder filled or swapped before the rename) failed on `the quarantine move reserved its name` (the hook never fired: no reservation existed). One `moveExclusively` (reservation, identity re-check before the rename, ENOTEMPTY / EEXIST / EISDIR = taken, `rmdir` of the placeholder only while ours and empty) serves the quarantine move (five draws, then the folder is kept with one error) and `restoreOnto`. The window between the identity check and `rename(2)` is accepted and said in the code (no `renameat2` in Node; only the same user can use it). Windows keeps the plain rename, unmeasured, pointing at F9.
 
 ## F18 — The quarantine pass asks the probe about any pid (found 2026-10-31, the E3 and E4 ports)
 
@@ -490,6 +491,7 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
 - **RED first.** Quarantines named with `-0-`, `-007-`, `-9007199254740993-` and (platform win32) `-1-` and an injected probe that
   answers `dead` for anything ⇒ today each is restored (RED); after the fix none is, and the probe is never called.
 - **Anchor.** `tools/lib/leftovers-sweep.mjs:406-419`, `tools/lib/owned.mjs:531-552`.
+- **Fixed** 2026-11-01, d7a2ec9, RED observed: `tools/owned-liveness.test.mjs` F18 failed with `-0- stays in quarantine` (each of `-0-`, `-007-`, `-9007199254740993-`, and `-1-` on win32 was restored on a probe that answers dead); after the fix the probe is never called. `isAskablePid(text, platform)` is exported from `owned.mjs` and used by `ownerState` and by the quarantine pass.
 
 ## F19 — The orphan-claim pass can delete the claim of a folder that sits in a quarantine (found 2026-10-31, the E3 and E4 ports)
 
@@ -501,6 +503,7 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
 - **RED first.** A claim with a gone record whose folder is renamed into a quarantine with a live renamer ⇒ today the claim is removed
   (RED); after the fix it stays and nothing is listed for it.
 - **Anchor.** `tools/lib/leftovers-sweep.mjs:376-404`.
+- **Fixed** 2026-11-01, bf3bd4a, RED observed: `tools/leftovers-sweep.test.mjs` 16i failed with `the claim is still there for the restore or the removal that follows` (the claim of a folder held in a live renamer's quarantine was removed); 16k the same for a `quarantine-conflict`; 16j failed on `the claim was about to be removed` (the new `beforeClaimRemoval` seam never fired). The pass skips a claim with a quarantine sibling (one snapshot per pass plus this report's conflicts) and looks again, freshly, immediately before the deletion.
 
 ## F20 — `readClaimText` can block on a FIFO swapped in between the check and the open (found 2026-10-31, the E3 and E4 ports)
 
@@ -514,6 +517,7 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   run in a child with a timeout so the suite cannot hang); after the fix it returns `{ unreadable: true }` at once. A regular file
   swapped in ⇒ unreadable.
 - **Anchor.** `tools/lib/owned.mjs:465-492`.
+- **Fixed** 2026-11-01, 733c781, RED observed: `tools/owned.test.mjs` F20b failed with `readClaimText did not return within 5 s: it blocked on the FIFO` (the read runs in a child with a 5 s timeout); F20a failed with `another file took the name between the look and the open` (the swapped-in file was read as the judged one). `readClaimText` opens with `O_RDONLY | O_NONBLOCK | O_NOFOLLOW` on POSIX and checks the descriptor (`fstat`: regular file, the lstat's `(dev, ino)`) before any read, on every platform.
 
 F17–F20 land together, with their tests, as one change released once (R7 of the remainder plan); the consumers that wrap the
 reference (coai E5, creds E2, the private sibling) take it with that pin. The ports E3 and E4 already behave this way.
