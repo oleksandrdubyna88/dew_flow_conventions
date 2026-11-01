@@ -18,10 +18,10 @@ parser or glob engine was avoided. Existing lexical path validation is reused fr
 
 Metadata keys: `id`, `load`, optional `paths`, `tasks`, `depends`, `path_tasks`. Unknown
 fields/tasks, duplicate ids/keys, empty bodies, missing dependencies and cycles are errors
-even in unselected rules. `path_tasks` has four errors of its own: it is refused on a
+even in unselected rules. `path_tasks` has five errors of its own: it is refused on a
 `load: always` rule (`applies to a conditional rule only`), when empty (`must name at least one
-task`), when it names a task outside the vocabulary (the legal ones are listed), and when
-the rule has no `paths` (`path_tasks needs paths`). All Markdown in the four rule directories must declare metadata.
+task`), when it repeats a task (`path_tasks must not repeat a task`), when it names a task outside the
+vocabulary (the legal ones are listed), and when the rule has no `paths` (`path_tasks needs paths`). All Markdown in the four rule directories must declare metadata.
 Local rules use the same schema and `local.*` ids. The migration inventory records every
 original rule section and body hash; it is historical evidence, not a second selector.
 

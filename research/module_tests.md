@@ -1364,7 +1364,8 @@ Also in the integration: `leftovers-check.mjs` covers `docker compose -p`/`--pro
 mutation included). Selection: a gated rule is selected by its paths only with a task inside its gate (a task outside, no
 file, a non-matching file, two gate tasks in one reason); an ungated rule with the same paths is unaffected; plain
 `tasks` and dependencies ignore the gate. Metadata: the six refusals (no `paths`, `paths: []`, an empty list, an unknown
-task, a string, a `load: always` rule). `explain` shows `path_tasks` on every rule with the same ids and bytes. The
+task, a string, a `load: always` rule) and a repeated task (`path_tasks must not repeat a task`, so a selection reason names each
+task once). `explain` shows `path_tasks` on every rule with the same ids and bytes. The
 provenance cases cover `provenanceFindings` (mirror equal / different tasks / path-only source, declared with a short
 reason or a different set, both or neither key, an absent rule's record before and after its epic lands, the real
 catalog with `gates: {}`).

@@ -99,6 +99,7 @@ function ruleFrom(file, base, namespace) {
   pathTasks.forEach(task => { if (!Object.hasOwn(TASKS,task)) throw new Error(`${file}: unknown path_tasks task ${task}; legal: ${Object.keys(TASKS).join(", ")}`); });
   if (gated && metadata.load === "always") throw new Error(`${file}: path_tasks applies to a conditional rule only`);
   if (gated && !pathTasks.length) throw new Error(`${file}: path_tasks must name at least one task`);
+  if (new Set(pathTasks).size !== pathTasks.length) throw new Error(`${file}: path_tasks must not repeat a task`);
   if (gated && !paths.length) throw new Error(`${file}: path_tasks needs paths — it gates path selection and selects nothing alone`);
   tasks.forEach(task => { if (!Object.hasOwn(TASKS,task)) throw new Error(`${file}: unknown task ${task}; legal: ${Object.keys(TASKS).join(", ")}`); });
   paths.forEach(patternMatcher);

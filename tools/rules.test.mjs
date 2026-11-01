@@ -405,6 +405,14 @@ test("plain tasks and dependencies ignore a rule's path_tasks gate",t=>{
   assert.equal(reasonsOf(catalog,["inspect"],["src/x.cs"],"csharp.mech"),undefined);
 });
 
+test("path_tasks is refused when it repeats a task, so the reason of a selection names each task once",t=>{
+  const {root,put}=fixture(t);
+  put("csharp/g.md",'id: csharp.g\nload: conditional\npaths: ["**/*.cs"]\npath_tasks: ["implement","implement"]');
+  assert.throws(()=>loadCatalog(root),/path_tasks must not repeat a task/);
+  put("csharp/g.md",'id: csharp.g\nload: conditional\npaths: ["**/*.cs"]\npath_tasks: ["implement","test"]');
+  assert.deepEqual(reasonsOf(loadCatalog(root),["implement"],["src/x.cs"],"csharp.g"),["path:src/x.cs (**/*.cs) when task:implement"]);
+});
+
 test("path_tasks is refused when it cannot do its job: no paths, no tasks, an unknown task, a string, an always rule",t=>{
   const {root,put}=fixture(t);
   for(const [meta,expected] of [
