@@ -1,9 +1,24 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **plan only, nothing implemented yet (2026-10-14); split into seven epics 2026-10-15.** Scope: the test
+> Status: **stopped for re-review (2026-11-01): a second change after approval (see Plan changes).** Was: **plan only, nothing implemented yet (2026-10-14); split into seven epics 2026-10-15.** Scope: the test
 > code, scripts and CI of the six consumers, plus one refinement of [common/test-leftovers.md](../common/test-leftovers.md).
 >
 > Related: [common/test-leftovers.md](../common/test-leftovers.md), [common/testing.md](../common/testing.md).
+
+## Plan changes
+
+> Epoch 1 · approved 2026-10-15 · by reviewers · state: stopped
+
+- 1.1 · 2026-11-01 · reviewer · build-order, merge-conditions — E2's producer stage lands as five per-epic PRs, not one commit
+  (the creds plan gate's split order on the re-split stories, session 0b24304d; consult 9d8564bb; dew_flow_creds_for_devs
+  docs/test-leftovers-e2-stories at f61358b. This plan says a producer stage is the rename and port in one commit.)
+- 1.2 · 2026-11-01 · reviewer · contract, build-order — E5's producer waits for a released raw-temp baseline rule
+  (coai's plan gate refused a coai-only allowlist as a waiver of rule section 7, session 55ddb13b round 1 findings 0
+  and 7; consult abcaae48 recommended changing the shared rule first. The rule change is being planned on branch
+  feat/raw-temp-baseline (todo/PLAN_raw_temp_baseline.md); E5's producer merges after its release and a pin bump alone.)
+  (This ledger opens at this change, as the rule says for a plan approved before it arrived. Changes made after the
+  rule arrived on 2026-10-28 and before this ledger, such as the wave 1 re-split notes and the R6 owner decisions of
+  2026-10-31, stay in the text where they were written.)
 
 ## Symptom
 
