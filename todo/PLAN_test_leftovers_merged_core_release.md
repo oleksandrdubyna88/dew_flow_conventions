@@ -197,6 +197,20 @@ cache or a process.
 - **When.** After F17–F20 merge on `main`; before the producer stage of E5 or E2.
 - **Done when.** `release` is at the merged sha, `release-distance` reports 0, the warning's recipients and date are recorded here, and
   every consumer's pin bump is listed.
+- **Done 2026-11-01.**
+  - *Warning.* 11:35 UTC, before the promotion, to the sessions "vllm fix", "dew-flow-conventions-2f", "kimi" and "C# vs Node". Before benchmark
+    #136 merged (11:47 UTC), "C# vs Node" and "kimi" were told again, as they asked.
+  - *Promotion.* `release` moved from `115bbf8` to `105d53c` (F17–F20 in #101, the core split in #102); `promote-release.yml` run 41302588544,
+    success. `release-distance` read 0 right after it. It reads 1 now: #103 (`bec3df7`, the `r9700` token row) merged on `main` later and rides the
+    next promotion; the "vllm fix" session is told when `release` moves.
+  - *Pin bumps to `105d53c`, each merged alone:* dew_flow_creds_for_devs #289 (`47724fd`), dew_flow_rag_qln #78 (`2936537`),
+    dew_flow_vscode_kit #20 (`7cab547`), dew_flow_benchmark #136 (`0e0bdd8`), dew_flow_sidecar_rust #66 (`e58be09`), dew_flow_mcp #60
+    (`142d8d2`), wsl_care #182 (`23859c4`), dew_flow_connect_other_ais #936 (`df375eb`).
+  - *Found while pinning.* wsl_care #182 also carries a test fix: `ActWindowsTests` dated its folder from the real clock while the host reads
+    `FixedTimeProvider.DefaultNow` (2026-10-02), so from 2026-11-01 the folder was no longer older than "now" and the Windows leg previewed
+    0 objects. The folder is now dated from `DefaultNow`. coai #936 merged before two CodeRabbit review-body notes were read; both were checked
+    afterward, and the one doc figure they found is fixed in coai #938. Lesson kept: read the review bodies, not only the inline comments,
+    before a merge.
 
 ## Build order
 
@@ -228,7 +242,10 @@ checkout of the PR's branch. Their outcome is recorded by hand; the scan itself 
 - [x] R4: the private sibling's confirmation exists (both spans byte-identical; the two consumer files copied with their sha256 pinned).
 - [x] R5: the warning went to the sessions with open consumer pull requests; `release` promoted once; `release-distance` 0.
 - [ ] R6: every sweep-only stage merged before any producer stage; the rollout plan's Definition of Done met.
-- [ ] R7: F17–F20 and the test-leftovers core split released once; every consumer pinned to that release (each pin bump merges alone, after the
+- [x] R7: F17–F20 and the test-leftovers core split released once; every consumer pinned to that release (each pin bump merges alone, after the
       release and before that consumer's producer stage).
-- [ ] The Darwin path of the C# helper: measured on a macOS CI leg and merged in dew_flow_mcp before E5 and E2 copy the helper.
+- [x] The Darwin path of the C# helper: measured on a macOS CI leg and merged in dew_flow_mcp before E5 and E2 copy the helper.
+      Done 2026-11-01: dew_flow_mcp #59 (`197cc76a`), its macOS job green. The macOS runs also found that a request was walked through the
+      root's spelling, so `/var` → `/private/var` spent one hop of the link budget; both readers (mcp, and coai #938) now walk from the
+      resolved root. The follow-ups, and what was never measured (X64, Rosetta), are in that repository's `research/PLAN_test_leftovers_E3.md`.
 - [ ] This plan is promoted to `research/` with its deviations, or deleted with a recorded reason, when R6 is done; its row in `todo/README.md` goes with it.
