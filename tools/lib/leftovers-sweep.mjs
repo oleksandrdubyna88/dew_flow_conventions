@@ -160,40 +160,82 @@ function quarantineName(dir) {
   return path.join(path.dirname(dir), `.${path.basename(dir)}.teststodelete-quarantine-${process.pid}-${crypto.randomBytes(4).toString("hex")}`);
 }
 
-/**
- * Put a quarantined folder back under `original` only if that name is FREE; `false` when it is taken (or cannot be had). Where the
- * name was reserved with an empty folder and the rename then failed, the placeholder is removed — only while it is still a real folder
- * of the caller's AND empty (`rmdir` refuses a folder that has anything in it): a name taken over in between is never touched, and the
- * quarantine stays, listed, instead of being orphaned behind a claim nobody can read.
- */
-function restoreOnto(quarantined, original, mine, hooks = {}) {
-  if (process.platform === "win32") {
-    try {
-      fs.renameSync(quarantined, original); // a directory rename onto an existing one fails here: the move is exclusive by itself
-      return true;
-    } catch {
-      return false;
-    }
-  }
+const TAKEN_CODES = new Set(["ENOTEMPTY", "EEXIST", "EISDIR"]); // what a rename onto an occupied name answers
+const QUARANTINE_DRAWS = 5; // the names a quarantine move draws before it gives up and keeps the folder
+
+/** Is `placeholder` still the directory this move reserved: a directory, not a link, the reserved `(dev, ino)`, and empty? */
+function isOwnEmptyPlaceholder(placeholder, reserved) {
+  const now = identityOf(placeholder); // lstat: a link is its own entry, never a directory
+  if (!sameIdentity(now, reserved) || !now.directory) return false;
   try {
-    fs.mkdirSync(original, { mode: 0o700 }); // exclusive: an existing folder or file under the name refuses
+    return fs.readdirSync(placeholder).length === 0;
   } catch {
-    return false;
-  }
-  try {
-    hooks.afterReserve?.(original, quarantined);
-    fs.renameSync(quarantined, original);
-    return true;
-  } catch {
-    removeOwnEmptyPlaceholder(original, mine);
     return false;
   }
 }
 
-function removeOwnEmptyPlaceholder(placeholder, mine) {
+/** Remove the reserved placeholder only while it is still ours and empty (`rmdir`, never recursive): a name taken over in between is never touched. */
+function removeOwnEmptyPlaceholder(placeholder, reserved) {
   try {
-    if (fs.lstatSync(placeholder).isDirectory() && mine(placeholder)) fs.rmdirSync(placeholder);
-  } catch { /* gone, or not empty, or not ours: leave it */ }
+    if (isOwnEmptyPlaceholder(placeholder, reserved)) fs.rmdirSync(placeholder);
+  } catch { /* gone, or not empty: leave it */ }
+}
+
+/**
+ * Rename `from` to `to` ONLY if nothing is at `to`: `true` when it moved, `false` when the name is taken (nothing at `to` was touched and
+ * `from` stays), any other failure throws. POSIX: Node has no `renameat2(RENAME_NOREPLACE)`, and `rename(2)` replaces an EMPTY directory, so the name is
+ * reserved with an exclusive `mkdir` and the rename lands on our own empty placeholder. The placeholder's identity is checked again immediately
+ * before the rename (a directory, not a link, the reserved `(dev, ino)`, empty). The window that remains between that check and `rename(2)` is
+ * ACCEPTED: only the same user can put something at the name inside it (a different user cannot touch our placeholder in a sticky temp root), and
+ * the same user is not the threat this sweep guards against. A rename refused with ENOTEMPTY / EEXIST / EISDIR is the name taken after all. When
+ * the rename fails the placeholder is removed — only while it is still our empty directory with the reserved identity.
+ * `hooks.afterReserve(to, from)` is the test seam between the reservation and the rename.
+ */
+function moveExclusively(from, to, hooks = {}) {
+  if (process.platform === "win32") {
+    try {
+      fs.renameSync(from, to); // a directory rename onto an existing one fails here, so the move is exclusive by itself — unmeasured on Windows, which F9 settles
+    } catch (error) {
+      if (TAKEN_CODES.has(error?.code)) return false;
+      throw error;
+    }
+    return true;
+  }
+  try {
+    fs.mkdirSync(to, { mode: 0o700 }); // exclusive: an existing folder, file or link under the name refuses
+  } catch (error) {
+    if (error?.code === "EEXIST") return false;
+    throw error;
+  }
+  const reserved = identityOf(to);
+  try {
+    hooks.afterReserve?.(to, from);
+    if (!isOwnEmptyPlaceholder(to, reserved)) return false; // not ours any more: never renamed onto, never removed
+    fs.renameSync(from, to);
+    return true;
+  } catch (error) {
+    removeOwnEmptyPlaceholder(to, reserved);
+    if (TAKEN_CODES.has(error?.code)) return false;
+    throw error;
+  }
+}
+
+/** Put a quarantined folder back under `original` only if that name is FREE; `false` when it is taken (or cannot be had): the quarantine stays, listed. */
+function restoreOnto(quarantined, original, hooks = {}) {
+  try {
+    return moveExclusively(quarantined, original, hooks);
+  } catch {
+    return false;
+  }
+}
+
+/** Move `dir` to a quarantine name that was free: a taken name draws a new suffix, at most `QUARANTINE_DRAWS` times; then the folder is kept (one error). Returns the name. */
+function moveToQuarantine(dir, hooks) {
+  for (let draw = 0; draw < QUARANTINE_DRAWS; draw += 1) {
+    const quarantine = quarantineName(dir);
+    if (moveExclusively(dir, quarantine, hooks)) return quarantine;
+  }
+  throw new Error(`no free quarantine name in ${QUARANTINE_DRAWS} draws — the folder is kept`);
 }
 
 /**
@@ -204,11 +246,10 @@ function removeOwnEmptyPlaceholder(placeholder, mine) {
 function removeFolderByIdentity(dir, captured, hooks) {
   hooks.afterVerdict?.(dir);
   if (!unchanged(dir, "folder", captured)) return { removed: false, reason: "replaced" };
-  const quarantine = quarantineName(dir);
-  fs.renameSync(dir, quarantine);
+  const quarantine = moveToQuarantine(dir, hooks);
   hooks.afterRename?.(dir, quarantine);
   if (!sameIdentity(identityOf(quarantine), captured.identity) || claimTextOf(dir, "folder", captured.mine) !== captured.claim) {
-    if (!restoreOnto(quarantine, dir, captured.mine, hooks)) return { removed: false, reason: "quarantine-conflict", path: quarantine };
+    if (!restoreOnto(quarantine, dir, hooks)) return { removed: false, reason: "quarantine-conflict", path: quarantine };
     return { removed: false, reason: "replaced" };
   }
   unlinkTopLevelLinks(quarantine);
@@ -413,7 +454,7 @@ function restoreQuarantines(context) {
     if (!mine(quarantined) || context.probe(Number(found[2]))?.state !== "dead") continue; // another uid's, or its renamer may still be working
     if (!pastWindow(quarantined, context.now, context.minAgeMs)) continue; // a renamer in another pid namespace has a pid this process cannot see: it is "dead" here and may be mid-delete
     const original = path.join(tmp, found[1]);
-    if (restoreOnto(quarantined, original, mine, context.hooks)) result.listed.push(`notice: restored ${found[1]} from a quarantine a killed sweep left`);
+    if (restoreOnto(quarantined, original, context.hooks)) result.listed.push(`notice: restored ${found[1]} from a quarantine a killed sweep left`);
     else context.report.keep(quarantined, "quarantine-conflict");
   }
 }

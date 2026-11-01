@@ -14,6 +14,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import cryptoDefault from "node:crypto";
 import fsDefault from "node:fs";
 import * as fs from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
@@ -106,6 +107,22 @@ function worktree(own, repo, tmp, what, { claim, young = false } = {}) {
   if (!young) setOld(wt.path);
   return wt.path;
 }
+
+/** Run `fn` with `crypto.randomBytes(4)` drawing `hexes` in turn (every other call untouched): the quarantine names are known in advance. */
+function withDrawnSuffixes(hexes, fn) {
+  const original = cryptoDefault.randomBytes;
+  const queue = [...hexes];
+  cryptoDefault.randomBytes = (size, ...rest) => (size === 4 && queue.length > 0 ? Buffer.from(queue.shift(), "hex") : original(size, ...rest));
+  syncBuiltinESMExports();
+  try {
+    return fn();
+  } finally {
+    cryptoDefault.randomBytes = original;
+    syncBuiltinESMExports();
+  }
+}
+
+const quarantineAs = (tmp, victim, hex) => path.join(tmp, `.${path.basename(victim)}.teststodelete-quarantine-${process.pid}-${hex}`);
 
 const listed = (repo) => git(repo, "worktree", "list", "--porcelain").split(/\r?\n/)
   .filter((line) => line.startsWith("worktree ")).map((line) => path.resolve(line.slice(9)).toLowerCase());
@@ -742,6 +759,80 @@ test("16d. a restore that fails after the name was reserved removes its own empt
   assert.equal(fs.readFileSync(path.join(tmp, names[1], "theirs.txt"), "utf8"), "put there since\n", "a placeholder with something in it is never touched");
   assert.ok(fs.existsSync(quarantineOf(names[1])));
   for (const name of names) assert.ok(result.preserved.some((entry) => entry.path === quarantineOf(name) && entry.reason === "quarantine-conflict"), `${name} stays listed: ${JSON.stringify(result.preserved)}`);
+});
+
+// 16e-16h (F17: the move into quarantine never lands on something that is already there) ---------------------------
+
+test("16e. an empty directory at the drawn quarantine name survives the sweep, and the folder is quarantined under a fresh name (F17)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f17-taken-repo");
+  const victim = folder(own, tmp, "f17-taken", { claim: deadOwnerLine() });
+  const taken = quarantineAs(tmp, victim, "aaaaaaaa");
+  fs.mkdirSync(taken); // appeared at the drawn name: rename(2) would replace an EMPTY directory
+  const before = fs.lstatSync(taken, { bigint: true });
+  const result = withDrawnSuffixes(["aaaaaaaa", "bbbbbbbb"], () => sweepLeftovers({ repo, tmp, probe: deadProbe }));
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.removed, [victim], "removed through the second draw");
+  const after = fs.lstatSync(taken, { bigint: true });
+  assert.equal(after.ino, before.ino, "the directory that was there is the same directory");
+  assert.equal(fs.existsSync(quarantineAs(tmp, victim, "bbbbbbbb")), false);
+  own.after(() => fs.rmSync(taken, { recursive: true, force: true }));
+});
+
+test("16f. five taken names in a row keep the folder where it is, with one error, and destroy nothing (F17)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f17-five-repo");
+  const victim = folder(own, tmp, "f17-five", { claim: deadOwnerLine() });
+  const hexes = ["a1a1a1a1", "a2a2a2a2", "a3a3a3a3", "a4a4a4a4", "a5a5a5a5"];
+  const planted = hexes.map((hex) => quarantineAs(tmp, victim, hex));
+  for (const taken of planted) { fs.mkdirSync(taken); own.after(() => fs.rmSync(taken, { recursive: true, force: true })); }
+  const result = withDrawnSuffixes(hexes, () => sweepLeftovers({ repo, tmp, probe: deadProbe }));
+  assert.equal(result.errors.length, 1, JSON.stringify(result.errors));
+  assert.match(result.errors[0], /quarantine/);
+  assert.deepEqual(result.removed, []);
+  assert.ok(fs.existsSync(victim), "the folder stays under its own name");
+  assert.ok(fs.existsSync(`${victim}.owner`), "and keeps its claim");
+  for (const taken of planted) assert.ok(fs.existsSync(taken), `${path.basename(taken)} was not replaced`);
+});
+
+test("16g. a placeholder somebody filled before the rename is left as theirs, and the folder is quarantined under a fresh name (F17, ENOTEMPTY)", (t) => {
+  if (win32) { t.skip("the placeholder is a POSIX reservation"); return; }
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f17-filled-repo");
+  const victim = folder(own, tmp, "f17-filled", { claim: deadOwnerLine() });
+  const first = quarantineAs(tmp, victim, "c1c1c1c1");
+  let fired = 0;
+  const hooks = { afterReserve: (placeholder) => { if (placeholder === first) { fired += 1; fs.writeFileSync(path.join(placeholder, "theirs.txt"), "put there since\n"); } } };
+  const result = withDrawnSuffixes(["c1c1c1c1", "c2c2c2c2"], () => sweepLeftovers({ repo, tmp, probe: deadProbe, hooks }));
+  own.after(() => fs.rmSync(first, { recursive: true, force: true }));
+  assert.equal(fired, 1, "the quarantine move reserved its name");
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.removed, [victim]);
+  assert.equal(fs.readFileSync(path.join(first, "theirs.txt"), "utf8"), "put there since\n", "a filled placeholder is never removed");
+});
+
+test("16h. a placeholder swapped for another empty directory is never renamed onto and never removed (F17: the identity is re-checked)", (t) => {
+  if (win32) { t.skip("the placeholder is a POSIX reservation"); return; }
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f17-swapped-repo");
+  const victim = folder(own, tmp, "f17-swapped", { claim: deadOwnerLine() });
+  const first = quarantineAs(tmp, victim, "d1d1d1d1");
+  const aside = path.join(work, "swapped-aside");
+  let theirs;
+  const hooks = {
+    afterReserve: (placeholder) => {
+      if (placeholder !== first) return;
+      fs.renameSync(placeholder, aside); // our placeholder goes away (its inode lives on, so the next one differs)…
+      fs.mkdirSync(placeholder); // …and an empty directory that is not ours takes the name
+      theirs = fs.lstatSync(placeholder, { bigint: true });
+    },
+  };
+  const result = withDrawnSuffixes(["d1d1d1d1", "d2d2d2d2"], () => sweepLeftovers({ repo, tmp, probe: deadProbe, hooks }));
+  own.after(() => { fs.rmSync(first, { recursive: true, force: true }); fs.rmSync(aside, { recursive: true, force: true }); });
+  assert.notEqual(theirs, undefined, "the quarantine move reserved its name");
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.removed, [victim], "removed through the second draw");
+  assert.equal(fs.lstatSync(first, { bigint: true }).ino, theirs.ino, "the directory that took the name is still there, untouched");
 });
 
 // 17 --------------------------------------------------------------------------------------------------------
