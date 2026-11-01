@@ -410,7 +410,7 @@ test("15. the proof marker in a consumer's test is not a legacy-name finding", (
 test("15b. the marker is matched in its exact case and needs a folder path after it: an image tag spelled like it stays a legacy-name finding", (t) => {
   const lower = "teststo" + "delete-baseline-proof:latest";
   const bare = MARK + "latest";
-  for (const [text, why] of [[lower, "lower case, no space, no folder"], [bare, "exact case but no folder path"]]) {
+  for (const [text, why] of [[lower, "lower case, no space, no folder"], [bare, "exact case but no folder path"], [`${lower.replace(":latest", ":")} ${ROOT}`, "a folder path but the wrong case"]]) {
     const { repo } = fixture(t, { baseline: null, proof: `export const tag = "${text}";\n` });
     const result = guard(repo);
     assert.ok(found(result.text).includes(`${PROOF}:1 — legacy-name`), `${why}: ${result.text}`);

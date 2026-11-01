@@ -14,6 +14,13 @@
 
 > Epoch 1 · approved 2026-11-01 · by reviewers · state: open
 
+- 1.1 · 2026-11-01 · reviewer · contract — the baseline has one fixed path at the repository root and is never a symlink
+  (Opus B1: a symlink turned a grown baseline into an allowed creation — the file at a link's target was "absent at base"
+  and `--allow-create` passed it; Opus M3: with a path argument, any new path counted as a "first creation", so a second
+  baseline file passed the creation rule. One path, a regular file, closes both: `--baseline`, `--baseline-shrinks` and
+  `--print-baseline` take no path, and wherever this plan says `--baseline <path>` or `--baseline-shrinks <path>` it
+  now means the flag that reads `raw-temp-baseline.json` at the repository root.)
+
 ## Symptom
 
 Rule §7 at release `105d53c` allows ONE pass for a `raw-temp` finding: an inline comment on the line or the line
@@ -327,7 +334,7 @@ Built on `feat/raw-temp-baseline` (local commits, nothing pushed, nothing releas
 table was written as a failing test first (`test(...)` commit), then the code, then watched RED again with the code
 stashed and with a targeted break (14 mutations of the module, each failing exactly the test that names it).
 
-- [x] S1 the rule: core sentence (8,876 B, cap 9,000), companion `common/test-leftovers-baseline.md` (5,910 B) with the
+- [x] S1 the rule: core sentence (8,876 B, cap 9,000), companion `common/test-leftovers-baseline.md` (6,988 B) with the
       detail's pointer (31,546 B) — see N1; `CORE_CAP` 9000; `MUST_CARRY` holds "`raw-temp` baseline"; bodies re-recorded;
       the selection baseline `research/selection-matrix.json` regenerated (the new id joins the scopes that select the janitor).
 - [x] S2 `tools/lib/raw-temp-baseline.mjs`; the guard's `--baseline`, `--print-baseline`, `--baseline-shrinks`, `--base`,
@@ -337,15 +344,61 @@ stashed and with a targeted break (14 mutations of the module, each failing exac
 - [ ] S4 the release, the warning, the pin bumps (not started — a later step).
 - [ ] The C# reader in the template (the template owner's plan; nothing here).
 
+Changes after the code gate and the Opus review (2026-11-01; ledger 1.1 is the design change). Each is built test first,
+watched RED before the fix and RED again with the fix taken out or broken; the source is in brackets.
+
+- [x] [ledger 1.1, Opus B1, Opus M3] ONE fixed path, `raw-temp-baseline.json` at the repository root; `--baseline` and
+      `--baseline-shrinks` are flags; a symlink (lstat, a dangling one too) or a folder in its place is a `baseline`
+      finding in a scan and exit 2 in the shrink check; a repository folder that is not the git root, or a path that
+      leaves it (`path.isAbsolute(rel)`, a Windows drive), is exit 2 [Opus m2]. A folder where the file belongs exits 2
+      cleanly in both commands [Opus m6]. Tests 16, 16b.
+- [x] [code gate 0] scope growth compares whole path segments; an unnormalised root (`src//test/`, `./src/test/`) is a
+      malformed file. `src/testing/` against `src/test/` is a new scope. Test 13, 13b. (The sibling pin is GREEN on the old
+      code too — the trailing `/` already protected it; the unnormalised roots are the RED.)
+- [x] [code gate 2, 3] the proof marker is parsed strictly: the marker, exactly the scope root, then only whitespace or a
+      comment closer (`*/`, `-->`). Test 17.
+- [x] [code gate 5] `--print-baseline` reports a finding whose line is gone (exit 2) instead of crashing. Test 19.
+- [x] [code gate 6, Opus M2] a git failure is exit 2 with git's own sentence, never "absent at base" and never "no
+      history"; every call uses `--literal-pathspecs`. Absence at the base is read with `git ls-tree --name-only <base>
+      -- <path>` (empty output is absence, a non-zero exit is a failure), not `git cat-file -e`: `cat-file -e` exits 128 for
+      a missing path and for a bad ref alike, and only its English message tells them apart. Tests 20, 20b.
+- [x] [code gate 7, 13] the entries that can still pass are indexed by (file, sha256) once in `createApplier`; a take is
+      not a scan. Test 22 (40,000 entries).
+- [x] [code gate 10] the companion's tasks are `test`, `audit`, `policy`, `release`, `pr`. The selection baseline was
+      regenerated: the `test` and `pr` scopes grow by the companion's 6,988 B (for example no file: `test` 289,359 →
+      296,347 B, `pr` 171,726 → 178,714 B), `audit` and `policy` by the 1,078 B the companion grew. No test pins a 90 KB
+      figure; the companion is one rule file of 6,988 B, under the per-read cap and under a reviewer's ~10,000-unit
+      per-file tail, and the core (8,876 B) is unchanged.
+- [x] [code gate 11, Opus m5] a proof is a file the guard DISCOVERED in this scan, a test file (`x.test.mjs`, `x.spec.ts`,
+      `XTests.cs`, `x_test.go`, a file under `test/` or `tests/`), and not the baseline file. The companion says so. Test 18.
+- [x] [code gate 12, Opus M1] a narrowed scope keeps the proof of the base scope that holds it, and that proof lies under
+      the new root; a changed proof is refused. The companion says so. Test 13b.
+- [x] [Opus m1] `git log --all --not HEAD` is gone: a deletion that merged is already in `<base>`, and other refs made a
+      local run and CI disagree. The creation check is `git log <base> -- <path>` plus the shallow fail-closed. Test 14
+      (history on another ref changes nothing).
+- [x] [Opus m3] the proof-marker exemption in the guard matches the exact case and needs `:` then whitespace then a folder
+      path; an image tag spelled `<prefix>-baseline-proof:latest` stays a `legacy-name` finding. Test 15b.
+- [x] [Opus] tests for what had none: an exempted line uses no entry (21b), `--base -x` and a malformed base copy (2) and
+      a malformed working copy (1) (21), the order of overlapping scopes — an entry belongs to the most specific root (21c),
+      the argument errors (21d).
+- [x] The companion says `--allow-create` belongs only in the creation PR's own run and never in the standing CI
+      command [ledger 1.1].
+- Rejected at the gate, unchanged: greedy line-order matching; a `printBaseline` cache change; generic shrink hints.
+
+Follow-up, NOT done here: `tools/leftovers-check.mjs` is about 1,040 lines against the 800-line maximum of
+`common/coding-style.md`; the command-line part (`parseArguments`, `main`, `report`) or the docker section should move
+into `tools/lib/` in its own change.
+
 Deviations from the plan as written, each with its reason:
 
 1. **A fifteenth behaviour.** The proof marker `<prefix>-baseline-proof:` would be a `legacy-name` finding in the very
    test file that carries it (second segment `baseline`). The guard now treats that exact marker as a marker word, as
    it treats `exempt` (test 15). The rule-test S1 5 allows the segment `baseline` for the same reason.
 2. **`--allow-create` and `git log --all`.** Read literally, `git log --all -- <path>` would also see the creation PR's
-   own commit, so the one creation could never pass in CI. The check uses the history behind the base ref
-   (`git log <base> -- <path>`) plus every other ref not in HEAD (`git log --all --not HEAD`): a path that ever existed
-   behind the base, or on another branch, is a re-creation; the creation commits above the base are the creation.
+   own commit, so the one creation could never pass in CI. The check uses only the history behind the base ref
+   (`git log <base> -- <path>`): a path that ever existed behind the base is a re-creation; the creation commits above
+   the base are the creation. A first build also looked at other refs (`git log --all --not HEAD`); Opus m1 removed it,
+   because a deletion that merged is already in `<base>` and other refs make a local run and CI differ.
 3. **The shallow-clone fail-closed applies when history is consulted** (a creation with `--allow-create`), not to
    every shrink check: a CI checkout is shallow by default and the plain check needs only the base ref's blob.
 4. **An entry under no scope, or under a scope whose proof does not hold, clears nothing** (the site stays a
@@ -365,9 +418,9 @@ Non-blocking (the defaults below were kept by the gate round; a different answer
   (`fix/f16-windows-list-only`, merging first) adds 131 B to the detail's §4 (31,241 → 31,372 B); the plan's
   paragraph (+1,471 B) would make the detail 32,843 B, over the 32,768 B per-read cap. So the FULL definition lives in
   the new `common/test-leftovers-baseline.md` (id `common.test-leftovers-baseline`, `load: conditional`, tasks
-  `audit`, `policy`, `release` — the janitor companion's frontmatter pattern), and the detail's §7 carries a 3-line
+  `audit`, `policy`, `release` — the janitor companion's frontmatter pattern; `test` and `pr` were added after the code gate), and the detail's §7 carries a 3-line
   pointer paragraph. Bytes: core 8,876 (unchanged, the sentence stays in the core); detail 31,546 (+305 on 31,241;
-  with F16's +131 it is 31,677, 1,091 B under the cap); companion 5,910. The companion holds the plan's paragraph
+  with F16's +131 it is 31,677, 1,091 B under the cap); companion 6,988. The companion holds the plan's paragraph
   verbatim plus the file format and the guard behaviour; no other text of the detail was touched. R1's mitigation
   is thereby done, not deferred.
 - **N2 — `count` field or repeated entries?** Default: repeated entries (one shape, one validator). coai's E5 text

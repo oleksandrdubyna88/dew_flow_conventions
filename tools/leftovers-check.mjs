@@ -31,21 +31,12 @@
  *
  *     node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>] [--profile node]
  *     node tools/leftovers-check.mjs --update-allowlist [--repo <dir>]
- *     node tools/leftovers-check.mjs [--repo <dir>] --baseline <path>
+ *     node tools/leftovers-check.mjs [--repo <dir>] --baseline
  *     node tools/leftovers-check.mjs [--repo <dir>] --print-baseline
- *     node tools/leftovers-check.mjs [--repo <dir>] --baseline-shrinks <path> --base <git-ref> [--allow-create]
+ *     node tools/leftovers-check.mjs [--repo <dir>] --baseline-shrinks --base <git-ref> [--allow-create]
  *
  * `--update-allowlist` rewrites the allowlist from the CURRENT `tools/janitor.sh`: every non-comment line the classifier calls
  * broad in that one file, by its line number and hash. The diff is what a reviewer reads; nothing else is ever added.
- *
- * `--baseline <path>` names the repository's `raw-temp` baseline (rule §7, `tools/lib/raw-temp-baseline.mjs`): a multiset of `raw-temp` sites — file and the
- * sha256 of the trimmed line, one entry per occurrence — for sites that run inside an owned run folder; a scope's proof file carries `testsToDelete-baseline-proof: <root>`.
- * It is read ONLY when named (nothing is discovered in the scanned tree). A site up to its entries passes; one more is `raw-temp`; a stale entry, an entry under no
- * scope or under a scope whose proof is missing, another class, a malformed file are class `baseline` (exit 1, with the cure). Only an unreadable path is exit 2.
- * `--print-baseline` prints, to stdout only, the baseline of the current scan's `raw-temp` findings (`scopes` empty, to be written by hand) for the one creation.
- * `--baseline-shrinks <path> --base <git-ref>` compares the working copy with `git show <ref>:<path>`: a new key, a raised count, a new or wider scope or a changed proof is
- * exit 1; a creation is exit 1 unless `--allow-create`, which is honoured only while the path has no history; an unresolved base ref or a shallow clone asked about a creation is
- * exit 2 naming the fetch to run. A CI checkout fetches the base ref first (`git fetch origin <base-branch> --depth=1`). No command writes a baseline.
  *
  * `--identity` is the "repository" column of the token's row in the rule's `## Tokens` table — which repository the token is.
  * It defaults to this repository's own row (`REPO_ROW`) ONLY for this repository's own token; any other `--token` without
@@ -63,6 +54,17 @@
  * Workflows are read with `yaml@2`: this guard's own copy first, then the scanned repository's (`node_modules` of the consumer), else exit 2 with the one
  * sentence that says to add `yaml@2` as a devDependency — and only when the repository has a workflow. Not here: a `module-load` class (needs a parser).
  *
+ * `--baseline` reads the repository's `raw-temp` baseline (rule §7, `common/test-leftovers-baseline.md`, `tools/lib/raw-temp-baseline.mjs`): ONE fixed path, `raw-temp-baseline.json`
+ * at the repository root, a regular file, never a symlink (a link is a `baseline` finding in a scan and exit 2 in the shrink check). It is a multiset of `raw-temp` sites — file and
+ * the sha256 of the trimmed line, one entry per occurrence — for sites that run inside an owned run folder; a scope's proof is a test file this scan discovered that carries
+ * `testsToDelete-baseline-proof: <root>`. It is read ONLY when `--baseline` is given. A site up to its entries passes; one more is `raw-temp`; a stale entry, an entry under no scope or
+ * under a scope whose proof is missing, another class, a malformed file are class `baseline` (exit 1, with the cure). Only an unreadable path is exit 2.
+ * `--print-baseline` prints, to stdout only, the baseline of the current scan's `raw-temp` findings (`scopes` empty, to be written by hand) for the one creation.
+ * `--baseline-shrinks --base <git-ref>` compares that file with `git show <ref>:raw-temp-baseline.json`: a new key, a raised count, a new or wider scope, a narrowed scope that does not
+ * keep its base proof, or a changed proof is exit 1; a creation is exit 1 unless `--allow-create`, which belongs only in the creation PR's own run (never in a standing CI command) and is
+ * honoured only while the path has no history behind the base ref; an unresolved base ref, a git failure, or a shallow clone asked about a creation is exit 2 naming the cause and the fetch to
+ * run. A CI checkout fetches the base ref first (`git fetch origin <base-branch> --depth=1`). No command writes a baseline.
+ *
  * Exit 0 clean, 1 with every finding printed (`file:line — <class> — <text>`), 2 when it scanned nothing or its
  * arguments are bad — an empty scan is a broken discovery, never a clean repository.
  */
@@ -75,7 +77,7 @@ import { fileURLToPath } from "node:url";
 import { gitOutput } from "./lib/git.mjs";
 import { OWNER_GRAMMAR } from "./lib/owned.mjs";
 import { REPO_ROW, REPO_TOKEN } from "./lib/owned-token.mjs";
-import { PROOF_MARKER, baselineShrinks, createApplier, loadBaseline, printBaseline, siteSha256 } from "./lib/raw-temp-baseline.mjs";
+import { BASELINE_FILE, PROOF_MARKER, baselineShrinks, createApplier, loadBaselineAt, printBaseline, siteSha256 } from "./lib/raw-temp-baseline.mjs";
 import { JANITOR_FILE, classifyLine, classifyLines, lineSha256 } from "./lib/sweeper-scan.mjs";
 import { isReason } from "./ownership-check.mjs";
 
@@ -133,8 +135,11 @@ const TOKEN_SHAPE = /^[a-z0-9]{2,12}$/;
 // The prefix is spelled in two pieces below: these are detectors, and the machine scan reads this file too.
 const WORD = "teststo" + "delete";
 const LEGACY_LITERAL = new RegExp(`${WORD}[-_]([a-z0-9]+)`, "gi");
-/** The proof marker of the `raw-temp` baseline (`<prefix>-baseline-proof:`) is a marker word, as `exempt` is, not a name. */
-const isProofMarker = (match) => match.input.slice(match.index).toLowerCase().startsWith(PROOF_MARKER.toLowerCase());
+/** The proof marker of the `raw-temp` baseline is a marker word, as `exempt` is, not a name — in its exact case, with a folder path after it (an image tag spelled like it is a name). */
+const isProofMarker = (match) => {
+  const rest = match.input.slice(match.index);
+  return rest.startsWith(PROOF_MARKER) && /^\s+\S+\//.test(rest.slice(PROOF_MARKER.length));
+};
 /** The second segments that are not names: the quarantine sibling (`.<name>.<prefix>-quarantine-…`) and an environment variable (`TESTSTODELETE_OWNER`: upper case, underscore). */
 const notAName = (match) => match[1].toLowerCase() === "exempt" || isProofMarker(match) || match[1].toLowerCase() === "quarantine" || new RegExp(`^${WORD.toUpperCase()}_[A-Z]+$`).test(match[0]);
 const LEGACY_BUILT = new RegExp(`${WORD}[-_]\\$\\{?\\s*(?:REPO_TOKEN|RepoToken|repoToken)\\b`, "i");
@@ -880,25 +885,24 @@ export function updateAllowlist(repo, explicit) {
   return entries;
 }
 
-/** The applier of a baseline given as a path or as `loadBaseline`'s result, its file named in findings by its path relative to the repository. */
-function appliedBaseline(baseline, repo) {
-  const loaded = typeof baseline === "string" ? loadBaseline(baseline) : baseline;
-  const relative = path.relative(repo, loaded.file).split(path.sep).join("/");
-  return createApplier(loaded, repo, relative.startsWith("../") ? loaded.file : relative);
+/** The applier of the repository's baseline (`true`, or `loadBaselineAt`'s result); `files` are what the scan will read, where a scope's proof must be. */
+function appliedBaseline(baseline, repo, files) {
+  const loaded = baseline === true ? loadBaselineAt(repo) : baseline;
+  return createApplier(loaded, repo, BASELINE_FILE, new Set(files));
 }
 
 /**
  * Scan a repository: `{ files, findings }`. `files` is how many files were read — zero is a broken discovery. `identity` is the repository column of the token's
  * row: this repository's own for its own token, else blank (fails closed). `profile` is a `--profile` (`node`). `resolvers` is the yaml seam of `loadYaml`.
- * `baseline` is a `raw-temp` baseline — the loaded one (`loadBaseline`) or its path — or nothing: only a baseline named here is read, never one found in the tree.
+ * `baseline` is `true` (read the repository's one baseline path) or a loaded baseline (`loadBaselineAt`), else nothing: a baseline is read only when asked for.
  */
 export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "", allowlist, profile, resolvers, baseline } = {}) {
   const files = discover(repo, profile);
   const findings = [];
   const entries = Array.isArray(allowlist) ? allowlist : loadAllowlist(allowlist);
-  const applier = baseline === undefined ? undefined : appliedBaseline(baseline, repo);
   let yamlModule;
   const yaml = () => (yamlModule ??= loadYaml(repo, resolvers)); // read at the first workflow, so a repository with none needs none
+  const applier = baseline === undefined || baseline === false ? undefined : appliedBaseline(baseline, repo, files);
   let read = 0;
   for (const file of files) {
     const absolute = path.join(repo, file);
@@ -919,15 +923,15 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = toke
 
 // --- the command line ----------------------------------------------------------------------------------------
 
-const USAGE = "usage: node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>] [--profile node] [--baseline <path>] | --update-allowlist | --print-baseline | --baseline-shrinks <path> --base <git-ref> [--allow-create]   (--identity: the repository column of the token's row; without it only this repository's own token passes; --profile node: a Node consumer's tests and scripts too; --baseline: the raw-temp baseline, read only when named; --print-baseline: print the current raw-temp sites as a baseline to stdout, writes nothing; --baseline-shrinks: refuse a baseline that grew against the base ref — a CI checkout fetches the base ref first: git fetch origin <base-branch> --depth=1; --allow-create passes only the one creation, a path with no history)";
+const USAGE = "usage: node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>] [--profile node] [--baseline] | --update-allowlist | --print-baseline | --baseline-shrinks --base <git-ref> [--allow-create]   (--identity: the repository column of the token's row; without it only this repository's own token passes; --profile node: a Node consumer's tests and scripts too; --baseline: read the raw-temp baseline, the file raw-temp-baseline.json at the repository root (never a symlink), only when given; --print-baseline: print the current raw-temp sites as a baseline to stdout, writes nothing; --baseline-shrinks: refuse a baseline that grew against the base ref — a CI checkout fetches the base ref first: git fetch origin <base-branch> --depth=1; --allow-create passes only the one creation, a path with no history behind the base, and belongs only in the creation PR\'s own run, never in the standing CI command)";
 
-const FLAGS = Object.freeze({ "--update-allowlist": "update", "--print-baseline": "printBaseline", "--allow-create": "allowCreate" });
+const FLAGS = Object.freeze({ "--update-allowlist": "update", "--print-baseline": "printBaseline", "--allow-create": "allowCreate", "--baseline": "baseline", "--baseline-shrinks": "baselineShrinks" });
 const PLAIN_VALUES = ["token", "identity", "profile", "base"]; // taken as written; every other value option is a path
-const VALUE_NAMES = Object.freeze({ repo: "repo", token: "token", identity: "identity", rule: "rule", allowlist: "allowlist", profile: "profile", baseline: "baseline", "baseline-shrinks": "baselineShrinks", base: "base" });
+const VALUE_NAMES = Object.freeze({ repo: "repo", token: "token", identity: "identity", rule: "rule", allowlist: "allowlist", profile: "profile", base: "base" });
 
 /** Parse the arguments: `{ repo, token, rule, identity, profile, baseline, … }` (everything but `repo` and `token` stays unset unless given) or `{ error }`. */
 export function parseArguments(argv) {
-  const options = { repo: process.cwd(), token: REPO_TOKEN, rule: undefined, identity: undefined, allowlist: undefined, profile: undefined, update: false, baseline: undefined, printBaseline: false, baselineShrinks: undefined, base: undefined, allowCreate: false };
+  const options = { repo: process.cwd(), token: REPO_TOKEN, rule: undefined, identity: undefined, allowlist: undefined, profile: undefined, update: false, baseline: false, printBaseline: false, baselineShrinks: false, base: undefined, allowCreate: false };
   for (let index = 0; index < argv.length; index += 2) {
     const name = argv[index].replace(/^--/, "");
     if (Object.hasOwn(FLAGS, argv[index])) {
@@ -939,9 +943,9 @@ export function parseArguments(argv) {
     options[VALUE_NAMES[name]] = PLAIN_VALUES.includes(name) ? argv[index + 1] : path.resolve(argv[index + 1]);
   }
   if (options.profile !== undefined && !PROFILES.includes(options.profile)) return { error: `unknown profile \`${options.profile}\` (the only profile is \`${PROFILES.join("`, `")}\`)` };
-  if (options.baselineShrinks !== undefined && options.base === undefined) return { error: "`--baseline-shrinks` needs `--base <git-ref>`" };
-  if (options.baselineShrinks === undefined && (options.base !== undefined || options.allowCreate)) return { error: "`--base` and `--allow-create` belong to `--baseline-shrinks`" };
-  if (options.printBaseline && options.baseline !== undefined) return { error: "`--print-baseline` lists the sites a baseline would carry; it cannot be combined with `--baseline`" };
+  if (options.baselineShrinks && options.base === undefined) return { error: "`--baseline-shrinks` needs `--base <git-ref>`" };
+  if (!options.baselineShrinks && (options.base !== undefined || options.allowCreate)) return { error: "`--base` and `--allow-create` belong to `--baseline-shrinks`" };
+  if (options.printBaseline && options.baseline) return { error: "`--print-baseline` lists the sites a baseline would carry; it cannot be combined with `--baseline`" };
   return options;
 }
 
@@ -969,7 +973,7 @@ function runUpdate(options, io) {
 }
 
 function runShrinks(options, io) {
-  const { code, lines } = baselineShrinks({ repo: options.repo, file: options.baselineShrinks, base: options.base, allowCreate: options.allowCreate });
+  const { code, lines } = baselineShrinks({ repo: options.repo, base: options.base, allowCreate: options.allowCreate });
   for (const line of lines) (code === 0 ? io.out : io.err)(`leftovers-check: --baseline-shrinks: ${line}`);
   return code;
 }
@@ -982,13 +986,13 @@ export function main(argv = process.argv.slice(2), io = { out: (text) => console
     return 2;
   }
   if (options.update) return runUpdate(options, io);
-  if (options.baselineShrinks !== undefined) return runShrinks(options, io);
+  if (options.baselineShrinks) return runShrinks(options, io);
   let baseline;
-  if (options.baseline !== undefined) {
+  if (options.baseline) {
     try {
-      baseline = loadBaseline(options.baseline);
+      baseline = loadBaselineAt(options.repo);
     } catch (error) {
-      io.err(`leftovers-check: cannot read the baseline ${options.baseline}: ${error.message.split("\n")[0]}`);
+      io.err(`leftovers-check: cannot read the baseline ${BASELINE_FILE} in ${options.repo}: ${error.message.split("\n")[0]}`);
       return 2;
     }
   }
@@ -1008,7 +1012,12 @@ export function main(argv = process.argv.slice(2), io = { out: (text) => console
     return 2;
   }
   if (options.printBaseline) {
-    io.out(JSON.stringify(printBaseline(result.findings, options.repo), null, 2));
+    const { baseline: listed, missing } = printBaseline(result.findings, options.repo);
+    if (missing.length > 0) {
+      io.err(`leftovers-check: --print-baseline: the line of ${missing.join(", ")} cannot be read — the file changed during the scan; run it again`);
+      return 2;
+    }
+    io.out(JSON.stringify(listed, null, 2));
     return 0;
   }
   if (result.findings.length === 0) {
