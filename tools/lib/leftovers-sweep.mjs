@@ -23,6 +23,12 @@
 // folder. A tree's top-level links (a `node_modules` junction) are unlinked BEFORE anything is removed, so a removal can never
 // follow one into its target.
 //
+// Windows lists and changes nothing (F16, interim). `isMine` there judges a path inside the caller's profile and never reads the owner SID, so
+// the scope key is not proven. `mutate` is decided ONCE from `platform` (`sweepLeftovers`): without it every resource a POSIX sweep would act on —
+// a quarantine to restore or a reservation to remove, a worktree to unlock, remove and prune, a folder to rename and remove, an orphan claim to
+// delete — is reported in `result.listed` as `unverified: <path> — the owner SID is not read on Windows (F16)`, and `removed` stays empty. The gate
+// is `withheld` (a verdict that says remove) and the quarantine pass; no other code path changes the disk. The Fix reads the SID and lifts the gate.
+//
 // Order. Quarantine restores, worktrees (only those this repository lists), folders, orphaned claims. Never throws: every
 // failure is an `errors` entry, and the caller decides what to print — a sweep never changes a run's exit code.
 
@@ -39,6 +45,7 @@ import {
 export const MIN_AGE_MS = 10 * 60_000; // rule §4: ten minutes
 
 const OWNER_SUFFIX = ".owner";
+const UNVERIFIED = "unverified"; // the reason a removal is withheld where the owner SID is not read (F16)
 const QUARANTINE = /^\.(.+)\.teststodelete-quarantine-(\d+)-([0-9a-f]+)$/i;
 
 /** One line saying what went wrong: an errno code, or the first line of the message. */
@@ -310,6 +317,7 @@ function reporter(result) {
     foreign: (kind, target, owner) => result.listed.push(`foreign: ${kind} ${path.basename(target)} — owner ${owner}`),
     legacy: (kind, target) => result.listed.push(`legacy: ${kind} ${path.basename(target)} — remove with: ${legacyCommand(kind, target)}`),
     unmarked: (kind, target) => result.listed.push(`unmarked: ${kind} ${path.basename(target)}`),
+    unverified: (target) => result.listed.push(`unverified: ${target} — the owner SID is not read on Windows (F16)`),
   };
   return {
     ...lines,
@@ -335,7 +343,16 @@ function decideLegacy({ kind, target, locked, ageMs, minAgeMs, probe, mine, plat
   return legacyOwnerState(old, probe, { platform }) === "gone" ? { remove: true } : { remove: false, reason: "legacy" };
 }
 
+/** THE gate of F16: a verdict that says remove becomes `unverified` where the sweep may not change the disk (`context.mutate` is false). Every other verdict stands. */
+function withheld(context, verdict) {
+  return verdict.remove && !context.mutate ? { remove: false, reason: UNVERIFIED } : verdict;
+}
+
 function judge(context, entry) {
+  return withheld(context, verdictOf(context, entry));
+}
+
+function verdictOf(context, entry) {
   const { now, minAgeMs, state, mine } = context;
   const { target, kind, relation, nameOwner } = entry;
   if (relation === "legacy") {
@@ -348,6 +365,11 @@ function judge(context, entry) {
 function record(context, entry, verdict) {
   const { report } = context;
   if (verdict.remove) return;
+  if (verdict.reason === UNVERIFIED) {
+    report.keep(entry.target, UNVERIFIED);
+    report.unverified(entry.target);
+    return;
+  }
   if (entry.relation === "legacy") {
     report.keep(entry.target, verdict.reason);
     if (verdict.reason === "legacy") report.legacy(entry.kind, entry.target);
@@ -510,9 +532,9 @@ function sweepOrphanClaims(context) {
     if (look.has(path.basename(folderPath))) continue; // its folder sits in a quarantine: not an orphan, nothing is listed
     // A claim with no folder is what a helper that claims FIRST leaves when it dies between the claim and the create. It is a
     // claim like any other: its owner decides — gone removes it; live, foreign, unknown and unreadable keep it.
-    const verdict = related.relation === "legacy"
+    const verdict = withheld(context, related.relation === "legacy"
       ? decideLegacy({ kind: "claim", target: folderPath, ageMs: Infinity, minAgeMs, probe: context.probe, mine: () => mine(claim), platform: context.platform })
-      : decide({ owner: readOwner(folderPath, "folder", { mine }), ageMs: Infinity, minAgeMs, state, mine: mine(claim), nameOwner: related.nameOwner });
+      : decide({ owner: readOwner(folderPath, "folder", { mine }), ageMs: Infinity, minAgeMs, state, mine: mine(claim), nameOwner: related.nameOwner }));
     if (!verdict.remove) {
       record(context, { ...related, kind: "claim", target: claim }, verdict);
       continue;
@@ -559,6 +581,11 @@ function restoreQuarantines(context) {
     if (!mine(quarantined) || !isAskablePid(found[2], context.platform)) continue; // another uid's, or a pid that is no process: the probe is never asked
     if (context.probe(Number(found[2]))?.state !== "dead") continue; // its renamer may still be working
     if (!pastWindow(quarantined, context.now, context.minAgeMs)) continue; // a renamer in another pid namespace has a pid this process cannot see: it is "dead" here and may be mid-delete
+    if (!context.mutate) { // a restore or a reservation removal would change the disk: listed, as a POSIX sweep would act (F16)
+      context.report.keep(quarantined, UNVERIFIED);
+      context.report.unverified(quarantined);
+      continue;
+    }
     const original = path.join(tmp, found[1]);
     if (removeEmptyReservation(quarantined, original, listedAs, context.hooks)) { // a placeholder a killed sweep reserved and never renamed onto: nothing to put back
       result.listed.push(`notice: removed the empty reservation ${dirent.name} a killed sweep left`);
@@ -584,6 +611,7 @@ function step(result, label, run) {
  * temp root; `probe` the liveness query (a seam for tests), asked at most once per pid; `mine` the kernel-owner question
  * (a seam: a second uid cannot be had in a test); `hooks.afterCapture` / `hooks.afterVerdict` / `hooks.afterRename` / `hooks.afterReserve(placeholder, source)` / `hooks.beforeRename(placeholder, source)` (both run on the quarantine move AND on a restore, where the arguments are `(original, quarantined)`) / `hooks.beforeReservationRemoval(quarantine)` / `hooks.beforeClaimRemoval` (seams: a change between the
  * capture, the verdict and the removal). Never throws. `result.listed` holds the `foreign:` / `legacy:` / `unmarked:` lines.
+ * `platform` (a seam) decides `mutate` once: on `win32` the sweep changes nothing and lists `unverified:` lines instead (F16).
  */
 export function sweepLeftovers({ repo, tmp = tempRoot(), now = Date.now(), minAgeMs = MIN_AGE_MS, probe = processProbe, mine = isMine, hooks = {}, platform = process.platform } = {}) {
   const result = { removed: [], preserved: [], listed: [], errors: [] };
@@ -594,7 +622,7 @@ export function sweepLeftovers({ repo, tmp = tempRoot(), now = Date.now(), minAg
   };
   const owner = thisOwnerToken();
   const state = (record, nameOwner) => ownerState(record, cached, { nameOwner, callerOwner: owner, kernelMine: true });
-  const context = { repo, tmp, now, minAgeMs, result, owner, mine, hooks, platform, probe: cached, state, report: reporter(result) };
+  const context = { repo, tmp, now, minAgeMs, result, owner, mine, hooks, platform, mutate: platform !== "win32", probe: cached, state, report: reporter(result) };
   step(result, "quarantines", () => restoreQuarantines(context));
   const listing = step(result, "worktree list", () => listWorktrees(repo));
   if (listing !== undefined) step(result, "worktrees", () => sweepWorktrees(context, listing));
