@@ -200,7 +200,8 @@ beyond its tasks); the original 108 scopes are unchanged.
   most 4,700 B from the moment E4 is in `LANDED_EPICS` (`tools/lib/parity-epics.mjs`). A rule cap applies whenever the rule
   exists; a cap with a `from` epic applies once that epic has landed.
 - **The negative-case definition** (`caseFindings` in `tools/lib/gates.mjs`): every gate record has at least one case that
-  selects the rule; a gated rule also needs a negative whose file matches its paths with every task outside the gate, and a
+  selects the rule; a gated rule also needs a positive through the gate (a file matching its paths and a task of the gate,
+  not a case its `tasks:` line selects), a negative whose file matches its paths with every task outside the gate, and a
   negative with a task inside the gate and no matching file; an ungated rule (a mirror of a path-only source) needs a
   negative with no matching file; every task is known, every file root-relative, and each case holds under `selectRules`.
   The messages name the rule, the case and what is missing.

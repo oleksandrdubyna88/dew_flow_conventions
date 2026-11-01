@@ -1396,7 +1396,8 @@ baseline (`research/selection-matrix.json`) is the control that a later gate doe
 - `gates` is `{}` (E1 declares nothing); the test is renamed when the first epic writes a record.
 - `rules.test.mjs`: every pin (read from the matrix file) selects at most 32,768 B (the original test name kept); every cap
   of `CAPS` holds on the real catalog; a cap is red one byte over, for the core, for a rule, and for a rule capped from an
-  epic that has not landed (`typescript.doctrine`); `caseFindings`: the selection fixture of a positive and the defined
+  epic that has not landed (`typescript.doctrine`); `caseFindings`: a gated rule whose only positive is selected by its
+  `tasks:` line (task `audit`, a `.cs` file) has no positive through the gate, one finding; the selection fixture of a positive and the defined
   negatives passes, each missing negative and a case the selector contradicts is one finding, an ungated mirror needs its
   no-path negative, an unknown task or a non-root-relative file is a finding.
 

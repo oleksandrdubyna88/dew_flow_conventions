@@ -64,6 +64,7 @@ export function provenanceFindings(catalog, gates, landedEpics) {
 }
 
 // The negative-case definition (plan section 4.4). Every record needs at least one positive case. A GATED rule needs a
+// positive through the gate (a matching file and a task of the gate — a `tasks:` line that selects it does not count), a
 // negative whose file matches its paths with every task outside the gate (the gate, not the path, is what refuses), and a
 // negative with a task inside the gate and no matching file (the path, not the gate, is what refuses). An UNGATED rule (a
 // mirror of a path-only source) needs a negative with no matching file. Every task is known, every file root-relative, and
@@ -96,7 +97,11 @@ export function caseFindings(catalog, gates) {
     }
     const negatives = sound.filter(({ item }) => !item.selected).map(({ item }) => item);
     const touches = item => item.files.some(file => matchesPaths(rule, file));
+    const positives = sound.filter(({ item }) => item.selected).map(({ item }) => item);
     if (rule.pathTasks.length) {
+      if (positives.length && !positives.some(item => touches(item) && item.tasks.some(task => rule.pathTasks.includes(task)))) {
+        findings.push(`${id}: no positive case through the gate — a matching file and a gate task`);
+      }
       if (!negatives.some(item => touches(item) && item.tasks.every(task => !rule.pathTasks.includes(task)))) {
         findings.push(`${id}: no negative case with a matching file and every task outside the gate [${rule.pathTasks.join(", ")}] — the gate's refusal is untested`);
       }

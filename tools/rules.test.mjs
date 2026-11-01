@@ -596,6 +596,16 @@ test("a gated rule's record is red without each negative, and when a case does n
   assert.match(without([OUT_OF_GATE,NO_PATH]).join("\n"),/positive/);
 });
 
+test("a gated rule needs a positive case through the gate, not one that its tasks line selects",t=>{
+  const {put,root}=provenanceFixture(t);
+  put("csharp/mech.md",'id: csharp.mech\nload: conditional\npaths: ["**/*.cs"]\npath_tasks: ["implement","test"]\ntasks: ["audit"]');
+  const throughTasks={tasks:["audit"],files:["src/x.cs"],selected:true};
+  const found=caseFindings(loadCatalog(root),gatedRecord([throughTasks,OUT_OF_GATE,NO_PATH]));
+  assert.equal(found.length,1);
+  assert.match(found[0],/csharp\.mech: no positive case through the gate — a matching file and a gate task/);
+  assert.deepEqual(caseFindings(loadCatalog(root),gatedRecord([throughTasks,POSITIVE,OUT_OF_GATE,NO_PATH])),[],"a positive through the gate beside it is enough");
+});
+
 test("an ungated mirror needs a negative with no matching file",t=>{
   const record=cases=>({"typescript.doc":{mirrors:"csharp.plain",epic:"E2",cases}});
   const positive={tasks:["inspect"],files:["ui/a.ts"],selected:true};
