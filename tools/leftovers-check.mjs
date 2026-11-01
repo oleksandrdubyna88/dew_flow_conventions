@@ -86,15 +86,15 @@ export { JANITOR_FILE };
 export const ALLOWLIST_FILE = "tools/fixtures/owner-blind-allowlist.json";
 
 export const CURES = Object.freeze({
-  "raw-temp": "Make temp folders with ownedDir(t, what) from tools/lib/owned.mjs — common/test-leftovers.md §7 (raw-temp), §2.",
-  "raw-worktree": "Make worktrees with ownedWorktree(t, repo, what) from tools/lib/owned.mjs — common/test-leftovers.md §7 (raw-worktree), §3.",
-  "docker-run": "Add --rm, or the complete carve-out: a testsToDelete-<owner>-<repo>-<what>-<id> name, a remover step on every path after the diagnostics — common/test-leftovers.md §5, §7 (docker-run).",
-  "docker-name": "Give the container, volume, network, compose project or test-built image one of the three spellings of testsToDelete-<owner>-<repo>-<what>-<id> — common/test-leftovers.md §1, §7 (docker-name).",
-  "legacy-name": "Build every name with the owner segment: testsToDelete-<owner>-<repo>-<what>-<id> from ownedName()/the helper of this repository — common/test-leftovers.md §1, §7 (legacy-name).",
-  "owner-blind": "Match the caller's owner after the prefix (^testsToDelete-<owner>-<repo>-), or delete the sweep and use the shipped janitor; this class takes no exemption — common/test-leftovers.md §7 (owner-blind), the barrier.",
-  "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers.md §6, §7 (shared-store).",
-  "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers.md §5, §7 (ryuk-off).",
-  exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers.md §7 (the exemption grammar).",
+  "raw-temp": "Make temp folders with ownedDir(t, what) from tools/lib/owned.mjs — common/test-leftovers-detail.md §7 (raw-temp), §2.",
+  "raw-worktree": "Make worktrees with ownedWorktree(t, repo, what) from tools/lib/owned.mjs — common/test-leftovers-detail.md §7 (raw-worktree), §3.",
+  "docker-run": "Add --rm, or the complete carve-out: a testsToDelete-<owner>-<repo>-<what>-<id> name, a remover step on every path after the diagnostics — common/test-leftovers-detail.md §5, §7 (docker-run).",
+  "docker-name": "Give the container, volume, network, compose project or test-built image one of the three spellings of testsToDelete-<owner>-<repo>-<what>-<id> — common/test-leftovers-detail.md §1, §7 (docker-name).",
+  "legacy-name": "Build every name with the owner segment: testsToDelete-<owner>-<repo>-<what>-<id> from ownedName()/the helper of this repository — common/test-leftovers-detail.md §1, §7 (legacy-name).",
+  "owner-blind": "Match the caller's owner after the prefix (^testsToDelete-<owner>-<repo>-), or delete the sweep and use the shipped janitor; this class takes no exemption — common/test-leftovers-detail.md §7 (owner-blind), the barrier.",
+  "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers-detail.md §6, §7 (shared-store).",
+  "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers-detail.md §5, §7 (ryuk-off).",
+  exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers-detail.md §7 (the exemption grammar).",
   token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers-detail.md § Tokens, common/test-leftovers.md §1 — and write it, with its row, in this repository's own tools/lib/owned-token.mjs beside the copied owned.mjs (never copy another repository's).",
 });
 
@@ -703,7 +703,7 @@ function belongsFindings(row, token, identity, rulePath) {
 }
 
 /** Findings (class `token`) when `token` is not a registered row of `ruleText`'s `## Tokens` table, or is the row of another repository. Fails closed: a rule with no table registers nothing. */
-export function tokenFindings(ruleText, token, rulePath = "common/test-leftovers.md", identity = REPO_ROW) {
+export function tokenFindings(ruleText, token, rulePath = "common/test-leftovers-detail.md", identity = REPO_ROW) {
   const at = (line, text) => [finding(rulePath, Math.max(line, 1), "token", text)];
   if (!TOKEN_SHAPE.test(token)) return at(1, `the token \`${token}\` is not [a-z0-9]{2,12} (${rulePath})`);
   const table = parseTokenTable(ruleText);

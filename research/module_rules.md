@@ -206,53 +206,34 @@ beyond its tasks); the original 108 scopes are unchanged.
   negative with no matching file; every task is known, every file root-relative, and each case holds under `selectRules`.
   The messages name the rule, the case and what is missing.
 
-Summed bytes of the selected rules per scope, as `node tools/selection-matrix.mjs --bytes` prints them. Measured 2026-10-31 at
-the commit that added the whitespace-only splits (E1.S0b, branch commit `b2c6642`, a commit that is not on `main` itself after a
-squash merge but stays reachable through the pull request's ref), over 39 rules; each later epic re-runs `--bytes` and replaces
-this table, never appends to it. The `App.sln`, `api/a.http` and `common/testing.md` rows and the `pr` and `policy` columns were
-added later, at the commit that made the baseline reach every rule; the original cells did not change.
+Summed bytes of the selected rules per scope, as `node tools/selection-matrix.mjs --bytes` prints them. Measured 2026-11-01 at
+the commit that split `common/test-leftovers.md` into an 8,483 B core (hard cap 8,500 B: a consumer's review gate packs each
+mounted rule file on its own under a free tail of about 9,990 units; owner decision 2026-11-01) and the 31,186 B
+`common/test-leftovers-detail.md` (the former text moved whole, same `load` and `tasks`, loaded as the core's dependency), over
+40 rules. It replaces the table measured 2026-10-31 at the whitespace-only splits (E1.S0b, branch commit `b2c6642`, over 39
+rules): every `implement`, `test`, `audit` and `policy` cell rose by 9,113 B (8,483 + 31,186 − 30,556; the no-file scopes read
+286,925, 279,493, 218,240 and 251,138 before, and `release`, not a column, 263,288 → 272,517), every other cell is as it was,
+and the four single-read tasks are untouched. Each later epic re-runs `--bytes` and replaces this table, never appends to it.
+The `App.sln`, `api/a.http` and `common/testing.md` rows and the `pr` and `policy` columns were added at the commit that made
+the baseline reach every rule; the original cells did not change then.
 
 | Files | inspect | ui | gpu | storage | implement | test | audit | logging | dependencies | pr | policy |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| (no file) | 24,207 | 26,420 | 27,680 | 29,406 | 286,925 | 279,493 | 218,240 | 74,253 | 160,356 | 171,726 | 251,138 |
-| `src/x.cs` | 28,820 | 31,033 | 32,293 | 34,019 | 291,538 | 284,106 | 222,853 | 78,866 | 164,969 | 176,339 | 255,751 |
-| `src/x.csproj` | 31,902 | 34,115 | 35,375 | 37,101 | 294,620 | 287,188 | 225,935 | 81,948 | 164,969 | 179,421 | 258,833 |
-| `Directory.Build.props` | 27,289 | 29,502 | 30,762 | 32,488 | 290,007 | 282,575 | 221,322 | 77,335 | 160,356 | 174,808 | 254,220 |
-| `ui/a.ts` | 30,090 | 32,303 | 33,563 | 35,289 | 292,808 | 285,376 | 224,123 | 80,136 | 166,239 | 177,609 | 257,021 |
-| `src/a.mjs` | 24,207 | 26,420 | 27,680 | 29,406 | 286,925 | 279,493 | 218,240 | 74,253 | 160,356 | 171,726 | 251,138 |
-| `src/x.cs` + `ui/a.ts` | 34,703 | 36,916 | 38,176 | 39,902 | 297,421 | 289,989 | 228,736 | 84,749 | 170,852 | 182,222 | 261,634 |
-| `package.json` | 35,409 | 37,622 | 38,882 | 40,608 | 298,127 | 279,493 | 229,442 | 85,455 | 171,558 | 182,928 | 262,340 |
-| `tsconfig.json` | 24,207 | 26,420 | 27,680 | 29,406 | 286,925 | 279,493 | 218,240 | 74,253 | 160,356 | 171,726 | 251,138 |
-| `.npmrc` | 24,207 | 26,420 | 27,680 | 29,406 | 286,925 | 279,493 | 218,240 | 74,253 | 160,356 | 171,726 | 251,138 |
-| `src/webview/page.ts` | 30,090 | 32,303 | 33,563 | 35,289 | 292,808 | 285,376 | 224,123 | 80,136 | 166,239 | 177,609 | 257,021 |
-| `src/main.rs` | 40,743 | 42,956 | 44,216 | 45,942 | 291,304 | 296,029 | 222,619 | 78,632 | 176,892 | 188,262 | 267,674 |
-| `App.sln` | 40,676 | 42,889 | 44,149 | 45,875 | 303,394 | 284,760 | 234,709 | 90,722 | 176,825 | 188,195 | 267,607 |
-| `api/a.http` | 60,125 | 62,338 | 63,598 | 65,324 | 286,925 | 290,712 | 218,240 | 110,171 | 196,274 | 207,644 | 262,357 |
-| `common/testing.md` | 33,846 | 36,059 | 37,319 | 39,045 | 296,564 | 289,132 | 227,879 | 83,892 | 169,995 | 181,365 | 251,138 |
-
-### The test-leftovers core split (2026-11-01)
-
-A consumer's review gate packs each mounted rule FILE on its own into a reviewer prompt under a 90,000-unit budget whose
-free tail is about 9,990 units, so the 30,556 B `common/test-leftovers.md` could never reach a reviewer. The owner's
-decision (2026-11-01, consultants first): never trim a decision or a rule text, but a companion may hold it. So the rule
-became two files with the same `load` and `tasks` (`implement`, `test`, `audit`, `policy`, `release`):
-
-- `common/test-leftovers.md` (`common.test-leftovers`, **8,437 B**, hard cap 8,500 B in `tools/test-leftovers-rule.test.mjs`
-  S1 8): a self-contained core — the four promises, §1–§7, the janitor, the barrier, Never and the Definition of Done, each
-  section ending with a pointer to the same section of the detail; it `depends` on the detail, so the resolver loads both for
-  an agent while the review gate, which ignores `depends`, packs the core alone (intended).
-- `common/test-leftovers-detail.md` (`common.test-leftovers-detail`, **31,186 B**, body under the 32,768 B read cap): the
-  former text moved whole — both core spans byte for byte, the `## Tokens` registry (now only here, with its `owns:` marker;
-  `tools/leftovers-check.mjs` reads the table from this file first) — under a header that names the core. Test S1 7 holds
-  every non-heading, non-blank body line of the text at `7852de2` (the fixture `tools/fixtures/test-leftovers-base-7852de2.md`)
-  against this file by occurrence count, so the split can lose nothing.
-
-The resolver bundle per task (`explain --repo . --task <t>`, summed rule bytes, no file), before `7852de2` → after the split:
-`implement` 286,925 → 295,992; `test` 279,493 → 288,560; `audit` 218,240 → 227,307; `policy` 251,138 → 260,205;
-`release` 263,288 → 272,355 — each +9,067 B (8,437 + 31,186 − 30,556). The single-read tasks are unchanged and under one
-read: `inspect` 24,207, `ui` 26,420, `gpu` 27,680, `storage` 29,406 (≤ 32,768). In the table above, every cell of the
-`implement`, `test`, `audit` and `policy` columns reads +9,067 B from this commit on; the other seven columns and the 22
-pins are as recorded. `research/selection-matrix.json` was regenerated (the new id joins every scope that selects the core).
+| (no file) | 24,207 | 26,420 | 27,680 | 29,406 | 296,038 | 288,606 | 227,469 | 74,253 | 160,356 | 171,726 | 260,367 |
+| `src/x.cs` | 28,820 | 31,033 | 32,293 | 34,019 | 300,651 | 293,219 | 232,082 | 78,866 | 164,969 | 176,339 | 264,980 |
+| `src/x.csproj` | 31,902 | 34,115 | 35,375 | 37,101 | 303,733 | 296,301 | 235,164 | 81,948 | 164,969 | 179,421 | 268,062 |
+| `Directory.Build.props` | 27,289 | 29,502 | 30,762 | 32,488 | 299,120 | 291,688 | 230,551 | 77,335 | 160,356 | 174,808 | 263,449 |
+| `ui/a.ts` | 30,090 | 32,303 | 33,563 | 35,289 | 301,921 | 294,489 | 233,352 | 80,136 | 166,239 | 177,609 | 266,250 |
+| `src/a.mjs` | 24,207 | 26,420 | 27,680 | 29,406 | 296,038 | 288,606 | 227,469 | 74,253 | 160,356 | 171,726 | 260,367 |
+| `src/x.cs` + `ui/a.ts` | 34,703 | 36,916 | 38,176 | 39,902 | 306,534 | 299,102 | 237,965 | 84,749 | 170,852 | 182,222 | 270,863 |
+| `package.json` | 35,409 | 37,622 | 38,882 | 40,608 | 307,240 | 288,606 | 238,671 | 85,455 | 171,558 | 182,928 | 271,569 |
+| `tsconfig.json` | 24,207 | 26,420 | 27,680 | 29,406 | 296,038 | 288,606 | 227,469 | 74,253 | 160,356 | 171,726 | 260,367 |
+| `.npmrc` | 24,207 | 26,420 | 27,680 | 29,406 | 296,038 | 288,606 | 227,469 | 74,253 | 160,356 | 171,726 | 260,367 |
+| `src/webview/page.ts` | 30,090 | 32,303 | 33,563 | 35,289 | 301,921 | 294,489 | 233,352 | 80,136 | 166,239 | 177,609 | 266,250 |
+| `src/main.rs` | 40,743 | 42,956 | 44,216 | 45,942 | 300,417 | 305,142 | 231,848 | 78,632 | 176,892 | 188,262 | 276,903 |
+| `App.sln` | 40,676 | 42,889 | 44,149 | 45,875 | 312,507 | 293,873 | 243,938 | 90,722 | 176,825 | 188,195 | 276,836 |
+| `api/a.http` | 60,125 | 62,338 | 63,598 | 65,324 | 296,038 | 299,825 | 227,469 | 110,171 | 196,274 | 207,644 | 271,586 |
+| `common/testing.md` | 33,846 | 36,059 | 37,319 | 39,045 | 305,677 | 298,245 | 237,108 | 83,892 | 169,995 | 181,365 | 260,367 |
 
 ## Byte allowances per epic
 

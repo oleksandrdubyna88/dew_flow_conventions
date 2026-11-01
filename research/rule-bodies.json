@@ -444,7 +444,7 @@
     {
       "id": "common.test-leftovers",
       "source": "common/test-leftovers.md",
-      "bodySha256": "aeab2a0a0cfa766556a2f68f32e29a36a3521643045043ebc800ccfdef917917",
+      "bodySha256": "b40f424e0b4f838c2450595c261bf92705be754ddb8f0b83c8d6d22839997e23",
       "sections": [
         "# Test leftovers are named `testsToDelete-<owner>-…`, owned by their run, scoped to their user, and collected (MANDATORY)",
         "## 1. The name",
@@ -483,7 +483,7 @@
     {
       "id": "common.test-leftovers-janitor",
       "source": "common/test-leftovers-janitor.md",
-      "bodySha256": "3dd8a5b003a332c9d03fc18242cd5c330876a1496c5caf7093cdf7cf38e77b9a",
+      "bodySha256": "9b458032b08ba8efdb2caa115ed264b97e8b1b06fd5f0a9d6d4fdbc63d639a19",
       "sections": [
         "# The leftover janitor — `tools/janitor.sh`, the one host-wide sweep (MANDATORY where it runs)",
         "## Running it",
