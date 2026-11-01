@@ -28,6 +28,8 @@ const sourceRoot = path.resolve(here, "..");
 const RULE = "common/test-leftovers.md";
 const DETAIL = "common/test-leftovers-detail.md";
 const COMPANION = "common/test-leftovers-janitor.md";
+/** The `raw-temp` baseline's full definition (N1 of `todo/PLAN_raw_temp_baseline.md`): a companion, so the detail keeps headroom under the per-read cap. */
+const BASELINE = "common/test-leftovers-baseline.md";
 /**
  * The rule as it was before the split (`git show 7852de2:common/test-leftovers.md`), committed so the test needs no history. It PINS
  * the detail to that text: a later edit of the rule text updates the detail AND this fixture in one commit (with the record in
@@ -62,11 +64,12 @@ test("S1 1 the core has one core span, the detail two and the companion one, eac
   assert.equal(rule.length, 1, "common/test-leftovers.md carries one span");
   assert.equal(detail.length, 2, "common/test-leftovers-detail.md carries two spans, the `## Tokens` table between them");
   assert.equal(spansOf(read(COMPANION)).length, 1, "the companion carries one span");
-  for (const span of [...rule, ...detail, ...spansOf(read(COMPANION))]) assert.ok(span.trim().length > 1000, "a span is the text, not a marker");
+  assert.equal(spansOf(read(BASELINE)).length, 1, "the baseline companion carries one span");
+  for (const span of [...rule, ...detail, ...spansOf(read(COMPANION)), ...spansOf(read(BASELINE))]) assert.ok(span.trim().length > 1000, "a span is the text, not a marker");
 });
 
 test("S1 2 a read of the detail refuses above the cap, proven on an inflated copy in a scratch root", (t) => {
-  for (const file of [RULE, DETAIL, COMPANION]) assert.ok(Buffer.byteLength(bodyOf(read(file))) <= CAP, `${file}: the real body is under the per-read cap`);
+  for (const file of [RULE, DETAIL, COMPANION, BASELINE]) assert.ok(Buffer.byteLength(bodyOf(read(file))) <= CAP, `${file}: the real body is under the per-read cap`);
   const root = ownedDir(t, "rule cap copy");
   for (const name of ["common", "csharp", "rust", "typescript", "AGENTS.md", "CLAUDE.md", "ENTRY.md", ".agents", "README.md", "research"]) {
     fs.cpSync(path.join(sourceRoot, name), path.join(root, name), { recursive: true });
@@ -80,7 +83,7 @@ test("S1 2 a read of the detail refuses above the cap, proven on an inflated cop
 });
 
 test("S1 3 no line of any of the three files is an owner-blind sweep pattern", () => {
-  for (const file of [RULE, DETAIL, COMPANION]) assert.deepEqual(broadLines(read(file)), [], `${file} holds a sweep that names no owner`);
+  for (const file of [RULE, DETAIL, COMPANION, BASELINE]) assert.deepEqual(broadLines(read(file)), [], `${file} holds a sweep that names no owner`);
 });
 
 test("S1 4 the core names the detail and the companion; the detail and the companion name the core", () => {
@@ -133,21 +136,28 @@ test("S1 9 the core carries, under each section, every phrase a reviewer needs t
   assert.deepEqual(missing, [], `${missing.length} phrase(s) the core must carry are missing`);
 });
 
-/** What the detail's §7 must carry of the `raw-temp` baseline: the one class, the proof marker, the multiset key, the ratchet. */
-const BASELINE_PHRASES = ["The `raw-temp` baseline", "testsToDelete-baseline-proof: <scope root>", "**multiset**", "sha256 of the trimmed line", "only when told to", "`baseline`", "**only shrinks**", "any creation but the first", "nothing regenerates it"];
+/** What the baseline companion must carry: the one class, the proof marker, the multiset key, the ratchet, the file format. */
+const BASELINE_PHRASES = ["The `raw-temp` baseline", "testsToDelete-baseline-proof: <scope root>", "**multiset**", "sha256 of the trimmed line", "only when told to", "`baseline`", "**only shrinks**", "any creation but the first", "nothing regenerates it", "\"class\": \"raw-temp\"", "No `count` field", "`--baseline-shrinks`"];
 
-test("S1 10 the detail's §7 carries the `raw-temp` baseline paragraph, once, between the exemption grammar and the janitor", () => {
-  const text = read(DETAIL);
-  const start = text.indexOf("## 7. ");
-  const section = text.slice(start, text.indexOf("## The janitor", start)).replace(/\s+/g, " "); // wrapped lines read as one
-  const missing = BASELINE_PHRASES.filter((phrase) => !section.includes(phrase));
-  assert.deepEqual(missing, [], "the baseline paragraph is missing phrases");
-  assert.equal(section.split("**The `raw-temp` baseline").length - 1, 1, "the paragraph is there once");
+test("S1 10 the baseline companion carries the full `raw-temp` baseline definition, once, and the detail's §7 points to it in one short paragraph, after the exemption grammar", () => {
+  const text = read(BASELINE).replace(/\s+/g, " ");
+  const missing = BASELINE_PHRASES.filter((phrase) => !text.includes(phrase));
+  assert.deepEqual(missing, [], "the baseline companion is missing phrases");
+  assert.equal(text.split("**The `raw-temp` baseline").length - 1, 1, "the definition is there once");
+  assert.ok(text.includes("`" + RULE + "`") && text.includes("`" + DETAIL + "`"), "it names the core and the detail by path");
+  const detail = read(DETAIL);
+  const start = detail.indexOf("## 7. ");
+  const section = detail.slice(start, detail.indexOf("## The janitor", start));
+  const pointer = section.replace(/\s+/g, " ");
+  assert.ok(pointer.includes("`" + BASELINE + "`"), "§7 points at the companion by path");
+  assert.equal(pointer.split("**The `raw-temp` baseline").length - 1, 1, "§7 has the one pointer paragraph");
   assert.ok(section.indexOf("The exemption grammar") < section.indexOf("**The `raw-temp` baseline"), "it follows the exemption grammar");
+  assert.ok(!pointer.includes("**multiset**"), "the definition is not copied into the detail");
+  assert.ok(Buffer.byteLength(bodyOf(detail)) <= CAP - 1000, "the detail keeps at least 1,000 B of headroom under the per-read cap");
 });
 
 test("S1 5 every example name carries an owner of the grammar; the old form appears only as the legacy name's own description", () => {
-  const text = [...spansOf(read(RULE)), ...spansOf(read(DETAIL)), ...spansOf(read(COMPANION))].join("\n");
+  const text = [...spansOf(read(RULE)), ...spansOf(read(DETAIL)), ...spansOf(read(COMPANION)), ...spansOf(read(BASELINE))].join("\n");
   const found = [...text.matchAll(/(teststodelete)[-_](<[a-z]+>|[A-Za-z0-9]+)/gi)].filter((match) => match[1] !== "TESTSTODELETE"); // the upper-case spelling is an environment variable, not a name
   assert.ok(found.length > 5, "the texts do carry examples");
   for (const { 2: segment, index } of found) {
@@ -184,6 +194,7 @@ test("S1 8 the core is self-contained under its own cap", () => {
 test("S1 6 the companion is its own rule with a conditional load and three tasks; the detail shares the core's load and tasks and the core depends on it", () => {
   const head = (file) => read(file).split("\n---\n")[0];
   assert.match(head(COMPANION), /^---\nid: "common\.test-leftovers-janitor"\nload: "conditional"\ntasks: \["audit","policy","release"\]$/);
+  assert.equal(head(BASELINE), '---\nid: "common.test-leftovers-baseline"\nload: "conditional"\ntasks: ["audit","policy","release"]', "the baseline companion is selected as the janitor's is");
   const TASKS = '["implement","test","audit","policy","release"]';
   assert.equal(head(RULE), `---\nid: "common.test-leftovers"\nload: "conditional"\ntasks: ${TASKS}\ndepends: ["common.test-leftovers-detail"]`);
   assert.equal(head(DETAIL), `---\nid: "common.test-leftovers-detail"\nload: "conditional"\ntasks: ${TASKS}`);
