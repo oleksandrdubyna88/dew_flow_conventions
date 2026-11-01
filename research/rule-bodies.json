@@ -444,9 +444,28 @@
     {
       "id": "common.test-leftovers",
       "source": "common/test-leftovers.md",
-      "bodySha256": "1f835ef94ebb6e89df259385fb7a89eb66261db3f284e06c01820e21c3cdf6d6",
+      "bodySha256": "b40f424e0b4f838c2450595c261bf92705be754ddb8f0b83c8d6d22839997e23",
       "sections": [
         "# Test leftovers are named `testsToDelete-<owner>-…`, owned by their run, scoped to their user, and collected (MANDATORY)",
+        "## 1. The name",
+        "## 2. The helper",
+        "## 3. The owner",
+        "## 4. The start-of-run sweep",
+        "## 5. Containers",
+        "## 6. Stores",
+        "## 7. The guard",
+        "## The janitor",
+        "## The barrier",
+        "## Never",
+        "## Definition of Done"
+      ]
+    },
+    {
+      "id": "common.test-leftovers-detail",
+      "source": "common/test-leftovers-detail.md",
+      "bodySha256": "11ad42dfe4d636d15219d5a677b2118b348d43197f9158904f380e6023b7e1e0",
+      "sections": [
+        "# Test leftovers — the full rule text (the detail of `common/test-leftovers.md`)",
         "## 1. The name — one form, three spellings",
         "## 2. The helper — one per language a repository tests in",
         "## 3. The owner — who may delete what",
@@ -464,7 +483,7 @@
     {
       "id": "common.test-leftovers-janitor",
       "source": "common/test-leftovers-janitor.md",
-      "bodySha256": "3dd8a5b003a332c9d03fc18242cd5c330876a1496c5caf7093cdf7cf38e77b9a",
+      "bodySha256": "9b458032b08ba8efdb2caa115ed264b97e8b1b06fd5f0a9d6d4fdbc63d639a19",
       "sections": [
         "# The leftover janitor — `tools/janitor.sh`, the one host-wide sweep (MANDATORY where it runs)",
         "## Running it",

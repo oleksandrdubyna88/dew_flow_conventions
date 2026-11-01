@@ -85,18 +85,32 @@ export const LEGACY_NAME_PENDING = Object.freeze([]);
 export { JANITOR_FILE };
 export const ALLOWLIST_FILE = "tools/fixtures/owner-blind-allowlist.json";
 
+/**
+ * The rule file the messages point at when nothing is resolved yet: the detail, which holds the `## Tokens` table since the
+ * split of 2026-11-01. `curesFor(ruleName)` rewrites every message to the file `resolveRule` actually found — on a mount from
+ * before the split that is `common/test-leftovers.md`, which there holds the whole text — so a cure never names a file the
+ * mount does not have.
+ */
+export const DEFAULT_RULE_NAME = "common/test-leftovers-detail.md";
+
+/** `common/<file>` for a resolved rule path, or a name that says the rule was not found. */
+export const ruleNameOf = (rulePath) => (rulePath === undefined ? "common/test-leftovers.md (not found)" : path.basename(path.dirname(rulePath)) + "/" + path.basename(rulePath));
+
 export const CURES = Object.freeze({
-  "raw-temp": "Make temp folders with ownedDir(t, what) from tools/lib/owned.mjs — common/test-leftovers.md §7 (raw-temp), §2.",
-  "raw-worktree": "Make worktrees with ownedWorktree(t, repo, what) from tools/lib/owned.mjs — common/test-leftovers.md §7 (raw-worktree), §3.",
-  "docker-run": "Add --rm, or the complete carve-out: a testsToDelete-<owner>-<repo>-<what>-<id> name, a remover step on every path after the diagnostics — common/test-leftovers.md §5, §7 (docker-run).",
-  "docker-name": "Give the container, volume, network, compose project or test-built image one of the three spellings of testsToDelete-<owner>-<repo>-<what>-<id> — common/test-leftovers.md §1, §7 (docker-name).",
-  "legacy-name": "Build every name with the owner segment: testsToDelete-<owner>-<repo>-<what>-<id> from ownedName()/the helper of this repository — common/test-leftovers.md §1, §7 (legacy-name).",
-  "owner-blind": "Match the caller's owner after the prefix (^testsToDelete-<owner>-<repo>-), or delete the sweep and use the shipped janitor; this class takes no exemption — common/test-leftovers.md §7 (owner-blind), the barrier.",
-  "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers.md §6, §7 (shared-store).",
-  "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers.md §5, §7 (ryuk-off).",
-  exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers.md §7 (the exemption grammar).",
-  token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers.md §1 — and write it, with its row, in this repository's own tools/lib/owned-token.mjs beside the copied owned.mjs (never copy another repository's).",
+  "raw-temp": "Make temp folders with ownedDir(t, what) from tools/lib/owned.mjs — common/test-leftovers-detail.md §7 (raw-temp), §2.",
+  "raw-worktree": "Make worktrees with ownedWorktree(t, repo, what) from tools/lib/owned.mjs — common/test-leftovers-detail.md §7 (raw-worktree), §3.",
+  "docker-run": "Add --rm, or the complete carve-out: a testsToDelete-<owner>-<repo>-<what>-<id> name, a remover step on every path after the diagnostics — common/test-leftovers-detail.md §5, §7 (docker-run).",
+  "docker-name": "Give the container, volume, network, compose project or test-built image one of the three spellings of testsToDelete-<owner>-<repo>-<what>-<id> — common/test-leftovers-detail.md §1, §7 (docker-name).",
+  "legacy-name": "Build every name with the owner segment: testsToDelete-<owner>-<repo>-<what>-<id> from ownedName()/the helper of this repository — common/test-leftovers-detail.md §1, §7 (legacy-name).",
+  "owner-blind": "Match the caller's owner after the prefix (^testsToDelete-<owner>-<repo>-), or delete the sweep and use the shipped janitor; this class takes no exemption — common/test-leftovers-detail.md §7 (owner-blind), the barrier.",
+  "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers-detail.md §6, §7 (shared-store).",
+  "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers-detail.md §5, §7 (ryuk-off).",
+  exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers-detail.md §7 (the exemption grammar).",
+  token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers-detail.md § Tokens (§1 of the rule) — and write it, with its row, in this repository's own tools/lib/owned-token.mjs beside the copied owned.mjs (never copy another repository's).",
 });
+
+/** The cures, each pointing at `ruleName` — the file the scan resolved (see `resolveRule`). */
+export const curesFor = (ruleName) => Object.fromEntries(Object.entries(CURES).map(([cls, text]) => [cls, text.replaceAll(DEFAULT_RULE_NAME, ruleName)]));
 
 const PREFIX_OK = /^teststodelete[-_][uw][0-9]{1,10}[-_]/i; // the OWNER form: one of the three spellings, then an owner segment
 /** A name the guard may accept: one of the three spellings, a value an argument array hides from it, or a value that is wholly a shell expansion (never guessed at). */
@@ -703,7 +717,7 @@ function belongsFindings(row, token, identity, rulePath) {
 }
 
 /** Findings (class `token`) when `token` is not a registered row of `ruleText`'s `## Tokens` table, or is the row of another repository. Fails closed: a rule with no table registers nothing. */
-export function tokenFindings(ruleText, token, rulePath = "common/test-leftovers.md", identity = REPO_ROW) {
+export function tokenFindings(ruleText, token, rulePath = ruleNameOf(resolveRule(path.join(HERE, ".."))), identity = REPO_ROW) {
   const at = (line, text) => [finding(rulePath, Math.max(line, 1), "token", text)];
   if (!TOKEN_SHAPE.test(token)) return at(1, `the token \`${token}\` is not [a-z0-9]{2,12} (${rulePath})`);
   const table = parseTokenTable(ruleText);
@@ -805,9 +819,15 @@ export function constantFindings(constants, token, ruleText, rulePath, identity 
   return found;
 }
 
-/** The rule text the token is checked against: `--rule`, else the repository's own, else the one beside this tool. */
+/**
+ * The rule text the token is checked against: `--rule`, else the repository's own, else the one beside this tool. The `## Tokens`
+ * table lives in `common/test-leftovers-detail.md` since the split of 2026-11-01; `common/test-leftovers.md` (the core) is tried
+ * after it in each place, for a mount from before the split that still holds the table there.
+ */
 export function resolveRule(repo, rule) {
-  const candidates = rule === undefined ? [path.join(repo, "common", "test-leftovers.md"), path.join(HERE, "..", "common", "test-leftovers.md")] : [rule];
+  const candidates = rule === undefined
+    ? [repo, path.join(HERE, "..")].flatMap((base) => [path.join(base, "common", "test-leftovers-detail.md"), path.join(base, "common", "test-leftovers.md")])
+    : [rule];
   return candidates.find((candidate) => fs.existsSync(candidate));
 }
 
@@ -860,10 +880,10 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = toke
   }
   const rulePath = resolveRule(repo, rule);
   const ruleText = rulePath === undefined ? "" : fs.readFileSync(rulePath, "utf8");
-  const ruleName = rulePath === undefined ? "common/test-leftovers.md (not found)" : path.basename(path.dirname(rulePath)) + "/" + path.basename(rulePath);
+  const ruleName = ruleNameOf(rulePath);
   findings.push(...tokenFindings(ruleText, token, ruleName, identity), ...constantFindings(tokenConstants(repo, profile), token, ruleText, ruleName, identity), ...tokenFileFindings(repo, profile));
   findings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.cls.localeCompare(b.cls));
-  return { files: read, findings };
+  return { files: read, findings, rule: ruleName };
 }
 
 // --- the command line ----------------------------------------------------------------------------------------
@@ -887,15 +907,16 @@ export function parseArguments(argv) {
   return options;
 }
 
-function report(findings, io) {
+function report(findings, io, ruleName) {
   const printed = new Set();
-  io.err(`leftovers-check: ${findings.length} finding(s) — see common/test-leftovers.md §7`);
+  const cures = curesFor(ruleName);
+  io.err(`leftovers-check: ${findings.length} finding(s) — see ${ruleName} §7`);
   for (const entry of findings) {
     io.err(`  ${entry.file}:${entry.line} — ${entry.cls} — ${entry.text}`);
     printed.add(entry.cls);
   }
   io.err("");
-  for (const cls of Object.keys(CURES).filter((name) => printed.has(name))) io.err(`  ${cls}: ${CURES[cls]}`);
+  for (const cls of Object.keys(cures).filter((name) => printed.has(name))) io.err(`  ${cls}: ${cures[cls]}`);
 }
 
 function runUpdate(options, io) {
@@ -936,7 +957,7 @@ export function main(argv = process.argv.slice(2), io = { out: (text) => console
     io.out(`leftovers-check: clean (${result.files} files).`);
     return 0;
   }
-  report(result.findings, io);
+  report(result.findings, io, result.rule);
   return 1;
 }
 

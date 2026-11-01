@@ -140,7 +140,7 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
 
 ## F10 — The guard has no `module-load` class (a consumer's request, 2026-10-27)
 
-- **What.** The rule says a helper never creates a resource at module load (`common/test-leftovers.md:69`), and nothing checks it:
+- **What.** The rule says a helper never creates a resource at module load (`common/test-leftovers-detail.md:77`, the detail file since the split of 2026-11-01), and nothing checks it:
   `tools/leftovers-check.mjs:51` lists "a `module-load` class (needs a parser)" as not built.
 - **Why.** A consumer keeps its own local check for this until the shared guard has the class. That is a second implementation
   of one rule, and the two can drift.
@@ -402,9 +402,9 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
      `loong64`, `mips64el`, `ppc64`, `riscv64`, `s390x`, `x64`; 4 for `arm`, `ia32`, `mips`, `mipsel`, `ppc`; any other
      value → `undefined` (no start), never a guess. The endianness is `os.endianness()`. The value is a `BigInt`
      converted to a `Number` only when it is a positive safe integer (finding 3).
-  3. Rule §3 (`common/test-leftovers.md:116-119`): the parenthesis names the bound — one child per script or run to learn a
+  3. Rule §3 (`common/test-leftovers-detail.md:124-127`, the detail file since the split of 2026-11-01): the parenthesis names the bound — one child per script or run to learn a
      host constant is allowed (a shell's `getconf CLK_TCK`, read once when the helper is loaded), never a child per test
-     process. `node tools/rule-bodies.mjs --update common.test-leftovers` moves the record in the same commit.
+     process. `node tools/rule-bodies.mjs --update common.test-leftovers-detail` moves the record in the same commit.
   4. The whole suite, lowered (`npm test`), `npm run check` (plan gate finding 2), `node tools/plan-lifecycle.mjs`, `node tools/rule-bodies.mjs`.
   Plan gate (coai, 2026-10-28): `proceed`, 2 of 2 reviewers, 4 findings, all accepted and written into the steps above.
 - **Not in this change.** The private sibling's byte copy of `owned.mjs` and its pinned rule spans: they follow at its next copy,

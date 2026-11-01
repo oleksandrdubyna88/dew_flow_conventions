@@ -6,8 +6,9 @@ tasks: ["audit","policy","release"]
 # The leftover janitor — `tools/janitor.sh`, the one host-wide sweep (MANDATORY where it runs)
 
 <!-- core:begin -->
-The companion of `common/test-leftovers.md`: that rule's §1–§4 (the name, the owner record, the two keys, the
-three-valued liveness) and its *barrier* are the contract; this text is the janitor's — its invocation, its
+The companion of `common/test-leftovers.md` (the core) and `common/test-leftovers-detail.md` (its full text): that
+rule's §1–§4 (the name, the owner record, the two keys, the three-valued liveness) and its *barrier* are the
+contract, in the detail's wording where the core summarises; this text is the janitor's — its invocation, its
 output, its exit codes and what every copy of it must keep. There is ONE implementation, shipped and tested in the
 rule repository; a wrapper may start it, nothing re-implements it.
 
