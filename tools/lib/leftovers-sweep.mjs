@@ -165,6 +165,16 @@ function quarantineName(dir) {
 const TAKEN_CODES = new Set(["ENOTEMPTY", "EEXIST", "ENOTDIR"]);
 const QUARANTINE_DRAWS = 5; // the names a quarantine move draws before it gives up and keeps the folder
 
+/**
+ * Does a failed rename say the name is TAKEN? On POSIX only the occupied-name codes. On Windows libuv answers EPERM (ERROR_ACCESS_DENIED) or EACCES
+ * for a rename onto an existing directory, so those two count — and only while something is at the target (`thereAtTarget`). Anything else (the
+ * source gone, an I/O error) is not "taken": it is thrown.
+ */
+export function isTakenRename(error, thereAtTarget, platform = process.platform) {
+  if (TAKEN_CODES.has(error?.code)) return true;
+  return platform === "win32" && (error?.code === "EPERM" || error?.code === "EACCES") && thereAtTarget;
+}
+
 /** Is `placeholder` still the directory this move reserved: a directory, not a link, the reserved `(dev, ino)`, and empty? */
 function isOwnEmptyPlaceholder(placeholder, reserved) {
   const now = identityOf(placeholder); // lstat: a link is its own entry, never a directory
@@ -199,7 +209,7 @@ function moveExclusively(from, to, hooks = {}) {
     try {
       fs.renameSync(from, to); // a directory rename onto an existing one fails here, so the move is exclusive by itself — unmeasured on Windows, which F9 settles
     } catch (error) {
-      if (TAKEN_CODES.has(error?.code) || identityOf(to) !== undefined) return false; // libuv answers EPERM (ERROR_ACCESS_DENIED) for a taken name: something at `to` is what says it
+      if (isTakenRename(error, identityOf(to) !== undefined, "win32")) return false;
       throw error;
     }
     return true;
@@ -518,10 +528,20 @@ function sweepOrphanClaims(context) {
   }
 }
 
-/** `rmdir` of a quarantine that holds nothing (it refuses a folder with content): the reservation of a sweep killed before its rename. `true` when removed. */
-function removeEmptyReservation(quarantined) {
+/**
+ * Remove the reservation of a sweep killed between its `mkdir` and its rename: an EMPTY quarantine whose original name EXISTS (the folder it was
+ * to receive is still there, so the quarantine can only be the placeholder). With the original absent an empty quarantine may be a moved empty
+ * folder, and it is restored instead. It is looked at again right before the `rmdir`: the same `(dev, ino)` as when it was listed, a directory,
+ * not a link, and empty. `true` when removed.
+ */
+function removeEmptyReservation(quarantined, original, listedAs, hooks) {
+  if (identityOf(original) === undefined) return false;
+  hooks.beforeReservationRemoval?.(quarantined);
+  const now = identityOf(quarantined);
+  if (!sameIdentity(now, listedAs) || !now.directory) return false;
   try {
-    fs.rmdirSync(quarantined);
+    if (fs.readdirSync(quarantined).length !== 0) return false;
+    fs.rmdirSync(quarantined); // refuses content too
     return true;
   } catch {
     return false;
@@ -535,11 +555,15 @@ function restoreQuarantines(context) {
     const found = QUARANTINE.exec(dirent.name);
     if (found === null || !dirent.isDirectory() || relationOf(found[1], context.owner).relation === "other") continue;
     const quarantined = path.join(tmp, dirent.name);
+    const listedAs = identityOf(quarantined);
     if (!mine(quarantined) || !isAskablePid(found[2], context.platform)) continue; // another uid's, or a pid that is no process: the probe is never asked
     if (context.probe(Number(found[2]))?.state !== "dead") continue; // its renamer may still be working
     if (!pastWindow(quarantined, context.now, context.minAgeMs)) continue; // a renamer in another pid namespace has a pid this process cannot see: it is "dead" here and may be mid-delete
-    if (removeEmptyReservation(quarantined)) continue; // a placeholder a killed sweep reserved and never renamed onto: nothing to put back
     const original = path.join(tmp, found[1]);
+    if (removeEmptyReservation(quarantined, original, listedAs, context.hooks)) { // a placeholder a killed sweep reserved and never renamed onto: nothing to put back
+      result.listed.push(`notice: removed the empty reservation ${dirent.name} a killed sweep left`);
+      continue;
+    }
     if (restoreOnto(quarantined, original, context.hooks)) result.listed.push(`notice: restored ${found[1]} from a quarantine a killed sweep left`);
     else context.report.keep(quarantined, "quarantine-conflict");
   }
@@ -558,7 +582,7 @@ function step(result, label, run) {
 /**
  * Collect what a killed run left behind. `repo` is the repository whose worktrees this sweep may remove; `tmp` the
  * temp root; `probe` the liveness query (a seam for tests), asked at most once per pid; `mine` the kernel-owner question
- * (a seam: a second uid cannot be had in a test); `hooks.afterCapture` / `hooks.afterVerdict` / `hooks.afterRename` / `hooks.afterReserve(placeholder, source)` / `hooks.beforeRename(placeholder, source)` (both run on the quarantine move AND on a restore, where the arguments are `(original, quarantined)`) / `hooks.beforeClaimRemoval` (seams: a change between the
+ * (a seam: a second uid cannot be had in a test); `hooks.afterCapture` / `hooks.afterVerdict` / `hooks.afterRename` / `hooks.afterReserve(placeholder, source)` / `hooks.beforeRename(placeholder, source)` (both run on the quarantine move AND on a restore, where the arguments are `(original, quarantined)`) / `hooks.beforeReservationRemoval(quarantine)` / `hooks.beforeClaimRemoval` (seams: a change between the
  * capture, the verdict and the removal). Never throws. `result.listed` holds the `foreign:` / `legacy:` / `unmarked:` lines.
  */
 export function sweepLeftovers({ repo, tmp = tempRoot(), now = Date.now(), minAgeMs = MIN_AGE_MS, probe = processProbe, mine = isMine, hooks = {}, platform = process.platform } = {}) {
