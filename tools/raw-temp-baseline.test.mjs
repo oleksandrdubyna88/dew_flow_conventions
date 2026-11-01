@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 
 import { git } from "./lib/git.mjs";
 import { ownedDir } from "./lib/owned.mjs";
-import { createApplier, printBaseline } from "./lib/raw-temp-baseline.mjs";
+import { createApplier, locateBaseline, printBaseline } from "./lib/raw-temp-baseline.mjs";
 import { main, scanRepository } from "./leftovers-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -584,4 +584,62 @@ test("22. matching is linear: 40,000 entries are taken in well under a few secon
   for (let index = 39999; index >= 0; index -= 1) assert.equal(applier.take(A, sha(`line ${index}`)), true);
   assert.equal(applier.finalFindings().length, 0);
   assert.ok(performance.now() - started < 3000, "a scan of every entry for every hit would take far longer");
+});
+
+// 22b — many entries under ONE key (code round 2 8, 9, 13) ----------------------------------------------------------------------
+
+test("22b. matching is linear under ONE key too: 60,000 entries of one site are taken in well under a few seconds", (t) => {
+  const { repo } = fixture(t);
+  const entries = Array.from({ length: 60000 }, (_, index) => entry(A, L3, index + 1));
+  const applier = createApplier({ scopes: [{ root: ROOT, proof: PROOF }], entries }, repo, FILE, new Set([PROOF]));
+  const started = performance.now();
+  for (let index = 0; index < 60000; index += 1) assert.equal(applier.take(A, sha(L3)), true);
+  assert.equal(applier.take(A, sha(L3)), false, "one more hit than entries is not passed");
+  assert.equal(applier.finalFindings().length, 0);
+  assert.ok(performance.now() - started < 3000, "copying or shifting the list of one key for every hit would take far longer");
+});
+
+// 19b — a vanished file is reported, never a crash (code round 2 5) ----------------------------------------------------------------
+
+test("19b. --print-baseline: a file that vanished or cannot be read is listed in `missing`, never a crash", (t) => {
+  const { repo } = fixture(t, { baseline: null });
+  fs.mkdirSync(path.join(repo, "src", "test", "dir.test.mjs"));
+  const listed = printBaseline([{ file: "src/test/gone.test.mjs", line: 1, cls: "raw-temp" }, { file: "src/test/dir.test.mjs", line: 1, cls: "raw-temp" }, { file: A, line: 3, cls: "raw-temp" }], repo);
+  assert.deepEqual(listed.baseline.entries, [entry(A, L3, 3)]);
+  assert.deepEqual(listed.missing, ["src/test/gone.test.mjs:1", "src/test/dir.test.mjs:1"]);
+});
+
+// 23 — ONE loader of the working-tree file (code round 2 1) ------------------------------------------------------------------------
+
+test("23. one loader finds the baseline file for the scan and the shrink check: absent, a file, a symlink, a folder, a folder that is not the git root", (t) => {
+  const absent = fixture(t, { baseline: null });
+  assert.deepEqual(locateBaseline(absent.repo), { file: path.join(absent.repo, FILE), absent: true });
+  const plain = fixture(t);
+  assert.deepEqual(locateBaseline(plain.repo), { file: path.join(plain.repo, FILE), absent: false });
+  const link = fixture(t, { baseline: null });
+  fs.writeFileSync(path.join(link.repo, "elsewhere.json"), "{}");
+  fs.symlinkSync("elsewhere.json", path.join(link.repo, FILE));
+  assert.equal(locateBaseline(link.repo).refusal?.kind, "symlink");
+  const folder = fixture(t, { baseline: null });
+  fs.mkdirSync(path.join(folder.repo, FILE));
+  assert.equal(locateBaseline(folder.repo).refusal?.kind, "not-file");
+  assert.equal(locateBaseline(plain.repo, { gitRoot: true }).refusal, undefined, "the git root passes");
+  fs.mkdirSync(path.join(plain.repo, "sub"));
+  assert.equal(locateBaseline(path.join(plain.repo, "sub"), { gitRoot: true }).refusal?.kind, "not-git-root");
+  // each caller keeps its own outcome for the same refusal
+  assert.equal(withBaseline(link.repo).code, 1, "the scan: a baseline finding");
+  assert.equal(shrinks(link.repo).code, 2, "the shrink check: exit 2");
+  assert.equal(withBaseline(folder.repo).code, 2);
+  assert.equal(shrinks(folder.repo).code, 2);
+});
+
+// 21e — a value option followed by another option (code round 2 11) ---------------------------------------------------------------------
+
+test("21e. a value option followed by another `--` option is a usage error that names the option", (t) => {
+  const { repo } = fixture(t);
+  for (const [args, name, next] of [[["--baseline-shrinks", "--base", "--allow-create"], "--base", "--allow-create"], [["--repo", "--baseline"], "--repo", "--baseline"], [["--token", "--profile", "node"], "--token", "--profile"]]) {
+    const result = guard(repo, args);
+    assert.equal(result.code, 2, `${args.join(" ")}: ${result.text}`);
+    assert.match(result.text, new RegExp(`\`${name}\` needs a value.*\`${next}\``), args.join(" "));
+  }
 });

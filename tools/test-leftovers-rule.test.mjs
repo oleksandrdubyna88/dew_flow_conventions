@@ -137,7 +137,7 @@ test("S1 9 the core carries, under each section, every phrase a reviewer needs t
 });
 
 /** What the baseline companion must carry: the one class, the proof marker, the multiset key, the ratchet, the file format. */
-const BASELINE_PHRASES = ["The `raw-temp` baseline", "testsTo" + "Delete-baseline-proof: <scope root>", "**multiset**", "sha256 of the trimmed line", "only when told to", "`baseline`", "**only shrinks**", "any creation but the first", "nothing regenerates it", "\"class\": \"raw-temp\"", "No `count` field", "--baseline-shrinks", "`raw-temp-baseline.json` at the repository root", "never a symlink", "a test file the guard discovered", "keeps the proof of the base scope", "only in the creation PR's own run", "never in the standing"];
+const BASELINE_PHRASES = ["The `raw-temp` baseline", "testsTo" + "Delete-baseline-proof: <scope root>", "**multiset**", "sha256 of the trimmed line", "only when told to", "`baseline`", "**only shrinks**", "any creation but the first", "nothing regenerates it", "\"class\": \"raw-temp\"", "No `count` field", "--baseline-shrinks", "`raw-temp-baseline.json` at the repository root", "never a symlink", "a test file the guard discovered", "keeps the proof of the base scope", "only in the creation PR's own run", "never in the standing", "on every pull request", "the PR's target branch"];
 
 test("S1 10 the baseline companion carries the full `raw-temp` baseline definition, once, and the detail's §7 points to it in one short paragraph, after the exemption grammar", () => {
   const text = read(BASELINE).replace(/\s+/g, " ");
