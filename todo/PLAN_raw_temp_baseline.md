@@ -5,7 +5,14 @@
 > `tools/leftovers-check.mjs` (a `--baseline` pass, a `--baseline-shrinks` check, a `--print-baseline` listing, the
 > class `baseline`) with its tests, the rule tests' caps, the research record, one release, and the pin bumps. It
 > changes the family's PUBLIC test-leftovers contract; the C# side is a recommendation to the template's owner, not a
-> change here. Written by Fable as a cornerstone spec; coded by Sonnet; reviewed by Opus.
+> change here. Written by Fable as a cornerstone spec; coded by Sonnet; reviewed by Opus. **Plan gate** (coai session
+> `c42be871`, round 1, 2026-11-01, both reviewers answered): verdict **PROCEED**, five findings, all accepted and
+> applied below, each marked *[gate finding n]*; the gate ruled the plan one unit, not split. B1 decided with the
+> round: the hash is of the TRIMMED line.
+
+## Plan changes
+
+> Epoch 1 · approved 2026-11-01 · by reviewers · state: open
 
 ## Symptom
 
@@ -47,9 +54,14 @@ them, so that a consumer can land its guard with every other class at zero and d
    key. A count ceiling alone is refused for the reason coai's own
    `src_vs_code/src/test/suppressionsOnlyShrink.test.ts:14-20` records: under a constant total one entry can be
    swapped for another.
-4. **Only shrinks.** A new site is a `raw-temp` finding. A stale entry (no line of its file hashes to it) is a
-   `baseline` finding until removed. A check against the base ref refuses a new key, a raised count, or a creation
-   it was not told of. No command writes the file; `--print-baseline` prints to stdout only, for the one creation.
+4. **Only shrinks.** A new site is a `raw-temp` finding. A stale entry is a `baseline` finding until removed —
+   reconciled GLOBALLY over the whole baseline, not per visited file, so an entry of a deleted file or of a file
+   whose hits dropped to zero is stale too *[gate finding 0]*. A malformed or wrong-schema file is a `baseline`
+   finding (exit 1, with its cure), as the rule text says; exit 2 is only an unreadable file or a usage error
+   *[gate finding 1]*. A check against the base ref refuses a new key, a raised count, a new scope, a widened root
+   or a changed proof *[gate finding 3]*, and any creation but the first: `--allow-create` passes only when the path
+   has NO git history, so a re-creation after the file existed is refused *[gate finding 4]*. No command writes the
+   file; `--print-baseline` prints to stdout only, for the one creation.
 5. **Read only when named.** The guard reads a baseline only through `--baseline <path>` (or the `baseline` option
    of `scanRepository`). Nothing is discovered from the scanned tree; the default run is byte-for-byte the current
    behaviour. This is a deliberate difference from the `owner-blind` allowlist, which is read from beside the tool
@@ -104,10 +116,11 @@ never lose it.
 > (`raw-temp`) and, as `baseline`, an entry no line matches, an entry outside every scope, a scope whose proof is
 > missing, a class other than `raw-temp` and a malformed file. It **only shrinks**: an entry goes when its site goes;
 > after the file's first reviewed commit none is added or re-keyed, a check against the base ref refuses a new key,
-> a raised count or a creation it was not told of, and nothing regenerates it.
+> a raised count, a new or wider scope, a changed proof and any creation but the first, and nothing regenerates it.
 
-Bytes: the paragraph is 1,434 B with its blank line. The detail is 31,241 B; after the change **32,675 B of the
-32,768 B** per-read cap (`tools/test-leftovers-rule.test.mjs:68-80`, S1 2) — it fits, with 93 B to spare. That
+Bytes: the paragraph is 1,471 B with its blank line (*[gate findings 3, 4]* added 37 B). The detail is 31,241 B;
+after the change **32,712 B of the 32,768 B** per-read cap (`tools/test-leftovers-rule.test.mjs:68-80`, S1 2) — it
+fits, with 56 B to spare. That
 headroom is a risk this plan records (§ *Risks*, R1) rather than hides. Both bodies are re-recorded with
 `node tools/rule-bodies.mjs --update common.test-leftovers common.test-leftovers-detail`
 (`research/rule-bodies.json:445-470`). The text names no product and no path that moves; `ownership-check` stays
@@ -154,23 +167,36 @@ guard gains the arguments and the wiring only (coding-style: 800 lines max).
 1. **Arguments** (`parseArguments`, `:894-909`): `--baseline <path>` (a file; resolved like `--allowlist`),
    `--print-baseline` (a flag; prints the JSON above for the current scan's `raw-temp` findings — `scopes` empty, to
    be written by hand — to stdout, exit 0, writes nothing), `--baseline-shrinks <path>` with `--base <git-ref>` and
-   the optional flag `--allow-create`. `USAGE` and the header comment (`:1-40`) name all of them.
-2. **`loadBaseline(path)`**: the shape above or an error naming what is wrong (never "no entries"); `class` other
-   than `raw-temp` → the whole file is one `baseline` finding at line 1 and no entry applies.
-3. **Apply** (in `lineFindings`, `:398-421`, after the `raw-temp` check): per file, group the `raw-temp` hits by
-   `siteSha256(line)`; for each key let `n` be the entries of the baseline with that file and key; the first `n`
-   hits in line order pass, the rest are `raw-temp` findings as today; `n` greater than the hits → `n − hits`
-   findings of class `baseline` ("entry has no line", at the entry's hint line). A hit on a line that also carries a
-   valid inline exemption is exempt first (unchanged). Per file afterwards: an entry whose file is under no scope →
-   `baseline`; per scope once: a proof file missing from the tree, or without the marker for that root → `baseline`.
+   the optional flag `--allow-create`. `USAGE` and the header comment (`:1-40`) name all of them, and `USAGE` says
+   that a CI checkout fetches the base ref before `--baseline-shrinks` *[gate finding 2]*.
+2. **`loadBaseline(path)`**: the shape above, or — for a file that is not JSON, not the schema, has a 63-hex sha, a
+   backslash path or a `class` other than `raw-temp` — ONE `baseline` finding at the file's line 1 naming the field,
+   after which no entry applies and the scan goes on (exit 1 with the cure); only a path that cannot be read is exit 2
+   *[gate finding 1]*.
+3. **Apply** — in two steps. Per file, in `lineFindings` (`:398-421`, after the `raw-temp` check): group the
+   `raw-temp` hits by `siteSha256(line)`; for each key let `n` be the entries of the baseline with that file and key;
+   the first `n` hits in line order pass, the rest are `raw-temp` findings as today; a hit on a line that also
+   carries a valid inline exemption is exempt first (unchanged); each passed hit is recorded as a MATCHED entry. Then
+   once, in `scanRepository` after every file (`:873-880`), the global reconcile *[gate finding 0]*: every baseline
+   entry that no hit matched — an entry of a visited file with fewer hits than entries, of a file whose hits dropped
+   to zero, of a deleted file, of a file discovery never read — is a `baseline` finding ("entry has no line", at the
+   entry's hint line); an entry whose file is under no scope → `baseline`; per scope once: a proof file missing from
+   the tree, or without the marker for that root → `baseline`.
 4. **`CURES.baseline`**: "Remove the stale or out-of-scope entry from the baseline, or move the site into the helper;
    nothing adds to it — common/test-leftovers-detail.md §7 (the `raw-temp` baseline)." `EXEMPTIBLE` unchanged.
 5. **`--baseline-shrinks`**: reads the file in the working tree and `git show <base>:<path>` through
    `tools/lib/git.mjs`; compares the two multisets by (file, sha256): a key new in the working copy, or with more
-   entries than at base → exit 1 naming each; hints ignored; the file absent at base → exit 1 ("a creation; pass
-   --allow-create in the one creation PR and record it") unless `--allow-create`; the file absent now and present at
-   base → exit 0 (drained); unreadable base → exit 2. A consumer's CI runs it against the PR base for every baseline
-   file, whatever language the baselined tree is in — one implementation.
+   entries than at base → exit 1 naming each; hints ignored. **Scopes are compared too** *[gate finding 3]*: a scope
+   root not at base, a root that is a prefix of a base root (wider), or a scope whose `proof` changed → exit 1
+   naming it, like a new entry; a scope removed or narrowed is a shrink. The file absent at base → exit 1 ("a
+   creation; pass --allow-create in the one creation PR and record it") unless `--allow-create`; **`--allow-create`
+   is honoured only when `git log --all --format=%H -- <path>` is empty** *[gate finding 4]* — a path with any
+   history is a re-creation and is refused with that sentence; a shallow clone (`git rev-parse --is-shallow-repository`
+   true) fails closed with the fetch to run (`git fetch --unshallow`). The file absent now and present at base →
+   exit 0 (drained). **The CI contract** *[gate finding 2]*: the step fetches the base ref first
+   (`git fetch origin <base-branch> --depth=1` or the repository's own fetch), and an unresolved base ref fails with
+   one sentence naming that fetch — exit 2, never a silent pass. A consumer's CI runs it against the PR base for
+   every baseline file, whatever language the baselined tree is in — one implementation.
 6. **Nothing else moves**: the `owner-blind` path, the allowlist's loader and `--update-allowlist` are untouched; a
    test pins that a run without `--baseline` produces the same findings as before over the fixture tree.
 
@@ -184,16 +210,18 @@ scope `src/test/` whose proof `src/test/runFolder.test.mjs` carries the marker.
 |---|---|---|---|---|
 | 1 | a baselined site passes | `--baseline B` still reports `a.test.mjs:3 — raw-temp` | exit 0 | one byte changed on line 3 → `raw-temp` at 3 AND `baseline` (stale) at hint 3 |
 | 2 | a new site is a finding | — | a second, different `tmpdir()` line at 7 → exit 1, `a.test.mjs:7 — raw-temp` | remove line 7 → exit 0 |
-| 3 | a stale entry is a finding | without the code a removed site leaves exit 0 | line 3 deleted → `baseline — entry has no line` at hint 3 | entry removed from B → exit 0 |
+| 3 | a stale entry is a finding — reconciled globally *[gate finding 0]* | without the code a removed site leaves exit 0 | line 3 deleted → `baseline — entry has no line` at hint 3; the whole FILE `a.test.mjs` deleted, B unchanged → the same finding; a file whose only hit is rewritten to a non-temp line (hits drop to zero) → the same finding; an entry for a file discovery never reads → the same | entry removed from B → exit 0 |
 | 4 | duplicate line (the multiset) | — | an identical copy of line 3 pasted at line 9, B holds ONE → exit 1 naming line 9 as `raw-temp`; B holding TWO entries for the key → exit 0 | B with two, the file with one → `baseline` stale |
 | 5 | a moved line keeps its entry | — | ten lines inserted above line 3 (hint stays 3) → exit 0 | re-indented line → still exit 0 (trimmed hash); a changed character → RED as in #1 |
 | 6 | a site outside a proven runner | — | an entry for `scripts/x.mjs` (under no scope) → `baseline — outside every scope`; scope whose proof file is absent, or present without the marker for that root → `baseline — proof missing` | marker added to the proof → exit 0 |
 | 7 | the class restriction | — | `"class": "owner-blind"` (or any other) → one `baseline` finding, and an owner-blind line in the tree is STILL `owner-blind`; a baseline entry whose hash matches a `legacy-name` line clears nothing | — |
 | 8 | read only when named | — | the same tree with the file present but no `--baseline` → the findings of today, unchanged | — |
-| 9 | a malformed file | — | a missing `entries`, a 63-hex sha, a `file` with a backslash → exit 2 naming the field | — |
+| 9 | a malformed file is a `baseline` finding *[gate finding 1]* | — | a missing `entries`, a 63-hex sha, a `file` with a backslash, not JSON → exit 1, ONE `baseline` finding at `<file>:1` naming the field, the cure printed, no entry applied (the `raw-temp` sites stay findings); a path that cannot be read → exit 2 | — |
 | 10 | `--print-baseline` | — | prints valid JSON with every `raw-temp` finding of the scan, `scopes: []`, writes no file (the tree is hashed before and after) | — |
-| 11 | `--baseline-shrinks` | — | same file → 0; one entry removed → 0; hint changed → 0; a key added → 1 naming it; a key's count 1→2 → 1; absent at base → 1, with `--allow-create` → 0; absent now → 0 | `--base` unreadable → 2 |
+| 11 | `--baseline-shrinks` | — | same file → 0; one entry removed → 0; hint changed → 0; a key added → 1 naming it; a key's count 1→2 → 1; absent now → 0 | `--base` unresolved → 2 with the one sentence naming the fetch *[gate finding 2]* (an `ownedDir` clone with the base branch not fetched) |
 | 12 | the real tree | — | `node tools/leftovers-check.mjs` over this repository stays clean with no baseline; this repository ships NO baseline file (a test pins its absence, the way `LEGACY_NAME_PENDING` is pinned empty, `:75-82`) | — |
+| 13 | scope widening is refused *[gate finding 3]* | — | a scope added → 1 naming the root; `src/test/unit/` at base widened to `src/test/` → 1 ("wider"); `proof` changed → 1; a scope removed, or narrowed to a sub-root → 0 | — |
+| 14 | re-creation is refused *[gate finding 4]* | — | in an `ownedDir` repository: file absent at base and NEVER committed → `--allow-create` → 0; file committed once, deleted and committed, then re-added → `--allow-create` → 1 with the re-creation sentence; without `--allow-create` a creation → 1 | a shallow clone (`git clone --depth=1` of the fixture) → 2 naming `git fetch --unshallow` |
 
 Rule tests (`tools/test-leftovers-rule.test.mjs`): `CORE_CAP` 9000; the new `MUST_CARRY` phrase watched RED on the
 old core text, GREEN on the new; S1 2 (the 32 KiB read) and S1 7 (nothing lost against the `7852de2` fixture) stay
@@ -206,13 +234,13 @@ GuardReport`) returns findings and `LeftoversRepositoryGuardTests.cs:14-17` asse
 consumer could filter in its own wrapper, but ~80 lines of multiset-and-scope logic copied per consumer is the
 duplicate `reuse-first` names as the whole defect, and a wrapper written by each consumer will apply the rule at
 some of its sites. **Recommended: the template gains a shared reader, `RawTempBaseline.cs`, beside the byte-identical
-scanner**, with `RawTempBaselineTests.cs` showing the same twelve behaviours (#1–#9, #12 apply; #10–#11 are the Node
-tool's), and `LeftoversGuard.cs` untouched:
+scanner**, with `RawTempBaselineTests.cs` showing the same behaviours (#1–#9 and #12 apply, the global reconcile of #3 and the
+`baseline` finding of #9 included; #10, #11, #13 and #14 are the Node tool's), and `LeftoversGuard.cs` untouched:
 
 ```csharp
 // tests/Mcp.Tests/Leftovers/RawTempBaseline.cs — copied by every C# consumer, byte-identical
 public static RawTempBaseline Load(string path);                       // the file format above, or a throw naming the field
-public GuardReport Apply(GuardReport report, string repoRoot);         // raw-temp findings up to the count pass; stale, out-of-scope, proof, class → "baseline" findings
+public GuardReport Apply(GuardReport report, string repoRoot);         // raw-temp findings up to the count pass; every unmatched entry (global), out-of-scope, proof, class, malformed → "baseline" findings
 ```
 
 The consumer's wrapper is then two lines: `RawTempBaseline.Load(path).Apply(LeftoversGuard.Scan(...), root)` and the
@@ -240,7 +268,7 @@ The usual path, as R5 and R7 ran it (`todo/PLAN_test_leftovers_merged_core_relea
 ## Build order
 
 S1 the rule text and the rule tests (watched RED on the caps and the phrase) → S2 the Node module, the guard's
-wiring, the twelve tests, the header and `USAGE` → S3 `research/module_tests.md` (§ *Test leftovers*, `:1199`,
+wiring, the fourteen tests, the header and `USAGE` → S3 `research/module_tests.md` (§ *Test leftovers*, `:1199`,
 `:1247-1250`) and `research/rule-bodies.json` → one PR → S4 the release and the pins (above). The C# recommendation
 is handed to the template's owner at S1 so that its plan can start in parallel.
 
@@ -257,7 +285,7 @@ node tools/release-distance.mjs                     # after S4 only
 
 ## Risks
 
-- **R1 — the detail's headroom is 93 B.** The next sentence anybody needs in the detail forces a split. Mitigation
+- **R1 — the detail's headroom is 56 B.** The next sentence anybody needs in the detail forces a split. Mitigation
   recorded now: that change moves §7's baseline paragraph and the file format to a companion
   `common/test-leftovers-baseline.md` (the janitor precedent, `common/test-leftovers-janitor.md:1-5`), with the
   detail keeping a one-line pointer. Not done here: the instruction for this plan puts the full definition in the
@@ -265,10 +293,10 @@ node tools/release-distance.mjs                     # after S4 only
 - **R2 — a baseline hides a real leak.** A site under a scope whose proof is wrong (TEMP set after some test, or a
   runner that swallows the folder failure) leaks into the real temp root. The guard checks the declaration, not the
   substance; the substance is the reviewer's at creation and the end-of-run audit's (coai D9) every run.
-- **R3 — deletion and re-creation across two PRs widens the baseline.** The shrink check sees one base; a file
-  drained to zero is deleted, and a creation is refused without `--allow-create`, which only the one creation PR
-  passes and records. A second creation in a repository's history is visible in `git log -- <file>` and is what the
-  rule's "first reviewed commit" forbids; the check cannot see it.
+- **R3 — deletion and re-creation across two PRs widens the baseline.** Closed by *[gate finding 4]*:
+  `--allow-create` is honoured only for a path with no history at all (`git log --all`), so a re-creation is refused
+  by the check, not only by the rule. What remains: a history rewritten to erase the path, which no check here sees,
+  and a shallow clone, which fails closed with its fetch hint.
 - **R4 — the trimmed hash is wider than the allowlist's exact hash.** Chosen so a re-indent does not strand an entry
   (a stale entry can never be re-added). The width is one line's whitespace; the content is still exact.
 - **R5 — two guards, one file format.** The C# reader is recommended, not built here; until it lands coai carries the
@@ -280,11 +308,13 @@ node tools/release-distance.mjs                     # after S4 only
       detail carries the paragraph and reads under 32 KiB with `--only`; `MUST_CARRY` holds the phrase.
 - [ ] `tools/lib/raw-temp-baseline.mjs` and the guard's `--baseline`, `--print-baseline`, `--baseline-shrinks`,
       `--base`, `--allow-create` exist and are in the header and `USAGE`; class `baseline` has its cure.
-- [ ] The twelve behaviours were each watched RED, then GREEN, then RED again where the table says; the default run
-      over the fixture tree and over this repository is unchanged; this repository ships no baseline file.
+- [ ] The fourteen behaviours were each watched RED, then GREEN, then RED again where the table says — the global
+      reconcile (a deleted file, hits at zero), the malformed file as a `baseline` finding, the unresolved base ref's
+      fetch sentence, scope widening and re-creation among them; the default run over the fixture tree and over this
+      repository is unchanged; this repository ships no baseline file.
 - [ ] `rule-bodies.json` re-recorded; `research/module_tests.md` § *Test leftovers* names the three arguments and the
       class; `ownership-check` passes with no baseline file of its own.
-- [ ] The C# recommendation was handed to the template's owner with the format and the twelve behaviours; the
+- [ ] The C# recommendation was handed to the template's owner with the format and the behaviours; the
       boundary is written in `dew_flow_mcp`'s plan and in coai's E5 (both sides).
 - [ ] The release: warning sent and recorded, `promote-release.yml` run, `release-distance` 0; coai's pin bump merged
       alone; the other consumers' pin bumps listed here.
@@ -293,14 +323,14 @@ node tools/release-distance.mjs                     # after S4 only
 
 ## Open questions
 
-Blocking (the plan gate or the owner answers before S1 is coded):
+Blocking: none open.
 
-- **B1 — the hash: trimmed line (this plan) or exact bytes (the allowlist's `lineSha256`)?** Recommended: trimmed —
-  a re-indented site must not become a stale entry plus an un-baselineable new site.
+- **B1 — DECIDED with the gate round (2026-11-01): the hash is of the TRIMMED line.** Nothing can re-add an entry,
+  so an exact-bytes hash would strand an entry on a re-indent.
 
-Non-blocking (a default is taken; a different answer is one edit):
+Non-blocking (the defaults below were kept by the gate round; a different answer is one edit):
 
-- **N1 — the full definition in the detail (as instructed; 32,675 of 32,768 B) or in a companion file now?**
+- **N1 — the full definition in the detail (as instructed; 32,712 of 32,768 B) or in a companion file now?**
   Default: the detail. If the owner prefers headroom, the companion of R1 is written in S1 instead and the detail
   carries only its first sentence (≈ 330 B).
 - **N2 — `count` field or repeated entries?** Default: repeated entries (one shape, one validator). coai's E5 text
