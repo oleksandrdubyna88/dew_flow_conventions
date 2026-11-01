@@ -244,5 +244,8 @@ checkout of the PR's branch. Their outcome is recorded by hand; the scan itself 
 - [ ] R6: every sweep-only stage merged before any producer stage; the rollout plan's Definition of Done met.
 - [x] R7: F17–F20 and the test-leftovers core split released once; every consumer pinned to that release (each pin bump merges alone, after the
       release and before that consumer's producer stage).
-- [ ] The Darwin path of the C# helper: measured on a macOS CI leg and merged in dew_flow_mcp before E5 and E2 copy the helper.
+- [x] The Darwin path of the C# helper: measured on a macOS CI leg and merged in dew_flow_mcp before E5 and E2 copy the helper.
+      Done 2026-11-01: dew_flow_mcp #59 (`197cc76a`), its macOS job green. The macOS runs also found that a request was walked through the
+      root's spelling, so `/var` → `/private/var` spent one hop of the link budget; both readers (mcp, and coai #938) now walk from the
+      resolved root. The follow-ups, and what was never measured (X64, Rosetta), are in that repository's `research/PLAN_test_leftovers_E3.md`.
 - [ ] This plan is promoted to `research/` with its deviations, or deleted with a recorded reason, when R6 is done; its row in `todo/README.md` goes with it.
