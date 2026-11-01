@@ -160,7 +160,9 @@ function quarantineName(dir) {
   return path.join(path.dirname(dir), `.${path.basename(dir)}.teststodelete-quarantine-${process.pid}-${crypto.randomBytes(4).toString("hex")}`);
 }
 
-const TAKEN_CODES = new Set(["ENOTEMPTY", "EEXIST", "EISDIR"]); // what a rename onto an occupied name answers
+// What rename(2) answers when the name is occupied: a directory with content (ENOTEMPTY, EEXIST), or a file where our directory was (ENOTDIR).
+// EISDIR is NOT here: it means the SOURCE became a file while the destination is a directory — the folder changed, the name was not taken.
+const TAKEN_CODES = new Set(["ENOTEMPTY", "EEXIST", "ENOTDIR"]);
 const QUARANTINE_DRAWS = 5; // the names a quarantine move draws before it gives up and keeps the folder
 
 /** Is `placeholder` still the directory this move reserved: a directory, not a link, the reserved `(dev, ino)`, and empty? */
@@ -187,16 +189,17 @@ function removeOwnEmptyPlaceholder(placeholder, reserved) {
  * reserved with an exclusive `mkdir` and the rename lands on our own empty placeholder. The placeholder's identity is checked again immediately
  * before the rename (a directory, not a link, the reserved `(dev, ino)`, empty). The window that remains between that check and `rename(2)` is
  * ACCEPTED: only the same user can put something at the name inside it (a different user cannot touch our placeholder in a sticky temp root), and
- * the same user is not the threat this sweep guards against. A rename refused with ENOTEMPTY / EEXIST / EISDIR is the name taken after all. When
- * the rename fails the placeholder is removed — only while it is still our empty directory with the reserved identity.
- * `hooks.afterReserve(to, from)` is the test seam between the reservation and the rename.
+ * the same user is not the threat this sweep guards against. A rename refused with ENOTEMPTY / EEXIST / ENOTDIR is the name taken after all
+ * (EISDIR is the source that changed: it is thrown). When the rename fails the placeholder is removed — only while it is still our empty
+ * directory with the reserved identity. `hooks.afterReserve(to, from)` and `hooks.beforeRename(to, from)` are the test seams between the
+ * reservation and the pre-check, and between the pre-check and the rename.
  */
 function moveExclusively(from, to, hooks = {}) {
   if (process.platform === "win32") {
     try {
       fs.renameSync(from, to); // a directory rename onto an existing one fails here, so the move is exclusive by itself — unmeasured on Windows, which F9 settles
     } catch (error) {
-      if (TAKEN_CODES.has(error?.code)) return false;
+      if (TAKEN_CODES.has(error?.code) || identityOf(to) !== undefined) return false; // libuv answers EPERM (ERROR_ACCESS_DENIED) for a taken name: something at `to` is what says it
       throw error;
     }
     return true;
@@ -211,6 +214,7 @@ function moveExclusively(from, to, hooks = {}) {
   try {
     hooks.afterReserve?.(to, from);
     if (!isOwnEmptyPlaceholder(to, reserved)) return false; // not ours any more: never renamed onto, never removed
+    hooks.beforeRename?.(to, from);
     fs.renameSync(from, to);
     return true;
   } catch (error) {
@@ -440,8 +444,8 @@ function stampOf(tmp) {
  * taken BEFORE the listing, so a change after it always differs). An unreadable stamp or listing says "quarantined" for every name (fail
  * closed: the claim stays). Limit, accepted: a change inside the file system's timestamp tick that follows the stamp is not seen.
  */
-function quarantineLook(tmp, preserved, entries) {
-  let stamp = stampOf(tmp);
+function quarantineLook(tmp, preserved, entries, stamped) {
+  let stamp = stamped; // taken by the caller BEFORE it listed the root
   let names = quarantinedNames(entries.map((entry) => entry.name), preserved);
   let failed = false;
   return {
@@ -459,11 +463,6 @@ function quarantineLook(tmp, preserved, entries) {
       }
       return names.has(name) || preserved.some((entry) => entry.reason === "quarantine-conflict" && QUARANTINE.exec(path.basename(entry.path))?.[1] === name);
     },
-    /** Our own removal moved the root's stamp: take the new one, so it is not mistaken for somebody else's change. */
-    settled(before) {
-      if (before === stamp) stamp = stampOf(tmp);
-    },
-    stamp: () => stamp,
   };
 }
 
@@ -485,8 +484,9 @@ function isThere(folderPath) {
  */
 function sweepOrphanClaims(context) {
   const { tmp, now, minAgeMs, state, result, mine } = context;
+  const stamped = stampOf(tmp); // BEFORE the listing: whatever changes the root after this differs from the stamp
   const entries = fs.readdirSync(tmp, { withFileTypes: true });
-  const look = quarantineLook(tmp, result.preserved, entries);
+  const look = quarantineLook(tmp, result.preserved, entries, stamped);
   for (const dirent of entries) {
     if (!dirent.isFile() || !dirent.name.endsWith(OWNER_SUFFIX)) continue;
     const claim = path.join(tmp, dirent.name);
@@ -510,13 +510,21 @@ function sweepOrphanClaims(context) {
     try {
       context.hooks.beforeClaimRemoval?.(claim);
       if (isThere(folderPath) || look.has(path.basename(folderPath))) continue; // the folder came back, or a quarantine appeared, since the verdict: the claim stays
-      const before = look.stamp();
-      fs.rmSync(claim, { force: true });
-      look.settled(before);
+      fs.rmSync(claim, { force: true }); // the root's stamp moves: the next claim reads the directory again (orphans are rare, and a change of another process must not hide in our own)
       result.removed.push(claim);
     } catch (error) {
       result.errors.push(`claim ${claim}: ${messageOf(error)}`);
     }
+  }
+}
+
+/** `rmdir` of a quarantine that holds nothing (it refuses a folder with content): the reservation of a sweep killed before its rename. `true` when removed. */
+function removeEmptyReservation(quarantined) {
+  try {
+    fs.rmdirSync(quarantined);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -530,6 +538,7 @@ function restoreQuarantines(context) {
     if (!mine(quarantined) || !isAskablePid(found[2], context.platform)) continue; // another uid's, or a pid that is no process: the probe is never asked
     if (context.probe(Number(found[2]))?.state !== "dead") continue; // its renamer may still be working
     if (!pastWindow(quarantined, context.now, context.minAgeMs)) continue; // a renamer in another pid namespace has a pid this process cannot see: it is "dead" here and may be mid-delete
+    if (removeEmptyReservation(quarantined)) continue; // a placeholder a killed sweep reserved and never renamed onto: nothing to put back
     const original = path.join(tmp, found[1]);
     if (restoreOnto(quarantined, original, context.hooks)) result.listed.push(`notice: restored ${found[1]} from a quarantine a killed sweep left`);
     else context.report.keep(quarantined, "quarantine-conflict");
@@ -549,7 +558,7 @@ function step(result, label, run) {
 /**
  * Collect what a killed run left behind. `repo` is the repository whose worktrees this sweep may remove; `tmp` the
  * temp root; `probe` the liveness query (a seam for tests), asked at most once per pid; `mine` the kernel-owner question
- * (a seam: a second uid cannot be had in a test); `hooks.afterCapture` / `hooks.afterVerdict` / `hooks.afterRename` / `hooks.afterReserve` / `hooks.beforeClaimRemoval` (seams: a change between the
+ * (a seam: a second uid cannot be had in a test); `hooks.afterCapture` / `hooks.afterVerdict` / `hooks.afterRename` / `hooks.afterReserve(placeholder, source)` / `hooks.beforeRename(placeholder, source)` (both run on the quarantine move AND on a restore, where the arguments are `(original, quarantined)`) / `hooks.beforeClaimRemoval` (seams: a change between the
  * capture, the verdict and the removal). Never throws. `result.listed` holds the `foreign:` / `legacy:` / `unmarked:` lines.
  */
 export function sweepLeftovers({ repo, tmp = tempRoot(), now = Date.now(), minAgeMs = MIN_AGE_MS, probe = processProbe, mine = isMine, hooks = {}, platform = process.platform } = {}) {

@@ -146,6 +146,7 @@ test("11. the sweep keeps a dead-looking folder when its probe answers in the ol
 function quarantined(own, tmp, what, pidText) {
   const original = ownedDir(own, what, { parent: tmp });
   const quarantine = path.join(tmp, `.${path.basename(original)}.teststodelete-quarantine-${pidText}-0a1b2c3d`);
+  fs.writeFileSync(path.join(original, "content.txt"), "an empty quarantine is a killed sweep's reservation: removed, not restored\n");
   fs.renameSync(original, quarantine);
   fs.rmSync(`${original}.owner`); // no claim: the orphan-claim pass would ask the probe about the claim's own pid, which is not what this scenario counts
   return { original, quarantine };
