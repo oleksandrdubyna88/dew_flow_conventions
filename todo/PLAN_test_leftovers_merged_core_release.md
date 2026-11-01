@@ -209,7 +209,7 @@ cache or a process.
   - *Found while pinning.* wsl_care #182 also carries a test fix: `ActWindowsTests` dated its folder from the real clock while the host reads
     `FixedTimeProvider.DefaultNow` (2026-10-02), so from 2026-11-01 the folder was no longer older than "now" and the Windows leg previewed
     0 objects. The folder is now dated from `DefaultNow`. coai #936 merged before two CodeRabbit review-body notes were read; both were checked
-    afterwards, and the one doc figure they found is fixed in coai #938. Lesson kept: read the review bodies, not only the inline comments,
+    afterward, and the one doc figure they found is fixed in coai #938. Lesson kept: read the review bodies, not only the inline comments,
     before a merge.
 
 ## Build order
