@@ -481,6 +481,18 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
     stale "unmarked and old": the sweep never removes an unmarked folder, the Opus judge's note of the rollout re-review), and this entry.
   - **Release.** Rides the same promotion as the `raw-temp` baseline rule (P2 of the rollout); E2 and E5 pin that release before their
     first producer merges.
+  - **Plan gate 2026-11-01** (coai session `ba9ad4f1`, `proceed`; findings 0, 1, 3, 4 accepted, 2 rejected):
+    - [gate finding 0] What is left on Windows is safe to leave: every kind carries a unique name (owner token, pid, random hex), so no
+      later run reuses or depends on it. Test: a new run beside listed leftovers of every kind creates, uses and removes its own
+      resources normally.
+    - [gate findings 1, 3] The interim is not permanent. The Fix above stays scheduled with F9's Windows run, and the list-only gate may
+      be removed only when all three pass there: a caller-owned folder in the profile is removed; a foreign-SID folder in the profile is
+      listed untouched; an unreadable owner is listed untouched.
+    - [gate finding 4] This repository's CI has no Windows leg. After creds and coai pin the release, their Windows CI legs assert that
+      the wrapped sweep lists and removes nothing (a planted gone-owner folder survives): a criterion of E2.1 and of E5's producer.
+    - Rejected, finding 2 (fail `isMine` closed on Windows): every caller that changes the disk is inside `sweepLeftovers`, which the
+      gate covers; `readClaimText` and `readOwner` only read and also serve the disposal of a run's OWN fresh resource, which a closed
+      `isMine` would refuse. A consumer's wrapper never removes anything on `isMine` alone (the docs say so).
 
 ## F17 — The rename into quarantine can replace an existing empty directory (found 2026-10-31, the E3 and E4 ports)
 
