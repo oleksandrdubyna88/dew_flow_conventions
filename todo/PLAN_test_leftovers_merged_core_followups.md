@@ -493,6 +493,12 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
     - Rejected, finding 2 (fail `isMine` closed on Windows): every caller that changes the disk is inside `sweepLeftovers`, which the
       gate covers; `readClaimText` and `readOwner` only read and also serve the disposal of a run's OWN fresh resource, which a closed
       `isMine` would refuse. A consumer's wrapper never removes anything on `isMine` alone (the docs say so).
+- **Progress 2026-11-01 — the interim is BUILT (f885225, RED fc230b4); the Fix is STILL OPEN and rides with F9.** One `mutate` capability, decided once from `platform` in
+  `sweepLeftovers`; a verdict that says remove (`withheld`) and the quarantine pass become `unverified: <path> — the owner SID is not read on Windows (F16)`, so no
+  mutation runs in any phase and `removed` stays empty. RED observed: `tools/leftovers-sweep.test.mjs` `F16 (folder)`, `(claim)`, `(quarantine)`, `(worktree)` failed on the
+  removal (`removed` not empty, the paths changed), `F16 (new run)` on the leftovers removed by the first sweep, `F16 (run-tests)` on `removed 1` and no `unverified:` line.
+  Not done: the owner-SID read and both keys (the Fix above), the removal of the list-only gate (its three checks on F9's Windows run), the Windows CI legs of E2.1 and E5, the
+  release (P2). The tests run through the `platform` seam on Linux; no Windows machine ran them.
 
 ## F17 — The rename into quarantine can replace an existing empty directory (found 2026-10-31, the E3 and E4 ports)
 
