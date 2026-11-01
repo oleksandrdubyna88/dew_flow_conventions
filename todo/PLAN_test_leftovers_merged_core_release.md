@@ -186,7 +186,7 @@ cache or a process.
 
 - **What.** Owner decision of 2026-11-01 (the question consultant `3ba92abb` first, both rows): before coai (E5) and creds (E2) wrap
   the shipped Node reference, F17–F20 of the follow-ups plan are fixed here, merged, and released ONCE through the same promotion as R5
-  (the warning to the sessions that own open consumer pull requests first, then `promote-release.yml`, then `release-distance`). Every
+  (the warning to the sessions that own open consumer pull requests first, then `promote-release.yml`, then `release-distance`). The same release carries the split of `common/test-leftovers.md` into a core and a detail companion (owner decision 2026-11-01, consultant `e03cae48`), so coai's reviewers can see the core. Every
   consumer then bumps its pin to that release (a pin bump alone, as decided for R6). F16 (the Windows owner SID) stays open: Node cannot
   read a SID without a native addon or a child process.
 - **Also decided 2026-11-01.** The C# helper of E3 gains a Darwin path (lstat with the symbol per CPU, a `kill(pid, 0)` probe, no start
@@ -200,7 +200,8 @@ cache or a process.
 
 ## Build order
 
-R1 ∥ R2 → R3 → R5 → R6, with R4 running beside R1–R3 and finishing before R5. Nothing is built: each item is a run, a record, a merge or a
+R1 ∥ R2 → R3 → R5 → R6 (sweep-only stages; producer stages except E5 and E2), then R7 (F17–F20 and the core split merged on `main`,
+one promotion, the pin bumps) and the Darwin path in dew_flow_mcp → the producer stages of E5 and E2. R4 running beside R1–R3 and finishing before R5. Nothing is built: each item is a run, a record, a merge or a
 dispatch.
 
 ## Test plan
@@ -227,5 +228,7 @@ checkout of the PR's branch. Their outcome is recorded by hand; the scan itself 
 - [x] R4: the private sibling's confirmation exists (both spans byte-identical; the two consumer files copied with their sha256 pinned).
 - [x] R5: the warning went to the sessions with open consumer pull requests; `release` promoted once; `release-distance` 0.
 - [ ] R6: every sweep-only stage merged before any producer stage; the rollout plan's Definition of Done met.
-- [ ] R7: F17–F20 released once; every consumer pinned to that release.
+- [ ] R7: F17–F20 and the test-leftovers core split released once; every consumer pinned to that release (each pin bump merges alone, after the
+      release and before that consumer's producer stage).
+- [ ] The Darwin path of the C# helper: measured on a macOS CI leg and merged in dew_flow_mcp before E5 and E2 copy the helper.
 - [ ] This plan is promoted to `research/` with its deviations, or deleted with a recorded reason, when R6 is done; its row in `todo/README.md` goes with it.
