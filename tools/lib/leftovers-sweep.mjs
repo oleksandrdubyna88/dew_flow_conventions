@@ -235,7 +235,7 @@ function moveToQuarantine(dir, hooks) {
     const quarantine = quarantineName(dir);
     if (moveExclusively(dir, quarantine, hooks)) return quarantine;
   }
-  throw new Error(`no free quarantine name in ${QUARANTINE_DRAWS} draws — the folder is kept`);
+  throw new Error(`cannot move ${dir} into quarantine: no free name in ${QUARANTINE_DRAWS} draws — the folder is kept`);
 }
 
 /**
@@ -425,24 +425,68 @@ function quarantinedNames(names, preserved) {
   return originals;
 }
 
-/** A fresh look: does a quarantine of `name` sit in the temp root now? A directory that cannot be listed says yes (fail closed: the claim stays). */
-function isQuarantinedNow(tmp, name, preserved) {
+/** `tmp`'s modification and change times in ns, or `undefined` when it cannot be read. A rename into or out of the root moves both. */
+function stampOf(tmp) {
   try {
-    return quarantinedNames(fs.readdirSync(tmp), preserved).has(name);
+    const stat = fs.statSync(tmp, { bigint: true });
+    return `${stat.mtimeNs}:${stat.ctimeNs}`;
   } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The quarantine names of the temp root, listed once and read again only when the root's mtime or ctime moved since that listing (the stamp is
+ * taken BEFORE the listing, so a change after it always differs). An unreadable stamp or listing says "quarantined" for every name (fail
+ * closed: the claim stays). Limit, accepted: a change inside the file system's timestamp tick that follows the stamp is not seen.
+ */
+function quarantineLook(tmp, preserved, entries) {
+  let stamp = stampOf(tmp);
+  let names = quarantinedNames(entries.map((entry) => entry.name), preserved);
+  let failed = false;
+  return {
+    has(name) {
+      const now = stampOf(tmp);
+      if (failed || now === undefined || now !== stamp) {
+        stamp = now;
+        try {
+          names = quarantinedNames(fs.readdirSync(tmp), preserved);
+          failed = false;
+        } catch {
+          failed = true;
+          return true;
+        }
+      }
+      return names.has(name) || preserved.some((entry) => entry.reason === "quarantine-conflict" && QUARANTINE.exec(path.basename(entry.path))?.[1] === name);
+    },
+    /** Our own removal moved the root's stamp: take the new one, so it is not mistaken for somebody else's change. */
+    settled(before) {
+      if (before === stamp) stamp = stampOf(tmp);
+    },
+    stamp: () => stamp,
+  };
+}
+
+/** Is `folderPath` there (the entry itself, a link not followed)? Anything but ENOENT counts as there. */
+function isThere(folderPath) {
+  try {
+    fs.lstatSync(folderPath);
     return true;
+  } catch (error) {
+    return error?.code !== "ENOENT";
   }
 }
 
 /**
  * A claim whose folder is not at its name. That is an orphan only when no quarantine holds the folder: a LIVE sweep (another process) that has
  * moved it aside leaves no folder at the name for that moment, and the claim it still needs must stay — the snapshot of this pass says so, and a
- * fresh look immediately before the deletion says so again.
+ * fresh look immediately before the deletion says so again: the folder is still absent AND no quarantine of the name exists (the root is listed
+ * again only when its stamps moved). The window that remains between that look and `rmSync` is ACCEPTED: only the same user can use it.
  */
 function sweepOrphanClaims(context) {
   const { tmp, now, minAgeMs, state, result, mine } = context;
   const entries = fs.readdirSync(tmp, { withFileTypes: true });
-  const quarantined = quarantinedNames(entries.map((entry) => entry.name), result.preserved);
+  const look = quarantineLook(tmp, result.preserved, entries);
   for (const dirent of entries) {
     if (!dirent.isFile() || !dirent.name.endsWith(OWNER_SUFFIX)) continue;
     const claim = path.join(tmp, dirent.name);
@@ -453,7 +497,7 @@ function sweepOrphanClaims(context) {
       context.report.foreign("claim", claim, related.nameOwner);
       continue;
     }
-    if (quarantined.has(path.basename(folderPath))) continue; // its folder sits in a quarantine: not an orphan, nothing is listed
+    if (look.has(path.basename(folderPath))) continue; // its folder sits in a quarantine: not an orphan, nothing is listed
     // A claim with no folder is what a helper that claims FIRST leaves when it dies between the claim and the create. It is a
     // claim like any other: its owner decides — gone removes it; live, foreign, unknown and unreadable keep it.
     const verdict = related.relation === "legacy"
@@ -465,8 +509,10 @@ function sweepOrphanClaims(context) {
     }
     try {
       context.hooks.beforeClaimRemoval?.(claim);
-      if (isQuarantinedNow(tmp, path.basename(folderPath), result.preserved)) continue; // a quarantine appeared since the snapshot
+      if (isThere(folderPath) || look.has(path.basename(folderPath))) continue; // the folder came back, or a quarantine appeared, since the verdict: the claim stays
+      const before = look.stamp();
       fs.rmSync(claim, { force: true });
+      look.settled(before);
       result.removed.push(claim);
     } catch (error) {
       result.errors.push(`claim ${claim}: ${messageOf(error)}`);

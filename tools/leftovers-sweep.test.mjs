@@ -788,7 +788,7 @@ test("16f. five taken names in a row keep the folder where it is, with one error
   for (const taken of planted) { fs.mkdirSync(taken); own.after(() => fs.rmSync(taken, { recursive: true, force: true })); }
   const result = withDrawnSuffixes(hexes, () => sweepLeftovers({ repo, tmp, probe: deadProbe }));
   assert.equal(result.errors.length, 1, JSON.stringify(result.errors));
-  assert.match(result.errors[0], /quarantine/);
+  assert.match(result.errors[0], new RegExp(`cannot move ${victim.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} into quarantine: no free name in 5 draws — the folder is kept`));
   assert.deepEqual(result.removed, []);
   assert.ok(fs.existsSync(victim), "the folder stays under its own name");
   assert.ok(fs.existsSync(`${victim}.owner`), "and keeps its claim");
@@ -883,6 +883,65 @@ test("16k. the claim of a quarantine that stays `quarantine-conflict` is kept (F
   assert.ok(result.preserved.some((entry) => entry.path === quarantine && entry.reason === "quarantine-conflict"), JSON.stringify(result.preserved));
   assert.ok(fs.existsSync(`${victim}.owner`), "its claim is not an orphan's");
   assert.deepEqual(result.removed, []);
+});
+
+test("16l. a folder restored under its name between the verdict and the claim removal keeps the claim (F19 round 1: the folder is looked at again)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f19-back-repo");
+  const victim = folder(own, tmp, "f19-back", { claim: deadOwnerLine() });
+  setOld(`${victim}.owner`);
+  const aside = path.join(work, "back-aside");
+  fs.renameSync(victim, aside); // no folder at the name, no quarantine: a real orphan at the snapshot
+  const hooks = { beforeClaimRemoval: () => fs.renameSync(aside, victim) }; // the folder comes back under its own name
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, hooks });
+  assert.ok(fs.existsSync(`${victim}.owner`), "its folder is there again: the claim is its claim");
+  assert.ok(fs.existsSync(victim));
+  assert.deepEqual(result.removed, []);
+  assert.deepEqual(result.listed, []);
+  assert.deepEqual(result.errors, []);
+});
+
+/** How many times `fs.readdirSync(dir)` is called while `fn` runs. */
+function countListings(dir, fn) {
+  let calls = 0;
+  const original = fsDefault.readdirSync;
+  fsDefault.readdirSync = (target, ...rest) => { if (path.resolve(String(target)) === path.resolve(dir)) calls += 1; return original(target, ...rest); };
+  syncBuiltinESMExports();
+  try { fn(); } finally { fsDefault.readdirSync = original; syncBuiltinESMExports(); }
+  return calls;
+}
+
+test("16m. orphan claims do not each re-list the temp root: the listing is read again only when the root's mtime or ctime moved (F19 round 1)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f19-count-repo");
+  const base = countListings(tmp, () => sweepLeftovers({ repo, tmp, probe: deadProbe }));
+  const names = ["a", "b", "c", "d", "e"].map((what) => path.join(tmp, ownedName(`f19-count-${what}`)));
+  for (const name of names) { fs.writeFileSync(`${name}.owner`, deadOwnerLine()); setOld(`${name}.owner`); }
+  let result;
+  const calls = countListings(tmp, () => { result = sweepLeftovers({ repo, tmp, probe: deadProbe }); });
+  assert.equal(result.removed.length, 5, "all five orphans went");
+  assert.equal(calls, base, `${calls} listings for five orphan claims, ${base} for none`);
+});
+
+test("16n. a quarantine that appears between two claims makes the next claim re-read the root and keeps that claim (F19 round 1)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f19-between-repo");
+  const names = ["a", "b"].map((what) => path.join(tmp, ownedName(`f19-between-${what}`)));
+  for (const name of names) { fs.writeFileSync(`${name}.owner`, deadOwnerLine()); setOld(`${name}.owner`); }
+  const [first, second] = fs.readdirSync(tmp).filter((n) => n.endsWith(".owner")).sort().map((n) => path.join(tmp, n.slice(0, -6)));
+  const quarantine = quarantineAs(tmp, second, "0a1b2c3d");
+  let fired = false;
+  const hooks = { beforeClaimRemoval: (claim) => { // runs once per claim, before its own check: plant the quarantine of the SECOND claim while the FIRST is checked
+    if (fired || claim !== `${first}.owner`) return;
+    fired = true;
+    fs.mkdirSync(quarantine);
+  } };
+  own.after(() => fs.rmSync(quarantine, { recursive: true, force: true }));
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, hooks });
+  assert.equal(fired, true);
+  assert.deepEqual(result.removed, [`${first}.owner`]);
+  assert.ok(fs.existsSync(`${second}.owner`), "the second claim's folder sits in a quarantine that appeared after the snapshot");
+  assert.deepEqual(result.errors, []);
 });
 
 // 17 --------------------------------------------------------------------------------------------------------
