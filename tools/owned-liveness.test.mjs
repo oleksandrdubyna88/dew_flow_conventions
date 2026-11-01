@@ -17,8 +17,8 @@ import * as path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { sweepLeftovers } from "./lib/leftovers-sweep.mjs";
-import { cleanupScope, formatOwner, ownedDir, ownerState, parseLegacyOwner, parseOwner, processProbe, runRecord, thisOwner } from "./lib/owned.mjs";
+import { sweepLeftovers, MIN_AGE_MS } from "./lib/leftovers-sweep.mjs";
+import { cleanupScope, formatOwner, isAskablePid, ownedDir, ownerState, parseLegacyOwner, parseOwner, processProbe, runRecord, thisOwner } from "./lib/owned.mjs";
 
 const HOUR = 3_600_000;
 const BAD_PIDS = [0, -1, -4242, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 60, "4242", null, undefined];
@@ -138,6 +138,56 @@ test("11. the sweep keeps a dead-looking folder when its probe answers in the ol
 
   const dead = sweepLeftovers({ repo, tmp, probe: () => ({ state: "dead" }) });
   assert.equal(fs.existsSync(kept), false, JSON.stringify(dead));
+});
+
+// --- F18: the quarantine pass asks the probe only about a pid that can be asked --------------------------------
+
+/** A quarantine of an owned folder, named as a sweep that died would have left it: `-<pid text>-` is the renamer. Returns `{ original, quarantine }`. */
+function quarantined(own, tmp, what, pidText) {
+  const original = ownedDir(own, what, { parent: tmp });
+  const quarantine = path.join(tmp, `.${path.basename(original)}.teststodelete-quarantine-${pidText}-0a1b2c3d`);
+  fs.writeFileSync(path.join(original, "content.txt"), "an empty quarantine is a killed sweep's reservation: removed, not restored\n");
+  fs.renameSync(original, quarantine);
+  fs.rmSync(`${original}.owner`); // no claim: the orphan-claim pass would ask the probe about the claim's own pid, which is not what this scenario counts
+  return { original, quarantine };
+}
+
+test("F18a. isAskablePid: canonical digits, 1 to 2^53-1, and on Windows never 1", () => {
+  for (const text of ["1", "4242", "9007199254740991"]) assert.equal(isAskablePid(text, "linux"), true, text);
+  for (const text of ["0", "007", "01", "-1", "+5", "1.5", "1e3", "", " 1", "1 ", "٣", "9007199254740992", "9007199254740993", "99999999999999999999", 4242, null, undefined]) {
+    assert.equal(isAskablePid(text, "linux"), false, String(text));
+  }
+  assert.equal(isAskablePid("1", "win32"), false, "Windows has no pid 1");
+  assert.equal(isAskablePid("2", "win32"), true);
+  assert.equal(isAskablePid("1"), process.platform !== "win32", "the default platform is this process's");
+});
+
+test("F18. a quarantine named with a pid that cannot be asked (0, a leading zero, past 2^53, Windows pid 1) stays, and the probe is never called; a pid that can be asked is", (t) => {
+  const own = lifo(t);
+  const tmp = ownedDir(own, "f18-tmp");
+  const repo = ownedDir(own, "f18-repo");
+  const asked = [];
+  const sayingDead = (pid) => { asked.push(pid); return { state: "dead" }; };
+  const later = Date.now() + 2 * MIN_AGE_MS; // both stamps of the quarantines are past the window
+  const unaskable = [["f18-zero", "0"], ["f18-leading", "007"], ["f18-huge", "9007199254740993"]].map(([what, pid]) => ({ ...quarantined(own, tmp, what, pid), pid }));
+  sweepLeftovers({ repo, tmp, probe: sayingDead, now: later }); // `repo` is no repository: the worktree step errors, and the quarantine step is the first
+  for (const { original, quarantine, pid } of unaskable) {
+    assert.ok(fs.existsSync(quarantine), `-${pid}- stays in quarantine`);
+    assert.equal(fs.existsSync(original), false, `-${pid}- is not restored`);
+  }
+  assert.deepEqual(asked, [], "no probe call for an unaskable pid");
+
+  const windows = quarantined(own, tmp, "f18-win1", "1");
+  sweepLeftovers({ repo, tmp, probe: sayingDead, now: later, platform: "win32" });
+  assert.ok(fs.existsSync(windows.quarantine), "Windows has no pid 1");
+  assert.equal(fs.existsSync(windows.original), false);
+  assert.deepEqual(asked, []);
+  fs.rmSync(windows.quarantine, { recursive: true }); // pid 1 is askable on a POSIX platform; the next sweep runs there
+
+  const fine = quarantined(own, tmp, "f18-fine", "4242");
+  sweepLeftovers({ repo, tmp, probe: sayingDead, now: later });
+  assert.equal(fs.existsSync(fine.original), true, "an askable pid whose process is gone is restored as before");
+  assert.deepEqual(asked, [4242]);
 });
 
 // --- the sweep seam must not change what REPO_ROOT means (finding 22) ----------------------------------------

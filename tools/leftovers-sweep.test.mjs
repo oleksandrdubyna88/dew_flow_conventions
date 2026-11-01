@@ -14,6 +14,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import cryptoDefault from "node:crypto";
 import fsDefault from "node:fs";
 import * as fs from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
@@ -22,7 +23,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { git } from "./lib/git.mjs";
-import { sweepLeftovers, MIN_AGE_MS } from "./lib/leftovers-sweep.mjs";
+import { sweepLeftovers, isTakenRename, MIN_AGE_MS } from "./lib/leftovers-sweep.mjs";
 import {
   cleanupScope, formatLegacyOwner, formatOwner, gitdirOf, ownedDir, ownedName, ownedWorktree, processProbe, removeQuietly, thisOwner, thisOwnerToken,
 } from "./lib/owned.mjs";
@@ -106,6 +107,22 @@ function worktree(own, repo, tmp, what, { claim, young = false } = {}) {
   if (!young) setOld(wt.path);
   return wt.path;
 }
+
+/** Run `fn` with `crypto.randomBytes(4)` drawing `hexes` in turn (every other call untouched): the quarantine names are known in advance. */
+function withDrawnSuffixes(hexes, fn) {
+  const original = cryptoDefault.randomBytes;
+  const queue = [...hexes];
+  cryptoDefault.randomBytes = (size, ...rest) => (size === 4 && queue.length > 0 ? Buffer.from(queue.shift(), "hex") : original(size, ...rest));
+  syncBuiltinESMExports();
+  try {
+    return fn();
+  } finally {
+    cryptoDefault.randomBytes = original;
+    syncBuiltinESMExports();
+  }
+}
+
+const quarantineAs = (tmp, victim, hex) => path.join(tmp, `.${path.basename(victim)}.teststodelete-quarantine-${process.pid}-${hex}`);
 
 const listed = (repo) => git(repo, "worktree", "list", "--porcelain").split(/\r?\n/)
   .filter((line) => line.startsWith("worktree ")).map((line) => path.resolve(line.slice(9)).toLowerCase());
@@ -712,6 +729,7 @@ test("16c. a YOUNG quarantine is not restored although its renamer looks dead (a
   const repo = ownedRepo(own, work, "q-young-repo");
   const name = path.basename(folder(own, tmp, "q-young", { claim: formatOwner(thisOwner()) + "\n" }));
   const quarantine = path.join(tmp, `.${name}.teststodelete-quarantine-${PRETEND_DEAD}-0a1b2c3d`);
+  fs.writeFileSync(path.join(path.join(tmp, name), "content.txt"), "an empty quarantine is a reservation and is removed, not restored\n");
   fs.renameSync(path.join(tmp, name), quarantine); // renamed just now: ctime and mtime are now
   const young = sweepLeftovers({ repo, tmp, probe: deadProbe });
   assert.ok(fs.existsSync(quarantine), "a rename younger than the window may be another janitor's, still deleting");
@@ -728,7 +746,10 @@ test("16d. a restore that fails after the name was reserved removes its own empt
   const repo = ownedRepo(own, work, "q-placeholder-repo");
   const quarantineOf = (name) => path.join(tmp, `.${name}.teststodelete-quarantine-${PRETEND_DEAD}-0a1b2c3d`);
   const names = ["q-ph-empty", "q-ph-filled"].map((what) => path.basename(folder(own, tmp, what, { claim: formatOwner(thisOwner()) + "\n" })));
-  for (const name of names) fs.renameSync(path.join(tmp, name), quarantineOf(name));
+  for (const name of names) {
+    fs.writeFileSync(path.join(tmp, name, "content.txt"), "not empty: restored, never removed as a reservation\n");
+    fs.renameSync(path.join(tmp, name), quarantineOf(name));
+  }
   const hooks = {
     afterReserve: (original, quarantined) => {
       if (original.endsWith(names[0])) { fs.rmSync(quarantined, { recursive: true }); fs.writeFileSync(quarantined, "not a folder\n"); } // the rename onto the placeholder now fails (ENOTDIR)
@@ -742,6 +763,288 @@ test("16d. a restore that fails after the name was reserved removes its own empt
   assert.equal(fs.readFileSync(path.join(tmp, names[1], "theirs.txt"), "utf8"), "put there since\n", "a placeholder with something in it is never touched");
   assert.ok(fs.existsSync(quarantineOf(names[1])));
   for (const name of names) assert.ok(result.preserved.some((entry) => entry.path === quarantineOf(name) && entry.reason === "quarantine-conflict"), `${name} stays listed: ${JSON.stringify(result.preserved)}`);
+});
+
+// 16e-16h (F17: the move into quarantine never lands on something that is already there) ---------------------------
+
+test("16e. an empty directory at the drawn quarantine name survives the sweep, and the folder is quarantined under a fresh name (F17)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f17-taken-repo");
+  const victim = folder(own, tmp, "f17-taken", { claim: deadOwnerLine() });
+  const taken = quarantineAs(tmp, victim, "aaaaaaaa");
+  fs.mkdirSync(taken); // appeared at the drawn name: rename(2) would replace an EMPTY directory
+  const before = fs.lstatSync(taken, { bigint: true });
+  const result = withDrawnSuffixes(["aaaaaaaa", "bbbbbbbb"], () => sweepLeftovers({ repo, tmp, probe: deadProbe }));
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.removed, [victim], "removed through the second draw");
+  const after = fs.lstatSync(taken, { bigint: true });
+  assert.equal(after.ino, before.ino, "the directory that was there is the same directory");
+  assert.equal(fs.existsSync(quarantineAs(tmp, victim, "bbbbbbbb")), false);
+  own.after(() => fs.rmSync(taken, { recursive: true, force: true }));
+});
+
+test("16f. five taken names in a row keep the folder where it is, with one error, and destroy nothing (F17)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f17-five-repo");
+  const victim = folder(own, tmp, "f17-five", { claim: deadOwnerLine() });
+  const hexes = ["a1a1a1a1", "a2a2a2a2", "a3a3a3a3", "a4a4a4a4", "a5a5a5a5"];
+  const planted = hexes.map((hex) => quarantineAs(tmp, victim, hex));
+  for (const taken of planted) { fs.mkdirSync(taken); own.after(() => fs.rmSync(taken, { recursive: true, force: true })); }
+  const result = withDrawnSuffixes(hexes, () => sweepLeftovers({ repo, tmp, probe: deadProbe }));
+  assert.equal(result.errors.length, 1, JSON.stringify(result.errors));
+  assert.match(result.errors[0], new RegExp(`cannot move ${victim.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} into quarantine: no free name in 5 draws — the folder is kept`));
+  assert.deepEqual(result.removed, []);
+  assert.ok(fs.existsSync(victim), "the folder stays under its own name");
+  assert.ok(fs.existsSync(`${victim}.owner`), "and keeps its claim");
+  for (const taken of planted) assert.ok(fs.existsSync(taken), `${path.basename(taken)} was not replaced`);
+});
+
+test("16g. a placeholder somebody filled right after the reservation is left as theirs (the pre-check refuses it), and the folder is quarantined under a fresh name (F17)", (t) => {
+  if (win32) { t.skip("the placeholder is a POSIX reservation"); return; }
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f17-filled-repo");
+  const victim = folder(own, tmp, "f17-filled", { claim: deadOwnerLine() });
+  const first = quarantineAs(tmp, victim, "c1c1c1c1");
+  let fired = 0;
+  const hooks = { afterReserve: (placeholder) => { if (placeholder === first) { fired += 1; fs.writeFileSync(path.join(placeholder, "theirs.txt"), "put there since\n"); } } };
+  const result = withDrawnSuffixes(["c1c1c1c1", "c2c2c2c2"], () => sweepLeftovers({ repo, tmp, probe: deadProbe, hooks }));
+  own.after(() => fs.rmSync(first, { recursive: true, force: true }));
+  assert.equal(fired, 1, "the quarantine move reserved its name");
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.removed, [victim]);
+  assert.equal(fs.readFileSync(path.join(first, "theirs.txt"), "utf8"), "put there since\n", "a filled placeholder is never removed");
+});
+
+test("16h. a placeholder swapped for another empty directory is never renamed onto and never removed (F17: the identity is re-checked)", (t) => {
+  if (win32) { t.skip("the placeholder is a POSIX reservation"); return; }
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f17-swapped-repo");
+  const victim = folder(own, tmp, "f17-swapped", { claim: deadOwnerLine() });
+  const first = quarantineAs(tmp, victim, "d1d1d1d1");
+  const aside = path.join(work, "swapped-aside");
+  let theirs;
+  const hooks = {
+    afterReserve: (placeholder) => {
+      if (placeholder !== first) return;
+      fs.renameSync(placeholder, aside); // our placeholder goes away (its inode lives on, so the next one differs)…
+      fs.mkdirSync(placeholder); // …and an empty directory that is not ours takes the name
+      theirs = fs.lstatSync(placeholder, { bigint: true });
+    },
+  };
+  const result = withDrawnSuffixes(["d1d1d1d1", "d2d2d2d2"], () => sweepLeftovers({ repo, tmp, probe: deadProbe, hooks }));
+  own.after(() => { fs.rmSync(first, { recursive: true, force: true }); fs.rmSync(aside, { recursive: true, force: true }); });
+  assert.notEqual(theirs, undefined, "the quarantine move reserved its name");
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.removed, [victim], "removed through the second draw");
+  assert.equal(fs.lstatSync(first, { bigint: true }).ino, theirs.ino, "the directory that took the name is still there, untouched");
+});
+
+// 16i-16k (F19: the claim of a folder that sits in a quarantine is not an orphan's) ----------------------------------
+
+test("16i. the claim of a folder that a live renamer holds in a quarantine is kept, and nothing is listed for it (F19)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f19-live-repo");
+  const victim = folder(own, tmp, "f19-live", { claim: deadOwnerLine() });
+  setOld(`${victim}.owner`);
+  const quarantine = quarantineAs(tmp, victim, "0a1b2c3d"); // this process is the renamer: alive, so the quarantine is not restored
+  fs.renameSync(victim, quarantine); // no folder at the name for the moment the sweep looks at its claim
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe });
+  assert.ok(fs.existsSync(`${victim}.owner`), "the claim is still there for the restore or the removal that follows");
+  assert.ok(fs.existsSync(quarantine));
+  assert.deepEqual(result.removed, []);
+  assert.deepEqual(result.preserved, []);
+  assert.deepEqual(result.listed, []);
+  assert.deepEqual(result.errors, []);
+});
+
+test("16j. a quarantine that appears after the pass's snapshot, before the claim is removed, keeps the claim (F19: a fresh check before the deletion)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f19-fresh-repo");
+  const victim = folder(own, tmp, "f19-fresh", { claim: deadOwnerLine() });
+  setOld(`${victim}.owner`);
+  const aside = path.join(work, "fresh-aside");
+  fs.renameSync(victim, aside); // no folder, no quarantine yet: a real orphan at the snapshot
+  const quarantine = quarantineAs(tmp, victim, "0a1b2c3d");
+  let asked = 0;
+  const hooks = { beforeClaimRemoval: () => { asked += 1; fs.renameSync(aside, quarantine); } }; // a live sweep moves the folder in after the snapshot
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, hooks });
+  own.after(() => removeQuietly(quarantine));
+  assert.equal(asked, 1, "the claim was about to be removed");
+  assert.ok(fs.existsSync(`${victim}.owner`), "the fresh look found the quarantine");
+  assert.deepEqual(result.removed, []);
+  assert.deepEqual(result.errors, []);
+});
+
+test("16k. the claim of a quarantine that stays `quarantine-conflict` is kept (F19)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f19-conflict-repo");
+  const victim = folder(own, tmp, "f19-conflict", { claim: deadOwnerLine() });
+  setOld(`${victim}.owner`);
+  const quarantine = path.join(tmp, `.${path.basename(victim)}.teststodelete-quarantine-${PRETEND_DEAD}-0a1b2c3d`);
+  fs.writeFileSync(path.join(victim, "content.txt"), "not empty\n");
+  fs.renameSync(victim, quarantine); // a killed sweep's quarantine
+  const hooks = { afterReserve: (original, quarantined) => { fs.rmSync(quarantined, { recursive: true }); fs.writeFileSync(quarantined, "not a folder\n"); } }; // the restore fails: the quarantine stays
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, now: Date.now() + 2 * MIN_AGE_MS, hooks });
+  assert.ok(result.preserved.some((entry) => entry.path === quarantine && entry.reason === "quarantine-conflict"), JSON.stringify(result.preserved));
+  assert.ok(fs.existsSync(`${victim}.owner`), "its claim is not an orphan's");
+  assert.deepEqual(result.removed, []);
+});
+
+test("16l. a folder restored under its name between the verdict and the claim removal keeps the claim (F19 round 1: the folder is looked at again)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f19-back-repo");
+  const victim = folder(own, tmp, "f19-back", { claim: deadOwnerLine() });
+  setOld(`${victim}.owner`);
+  const aside = path.join(work, "back-aside");
+  fs.renameSync(victim, aside); // no folder at the name, no quarantine: a real orphan at the snapshot
+  const hooks = { beforeClaimRemoval: () => fs.renameSync(aside, victim) }; // the folder comes back under its own name
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, hooks });
+  assert.ok(fs.existsSync(`${victim}.owner`), "its folder is there again: the claim is its claim");
+  assert.ok(fs.existsSync(victim));
+  assert.deepEqual(result.removed, []);
+  assert.deepEqual(result.listed, []);
+  assert.deepEqual(result.errors, []);
+});
+
+/** How many times `fs.readdirSync(dir)` is called while `fn` runs. */
+function countListings(dir, fn) {
+  let calls = 0;
+  const original = fsDefault.readdirSync;
+  fsDefault.readdirSync = (target, ...rest) => { if (path.resolve(String(target)) === path.resolve(dir)) calls += 1; return original(target, ...rest); };
+  syncBuiltinESMExports();
+  try { fn(); } finally { fsDefault.readdirSync = original; syncBuiltinESMExports(); }
+  return calls;
+}
+
+test("16m. orphan claims do not each re-list the temp root: the listing is read again only when the root's mtime or ctime moved (F19 round 1)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f19-count-repo");
+  const base = countListings(tmp, () => sweepLeftovers({ repo, tmp, probe: deadProbe }));
+  const names = ["a", "b", "c", "d", "e"].map((what) => path.join(tmp, ownedName(`f19-count-${what}`)));
+  for (const name of names) { fs.writeFileSync(`${name}.owner`, deadOwnerLine()); setOld(`${name}.owner`); }
+  let result;
+  const calls = countListings(tmp, () => { result = sweepLeftovers({ repo, tmp, probe: deadProbe }); });
+  assert.equal(result.removed.length, 5, "all five orphans went");
+  assert.ok(calls <= base + result.removed.length - 1, `${calls} listings for five removed orphan claims, ${base} for none: at most one per removed claim after the first`);
+});
+
+test("16n. a quarantine that appears between two claims makes the next claim re-read the root and keeps that claim (F19 round 1)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f19-between-repo");
+  const names = ["a", "b"].map((what) => path.join(tmp, ownedName(`f19-between-${what}`)));
+  for (const name of names) { fs.writeFileSync(`${name}.owner`, deadOwnerLine()); setOld(`${name}.owner`); }
+  const quarantines = [];
+  let checked; // the claim whose check ran first, whichever the directory order made it
+  const hooks = { beforeClaimRemoval: (claim) => { // runs once per claim, before its own check: plant the quarantine of the OTHER claim on the first call
+    if (checked !== undefined) return;
+    checked = claim;
+    const other = names.find((name) => `${name}.owner` !== claim);
+    const quarantine = quarantineAs(tmp, other, "0a1b2c3d");
+    quarantines.push(quarantine);
+    fs.mkdirSync(quarantine);
+  } };
+  own.after(() => { for (const quarantine of quarantines) fs.rmSync(quarantine, { recursive: true, force: true }); });
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, hooks });
+  assert.notEqual(checked, undefined);
+  const other = names.find((name) => `${name}.owner` !== checked);
+  assert.deepEqual(result.removed, [checked]);
+  assert.ok(fs.existsSync(`${other}.owner`), "the other claim's folder sits in a quarantine that appeared after the snapshot");
+  assert.deepEqual(result.errors, []);
+});
+
+test("16g2. a placeholder filled between the pre-check and the rename: rename(2) says ENOTEMPTY, which is a taken name — the placeholder is theirs, a new name is drawn (F17)", (t) => {
+  if (win32) { t.skip("the placeholder is a POSIX reservation"); return; }
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f17-late-repo");
+  const victim = folder(own, tmp, "f17-late", { claim: deadOwnerLine() });
+  const first = quarantineAs(tmp, victim, "e1e1e1e1");
+  let fired = 0;
+  const hooks = { beforeRename: (placeholder) => { if (placeholder === first) { fired += 1; fs.writeFileSync(path.join(placeholder, "theirs.txt"), "put there since\n"); } } };
+  const result = withDrawnSuffixes(["e1e1e1e1", "e2e2e2e2"], () => sweepLeftovers({ repo, tmp, probe: deadProbe, hooks }));
+  own.after(() => fs.rmSync(first, { recursive: true, force: true }));
+  assert.equal(fired, 1);
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.removed, [victim], "removed through the second draw");
+  assert.equal(fs.readFileSync(path.join(first, "theirs.txt"), "utf8"), "put there since\n");
+});
+
+test("16g3. a placeholder replaced by a FILE after the pre-check: ENOTDIR is a taken name (a new name is drawn, the file is theirs); EISDIR means the SOURCE changed and is an error, not a draw (F17)", (t) => {
+  if (win32) { t.skip("the placeholder is a POSIX reservation"); return; }
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f17-codes-repo");
+  const taken = folder(own, tmp, "f17-enotdir", { claim: deadOwnerLine() });
+  const first = quarantineAs(tmp, taken, "f1f1f1f1");
+  const hooks = { beforeRename: (placeholder) => { if (placeholder === first) { fs.rmdirSync(placeholder); fs.writeFileSync(placeholder, "a file took the name\n"); } } };
+  const one = withDrawnSuffixes(["f1f1f1f1", "f2f2f2f2"], () => sweepLeftovers({ repo, tmp, probe: deadProbe, hooks }));
+  own.after(() => fs.rmSync(first, { force: true }));
+  assert.deepEqual(one.errors, []);
+  assert.deepEqual(one.removed, [taken]);
+  assert.equal(fs.readFileSync(first, "utf8"), "a file took the name\n");
+
+  const changed = folder(own, tmp, "f17-eisdir", { claim: deadOwnerLine() });
+  const second = quarantineAs(tmp, changed, "f3f3f3f3");
+  const swap = { beforeRename: (placeholder, from) => { if (placeholder === second) { fs.rmSync(from, { recursive: true }); fs.writeFileSync(from, "the source is a file now\n"); } } };
+  const two = withDrawnSuffixes(["f3f3f3f3", "f4f4f4f4"], () => sweepLeftovers({ repo, tmp, probe: deadProbe, hooks: swap }));
+  assert.equal(two.errors.length, 1, JSON.stringify(two.errors));
+  assert.match(two.errors[0], /EISDIR/);
+  assert.deepEqual(two.removed, []);
+  assert.equal(fs.existsSync(second), false, "our own empty placeholder is removed");
+  assert.equal(fs.existsSync(quarantineAs(tmp, changed, "f4f4f4f4")), false, "no second draw: the source changed, the name was not taken");
+  fs.rmSync(changed, { force: true });
+});
+
+test("16g4. an EMPTY quarantine of a dead renamer whose original name EXISTS is a killed sweep's reservation: removed past the window with one notice, never restored (F17)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f17-empty-repo");
+  const original = folder(own, tmp, "f17-empty-q", { claim: formatOwner(thisOwner()) + "\n" }); // a live claim: the folder is not this sweep's to take
+  const quarantine = path.join(tmp, `.${path.basename(original)}.teststodelete-quarantine-${PRETEND_DEAD}-0a1b2c3d`);
+  fs.mkdirSync(quarantine); // the reservation a killed sweep left, while the folder it was to receive still sits at its name
+  const young = sweepLeftovers({ repo, tmp, probe: deadProbe });
+  assert.ok(fs.existsSync(quarantine), "inside the window the renamer may be in another pid namespace: left alone");
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, now: Date.now() + 2 * MIN_AGE_MS });
+  assert.deepEqual(young.errors.concat(result.errors), []);
+  assert.equal(fs.existsSync(quarantine), false, "the empty reservation is removed");
+  assert.ok(fs.existsSync(original), "the folder at the name is untouched");
+  assert.deepEqual(result.listed, [`notice: removed the empty reservation ${path.basename(quarantine)} a killed sweep left`]);
+});
+
+test("16g5. an EMPTY quarantine whose original name is ABSENT may be a moved empty folder: it is restored under its name (F17)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f17-moved-repo");
+  const original = folder(own, tmp, "f17-moved", { claim: formatOwner(thisOwner()) + "\n" });
+  const quarantine = path.join(tmp, `.${path.basename(original)}.teststodelete-quarantine-${PRETEND_DEAD}-0a1b2c3d`);
+  fs.renameSync(original, quarantine); // a killed sweep's quarantine of an empty folder
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, now: Date.now() + 2 * MIN_AGE_MS });
+  assert.deepEqual(result.errors, []);
+  assert.equal(fs.existsSync(quarantine), false);
+  assert.ok(fs.existsSync(original), "put back under its own name, with its claim beside it");
+  assert.deepEqual(result.listed, [`notice: restored ${path.basename(original)} from a quarantine a killed sweep left`]);
+});
+
+test("16g6. an empty reservation that was swapped after it was listed is kept (F17: same (dev, ino), a directory, empty)", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f17-swap-repo");
+  const original = folder(own, tmp, "f17-swap", { claim: formatOwner(thisOwner()) + "\n" });
+  const quarantine = path.join(tmp, `.${path.basename(original)}.teststodelete-quarantine-${PRETEND_DEAD}-0a1b2c3d`);
+  fs.mkdirSync(quarantine);
+  const aside = path.join(work, "swap-aside");
+  const hooks = { beforeReservationRemoval: () => { fs.renameSync(quarantine, aside); fs.mkdirSync(quarantine); } }; // another empty directory takes the name
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, now: Date.now() + 2 * MIN_AGE_MS, hooks });
+  own.after(() => { fs.rmSync(aside, { recursive: true, force: true }); fs.rmSync(quarantine, { recursive: true, force: true }); });
+  assert.ok(fs.existsSync(quarantine), "not the directory that was listed: kept");
+  assert.ok(result.preserved.some((entry) => entry.path === quarantine && entry.reason === "quarantine-conflict"), JSON.stringify(result.preserved));
+  assert.ok(fs.existsSync(original));
+});
+
+test("16g7. isTakenRename: the occupied-name codes everywhere; EPERM and EACCES only on Windows and only with something at the target; anything else is not taken", () => {
+  const e = (code) => Object.assign(new Error(code), { code });
+  for (const code of ["ENOTEMPTY", "EEXIST", "ENOTDIR"]) for (const platform of ["linux", "win32"]) assert.equal(isTakenRename(e(code), false, platform), true, `${code} on ${platform}`);
+  for (const code of ["EPERM", "EACCES"]) {
+    assert.equal(isTakenRename(e(code), true, "win32"), true, `${code} with a target on Windows`);
+    assert.equal(isTakenRename(e(code), false, "win32"), false, `${code} with no target on Windows`);
+    assert.equal(isTakenRename(e(code), true, "linux"), false, `${code} on POSIX is a permission, not a taken name`);
+  }
+  for (const code of ["ENOENT", "EISDIR", "EIO", "EXDEV", undefined]) for (const platform of ["linux", "win32"]) assert.equal(isTakenRename(e(code), true, platform), false, `${code} on ${platform}`);
 });
 
 // 17 --------------------------------------------------------------------------------------------------------
