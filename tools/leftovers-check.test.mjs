@@ -15,10 +15,26 @@ import { fileURLToPath } from "node:url";
 
 import { git } from "./lib/git.mjs";
 import { MAX_CLAIM_BYTES, REPO_ROW, REPO_TOKEN, ownedDir } from "./lib/owned.mjs";
-import { EXCLUDED_FILES, LEGACY_NAME_PENDING, isScanned, main, parseArguments, scanRepository, scanText, tokenConstants, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
+import { EXCLUDED_FILES, LEGACY_NAME_PENDING, isScanned, main, parseArguments, resolveRule, scanRepository, scanText, tokenConstants, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RULE = path.join(root, "common", "test-leftovers-detail.md"); // the rule file that holds the Tokens table since the split
+
+test("resolveRule: --rule wins; else the repository's detail, then its core (an old mount), then the files beside the tool in that order", (t) => {
+  const repo = ownedDir(t, "resolve rule");
+  const core = path.join(repo, "common", "test-leftovers.md");
+  const detail = path.join(repo, "common", "test-leftovers-detail.md");
+  assert.equal(resolveRule(repo, undefined), RULE, "nothing in the repository: the detail beside the tool");
+  fs.mkdirSync(path.dirname(core), { recursive: true });
+  fs.writeFileSync(core, "## Tokens\n");
+  assert.equal(resolveRule(repo, undefined), core, "a mount from before the split holds the table in the core");
+  fs.writeFileSync(detail, "## Tokens\n");
+  assert.equal(resolveRule(repo, undefined), detail, "the detail is preferred over the core beside it");
+  const explicit = path.join(repo, "rule.md");
+  fs.writeFileSync(explicit, "## Tokens\n");
+  assert.equal(resolveRule(repo, explicit), explicit, "--rule is the only candidate");
+  assert.equal(resolveRule(repo, path.join(repo, "absent.md")), undefined, "an absent --rule resolves to nothing, never to a fallback");
+});
 
 /** A git repository in an owned folder holding `files` (path → text); returns its path. */
 function tree(t, files = {}) {

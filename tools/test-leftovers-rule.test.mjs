@@ -28,7 +28,11 @@ const sourceRoot = path.resolve(here, "..");
 const RULE = "common/test-leftovers.md";
 const DETAIL = "common/test-leftovers-detail.md";
 const COMPANION = "common/test-leftovers-janitor.md";
-/** The rule as it was before the split (`git show 7852de2:common/test-leftovers.md`), committed so the test needs no history. */
+/**
+ * The rule as it was before the split (`git show 7852de2:common/test-leftovers.md`), committed so the test needs no history. It PINS
+ * the detail to that text: a later edit of the rule text updates the detail AND this fixture in one commit (with the record in
+ * `research/rule-bodies.json`), so the no-loss test keeps proving the split and never holds the current wording against stale text.
+ */
 const BASE = "tools/fixtures/test-leftovers-base-7852de2.md";
 const CAP = 32768;
 /** The core must reach a reviewer whose prompt packs each rule file on its own under a ~10,000-unit free tail (owner decision 2026-11-01). */
@@ -88,8 +92,45 @@ test("S1 4 the core names the detail and the companion; the detail and the compa
   assert.ok(detail.includes("`" + RULE + "`"), "the detail's header points back at the core");
   assert.ok(companion.includes("`" + RULE + "`"), "the companion points back at the core");
   assert.doesNotMatch(rule + spansOf(read(DETAIL)).join("\n") + companion, /\]\([^)]+\)/, "no markdown link inside a span");
-  const pointers = rule.match(/^Detail: /gm) ?? [];
+  const pointers = rule.match(/^Detail: .*$/gm) ?? [];
   assert.equal(pointers.length, (rule.match(/^## /gm) ?? []).length, "every section of the core ends with a pointer to the same section of the detail");
+  const headings = detail.split("\n").filter((line) => line.startsWith("## "));
+  for (const pointer of pointers) {
+    const target = /^Detail: § ?(.+)\.$/.exec(pointer);
+    assert.ok(target !== null, `${pointer}: a pointer is \`Detail: §N.\` or \`Detail: § <name>.\``);
+    const wanted = /^\d+$/.test(target[1]) ? `## ${target[1]}. ` : `## ${target[1]}`;
+    assert.ok(headings.some((heading) => heading.startsWith(wanted)), `${pointer}: the detail has no heading \`${wanted}\``);
+  }
+});
+
+/**
+ * What the core must carry so that a reviewer with the core ALONE refuses what the detail refuses — a judge of the split found
+ * the first core allowing deletions the detail forbids (2026-11-01). One phrase per obligation, under the section that owns it.
+ */
+const MUST_CARRY = {
+  "## 1. ": ["testsToDelete-<owner>-<repo>-<what>-<id>", "u<uid>", "w<digits>", "^[uw][0-9]{1,10}$", "## Tokens", "legacy name", "never by age"],
+  "## 2. ": ["claim first", "never at module load", "create exclusively", "never adopted", "redraw", "exact full name", "TMPDIR", "TEMP", "TMP"],
+  "## 3. ": ["<owner>:<host>@<os>:<pid>[:<start>[:<ns>]]", "OUTSIDE the resource", "TESTSTODELETE_RUN", "kernel authorises", "REAL uid", "mismatch is `unknown`", "lock-owned", "unmarked", "pid namespace", "<ns>", "the only `gone`", "hidepid", "2 seconds", "never signals", "Uncertainty preserves"],
+  "## 4. ": ["two keys", "git worktree list", "`gone`", "10 minutes", "by identity", "teststodelete-quarantine", "never renamed", "holds anything", "never fails the run"],
+  "## 5. ": ["--rm", "reaper", "carve-out", "every path", "docker rm -f -v"],
+  "## 6. ": ["teststodelete_<owner>_<repo>_<what>_<id>", "shared-store", "lock:", "wider than", "container-scoped", "reuse"],
+  "## 7. ": ["scan of nothing", "raw-temp", "RUNNER_TEMP", "raw-worktree", "docker-run", "docker-name", "COMPOSE_PROJECT_NAME", "legacy-name", "owner-blind", "shared-store", "ryuk-off", "testsToDelete-exempt: <class> — <reason>", "placeholder", "take none", "`exemption`"],
+  "## The janitor": ["tools/janitor.sh", "two keys of §4", "common/test-leftovers-janitor.md"],
+  "## The barrier": ["no producer emits the owner form", "age-based", "concurrent", "two stages", "rollback"],
+  "## Never": ["Never widen", "name alone", "age", "can be empty", "shared prefix", "fail the run", "--rm", "owner inside", "owner-blind"],
+  "## Definition of Done": ["Detail: § Definition of Done."],
+};
+
+test("S1 9 the core carries, under each section, every phrase a reviewer needs to refuse what the detail refuses", () => {
+  const text = spansOf(read(RULE)).join("\n");
+  const sections = text.split(/^(?=## )/m);
+  const missing = [];
+  for (const [heading, phrases] of Object.entries(MUST_CARRY)) {
+    const section = sections.find((part) => part.startsWith(heading));
+    if (section === undefined) { missing.push(`${heading}: no such section`); continue; }
+    for (const phrase of phrases) if (!section.includes(phrase)) missing.push(`${heading.trim()}: "${phrase}"`);
+  }
+  assert.deepEqual(missing, [], `${missing.length} phrase(s) the core must carry are missing`);
 });
 
 test("S1 5 every example name carries an owner of the grammar; the old form appears only as the legacy name's own description", () => {
