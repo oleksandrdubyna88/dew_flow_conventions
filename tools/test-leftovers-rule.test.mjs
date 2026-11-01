@@ -24,8 +24,13 @@ import { broadLines } from "./lib/sweeper-scan.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const sourceRoot = path.resolve(here, "..");
 const RULE = "common/test-leftovers.md";
+const DETAIL = "common/test-leftovers-detail.md";
 const COMPANION = "common/test-leftovers-janitor.md";
+/** The rule as it was before the split (`git show 7852de2:common/test-leftovers.md`), committed so the test needs no history. */
+const BASE = "tools/fixtures/test-leftovers-base-7852de2.md";
 const CAP = 32768;
+/** The core must reach a reviewer whose prompt packs each rule file on its own under a ~10,000-unit free tail (owner decision 2026-11-01). */
+const CORE_CAP = 8500;
 const BEGIN = "<!-- core:begin -->\n";
 const END = "<!-- core:end -->";
 const gitGuarded = gitWith({ timeoutMs: GUARD_MS });
@@ -88,6 +93,30 @@ test("S1 5 every example name carries an owner of the grammar; the old form appe
     assert.ok(legacySentence || /^(?:<owner>|[uw][0-9]{1,10}|exempt|quarantine)$/.test(segment), "`" + segment + "` follows the prefix and is no owner");
   }
   assert.equal(found.filter((match) => match[2] === "<repo>").length, 1, "the old form is spelled once, where the legacy name is defined");
+});
+
+/** Every non-heading, non-blank line of a rule's body (frontmatter removed — the ids differ by design), with how often it occurs. */
+function occurrences(text) {
+  const counts = new Map();
+  for (const line of bodyOf(text).split("\n")) {
+    if (line.trim() === "" || /^#{1,6} /.test(line)) continue;
+    counts.set(line, (counts.get(line) ?? 0) + 1);
+  }
+  return counts;
+}
+
+test("S1 7 nothing lost: every non-heading, non-blank line of the rule at 7852de2 is in the detail file, at least as often", () => {
+  const base = occurrences(read(BASE));
+  assert.ok(base.size > 200, "the base fixture is the whole rule, not a stub");
+  assert.ok(fs.existsSync(path.join(sourceRoot, DETAIL)), `${DETAIL} does not exist`);
+  const detail = occurrences(read(DETAIL));
+  const lost = [...base].filter(([line, count]) => (detail.get(line) ?? 0) < count).map(([line, count]) => `${count} x ${line.slice(0, 90)}`);
+  assert.deepEqual(lost, [], `${lost.length} line(s) of the base text are missing from ${DETAIL}`);
+});
+
+test("S1 8 the core is self-contained under its own cap", () => {
+  const bytes = Buffer.byteLength(read(RULE));
+  assert.ok(bytes <= CORE_CAP, `${RULE} is ${bytes} B, over its cap of ${CORE_CAP} B`);
 });
 
 test("S1 6 the companion is its own rule with a conditional load and three tasks", () => {
