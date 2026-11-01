@@ -334,7 +334,7 @@ Built on `feat/raw-temp-baseline` (local commits, nothing pushed, nothing releas
 table was written as a failing test first (`test(...)` commit), then the code, then watched RED again with the code
 stashed and with a targeted break (14 mutations of the module, each failing exactly the test that names it).
 
-- [x] S1 the rule: core sentence (8,876 B, cap 9,000), companion `common/test-leftovers-baseline.md` (6,988 B) with the
+- [x] S1 the rule: core sentence (8,876 B, cap 9,000), companion `common/test-leftovers-baseline.md` (7,113 B) with the
       detail's pointer (31,546 B) — see N1; `CORE_CAP` 9000; `MUST_CARRY` holds "`raw-temp` baseline"; bodies re-recorded;
       the selection baseline `research/selection-matrix.json` regenerated (the new id joins the scopes that select the janitor).
 - [x] S2 `tools/lib/raw-temp-baseline.mjs`; the guard's `--baseline`, `--print-baseline`, `--baseline-shrinks`, `--base`,
@@ -365,9 +365,9 @@ watched RED before the fix and RED again with the fix taken out or broken; the s
 - [x] [code gate 7, 13] the entries that can still pass are indexed by (file, sha256) once in `createApplier`; a take is
       not a scan. Test 22 (40,000 entries).
 - [x] [code gate 10] the companion's tasks are `test`, `audit`, `policy`, `release`, `pr`. The selection baseline was
-      regenerated: the `test` and `pr` scopes grow by the companion's 6,988 B (for example no file: `test` 289,359 →
-      296,347 B, `pr` 171,726 → 178,714 B), `audit` and `policy` by the 1,078 B the companion grew. No test pins a 90 KB
-      figure; the companion is one rule file of 6,988 B, under the per-read cap and under a reviewer's ~10,000-unit
+      regenerated: the `test` and `pr` scopes grow by the companion's 7,113 B (for example no file: `test` 289,359 →
+      296,472 B, `pr` 171,726 → 178,839 B), `audit` and `policy` by the 1,203 B the companion grew since its first version. No test pins a 90 KB
+      figure; the companion is one rule file of 7,113 B, under the per-read cap and under a reviewer's ~10,000-unit
       per-file tail, and the core (8,876 B) is unchanged.
 - [x] [code gate 11, Opus m5] a proof is a file the guard DISCOVERED in this scan, a test file (`x.test.mjs`, `x.spec.ts`,
       `XTests.cs`, `x_test.go`, a file under `test/` or `tests/`), and not the baseline file. The companion says so. Test 18.
@@ -385,9 +385,26 @@ watched RED before the fix and RED again with the fix taken out or broken; the s
       command [ledger 1.1].
 - Rejected at the gate, unchanged: greedy line-order matching; a `printBaseline` cache change; generic shrink hints.
 
-Follow-up, NOT done here: `tools/leftovers-check.mjs` is about 1,040 lines against the 800-line maximum of
-`common/coding-style.md`; the command-line part (`parseArguments`, `main`, `report`) or the docker section should move
-into `tools/lib/` in its own change.
+Code round 2 (2026-11-01; proceed, 14 findings, accepted 0, 1, 5, 8, 9, 11, 12, 13; rejected 2, 3, 4, 6, 7, 10). Test first, RED before,
+RED again with the fix broken:
+
+- [x] [code round 2 0] `tools/leftovers-check.mjs` was about 1,040 lines against the 800 maximum. The command line
+      (`parseArguments`, the run functions, `USAGE`, `PROFILES`) is now `tools/lib/leftovers-cli.mjs`, the docker pass is
+      `tools/lib/leftovers-docker.mjs` and the shell-value helpers both share are `tools/lib/leftovers-shell.mjs`; moved
+      whole, behaviour unchanged (the 253 tests of the guard, the consumers, the baseline, the sweeper scan and the rules
+      passed before and after). The guard is 592 lines. The earlier "size follow-up" is done and removed.
+- [x] [code round 2 1] ONE working-tree loader, `locateBaseline`, for the scan and the shrink check: the fixed path, the
+      symlink refusal (lstat), a folder in its place, containment, and with `gitRoot` the git-root check. Each caller keeps
+      its outcome: a `baseline` finding in the scan (symlink, outside), exit 2 in the shrink check. Test 23.
+- [x] [code round 2 5] `printBaseline`'s file read is guarded: a vanished or unreadable file is listed in `missing` (exit 2
+      with its sentence). Test 19b.
+- [x] [code round 2 8, 9, 13] `createApplier` pushes into a key's list and walks it with a cursor, no copy and no
+      `shift()`. Test 22b (150,000 entries under one key; 122 s with a copying build, under a second now).
+- [x] [code round 2 11] a value option followed by another `--` option is a usage error naming the option
+      (`--base --allow-create`). Test 21e.
+- [x] [code round 2 12] the companion says a repository carrying a baseline runs `--baseline-shrinks --base <the PR's
+      target branch>` in CI on every pull request, without `--allow-create`, the creation PR's own run being the one
+      exception; the companion is 7,113 B.
 
 Deviations from the plan as written, each with its reason:
 
@@ -420,7 +437,7 @@ Non-blocking (the defaults below were kept by the gate round; a different answer
   the new `common/test-leftovers-baseline.md` (id `common.test-leftovers-baseline`, `load: conditional`, tasks
   `audit`, `policy`, `release` — the janitor companion's frontmatter pattern; `test` and `pr` were added after the code gate), and the detail's §7 carries a 3-line
   pointer paragraph. Bytes: core 8,876 (unchanged, the sentence stays in the core); detail 31,546 (+305 on 31,241;
-  with F16's +131 it is 31,677, 1,091 B under the cap); companion 6,988. The companion holds the plan's paragraph
+  with F16's +131 it is 31,677, 1,091 B under the cap); companion 7,113. The companion holds the plan's paragraph
   verbatim plus the file format and the guard behaviour; no other text of the detail was touched. R1's mitigation
   is thereby done, not deferred.
 - **N2 — `count` field or repeated entries?** Default: repeated entries (one shape, one validator). coai's E5 text

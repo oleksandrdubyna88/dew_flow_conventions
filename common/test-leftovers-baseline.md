@@ -80,8 +80,9 @@ proof lies under the new root; hints are ignored. A creation passes only with `-
 no history behind the base ref — a re-creation after the file existed is refused. `--allow-create` belongs only in
 the creation PR's own run, never in the standing CI command: left in it, it would pass a creation again after a deletion
 merged. An unresolved base ref, a git failure, or a shallow clone asked about a creation is not a pass: the check fails
-closed naming the cause and the fetch to run (`git fetch origin <base-branch> --depth=1`, `git fetch --unshallow`). A repository's CI runs it against
-the pull request's base for every baseline file, whatever language the baselined tree is in. A file at zero entries is
+closed naming the cause and the fetch to run (`git fetch origin <base-branch> --depth=1`, `git fetch --unshallow`). A repository that carries a baseline
+runs `--baseline-shrinks --base <the PR's target branch>` in CI on every pull request, without `--allow-create`, whatever
+language the baselined tree is in; the creation pull request's own run is the one exception. A file at zero entries is
 deleted with its last entry; a repository with none ships none.
 
 ## Never

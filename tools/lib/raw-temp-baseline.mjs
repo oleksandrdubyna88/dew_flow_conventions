@@ -83,27 +83,41 @@ const realOrSelf = (target) => {
   }
 };
 
-/** Why `repo`'s baseline file may not be read as one — a symlink, or a real folder that is not the repository's own — or `undefined`. */
-function pathRefusal(repo, file) {
+/**
+ * The ONE loader of the working-tree baseline, for the scan and the shrink check alike: the fixed path, and what may stand there. `{ file, absent }`, plus a
+ * `refusal` `{ kind, why }` when the thing at the path may not be read as a baseline — `symlink` (a link can point a grown baseline anywhere), `not-file` (a folder),
+ * `unreadable`, `outside` (its real folder is not the repository's own) and, with `gitRoot`, `git` (git failed) and `not-git-root` (`repo` is not the root of its git
+ * repository, so the path is not the repository's root path). Each caller keeps its own outcome for a refusal: a `baseline` finding in a scan, exit 2 in the shrink check.
+ */
+export function locateBaseline(repo, { gitRoot = false } = {}) {
+  const file = path.join(repo, BASELINE_FILE);
+  const refused = (kind, why) => ({ file, absent: false, refusal: { kind, why } });
   let stat;
   try {
     stat = fs.lstatSync(file);
-  } catch {
-    return undefined; // absent: the read says so
+  } catch (error) {
+    if (error.code !== "ENOENT") return refused("unreadable", `${BASELINE_FILE} cannot be read: ${error.message.split("\n")[0]}`);
   }
-  if (stat.isSymbolicLink()) return `${BASELINE_FILE} is a symlink — the baseline is a regular file at the repository root and never a link (a link can point a grown baseline anywhere)`;
-  if (realOrSelf(path.dirname(file)) !== realOrSelf(repo)) return `${BASELINE_FILE} does not lie in the repository folder itself — the baseline is at the repository root`;
-  return undefined;
+  if (stat?.isSymbolicLink()) return refused("symlink", `${BASELINE_FILE} is a symlink — the baseline is a regular file at the repository root and never a link (a link can point a grown baseline anywhere)`);
+  if (stat !== undefined && !stat.isFile()) return refused("not-file", `${BASELINE_FILE} is not a regular file`);
+  if (stat !== undefined && realOrSelf(path.dirname(file)) !== realOrSelf(repo)) return refused("outside", `${BASELINE_FILE} does not lie in the repository folder itself — the baseline is at the repository root`);
+  if (gitRoot) {
+    const top = runGit(repo, ["rev-parse", "--show-toplevel"]);
+    if (!top.ok) return refused("git", top.why);
+    if (path.relative(realOrSelf(top.out.trim()), realOrSelf(repo)) !== "") return refused("not-git-root", `${repo} is not the root of the git repository (${top.out.trim()}) — the baseline is judged at the repository root`);
+  }
+  return { file, absent: stat === undefined };
 }
 
 /**
- * The baseline of `repo`: its ONE path, `raw-temp-baseline.json` at the root. A symlink is refused as a `{ problem }` (the scan reports it as a
- * `baseline` finding); an unreadable path or a folder throws (the guard's exit 2).
+ * The baseline of `repo`: its ONE path, `raw-temp-baseline.json` at the root. A symlink, or a real folder outside the repository, is refused as a `{ problem }`
+ * (the scan reports it as a `baseline` finding); an unreadable path or a folder throws (the guard's exit 2).
  */
 export function loadBaselineAt(repo) {
-  const file = path.join(repo, BASELINE_FILE);
-  const refusal = pathRefusal(repo, file);
-  return refusal === undefined ? loadBaseline(file) : { problem: refusal, file };
+  const { file, refusal } = locateBaseline(repo);
+  if (refusal === undefined) return loadBaseline(file);
+  if (refusal.kind === "symlink" || refusal.kind === "outside") return { problem: refusal.why, file };
+  throw new Error(refusal.why);
 }
 
 /** Whether a scope's proof is a test file the scan discovered, outside the baseline itself, with a marker line for exactly its root. */
@@ -137,13 +151,18 @@ export function createApplier(loaded, repo, label, discovered = new Set()) {
   const scopes = loaded.scopes.map((scope) => ({ ...scope, proven: proofHolds(repo, scope, discovered) }));
   const scopeOf = (file) => scopes.filter((scope) => file.startsWith(scope.root)).sort((a, b) => b.root.length - a.root.length)[0]; // the most specific, whatever the list's order
   const entries = loaded.entries.map((entry) => ({ ...entry, scope: scopeOf(entry.file), used: false }));
-  const available = new Map(); // key → the unused entries that apply, in list order
-  for (const entry of entries) if (entry.scope?.proven === true) available.set(keyOf(entry), [...(available.get(keyOf(entry)) ?? []), entry]);
+  const available = new Map(); // key → { list: the entries that apply, in list order; next: how many were taken }
+  for (const entry of entries) {
+    if (entry.scope?.proven !== true) continue;
+    if (!available.has(keyOf(entry))) available.set(keyOf(entry), { list: [], next: 0 });
+    available.get(keyOf(entry)).list.push(entry);
+  }
   return {
     take(file, sha256) {
-      const queue = available.get(keyOf({ file, sha256 }));
-      const entry = queue?.shift();
+      const slot = available.get(keyOf({ file, sha256 }));
+      const entry = slot?.list[slot.next];
       if (entry === undefined) return false;
+      slot.next += 1;
       entry.used = true;
       return true;
     },
@@ -162,7 +181,13 @@ export function createApplier(loaded, repo, label, discovered = new Set()) {
 export function printBaseline(findings, repo) {
   const cache = new Map();
   const linesOf = (file) => {
-    if (!cache.has(file)) cache.set(file, fs.readFileSync(path.join(repo, file), "utf8").split(/\r?\n/));
+    if (!cache.has(file)) {
+      try {
+        cache.set(file, fs.readFileSync(path.join(repo, file), "utf8").split(/\r?\n/));
+      } catch {
+        cache.set(file, []); // vanished or unreadable: every line of it is missing
+      }
+    }
     return cache.get(file);
   };
   const sites = findings.filter((entry) => entry.cls === BASELINE_CLASS).map((entry) => ({ entry, text: linesOf(entry.file)[entry.line - 1] }));
@@ -223,23 +248,13 @@ const refuse = (line) => ({ code: 2, lines: [line] });
  * the git root, an unresolved base ref, a git failure, a shallow clone for a creation, an unreadable base copy). Never writes anything.
  */
 export function baselineShrinks({ repo, base, allowCreate = false }) {
-  const file = path.join(repo, BASELINE_FILE);
-  let stat;
-  try {
-    stat = fs.lstatSync(file);
-  } catch (error) {
-    if (error.code !== "ENOENT") return refuse(`${BASELINE_FILE} cannot be read: ${error.message.split("\n")[0]}`);
-  }
-  if (stat?.isSymbolicLink()) return refuse(`${BASELINE_FILE} is a symlink — the baseline is a regular file at the repository root and never a link`);
-  if (stat !== undefined && !stat.isFile()) return refuse(`${BASELINE_FILE} is not a regular file`);
-  const top = runGit(repo, ["rev-parse", "--show-toplevel"]);
-  if (!top.ok) return refuse(top.why);
-  const rel = path.relative(realOrSelf(top.out.trim()), realOrSelf(repo));
-  if (rel !== "" || path.isAbsolute(rel)) return refuse(`${repo} is not the root of the git repository (${top.out.trim()}) — the baseline is judged at the repository root`);
+  const located = locateBaseline(repo, { gitRoot: true });
+  if (located.refusal !== undefined) return refuse(located.refusal.why);
+  const { file, absent } = located;
   if (base.startsWith("-") || !runGit(repo, ["rev-parse", "--verify", "--quiet", `${base}^{commit}`]).ok) {
     return refuse(`the base ref \`${base}\` is not available here — fetch it first (\`${FETCH}\` or the repository's own fetch), then run the check again; an unresolved base is never a pass`);
   }
-  if (stat === undefined) return { code: 0, lines: [`${BASELINE_FILE}: absent now — drained (it only shrinks, and nothing is left)`] };
+  if (absent) return { code: 0, lines: [`${BASELINE_FILE}: absent now — drained (it only shrinks, and nothing is left)`] };
   const working = parseBaseline(fs.readFileSync(file, "utf8"));
   if (working.problem !== undefined) return { code: 1, lines: [`${BASELINE_FILE}: not a baseline — ${working.problem}`] };
   const listed = runGit(repo, ["ls-tree", "--name-only", base, "--", BASELINE_FILE]);

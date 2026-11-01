@@ -1250,6 +1250,7 @@ release — is `todo/PLAN_test_leftovers_merged_core_release.md`.
   `token`; exit 0 clean, 1 with findings, 2 when it scanned nothing. `--profile node` is for a Node consumer that mounts it: it adds the consumer's tracked
   `*.test.<ext>` / `*.spec.<ext>` files and every text file under `scripts/`, `test/` and `tests/`, reads workflows with `yaml@2`, treats a wholly dynamic shell
   name as dynamic, and takes the token's row with `--token` and `--identity`.
+  The guard's command line is `tools/lib/leftovers-cli.mjs`, its docker pass `tools/lib/leftovers-docker.mjs` and the shell-value helpers both share `tools/lib/leftovers-shell.mjs` (moved out of `tools/leftovers-check.mjs` whole, to keep it under 800 lines).
   The `raw-temp` baseline (`tools/lib/raw-temp-baseline.mjs`; rule §7, `todo/PLAN_raw_temp_baseline.md`; tests `tools/raw-temp-baseline.test.mjs`) adds three arguments and a class.
   `--baseline` reads the one path `raw-temp-baseline.json` at the repository root (a regular file, never a symlink) only when given, and passes a `raw-temp` site up to its entries (a multiset keyed by file and the sha256 of the trimmed line; the line is a hint);
   class `baseline` is a stale entry (reconciled over the whole file, so a deleted file counts), an entry under no scope or under a scope whose proof file lacks the marker for that

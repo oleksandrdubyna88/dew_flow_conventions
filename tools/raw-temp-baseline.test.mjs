@@ -588,15 +588,15 @@ test("22. matching is linear: 40,000 entries are taken in well under a few secon
 
 // 22b — many entries under ONE key (code round 2 8, 9, 13) ----------------------------------------------------------------------
 
-test("22b. matching is linear under ONE key too: 60,000 entries of one site are taken in well under a few seconds", (t) => {
+test("22b. matching is linear under ONE key too: 150,000 entries of one site are indexed and taken in a couple of seconds", (t) => {
   const { repo } = fixture(t);
-  const entries = Array.from({ length: 60000 }, (_, index) => entry(A, L3, index + 1));
-  const applier = createApplier({ scopes: [{ root: ROOT, proof: PROOF }], entries }, repo, FILE, new Set([PROOF]));
+  const entries = Array.from({ length: 150000 }, (_, index) => entry(A, L3, index + 1));
   const started = performance.now();
-  for (let index = 0; index < 60000; index += 1) assert.equal(applier.take(A, sha(L3)), true);
+  const applier = createApplier({ scopes: [{ root: ROOT, proof: PROOF }], entries }, repo, FILE, new Set([PROOF]));
+  for (let index = 0; index < 150000; index += 1) assert.equal(applier.take(A, sha(L3)), true);
   assert.equal(applier.take(A, sha(L3)), false, "one more hit than entries is not passed");
   assert.equal(applier.finalFindings().length, 0);
-  assert.ok(performance.now() - started < 3000, "copying or shifting the list of one key for every hit would take far longer");
+  assert.ok(performance.now() - started < 2500, "copying the list of one key for every entry would take many times longer");
 });
 
 // 19b — a vanished file is reported, never a crash (code round 2 5) ----------------------------------------------------------------

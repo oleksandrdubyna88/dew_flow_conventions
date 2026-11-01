@@ -29,6 +29,7 @@ export function parseArguments(argv) {
       continue;
     }
     if (!Object.hasOwn(VALUE_NAMES, name) || !argv[index].startsWith("--") || argv[index + 1] === undefined) return { error: `unknown or incomplete argument \`${argv[index]}\`` };
+    if (argv[index + 1].startsWith("--")) return { error: `\`${argv[index]}\` needs a value, not the option \`${argv[index + 1]}\`` };
     options[VALUE_NAMES[name]] = PLAIN_VALUES.includes(name) ? argv[index + 1] : path.resolve(argv[index + 1]);
   }
   if (options.profile !== undefined && !PROFILES.includes(options.profile)) return { error: `unknown profile \`${options.profile}\` (the only profile is \`${PROFILES.join("`, `")}\`)` };
