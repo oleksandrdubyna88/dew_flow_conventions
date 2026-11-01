@@ -11,6 +11,8 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import { loadCatalog } from "./lib/rule-catalog.mjs";
+import { provenanceFindings, caseFindings } from "./lib/gates.mjs";
+import { LANDED_EPICS } from "./lib/parity-epics.mjs";
 import { ownedDir } from "./lib/owned.mjs";
 import { GUARD_MS } from "./lib/startup-ceilings.mjs";
 import { drifted } from "./rule-bodies.mjs";
@@ -149,10 +151,12 @@ test("the tool prints the bytes table and refuses an unknown argument with usage
 });
 
 test("the selection matrix carries no gate declaration at E1", () => {
-  // E1 ships the schema and the check, empty of entries: every gate record is written by the epic that lands its file.
-  // When the first epic writes one this test becomes "every gate record belongs to a landed or unlanded owning epic" —
-  // each record's `epic` is E2..E6, an epic in LANDED_EPICS has its rule in the catalog, and the record passes
-  // provenanceFindings and caseFindings (tools/lib/gates.mjs).
   assert.deepEqual(parsed().gates, {});
   assert.deepEqual(GATES, {});
+});
+
+test("every gate record of the tool passes the provenance and the case checks on the real catalog", () => {
+  const catalog = loadCatalog(sourceRoot);
+  assert.deepEqual(provenanceFindings(catalog, GATES, LANDED_EPICS), []);
+  assert.deepEqual(caseFindings(catalog, GATES), []);
 });
