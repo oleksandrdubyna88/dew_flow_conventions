@@ -36,7 +36,7 @@ const COMPANION = "common/test-leftovers-janitor.md";
 const BASE = "tools/fixtures/test-leftovers-base-7852de2.md";
 const CAP = 32768;
 /** The core must reach a reviewer whose prompt packs each rule file on its own under a ~10,000-unit free tail (owner decision 2026-11-01). */
-const CORE_CAP = 8500;
+const CORE_CAP = 9000;
 const BEGIN = "<!-- core:begin -->\n";
 const END = "<!-- core:end -->";
 const gitGuarded = gitWith({ timeoutMs: GUARD_MS });
@@ -114,7 +114,7 @@ const MUST_CARRY = {
   "## 4. ": ["two keys", "git worktree list", "`gone`", "10 minutes", "by identity", "teststodelete-quarantine", "never renamed", "holds anything", "never fails the run"],
   "## 5. ": ["--rm", "reaper", "carve-out", "every path", "docker rm -f -v"],
   "## 6. ": ["teststodelete_<owner>_<repo>_<what>_<id>", "shared-store", "lock:", "wider than", "container-scoped", "reuse"],
-  "## 7. ": ["scan of nothing", "raw-temp", "RUNNER_TEMP", "raw-worktree", "docker-run", "docker-name", "COMPOSE_PROJECT_NAME", "legacy-name", "owner-blind", "shared-store", "ryuk-off", "testsToDelete-exempt: <class> — <reason>", "placeholder", "take none", "`exemption`"],
+  "## 7. ": ["scan of nothing", "raw-temp", "RUNNER_TEMP", "raw-worktree", "docker-run", "docker-name", "COMPOSE_PROJECT_NAME", "legacy-name", "owner-blind", "shared-store", "ryuk-off", "testsToDelete-exempt: <class> — <reason>", "placeholder", "take none", "`exemption`", "`raw-temp` baseline"],
   "## The janitor": ["tools/janitor.sh", "two keys of §4", "common/test-leftovers-janitor.md"],
   "## The barrier": ["no producer emits the owner form", "age-based", "concurrent", "two stages", "rollback"],
   "## Never": ["Never widen", "name alone", "age", "can be empty", "shared prefix", "fail the run", "--rm", "owner inside", "owner-blind"],
@@ -133,13 +133,26 @@ test("S1 9 the core carries, under each section, every phrase a reviewer needs t
   assert.deepEqual(missing, [], `${missing.length} phrase(s) the core must carry are missing`);
 });
 
+/** What the detail's §7 must carry of the `raw-temp` baseline: the one class, the proof marker, the multiset key, the ratchet. */
+const BASELINE_PHRASES = ["The `raw-temp` baseline", "testsToDelete-baseline-proof: <scope root>", "**multiset**", "sha256 of the trimmed line", "only when told to", "`baseline`", "**only shrinks**", "any creation but the first", "nothing regenerates it"];
+
+test("S1 10 the detail's §7 carries the `raw-temp` baseline paragraph, once, between the exemption grammar and the janitor", () => {
+  const text = read(DETAIL);
+  const start = text.indexOf("## 7. ");
+  const section = text.slice(start, text.indexOf("## The janitor", start));
+  const missing = BASELINE_PHRASES.filter((phrase) => !section.includes(phrase));
+  assert.deepEqual(missing, [], "the baseline paragraph is missing phrases");
+  assert.equal(section.split("**The `raw-temp` baseline").length - 1, 1, "the paragraph is there once");
+  assert.ok(section.indexOf("The exemption grammar") < section.indexOf("**The `raw-temp` baseline"), "it follows the exemption grammar");
+});
+
 test("S1 5 every example name carries an owner of the grammar; the old form appears only as the legacy name's own description", () => {
   const text = [...spansOf(read(RULE)), ...spansOf(read(DETAIL)), ...spansOf(read(COMPANION))].join("\n");
   const found = [...text.matchAll(/(teststodelete)[-_](<[a-z]+>|[A-Za-z0-9]+)/gi)].filter((match) => match[1] !== "TESTSTODELETE"); // the upper-case spelling is an environment variable, not a name
   assert.ok(found.length > 5, "the texts do carry examples");
   for (const { 2: segment, index } of found) {
     const legacySentence = segment === "<repo>" && text.slice(Math.max(0, index - 400), index).includes("legacy name");
-    assert.ok(legacySentence || /^(?:<owner>|[uw][0-9]{1,10}|exempt|quarantine)$/.test(segment), "`" + segment + "` follows the prefix and is no owner");
+    assert.ok(legacySentence || /^(?:<owner>|[uw][0-9]{1,10}|exempt|quarantine|baseline)$/.test(segment), "`" + segment + "` follows the prefix and is no owner");
   }
   assert.equal(found.filter((match) => match[2] === "<repo>").length, 1, "the old form is spelled once, where the legacy name is defined");
 });
