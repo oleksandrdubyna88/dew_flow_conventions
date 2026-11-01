@@ -188,8 +188,9 @@ find nothing of the caller's scope with a `gone` record.
       private sibling byte for byte where it touches the two rule spans, and pinned by coai by a pin bump alone — before
       E5's producer PR merges. Any consumer other than coai that wants the baseline says so in its stories document first.
 - [ ] **Added 2026-11-01:** every consumer's start-of-run sweep and guard behave on Windows as the F16 disposition below
-      says (§ *Epoch 2*, item 4), and the owner's Windows machine has its barrier section before the first producer merge
-      of E2 and of E5.
+      says (§ *Epoch 2*, item 4) — on Windows the Node sweep changes nothing, so a killed Node run there waits for a C# sweep,
+      the armed janitor or a person [re-review gate finding 0] — and the owner's Windows machine has its barrier section before
+      the first producer merge of E2 and of E5.
 - [ ] Every producer stage merged under decision 6's shape; every pin bump merged alone; the one-time hand clean-up of
       old names recorded per machine on the PR of the epic whose names they are.
 - [ ] The coai feature review (`mcp__coai__review_feature`, a plan of seven epics) ran once after the last epic, from a
@@ -269,7 +270,8 @@ exists on 2026-11-01 is different in kind:
 
 **Goal (revised).** Every consumer's test run, harness, script and CI step creates outside its own process only resources of the
 owner form, claimed first, removed on every exit path, and collected by that user's next run under the two keys of rule §4 when the run
-was killed; every consumer's sweep is owner-aware or retired BEFORE its first producer; a structural guard per language keeps every
+was killed — except a Node run killed on Windows, which under F16 (b) (§ 4) is collected later: by a C# sweep that checks both keys, by
+the janitor once F9 arms it there, or by a person, until F16 is fixed [re-review gate finding 0]; every consumer's sweep is owner-aware or retired BEFORE its first producer; a structural guard per language keeps every
 tree so; and nothing a sweep or a janitor removes can be a resource a live run still owns. Done when the Definition of Done above holds.
 
 ### 2. Prerequisites that are wider than the approved plan
@@ -293,7 +295,7 @@ tree so; and nothing a sweep or a janitor removes can be a resource a live run s
 ### 3. Merge conditions (revised, per producer PR)
 
 A producer PR of any epic merges only when, in this order: (a) its repository's pin is at the release its stories document cites
-(`105d53c` today; the baseline release for coai); (b) R6 records every consumer's sweep-only stage as landed or empty — done 2026-10-31
+(`105d53c` today; for E2 and E5, the release that carries the F16 (b) change, and for coai also the baseline rule [re-review gate finding 1]); (b) R6 records every consumer's sweep-only stage as landed or empty — done 2026-10-31
 for this family's seven and the sibling's ten; the barrier is open on the operator's WSL machine; (c) the per-machine barrier checklist
 is recorded for EVERY machine that builds or tests that repository — for E2 and E5 that includes the owner's Windows machine (item 2.2);
 (d) the one-time hand clean-up of the old names is recorded per machine on the PR of the epic whose names they are; (e) the coai plan
@@ -339,15 +341,16 @@ NEXT   P1 the owner's Windows barrier record            — the owner; blocks th
        P2 the raw-temp baseline rule                      — this repository (its own plan, gate, PR, release, sibling mirror); then coai's pin bump alone
        P3 the F16 disposition, decided (b) (§ 4)          — one reference change riding P2's release
        E5 stage A (S2-A, the age-only coai- sweep retired, one PR alone) ∥ E5 S5 (the bare-prefix literals leave the test trees) — may start now
-       E2.1 → E2.2 → E2.3 → E2.4 → E2.5 (five stacked, gated PRs; E2.1 merges after P1; the guards switch on in E2.5)
-       E5 producer PR (S3 → S2-B → S4 → S6, one squash-merged PR, after P1, P2 and stage A) → E5.S7 the drain (one PR per suite, not a producer)
+       E2.1 → E2.2 → E2.3 → E2.4 → E2.5 (five stacked, gated PRs; E2.1 merges after P1 and creds' pin on P3's release; the guards switch on in E2.5)
+       E5 producer PR (S3 → S2-B → S4 → S6, one squash-merged PR, after P1, P2, P3's release, stage A and S5 [re-review gate finding 2]) → E5.S7 the drain (one PR per suite, not a producer)
 THEN   wave 3: E6 ∥ E7 — stories written against 105d53c (or the baseline release) and E3's merged helper, each with its own plan gate;
-       E6's stage A is landed (#125), E7's is empty; both merge under § 3.
+       E6's stage A is landed (#125); E7's stage A is REQUIRED — gate or retire InfrastructureSampler's owner-blind qlntest_* drop
+       in a sweep-only PR before any E7 producer [re-review gate finding 3]; both merge under § 3.
 LAST   the coai feature review; the promotion of this plan and its stories documents; R6 ticked in the remainder plan.
 ```
 
 The wave order E3+E4, E5+E2, E6+E7 is the owner's (§ *Wave 1*) and stands. Inside wave 2 the two epics are independent of each other
-and share P1; only E5 waits for P2.
+and share P1 and P3's release (the Node sweep on Windows, F16 (b)) [re-review gate finding 1]; only E5 waits for P2 as well.
 
 ### 6. What the re-review consultant raised, and what was done with it
 
@@ -499,7 +502,7 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
   audit — cornerstone E2.1.S2), E2.2 the Node harnesses, E2.3 the C# lifecycle across the five xUnit executables (E3's helper copied by file
   with its Darwin path; both Windows keys), E2.4 shell, the Docker smoke under the carve-out, acme (cornerstone E2.4.S1, the bash helper
   that claims FIRST), E2.5 repository-wide enforcement (both guards switch on). **Depends on** E3 merged (`4feb245`, `197cc76`) — done;
-  **P1** (the owner's Windows barrier record) before E2.1 MERGES; the F16 disposition (P3) for its Node wrap on Windows. Not a cornerstone
+  **P1** (the owner's Windows barrier record) and creds' pin on the release carrying P3 (the F16 (b) change) before E2.1 MERGES: E2 wraps the same Node reference on elevated hosted Windows [re-review gate finding 1]. Not a cornerstone
   epic in this plan's ledger; the two cornerstones are counted in its own stories document (its quota of 2 of 2 for five sub-epics).
 - **Repository:** `dew_flow_creds_for_devs`. **Stories:** `dew_flow_creds_for_devs · todo/PLAN_test_leftovers_E2.md`. Depends on E1.
 - **Goal.** Every temp site goes through the helper; the acme state and the stub files are removed by the run that
@@ -608,8 +611,8 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
   producers wrap the reference → S6 the two guards, the audit, the `raw-temp` baseline, the CI legs), with the invariant that no commit
   on `main` carries the producer without the sweep or the sweep without the producer (a revert reverts both). **Stage C** is the drain
   (S7, one PR per suite, not a producer) and is inside E5's done-when. **Depends on** E3 merged (`4feb245`, `197cc76`) — done; **P1**
-  (the owner's Windows barrier record) and **P2** (the baseline rule released and pinned) before the producer PR MERGES; the F16
-  disposition (P3) for its Node wrap on Windows. The E5.S2 spec is Fable's (`todo/PLAN_test_leftovers_E5_S2_spec.md` there).
+  (the owner's Windows barrier record), **P2** (the baseline rule released and pinned), the release carrying **P3** (F16 (b)) and
+  **S5** (the bare-prefix literals gone, which S6's guard would flag) before the producer PR MERGES [re-review gate findings 1, 2]. The E5.S2 spec is Fable's (`todo/PLAN_test_leftovers_E5_S2_spec.md` there).
 - **Repository:** `dew_flow_connect_other_ais`. **Stories:** `dew_flow_connect_other_ais · todo/PLAN_test_leftovers_E5.md`. Depends on E1.
 - **Goal.** Tests create only `testsToDelete-coai-…`; the startup sweep collects both the new prefix and, for
   the migration window, the old `coai-` test literals; the product's `coai-*` runtime directories and their
@@ -717,8 +720,9 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
 
 ### E7 — rag_qln: the shared store's ownership, then the rename
 
-- **State (2026-11-01): wave 3, not started.** The pin is DONE (#78 `105d53c`, alone, with the sibling pins). Stage A is EMPTY (R6's scan
-  of `9100184`). The stories document is not written; it is written against `105d53c` (or the baseline release) and E3's merged helper when
+- **State (2026-11-01): wave 3, not started.** The pin is DONE (#78 `105d53c`, alone, with the sibling pins). Stage A is REQUIRED, not
+  empty: R6's scan of `9100184` looked only for `testsToDelete` and missed the product's owner-blind drop of every `qlntest_*` collection
+  (`InfrastructureSampler.cs:104-109`); a sweep-only PR gates or retires it before any producer [re-review gate finding 3]. The stories document is not written; it is written against `105d53c` (or the baseline release) and E3's merged helper when
   the epic starts, with its own plan gate; E7.S2 (the corpus ownership and drop protocol) is a cornerstone with a Fable spec. **Depends on**
   E3 merged for its C# helper — done; rule §6 for the store: a per-run collection `teststodelete_<owner>_<repo>_<what>_<id>` is owned
   by a lock or a marker written before the resource into a registry OUTSIDE it (rule §3's store row), and a shared store is exempt only
@@ -792,9 +796,9 @@ The table as of the re-review (2026-11-01):
 | E3 | mcp | DONE #58, #59 (wave 1) | E1's release | the smallest full adoption and the C# template every other C# consumer copies by file |
 | E4 | sidecar_rust | DONE #64 (wave 1) | E1's release | the Rust shape; its Deviations are the Windows cases the copies read |
 | E5 | coai | wave 2: stories at `2c64601a` (PR #850), gate `proceed`; pin done; stage A and S5 may start | E3 merged (the C# copy); P1 and P2 before the producer MERGES; P3 for its Node wrap on Windows | the live-data sweep and the largest tree; the one consumer that needs the baseline rule |
-| E2 | creds_for_devs | wave 2: stories at `f61358b` (PR #253), gate `proceed`; pin done; stage A empty | E3 merged (the C# copy); P1 before E2.1 MERGES; P3 for its Node wrap on Windows | five stacked PRs under decision 6; the carve-out's first use |
+| E2 | creds_for_devs | wave 2: stories at `f61358b` (PR #253), gate `proceed`; pin done; stage A empty | E3 merged (the C# copy); P1 and the pin on P3's release before E2.1 MERGES | five stacked PRs under decision 6; the carve-out's first use |
 | E6 | benchmark | wave 3: stage A landed (#125); pin done; stories not written | E3 merged; P1 if the Windows machine tests it; its own plan gate | the Testcontainers fixture and decision 2b's first use; the worktree seam in product code |
-| E7 | rag_qln | wave 3: stage A empty; pin done; stories not written | E3 merged; its own plan gate; the sampler's prefix-only drop settled first (stage A or owner-aware) | the shared-store contradiction must be settled before any rename; rule §6 (a) is its wording |
+| E7 | rag_qln | wave 3: stage A REQUIRED (the sampler's qlntest_* drop); pin done; stories not written | E3 merged; its own plan gate; the sampler's prefix-only drop settled first (stage A or owner-aware) | the shared-store contradiction must be settled before any rename; rule §6 (a) is its wording |
 
 ### Cornerstone areas
 
