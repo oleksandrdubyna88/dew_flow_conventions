@@ -137,7 +137,7 @@ test("S1 9 the core carries, under each section, every phrase a reviewer needs t
 });
 
 /** What the baseline companion must carry: the one class, the proof marker, the multiset key, the ratchet, the file format. */
-const BASELINE_PHRASES = ["The `raw-temp` baseline", "testsToDelete-baseline-proof: <scope root>", "**multiset**", "sha256 of the trimmed line", "only when told to", "`baseline`", "**only shrinks**", "any creation but the first", "nothing regenerates it", "\"class\": \"raw-temp\"", "No `count` field", "--baseline-shrinks"];
+const BASELINE_PHRASES = ["The `raw-temp` baseline", "testsToDelete-baseline-proof: <scope root>", "**multiset**", "sha256 of the trimmed line", "only when told to", "`baseline`", "**only shrinks**", "any creation but the first", "nothing regenerates it", "\"class\": \"raw-temp\"", "No `count` field", "--baseline-shrinks", "`raw-temp-baseline.json` at the repository root", "never a symlink", "a test file the guard discovered", "keeps the proof of the base scope", "only in the creation PR's own run", "never in the standing"];
 
 test("S1 10 the baseline companion carries the full `raw-temp` baseline definition, once, and the detail's §7 points to it in one short paragraph, after the exemption grammar", () => {
   const text = read(BASELINE).replace(/\s+/g, " ");
@@ -194,7 +194,7 @@ test("S1 8 the core is self-contained under its own cap", () => {
 test("S1 6 the companion is its own rule with a conditional load and three tasks; the detail shares the core's load and tasks and the core depends on it", () => {
   const head = (file) => read(file).split("\n---\n")[0];
   assert.match(head(COMPANION), /^---\nid: "common\.test-leftovers-janitor"\nload: "conditional"\ntasks: \["audit","policy","release"\]$/);
-  assert.equal(head(BASELINE), '---\nid: "common.test-leftovers-baseline"\nload: "conditional"\ntasks: ["audit","policy","release"]', "the baseline companion is selected as the janitor's is");
+  assert.equal(head(BASELINE), '---\nid: "common.test-leftovers-baseline"\nload: "conditional"\ntasks: ["test","audit","policy","release","pr"]', "the baseline companion is selected for the tasks that write, review or ship a baseline");
   const TASKS = '["implement","test","audit","policy","release"]';
   assert.equal(head(RULE), `---\nid: "common.test-leftovers"\nload: "conditional"\ntasks: ${TASKS}\ndepends: ["common.test-leftovers-detail"]`);
   assert.equal(head(DETAIL), `---\nid: "common.test-leftovers-detail"\nload: "conditional"\ntasks: ${TASKS}`);
