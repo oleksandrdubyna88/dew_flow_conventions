@@ -1,8 +1,10 @@
 # PLAN — The `raw-temp` baseline: rule §7 authorises one ratcheting, membership-keyed baseline for sites proven to run inside an owned run folder
 
-> Status: **stopped for re-review (2026-11-02): a second change after approval (see Plan changes; CodeRabbit on #108).**
-> This document is the WHOLE plan revised for epoch 2 (step 4 of the full stop, 2026-11-02, against re-review consult
-> `b6ce1182` and the coordinator's verifications); the epoch-2 line is written after the re-review gate, not here.
+> Status: **epoch 2 OPEN (re-review document gate passed, proceed, 4 reviewers, 2026-11-02; approved by reviewers, not
+> narrowed) — the epoch-2 items are not built yet; #108 may take new code again.** The stop of 2026-11-02 (a second
+> change after approval; CodeRabbit on #108) is closed: this document is the WHOLE plan revised for epoch 2 (step 4 of
+> the full stop, against re-review consult `b6ce1182` and the coordinator's verifications), sorted by an Opus judge
+> (18 fits, 0 cut) and passed by the document gate, whose four findings are applied and marked *[re-review finding n]*.
 > Before the stop: **S1–S3 built on branch `feat/raw-temp-baseline` (PR #108, unmerged); the release (S4), the C#
 > reader and the pin bumps are NOT done** — see § *Build progress*. Scope: one sentence in the core
 > `common/test-leftovers.md` §7, a pointer paragraph in the detail `common/test-leftovers-detail.md` §7, the full
@@ -17,7 +19,7 @@
 
 ## Plan changes
 
-> Epoch 1 · approved 2026-11-01 · by reviewers · state: stopped
+> Epoch 1 · approved 2026-11-01 · by reviewers · state: closed
 
 - 1.1 · 2026-11-01 · reviewer · contract — the baseline has one fixed path at the repository root and is never a symlink
   (Opus B1: a symlink turned a grown baseline into an allowed creation — the file at a link's target was "absent at base"
@@ -70,19 +72,24 @@ Narrowed: no — every entry is reconciled by exactly one guard, the one its sco
   so E2-b must rewrite that case too; it belongs in E2-b's test list beside tests 25 and 26.)
   (Hygiene, not a cut: cb511e4, a test commit "RED before the file", also adds the 194-line module
   `tools/lib/raw-temp-baseline.mjs`. Pushed history is not rewritten; it is recorded here.)
-  (The judge disagrees with `Narrowed: no`. Epoch 1's Goal 4 and Definition of Done named a GLOBAL reconcile over the
+  (SUPERSEDED — kept as history; the record's one verdict is the `Narrowed: no` line above *[re-review finding 1]*. The
+  judge's objection of 2026-11-02, before the named-guard design: the judge disagreed with `Narrowed: no`. Epoch 1's Goal 4 and Definition of Done named a GLOBAL reconcile over the
   whole baseline [gate finding 0]; Goal 6 reconciles only the scopes a guard judges, and R6 admits a scope no guard
   judges keeps dead entries nobody reports. That is a smaller guarantee in the contract and in the Definition of Done,
-  so the record should read `Narrowed: yes` and the owner approves epoch 2. Scope, the merge conditions and the release
-  are not smaller: the merge conditions grew (the re-review gate, CodeRabbit's threads), the release is unchanged, and
-  ledger 1.3's base-only history check replaces a check that could never pass.)
+  so the record should have read `Narrowed: yes` with the owner's approval. Scope, the merge conditions and the release
+  were not smaller: the merge conditions grew (the re-review gate, CodeRabbit's threads), the release was unchanged, and
+  ledger 1.3's base-only history check replaced a check that could never pass. The objection no longer applies: the
+  design below removed the narrowing, and epoch 2 is approved by reviewers.)
   (The narrowing the judge named was REMOVED on 2026-11-02 by a revision of the design, chosen over asking the owner:
   each scope names the guard that judges it (`guard`, a closed list in the companion), a guard judges exactly the scopes
   that name it and reconciles every one of their entries globally, an unknown guard name is a malformed file for every
   guard, a changed `guard` is refused by the ratchet, and the companion requires the named guard to run in CI on every
   pull request — so no scope is without a guard and no entry goes unreported. `Narrowed: no` therefore holds with the
   reason on the record line; the judge's cells above are untouched, and its fix-forward notes on E2-b now mean the
-  named-guard form of Goal 6.)
+  named-guard form of Goal 6. The re-review document gate passed this revision on 2026-11-02 — proceed, 4 reviewers,
+  four findings accepted and applied as *[re-review finding 0–3]* — so epoch 2 is approved by reviewers.)
+
+> Epoch 2 · approved 2026-11-02 · by reviewers · state: open
 
 ## Symptom
 
@@ -165,10 +172,13 @@ them, so that a consumer can land its guard with every other class at zero and d
    rule change. A guard judges EXACTLY the scopes that name it: it applies their entries and reconciles every one of
    them globally — an entry whose file it did not read, or that no hit matched, is stale *[gate finding 0]*; a scope
    that names another guard applies nothing here (a `raw-temp` site this guard reads under it stays a finding) and
-   reports nothing here. An entry whose file is ABSENT from the tree is stale for every guard. A scope that names a
-   guard not in the list is a `baseline` finding for every guard (a malformed file: nothing applies). A proof the
-   judging guard did not discover, or discovered without its marker, is `proof missing`; a proof absent from the tree
-   is `proof missing` for every guard. **Why the global reconcile holds entry for entry:** every scope names exactly
+   reports nothing here — **a guard never checks another guard's scopes** *[re-review findings 0, 2]*. Within its own
+   scopes the guard also reports an entry whose file is ABSENT from the tree and a proof absent from the tree, and it
+   checks these by a direct `lstat` of that one relative path under the repository root, not by its discovery (a `.cs`
+   path is checked by the C# guard, never by the Node guard's file walk). A scope that names a guard not in the list is
+   a malformed file: one `baseline` finding, nothing applies (the whole file is parsed by whichever guard reads it). A
+   proof the judging guard did not discover, or discovered without its marker, is `proof missing`; a proof absent from
+   the tree is `proof missing` from its own guard. **Why the global reconcile holds entry for entry:** every scope names exactly
    one guard, and the companion requires a repository whose baseline names a guard to run that guard in CI on every
    pull request — so every entry has exactly one guard that reconciles it, and that guard runs. The creation PR shows
    each named guard's run. The ratchet treats a changed `guard` of an existing scope like a changed proof (refused).
@@ -234,10 +244,11 @@ scope precedence at `:52`), § *What a guard does with it* (`:60-70`), § *The r
   list is closed and grows only by a change to this rule. A scope naming any other value is a malformed file."* § *What
   a guard does with it* replaces its two sentences that say "a file never read" and "a scope whose proof is missing"
   without saying whose scan: *"A guard judges exactly the scopes that name it: it applies their entries and reconciles
-  every one of them — an entry of a file it did not read, or that no hit matched, is stale. A scope that names another
-  guard applies nothing here and is not reported here; an entry whose file is absent from the tree is stale for every
-  guard; a proof the judging guard did not discover, or discovered without its marker, is `proof missing`, and a proof
-  absent from the tree is `proof missing` for every guard. A repository whose baseline names a guard runs that guard in
+  every one of them — an entry of a file it did not read, or that no hit matched, is stale, and an entry whose file is
+  absent from the tree, or a proof absent from the tree, is reported by that guard after a direct look at the one path,
+  not by its discovery. A scope that names another guard applies nothing here and is not reported here: a guard never
+  checks another guard's scopes *[re-review findings 0, 2]*. A proof the judging guard did not discover, or discovered
+  without its marker, is `proof missing`. A repository whose baseline names a guard runs that guard in
   CI on every pull request, so every entry has exactly one guard that reconciles it, and that guard runs."* § *The
   ratchet* adds: *"a changed `guard` of a scope is refused like a changed proof."* § *Never* adds: *"Never name a guard
   the list does not have; never leave a named guard out of CI."*
@@ -288,7 +299,7 @@ no path that moves; `ownership-check` stays armed.
   `src/test/unit/a.test.mjs` is under the second, and only that scope's proof clears it.
 - **`scopes[].guard` names the guard that judges the scope** (Goal 6): `node` (the shipped Node guard) or `csharp`
   (the C# guard copied from the template) — a closed list in the companion, grown only by a rule change; any other
-  value is a malformed file for every guard. The Node scope above is judged by the Node guard, the C# scope by the C#
+  value is a malformed file, whichever guard parses it. The Node scope above is judged by the Node guard, the C# scope by the C#
   guard; one file, two guards, every entry reconciled by exactly one of them, and the named guard runs in CI on every
   pull request. The ratchet refuses a changed `guard` like a changed proof.
 - `entries[].file` is repository-relative with forward slashes and starts with some scope's `root`; `sha256` is
@@ -328,13 +339,16 @@ the shell helpers `tools/lib/leftovers-shell.mjs` (code round 2 finding 0); the 
    `createApplier` takes the guard's own name (`"node"` for the shipped guard, a constant `GUARD_NAME`) and judges
    exactly the scopes whose `guard` equals it**: their entries are indexed and reconciled globally (an entry no hit
    matched — a file not read included — is stale); a scope naming another guard is skipped whole (no entries applied,
-   no findings); an entry under ANY scope whose file is absent from the tree is a finding for every guard; `proofHolds`
-   is unchanged for a judged scope (not discovered, or discovered without the marker → `proof missing`) and is not
-   asked for another guard's scope. Tests: a two-scope baseline (a `node` scope with a discovered proof, a `csharp` scope
-   whose `.cs` proof the `node` profile never reads): the Node scope's stale entry is a finding, the C# scope's entries
-   are silent, a C# entry whose file is absent from the tree is a finding, and a `raw-temp` line under the C# scope in a
-   file the Node guard DOES read (a `.mjs` under `tests/Unit/`) stays a `raw-temp` finding — RED today (the C# scope is
-   `proof missing`, its entries stale), GREEN after. **Test 18's first case** (a proof present in the tree but not
+   no findings, no look at its files or its proof — a guard never checks another guard's scopes *[re-review findings
+   0, 2]*); within a judged scope, an entry whose file is absent from the tree is reported as "file absent" after a
+   direct `fs.lstatSync` of `path.join(repo, entry.file)` (not `discovered`), distinct from "no line"; `proofHolds`
+   is unchanged for a judged scope (not discovered, or discovered without the marker → `proof missing`; absent from the
+   tree, by the same direct `lstat`, → `proof missing` naming the absence) and is not asked for another guard's scope.
+   Tests: a two-scope baseline (a `node` scope with a discovered proof, a `csharp` scope whose `.cs` proof the `node`
+   profile never reads): the Node scope's stale entry is a finding, the C# scope's entries are silent — a C# entry whose
+   file is absent from the tree included — and a `raw-temp` line under the C# scope in a file the Node guard DOES read
+   (a `.mjs` under `tests/Unit/`) stays a `raw-temp` finding; a `node` entry whose file is absent is "file absent" —
+   RED today (the C# scope is `proof missing`, its entries stale), GREEN after. **Test 18's first case** (a proof present in the tree but not
    discovered, from `ecd47ef`): for a scope naming THIS guard it stays `proof missing` (unchanged); the case is joined by
    its twin, the same undiscovered proof under a scope naming ANOTHER guard, which is silent.
 5. **The proof marker** (`proofHolds`, `:132-137`): the marker, exactly the root, then only whitespace or a comment
@@ -370,9 +384,9 @@ progress* says which finding each came from). **Epoch 2 adds, each RED first:**
 | # | Behaviour | RED (before the code) | GREEN | RED again (break-it) |
 |---|---|---|---|---|
 | 24 | the scan judges only at the git root *[E2-e]* | `--repo <subfolder> --baseline` reads the subfolder's file | exit 2 naming the git root; at the root, unchanged | `gitRoot` dropped again from `loadBaselineAt` → the subfolder file is read |
-| 25 | one file, two guards: a scope is judged by the guard it NAMES *[E2-b]* | the `csharp` scope is `proof missing` and its entries stale under `--profile node` | the `node` scope's stale entry is a finding; the `csharp` scope's entries are silent; an entry under the `csharp` scope whose file is absent from the tree is a finding; a `raw-temp` `.mjs` line under the `csharp` scope stays a finding; test 18's first case keeps `proof missing` for a `node` scope and its twin under a `csharp` scope is silent | the `guard` comparison dropped → the `csharp` scope is `proof missing` again |
-| 26 | a proof file absent from the tree is `proof missing` for every guard; a changed `guard` is refused by the ratchet *[E2-b]* | — | the `csharp` scope's proof deleted → `proof missing` under the `node` profile too; `--baseline-shrinks` with a scope's `guard` changed `csharp` → `node` → exit 1 naming it; a narrowed scope that changes the guard → 1 | — |
-| 31 | an unknown guard name is a malformed file for every guard *[E2-b]* | — | `"guard": "rust"` (or a missing `guard`) → ONE `baseline` finding at line 1 naming `scopes[i].guard` and the closed list; nothing applies, under the `node` profile and in the shrink check (exit 1) | `"guard": "node"` → the scope is judged |
+| 25 | one file, two guards: a scope is judged by the guard it NAMES, and only by it *[E2-b; re-review findings 0, 2]* | the `csharp` scope is `proof missing` and its entries stale under `--profile node` | the `node` scope's stale entry is a finding; the `csharp` scope's entries are silent — one whose file is absent from the tree included; a `raw-temp` `.mjs` line under the `csharp` scope stays a finding; a `node` entry whose file is absent from the tree is "file absent" (by `lstat`, not discovery: a `node` scope file that exists but the `node` profile does not walk is "no line", not "file absent"); test 18's first case keeps `proof missing` for a `node` scope and its twin under a `csharp` scope is silent | the `guard` comparison dropped → the `csharp` scope is `proof missing` again |
+| 26 | a proof absent from the tree is `proof missing` from its OWN guard only; a changed `guard` is refused by the ratchet *[E2-b; re-review findings 0, 2]* | — | the `node` scope's proof deleted → `proof missing` under the `node` profile; the `csharp` scope's proof deleted → nothing under the `node` profile; `--baseline-shrinks` with a scope's `guard` changed `csharp` → `node` → exit 1 naming it; a narrowed scope that changes the guard → 1 | — |
+| 31 | an unknown guard name is a malformed file (whichever guard parses it) *[E2-b]* | — | `"guard": "rust"` (or a missing `guard`) → ONE `baseline` finding at line 1 naming `scopes[i].guard` and the closed list; nothing applies, under the `node` profile and in the shrink check (exit 1) | `"guard": "node"` → the scope is judged |
 | 27 | the marker parse is linear *[CodeRabbit]* | — | test 17's cases unchanged; a 100,000-character line after the marker parses in under 50 ms; a root followed by two closers is no marker | the regex restored → the long line is slow or the two-closer case passes |
 | 28 | cross-platform tests *[CodeRabbit]* | the `git clone` URL is `file://${origin}` (tests 11, 14) | `pathToFileURL(origin).href`; tests 16 and 23 (symlinks) `skip` on `win32` with the reason "symlinks need a privilege on Windows"; tests 20 and 20b (a `#!/bin/sh` fake git on `PATH`) `skip` on `win32` with the reason "the fake git is a POSIX script" | — |
 | 29 | the companion is selected for `implement` *[E2-a]* | `explain --task implement --file raw-temp-baseline.json` lacks the companion; `tools/test-leftovers-rule.test.mjs:197` pins the old tasks | the new tasks string; the regenerated selection baseline; the explain lists `common.test-leftovers-baseline` | — |
@@ -394,14 +408,18 @@ the reader takes the repository root and the scan's discovered files, because th
 ```csharp
 // tests/Mcp.Tests/Leftovers/RawTempBaseline.cs — copied by every C# consumer, byte-identical
 public static RawTempBaseline LoadAt(string repoRoot);                 // raw-temp-baseline.json at the git root; a symlink or a non-root folder is refused the way the Node loader refuses it; an unknown or missing `guard` is malformed
-public GuardReport Apply(GuardReport report, IReadOnlySet<string> discovered);  // judges exactly the scopes with guard: "csharp": their entries pass up to the count and every unmatched one is stale; a proof not in `discovered`, or without its marker, is "proof missing"; scopes naming another guard apply nothing and report nothing; an entry whose file is absent from the tree, class, malformed → "baseline"
+public GuardReport Apply(GuardReport report, IReadOnlySet<string> discovered);  // judges exactly the scopes with guard: "csharp" and no other: their entries pass up to the count and every unmatched one is stale, an entry whose file is absent (File.Exists on that one path, not `discovered`) is "file absent", a proof not in `discovered` or without its marker or absent is "proof missing"; scopes naming another guard are never looked at; class, malformed, unknown guard → "baseline"
 ```
 
 The consumer's wrapper is then `RawTempBaseline.LoadAt(root).Apply(LeftoversGuard.Scan(root, mount), scan.FilesRead)` and
 the empty assertion — `GuardReport` today carries `FilesScanned` (a count); the template adds the set of relative paths it
 read (`FilesRead`), which is the one change to the report type and none to the scanner. The guard's name is the constant
 `"csharp"` of the closed list. The tests show behaviours 1–9, 12, 21b, 21c, 25, 26 and 31 (the Node tool's 10, 11, 13,
-14, 24, 27–30 are not ported). The shrink check is NOT ported: the
+14, 24, 27–30 are not ported). **A repository with no baseline file passes no baseline flag and calls no reader:
+the wrapper is the plain empty assertion, as today** *[re-review finding 3]*. The shrink check is NOT ported — **it is
+the Node tool, so a consumer's CI that carries a baseline needs Node (the mounted conventions' `npm ci`) for that one
+step, `node .agents/conventions/tools/leftovers-check.mjs --baseline-shrinks --base <target>`, whatever language the
+baselined trees are in** *[re-review finding 3]*: the
 consumer's CI runs the Node tool's `--baseline-shrinks --base <target>` once per PR over the one file (one implementation,
 as the C# guard already shells to the shipped `sweeper-scan.mjs` for scripts). If the template lags coai's producer PR,
 coai's wrapper may carry the reader inline FIRST and the template adopts that code unchanged — the plan says which it was.
@@ -465,7 +483,7 @@ node tools/release-distance.mjs                     # after S4 only
   logic inline. The format and the judged-scope rule are fixed by the companion, so the two cannot drift on the
   contract, only on bugs.
 - **R6 — a scope no guard judges is silent about its entries.** CLOSED 2026-11-02 by the named-guard design (Goal 6):
-  every scope names its guard, an unknown name is malformed for every guard, and the companion requires the named guard
+  every scope names its guard, an unknown name is malformed whichever guard parses it, and the companion requires the named guard
   to run in CI on every pull request — so no entry is without a guard that reconciles it. What remains: a repository
   that names a guard and does not run it in CI breaks the companion's rule, which a reviewer of the creation PR sees in
   the workflow file; the shipped guard cannot see another guard's absence.
