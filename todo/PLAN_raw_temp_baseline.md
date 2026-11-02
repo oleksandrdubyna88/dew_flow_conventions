@@ -91,6 +91,11 @@ Narrowed: no — every entry is reconciled by exactly one guard, the one its sco
 
 > Epoch 2 · approved 2026-11-02 · by reviewers · state: open
 
+- 2.1 · 2026-11-02 · reviewer · contract — two guards never read or judge the same files: overlapping scopes name one guard, and a csharp scope inside the Node guard's walk is a finding
+  (epoch-2 code gate finding 5: a csharp scope nested in a node scope took entries the Node guard reads but may not judge;
+  Opus review 1: the Node guard's walk reads `tests/`, `test/` and `scripts/` whole, .cs included, so the companion's own
+  csharp example failed there. One cause, one entry: "every entry is reconciled by exactly one guard" needs both rules.)
+
 ## Symptom
 
 Rule §7 at release `105d53c` allows ONE pass for a `raw-temp` finding: an inline comment on the line or the line
