@@ -1,7 +1,7 @@
 ---
 id: "common.test-leftovers-baseline"
 load: "conditional"
-tasks: ["test","audit","policy","release","pr"]
+tasks: ["implement","test","audit","policy","release","pr"]
 ---
 # The `raw-temp` baseline — one ratcheting file for sites inside an owned run folder
 
