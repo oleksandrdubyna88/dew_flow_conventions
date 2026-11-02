@@ -590,6 +590,14 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   test that a mocked `io` given to `moveToQuarantine` is the one the inner helpers use; [gate finding 1] inside them `isTakenRename` is
   called with `options.platform` (a string), its own exported signature unchanged, tested through `moveExclusively`'s taken path on
   `platform: "win32"`.
+- **Progress 2026-11-02 — the helpers are EXPORTED (feat 657b311, RED fa661ea; test tightened 42239d6).** `identityOf`, `isOwnEmptyPlaceholder`, `removeOwnEmptyPlaceholder`, `moveExclusively` and
+  `moveToQuarantine` take a last `{ io = fs, platform = process.platform }`; the options object is forwarded through every call between them and `isTakenRename` is called with the platform
+  string. The sweep's own calls pass nothing: `tools/leftovers-sweep.test.mjs` is unchanged and green (59 tests). The new tests are in `tools/leftovers-sweep-helpers.test.mjs` (a new file: the
+  sweep's test file is already past the 800-line limit). RED observed: with the module as on main all 11 failed (not exported); GREEN with the change; RED again with the change stashed
+  (0 of 11 pass, the sweep suite still 59). Each forwarding point was also dropped on purpose, one at a time (`moveToQuarantine`, the placeholder check inside `moveExclusively`, the
+  failure-path remover, `isTakenRename` given the options object, the check inside `removeOwnEmptyPlaceholder`): each is caught by a test. The last one was NOT at first, so test `d` was
+  tightened (42239d6). Docs: the README tool row and the module header say the helpers are the family's one implementation. Not done: the release (rides F16 and the `raw-temp`
+  baseline), coai deleting its copy after its pin bump. The Windows branch ran only through the `platform` seam on Linux; no Windows machine ran it.
 
 ## Definition of Done
 
