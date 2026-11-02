@@ -723,14 +723,15 @@ const TOKEN_FREE = {
   tempRoot, asciiLower, windowsOwnerToken, ownerToken, thisOwnerToken, classifyName, isInsideProfile, isMine, cleanupScope, startFromProcStat, auxvWordBytes, clockTicksFromAuxv, clockTicksPerSecond,
   readPidNamespace, isProcessId, isAskablePid, processProbe, hidepidActive, hostName, hostId, thisOwner, formatOwner, formatLegacyOwner, parseOwner,
   parseLegacyOwner, runRecord, writeOwner, removeClaimIfStill, gitdirOf, readClaimText, readOwner, ownerState, legacyOwnerState, removeLink,
-  removeQuietly, removeClaim,
+  removeQuietly, removeClaim, checkToken,
 };
 
 /** `token` or a TypeError naming the legal shape: `[a-z0-9]{2,12}`, and never of the owner grammar (a token that read as an owner would make every name ambiguous, rule §1). */
-function checkToken(token) {
+export function checkToken(token) {
   if (typeof token !== "string" || !TOKEN_SHAPE.test(token) || OWNER_GRAMMAR.test(token)) {
     throw new TypeError(`owned: \`token\` must match ${TOKEN_SHAPE} and must not be of the owner grammar ${OWNER_GRAMMAR}, got ${JSON.stringify(token)}`);
   }
+  return token;
 }
 
 /** `row` is the "repository" column of the token's row in the rule's `## Tokens` table: one non-blank line, or absent. */
