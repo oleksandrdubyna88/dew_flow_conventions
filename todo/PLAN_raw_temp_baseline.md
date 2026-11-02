@@ -584,6 +584,9 @@ unchanged code), then the code, then RED again with the code stashed and with ta
   - [x] [epoch-2 code2 1] a root also refuses control characters (below U+0020, U+007F); `\s` already covers the Unicode spaces (test 17 adds
         U+0001, U+007F, U+00A0, U+2003; the companion says "no whitespace, control character, `*/` or `-->`").
   - [x] [epoch-2 code2 3] the walk finding names `src/Tests/` as an example root (test 34).
+- [x] [CodeRabbit 4440549937] the run modes are mutually exclusive: `optionsProblem` refuses any two of `--update-allowlist`,
+      `--baseline-shrinks` and `--print-baseline` (a usage error naming both, exit 2, before a mode is chosen); `--print-baseline` still
+      refuses `--baseline`. Test 41 (RED: the combination ran the allowlist update only; break-it: the check disabled).
 - [ ] Every open CodeRabbit thread on #108 answered (the Definition of Done's epoch-2 line stays open until then; the code gate and
       the Opus review have passed).
 

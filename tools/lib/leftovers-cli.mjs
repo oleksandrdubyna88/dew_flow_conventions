@@ -18,8 +18,10 @@ const FLAGS = Object.freeze({ "--update-allowlist": "update", "--print-baseline"
 const PLAIN_VALUES = ["token", "identity", "profile", "base"]; // taken as written; every other value option is a path
 const VALUE_NAMES = Object.freeze({ repo: "repo", token: "token", identity: "identity", rule: "rule", allowlist: "allowlist", profile: "profile", base: "base" });
 
-/** The first thing wrong with the parsed options as a whole (a profile, the pairing of the baseline flags), or `undefined`. */
+/** The first thing wrong with the parsed options as a whole (the run modes, a profile, the pairing of the baseline flags), or `undefined`. */
 export function optionsProblem(options) {
+  const modes = [["--update-allowlist", options.update], ["--baseline-shrinks", options.baselineShrinks], ["--print-baseline", options.printBaseline]].filter(([, on]) => on);
+  if (modes.length > 1) return `\`${modes[0][0]}\` and \`${modes[1][0]}\` are separate run modes; give one of them per run`;
   if (options.profile !== undefined && !PROFILES.includes(options.profile)) return `unknown profile \`${options.profile}\` (the only profile is \`${PROFILES.join("`, `")}\`)`;
   if (options.baselineShrinks && options.base === undefined) return "`--baseline-shrinks` needs `--base <git-ref>`";
   if (!options.baselineShrinks && (options.base !== undefined || options.allowCreate)) return "`--base` and `--allow-create` belong to `--baseline-shrinks`";
