@@ -478,7 +478,7 @@ test("17. the proof marker is the marker, exactly the scope root, then only whit
     assert.equal(withBaseline(repo).code, 0, `a CRLF file: ${JSON.stringify(line)} [epoch-2 Opus 5]`);
   }
   // a root holds no whitespace, star-slash or `-->`: such a root could never be written into a marker line [epoch-2 code 0, Opus 5]
-  for (const root of ["src/my tests/", "src/my\ttests/", "src/a*/b/", "src/a-->b/"]) {
+  for (const root of ["src/my tests/", "src/my\ttests/", "src/a*/b/", "src/a-->b/", "src/a\u0001b/", "src/a\u007fb/", "src/a\u00a0b/", "src/a\u2003b/"]) { // [epoch-2 code2 1]: control characters and the Unicode spaces too
     const { repo } = fixture(t, { baseline: baselineOf({ scopes: [{ root, proof: `${root}run.test.mjs`, guard: "node" }] }) });
     const result = withBaseline(repo);
     assert.equal(result.code, 1, JSON.stringify(root));
@@ -874,6 +874,7 @@ test("34. a csharp scope inside the node guard's walk is a baseline finding of t
   assert.equal(result.code, 1, result.text);
   assert.deepEqual(found(result.text), ["raw-temp-baseline.json:1 — baseline"], result.text);
   assert.match(result.text, /a csharp scope inside the node guard's walk: its files would be read by both guards/);
+  assert.match(result.text, /src\/Tests\//, "the message names an example root outside the walk, as the companion does [epoch-2 code2 3]");
   assert.doesNotMatch(result.text, /proof missing/);
   const moved = fixture(t, { baseline: baselineOf({ scopes: [NODE_SCOPE, { root: "src/Tests/", proof: "src/Tests/RunFolderTests.cs", guard: "csharp" }] }), extra: { "src/Tests/RunFolderTests.cs": `// ${MARK}src/Tests/\n` } });
   assert.equal(withBaseline(moved.repo).code, 0, "a root the node guard does not read is fine");
@@ -953,4 +954,20 @@ test("39. a git failure while the scan locates the git root is exit 2 with git's
   const result = withBaseline(repo);
   assert.equal(result.code, 2, result.text);
   assert.match(result.text, /boom/);
+});
+
+// 40 ---------------------------------------------------------------------------------------------------------------------------
+
+test("40. the applier keys scanned paths and entries by forward slashes: a Windows scan (backslash relative paths) matches a baseline written with `/` [epoch-2 code2 0]", (t) => {
+  const { repo } = fixture(t);
+  const slashed = (name) => name.replaceAll("/", "\\");
+  const hit = sha(L3);
+  const applier = createApplier({ scopes: [NODE_SCOPE], entries: [entry(A, L3, 3)] }, repo, FILE, new Set([slashed(PROOF)]));
+  assert.equal(applier.take(slashed(A), hit), true, "a backslash path of the scan takes the entry written with `/`");
+  assert.deepEqual(applier.finalFindings(), [], "and the proof discovered as a backslash path holds");
+  const written = createApplier({ scopes: [NODE_SCOPE], entries: [entry(slashed(A), L3, 3)] }, repo, FILE, new Set([PROOF]));
+  assert.equal(written.take(A, hit), true, "an entry whose file has backslashes is attributed to its scope and matched");
+  assert.deepEqual(written.finalFindings(), []);
+  const deep = createApplier({ scopes: [NODE_SCOPE, { root: "src/test/unit/", proof: "src/test/unit/u.test.mjs", guard: "node" }], entries: [entry(slashed("src/test/unit/b.test.mjs"), L3, 1)] }, repo, FILE, new Set([PROOF]));
+  assert.ok(deep.finalFindings().some((finding) => finding.text.includes("proof missing") && finding.text.includes("src/test/unit/")), "the ancestor lookup finds the most specific scope of a backslash entry");
 });
