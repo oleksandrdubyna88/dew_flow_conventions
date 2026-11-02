@@ -96,6 +96,10 @@ after it; the only pass is the janitor's inventory line by file, line and hash),
 true). The one exemption form is a comment on the line or the line above,
 `testsToDelete-exempt: <class> — <reason>`: ten characters, three words, no placeholder, `lock:` for
 `shared-store`; `owner-blind` and `ryuk-off` take none; a malformed one is a finding of class `exemption`.
+A `raw-temp` site that provably runs inside an owned, claimed run folder may instead be carried by the repository's
+**`raw-temp` baseline**: a multiset of sites (file and the content hash of the line; the line number a hint), read
+by the guard only when named, that only shrinks — an occurrence beyond it, a stale entry, a site outside a proven
+runner or any other class in it is a finding.
 Detail: §7.
 
 ## The janitor
