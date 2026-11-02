@@ -80,6 +80,11 @@ test("F21 d. removeOwnEmptyPlaceholder calls io.rmdirSync only for our empty res
   assert.deepEqual(calls, [], "another identity: rmdir is never asked");
   assert.ok(fs.existsSync(placeholder));
 
+  const blind = ioWith({ lstatSync: failing("EIO") }, ["rmdirSync"]);
+  sweep.removeOwnEmptyPlaceholder(placeholder, reserved, { io: blind.io });
+  assert.deepEqual(blind.calls, ["lstatSync"], "an io that cannot read the identity is the one the check uses: rmdir is never asked");
+  assert.ok(fs.existsSync(placeholder));
+
   sweep.removeOwnEmptyPlaceholder(placeholder, reserved, { io });
   assert.deepEqual(calls, ["rmdirSync"], "ours and empty: rmdir asked once");
   assert.equal(fs.existsSync(placeholder), false);
