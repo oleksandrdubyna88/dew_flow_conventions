@@ -606,6 +606,39 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   with the guard (d02d6c5), RED again with it stashed (3 failed, the other 11 pass).
 - **Released 2026-11-02** in `5863c60` (#109, `5863c60d`); every consumer pinned it the same day. coai's E5.S2-A imports these helpers and drops its copy.
 
+## F22 — The reference sweep only sweeps its own token, so no wrapping consumer can collect its own folders (found 2026-11-02, creds E2.1)
+
+- **What.** `relationOf` (`tools/lib/leftovers-sweep.mjs` ~:75-82) compares every name's token with the module's own `REPO_TOKEN`
+  (`conventions`), and `sweepLeftovers` takes no token. `ownedFor({ token, row })` binds the token for naming, folders and worktrees,
+  but not for the sweep. A consumer that wraps the reference (decision 11: creds E2, coai E5's Node runners) therefore sweeps
+  nothing of its own: measured by the creds E2.1 coder — a dead-claimed `creds` folder beside a dead-claimed `conventions` folder in
+  one private root; only the `conventions` one was removed.
+- **Why.** Decision 11 makes the wrapped reference the Node consumers' only sweep; without this, a killed run's folders are never
+  collected by a Node consumer, and copying the sweep to change one constant is the reuse-first defect F21 just removed.
+- **Fix — widen, behaviour unchanged for this repository.** `sweepLeftovers({ ..., token = REPO_TOKEN })`: the given token
+  replaces `REPO_TOKEN` in the name relation (owner-form and legacy names alike), validated by the same `checkToken` as
+  `ownedFor`; an invalid token throws before anything is read. This repository's own call sites pass nothing. The F16 Windows
+  list-only gate and every other check are unchanged.
+- **Tests (RED → GREEN → RED):** a private root with a dead-claimed `creds` owner-form folder and a dead-claimed `conventions` one:
+  `token: "creds"` removes only the `creds` one (RED today: it is kept), the default removes only the `conventions` one (the
+  companion); a `creds` legacy name is `legacy:` under `token: "creds"` and `other` under the default; an invalid token throws and
+  nothing is read; on `platform: "win32"` the `creds` folder is `unverified:`, untouched (F16).
+- **Docs.** The README tool row and the module header say the sweep takes the consumer's token; the detail §4 needs no change (it
+  already says each repository sweeps its own token).
+- **Release.** A release of its own, then the pin bumps of the consumers that sweep through the reference (creds first, for E2.1);
+  E2.1 merges only after creds pins it (rollout ledger 2.1).
+- **Progress 2026-11-02 — the sweep takes the consumer's token (fix f4431a8, RED a9e3198).** `sweepLeftovers({ ..., token = REPO_TOKEN })`: `relationOf` compares owner-form and legacy names with the
+  given token; `checkToken` (the check `ownedFor` uses) is exported from `tools/lib/owned.mjs` (and listed token-free in `ownedFor`'s bound API, which a test enumerates; 95ca8b5) and called first, so an invalid token throws a TypeError before the root, the repository, the probe or a hook is
+  touched. This repository's own calls pass nothing; the F16 gate, the never-throw error handling and the order are unchanged. The tests are in `tools/leftovers-sweep-token.test.mjs` (a new file: the sweep's test
+  file is past the 800-line limit). RED observed with the module as on main: 4 of 5 failed (a: the `creds` folder was kept; c: no `legacy:` line; d: an invalid token did not throw; e: the `conventions` folder was
+  listed `unverified:` instead of the `creds` one); the companion b (the default removes only the `conventions` folder) passes on main by design. GREEN with the change (5 of 5; the sweep suite and the F21 helper tests
+  unchanged, 73 pass). RED again with the lib stashed to main (4 of 5 failed, the sweep and helper suites still 73 pass). Docs: the README tool row and the module header say the sweep takes the consumer's token. Not done: the release and
+  the consumers' pin bumps (creds first, for E2.1). Not tested: the token reaching the worktree, orphan-claim and quarantine relations (they call the same `relationOf` with the same `context.token`; only folders and
+  legacy names have a test).
+  [PR review, CodeRabbit] (accepted) The exported `checkToken` is documented to return the token but returned `undefined`, so `sweepLeftovers({ token: checkToken("creds") })` fell back to `conventions`. It now returns the
+  validated token (`ownedFor` and the sweep ignore the value). Tests `F22 f` (returns the token, still throws) and `F22 g` (the passed-through token removes the creds folder): RED first (2 failed), GREEN with the change,
+  RED again with `owned.mjs` back to the previous commit (2 failed, the other 5 pass).
+
 ## Definition of Done
 
 - [ ] Each of F1 to F20 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.

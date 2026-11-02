@@ -83,6 +83,11 @@ Narrowed: yes — E5's producer PR may merge with the structural guard green-by-
 
 > Epoch 2 · approved 2026-11-01 · by owner · state: open
 
+- 2.1 · 2026-11-02 · agent · build-order — E2.1 and E5's Node runners wait for F22 (the reference sweep takes the consumer's token) and its release
+  (the E2.1 coder measured it: `sweepLeftovers` compares every name with the reference's own `REPO_TOKEN`, so a wrapper cannot
+  sweep `creds-` or `coai-` folders; decision 11 forbids a copy. F22 is in the follow-ups plan; E2.1 is built with a sweep seam
+  that refuses loudly until the pin carries F22.)
+
 ## Symptom
 
 The owner, 2026-10-14: containers started by tests stay up for weeks and hold memory, CPU, ports and disk;
