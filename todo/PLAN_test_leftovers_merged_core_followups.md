@@ -585,6 +585,11 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   family's one implementation and consumers import them, never copy them.
 - **Release.** Rides the same promotion as F16 (#107) and the `raw-temp` baseline (#108). coai then deletes its copy and imports these
   after its pin bump (E5.S2-A, before that PR merges).
+- **Plan gate 2026-11-02** (coai session `ad098f3b`, `proceed`; 0 and 1 accepted, 2 rejected — RED → GREEN → RED is the family's check,
+  the suite ends green): [gate finding 0] the options object is forwarded through every internal call between the five helpers, with a
+  test that a mocked `io` given to `moveToQuarantine` is the one the inner helpers use; [gate finding 1] inside them `isTakenRename` is
+  called with `options.platform` (a string), its own exported signature unchanged, tested through `moveExclusively`'s taken path on
+  `platform: "win32"`.
 
 ## Definition of Done
 
