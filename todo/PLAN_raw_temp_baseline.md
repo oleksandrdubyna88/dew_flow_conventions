@@ -279,12 +279,12 @@ no path that moves; `ownership-check` stays armed.
   "class": "raw-temp",
   "scopes": [
     { "root": "src/test/", "proof": "src/test/runFolder.test.mjs", "guard": "node" },
-    { "root": "tests/Unit/", "proof": "tests/Unit/RunFolderTests.cs", "guard": "csharp" }
+    { "root": "src/Tests/", "proof": "src/Tests/RunFolderTests.cs", "guard": "csharp" }
   ],
   "entries": [
     { "file": "src/test/a.test.mjs", "sha256": "<64 hex of the trimmed line>", "line": 18 },
     { "file": "src/test/a.test.mjs", "sha256": "<the same key, a second occurrence>", "line": 40 },
-    { "file": "tests/Unit/A.cs", "sha256": "<64 hex>", "line": 12 }
+    { "file": "src/Tests/A.cs", "sha256": "<64 hex>", "line": 12 }
   ]
 }
 ```
@@ -302,6 +302,11 @@ no path that moves; `ownership-check` stays armed.
   value is a malformed file, whichever guard parses it. The Node scope above is judged by the Node guard, the C# scope by the C#
   guard; one file, two guards, every entry reconciled by exactly one of them, and the named guard runs in CI on every
   pull request. The ratchet refuses a changed `guard` like a changed proof.
+- **Epoch-2 rules of the format after the code gate and the Opus review** *[epoch-2 code 0, 5; Opus 1, 4, 5]*: a root contains no
+  whitespace, `*/` or `-->` (a marker line could not carry it); no root is listed twice; scopes that overlap (one root a
+  path-segment prefix of the other) name the SAME guard, else the file is malformed for every guard; and a scope's files are not read
+  by another guard's walk — the Node guard reads every file under `scripts/`, `test/` and `tests/`, so a `csharp` scope with a root
+  there is a `baseline` finding in the Node guard (the example's C# root is `src/Tests/` for that reason).
 - `entries[].file` is repository-relative with forward slashes and starts with some scope's `root`; `sha256` is
   `createHash("sha256")` of the line with leading and trailing whitespace and any `\r` removed (B1; unlike the
   allowlist's `lineSha256`, `tools/lib/sweeper-scan.mjs:156-158`, which pins exact bytes on purpose); `line` is a 1-based
@@ -347,7 +352,7 @@ the shell helpers `tools/lib/leftovers-shell.mjs` (code round 2 finding 0); the 
    Tests: a two-scope baseline (a `node` scope with a discovered proof, a `csharp` scope whose `.cs` proof the `node`
    profile never reads): the Node scope's stale entry is a finding, the C# scope's entries are silent — a C# entry whose
    file is absent from the tree included — and a `raw-temp` line under the C# scope in a file the Node guard DOES read
-   (a `.mjs` under `tests/Unit/`) stays a `raw-temp` finding; a `node` entry whose file is absent is "file absent" —
+   (a `.mjs` under the `csharp` scope's root) stays a `raw-temp` finding; a `node` entry whose file is absent is "file absent" —
    RED today (the C# scope is `proof missing`, its entries stale), GREEN after. **Test 18's first case** (a proof present in the tree but not
    discovered, from `ecd47ef`): for a scope naming THIS guard it stays `proof missing` (unchanged); the case is joined by
    its twin, the same undiscovered proof under a scope naming ANOTHER guard, which is silent.
@@ -549,8 +554,26 @@ unchanged code), then the code, then RED again with the code stashed and with ta
 - [x] CodeRabbit — `declaredRoot` is a linear parse without trim (test 27); `pathToFileURL` for both clones and `skip` on `win32` with a
       reason for tests 16, 23 (symlinks) and 20, 20b (the sh fake git), pinned by test 28; `scopeProblem`/`entryProblem` out of
       `problemOf` and `optionsProblem` out of `parseArguments` (test 30).
-- [ ] The code gate and the Opus review of epoch 2 on #108; every open CodeRabbit thread answered (the Definition of Done's epoch-2 line
-      stays open until they pass).
+- [x] The epoch-2 code gate (proceed) and Opus review (no blocking) were applied, test first (`9fd4f2e`, `4131032` tests; `9f451fa` code):
+  - [x] [epoch-2 code 0] `scopeProblem` refuses an ASCII space or tab in a root (test 17; break-it: the check dropped).
+  - [x] [epoch-2 code 1] only ENOENT and ENOTDIR mean absent; any other lstat error is a `baseline` finding naming path and error, for an
+        entry and for a proof (test 35, ENAMETOOLONG; break-it: any error is absent).
+  - [x] [epoch-2 code 2] one look per path per run (test 36 counts the lstat calls: 50 against 1; break-it: no memo).
+  - [x] [epoch-2 code 3] `firstProblem` stops at the first problem; `problemOf` is exported for test 32 (a Proxy counts later reads: 0).
+  - [x] [epoch-2 code 4] the guard message says `node` for the Node guard's suites and `csharp` for the C# guard's (test 31).
+  - [x] [epoch-2 code 5] overlapping scopes name one guard; a root twice is malformed (test 33, shrink check included; `overlapProblem`
+        walks each root's ancestors; break-its: the compare, the duplicate check).
+  - [x] [epoch-2 code 6] scopes are attributed to entries by an ancestor lookup in a root map, not a filter and a sort per entry (test 22c:
+        20,000 scopes and 20,000 entries, 5.2 s before, milliseconds after). This is faster than the sort-once the gate named.
+  - [x] [epoch-2 Opus 1] a `csharp` scope inside the Node guard's walk is a `baseline` finding of the Node guard (`createApplier`'s `walks`,
+        fed by `NODE_TREE`; test 34 reproduces `tests/Unit/`; the examples move to `src/Tests/`; break-it: the finding dropped).
+  - [x] [epoch-2 Opus 2] `locateBaseline` checks the git root before the symlink (test 38; break-it: `gitRoot` dropped).
+  - [x] [epoch-2 Opus 3] test 39: `--baseline` with a failing `git rev-parse` is exit 2 (GREEN on the code as it stood; break-it: `gitRoot` dropped).
+  - [x] [epoch-2 Opus 4] a duplicate root is malformed, one guard or two (test 33).
+  - [x] [epoch-2 Opus 5] a root holds no `*/` or `-->` either; test 17 gains the root cases and the CRLF case (GREEN before; break-it: a
+        split on LF only).
+- [ ] Every open CodeRabbit thread on #108 answered (the Definition of Done's epoch-2 line stays open until then; the code gate and
+      the Opus review have passed).
 
 Deviations of the epoch-2 build, each with its reason:
 
@@ -560,7 +583,8 @@ Deviations of the epoch-2 build, each with its reason:
    `NO_POSIX_SH`): a Windows-only defect cannot be RED on Linux. The edits it pins are in the same commit, so its RED is a targeted
    break (the join restored; `NO_POSIX_SH` dropped from test 20), not an unchanged-code run.
 9. **The marker parse follows the plan's algorithm literally**: the root candidate ends at the next space or tab, so a scope root that
-   contains a space can never be proven (the old pattern accepted one). Roots with spaces are not in use; say so if one appears.
+   contains a space can never be proven. *Closed by [epoch-2 code 0]: such a root is now a malformed file, so no scope can be
+   unprovable for that reason.*
 10. **Test 29 is `S1 11` in `tools/test-leftovers-rule.test.mjs`**, beside S1 6, not in `raw-temp-baseline.test.mjs`.
 11. **Not run here: SonarCloud.** The complexity splits are tested for existence and behaviour (test 30); whether no function is over 15
     is for SonarCloud on the pushed branch.
