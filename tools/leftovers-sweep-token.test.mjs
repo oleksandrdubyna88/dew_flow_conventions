@@ -14,7 +14,7 @@ import * as path from "node:path";
 
 import { git } from "./lib/git.mjs";
 import { sweepLeftovers } from "./lib/leftovers-sweep.mjs";
-import { cleanupScope, ownedDir, ownedFor, processProbe, thisOwner, thisOwnerToken } from "./lib/owned.mjs";
+import { checkToken, cleanupScope, ownedDir, ownedFor, processProbe, thisOwner, thisOwnerToken } from "./lib/owned.mjs";
 
 const HOUR = 3_600_000;
 const PRETEND_DEAD = 4242;
@@ -131,4 +131,22 @@ test("F22 e. on win32, token \"creds\" lists the creds folder as `unverified:` a
   assert.deepEqual(result.removed, []);
   assert.deepEqual(result.listed.filter((line) => line.startsWith("unverified: ")), [`unverified: ${ours} — the owner SID is not read on Windows (F16)`]);
   for (const kept of [ours, other]) assert.ok(fs.existsSync(kept) && fs.existsSync(`${kept}.owner`), `${kept} must be untouched`);
+});
+
+test("F22 f. checkToken returns the token it validated, and still throws on a bad one", () => {
+  for (const token of ["creds", "conventions", "r9700", "ab"]) assert.equal(checkToken(token), token);
+  assert.throws(() => checkToken("u1000"), TypeError);
+  assert.throws(() => checkToken(undefined), TypeError);
+});
+
+test("F22 g. a validated token passed straight in: sweepLeftovers({ token: checkToken(\"creds\") }) removes the creds folder", (t) => {
+  const { scope, tmp, repo } = arena(t);
+  const ours = deadFolder(scope, creds, tmp, "f22g-creds");
+  const other = deadFolder(scope, conventions, tmp, "f22g-conventions");
+
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, token: checkToken("creds") });
+
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(namesOf(result.removed), namesOf([ours]), "not the default token's folder: a returned undefined would fall back to `conventions`");
+  assert.ok(fs.existsSync(other) && fs.existsSync(`${other}.owner`));
 });
