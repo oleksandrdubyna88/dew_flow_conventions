@@ -1,6 +1,6 @@
 # PLAN — The `raw-temp` baseline: rule §7 authorises one ratcheting, membership-keyed baseline for sites proven to run inside an owned run folder
 
-> Status: **S1–S3 built on branch `feat/raw-temp-baseline`, 2026-11-01; the release (S4), the C# reader and the pin bumps are NOT done** — see § *Build progress*. Scope: one sentence in the core
+> Status: **stopped for re-review (2026-11-02): a second change after approval (see Plan changes; CodeRabbit on #108).** Before it: **S1–S3 built on branch `feat/raw-temp-baseline`, 2026-11-01; the release (S4), the C# reader and the pin bumps are NOT done** — see § *Build progress*. Scope: one sentence in the core
 > `common/test-leftovers.md` §7, one paragraph in the detail `common/test-leftovers-detail.md` §7, the Node guard
 > `tools/leftovers-check.mjs` (a `--baseline` pass, a `--baseline-shrinks` check, a `--print-baseline` listing, the
 > class `baseline`) with its tests, the rule tests' caps, the research record, one release, and the pin bumps. It
@@ -12,7 +12,7 @@
 
 ## Plan changes
 
-> Epoch 1 · approved 2026-11-01 · by reviewers · state: open
+> Epoch 1 · approved 2026-11-01 · by reviewers · state: stopped
 
 - 1.1 · 2026-11-01 · reviewer · contract — the baseline has one fixed path at the repository root and is never a symlink
   (Opus B1: a symlink turned a grown baseline into an allowed creation — the file at a link's target was "absent at base"
@@ -20,6 +20,14 @@
   baseline file passed the creation rule. One path, a regular file, closes both: `--baseline`, `--baseline-shrinks` and
   `--print-baseline` take no path, and wherever this plan says `--baseline <path>` or `--baseline-shrinks <path>` it
   now means the flag that reads `raw-temp-baseline.json` at the repository root.)
+- 1.2 · 2026-11-01 · agent · approach — the full definition lives in a companion `common/test-leftovers-baseline.md`, not the detail
+  (N1's default was the detail; with F16's sentence beside it the detail would exceed its 32,768 B per-read cap. The core keeps
+  its one sentence; the detail's §7 points to the companion.)
+- 1.3 · 2026-11-01 · agent · contract — a creation is judged by `git log <base>` only, and a shallow clone fails closed only for a creation
+  (the planned `git log --all` would see the creating PR's own commit, so the one creation could never pass in CI, and a shallow
+  check on every shrink run would fail every CI job; later the Opus review removed the interim `--all --not HEAD` part.)
+  (Both were accepted on 2026-11-01 and not recorded then; CodeRabbit named them on #108 on 2026-11-02, and they are recorded
+  now. This second change stops the plan: no new code and no merge of #108 until the whole plan is reviewed again.)
 
 ## Symptom
 
