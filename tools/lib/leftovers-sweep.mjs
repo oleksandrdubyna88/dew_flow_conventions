@@ -34,6 +34,10 @@
 // them (a copy drifts). `io` replaces every `fs` call and `platform` the Windows branch, so a consumer's failure tests need no second implementation; the
 // options object is forwarded through every call between the helpers, and the sweep's own calls pass none.
 //
+// The consumer's token (F22). `sweepLeftovers({ token })` collects the names of THAT repository (`token` replaces `REPO_TOKEN` for owner-form and legacy names alike), so a consumer
+// that wraps the reference sweeps its own folders instead of copying the sweep to change one constant. It is validated by `owned.mjs`'s `checkToken`, the check `ownedFor` uses; this
+// repository's own calls pass nothing, and the Windows list-only gate (F16) and every other check are unchanged.
+//
 // Order. Quarantine restores, worktrees (only those this repository lists), folders, orphaned claims. Never throws: every
 // failure is an `errors` entry, and the caller decides what to print — a sweep never changes a run's exit code.
 
@@ -44,7 +48,7 @@ import * as path from "node:path";
 
 import { git } from "./git.mjs";
 import {
-  REPO_TOKEN, classifyName, gitdirOf, isAskablePid, isMine, legacyOwnerState, ownerState, parseLegacyOwner, parseOwner, processProbe, readClaimText, readOwner,
+  REPO_TOKEN, checkToken, classifyName, gitdirOf, isAskablePid, isMine, legacyOwnerState, ownerState, parseLegacyOwner, parseOwner, processProbe, readClaimText, readOwner,
   removeLink, removeQuietly, tempRoot, thisOwner, thisOwnerToken,
 } from "./owned.mjs";
 
@@ -71,14 +75,14 @@ export function listWorktrees(repo) {
   });
 }
 
-/** What a name says about whose it is, for THIS repository: `own` (the caller's), `foreign` (another owner's), `legacy` (before the owner segment) or `other` (not this repository's business). */
-function relationOf(name, owner) {
+/** What a name says about whose it is, for the repository of `token`: `own` (the caller's), `foreign` (another owner's), `legacy` (before the owner segment) or `other` (not this repository's business). */
+function relationOf(name, owner, token) {
   const parsed = classifyName(name);
   if (parsed.form === "owner") {
-    if (parsed.token !== REPO_TOKEN) return { relation: "other" };
+    if (parsed.token !== token) return { relation: "other" };
     return parsed.owner === owner ? { relation: "own", nameOwner: parsed.owner } : { relation: "foreign", nameOwner: parsed.owner };
   }
-  return parsed.form === "legacy" && parsed.token === REPO_TOKEN ? { relation: "legacy" } : { relation: "other" };
+  return parsed.form === "legacy" && parsed.token === token ? { relation: "legacy" } : { relation: "other" };
 }
 
 /** Rule §4's table for one own-scope candidate: `{ remove: true }` or `{ remove: false, reason }`. */
@@ -404,7 +408,7 @@ function sweepWorktrees(context, listing) {
   const { repo, result } = context;
   let acted = false;
   for (const listed of listing.slice(1)) { // the first block is the main worktree, never a candidate
-    const related = relationOf(path.basename(listed.path), context.owner);
+    const related = relationOf(path.basename(listed.path), context.owner, context.token);
     if (related.relation === "other") continue;
     if (related.relation === "foreign") {
       context.report.foreign("worktree", listed.path, related.nameOwner);
@@ -440,7 +444,7 @@ function sweepFolders(context, listedPaths) {
   const { tmp, result } = context;
   for (const dirent of fs.readdirSync(tmp, { withFileTypes: true })) {
     const dir = path.join(tmp, dirent.name);
-    const related = relationOf(dirent.name, context.owner);
+    const related = relationOf(dirent.name, context.owner, context.token);
     if (!dirent.isDirectory() || related.relation === "other" || listedPaths.some((listed) => same(listed, dir))) continue;
     if (related.relation === "foreign") {
       context.report.foreign("folder", dir, related.nameOwner);
@@ -545,7 +549,7 @@ function sweepOrphanClaims(context) {
     if (!dirent.isFile() || !dirent.name.endsWith(OWNER_SUFFIX)) continue;
     const claim = path.join(tmp, dirent.name);
     const folderPath = claim.slice(0, -OWNER_SUFFIX.length);
-    const related = relationOf(path.basename(folderPath), context.owner);
+    const related = relationOf(path.basename(folderPath), context.owner, context.token);
     if (related.relation === "other" || fs.existsSync(folderPath) || ageOf(claim, now) < minAgeMs) continue;
     if (related.relation === "foreign") {
       context.report.foreign("claim", claim, related.nameOwner);
@@ -597,7 +601,7 @@ function restoreQuarantines(context) {
   const { tmp, result, mine } = context;
   for (const dirent of fs.readdirSync(tmp, { withFileTypes: true })) {
     const found = QUARANTINE.exec(dirent.name);
-    if (found === null || !dirent.isDirectory() || relationOf(found[1], context.owner).relation === "other") continue;
+    if (found === null || !dirent.isDirectory() || relationOf(found[1], context.owner, context.token).relation === "other") continue;
     const quarantined = path.join(tmp, dirent.name);
     const listedAs = identityOf(quarantined);
     if (!mine(quarantined) || !isAskablePid(found[2], context.platform)) continue; // another uid's, or a pid that is no process: the probe is never asked
@@ -634,8 +638,12 @@ function step(result, label, run) {
  * (a seam: a second uid cannot be had in a test); `hooks.afterCapture` / `hooks.afterVerdict` / `hooks.afterRename` / `hooks.afterReserve(placeholder, source)` / `hooks.beforeRename(placeholder, source)` (both run on the quarantine move AND on a restore, where the arguments are `(original, quarantined)`) / `hooks.beforeReservationRemoval(quarantine)` / `hooks.beforeClaimRemoval` (seams: a change between the
  * capture, the verdict and the removal). Never throws. `result.listed` holds the `foreign:` / `legacy:` / `unmarked:` lines.
  * `platform` (a seam) decides `mutate` once: on `win32` the sweep changes nothing and lists `unverified:` lines instead (F16).
+ * `token` (F22) is the repository whose names this sweep collects: the default is this repository's `REPO_TOKEN`; a consumer that wraps the reference passes its own row of the
+ * rule's `## Tokens` table, and it replaces `REPO_TOKEN` in the name relation for owner-form and legacy names alike. It is judged by the same `checkToken` as `ownedFor`: an invalid one
+ * throws a TypeError BEFORE anything is read — the one throw of this function, since no sweep of the wrong names is better than a quiet one.
  */
-export function sweepLeftovers({ repo, tmp = tempRoot(), now = Date.now(), minAgeMs = MIN_AGE_MS, probe = processProbe, mine = isMine, hooks = {}, platform = process.platform } = {}) {
+export function sweepLeftovers({ repo, tmp = tempRoot(), now = Date.now(), minAgeMs = MIN_AGE_MS, probe = processProbe, mine = isMine, hooks = {}, platform = process.platform, token = REPO_TOKEN } = {}) {
+  checkToken(token); // BEFORE anything is read: a wrong token is a programming error, and a sweep must never judge names by it
   const result = { removed: [], preserved: [], listed: [], errors: [] };
   const asked = new Map();
   const cached = (pid) => {
@@ -644,7 +652,7 @@ export function sweepLeftovers({ repo, tmp = tempRoot(), now = Date.now(), minAg
   };
   const owner = thisOwnerToken();
   const state = (record, nameOwner) => ownerState(record, cached, { nameOwner, callerOwner: owner, kernelMine: true });
-  const context = { repo, tmp, now, minAgeMs, result, owner, mine, hooks, platform, mutate: platform !== "win32", probe: cached, state, report: reporter(result) };
+  const context = { repo, tmp, token, now, minAgeMs, result, owner, mine, hooks, platform, mutate: platform !== "win32", probe: cached, state, report: reporter(result) };
   step(result, "quarantines", () => restoreQuarantines(context));
   const listing = step(result, "worktree list", () => listWorktrees(repo));
   if (listing !== undefined) step(result, "worktrees", () => sweepWorktrees(context, listing));

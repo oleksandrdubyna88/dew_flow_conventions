@@ -727,7 +727,7 @@ const TOKEN_FREE = {
 };
 
 /** `token` or a TypeError naming the legal shape: `[a-z0-9]{2,12}`, and never of the owner grammar (a token that read as an owner would make every name ambiguous, rule §1). */
-function checkToken(token) {
+export function checkToken(token) {
   if (typeof token !== "string" || !TOKEN_SHAPE.test(token) || OWNER_GRAMMAR.test(token)) {
     throw new TypeError(`owned: \`token\` must match ${TOKEN_SHAPE} and must not be of the owner grammar ${OWNER_GRAMMAR}, got ${JSON.stringify(token)}`);
   }
