@@ -346,8 +346,11 @@ unchanged. E2's and E5's stories cite this decision (fix forward on #253 and #85
 DONE   E1 (the contract) → the merged core → R1–R5 (release 115bbf8) → wave 1: E3 ∥ E4 → R7 (release 105d53c, every pin bump alone,
        the Darwin helper) → the E2 and E5 re-splits (plan gates proceed) → the stop (this re-review).
 NEXT   P1 the owner's Windows barrier record            — the owner; blocks the first producer MERGE of E2 and of E5, not their build
-       P2 the raw-temp baseline rule                      — this repository (its own plan, gate, PR, release, sibling mirror); then coai's pin bump alone
-       P3 the F16 disposition, decided (b) (§ 4)          — one reference change riding P2's release
+       P2 the raw-temp baseline rule                      — DONE 2026-11-02: #108 (`eb2fdd55`), released; the sibling mirror is the owner's (R4)
+       P3 the F16 disposition, decided (b) (§ 4)          — DONE 2026-11-02: #107 (`5e077ff9`), released with P2
+          (Release `5863c60`, promote-release run 41430127939, 2026-11-02: #107 F16 interim, #108 the baseline rule, #109 F21 the
+          reference's move helpers exported, #103 the r9700 token row, #62 an actions bump. Warned first: "vllm fix", "kimi", "C# vs Node".
+          The pin bumps, each alone, the seven over the PR cap with the owner's agreement of 2026-11-02: creds #292 (`66056a6e`), rag_qln #80 (`ae9c7d6d`, with its two externals current), vscode_kit #21 (`27f69034`), benchmark #151 (`0ea28fbe`), mcp #62 (`76c9c5f5`), sidecar_rust #68 (`6c57d526`), wsl_care #184 (`72b89017`), coai #939 (`2221559a`); the new consumer dew_flow_amd_r9700_tuning_ai pins it inside its own PR #1.)
        E5 stage A (S2-A, the age-only coai- sweep retired, one PR alone) ∥ E5 S5 (the bare-prefix literals leave the test trees) — may start now
        E2.1 → E2.2 → E2.3 → E2.4 → E2.5 (five stacked, gated PRs; E2.1 merges after P1 and creds' pin on P3's release; the guards switch on in E2.5)
        E5 producer PR (S3 → S2-B → S4 → S6, one squash-merged PR, after P1, P2, P3's release, stage A and S5 [re-review gate finding 2]) → E5.S7 the drain (one PR per suite, not a producer)
