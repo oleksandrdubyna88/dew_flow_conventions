@@ -27,7 +27,7 @@
 // the scope key is not proven. `mutate` is decided ONCE from `platform` (`sweepLeftovers`): without it every resource a POSIX sweep would act on —
 // a quarantine to restore or a reservation to remove, a worktree to unlock, remove and prune, a folder to rename and remove, an orphan claim to
 // delete — is reported in `result.listed` as `unverified: <path> — the owner SID is not read on Windows (F16)`, and `removed` stays empty. The gate
-// is `withheld` (a verdict that says remove) and the quarantine pass; no other code path changes the disk. The Fix reads the SID and lifts the gate.
+// is `withheld` (a verdict that says remove, or `foreign-uid`, which there is only the profile-path proxy: it is `unverified` too, never `foreign:`) and the quarantine pass; no other code path changes the disk. The Fix reads the SID and lifts the gate.
 //
 // Order. Quarantine restores, worktrees (only those this repository lists), folders, orphaned claims. Never throws: every
 // failure is an `errors` entry, and the caller decides what to print — a sweep never changes a run's exit code.
@@ -343,9 +343,14 @@ function decideLegacy({ kind, target, locked, ageMs, minAgeMs, probe, mine, plat
   return legacyOwnerState(old, probe, { platform }) === "gone" ? { remove: true } : { remove: false, reason: "legacy" };
 }
 
-/** THE gate of F16: a verdict that says remove becomes `unverified` where the sweep may not change the disk (`context.mutate` is false). Every other verdict stands. */
+/**
+ * THE gate of F16, for a sweep that may not change the disk (`context.mutate` is false). A verdict that says remove becomes `unverified`; so does
+ * `foreign-uid`, which on Windows is only the profile-path proxy of `isMine` (a shared TEMP outside the profile): neither key is read there, so
+ * nobody is called foreign by it. Every other verdict stands.
+ */
 function withheld(context, verdict) {
-  return verdict.remove && !context.mutate ? { remove: false, reason: UNVERIFIED } : verdict;
+  if (context.mutate) return verdict;
+  return verdict.remove || verdict.reason === "foreign-uid" ? { remove: false, reason: UNVERIFIED } : verdict;
 }
 
 function judge(context, entry) {
