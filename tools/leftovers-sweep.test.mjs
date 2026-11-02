@@ -1108,3 +1108,167 @@ test("18. run-tests prints the listed lines after the report line", async () => 
   });
   assert.deepEqual(lines, ["run-tests: leftovers — removed 0, preserved 1", "run-tests: unmarked: folder c", "run-tests: foreign: folder d — owner u7"]);
 });
+
+// F16 --------------------------------------------------------------------------------------------------------
+// On Windows the owner SID is not read (`isMine` judges by the profile path alone), so the sweep there LISTS what a POSIX sweep would act on and
+// changes NOTHING. The `platform` seam reaches that branch on any OS; on Linux the same fixtures are removed as before (the companion).
+
+const UNVERIFIED = "the owner SID is not read on Windows (F16)";
+const unverifiedLine = (target) => `unverified: ${target} — ${UNVERIFIED}`;
+const unverifiedOf = (result) => result.listed.filter((line) => line.startsWith("unverified: ")).sort();
+
+/** Every entry under `root`, by relative path: `(dev, ino)` and, for a file, its bytes. What "byte for byte unchanged" compares. */
+function snapshotOf(root) {
+  const seen = {};
+  const walk = (dir) => {
+    for (const name of fs.readdirSync(dir)) {
+      const full = path.join(dir, name);
+      const stat = fs.lstatSync(full, { bigint: true });
+      seen[path.relative(root, full)] = { dev: stat.dev, ino: stat.ino, text: stat.isFile() ? fs.readFileSync(full, "utf8") : stat.isSymbolicLink() ? fs.readlinkSync(full) : null };
+      if (stat.isDirectory()) walk(full);
+    }
+  };
+  walk(root);
+  return seen;
+}
+
+const lockOf = (wt) => fs.readFileSync(path.join(gitdirOf(wt), "locked"), "utf8");
+
+/**
+ * One leftover per kind, each a candidate that a Windows or macOS reader would act on. A builder returns `{ listed, gone, now? }`: `listed` is what win32 reports
+ * `unverified:`, `gone` what a linux sweep deals with, `now` a clock past the quarantine window. `legacy` has `gone: []` and `kept`: a Linux reader keeps every legacy record.
+ */
+const KINDS = {
+  folder(own, work, tmp) {
+    const dir = folder(own, tmp, "f16-folder", { claim: deadOwnerLine() });
+    return { listed: [dir], gone: [dir, `${dir}.owner`] };
+  },
+  claim(own, work, tmp) {
+    const orphan = path.join(tmp, ownedName("f16-orphan"));
+    fs.writeFileSync(`${orphan}.owner`, deadOwnerLine());
+    setOld(`${orphan}.owner`);
+    return { listed: [`${orphan}.owner`], gone: [`${orphan}.owner`] };
+  },
+  quarantine(own, work, tmp) {
+    const quarantineOf = (name) => path.join(tmp, `.${name}.teststodelete-quarantine-${PRETEND_DEAD}-0a1b2c3d`);
+    const moved = folder(own, tmp, "f16-moved", { claim: formatOwner(thisOwner()) + "\n" });
+    fs.renameSync(moved, quarantineOf(path.basename(moved))); // a sweep killed after its rename
+    fs.writeFileSync(path.join(quarantineOf(path.basename(moved)), "kept.txt"), "was in the folder\n");
+    const sitting = folder(own, tmp, "f16-sitting", { claim: formatOwner(thisOwner()) + "\n" });
+    fs.mkdirSync(quarantineOf(path.basename(sitting))); // a sweep killed after its reservation, while the folder still sits at its name
+    return { listed: [quarantineOf(path.basename(moved)), quarantineOf(path.basename(sitting))], gone: [quarantineOf(path.basename(moved)), quarantineOf(path.basename(sitting))], now: Date.now() + 2 * MIN_AGE_MS };
+  },
+  legacy(own, work, tmp) {
+    const plant = (what) => path.join(tmp, `${"testsTo" + "Delete"}-conventions-${what}-abc123`); // the form before the owner segment, spelled in two pieces
+    const dir = plant("f16-legacy");
+    fs.mkdirSync(dir);
+    fs.writeFileSync(`${dir}.owner`, `${thisOwner().host}:${PRETEND_DEAD}\n`);
+    setOld(dir);
+    const orphan = plant("f16-legacy-orphan"); // a legacy claim with no folder
+    fs.writeFileSync(`${orphan}.owner`, `${thisOwner().host}:${PRETEND_DEAD}\n`);
+    setOld(`${orphan}.owner`);
+    return { listed: [dir, `${orphan}.owner`], gone: [], kept: [dir, `${dir}.owner`, `${orphan}.owner`] };
+  },
+  worktree(own, work, tmp, repo) {
+    const wt = worktree(own, repo, tmp, "f16-wt", { claim: deadOwnerLine() });
+    return { listed: [wt], gone: [wt] };
+  },
+};
+
+for (const [kind, build] of Object.entries(KINDS)) {
+  test(`F16 (${kind}). on win32 the sweep changes nothing and lists it \`unverified:\`; on linux the same fixture is dealt with as before`, (t) => {
+    const { own, work, tmp } = arena(t);
+    const repo = ownedRepo(own, work, `f16-${kind}-repo`);
+    const made = build(own, work, tmp, repo);
+    const now = made.now ?? Date.now();
+    const before = snapshotOf(tmp);
+    const worktrees = git(repo, "worktree", "list", "--porcelain");
+    const lock = kind === "worktree" ? lockOf(made.listed[0]) : undefined;
+
+    const result = sweepLeftovers({ repo, tmp, probe: deadProbe, now, platform: "win32" });
+
+    assert.deepEqual(result.errors, []);
+    assert.deepEqual(result.removed, [], "nothing is removed");
+    assert.deepEqual(snapshotOf(tmp), before, "every path, its (dev, ino) and its text are unchanged");
+    assert.equal(git(repo, "worktree", "list", "--porcelain"), worktrees, "no worktree unlocked, removed or pruned");
+    if (lock !== undefined) assert.equal(lockOf(made.listed[0]), lock);
+    assert.deepEqual(unverifiedOf(result), made.listed.map(unverifiedLine).sort());
+    assert.equal(result.listed.some((line) => line.startsWith("notice:")), false, "no restore, no reservation removal");
+
+    const posix = sweepLeftovers({ repo, tmp, probe: deadProbe, now, platform: "linux" }); // the companion: today's behaviour
+    assert.deepEqual(posix.errors, []);
+    assert.deepEqual(unverifiedOf(posix), []);
+    for (const gone of made.gone) assert.equal(fs.existsSync(gone), false, `${path.basename(gone)} is dealt with on linux`);
+    for (const kept of made.kept ?? []) assert.equal(fs.existsSync(kept), true, `${path.basename(kept)} is kept on linux`);
+  });
+}
+
+test("F16 (quarantine). on linux the killed sweep's quarantine is restored and its placeholder removed, with their notices", (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f16-q-companion-repo");
+  const made = KINDS.quarantine(own, work, tmp);
+  const result = sweepLeftovers({ repo, tmp, probe: deadProbe, now: made.now, platform: "linux" });
+  assert.equal(result.listed.filter((line) => line.startsWith("notice: restored ")).length, 1, JSON.stringify(result.listed));
+  assert.equal(result.listed.filter((line) => line.startsWith("notice: removed the empty reservation ")).length, 1, JSON.stringify(result.listed));
+});
+
+test("F16 (new run). a run beside the listed leftovers of every kind creates, uses and removes its own resources normally (gate finding 0)", async (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f16-new-run-repo");
+  const made = Object.values(KINDS).map((build) => build(own, work, tmp, repo));
+  const now = Math.max(...made.map((m) => m.now ?? 0), Date.now());
+  const before = snapshotOf(tmp);
+
+  const first = sweepLeftovers({ repo, tmp, probe: deadProbe, now, platform: "win32" });
+  assert.equal(unverifiedOf(first).length, made.flatMap((m) => m.listed).length);
+
+  const run = cleanupScope(); // the new run's own scope: its teardown is the run's, not this test's
+  const dir = ownedDir(run, "f16-new-dir", { parent: tmp });
+  fs.writeFileSync(path.join(dir, "used.txt"), "used\n");
+  const wt = ownedWorktree(run, repo, "f16-new-wt", { parent: tmp });
+  assert.ok(fs.existsSync(path.join(wt.path, ".git")), "its worktree is usable");
+  const second = sweepLeftovers({ repo, tmp, probe: deadProbe, now, platform: "win32" }); // the run's own resources are `live` (this process): kept
+  assert.equal(unverifiedOf(second).length, unverifiedOf(first).length);
+  assert.ok(fs.existsSync(path.join(dir, "used.txt")));
+  await run.close();
+
+  assert.equal(fs.existsSync(dir), false, "its own folder is removed by its own teardown");
+  assert.equal(fs.existsSync(`${dir}.owner`), false, "and its claim");
+  assert.equal(fs.existsSync(wt.path), false, "and its own worktree");
+  assert.deepEqual(snapshotOf(tmp), before, "the leftovers are as they were");
+});
+
+test("F16 (run-tests). the caller prints the listed `unverified:` folder and leaves with the suite's code 0", async (t) => {
+  const { own, work, tmp } = arena(t);
+  const repo = ownedRepo(own, work, "f16-caller-repo");
+  const dir = folder(own, tmp, "f16-caller", { claim: deadOwnerLine() });
+  let code;
+  const lines = await stderrOf(() => {
+    code = runWithSweep([], {
+      sweep: ({ repo: served }) => sweepLeftovers({ repo: served, tmp, probe: deadProbe, platform: "win32" }),
+      spawn: () => ({ status: 0, signal: null }),
+      repo,
+    });
+  });
+  assert.equal(code, 0, "a listed unverified folder never fails a run");
+  assert.ok(lines.includes(`run-tests: ${unverifiedLine(dir)}`), JSON.stringify(lines));
+  assert.ok(fs.existsSync(dir), "and nothing was removed");
+});
+
+for (const kind of ["folder", "claim", "worktree"]) {
+  test(`F16 (shared root, ${kind}). on win32 a path outside the profile is not judged \`foreign:\` by the path proxy: it is \`unverified:\`, untouched`, (t) => {
+    const { own, work, tmp } = arena(t);
+    const repo = ownedRepo(own, work, `f16-shared-${kind}-repo`);
+    const made = KINDS[kind](own, work, tmp, repo);
+    const before = snapshotOf(tmp);
+    const outsideProfile = () => false; // what `isMine` answers on win32 for a shared TEMP outside the profile
+
+    const result = sweepLeftovers({ repo, tmp, probe: deadProbe, mine: outsideProfile, platform: "win32" });
+
+    assert.deepEqual(result.errors, []);
+    assert.deepEqual(result.removed, []);
+    assert.deepEqual(snapshotOf(tmp), before, "nothing changed");
+    assert.deepEqual(result.listed.filter((line) => line.startsWith("foreign:")), [], "the owner is not read, so nobody is called foreign");
+    assert.deepEqual(unverifiedOf(result), made.listed.map(unverifiedLine).sort());
+  });
+}

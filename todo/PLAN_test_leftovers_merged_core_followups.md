@@ -461,6 +461,48 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   rollout), not built yet, must check both keys: a criterion of their producer stage (owner decision 2026-10-31, R6 of the remainder plan).
 - **When.** With F9, before a Windows machine's janitor switch.
 - **Anchor.** `tools/lib/owned.mjs:209-228` (`isInsideProfile`, `isMine`); `tools/owned.test.mjs` (the path-boundary tests, no foreign-owner case).
+- **Interim disposition, decided 2026-11-01: (b) — on Windows the sweep LISTS and changes nothing until the Fix above lands.** Asked
+  through the question consultant (consult `3310f6ba`, two vendors, both (b)); recorded in the rollout plan's epoch 2 (§ *Epoch 2* item 4,
+  approved by the owner 2026-11-01). Why: the Node consumers E2 and E5 wrap this reference on the elevated hosted Windows runner, where a
+  folder inside the profile can belong to `Administrators`; (a) would remove it on the profile key alone, and the Fix needs F9's Windows
+  run, which has not happened. The janitor already has this shape (`--dry-run` forced on Windows until `JANITOR_WINDOWS_E2E_GREEN`).
+  - **Build.** `sweepLeftovers` (`tools/lib/leftovers-sweep.mjs`, its `platform` seam) on `win32` performs NO mutation in any phase: no
+    quarantine restore and no reservation removal, no worktree unlock, remove or prune, no folder rename or removal, no orphan-claim
+    deletion. Every resource a POSIX sweep would act on is reported in `result.listed` as `unverified: <path> — the owner SID is not read on
+    Windows (F16)`; `removed` stays empty. A pre-existing unverified folder never fails a run: the callers (`tools/run-tests.mjs` and the
+    consumers' wrappers) print the listing and go on, as they do with `foreign:` lines. `isMine` itself is unchanged (other callers ask it
+    about their OWN fresh resources).
+  - **Tests (RED → GREEN → RED each, through the `platform` seam on any OS):** one fixture per kind — a dead owner's folder, an orphan
+    claim, a killed sweep's quarantine (and its placeholder), a worktree this repository lists with a gone owner — swept with `platform:
+    "win32"`: every path is byte-for-byte unchanged (`(dev, ino)`, contents, the claim's text), each is in `listed` with `unverified:`, and
+    `removed` is empty; the same fixtures with `platform: "linux"` are removed as today (the companion); the run-tests caller with a
+    listed unverified folder exits 0.
+  - **Docs.** Rule §4's detail (one sentence: the reference lists only on Windows until F16), the README tool row (which also drops its
+    stale "unmarked and old": the sweep never removes an unmarked folder, the Opus judge's note of the rollout re-review), and this entry.
+  - **Release.** Rides the same promotion as the `raw-temp` baseline rule (P2 of the rollout); E2 and E5 pin that release before their
+    first producer merges. After the promotion every consumer bumps its pin alone, as in R7, each a PR with its CI as the check, and a revert of the bump is the rollback; only E2 and E5 must bump before their first producer merge.
+  - **Plan gate 2026-11-01** (coai session `ba9ad4f1`, `proceed`; findings 0, 1, 3, 4 accepted, 2 rejected):
+    - [gate finding 0] What is left on Windows is safe to leave: every kind carries a unique name (owner token, pid, random hex), so no
+      later run reuses or depends on it. Test: a new run beside listed leftovers of every kind creates, uses and removes its own
+      resources normally.
+    - [gate findings 1, 3] The interim is not permanent. The Fix above stays scheduled with F9's Windows run, and the list-only gate may
+      be removed only when all three pass there: a caller-owned folder in the profile is removed; a foreign-SID folder in the profile is
+      listed untouched; an unreadable owner is listed untouched.
+    - [gate finding 4] This repository's CI has no Windows leg. After creds and coai pin the release, their Windows CI legs assert that
+      the wrapped sweep lists and removes nothing (a planted gone-owner folder survives): a criterion of E2.1 and of E5's producer.
+    - Rejected, finding 2 (fail `isMine` closed on Windows): every caller that changes the disk is inside `sweepLeftovers`, which the
+      gate covers; `readClaimText` and `readOwner` only read and also serve the disposal of a run's OWN fresh resource, which a closed
+      `isMine` would refuse. A consumer's wrapper never removes anything on `isMine` alone (the docs say so).
+- **Progress 2026-11-01 — the interim is BUILT (f885225, RED fc230b4); the Fix is STILL OPEN and rides with F9.** One `mutate` capability, decided once from `platform` in
+  `sweepLeftovers`; a verdict that says remove (`withheld`) and the quarantine pass become `unverified: <path> — the owner SID is not read on Windows (F16)`, so no
+  mutation runs in any phase and `removed` stays empty. RED observed: `tools/leftovers-sweep.test.mjs` `F16 (folder)`, `(claim)`, `(quarantine)`, `(worktree)` failed on the
+  removal (`removed` not empty, the paths changed), `F16 (new run)` on the leftovers removed by the first sweep, `F16 (run-tests)` on `removed 1` and no `unverified:` line.
+  Not done: the owner-SID read and both keys (the Fix above), the removal of the list-only gate (its three checks on F9's Windows run), the Windows CI legs of E2.1 and E5, the
+  release (P2). The tests run through the `platform` seam on Linux; no Windows machine ran them.
+  Second RED (the Opus review, then the legacy case): each gate removed on its own, the pinned tests failed — the quarantine gate: quarantine and new run; the claim gate: claim and new
+  run; the judge gate (`withheld` in `judge`): folder, worktree, run-tests and new run. The review's minor point added `F16 (legacy)` (a legacy-name folder and a legacy orphan claim, both
+  with a gone owner, read as a win32 reader): it fails with the judge gate off and with the claim gate off, one at a time (legacy and new run fail on the claim gate, legacy on the judge gate too).
+  CodeRabbit's finding on PR #107 (accepted): on win32 a `foreign-uid` verdict is only the profile-path proxy (a shared TEMP outside the profile), so it is `unverified` too, never `foreign:`; `F16 (shared root, folder|claim|worktree)` — RED observed (the three failed on the foreign line), GREEN with the gate.
 
 ## F17 — The rename into quarantine can replace an existing empty directory (found 2026-10-31, the E3 and E4 ports)
 
