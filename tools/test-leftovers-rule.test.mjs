@@ -156,6 +156,13 @@ test("S1 10 the baseline companion carries the full `raw-temp` baseline definiti
   assert.ok(Buffer.byteLength(bodyOf(detail)) <= CAP - 800, "the detail keeps at least 800 B of headroom under the per-read cap");
 });
 
+test("S1 11 the companion is selected for `implement` on the baseline file: a coder who writes one is handed its definition [E2-a]", () => {
+  const listed = (task, file) => JSON.parse(run(["explain", "--task", task, "--file", file, "--repo", sourceRoot], sourceRoot)).rules.map((rule) => rule.id);
+  for (const task of ["implement", "test", "audit", "policy", "release", "pr"]) {
+    assert.ok(listed(task, "raw-temp-baseline.json").includes("common.test-leftovers-baseline"), `${task}: the companion is selected`);
+  }
+});
+
 test("S1 5 every example name carries an owner of the grammar; the old form appears only as the legacy name's own description", () => {
   const text = [...spansOf(read(RULE)), ...spansOf(read(DETAIL)), ...spansOf(read(COMPANION)), ...spansOf(read(BASELINE))].join("\n");
   const found = [...text.matchAll(/(teststodelete)[-_](<[a-z]+>|[A-Za-z0-9]+)/gi)].filter((match) => match[1] !== "TESTSTODELETE"); // the upper-case spelling is an environment variable, not a name
@@ -194,7 +201,7 @@ test("S1 8 the core is self-contained under its own cap", () => {
 test("S1 6 the companion is its own rule with a conditional load and three tasks; the detail shares the core's load and tasks and the core depends on it", () => {
   const head = (file) => read(file).split("\n---\n")[0];
   assert.match(head(COMPANION), /^---\nid: "common\.test-leftovers-janitor"\nload: "conditional"\ntasks: \["audit","policy","release"\]$/);
-  assert.equal(head(BASELINE), '---\nid: "common.test-leftovers-baseline"\nload: "conditional"\ntasks: ["test","audit","policy","release","pr"]', "the baseline companion is selected for the tasks that write, review or ship a baseline");
+  assert.equal(head(BASELINE), '---\nid: "common.test-leftovers-baseline"\nload: "conditional"\ntasks: ["implement","test","audit","policy","release","pr"]', "the baseline companion is selected for the tasks that write, review or ship a baseline, and for the code that reads one");
   const TASKS = '["implement","test","audit","policy","release"]';
   assert.equal(head(RULE), `---\nid: "common.test-leftovers"\nload: "conditional"\ntasks: ${TASKS}\ndepends: ["common.test-leftovers-detail"]`);
   assert.equal(head(DETAIL), `---\nid: "common.test-leftovers-detail"\nload: "conditional"\ntasks: ${TASKS}`);
