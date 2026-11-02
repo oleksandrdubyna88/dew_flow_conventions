@@ -536,7 +536,8 @@ stashed and with a targeted break (14 mutations of the module, each failing exac
       `--allow-create`; class `baseline` and its cure; header and `USAGE`; `tools/raw-temp-baseline.test.mjs` (the
       fourteen behaviours and a fifteenth, below).
 - [x] S3 `research/module_tests.md` § *Test leftovers*, `research/rule-bodies.json`, the README tool row.
-- [ ] S4 the release, the warning, the pin bumps (not started — a later step).
+- [x] S4 the release, the warning, the pin bumps — DONE 2026-11-02: #108 merged (`eb2fdd55`); release `5863c60` (promote-release run
+      41430127939, after the first run refused because main's ci had not finished); warned "vllm fix", "kimi", "C# vs Node"; pin bumps creds #292 (`66056a6e`), rag_qln #80 (`ae9c7d6d`, with its two externals current), vscode_kit #21 (`27f69034`), benchmark #151 (`0ea28fbe`), mcp #62 (`76c9c5f5`), sidecar_rust #68 (`6c57d526`), wsl_care #184 (`72b89017`), coai #939 (`2221559a`); the new consumer dew_flow_amd_r9700_tuning_ai pins it inside its own PR #1. The C# reader in the template and the sibling mirror stay open.
 - [ ] The C# reader in the template (the template owner's plan; nothing here).
 
 **Epoch 2 build (2026-11-02, local commits on `feat/raw-temp-baseline`, not pushed).** Each item a test commit first (RED observed on the

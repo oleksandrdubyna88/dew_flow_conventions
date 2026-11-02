@@ -503,6 +503,7 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   run; the judge gate (`withheld` in `judge`): folder, worktree, run-tests and new run. The review's minor point added `F16 (legacy)` (a legacy-name folder and a legacy orphan claim, both
   with a gone owner, read as a win32 reader): it fails with the judge gate off and with the claim gate off, one at a time (legacy and new run fail on the claim gate, legacy on the judge gate too).
   CodeRabbit's finding on PR #107 (accepted): on win32 a `foreign-uid` verdict is only the profile-path proxy (a shared TEMP outside the profile), so it is `unverified` too, never `foreign:`; `F16 (shared root, folder|claim|worktree)` — RED observed (the three failed on the foreign line), GREEN with the gate.
+- **Released 2026-11-02** in `5863c60` (#107, `5e077ff9`); every consumer pinned it the same day. The Fix itself stays open with F9.
 
 ## F17 — The rename into quarantine can replace an existing empty directory (found 2026-10-31, the E3 and E4 ports)
 
@@ -603,6 +604,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   `win32` and `io` is the real fs (the `fs` namespace or its default export); an `io` of the caller's own keeps working, so tests i to k are unchanged. `moveToQuarantine` reaches it
   through `moveExclusively`; no other code decides an fs operation on `platform`. Test `F21 l` (three forms: namespace, default export, no `io`): RED first (e2ab09e, 3 failed), GREEN
   with the guard (d02d6c5), RED again with it stashed (3 failed, the other 11 pass).
+- **Released 2026-11-02** in `5863c60` (#109, `5863c60d`); every consumer pinned it the same day. coai's E5.S2-A imports these helpers and drops its copy.
 
 ## Definition of Done
 
