@@ -638,10 +638,18 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   [PR review, CodeRabbit] (accepted) The exported `checkToken` is documented to return the token but returned `undefined`, so `sweepLeftovers({ token: checkToken("creds") })` fell back to `conventions`. It now returns the
   validated token (`ownedFor` and the sweep ignore the value). Tests `F22 f` (returns the token, still throws) and `F22 g` (the passed-through token removes the creds folder): RED first (2 failed), GREEN with the change,
   RED again with `owned.mjs` back to the previous commit (2 failed, the other 5 pass).
+- **Released 2026-11-02 — `cc24f9e`** (promote-release run 41523829952; merged as #112 `edfcdc2`, with #110 and #111). The owner
+  agreed again to the seven over-cap pin bumps, for this release only (consult `4d631b36` first). Before the promotion the creds
+  call site was checked locally: `sweepLeftovers({ ...args, token: "creds" })` through the creds wrapper removed a dead `creds`
+  folder with no errors. The pin bumps, each alone: creds #293 (`bfc5348`), vscode_kit #22 (`e31394c`), mcp #63 (`b8a508e`),
+  sidecar_rust #69 (`c00fd93`), rag_qln #81 (`b40c0ae`, with its two externals moved to their new tips), wsl_care #185
+  (`edf764b`), coai #941 (`a3b7353`), dew_flow_amd_r9700_tuning_ai #4 (`255aeac`, with its vendored `owned.mjs` and
+  `leftovers-sweep.mjs` refreshed, as its `check_static.sh --vendored` requires), dew_flow_benchmark #152 (`c466652`). creds E2.1
+  is wired to it (draft PR creds #294).
 
 ## Definition of Done
 
-- [ ] Each of F1 to F20 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
+- [ ] Each of F1 to F22 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.
