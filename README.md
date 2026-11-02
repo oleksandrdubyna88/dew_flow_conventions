@@ -199,6 +199,7 @@ of skipping it is a commit that breaks a rule written precisely because breaking
 | `dew_flow_connect_other_ais` | .NET + TypeScript — the ConnectOtherAIs review gate: a C# AOT MCP server and a VS Code extension, so `csharp/` and `typescript/` both match |
 | `wsl_care` | mounted at `.agents/conventions` on `release` (the migrated layout); its CI runs `pin-check` and `adapter-check` — found 2026-10-13 |
 | `dew_flow_vscode_kit` | mounted at `.agents/conventions` on `release` (the migrated layout) — found 2026-10-13 |
+| `dew_flow_amd_r9700_tuning_ai` | bash + Python, public — the R9700 vLLM tuning toolkit; mounted at `.agents/conventions` on `release` (pinned at 5863c60), test-leftovers token `r9700` — joined 2026-11-02 |
 
 A new repository joins with one `git submodule add` — see [ROLLOUT.md](ROLLOUT.md).
 
