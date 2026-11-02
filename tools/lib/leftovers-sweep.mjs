@@ -38,6 +38,7 @@
 // failure is an `errors` entry, and the caller decides what to print — a sweep never changes a run's exit code.
 
 import * as crypto from "node:crypto";
+import fsDefault from "node:fs";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -219,11 +220,16 @@ export function removeOwnEmptyPlaceholder(placeholder, reserved, options = {}) {
  * the same user is not the threat this sweep guards against. A rename refused with ENOTEMPTY / EEXIST / ENOTDIR is the name taken after all
  * (EISDIR is the source that changed: it is thrown). When the rename fails the placeholder is removed — only while it is still our empty
  * directory with the reserved identity. `hooks.afterReserve(to, from)` and `hooks.beforeRename(to, from)` are the test seams between the
- * reservation and the pre-check, and between the pre-check and the rename. `options` (`{ io, platform }`) is forwarded to every helper it calls.
+ * reservation and the pre-check, and between the pre-check and the rename. `options` (`{ io, platform }`) is forwarded to every helper it calls; `platform: "win32"` on a POSIX machine needs an `io` of its own and throws, before any rename, with the real `fs`.
  */
 export function moveExclusively(from, to, hooks = {}, options = {}) {
   const { io = fs, platform = process.platform } = options;
   if (platform === "win32") {
+    // [code gate 0] The Windows branch renames directly and relies on the OS refusing an occupied name. On POSIX rename(2) REPLACES an empty directory, so
+    // `platform: "win32"` is a test seam for an `io` of the caller's own, never a way to run this branch on the real fs of a POSIX machine.
+    if (process.platform !== "win32" && (io === fs || io === fsDefault)) {
+      throw new Error(`moveExclusively: platform "win32" cannot be used with the real fs on ${process.platform}: rename(2) would replace an empty directory — pass an io of your own`);
+    }
     try {
       io.renameSync(from, to); // a directory rename onto an existing one fails here, so the move is exclusive by itself — unmeasured on Windows, which F9 settles
     } catch (error) {
