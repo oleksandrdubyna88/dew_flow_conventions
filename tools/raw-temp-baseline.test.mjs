@@ -14,7 +14,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { git } from "./lib/git.mjs";
 import { ownedDir } from "./lib/owned.mjs";
@@ -28,6 +28,9 @@ const TD = "tmp" + "dir";
 const MARK = "testsTo" + "Delete-baseline-proof: ";
 const FILE = "raw-temp-baseline.json"; // the ONE path of a baseline: the repository root, never a symlink
 const ROOT = "src/test/";
+/** Why a test is skipped on Windows [CodeRabbit on #108]: a symlink needs a privilege there, and the fake git is a `#!/bin/sh` script. */
+const NO_SYMLINKS = { skip: process.platform === "win32" ? "symlinks need a privilege on Windows" : false };
+const NO_POSIX_SH = { skip: process.platform === "win32" ? "the fake git is a POSIX script" : false };
 const PROOF = "src/test/runFolder.test.mjs";
 const A = "src/test/a.test.mjs";
 const L3 = `const dir = fs.${MK}("x-");`;
@@ -38,7 +41,7 @@ const PROOF_TEXT = `// ${MARK}${ROOT}\nexport {};\n`;
 /** The hash of a line as the rule says: trimmed, `\r` removed. Written here independently of the module under test. */
 const sha = (line) => createHash("sha256").update(line.replaceAll("\r", "").trim()).digest("hex");
 const entry = (file, line, hint) => ({ file, sha256: sha(line), line: hint });
-const baselineOf = (over = {}) => ({ about: "fixture", class: "raw-temp", scopes: [{ root: ROOT, proof: PROOF }], entries: [entry(A, L3, 3)], ...over });
+const baselineOf = (over = {}) => ({ about: "fixture", class: "raw-temp", scopes: [{ root: ROOT, proof: PROOF, guard: "node" }], entries: [entry(A, L3, 3)], ...over });
 const lines = (list) => `${list.join("\n")}\n`;
 
 /** A git repository in an owned folder holding `files` (path → text). */
@@ -105,10 +108,10 @@ test("2. a new site is a finding; remove it and the run is clean", (t) => {
 // 3 ---------------------------------------------------------------------------------------------------------------------------
 
 test("3. a stale entry is a finding, reconciled over the whole baseline: a removed line, a deleted file, hits dropped to zero, a file never read", (t) => {
-  const stale = (result, at) => {
+  const stale = (result, at, why = /entry has no line/) => {
     assert.equal(result.code, 1, result.text);
     assert.ok(found(result.text).includes(at), result.text);
-    assert.match(result.text, /entry has no line/);
+    assert.match(result.text, why);
   };
   // line 3 removed while another, different site stays in the visited file
   const removed = fixture(t, { source: ["import fs from 'node:fs';", "import os from 'node:os';", "console.log(1);", "", "", L7] });
@@ -117,7 +120,7 @@ test("3. a stale entry is a finding, reconciled over the whole baseline: a remov
   assert.ok(found(first.text).includes(`${A}:6 — raw-temp`), "the new site is its own finding");
   // the whole file deleted, the baseline unchanged
   const deleted = fixture(t, { source: null });
-  stale(withBaseline(deleted.repo), `${A}:3 — baseline`);
+  stale(withBaseline(deleted.repo), `${A}:3 — baseline`, /file absent/); // a file absent from the tree is "file absent", a file present but without the line is "no line" [E2-b]
   // the file's only hit rewritten to a non-temp line: hits drop to zero
   const zero = fixture(t, { source: ["import fs from 'node:fs';", "console.log(fs);", "console.log(2);"] });
   stale(withBaseline(zero.repo), `${A}:3 — baseline`);
@@ -215,8 +218,8 @@ test("9. a malformed baseline is ONE baseline finding at its line 1 naming the f
     [JSON.stringify({ ...good, entries: undefined }), /entries/],
     [JSON.stringify(baselineOf({ entries: [{ ...entry(A, L3, 3), sha256: sha(L3).slice(1) }] })), /sha256/],
     [JSON.stringify(baselineOf({ entries: [entry("src\\test\\a.test.mjs", L3, 3)] })), /file/],
-    [JSON.stringify(baselineOf({ scopes: [{ root: "src/test", proof: PROOF }] })), /root/],
-    [JSON.stringify(baselineOf({ scopes: [{ root: ROOT, proof: "other/proof.mjs" }] })), /proof/],
+    [JSON.stringify(baselineOf({ scopes: [{ root: "src/test", proof: PROOF, guard: "node" }] })), /root/],
+    [JSON.stringify(baselineOf({ scopes: [{ root: ROOT, proof: "other/proof.mjs", guard: "node" }] })), /proof/],
     ["{ not json", /not JSON/],
   ];
   for (const [text, field] of cases) {
@@ -293,7 +296,7 @@ test("11. --baseline-shrinks: a base ref that is not fetched is exit 2 with the 
   git(origin, "checkout", "-q", "-b", "work");
   commit(origin, "two");
   const clone = ownedDir(t, "baseline clone");
-  git(clone, "clone", "-q", "--branch", "work", "--single-branch", `file://${origin}`, clone);
+  git(clone, "clone", "-q", "--branch", "work", "--single-branch", pathToFileURL(origin).href, clone);
   const file = path.join(clone, "raw-temp-baseline.json");
   writeBaseline(file, baselineOf());
   const result = shrinks(clone, [], "origin/main");
@@ -312,41 +315,41 @@ test("12. this repository is clean with no baseline, and ships none", () => {
 // 13 --------------------------------------------------------------------------------------------------------------------------
 
 test("13. scope widening is refused: a new scope, a wider root, a changed proof; a removed or narrowed scope passes", (t) => {
-  const unit = { root: "src/test/unit/", proof: "src/test/unit/run.test.mjs" };
+  const unit = { root: "src/test/unit/", proof: "src/test/unit/run.test.mjs", guard: "node" };
   const { repo, file } = committed(t, baselineOf({ scopes: [unit] }));
   const run = (scopes) => {
     writeBaseline(file, baselineOf({ scopes }));
     return shrinks(repo);
   };
   assert.equal(run([unit]).code, 0, "the same scope");
-  const added = run([unit, { root: "scripts/", proof: "scripts/run.test.mjs" }]);
+  const added = run([unit, { root: "scripts/", proof: "scripts/run.test.mjs", guard: "node" }]);
   assert.equal(added.code, 1);
   assert.match(added.text, /new scope.*scripts\//);
-  const wider = run([{ root: ROOT, proof: unit.proof }]);
+  const wider = run([{ root: ROOT, proof: unit.proof, guard: "node" }]);
   assert.equal(wider.code, 1);
   assert.match(wider.text, /wider/);
-  const proof = run([{ root: unit.root, proof: "src/test/unit/other.test.mjs" }]);
+  const proof = run([{ root: unit.root, proof: "src/test/unit/other.test.mjs", guard: "node" }]);
   assert.equal(proof.code, 1);
   assert.match(proof.text, /changed proof/);
   assert.equal(run([]).code, 0, "a scope removed");
-  const sibling = run([{ root: "src/testing/", proof: "src/testing/run.test.mjs" }]);
+  const sibling = run([{ root: "src/testing/", proof: "src/testing/run.test.mjs", guard: "node" }]);
   assert.equal(sibling.code, 1, "`src/testing/` is not inside `src/test/`: segments, not characters");
   assert.match(sibling.text, /new scope/);
-  assert.equal(run([{ root: "src/test/unit/deep/", proof: unit.proof }]).code, 1, "narrowed, but the kept proof lies outside the new root");
+  assert.equal(run([{ root: "src/test/unit/deep/", proof: unit.proof, guard: "node" }]).code, 1, "narrowed, but the kept proof lies outside the new root");
 });
 
 test("13b. a narrowed scope keeps the proof of the base scope that holds it, and that proof lies under the new root [Opus M1, code gate 12]", (t) => {
-  const deep = { root: "src/test/", proof: "src/test/a/run.test.mjs" };
+  const deep = { root: "src/test/", proof: "src/test/a/run.test.mjs", guard: "node" };
   const { repo, file } = committed(t, baselineOf({ scopes: [deep] }));
   const run = (scopes) => {
     writeBaseline(file, baselineOf({ scopes }));
     return shrinks(repo);
   };
-  assert.equal(run([{ root: "src/test/a/", proof: deep.proof }]).code, 0, "narrowed, the base proof kept and under the new root");
-  const fake = run([{ root: "src/test/a/", proof: "src/test/a/fake.test.mjs" }]);
+  assert.equal(run([{ root: "src/test/a/", proof: deep.proof, guard: "node" }]).code, 0, "narrowed, the base proof kept and under the new root");
+  const fake = run([{ root: "src/test/a/", proof: "src/test/a/fake.test.mjs", guard: "node" }]);
   assert.equal(fake.code, 1, fake.text);
   assert.match(fake.text, /narrowed/);
-  assert.equal(run([{ root: "src/test/b/", proof: deep.proof }]).code, 1, "a sub-root the kept proof is not under");
+  assert.equal(run([{ root: "src/test/b/", proof: deep.proof, guard: "node" }]).code, 1, "a sub-root the kept proof is not under");
   for (const root of ["src//test/", "./src/test/", "src/./test/"]) {
     const bad = run([{ root, proof: `${root}run.test.mjs` }]);
     assert.equal(bad.code, 1, `${root}: ${bad.text}`);
@@ -388,7 +391,7 @@ test("14. creation: only the first, only with --allow-create, never after the pa
   commit(origin, "base");
   commit(origin, "second");
   const clone = ownedDir(t, "baseline shallow");
-  git(clone, "clone", "-q", "--depth=1", `file://${origin}`, clone);
+  git(clone, "clone", "-q", "--depth=1", pathToFileURL(origin).href, clone);
   const shallow = path.join(clone, "raw-temp-baseline.json");
   writeBaseline(shallow, baselineOf());
   const closed = shrinks(clone, ["--allow-create"]);
@@ -419,7 +422,7 @@ test("15b. the marker is matched in its exact case and needs a folder path after
 
 // 16 — one fixed path, never a symlink (Opus B1, M3) ---------------------------------------------------------------------------
 
-test("16. the baseline is the file `raw-temp-baseline.json` at the repository root: a symlink is a baseline finding in the scan and exit 2 in the shrink check; a folder is exit 2", (t) => {
+test("16. the baseline is the file `raw-temp-baseline.json` at the repository root: a symlink is a baseline finding in the scan and exit 2 in the shrink check; a folder is exit 2", NO_SYMLINKS, (t) => {
   const { repo } = fixture(t, { baseline: null });
   fs.writeFileSync(path.join(repo, "elsewhere.json"), JSON.stringify(baselineOf(), null, 2));
   fs.symlinkSync("elsewhere.json", path.join(repo, FILE));
@@ -476,15 +479,17 @@ test("17. the proof marker is the marker, exactly the scope root, then only whit
 
 test("18. the proof must be a test file the guard discovered in this scan: an undiscovered file or a script that is no test is `proof missing`", (t) => {
   const marked = `// ${MARK}${ROOT}\n`;
-  const hidden = fixture(t, { baseline: baselineOf({ scopes: [{ root: ROOT, proof: "src/test/run-folder.mjs" }] }), proof: null, extra: { "src/test/run-folder.mjs": marked } });
+  const hidden = fixture(t, { baseline: baselineOf({ scopes: [{ root: ROOT, proof: "src/test/run-folder.mjs", guard: "node" }] }), proof: null, extra: { "src/test/run-folder.mjs": marked } });
   const first = withBaseline(hidden.repo);
   assert.equal(first.code, 1, "present in the tree but never discovered by the scan");
   assert.match(first.text, /proof missing/);
-  const script = fixture(t, { baseline: baselineOf({ entries: [entry("scripts/x.mjs", L3, 1)], scopes: [{ root: "scripts/", proof: "scripts/setup.mjs" }] }), proof: null, source: null, extra: { "scripts/x.mjs": `${L3}\n`, "scripts/setup.mjs": `// ${MARK}scripts/\n` } });
+  const other = fixture(t, { baseline: baselineOf({ scopes: [{ root: ROOT, proof: "src/test/run-folder.mjs", guard: "csharp" }], entries: [] }), source: ["export {};"], proof: null, extra: { "src/test/run-folder.mjs": marked } });
+  assert.equal(withBaseline(other.repo).code, 0, "its twin: the same undiscovered proof under a scope that names ANOTHER guard is silent [E2-b]");
+  const script = fixture(t, { baseline: baselineOf({ entries: [entry("scripts/x.mjs", L3, 1)], scopes: [{ root: "scripts/", proof: "scripts/setup.mjs", guard: "node" }] }), proof: null, source: null, extra: { "scripts/x.mjs": `${L3}\n`, "scripts/setup.mjs": `// ${MARK}scripts/\n` } });
   const second = withBaseline(script.repo);
   assert.equal(second.code, 1, "discovered under a `scripts/` root, but no test file");
   assert.match(second.text, /proof missing/);
-  const tests = fixture(t, { baseline: baselineOf({ entries: [entry("test/x.mjs", L3, 1)], scopes: [{ root: "test/", proof: "test/setup.mjs" }] }), proof: null, source: null, extra: { "test/x.mjs": `${L3}\n`, "test/setup.mjs": `// ${MARK}test/\n` } });
+  const tests = fixture(t, { baseline: baselineOf({ entries: [entry("test/x.mjs", L3, 1)], scopes: [{ root: "test/", proof: "test/setup.mjs", guard: "node" }] }), proof: null, source: null, extra: { "test/x.mjs": `${L3}\n`, "test/setup.mjs": `// ${MARK}test/\n` } });
   assert.equal(withBaseline(tests.repo).code, 0, "a file under `test/` is a test file");
 });
 
@@ -510,7 +515,7 @@ function failingGit(t, word) {
   t.after(() => { process.env.PATH = before; });
 }
 
-test("20. a git failure is exit 2 with its sentence, never 'absent at base' and never 'no history'", (t) => {
+test("20. a git failure is exit 2 with its sentence, never 'absent at base' and never 'no history'", NO_POSIX_SH, (t) => {
   const { repo } = committed(t, baselineOf());
   failingGit(t, "ls-tree");
   const absent = shrinks(repo);
@@ -519,7 +524,7 @@ test("20. a git failure is exit 2 with its sentence, never 'absent at base' and 
   assert.doesNotMatch(absent.text, /a creation/);
 });
 
-test("20b. a git failure while asking for the path's history is exit 2, not a creation that never had history", (t) => {
+test("20b. a git failure while asking for the path's history is exit 2, not a creation that never had history", NO_POSIX_SH, (t) => {
   const never = tree(t, { x: "1\n" });
   commit(never, "base");
   writeBaseline(path.join(never, FILE), baselineOf());
@@ -554,8 +559,8 @@ test("21b. a line with a valid exemption uses no entry", (t) => {
 });
 
 test("21c. overlapping scopes: an entry belongs to the most specific root whatever the order of the list", (t) => {
-  const wide = { root: "src/", proof: "src/wide.test.mjs" };
-  const narrow = { root: ROOT, proof: PROOF };
+  const wide = { root: "src/", proof: "src/wide.test.mjs", guard: "node" };
+  const narrow = { root: ROOT, proof: PROOF, guard: "node" };
   for (const scopes of [[wide, narrow], [narrow, wide]]) {
     const { repo } = fixture(t, { baseline: baselineOf({ scopes }), extra: { "src/wide.test.mjs": "export {};\n" } });
     const result = withBaseline(repo);
@@ -579,7 +584,7 @@ test("21d. the argument errors: --baseline-shrinks needs --base; --base and --al
 test("22. matching is linear: 40,000 entries are taken in well under a few seconds", (t) => {
   const { repo } = fixture(t);
   const entries = Array.from({ length: 40000 }, (_, index) => entry(A, `line ${index}`, index + 1));
-  const applier = createApplier({ scopes: [{ root: ROOT, proof: PROOF }], entries }, repo, FILE, new Set([PROOF]));
+  const applier = createApplier({ scopes: [{ root: ROOT, proof: PROOF, guard: "node" }], entries }, repo, FILE, new Set([PROOF]));
   const started = performance.now();
   for (let index = 39999; index >= 0; index -= 1) assert.equal(applier.take(A, sha(`line ${index}`)), true);
   assert.equal(applier.finalFindings().length, 0);
@@ -592,7 +597,7 @@ test("22b. matching is linear under ONE key too: 150,000 entries of one site are
   const { repo } = fixture(t);
   const entries = Array.from({ length: 150000 }, (_, index) => entry(A, L3, index + 1));
   const started = performance.now();
-  const applier = createApplier({ scopes: [{ root: ROOT, proof: PROOF }], entries }, repo, FILE, new Set([PROOF]));
+  const applier = createApplier({ scopes: [{ root: ROOT, proof: PROOF, guard: "node" }], entries }, repo, FILE, new Set([PROOF]));
   for (let index = 0; index < 150000; index += 1) assert.equal(applier.take(A, sha(L3)), true);
   assert.equal(applier.take(A, sha(L3)), false, "one more hit than entries is not passed");
   assert.equal(applier.finalFindings().length, 0);
@@ -611,7 +616,7 @@ test("19b. --print-baseline: a file that vanished or cannot be read is listed in
 
 // 23 — ONE loader of the working-tree file (code round 2 1) ------------------------------------------------------------------------
 
-test("23. one loader finds the baseline file for the scan and the shrink check: absent, a file, a symlink, a folder, a folder that is not the git root", (t) => {
+test("23. one loader finds the baseline file for the scan and the shrink check: absent, a file, a symlink, a folder, a folder that is not the git root", NO_SYMLINKS, (t) => {
   const absent = fixture(t, { baseline: null });
   assert.deepEqual(locateBaseline(absent.repo), { file: path.join(absent.repo, FILE), absent: true });
   const plain = fixture(t);
@@ -642,4 +647,170 @@ test("21e. a value option followed by another `--` option is a usage error that 
     assert.equal(result.code, 2, `${args.join(" ")}: ${result.text}`);
     assert.match(result.text, new RegExp(`\`${name}\` needs a value.*\`${next}\``), args.join(" "));
   }
+});
+
+// ---- epoch 2 (todo/PLAN_raw_temp_baseline.md, § Tests): the named guard, the git-root scan, the linear marker, the splits --------------
+
+const CS = { root: "csharp/Suite/", proof: "csharp/Suite/RunFolderTests.cs", guard: "csharp" };
+const NODE_SCOPE = { root: ROOT, proof: PROOF, guard: "node" };
+const CS_SITE = "var run = MakeRunFolder();";
+/** One file, two guards: a `node` scope the Node guard judges and a `csharp` scope its `.cs` files belong to (the `node` profile never reads a `.cs` outside scripts/, test/, tests/). */
+const twoGuards = (t, { entries = [entry(A, L3, 3)], scopes = [NODE_SCOPE, CS], extra = {} } = {}) => fixture(t, { baseline: baselineOf({ scopes, entries }), extra: { [CS.proof]: `// ${MARK}${CS.root}\n`, "csharp/Suite/A.cs": `${CS_SITE}\n`, ...extra } });
+
+// 24 ---------------------------------------------------------------------------------------------------------------------------
+
+test("24. the scan judges only at the git root: --baseline run in a subfolder is exit 2 naming the git root, with or without a file there [E2-e]", (t) => {
+  const { repo } = fixture(t);
+  assert.equal(withBaseline(repo).code, 0, "at the root: unchanged");
+  const sub = path.join(repo, "sub");
+  fs.mkdirSync(path.join(sub, "src", "test"), { recursive: true });
+  write(sub, A, lines(SOURCE));
+  write(sub, PROOF, PROOF_TEXT);
+  writeBaseline(path.join(sub, FILE), baselineOf());
+  const inside = withBaseline(sub);
+  assert.equal(inside.code, 2, `a baseline in a subfolder is not read as the root's: ${inside.text}`);
+  assert.match(inside.text, /root of the git repository/);
+  fs.rmSync(path.join(sub, FILE));
+  const bare = withBaseline(sub);
+  assert.equal(bare.code, 2, bare.text);
+  assert.match(bare.text, /root of the git repository/, "the root is named whether or not a file stands there");
+  assert.equal(guard(sub).code, 1, "without --baseline nothing changes: the scan runs, the site is a finding");
+});
+
+// 25 ---------------------------------------------------------------------------------------------------------------------------
+
+test("25. one file, two guards: a scope is judged by the guard it NAMES, and only by it [E2-b, re-review findings 0 and 2]", (t) => {
+  const own = twoGuards(t, { entries: [entry(A, L3, 3), entry("csharp/Suite/A.cs", CS_SITE, 1), entry("csharp/Suite/Gone.cs", CS_SITE, 4)] });
+  const clean = withBaseline(own.repo);
+  assert.equal(clean.code, 0, `the csharp scope is silent — its proof undiscovered, its entries unread, one whose file is absent: ${clean.text}`);
+  const stale = twoGuards(t, { entries: [entry(A, L3, 3), entry(A, L7, 7), entry("csharp/Suite/A.cs", CS_SITE, 1)] });
+  const second = withBaseline(stale.repo);
+  assert.deepEqual(found(second.text), [`${A}:7 — baseline`], "the node scope's stale entry is a finding, and only that");
+  const alien = twoGuards(t, { entries: [entry(A, L3, 3), entry("csharp/Suite/b.test.mjs", L3, 1)], extra: { "csharp/Suite/b.test.mjs": `${L3}\n` } });
+  const third = withBaseline(alien.repo);
+  assert.deepEqual(found(third.text), ["csharp/Suite/b.test.mjs:1 — raw-temp"], "a raw-temp line the node guard reads under a csharp scope stays a finding; the csharp entry applies nothing here");
+  const gone = twoGuards(t, { entries: [entry(A, L3, 3), entry("src/test/gone.test.mjs", L3, 2)] });
+  const fourth = withBaseline(gone.repo);
+  assert.deepEqual(found(fourth.text), ["src/test/gone.test.mjs:2 — baseline"]);
+  assert.match(fourth.text, /file absent/, "an entry of the node scope whose file is not in the tree is `file absent`");
+  const unread = twoGuards(t, { entries: [entry(A, L3, 3), entry("src/test/notes.txt", L3, 9)], extra: { "src/test/notes.txt": `${L3}\n` } });
+  const fifth = withBaseline(unread.repo);
+  assert.match(fifth.text, /entry has no line/, "a file that exists but the node profile does not walk is `no line`, by lstat not by discovery");
+  assert.doesNotMatch(fifth.text, /file absent/);
+});
+
+// 26 ---------------------------------------------------------------------------------------------------------------------------
+
+test("26. a proof absent from the tree is `proof missing` from its OWN guard only; the ratchet refuses a changed guard [E2-b]", (t) => {
+  const own = twoGuards(t);
+  fs.rmSync(path.join(own.repo, PROOF));
+  const node = withBaseline(own.repo);
+  assert.equal(node.code, 1, node.text);
+  assert.match(node.text, /proof missing.*absent from the tree/, "the node scope's proof is gone: its own guard says so, naming the absence");
+  const other = twoGuards(t);
+  fs.rmSync(path.join(other.repo, CS.proof));
+  assert.equal(withBaseline(other.repo).code, 0, "the csharp scope's proof is gone: nothing under the node profile");
+  const { repo, file } = committed(t, baselineOf({ scopes: [NODE_SCOPE, CS] }));
+  const run = (scopes) => {
+    writeBaseline(file, baselineOf({ scopes }));
+    return shrinks(repo);
+  };
+  assert.equal(run([NODE_SCOPE, CS]).code, 0, "the same guards");
+  const swapped = run([NODE_SCOPE, { ...CS, guard: "node" }]);
+  assert.equal(swapped.code, 1, swapped.text);
+  assert.match(swapped.text, /changed guard.*csharp/);
+  const held = committed(t, baselineOf({ scopes: [{ root: ROOT, proof: "src/test/a/run.test.mjs", guard: "node" }] }));
+  writeBaseline(held.file, baselineOf({ scopes: [{ root: "src/test/a/", proof: "src/test/a/run.test.mjs", guard: "csharp" }] }));
+  const narrowed = shrinks(held.repo);
+  assert.equal(narrowed.code, 1, "a narrowed scope that changes the guard of the scope that holds it");
+  assert.match(narrowed.text, /guard/);
+  writeBaseline(held.file, baselineOf({ scopes: [{ root: "src/test/a/", proof: "src/test/a/run.test.mjs", guard: "node" }] }));
+  assert.equal(shrinks(held.repo).code, 0, "narrowed with the same guard: a shrink");
+});
+
+// 31 ---------------------------------------------------------------------------------------------------------------------------
+
+test("31. a missing or unknown guard is a malformed file whichever guard parses it: ONE baseline finding naming scopes[i].guard and the closed list; nothing applies [E2-b]", (t) => {
+  const withGuard = (value) => baselineOf({ scopes: [{ root: ROOT, proof: PROOF, ...(value === undefined ? {} : { guard: value }) }] });
+  for (const value of ["rust", undefined, 3, ""]) {
+    const { repo } = fixture(t, { baseline: withGuard(value) });
+    const result = withBaseline(repo);
+    assert.equal(result.code, 1, result.text);
+    assert.equal(found(result.text).filter((line) => line.endsWith(" — baseline")).length, 1, `ONE baseline finding for ${JSON.stringify(value)}: ${result.text}`);
+    assert.match(result.text, /raw-temp-baseline\.json:1 — baseline — .*scopes\[0\]\.guard.*`node`, `csharp`/);
+    assert.ok(found(result.text).includes(`${A}:3 — raw-temp`), "nothing applied");
+    const base = committed(t);
+    writeBaseline(base.file, withGuard(value));
+    const shrink = shrinks(base.repo);
+    assert.equal(shrink.code, 1, shrink.text);
+    assert.match(shrink.text, /not a baseline.*scopes\[0\]\.guard/);
+  }
+  const { repo } = fixture(t, { baseline: withGuard("node") });
+  assert.equal(withBaseline(repo).code, 0, "break-it: a named guard is judged");
+});
+
+// 27 ---------------------------------------------------------------------------------------------------------------------------
+
+test("27. the marker parse is linear: a 1,500- and a 100,000-character tail parse in under 50 ms; a root followed by two closers is no marker [CodeRabbit]", (t) => {
+  const timed = (proof) => {
+    const { repo } = fixture(t, { proof });
+    let best = Infinity;
+    let findings;
+    for (let round = 0; round < 3; round += 1) {
+      const started = performance.now();
+      findings = createApplier({ scopes: [NODE_SCOPE], entries: [] }, repo, FILE, new Set([PROOF])).finalFindings();
+      best = Math.min(best, performance.now() - started);
+    }
+    return { best, findings };
+  };
+  const spaces = timed(`// ${MARK}${ROOT}${" ".repeat(1500)}x\n`);
+  assert.equal(spaces.findings.length, 1, "a root followed by a long run of spaces and a stray character is no marker");
+  assert.ok(spaces.best < 50, `${spaces.best.toFixed(1)} ms — a backtracking pattern is quadratic here`);
+  const huge = timed(`// ${MARK}${ROOT}${" ".repeat(100000)}x\n`); // reached only by a linear parse: the backtracking pattern needs minutes for it, so the 1,500 above is the RED
+  assert.equal(huge.findings.length, 1);
+  assert.ok(huge.best < 50, `${huge.best.toFixed(1)} ms for 100,000 characters`);
+  const blanks = timed(`// ${MARK}${ROOT}${" \t".repeat(10000)}-->\n`);
+  assert.deepEqual(blanks.findings, [], "a root, then only blanks and one closer, is a marker however long the blanks");
+  assert.ok(blanks.best < 50, `${blanks.best.toFixed(1)} ms`);
+  const { repo } = fixture(t, { proof: `// ${MARK}${ROOT} */ */\n` });
+  assert.match(withBaseline(repo).text, /proof missing/, "two closers");
+});
+
+// 28 ---------------------------------------------------------------------------------------------------------------------------
+
+test("28. the tests run on Windows: git clones take a pathToFileURL; the symlink tests and the fake-git tests skip there with a reason [CodeRabbit]", () => {
+  const source = fs.readFileSync(fileURLToPath(import.meta.url), "utf8");
+  assert.equal(source.split("`file:" + "//${").length - 1, 0, "a file URL is built by pathToFileURL, never by joining a path to `file://`");
+  assert.ok(source.split("pathToFileURL(origin).href").length - 1 >= 2, "tests 11 and 14 clone through pathToFileURL");
+  for (const [number, skip] of [["16.", "NO_SYMLINKS"], ["23.", "NO_SYMLINKS"], ["20.", "NO_POSIX_SH"], ["20b.", "NO_POSIX_SH"]]) {
+    const line = source.split("\n").find((text) => text.startsWith(`test("${number} `));
+    assert.ok(line?.includes(`", ${skip}, (t) =>`), `test ${number} skips on win32 through ${skip}`);
+  }
+  assert.ok(source.includes('"symlinks need a privilege on Windows"') && source.includes('"the fake git is a POSIX script"'), "each skip says why");
+});
+
+// 30 ---------------------------------------------------------------------------------------------------------------------------
+
+test("30. the complexity splits exist and keep every message: scopeProblem and entryProblem (the module), optionsProblem (the command line) [CodeRabbit]", async () => {
+  const module = await import("./lib/raw-temp-baseline.mjs");
+  const cli = await import("./lib/leftovers-cli.mjs");
+  for (const [owner, name] of [[module, "scopeProblem"], [module, "entryProblem"], [cli, "optionsProblem"]]) assert.equal(typeof owner[name], "function", `${name} is exported`);
+  const { scopeProblem, entryProblem } = module;
+  assert.equal(scopeProblem(NODE_SCOPE, 0), undefined);
+  assert.match(scopeProblem(null, 2), /`scopes\[2\]` is not an object/);
+  assert.match(scopeProblem({ ...NODE_SCOPE, root: "src/test" }, 1), /`scopes\[1\]\.root`/);
+  assert.match(scopeProblem({ ...NODE_SCOPE, proof: "other/run.test.mjs" }, 0), /`scopes\[0\]\.proof`/);
+  assert.match(scopeProblem({ ...NODE_SCOPE, proof: FILE }, 0), /`scopes\[0\]\.proof`/);
+  assert.match(scopeProblem({ ...NODE_SCOPE, guard: "rust" }, 3), /`scopes\[3\]\.guard`.*`node`, `csharp`/);
+  assert.equal(entryProblem(entry(A, L3, 3), 0), undefined);
+  assert.match(entryProblem(7, 4), /`entries\[4\]` is not an object/);
+  assert.match(entryProblem({ ...entry(A, L3, 3), file: "a\\b" }, 0), /`entries\[0\]\.file`/);
+  assert.match(entryProblem({ ...entry(A, L3, 3), sha256: "abc" }, 1), /`entries\[1\]\.sha256`/);
+  assert.match(entryProblem({ ...entry(A, L3, 3), line: 0 }, 2), /`entries\[2\]\.line`/);
+  const { optionsProblem } = cli;
+  assert.equal(optionsProblem({}), undefined);
+  assert.match(optionsProblem({ profile: "go" }), /unknown profile `go`/);
+  assert.match(optionsProblem({ baselineShrinks: true }), /needs `--base/);
+  assert.match(optionsProblem({ allowCreate: true }), /belong to `--baseline-shrinks`/);
+  assert.match(optionsProblem({ printBaseline: true, baseline: true }), /cannot be combined/);
 });

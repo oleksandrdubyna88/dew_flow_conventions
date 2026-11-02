@@ -137,12 +137,13 @@ test("S1 9 the core carries, under each section, every phrase a reviewer needs t
 });
 
 /** What the baseline companion must carry: the one class, the proof marker, the multiset key, the ratchet, the file format. */
-const BASELINE_PHRASES = ["The `raw-temp` baseline", "testsTo" + "Delete-baseline-proof: <scope root>", "**multiset**", "sha256 of the trimmed line", "only when told to", "`baseline`", "**only shrinks**", "any creation but the first", "nothing regenerates it", "\"class\": \"raw-temp\"", "No `count` field", "--baseline-shrinks", "`raw-temp-baseline.json` at the repository root", "never a symlink", "a test file the guard discovered", "keeps the proof of the base scope", "only in the creation PR's own run", "never in the standing", "on every pull request", "the PR's target branch"];
+const BASELINE_PHRASES = ["The `raw-temp` baseline", "testsTo" + "Delete-baseline-proof: <scope root>", "**multiset**", "sha256 of the trimmed line", "only when told to", "`baseline`", "**only shrinks**", "any creation but the first", "nothing regenerates it", "\"class\": \"raw-temp\"", "No `count` field", "--baseline-shrinks", "`raw-temp-baseline.json` at the repository root", "never a symlink", "a test file the guard discovered", "keeps the proof of the base scope", "only in the creation PR's own run", "never in the standing", "on every pull request", "the PR's target branch", "`scopes[].guard` names the guard that judges the scope", "\"guard\": \"csharp\"", "never checks another guard's scopes", "a changed `guard`", "Never name a guard the list does not have", "never leave a named guard out of CI", "a standing flag would let the ONE creation pass without the reviewed run"];
 
 test("S1 10 the baseline companion carries the full `raw-temp` baseline definition, once, and the detail's §7 points to it in one short paragraph, after the exemption grammar", () => {
   const text = read(BASELINE).replace(/\s+/g, " ");
   const missing = BASELINE_PHRASES.filter((phrase) => !text.includes(phrase));
   assert.deepEqual(missing, [], "the baseline companion is missing phrases");
+  assert.ok(!text.includes("pass a creation again after a deletion merged"), "the wrong reason for the --allow-create rule is gone: a re-creation is refused by the path's history [E2-c]");
   assert.equal(text.split("**The `raw-temp` baseline").length - 1, 1, "the definition is there once");
   assert.ok(text.includes("`" + RULE + "`") && text.includes("`" + DETAIL + "`"), "it names the core and the detail by path");
   const detail = read(DETAIL);
