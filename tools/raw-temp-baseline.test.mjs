@@ -903,15 +903,16 @@ test("36. the absence of a file is looked at once per run, however many entries 
   const { syncBuiltinESMExports } = await import("node:module");
   const { repo } = fixture(t);
   const entries = Array.from({ length: 50 }, (_, index) => entry("src/test/gone.test.mjs", `line ${index}`, index + 1));
-  const real = fs.lstatSync;
+  const { default: own } = await import("node:fs"); // the module object itself (`fs` above is a namespace); syncBuiltinESMExports makes the named export follow
+  const real = own.lstatSync;
   const asked = [];
-  fs.lstatSync = (...args) => { asked.push(String(args[0])); return real(...args); }; // `fs` is the module's own object: syncBuiltinESMExports makes the named export follow
+  own.lstatSync = (...args) => { asked.push(String(args[0])); return real(...args); };
   syncBuiltinESMExports();
   let findings;
   try {
     findings = createApplier({ scopes: [NODE_SCOPE], entries }, repo, FILE, new Set([PROOF])).finalFindings();
   } finally {
-    fs.lstatSync = real;
+    own.lstatSync = real;
     syncBuiltinESMExports();
   }
   assert.equal(findings.length, 50, "every entry is stale");
