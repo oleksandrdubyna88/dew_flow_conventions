@@ -15,7 +15,7 @@
 > [common/test-leftovers-detail.md](../common/test-leftovers-detail.md) (the detail; where the two differ the detail
 > decides), [common/testing.md](../common/testing.md),
 > [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md) (R1–R7, the owner decisions),
-> [PLAN_test_leftovers_merged_core_followups.md](PLAN_test_leftovers_merged_core_followups.md) (F1–F20),
+> [PLAN_test_leftovers_merged_core_followups.md](PLAN_test_leftovers_merged_core_followups.md) (F1–F22),
 > [research/PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) (the contract as built).
 
 ## Plan changes
@@ -399,6 +399,10 @@ merges of E2 and E5 wait.
    account, walk the manual items of the merged-core plan's barrier checklist, and record the section in
    `research/security/machines.md` — or state in writing that the machine no longer builds or tests E2's and E5's repositories.
    *Recommended:* run it; it is one scan and a short record, and it is the only thing between E2.1 and its merge.
+   (Correction, 2026-11-02 [PR review, CodeRabbit]: P1 is not the only condition. E2.1's own plan (creds
+   `todo/PLAN_test_leftovers_E2.md`, "Open before E2.1 may merge") also names the by-hand macOS record, the Windows by-hand
+   `npm test` count and the Windows CI leg's first green, sc. 12 by hand, and D8's barrier conditions (c) and (d) for the owner's
+   Windows machine. That list is the canonical one; P1 is its item (e).)
    (Settled without the owner, 2026-11-01: the F16 disposition — (b), § 4, consult `3310f6ba`; and P2's plan — written and through
    its plan gate, item 2.1. The `r9700` token row (#103) rides the same promotion as P2 and the F16 change.)
 
