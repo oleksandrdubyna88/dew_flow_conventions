@@ -473,6 +473,18 @@ test("17. the proof marker is the marker, exactly the scope root, then only whit
     assert.equal(result.code, 1, `refused: ${line}`);
     assert.match(result.text, /proof missing/, line);
   }
+  for (const line of [`// ${MARK}${ROOT}\r\nexport {};\r\n`, `/* ${MARK}${ROOT} */\r\nexport {};\r\n`]) {
+    const { repo } = fixture(t, { proof: line });
+    assert.equal(withBaseline(repo).code, 0, `a CRLF file: ${JSON.stringify(line)} [epoch-2 Opus 5]`);
+  }
+  // a root holds no whitespace, star-slash or `-->`: such a root could never be written into a marker line [epoch-2 code 0, Opus 5]
+  for (const root of ["src/my tests/", "src/my\ttests/", "src/a*/b/", "src/a-->b/"]) {
+    const { repo } = fixture(t, { baseline: baselineOf({ scopes: [{ root, proof: `${root}run.test.mjs`, guard: "node" }] }) });
+    const result = withBaseline(repo);
+    assert.equal(result.code, 1, JSON.stringify(root));
+    assert.equal(found(result.text).filter((text) => text.endsWith(" — baseline")).length, 1, `ONE finding for ${JSON.stringify(root)}: ${result.text}`);
+    assert.match(result.text, /scopes\[0\]\.root.*no whitespace/, JSON.stringify(root));
+  }
 });
 
 // 18 — the proof is a test file this scan discovered, not the baseline (code gate 11, Opus m5) -----------------------------------
@@ -738,6 +750,7 @@ test("31. a missing or unknown guard is a malformed file whichever guard parses 
     assert.equal(result.code, 1, result.text);
     assert.equal(found(result.text).filter((line) => line.endsWith(" — baseline")).length, 1, `ONE baseline finding for ${JSON.stringify(value)}: ${result.text}`);
     assert.match(result.text, /raw-temp-baseline\.json:1 — baseline — .*scopes\[0\]\.guard.*`node`, `csharp`/);
+    assert.match(result.text, /`node` for the Node guard's suites.*`csharp` for the C# guard's/, "the message says which to use [epoch-2 code 4]");
     assert.ok(found(result.text).includes(`${A}:3 — raw-temp`), "nothing applied");
     const base = committed(t);
     writeBaseline(base.file, withGuard(value));
@@ -782,7 +795,7 @@ test("28. the tests run on Windows: git clones take a pathToFileURL; the symlink
   const source = fs.readFileSync(fileURLToPath(import.meta.url), "utf8");
   assert.equal(source.split("`file:" + "//${").length - 1, 0, "a file URL is built by pathToFileURL, never by joining a path to `file://`");
   assert.ok(source.split("pathToFileURL(origin).href").length - 1 >= 2, "tests 11 and 14 clone through pathToFileURL");
-  for (const [number, skip] of [["16.", "NO_SYMLINKS"], ["23.", "NO_SYMLINKS"], ["20.", "NO_POSIX_SH"], ["20b.", "NO_POSIX_SH"]]) {
+  for (const [number, skip] of [["16.", "NO_SYMLINKS"], ["23.", "NO_SYMLINKS"], ["38.", "NO_SYMLINKS"], ["20.", "NO_POSIX_SH"], ["20b.", "NO_POSIX_SH"], ["39.", "NO_POSIX_SH"]]) {
     const line = source.split("\n").find((text) => text.startsWith(`test("${number} `));
     assert.ok(line?.includes(`", ${skip}, (t) =>`), `test ${number} skips on win32 through ${skip}`);
   }
@@ -813,4 +826,130 @@ test("30. the complexity splits exist and keep every message: scopeProblem and e
   assert.match(optionsProblem({ baselineShrinks: true }), /needs `--base/);
   assert.match(optionsProblem({ allowCreate: true }), /belong to `--baseline-shrinks`/);
   assert.match(optionsProblem({ printBaseline: true, baseline: true }), /cannot be combined/);
+});
+
+// ---- epoch 2, after the code gate and the Opus review (todo/PLAN_raw_temp_baseline.md, § Build progress) --------------------------------
+
+// 32 ---------------------------------------------------------------------------------------------------------------------------
+
+test("32. the validation loops stop at the first problem: nothing after it is read [epoch-2 code 3]", async () => {
+  const { problemOf } = await import("./lib/raw-temp-baseline.mjs");
+  let reads = 0;
+  const watched = () => new Proxy({}, { get: () => { reads += 1; return undefined; } });
+  assert.match(problemOf({ class: "raw-temp", scopes: [], entries: [7, watched(), watched()] }), /`entries\[0\]` is not an object/);
+  assert.match(problemOf({ class: "raw-temp", scopes: [null, watched(), watched()], entries: [watched()] }), /`scopes\[0\]` is not an object/);
+  assert.equal(reads, 0, "a later scope or entry is never looked at once an earlier one is wrong");
+});
+
+// 33 ---------------------------------------------------------------------------------------------------------------------------
+
+test("33. scopes that overlap name the same guard, and no root is listed twice; otherwise the file is malformed for every guard [epoch-2 code 5, Opus 4]", (t) => {
+  const node = (root) => ({ root, proof: `${root}run.test.mjs`, guard: "node" });
+  const cs = (root) => ({ root, proof: `${root}RunTests.cs`, guard: "csharp" });
+  const malformed = (scopes, why) => {
+    const { repo } = fixture(t, { baseline: baselineOf({ scopes }) });
+    const result = withBaseline(repo);
+    assert.equal(result.code, 1, `${why}: ${result.text}`);
+    assert.equal(found(result.text).filter((text) => text.endsWith(" — baseline")).length, 1, `${why}: ONE finding`);
+    assert.match(result.text, /scopes\[1\]/, why);
+    return result;
+  };
+  assert.match(malformed([node("src/"), cs("src/Tests/")], "a csharp scope inside a node scope").text, /same guard/);
+  assert.match(malformed([cs("src/Tests/"), node("src/")], "the same, the other way round").text, /same guard/);
+  assert.match(malformed([node("src/test/"), cs("src/test/")], "one root, two guards").text, /twice|repeats|same/);
+  assert.match(malformed([node("src/test/"), node("src/test/")], "one root twice, one guard").text, /twice|repeats/);
+  const fine = fixture(t, { baseline: baselineOf({ scopes: [node("src/"), node("src/test/"), cs("lib/Tests/")] }), extra: { "src/run.test.mjs": `// ${MARK}src/\n`, "src/test/run.test.mjs": PROOF_TEXT } });
+  assert.equal(withBaseline(fine.repo).code, 0, "overlapping scopes of one guard, and a sibling of another, are fine");
+  const shrink = committed(t);
+  writeBaseline(shrink.file, baselineOf({ scopes: [node("src/"), cs("src/Tests/")] }));
+  assert.equal(shrinks(shrink.repo).code, 1, "the shrink check parses the same way");
+});
+
+// 34 ---------------------------------------------------------------------------------------------------------------------------
+
+test("34. a csharp scope inside the node guard's walk is a baseline finding of the node guard: its files would be read by both guards [Opus 1]", (t) => {
+  const scope = { root: "tests/Unit/", proof: "tests/Unit/RunFolderTests.cs", guard: "csharp" };
+  const { repo } = fixture(t, { baseline: baselineOf({ scopes: [NODE_SCOPE, scope], entries: [entry(A, L3, 3)] }), extra: { [scope.proof]: `// ${MARK}${scope.root}\n` } });
+  const result = withBaseline(repo);
+  assert.equal(result.code, 1, result.text);
+  assert.deepEqual(found(result.text), ["raw-temp-baseline.json:1 — baseline"], result.text);
+  assert.match(result.text, /a csharp scope inside the node guard's walk: its files would be read by both guards/);
+  assert.doesNotMatch(result.text, /proof missing/);
+  const moved = fixture(t, { baseline: baselineOf({ scopes: [NODE_SCOPE, { root: "src/Tests/", proof: "src/Tests/RunFolderTests.cs", guard: "csharp" }] }), extra: { "src/Tests/RunFolderTests.cs": `// ${MARK}src/Tests/\n` } });
+  assert.equal(withBaseline(moved.repo).code, 0, "a root the node guard does not read is fine");
+  const scripts = fixture(t, { baseline: baselineOf({ scopes: [NODE_SCOPE, { root: "scripts/", proof: "scripts/RunTests.cs", guard: "csharp" }] }) });
+  assert.match(withBaseline(scripts.repo).text, /inside the node guard's walk/, "scripts/ and test/ are walked too");
+});
+
+// 35 ---------------------------------------------------------------------------------------------------------------------------
+
+test("35. a path that cannot be looked at is a baseline finding naming the path and the error, never a crash and never 'absent' [epoch-2 code 1]", { skip: process.platform === "win32" ? "the error code differs on Windows" : false }, (t) => {
+  const long = `${"x".repeat(300)}.test.mjs`; // a name over 255 bytes: lstat answers ENAMETOOLONG, not ENOENT
+  const { repo } = fixture(t, { baseline: baselineOf({ entries: [entry(A, L3, 3), entry(`src/test/${long}`, L3, 5)] }) });
+  const result = withBaseline(repo);
+  assert.equal(result.code, 1, result.text);
+  assert.match(result.text, /cannot be looked at.*ENAMETOOLONG/);
+  assert.ok(result.text.includes(long.slice(0, 40)), "it names the path");
+  assert.doesNotMatch(result.text, /file absent/);
+  const proof = fixture(t, { baseline: baselineOf({ scopes: [{ root: ROOT, proof: `src/test/${long}`, guard: "node" }] }), proof: null });
+  const second = withBaseline(proof.repo);
+  assert.equal(second.code, 1, second.text);
+  assert.match(second.text, /proof missing.*cannot be looked at.*ENAMETOOLONG/);
+});
+
+// 36 ---------------------------------------------------------------------------------------------------------------------------
+
+test("36. the absence of a file is looked at once per run, however many entries name it [epoch-2 code 2]", async (t) => {
+  const { syncBuiltinESMExports } = await import("node:module");
+  const { repo } = fixture(t);
+  const entries = Array.from({ length: 50 }, (_, index) => entry("src/test/gone.test.mjs", `line ${index}`, index + 1));
+  const real = fs.lstatSync;
+  const asked = [];
+  fs.lstatSync = (...args) => { asked.push(String(args[0])); return real(...args); }; // `fs` is the module's own object: syncBuiltinESMExports makes the named export follow
+  syncBuiltinESMExports();
+  let findings;
+  try {
+    findings = createApplier({ scopes: [NODE_SCOPE], entries }, repo, FILE, new Set([PROOF])).finalFindings();
+  } finally {
+    fs.lstatSync = real;
+    syncBuiltinESMExports();
+  }
+  assert.equal(findings.length, 50, "every entry is stale");
+  assert.equal(asked.filter((name) => name.endsWith("gone.test.mjs")).length, 1, "one look at the one path");
+});
+
+// 22c — many scopes (epoch-2 code 6) ---------------------------------------------------------------------------------------------
+
+test("22c. matching stays linear with many scopes: 20,000 scopes and 20,000 entries are attributed in well under a second [epoch-2 code 6]", (t) => {
+  const { repo } = fixture(t);
+  const scopes = Array.from({ length: 20000 }, (_, index) => ({ root: `r${index}/`, proof: `r${index}/x.test.mjs`, guard: "node" }));
+  const entries = Array.from({ length: 20000 }, (_, index) => entry(`r${index}/x.test.mjs`, L3, 1));
+  const started = performance.now();
+  const findings = createApplier({ scopes, entries }, repo, FILE, new Set()).finalFindings();
+  assert.equal(findings.length, 20000, "every proof is missing (a finding per scope)");
+  assert.ok(performance.now() - started < 1000, "a filter and a sort of every scope for every entry would take many times longer");
+});
+
+// 38 ---------------------------------------------------------------------------------------------------------------------------
+
+test("38. the git root is checked BEFORE the symlink: a baseline that is a symlink in a subfolder is exit 2 naming the git root [Opus 2]", NO_SYMLINKS, (t) => {
+  const { repo } = fixture(t);
+  const sub = path.join(repo, "sub");
+  fs.mkdirSync(sub);
+  fs.writeFileSync(path.join(sub, "elsewhere.json"), "{}");
+  fs.symlinkSync("elsewhere.json", path.join(sub, FILE));
+  const result = withBaseline(sub);
+  assert.equal(result.code, 2, result.text);
+  assert.match(result.text, /root of the git repository/);
+  assert.equal(withBaseline(repo).code, 0, "at the root nothing changed");
+});
+
+// 39 ---------------------------------------------------------------------------------------------------------------------------
+
+test("39. a git failure while the scan locates the git root is exit 2 with git's sentence [Opus 3, E2-e]", NO_POSIX_SH, (t) => {
+  const { repo } = fixture(t);
+  failingGit(t, "rev-parse");
+  const result = withBaseline(repo);
+  assert.equal(result.code, 2, result.text);
+  assert.match(result.text, /boom/);
 });
