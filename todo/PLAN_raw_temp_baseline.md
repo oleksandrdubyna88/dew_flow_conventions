@@ -1,7 +1,7 @@
 # PLAN — The `raw-temp` baseline: rule §7 authorises one ratcheting, membership-keyed baseline for sites proven to run inside an owned run folder
 
 > Status: **epoch 2 OPEN (re-review document gate passed, proceed, 4 reviewers, 2026-11-02; approved by reviewers, not
-> narrowed) — the epoch-2 items are not built yet; #108 may take new code again.** The stop of 2026-11-02 (a second
+> narrowed) — the epoch-2 items are built on the branch (local commits `f567bf3`…, see § *Build progress*; not yet pushed or gated); #108 may take new code again.** The stop of 2026-11-02 (a second
 > change after approval; CodeRabbit on #108) is closed: this document is the WHOLE plan revised for epoch 2 (step 4 of
 > the full stop, against re-review consult `b6ce1182` and the coordinator's verifications), sorted by an Opus judge
 > (18 fits, 0 cut) and passed by the document gate, whose four findings are applied and marked *[re-review finding n]*.
@@ -259,7 +259,7 @@ scope precedence at `:52`), § *What a guard does with it* (`:60-70`), § *The r
   scope that holds its file, whatever the order of the list"); this plan's § *The file format* now carries it too, and
   the C# reader's tests show it (test 21c's twin).
 
-Bytes after E2-a to E2-c: about 7,300 B (one rule file, under the per-read cap; no test pins a figure). Bodies are
+Bytes after E2-a to E2-c: 7,300 B planned, **8,485 B built** (one rule file, under the per-read cap; no test pins a figure). Bodies are
 re-recorded with `node tools/rule-bodies.mjs --update common.test-leftovers-baseline`. The text names no product and
 no path that moves; `ownership-check` stays armed.
 
@@ -309,8 +309,8 @@ no path that moves; `ownership-check` stays armed.
 
 ## The Node guard — `tools/leftovers-check.mjs` and `tools/lib/raw-temp-baseline.mjs` (as built; epoch 2 marked)
 
-The guard is 592 lines; the command line is `tools/lib/leftovers-cli.mjs`, the docker pass `tools/lib/leftovers-docker.mjs`,
-the shell helpers `tools/lib/leftovers-shell.mjs` (code round 2 finding 0); the baseline module is 281 lines.
+The guard is 593 lines; the command line is `tools/lib/leftovers-cli.mjs`, the docker pass `tools/lib/leftovers-docker.mjs`,
+the shell helpers `tools/lib/leftovers-shell.mjs` (code round 2 finding 0); the baseline module is 336 lines.
 
 1. **Arguments** (`tools/lib/leftovers-cli.mjs` § `parseArguments`, `:22`): the flags `--baseline` and
    `--print-baseline` (no value; `--print-baseline` excludes `--baseline`), `--baseline-shrinks` with `--base <git-ref>`
@@ -375,7 +375,7 @@ the shell helpers `tools/lib/leftovers-shell.mjs` (code round 2 finding 0); the 
 9. **Nothing else moves**: the `owner-blind` path, the allowlist's loader and `--update-allowlist` are untouched; a
    test pins that a run without `--baseline` produces the same findings as before over the fixture tree (test 8).
 
-### Tests — `tools/raw-temp-baseline.test.mjs` (645 lines, 37 tests as built; RED first, then GREEN, then the break-it)
+### Tests — `tools/raw-temp-baseline.test.mjs` (816 lines, 41 tests as built after epoch 2; RED first, then GREEN, then the break-it)
 
 Fixtures are built with `ownedDir(t, …)`; the prefix word is spelled in two pieces. The table of epoch 1 (behaviours
 1–14) is built as tests 1–14 plus 13b, 15, 15b, 16, 16b, 17, 18, 19, 19b, 20, 20b, 21, 21b–21e, 22, 22b, 23 (§ *Build
@@ -528,6 +528,42 @@ stashed and with a targeted break (14 mutations of the module, each failing exac
 - [x] S3 `research/module_tests.md` § *Test leftovers*, `research/rule-bodies.json`, the README tool row.
 - [ ] S4 the release, the warning, the pin bumps (not started — a later step).
 - [ ] The C# reader in the template (the template owner's plan; nothing here).
+
+**Epoch 2 build (2026-11-02, local commits on `feat/raw-temp-baseline`, not pushed).** Each item a test commit first (RED observed on the
+unchanged code), then the code, then RED again with the code stashed and with targeted breaks:
+
+- [x] E2-a — `implement` joins the companion's tasks. `f567bf3` test (S1 6 pins the string, S1 11 asks `explain` for the companion under
+      every task: 2 fail), `06f92e1` code (frontmatter, `selection-matrix.mjs --write`, the `--bytes` table in `research/module_rules.md`;
+      81 pass; stashed: 2 fail again). The selection test holds no fixture row naming the companion, so there was none to change.
+- [x] E2-b — the named guard (tests 25, 26, 31, test 18's twin, test 3's `file absent`). Test commit `56eeaac`; code `80776db`:
+      `GUARDS`, `GUARD_NAME`, `scopeProblem` rejects a missing or unknown `guard`, `createApplier(…, guard)` judges only the scopes that
+      name it (entries indexed by the most specific scope of ALL scopes, judged only if that scope names this guard), `proofFailure` and
+      the stale text check absence by a direct `lstat`, `scopeGrowth` refuses a changed guard (and a narrowed scope keeps the holder's).
+      Targeted breaks, each failing the named tests: the guard filter (18, 25, 26), the guard compare (26), the validation (30, 31), the
+      proof `lstat` (26). Companion text: the `guard` field, § What a guard does with it, the ratchet, § Never.
+- [x] E2-c — the companion's `--allow-create` reason; S1 10 forbids the old sentence and requires the new one.
+- [x] E2-d — the precedence is in this plan's format and in the companion's § The file (`:52` of the first build); no code. The C# twin
+      of test 21c belongs to the template's tests.
+- [x] E2-e — `loadBaselineAt` passes `{ gitRoot: true }`; test 24 (a baseline in a subfolder, with or without a file there, is exit 2
+      naming the git root; the root is unchanged). Break-it: `gitRoot` dropped fails test 24.
+- [x] CodeRabbit — `declaredRoot` is a linear parse without trim (test 27); `pathToFileURL` for both clones and `skip` on `win32` with a
+      reason for tests 16, 23 (symlinks) and 20, 20b (the sh fake git), pinned by test 28; `scopeProblem`/`entryProblem` out of
+      `problemOf` and `optionsProblem` out of `parseArguments` (test 30).
+- [ ] The code gate and the Opus review of epoch 2 on #108; every open CodeRabbit thread answered (the Definition of Done's epoch-2 line
+      stays open until they pass).
+
+Deviations of the epoch-2 build, each with its reason:
+
+7. **Test 27 asserts 1,500 characters first, then 100,000.** The old pattern is cubic: 1,500 spaces take 645 ms (the RED), 20,000 take
+   over 250 s. The 100,000-character assertion follows the 1,500 one, so it is reached only by a linear parse.
+8. **Test 28 reads its own source** (no `file://${` join, `pathToFileURL(origin).href` twice, the four test lines carry `NO_SYMLINKS` or
+   `NO_POSIX_SH`): a Windows-only defect cannot be RED on Linux. The edits it pins are in the same commit, so its RED is a targeted
+   break (the join restored; `NO_POSIX_SH` dropped from test 20), not an unchanged-code run.
+9. **The marker parse follows the plan's algorithm literally**: the root candidate ends at the next space or tab, so a scope root that
+   contains a space can never be proven (the old pattern accepted one). Roots with spaces are not in use; say so if one appears.
+10. **Test 29 is `S1 11` in `tools/test-leftovers-rule.test.mjs`**, beside S1 6, not in `raw-temp-baseline.test.mjs`.
+11. **Not run here: SonarCloud.** The complexity splits are tested for existence and behaviour (test 30); whether no function is over 15
+    is for SonarCloud on the pushed branch.
 
 Changes after the code gate and the Opus review (2026-11-01; ledger 1.1 is the design change). Each is built test first,
 watched RED before the fix and RED again with the fix taken out or broken; the source is in brackets.
