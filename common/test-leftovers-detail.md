@@ -200,6 +200,8 @@ resource kind wires a sweep of that kind into the **start** of its test run (the
   branches run their old suites until they drain;
 - **never fails the run**: a sweep error is one reported line; the exit code is the tests'.
 
+Until F16 the Node reference sweep only lists on Windows (`unverified:`, nothing is removed): it does not yet read the owner SID.
+
 Age alone is forbidden (a measuring harness's run store reclaimed by age until 2026-08-16 and requeued a leg
 another worker was still measuring); so is a name alone — anyone can type any owner into a name in a shared temp
 root.
