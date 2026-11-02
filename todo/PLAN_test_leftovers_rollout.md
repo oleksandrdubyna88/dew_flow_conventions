@@ -351,8 +351,15 @@ NEXT   P1 the owner's Windows barrier record            — the owner; blocks th
           (Release `5863c60`, promote-release run 41430127939, 2026-11-02: #107 F16 interim, #108 the baseline rule, #109 F21 the
           reference's move helpers exported, #103 the r9700 token row, #62 an actions bump. Warned first: "vllm fix", "kimi", "C# vs Node".
           The pin bumps, each alone, the seven over the PR cap with the owner's agreement of 2026-11-02: creds #292 (`66056a6e`), rag_qln #80 (`ae9c7d6d`, with its two externals current), vscode_kit #21 (`27f69034`), benchmark #151 (`0ea28fbe`), mcp #62 (`76c9c5f5`), sidecar_rust #68 (`6c57d526`), wsl_care #184 (`72b89017`), coai #939 (`2221559a`); the new consumer dew_flow_amd_r9700_tuning_ai pins it inside its own PR #1.)
+          (Release `cc24f9e`, promote-release run 41523829952, 2026-11-02: #112 F22 — the reference sweep takes the consumer's token
+          (ledger 2.1's wait ends), #110, #111. Warned first: "vllm fix", "kimi", "C# vs Node". Nine pin bumps, each alone, the seven
+          over the cap with the owner's agreement for this release: creds #293, vscode_kit #22, mcp #63, sidecar_rust #69, rag_qln #81,
+          wsl_care #185, coai #941, amd_r9700_tuning_ai #4, benchmark #152 — the list and merge commits are in the follow-ups plan, F22.)
        E5 stage A (S2-A, the age-only coai- sweep retired, one PR alone) ∥ E5 S5 (the bare-prefix literals leave the test trees) — may start now
+          (E5 stage A DONE 2026-11-02: coai #940 (`d02ed40`), ten code rounds and the CodeRabbit round. E5 S5 not started.)
        E2.1 → E2.2 → E2.3 → E2.4 → E2.5 (five stacked, gated PRs; E2.1 merges after P1 and creds' pin on P3's release; the guards switch on in E2.5)
+          (E2.1 built, six code rounds, wired to F22 on release `cc24f9e`: draft PR creds #294 (2026-11-02). It merges after P1 and the
+          by-hand macOS and Windows records its plan names.)
        E5 producer PR (S3 → S2-B → S4 → S6, one squash-merged PR, after P1, P2, P3's release, stage A and S5 [re-review gate finding 2]) → E5.S7 the drain (one PR per suite, not a producer)
 THEN   wave 3: E6 ∥ E7 — stories written against 105d53c (or the baseline release) and E3's merged helper, each with its own plan gate;
        E6's stage A is landed (#125); E7's stage A is REQUIRED — gate or retire InfrastructureSampler's owner-blind qlntest_* drop
