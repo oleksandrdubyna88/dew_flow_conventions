@@ -18,7 +18,7 @@ owned, claimed run folder (§2) and points `TEMP`, `TMP` and `TMPDIR` at it befo
 the tree, named by the file as a scope's proof: the runner makes the folder before the first test; a run that
 cannot make it fails before any test; a test per assembly or package, ordered first, asserts that `TEMP` names the
 run folder and carries `testsToDelete-baseline-proof: <scope root>`. The file — `{ "class": "raw-temp", "scopes":
-[{ "root", "proof" }], "entries": [{ "file", "sha256", "line" }] }` — is a **multiset**: one entry per occurrence,
+[{ "root", "proof", "guard" }], "entries": [{ "file", "sha256", "line" }] }` — is a **multiset**: one entry per occurrence,
 keyed by the file and the sha256 of the trimmed line; `line` is a hint, never a key. A guard reads it only when
 told to, passes a key's occurrences up to its entries and no further, and finds an occurrence beyond them
 (`raw-temp`) and, as `baseline`, an entry no line matches, an entry outside every scope, a scope whose proof is
@@ -33,11 +33,13 @@ a raised count, a new or wider scope, a changed proof and any creation but the f
   "about": "raw-temp sites inside the owned run folder; only shrinks — common/test-leftovers-detail.md §7",
   "class": "raw-temp",
   "scopes": [
-    { "root": "src/test/", "proof": "src/test/runFolder.test.mjs" }
+    { "root": "src/test/", "proof": "src/test/runFolder.test.mjs", "guard": "node" },
+    { "root": "tests/Unit/", "proof": "tests/Unit/RunFolderTests.cs", "guard": "csharp" }
   ],
   "entries": [
     { "file": "src/test/a.test.mjs", "sha256": "<64 hex of the trimmed line>", "line": 18 },
-    { "file": "src/test/a.test.mjs", "sha256": "<the same key, a second occurrence>", "line": 40 }
+    { "file": "src/test/a.test.mjs", "sha256": "<the same key, a second occurrence>", "line": 40 },
+    { "file": "tests/Unit/A.cs", "sha256": "<64 hex>", "line": 12 }
   ]
 }
 ```
@@ -50,6 +52,9 @@ a raised count, a new or wider scope, a changed proof and any creation but the f
   (`*/`, `-->`) to the end of the line; anything else is a malformed proof. A guard checks that the declaration is
   there; the reviewer of the baseline's creation checks the substance — the three things the proof names — and says
   so in the pull request. An entry belongs to the most specific scope that holds its file, whatever the order of the list.
+- `scopes[].guard` names the guard that judges the scope — one of `node` (the shipped Node guard) or `csharp` (the C# guard
+  a consumer copies from the template); the list is closed and grows only by a change to this rule. A scope that names
+  any other value, or none, is a malformed file, whichever guard reads it.
 - `entries[].file` is repository-relative with forward slashes and starts with some scope's `root`; `sha256` is the
   sha256 of the line with leading and trailing whitespace and any `\r` removed, so a re-indent or a line-ending
   change keeps the entry; `line` is a 1-based hint. Order is free; two entries with one key are two occurrences.
@@ -59,27 +64,32 @@ a raised count, a new or wider scope, a changed proof and any creation but the f
 
 ## What a guard does with it
 
-It reads the file only when told to, and only at that one path. Per `raw-temp` hit, in line order, an entry with
-that file and key passes it (a line that carries a valid exemption is exempt first and uses none); a hit beyond the
-entries is a `raw-temp` finding. Once, after every file, it reconciles the whole baseline: every entry no line matched
-— a visited file with fewer hits, a file whose hits fell to zero, a deleted file, a file never read — is a `baseline`
-finding, as is an entry under no scope, a scope whose proof is missing or lacks its marker, a class other than
-`raw-temp`, and a malformed or wrong-schema file (one finding at the file's line 1 naming the field, nothing applied).
-An entry outside every scope, or under a scope whose proof does not hold, clears nothing. A baseline that is a symlink
-is a `baseline` finding too, and nothing is applied through it. A path that cannot be read, or a folder where the file
-belongs, is a usage error, not a finding.
+It reads the file only when told to, and only at that one path, run at the root of the git repository. Per `raw-temp`
+hit, in line order, an entry with that file and key passes it (a line that carries a valid exemption is exempt first and
+uses none); a hit beyond the entries is a `raw-temp` finding. A guard judges exactly the scopes that name it: it applies
+their entries and, once, after every file, reconciles every one of them — an entry of a file it did not read, or that no
+hit matched, is stale (a `baseline` finding), and an entry whose file is absent from the tree, or a proof absent from the
+tree, is reported by that guard after a direct look at the one path, not by its discovery. A scope that names another
+guard applies nothing here and is not reported here: a guard never checks another guard's scopes. A proof the judging
+guard did not discover, or discovered without its marker, is `proof missing`. Every guard also reports an entry under no
+scope, a class other than `raw-temp`, and a malformed or wrong-schema file (one finding at the file's line 1 naming the
+field, nothing applied). An entry outside every scope, or under a scope whose proof does not hold, clears nothing. A
+repository whose baseline names a guard runs that guard in CI on every pull request, so every entry has exactly one guard
+that reconciles it, and that guard runs. A baseline that is a symlink is a `baseline` finding too, and nothing is
+applied through it. A path that cannot be read, a folder where the file belongs, or a run that is not at the git root is
+a usage error, not a finding.
 
 ## The ratchet
 
 A check against the base ref (`--baseline-shrinks --base <git-ref>` in the shipped guard, which reads the one path
 above and refuses a symlink there) compares the working file with the base's, by (file, sha256): a key that is
 new, a key with more entries, a scope whose root is not at the base, a root wider than a base root (compared by whole
-path segments, never by characters), a changed proof, and any creation but the first are refused; a removed scope and
-a removed entry are shrinks, and so is a narrowed scope that keeps the proof of the base scope that holds it, when that
+path segments, never by characters), a changed proof, a changed `guard` of a scope (refused like a changed proof), and any creation but the first are refused; a removed scope and
+a removed entry are shrinks, and so is a narrowed scope that keeps the proof of the base scope that holds it, and its guard, when that
 proof lies under the new root; hints are ignored. A creation passes only with `--allow-create`, only while the path has
 no history behind the base ref — a re-creation after the file existed is refused. `--allow-create` belongs only in
-the creation PR's own run, never in the standing CI command: left in it, it would pass a creation again after a deletion
-merged. An unresolved base ref, a git failure, or a shallow clone asked about a creation is not a pass: the check fails
+the creation PR's own run, never in the standing CI command: a re-creation is refused by the path's history behind the
+base, but a standing flag would let the ONE creation pass without the reviewed run that records it. An unresolved base ref, a git failure, or a shallow clone asked about a creation is not a pass: the check fails
 closed naming the cause and the fetch to run (`git fetch origin <base-branch> --depth=1`, `git fetch --unshallow`). A repository that carries a baseline
 runs `--baseline-shrinks --base <the PR's target branch>` in CI on every pull request, without `--allow-create`, whatever
 language the baselined tree is in; the creation pull request's own run is the one exception. A file at zero entries is
@@ -91,4 +101,5 @@ deleted with its last entry; a repository with none ships none.
 - Never add, re-key or regenerate an entry after the file's first reviewed commit; never widen a scope or change a proof.
 - Never read a baseline at any other path, through a symlink, or without being told to.
 - Never leave `--allow-create` in a standing CI command.
+- Never name a guard the list does not have; never leave a named guard out of CI.
 <!-- core:end -->

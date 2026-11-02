@@ -18,6 +18,15 @@ const FLAGS = Object.freeze({ "--update-allowlist": "update", "--print-baseline"
 const PLAIN_VALUES = ["token", "identity", "profile", "base"]; // taken as written; every other value option is a path
 const VALUE_NAMES = Object.freeze({ repo: "repo", token: "token", identity: "identity", rule: "rule", allowlist: "allowlist", profile: "profile", base: "base" });
 
+/** The first thing wrong with the parsed options as a whole (a profile, the pairing of the baseline flags), or `undefined`. */
+export function optionsProblem(options) {
+  if (options.profile !== undefined && !PROFILES.includes(options.profile)) return `unknown profile \`${options.profile}\` (the only profile is \`${PROFILES.join("`, `")}\`)`;
+  if (options.baselineShrinks && options.base === undefined) return "`--baseline-shrinks` needs `--base <git-ref>`";
+  if (!options.baselineShrinks && (options.base !== undefined || options.allowCreate)) return "`--base` and `--allow-create` belong to `--baseline-shrinks`";
+  if (options.printBaseline && options.baseline) return "`--print-baseline` lists the sites a baseline would carry; it cannot be combined with `--baseline`";
+  return undefined;
+}
+
 /** Parse the arguments: `{ repo, token, rule, identity, profile, baseline, … }` (everything but `repo` and `token` stays unset unless given) or `{ error }`. */
 export function parseArguments(argv) {
   const options = { repo: process.cwd(), token: REPO_TOKEN, rule: undefined, identity: undefined, allowlist: undefined, profile: undefined, update: false, baseline: false, printBaseline: false, baselineShrinks: false, base: undefined, allowCreate: false };
@@ -32,10 +41,8 @@ export function parseArguments(argv) {
     if (argv[index + 1].startsWith("--")) return { error: `\`${argv[index]}\` needs a value, not the option \`${argv[index + 1]}\`` };
     options[VALUE_NAMES[name]] = PLAIN_VALUES.includes(name) ? argv[index + 1] : path.resolve(argv[index + 1]);
   }
-  if (options.profile !== undefined && !PROFILES.includes(options.profile)) return { error: `unknown profile \`${options.profile}\` (the only profile is \`${PROFILES.join("`, `")}\`)` };
-  if (options.baselineShrinks && options.base === undefined) return { error: "`--baseline-shrinks` needs `--base <git-ref>`" };
-  if (!options.baselineShrinks && (options.base !== undefined || options.allowCreate)) return { error: "`--base` and `--allow-create` belong to `--baseline-shrinks`" };
-  if (options.printBaseline && options.baseline) return { error: "`--print-baseline` lists the sites a baseline would carry; it cannot be combined with `--baseline`" };
+  const problem = optionsProblem(options);
+  if (problem !== undefined) return { error: problem };
   return options;
 }
 

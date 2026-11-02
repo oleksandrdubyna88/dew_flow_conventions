@@ -2,7 +2,7 @@
  * The `raw-temp` baseline of `common/test-leftovers-detail.md` §7: one ratcheting, membership-keyed file that carries the `raw-temp` sites of a
  * repository whose test runner owns a run folder. Nothing here writes a baseline; the guard (`tools/leftovers-check.mjs`) reads one only when named.
  *
- *   { "class": "raw-temp", "scopes": [{ "root", "proof" }], "entries": [{ "file", "sha256", "line" }] }
+ *   { "class": "raw-temp", "scopes": [{ "root", "proof", "guard" }], "entries": [{ "file", "sha256", "line" }] }
  *
  * - ONE fixed path: `raw-temp-baseline.json` at the repository root, a regular file, never a symlink (a link could turn a grown baseline into an
  *   "allowed creation"); the guard and the shrink check both refuse a link;
@@ -10,8 +10,11 @@
  * - a scope's `proof` is a TEST file under its `root`, discovered by the same scan, that carries a line of `testsToDelete-baseline-proof: <root>` (the root
  *   exactly, then only whitespace or a comment closer) — the guard checks the declaration, a reviewer checks the substance; an entry outside every scope, or
  *   under a scope whose proof does not hold, clears nothing; an entry belongs to the most specific scope that holds its file;
+ * - each scope NAMES the guard that judges it (`node`, the shipped Node guard, or `csharp`, the C# guard a consumer copies; a closed list, any other value
+ *   is a malformed file): a guard judges exactly the scopes that name it and reconciles every one of their entries globally, and it never checks another
+ *   guard's scopes — the companion requires the named guard to run in CI, so every entry has one guard that reconciles it and that guard runs;
  * - it only shrinks: `baselineShrinks` compares the working copy with the base ref and refuses a new key, a raised count, a new or wider scope, a
- *   changed proof and any creation but the first.
+ *   changed proof, a changed guard and any creation but the first.
  */
 
 import { createHash } from "node:crypto";
@@ -25,6 +28,10 @@ export const BASELINE_CLASS = "raw-temp";
 export const BASELINE_FILE = "raw-temp-baseline.json";
 /** The marker a scope's proof file carries, spelled in two pieces: this module is read by tools that scan for the prefix word. */
 export const PROOF_MARKER = "testsTo" + "Delete-baseline-proof:";
+/** The closed list of guards a scope may name; it grows only by a change to `common/test-leftovers-baseline.md`. */
+export const GUARDS = Object.freeze(["node", "csharp"]);
+/** The name of THIS guard: the scopes that name it are the ones `createApplier` judges. */
+export const GUARD_NAME = "node";
 const SHA256 = /^[0-9a-f]{64}$/;
 
 /** The hash of a site: sha256 of the line with leading and trailing whitespace and any `\r` removed, so a re-indent or an EOL change keeps the entry. */
@@ -38,24 +45,31 @@ const isFolder = (value) => typeof value === "string" && value.endsWith("/") && 
 /** A test file by its name or place: `x.test.mjs`, `x.spec.ts`, `XTests.cs`, `x_test.go`, `x-test.js`, or anything under a `test/` or `tests/` folder. */
 const isTestFile = (file) => /(?:\.(?:test|spec)|Tests?|[_-]test)\.[A-Za-z0-9]+$/.test(file) || /(?:^|\/)tests?\//.test(file);
 
+/** The first thing wrong with one parsed scope, naming the field, or `undefined`. */
+export function scopeProblem(scope, index) {
+  if (scope === null || typeof scope !== "object") return `\`scopes[${index}]\` is not an object`;
+  if (!isFolder(scope.root)) return `\`scopes[${index}].root\` must be a repository-relative folder with a trailing \`/\` and forward slashes`;
+  if (!isRelative(scope.proof) || !scope.proof.startsWith(scope.root) || scope.proof.endsWith("/") || scope.proof === BASELINE_FILE) return `\`scopes[${index}].proof\` must be a file under its root \`${scope.root}\` (a test file the scan discovers)`;
+  if (!GUARDS.includes(scope.guard)) return `\`scopes[${index}].guard\` must be exactly one of ${GUARDS.map((name) => `\`${name}\``).join(", ")} — the guard that judges the scope (found ${scope.guard === undefined ? "none" : JSON.stringify(scope.guard)}); the list is closed`;
+  return undefined;
+}
+
+/** The first thing wrong with one parsed entry, naming the field, or `undefined`. */
+export function entryProblem(item, index) {
+  if (item === null || typeof item !== "object") return `\`entries[${index}]\` is not an object`;
+  if (!isRelative(item.file) || item.file.endsWith("/")) return `\`entries[${index}].file\` must be a repository-relative path with forward slashes (no backslash, no leading slash, no \`..\`)`;
+  if (typeof item.sha256 !== "string" || !SHA256.test(item.sha256)) return `\`entries[${index}].sha256\` must be 64 lower-case hex digits`;
+  if (!Number.isInteger(item.line) || item.line < 1) return `\`entries[${index}].line\` must be a 1-based integer hint`;
+  return undefined;
+}
+
 /** The first thing wrong with a parsed baseline, naming the field, or `undefined`. */
 function problemOf(data) {
   if (data === null || typeof data !== "object" || Array.isArray(data)) return "the file is not an object";
   if (data.class !== BASELINE_CLASS) return `\`class\` must be exactly \`${BASELINE_CLASS}\` (found ${data.class === undefined ? "none" : JSON.stringify(data.class)}); no other class has a baseline`;
   if (!Array.isArray(data.scopes)) return "`scopes` is missing or is not a list";
   if (!Array.isArray(data.entries)) return "`entries` is missing or is not a list";
-  for (const [index, scope] of data.scopes.entries()) {
-    if (scope === null || typeof scope !== "object") return `\`scopes[${index}]\` is not an object`;
-    if (!isFolder(scope.root)) return `\`scopes[${index}].root\` must be a repository-relative folder with a trailing \`/\` and forward slashes`;
-    if (!isRelative(scope.proof) || !scope.proof.startsWith(scope.root) || scope.proof.endsWith("/") || scope.proof === BASELINE_FILE) return `\`scopes[${index}].proof\` must be a file under its root \`${scope.root}\` (a test file the scan discovers)`;
-  }
-  for (const [index, item] of data.entries.entries()) {
-    if (item === null || typeof item !== "object") return `\`entries[${index}]\` is not an object`;
-    if (!isRelative(item.file) || item.file.endsWith("/")) return `\`entries[${index}].file\` must be a repository-relative path with forward slashes (no backslash, no leading slash, no \`..\`)`;
-    if (typeof item.sha256 !== "string" || !SHA256.test(item.sha256)) return `\`entries[${index}].sha256\` must be 64 lower-case hex digits`;
-    if (!Number.isInteger(item.line) || item.line < 1) return `\`entries[${index}].line\` must be a 1-based integer hint`;
-  }
-  return undefined;
+  return data.scopes.map(scopeProblem).find(Boolean) ?? data.entries.map(entryProblem).find(Boolean);
 }
 
 /** `{ scopes, entries }` for a valid baseline text, else `{ problem }` naming the field. */
@@ -67,7 +81,7 @@ export function parseBaseline(text) {
     return { problem: "the file is not JSON" };
   }
   const problem = problemOf(data);
-  return problem === undefined ? { scopes: data.scopes.map(({ root, proof }) => ({ root, proof })), entries: data.entries.map(({ file, sha256, line }) => ({ file, sha256, line })) } : { problem };
+  return problem === undefined ? { scopes: data.scopes.map(({ root, proof, guard }) => ({ root, proof, guard })), entries: data.entries.map(({ file, sha256, line }) => ({ file, sha256, line })) } : { problem };
 }
 
 /** Read a baseline file: the parse result plus its `file`. Throws only when the path cannot be read (the guard's exit 2). */
@@ -110,53 +124,91 @@ export function locateBaseline(repo, { gitRoot = false } = {}) {
 }
 
 /**
- * The baseline of `repo`: its ONE path, `raw-temp-baseline.json` at the root. A symlink, or a real folder outside the repository, is refused as a `{ problem }`
- * (the scan reports it as a `baseline` finding); an unreadable path or a folder throws (the guard's exit 2).
+ * The baseline of `repo`: its ONE path, `raw-temp-baseline.json` at the root of the git repository. A symlink, or a real folder outside the repository, is
+ * refused as a `{ problem }` (the scan reports it as a `baseline` finding); an unreadable path, a folder, a git failure or a `repo` that is not the git root
+ * throws (the guard's exit 2: `--baseline` is run at the git root).
  */
 export function loadBaselineAt(repo) {
-  const { file, refusal } = locateBaseline(repo);
+  const { file, refusal } = locateBaseline(repo, { gitRoot: true });
   if (refusal === undefined) return loadBaseline(file);
   if (refusal.kind === "symlink" || refusal.kind === "outside") return { problem: refusal.why, file };
   throw new Error(refusal.why);
 }
 
-/** Whether a scope's proof is a test file the scan discovered, outside the baseline itself, with a marker line for exactly its root. */
-function proofHolds(repo, scope, discovered) {
-  if (!discovered.has(scope.proof) || !isTestFile(scope.proof)) return false;
+const isBlank = (char) => char === " " || char === "\t";
+
+/**
+ * The root a proof line declares, or `undefined` when the line is not a marker line. Linear, with no pattern to backtrack: after the marker skip ASCII spaces and
+ * tabs, take the candidate up to the next space, tab, a star-slash closer, `-->` or the end, skip blanks, accept ONE comment closer, skip blanks and require the end of the line.
+ */
+function declaredRoot(line) {
+  const at = line.indexOf(PROOF_MARKER);
+  if (at < 0) return undefined;
+  let index = at + PROOF_MARKER.length;
+  const skipBlanks = () => {
+    while (index < line.length && isBlank(line[index])) index += 1;
+  };
+  skipBlanks();
+  const start = index;
+  while (index < line.length && !isBlank(line[index]) && !line.startsWith("*/", index) && !line.startsWith("-->", index)) index += 1;
+  const candidate = line.slice(start, index);
+  skipBlanks();
+  if (line.startsWith("*/", index)) index += 2;
+  else if (line.startsWith("-->", index)) index += 3;
+  skipBlanks();
+  return index === line.length ? candidate : undefined;
+}
+
+/** Whether `relative` is absent from the tree: a direct `lstat` of that one path under `repo`, never the scan's discovery. */
+function absentFromTree(repo, relative) {
+  try {
+    fs.lstatSync(path.join(repo, relative));
+    return false;
+  } catch (error) {
+    return error.code === "ENOENT" || error.code === "ENOTDIR";
+  }
+}
+
+/** Why a scope's proof does not hold, or `undefined`: absent from the tree (by `lstat`), not a test file this scan discovered, or no marker line for exactly its root. */
+function proofFailure(repo, scope, discovered) {
+  if (absentFromTree(repo, scope.proof)) return `\`${scope.proof}\` is absent from the tree`;
+  const generic = `\`${scope.proof}\` is not a test file this scan discovered, or does not carry \`${PROOF_MARKER} ${scope.root}\` (the root exactly, then only whitespace or a comment closer)`;
+  if (!discovered.has(scope.proof) || !isTestFile(scope.proof)) return generic;
   let text;
   try {
     text = fs.readFileSync(path.join(repo, scope.proof), "utf8");
   } catch {
-    return false;
+    return generic;
   }
-  return text.split(/\r?\n/).some((line) => {
-    const at = line.indexOf(PROOF_MARKER);
-    if (at < 0) return false;
-    // the marker, exactly the root, then only whitespace or one comment closer to the end of the line
-    return /^[ \t]*(.*?)[ \t]*(?:\*\/|-->)?[ \t]*$/.exec(line.slice(at + PROOF_MARKER.length))?.[1] === scope.root;
-  });
+  return text.split(/\r?\n/).some((line) => declaredRoot(line) === scope.root) ? undefined : generic;
 }
 
 const keyOf = (entry) => `${entry.file}\0${entry.sha256}`;
 
 /**
  * What the scan asks of a loaded baseline. `take(file, sha)` is called by the per-file scan for each `raw-temp` hit in line order and answers whether an
- * entry passes it (that entry is then matched); `finalFindings()` is called once after every file and reconciles the whole baseline: a malformed file,
- * a scope whose proof does not hold, an entry under no scope, and every entry no hit matched. Nothing is applied from a malformed file.
+ * entry passes it (that entry is then matched); `finalFindings()` is called once after every file and reconciles the entries this guard judges: a malformed file,
+ * a judged scope whose proof does not hold, an entry under no scope, and every entry of a judged scope no hit matched (its file absent from the tree by a direct
+ * `lstat` is `file absent`, else `no line`). Nothing is applied from a malformed file.
+ * `guard` is this guard's own name: it judges EXACTLY the scopes that name it and never looks at another guard's scopes, their proofs, their entries or their files.
  * `label` is how the baseline file is named in a finding. `discovered` is the set of files the scan read: a proof must be one of them.
  * The entries that can still pass are indexed by key once, so a take is not a scan of the baseline.
  */
-export function createApplier(loaded, repo, label, discovered = new Set()) {
+export function createApplier(loaded, repo, label, discovered = new Set(), guard = GUARD_NAME) {
   if (loaded.problem !== undefined) return { take: () => false, finalFindings: () => [finding(label, 1, loaded.problem)] };
-  const scopes = loaded.scopes.map((scope) => ({ ...scope, proven: proofHolds(repo, scope, discovered) }));
-  const scopeOf = (file) => scopes.filter((scope) => file.startsWith(scope.root)).sort((a, b) => b.root.length - a.root.length)[0]; // the most specific, whatever the list's order
+  const mine = loaded.scopes.filter((scope) => scope.guard === guard).map((scope) => ({ ...scope, failure: proofFailure(repo, scope, discovered) }));
+  const scopeOf = (file) => loaded.scopes.filter((scope) => file.startsWith(scope.root)).sort((a, b) => b.root.length - a.root.length)[0]; // the most specific, whatever the list's order and whoever judges it
   const entries = loaded.entries.map((entry) => ({ ...entry, scope: scopeOf(entry.file), used: false }));
+  const judged = entries.filter((entry) => entry.scope !== undefined && entry.scope.guard === guard).map((entry) => ({ ...entry, scope: mine.find((scope) => scope.root === entry.scope.root) }));
   const available = new Map(); // key → { list: the entries that apply, in list order; next: how many were taken }
-  for (const entry of entries) {
-    if (entry.scope?.proven !== true) continue;
+  for (const entry of judged) {
+    if (entry.scope.failure !== undefined) continue;
     if (!available.has(keyOf(entry))) available.set(keyOf(entry), { list: [], next: 0 });
     available.get(keyOf(entry)).list.push(entry);
   }
+  const staleText = (entry) => (absentFromTree(repo, entry.file)
+    ? `entry's file is absent from the tree — file absent: \`${entry.file}\` is not there; remove the entry`
+    : "entry has no line — no `raw-temp` line of this file has this content (the site is gone or changed); remove the entry");
   return {
     take(file, sha256) {
       const slot = available.get(keyOf({ file, sha256 }));
@@ -167,9 +219,9 @@ export function createApplier(loaded, repo, label, discovered = new Set()) {
       return true;
     },
     finalFindings: () => [
-      ...scopes.filter((scope) => !scope.proven).map((scope) => finding(label, 1, `scope \`${scope.root}\`: proof missing — \`${scope.proof}\` is not a test file this scan discovered, or does not carry \`${PROOF_MARKER} ${scope.root}\` (the root exactly, then only whitespace or a comment closer); no entry under it applies`)),
+      ...mine.filter((scope) => scope.failure !== undefined).map((scope) => finding(label, 1, `scope \`${scope.root}\`: proof missing — ${scope.failure}; no entry under it applies`)),
       ...entries.filter((entry) => entry.scope === undefined).map((entry) => finding(entry.file, entry.line, "entry is outside every scope — it clears nothing; remove it")),
-      ...entries.filter((entry) => entry.scope?.proven === true && !entry.used).map((entry) => finding(entry.file, entry.line, "entry has no line — no `raw-temp` line of this file has this content (the site is gone or changed); remove the entry")),
+      ...judged.filter((entry) => entry.scope.failure === undefined && !entry.used).map((entry) => finding(entry.file, entry.line, staleText(entry))),
     ],
   };
 }
@@ -218,13 +270,16 @@ function runGit(repo, args) {
 /** What a working scope may be against the base's: `undefined` when it is a shrink, else the sentence. */
 function scopeGrowth(scope, baseScopes) {
   const same = baseScopes.find((base) => base.root === scope.root);
-  if (same !== undefined) return same.proof === scope.proof ? undefined : `changed proof for scope \`${scope.root}\`: \`${same.proof}\` → \`${scope.proof}\``;
+  if (same !== undefined) {
+    const changes = [same.proof === scope.proof ? undefined : `changed proof for scope \`${scope.root}\`: \`${same.proof}\` → \`${scope.proof}\``, same.guard === scope.guard ? undefined : `changed guard for scope \`${scope.root}\`: \`${same.guard}\` → \`${scope.guard}\``];
+    return changes.filter(Boolean).join("; ") || undefined;
+  }
   const inside = baseScopes.find((base) => within(base.root, scope.root));
   if (inside !== undefined) return `wider scope \`${scope.root}\` — it holds the base scope \`${inside.root}\``;
   const holder = baseScopes.filter((base) => within(scope.root, base.root)).sort((a, b) => b.root.length - a.root.length)[0];
   if (holder === undefined) return `new scope \`${scope.root}\``;
-  const keeps = scope.proof === holder.proof && holder.proof.startsWith(scope.root);
-  return keeps ? undefined : `narrowed scope \`${scope.root}\` must keep the proof of the base scope that holds it (\`${holder.proof}\` of \`${holder.root}\`), and that proof must lie under the new root`;
+  const keeps = scope.proof === holder.proof && scope.guard === holder.guard && holder.proof.startsWith(scope.root);
+  return keeps ? undefined : `narrowed scope \`${scope.root}\` must keep the proof and the guard of the base scope that holds it (\`${holder.proof}\`, \`${holder.guard}\` of \`${holder.root}\`), and that proof must lie under the new root`;
 }
 
 /** Why a creation is refused or cannot be judged: `{ code, line }`, or `undefined` when the path never had history behind the base. */
