@@ -626,7 +626,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - **Release.** A release of its own, then the pin bumps of the consumers that sweep through the reference (creds first, for E2.1);
   E2.1 merges only after creds pins it (rollout ledger 2.1).
 - **Progress 2026-11-02 — the sweep takes the consumer's token (fix f4431a8, RED a9e3198).** `sweepLeftovers({ ..., token = REPO_TOKEN })`: `relationOf` compares owner-form and legacy names with the
-  given token; `checkToken` (the check `ownedFor` uses) is exported from `tools/lib/owned.mjs` and called first, so an invalid token throws a TypeError before the root, the repository, the probe or a hook is
+  given token; `checkToken` (the check `ownedFor` uses) is exported from `tools/lib/owned.mjs` (and listed token-free in `ownedFor`'s bound API, which a test enumerates; 95ca8b5) and called first, so an invalid token throws a TypeError before the root, the repository, the probe or a hook is
   touched. This repository's own calls pass nothing; the F16 gate, the never-throw error handling and the order are unchanged. The tests are in `tools/leftovers-sweep-token.test.mjs` (a new file: the sweep's test
   file is past the 800-line limit). RED observed with the module as on main: 4 of 5 failed (a: the `creds` folder was kept; c: no `legacy:` line; d: an invalid token did not throw; e: the `conventions` folder was
   listed `unverified:` instead of the `creds` one); the companion b (the default removes only the `conventions` folder) passes on main by design. GREEN with the change (5 of 5; the sweep suite and the F21 helper tests
