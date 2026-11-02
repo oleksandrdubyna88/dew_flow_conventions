@@ -444,7 +444,7 @@
     {
       "id": "common.test-leftovers",
       "source": "common/test-leftovers.md",
-      "bodySha256": "b40f424e0b4f838c2450595c261bf92705be754ddb8f0b83c8d6d22839997e23",
+      "bodySha256": "d1510b5aabac8e2272cd8f84206ef4d1b5fb4b0c511e910f2b3f49dacb0754a0",
       "sections": [
         "# Test leftovers are named `testsToDelete-<owner>-…`, owned by their run, scoped to their user, and collected (MANDATORY)",
         "## 1. The name",
@@ -463,7 +463,7 @@
     {
       "id": "common.test-leftovers-detail",
       "source": "common/test-leftovers-detail.md",
-      "bodySha256": "7c82160076b3c106e88abad7874eaf352c2af73b12e3f7a90c16cddb63583c96",
+      "bodySha256": "aabb603e13302ff77b7974b23ad0e6318e0457e0fd3d285a464df0e56d6022c0",
       "sections": [
         "# Test leftovers — the full rule text (the detail of `common/test-leftovers.md`)",
         "## 1. The name — one form, three spellings",
@@ -492,6 +492,18 @@
         "## What a copy must keep",
         "## Never",
         "## Definition of Done"
+      ]
+    },
+    {
+      "id": "common.test-leftovers-baseline",
+      "source": "common/test-leftovers-baseline.md",
+      "bodySha256": "5bf709588dc2ead0200d3be530f690de8d595a52d683a83d1f7a9439a36ed061",
+      "sections": [
+        "# The `raw-temp` baseline — one ratcheting file for sites inside an owned run folder",
+        "## The file",
+        "## What a guard does with it",
+        "## The ratchet",
+        "## Never"
       ]
     },
     {

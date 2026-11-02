@@ -31,6 +31,9 @@
  *
  *     node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>] [--profile node]
  *     node tools/leftovers-check.mjs --update-allowlist [--repo <dir>]
+ *     node tools/leftovers-check.mjs [--repo <dir>] --baseline
+ *     node tools/leftovers-check.mjs [--repo <dir>] --print-baseline
+ *     node tools/leftovers-check.mjs [--repo <dir>] --baseline-shrinks --base <git-ref> [--allow-create]
  *
  * `--update-allowlist` rewrites the allowlist from the CURRENT `tools/janitor.sh`: every non-comment line the classifier calls
  * broad in that one file, by its line number and hash. The diff is what a reviewer reads; nothing else is ever added.
@@ -51,6 +54,17 @@
  * Workflows are read with `yaml@2`: this guard's own copy first, then the scanned repository's (`node_modules` of the consumer), else exit 2 with the one
  * sentence that says to add `yaml@2` as a devDependency — and only when the repository has a workflow. Not here: a `module-load` class (needs a parser).
  *
+ * `--baseline` reads the repository's `raw-temp` baseline (rule §7, `common/test-leftovers-baseline.md`, `tools/lib/raw-temp-baseline.mjs`): ONE fixed path, `raw-temp-baseline.json`
+ * at the repository root, a regular file, never a symlink (a link is a `baseline` finding in a scan and exit 2 in the shrink check). It is a multiset of `raw-temp` sites — file and
+ * the sha256 of the trimmed line, one entry per occurrence — for sites that run inside an owned run folder; a scope's proof is a test file this scan discovered that carries
+ * `testsToDelete-baseline-proof: <root>`. It is read ONLY when `--baseline` is given. A site up to its entries passes; one more is `raw-temp`; a stale entry, an entry under no scope or
+ * under a scope whose proof is missing, another class, a malformed file are class `baseline` (exit 1, with the cure). Only an unreadable path is exit 2.
+ * `--print-baseline` prints, to stdout only, the baseline of the current scan's `raw-temp` findings (`scopes` empty, to be written by hand) for the one creation.
+ * `--baseline-shrinks --base <git-ref>` compares that file with `git show <ref>:raw-temp-baseline.json`: a new key, a raised count, a new or wider scope, a narrowed scope that does not
+ * keep its base proof, or a changed proof is exit 1; a creation is exit 1 unless `--allow-create`, which belongs only in the creation PR's own run (never in a standing CI command) and is
+ * honoured only while the path has no history behind the base ref; an unresolved base ref, a git failure, or a shallow clone asked about a creation is exit 2 naming the cause and the fetch to
+ * run. A CI checkout fetches the base ref first (`git fetch origin <base-branch> --depth=1`). No command writes a baseline.
+ *
  * Exit 0 clean, 1 with every finding printed (`file:line — <class> — <text>`), 2 when it scanned nothing or its
  * arguments are bad — an empty scan is a broken discovery, never a clean repository.
  */
@@ -62,7 +76,13 @@ import { fileURLToPath } from "node:url";
 
 import { gitOutput } from "./lib/git.mjs";
 import { OWNER_GRAMMAR } from "./lib/owned.mjs";
+import { PREFIX_OK, composeEnvHits, finding, isComment } from "./lib/leftovers-shell.mjs";
+import { dockerFindings } from "./lib/leftovers-docker.mjs";
 import { REPO_ROW, REPO_TOKEN } from "./lib/owned-token.mjs";
+import { BASELINE_FILE, PROOF_MARKER, createApplier, loadBaselineAt, siteSha256 } from "./lib/raw-temp-baseline.mjs";
+import { PROFILES, parseArguments, runCli } from "./lib/leftovers-cli.mjs";
+
+export { PROFILES, parseArguments };
 import { JANITOR_FILE, classifyLine, classifyLines, lineSha256 } from "./lib/sweeper-scan.mjs";
 import { isReason } from "./ownership-check.mjs";
 
@@ -105,6 +125,7 @@ export const CURES = Object.freeze({
   "owner-blind": "Match the caller's owner after the prefix (^testsToDelete-<owner>-<repo>-), or delete the sweep and use the shipped janitor; this class takes no exemption — common/test-leftovers-detail.md §7 (owner-blind), the barrier.",
   "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers-detail.md §6, §7 (shared-store).",
   "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers-detail.md §5, §7 (ryuk-off).",
+  baseline: "Remove the stale or out-of-scope entry from the baseline, or move the site into the helper; nothing adds to it — common/test-leftovers-detail.md §7 (the `raw-temp` baseline).",
   exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers-detail.md §7 (the exemption grammar).",
   token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers-detail.md § Tokens (§1 of the rule) — and write it, with its row, in this repository's own tools/lib/owned-token.mjs beside the copied owned.mjs (never copy another repository's).",
 });
@@ -112,15 +133,17 @@ export const CURES = Object.freeze({
 /** The cures, each pointing at `ruleName` — the file the scan resolved (see `resolveRule`). */
 export const curesFor = (ruleName) => Object.fromEntries(Object.entries(CURES).map(([cls, text]) => [cls, text.replaceAll(DEFAULT_RULE_NAME, ruleName)]));
 
-const PREFIX_OK = /^teststodelete[-_][uw][0-9]{1,10}[-_]/i; // the OWNER form: one of the three spellings, then an owner segment
-/** A name the guard may accept: one of the three spellings, a value an argument array hides from it, or a value that is wholly a shell expansion (never guessed at). */
-const nameOk = (name) => PREFIX_OK.test(name) || name === DYNAMIC || isDynamicName(name);
 const TOKEN_SHAPE = /^[a-z0-9]{2,12}$/;
 // The prefix is spelled in two pieces below: these are detectors, and the machine scan reads this file too.
 const WORD = "teststo" + "delete";
 const LEGACY_LITERAL = new RegExp(`${WORD}[-_]([a-z0-9]+)`, "gi");
+/** The proof marker of the `raw-temp` baseline is a marker word, as `exempt` is, not a name — in its exact case, with a folder path after it (an image tag spelled like it is a name). */
+const isProofMarker = (match) => {
+  const rest = match.input.slice(match.index);
+  return rest.startsWith(PROOF_MARKER) && /^\s+\S+\//.test(rest.slice(PROOF_MARKER.length));
+};
 /** The second segments that are not names: the quarantine sibling (`.<name>.<prefix>-quarantine-…`) and an environment variable (`TESTSTODELETE_OWNER`: upper case, underscore). */
-const notAName = (match) => match[1].toLowerCase() === "exempt" || match[1].toLowerCase() === "quarantine" || new RegExp(`^${WORD.toUpperCase()}_[A-Z]+$`).test(match[0]);
+const notAName = (match) => match[1].toLowerCase() === "exempt" || isProofMarker(match) || match[1].toLowerCase() === "quarantine" || new RegExp(`^${WORD.toUpperCase()}_[A-Z]+$`).test(match[0]);
 const LEGACY_BUILT = new RegExp(`${WORD}[-_]\\$\\{?\\s*(?:REPO_TOKEN|RepoToken|repoToken)\\b`, "i");
 const MARKER = /(?:\/\/|#|--|\/\*|\*|<!--)\s*testsToDelete-exempt:(.*)$/;
 const JS_FILE = /\.(?:mjs|js|cjs)$/;
@@ -171,7 +194,6 @@ export function loadYaml(repo, resolvers = {}) {
 // --- discovery -----------------------------------------------------------------------------------------------
 
 /** The profiles of `--profile`: what a consumer's tree adds to the scan. `node` is the Node consumers of this family. */
-export const PROFILES = Object.freeze(["node"]);
 
 // The `node` profile: a consumer's tests and scripts, wherever they sit. `node_modules` and the two places the shared rules are mounted
 // are never read under it — a mount holds this repository's own scripts, which are not the consumer's to be judged.
@@ -223,9 +245,7 @@ function listFiles(repo) {
 
 // --- lines, comments, exemptions -----------------------------------------------------------------------------
 
-const isComment = (line) => /^\s*(?:\/\/|#|-- |--$)/.test(line);
 
-const finding = (file, line, cls, text) => ({ file, line, cls, text });
 
 /** Parse every `testsToDelete-exempt:` comment: `{ valid: Map<class, Set<line>>, findings }`. */
 export function readExemptions(file, lines) {
@@ -294,99 +314,6 @@ function allMatches(patterns, line) {
   });
 }
 
-// A value that is wholly a shell expansion — `"${x}"`, `$x`, `"$(f a b)"` — is dynamic: a text scan cannot know what it builds, the way it cannot
-// know a JavaScript array item that is no literal. The consumer's own tests cover the helper that builds it. A value that MIXES literal text and an
-// expansion is not wholly one, and is judged as it always was, on the text it has. Two exceptions, both about what the text itself says:
-//   * `${V:-w}`, `${V-w}`, `${V:=w}`, `${V=w}` with a default `w` that holds no `$` and is not empty names `w` whenever V is unset, so `w` is judged as a name
-//     (a default in the owner form passes; any other default is a finding). `$(…)`, a default with a `$` in it and `${V:+w}` stay dynamic:
-//     a known limit of a text scan, which cannot run the command or know the environment.
-//   * a single-quoted `'${x}'` is no expansion to the shell: it is the literal text `${x}` and is judged as text.
-const SIMPLE_VARIABLE = /^\$[A-Za-z_][A-Za-z0-9_]*$/;
-const LITERAL_DEFAULT = /^\$\{[A-Za-z_][A-Za-z0-9_]*:?[-=]([^${}]+)\}$/;
-const MASK = "\u0001";
-const LITERAL_DOLLAR = "\u0002";
-
-/** `text` with the `$` inside every single-quoted span made `LITERAL_DOLLAR` — the shell does not expand there. A quote inside double quotes opens nothing. */
-function literalizeSingleQuoted(text) {
-  let out = "";
-  let quote = "";
-  for (const char of text) {
-    if (quote === "") {
-      if (char === "'" || char === '"') quote = char;
-      out += char;
-    } else if (char === quote) {
-      quote = "";
-      out += char;
-    } else out += quote === "'" && char === "$" ? LITERAL_DOLLAR : char;
-  }
-  return out;
-}
-
-const restoreDollar = (text) => text.replaceAll(LITERAL_DOLLAR, "$");
-
-/** The literal default of an expansion (`${V:-w}` → `w`), or undefined when it has none, an empty one, or one that holds a `$`. */
-const literalDefault = (expansion) => LITERAL_DEFAULT.exec(expansion)?.[1];
-
-/** Is `value` a whole expansion that may stay unjudged: a default it has is in the owner form. */
-function isDynamicName(value) {
-  if (!isWholeExpansion(value)) return false;
-  const fallback = literalDefault(value.replace(/^["']+|["']+$/g, ""));
-  return fallback === undefined || PREFIX_OK.test(fallback);
-}
-
-/** The index of the bracket that closes the one at `open` (`(` or `{`), nesting counted, or -1 when it never closes. */
-function closingOf(text, open) {
-  const up = text[open];
-  const down = up === "(" ? ")" : "}";
-  let depth = 0;
-  for (let index = open; index < text.length; index += 1) {
-    if (text[index] === up) depth += 1;
-    else if (text[index] === down && (depth -= 1) === 0) return index;
-  }
-  return -1;
-}
-
-/** Is `value` (outer quotes ignored) ONE shell expansion from its first character to its last? An expansion that never closes is not. */
-function isWholeExpansion(value) {
-  const bare = value.replace(/^["']+|["']+$/g, "");
-  if (SIMPLE_VARIABLE.test(bare)) return true;
-  return /^\$[({]/.test(bare) && closingOf(bare, 1) === bare.length - 1;
-}
-
-/** `text` with the whitespace inside every balanced `$(…)` and `${…}` made `MASK`, so that splitting on whitespace keeps an expansion in one word. */
-function maskExpansions(text) {
-  let masked = "";
-  for (let index = 0; index < text.length; index += 1) {
-    const end = text[index] === "$" && (text[index + 1] === "(" || text[index + 1] === "{") ? closingOf(text, index + 1) : -1;
-    if (end < 0) masked += text[index];
-    else {
-      masked += text.slice(index, end + 1).replace(/\s/g, MASK);
-      index = end;
-    }
-  }
-  return masked;
-}
-
-/** How many characters at the start of `rest` are a whole expansion that ends the value (a quote, a space, `;` `,` `}` or the end follows). 0 when none. */
-function leadingExpansion(rest) {
-  const end = /^\$[({]/.test(rest) ? closingOf(rest, 1) + 1 : /^\$[A-Za-z_][A-Za-z0-9_]*/.exec(rest)?.[0].length ?? 0;
-  return end > 0 && /^(?:[\s"';,}]|$)/.test(rest.slice(end)) ? end : 0;
-}
-
-/** `COMPOSE_PROJECT_NAME=x` or `: x` on a line: one hit when x is not an owner-form leftover name — a compose project's containers carry the project's name. */
-function composeEnvHits(line) {
-  return [...line.matchAll(/COMPOSE_PROJECT_NAME["']?\s*[:=]\s*["']?/g)].flatMap((match) => {
-    const rest = literalizeSingleQuoted(line).slice(match.index + match[0].length);
-    const length = leadingExpansion(rest);
-    if (length > 0) {
-      const fallback = literalDefault(rest.slice(0, length));
-      return fallback === undefined || PREFIX_OK.test(fallback) ? [] : [`COMPOSE_PROJECT_NAME defaults to a name that is not an owner-form leftover name: ${fallback}`];
-    }
-    const value = /^[^\s"';,}]*/.exec(rest)[0];
-    return PREFIX_OK.test(value) ? [] : [`COMPOSE_PROJECT_NAME is not an owner-form leftover name: ${value === "" ? "(empty)" : restoreDollar(value)}`];
-  });
-}
-
 /** `legacy-name` hits of a line: a literal whose second segment is no owner (and no `exempt` marker word), or a prefix built from the token alone. */
 function legacyNameHits(line) {
   const literal = [...line.matchAll(LEGACY_LITERAL)]
@@ -395,7 +322,7 @@ function legacyNameHits(line) {
   return LEGACY_BUILT.test(line) ? [...literal, "a prefix built from the repository token"] : literal;
 }
 
-function lineFindings(file, lines, exemptions, allowlist) {
+function lineFindings(file, lines, exemptions, allowlist, baseline) {
   const extra = RAW_TEMP_BY_EXTENSION[path.extname(file)] ?? [];
   const found = [];
   const add = (index, cls, text) => {
@@ -412,262 +339,16 @@ function lineFindings(file, lines, exemptions, allowlist) {
       ["docker-name", composeEnvHits(line)],
       ["legacy-name", LEGACY_NAME_PENDING.includes(file) ? [] : legacyNameHits(line)],
     ];
-    for (const [cls, hits] of checks) if (hits.length > 0) add(index, cls, [...new Set(hits)].map((hit) => `\`${hit}\``).join(", "));
+    for (const [cls, hits] of checks) {
+      if (hits.length === 0) continue;
+      // the baseline passes a `raw-temp` hit up to its entries; a line with a valid exemption is exempt first and consumes none
+      if (cls === "raw-temp" && baseline !== undefined && !isExempt(exemptions, cls, index + 1) && baseline.take(file, siteSha256(line))) continue;
+      add(index, cls, [...new Set(hits)].map((hit) => `\`${hit}\``).join(", "));
+    }
     // owner-blind: no exemption of any kind — the allowlist (file, line, hash) is the one pass
     if (verdicts[index] === "broad") found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
   });
   return found;
-}
-
-// --- docker --------------------------------------------------------------------------------------------------
-
-/** Logical command lines (a trailing `\` joins the next), skipping whole-line comments: `{ line, text }`, `line` 1-based, within [from, to). */
-function commandsIn(lines, from, to) {
-  const commands = [];
-  for (let index = from; index < to; index += 1) {
-    if (isComment(lines[index])) continue;
-    let text = lines[index];
-    const line = index + 1;
-    while ((/\\\s*$/.test(text) || OPEN_DOCKER_ARRAY.test(text)) && index + 1 < to) {
-      index += 1;
-      text = `${text.replace(/\\\s*$/, " ")} ${lines[index].trim()}`;
-    }
-    commands.push({ line, text: flattenDockerArrays(text) });
-  }
-  return commands;
-}
-
-// A JavaScript test starts docker as `execFileSync("docker", ["run", "--rm", …])`: the arguments are an array, not a command line.
-// Each such call is rewritten to the command line it stands for (`docker run --rm …`), so every class below reads one shape. An
-// item that is not a string literal is a value the guard cannot see: it becomes DYNAMIC and is never guessed at.
-const DYNAMIC = "«value»";
-const OPEN_DOCKER_ARRAY = /(["'`])docker\1\s*,\s*\[[^\]]*$/;
-const DOCKER_ARRAY = /(["'`])docker\1\s*,\s*\[([^\]]*)\]/g;
-
-/** The top-level, comma-separated items of an array body (a comma inside quotes or brackets does not split). */
-function arrayItems(body) {
-  const items = [];
-  let item = "";
-  let quote = "";
-  let depth = 0;
-  for (const char of body) {
-    if (quote !== "") quote = char === quote ? "" : quote;
-    else if (/["'`]/.test(char)) quote = char;
-    else if ("([{".includes(char)) depth += 1;
-    else if (")]}".includes(char)) depth -= 1;
-    if (char === "," && quote === "" && depth === 0) {
-      items.push(item);
-      item = "";
-    } else item += char;
-  }
-  return [...items, item].map((entry) => entry.trim()).filter(Boolean);
-}
-
-const itemWord = (item) => {
-  const literal = /^(["'`])(.*)\1$/s.exec(item);
-  if (literal === null || (literal[1] === "`" && /^\$\{[^]*\}$/.test(literal[2]) && closingOf(literal[2], 1) === literal[2].length - 1)) return DYNAMIC; // a template that is wholly one `${…}` is a value, not a literal
-  return literal[2].replace(/\s+/g, "_");
-};
-
-/** `execFileSync("docker", ["run", "--rm", NAME])` → `execFileSync( docker run --rm «value» )`: the words the shell form has. */
-function flattenDockerArrays(text) {
-  return text.replace(DOCKER_ARRAY, (_match, _quote, body) => ` docker ${arrayItems(body).map(itemWord).join(" ")} `);
-}
-
-const words = (text) => text.split(/\s+/).filter(Boolean).map((word) => word.replace(/^["']+|["',;]+$/g, ""));
-
-/** The value of `--flag value` / `--flag=value` (repeatable), from a command's words. */
-function flagValues(tokens, flags) {
-  const values = [];
-  tokens.forEach((token, index) => {
-    for (const flag of flags) {
-      if (token === flag && tokens[index + 1] !== undefined) values.push(tokens[index + 1]);
-      else if (token.startsWith(`${flag}=`)) values.push(token.slice(flag.length + 1));
-    }
-  });
-  return values;
-}
-
-const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const stripTag = (image) => image.replace(/:[^:/]*$/, "");
-
-/** The named volumes of a `docker run` (a source with no `/`, not starting `.`, `$` or `~`, not a drive letter). */
-function namedVolumes(tokens) {
-  return flagValues(tokens, ["-v", "--volume"])
-    .map((spec) => spec.split(":")[0])
-    .filter((source) => source !== "" && !/[/\\]/.test(source) && !/^[.$~]/.test(source) && !/^[A-Za-z]$/.test(source));
-}
-
-const NETWORK_OPTIONS_WITH_VALUE = new Set(["-d", "--driver", "--label", "-l", "-o", "--opt", "--subnet", "--gateway", "--ip-range", "--scope", "--ipam-driver", "--name"]);
-
-/** The name argument of `docker volume|network create`, or "" when there is none. */
-function createdName(tokens, createAt) {
-  for (let index = createAt + 1; index < tokens.length; index += 1) {
-    if (!tokens[index].startsWith("-")) return tokens[index];
-    if (NETWORK_OPTIONS_WITH_VALUE.has(tokens[index])) index += 1;
-  }
-  return "";
-}
-
-const COMPOSE_VALUE_FLAGS = new Set(["-f", "--file", "-p", "--project-name", "--profile", "--env-file", "--project-directory", "--parallel", "--ansi", "--progress"]);
-
-/** The project names a `docker compose` / `docker-compose` command line gives, from its GLOBAL options only (`-p` after the subcommand is `--publish`). */
-function composeProjectNames(tokens) {
-  const at = tokens.findIndex((token, index) => token === "docker-compose" || (token === "compose" && tokens[index - 1] === "docker"));
-  if (at < 0) return [];
-  const names = [];
-  for (let index = at + 1; index < tokens.length && tokens[index].startsWith("-"); index += 1) {
-    const token = tokens[index];
-    const inline = /^--project-name=(.*)$/.exec(token);
-    if (inline !== null) names.push(inline[1]);
-    else if (COMPOSE_VALUE_FLAGS.has(token)) {
-      if (token === "-p" || token === "--project-name") names.push(tokens[index + 1] ?? "");
-      index += 1;
-    }
-  }
-  return names;
-}
-
-/** `docker-name` findings of one command; `pushed` is the set of images the scope publishes. */
-function nameFindings(file, command, pushed) {
-  const tokens = words(maskExpansions(literalizeSingleQuoted(command.text))).map((word) => word.replaceAll(MASK, " "));
-  const found = [];
-  const bad = (text) => found.push(finding(file, command.line, "docker-name", restoreDollar(text)));
-  if (/\bdocker\b/.test(command.text)) {
-    const arrayForm = [...command.text.matchAll(/["']--name["']\s*,\s*["']([^"']*)["']/g)].map((match) => match[1]);
-    for (const name of [...flagValues(tokens, ["--name"]), ...arrayForm]) if (!nameOk(name)) bad(`\`--name ${name}\` is not an owner-form leftover name`);
-  }
-  for (const match of command.text.matchAll(/\bdocker\s+(volume|network)\s+create\b/g)) {
-    const name = createdName(tokens, tokens.indexOf("create", tokens.indexOf(match[1])));
-    if (name === "") bad(`\`docker ${match[1]} create\` makes an unnamed ${match[1]}`);
-    else if (!nameOk(name)) bad(`\`docker ${match[1]} create ${name}\` is not an owner-form leftover name`);
-  }
-  for (const name of composeProjectNames(tokens)) if (!PREFIX_OK.test(name) && !isDynamicName(name)) bad(`the compose project \`${name}\` is not an owner-form leftover name`);
-  for (const match of command.text.matchAll(/\bWithName\(\s*"([^"]*)"/g)) if (!PREFIX_OK.test(match[1])) bad(`\`WithName("${match[1]}")\` is not an owner-form leftover name`);
-  if (/\bdocker\s+build\b/.test(command.text)) {
-    for (const tag of flagValues(tokens, ["-t", "--tag"])) {
-      const published = [...pushed].some((image) => image === tag || stripTag(image) === stripTag(tag));
-      if (!nameOk(tag) && !published) bad(`the image \`${tag}\` a test builds is not an owner-form leftover name`);
-    }
-  }
-  return found;
-}
-
-const pushedImages = (commands) => new Set(commands.flatMap((command) => [...command.text.matchAll(/\bdocker\s+push\s+(\S+)/g)].map((match) => match[1].replace(/^["']|["']$/g, ""))));
-
-const RUN_COMMAND = /\bdocker\s+run\b/;
-const hasRm = (tokens) => tokens.includes("--rm") || tokens.some((token) => token.startsWith("--rm="));
-
-function removerWords(name, volumes) {
-  const container = new RegExp(`docker\\s+rm\\s+-f\\s+-v\\s+${escapeRegExp(name)}(?![\\w.-])`);
-  return { container, volumes: volumes.map((volume) => new RegExp(`docker\\s+volume\\s+rm\\s+${escapeRegExp(volume)}(?![\\w.-])`)) };
-}
-
-/** The `.sh` carve-out: a `trap '…' EXIT` on an earlier line whose body removes the container and each volume with `|| true`. */
-function trapCoversRun(lines, runLine, name, volumes) {
-  const wanted = [`docker\\s+rm\\s+-f\\s+-v\\s+${escapeRegExp(name)}\\s*\\|\\|\\s*true`, ...volumes.map((volume) => `docker\\s+volume\\s+rm\\s+${escapeRegExp(volume)}\\s*\\|\\|\\s*true`)];
-  return lines.slice(0, runLine - 1).some((line) => {
-    const trap = /\btrap\s+(["'])(.*?)\1\s+EXIT\b/.exec(line);
-    return trap !== null && wanted.every((pattern) => new RegExp(pattern).test(trap[2]));
-  });
-}
-
-/** What a `docker run` command declares: whether it carries `--rm`, and the one name and volumes the carve-out must clean up. */
-function runFacts(command) {
-  const tokens = words(command.text);
-  const names = flagValues(tokens, ["--name"]);
-  return { rm: hasRm(tokens), name: names[0], volumes: namedVolumes(tokens) };
-}
-
-const dropsRm = (file, command) => finding(file, command.line, "docker-run", "`docker run` permits dropping --rm: no complete carve-out (§5)");
-
-function scriptRunFindings(file, lines, commands) {
-  return commands
-    .filter((command) => RUN_COMMAND.test(command.text))
-    .flatMap((command) => {
-      const facts = runFacts(command);
-      if (facts.rm) return [];
-      const covered = facts.name !== undefined && [facts.name, ...facts.volumes].every((name) => PREFIX_OK.test(name)) && trapCoversRun(lines, command.line, facts.name, facts.volumes);
-      return covered ? [] : [dropsRm(file, command)];
-    });
-}
-
-/** A workflow step reduced to what the carve-out reads. */
-function stepFacts(step, lineCounter, linesCount) {
-  const startLine = lineCounter.linePos(step.range[0]).line;
-  const endLine = Math.min(linesCount, Math.max(startLine, lineCounter.linePos(Math.max(step.range[0], step.range[1] - 1)).line));
-  const run = step.get("run");
-  const guard = String(step.get("if") ?? "");
-  const keeps = step.get("continue-on-error");
-  return {
-    startLine,
-    endLine,
-    run: typeof run === "string" ? run : "",
-    always: guard.includes("always()"),
-    continues: keeps === true || keeps === "true",
-  };
-}
-
-function readsName(step, name) {
-  const reader = new RegExp(`docker\\s+(?:logs|cp|inspect|wait|exec|diff)\\b[^\\n]*${escapeRegExp(name)}(?![\\w.-])`);
-  return reader.test(step.run.replace(/\\\r?\n\s*/g, " "));
-}
-
-function removesAll(step, name, volumes) {
-  const text = step.run.replace(/\\\r?\n\s*/g, " ");
-  const { container, volumes: volumeRemovers } = removerWords(name, volumes);
-  return step.always && step.continues && container.test(text) && volumeRemovers.every((remover) => remover.test(text));
-}
-
-/** The workflow carve-out: a LATER `if: always()` + `continue-on-error: true` step removes everything, after every reader. */
-function stepCoversRun(steps, at, facts) {
-  if (facts.name === undefined || ![facts.name, ...facts.volumes].every((name) => PREFIX_OK.test(name))) return false;
-  const lastReader = steps.reduce((last, step, index) => (readsName(step, facts.name) ? index : last), -1);
-  return steps.some((step, index) => index > at && index > lastReader && removesAll(step, facts.name, facts.volumes));
-}
-
-function jobRunFindings(file, steps, commands) {
-  return commands
-    .filter((command) => RUN_COMMAND.test(command.text))
-    .flatMap((command) => {
-      const at = steps.findIndex((step) => command.line >= step.startLine && command.line <= step.endLine);
-      const facts = runFacts(command);
-      if (facts.rm) return [];
-      return at >= 0 && stepCoversRun(steps, at, facts) ? [] : [dropsRm(file, command)];
-    });
-}
-
-function workflowJobs(file, lines, text, yaml) {
-  const { LineCounter, parseDocument } = yaml();
-  const lineCounter = new LineCounter();
-  const document = parseDocument(text, { lineCounter });
-  if (document.errors.length > 0) return undefined;
-  const jobs = document.get("jobs", true);
-  const found = [];
-  for (const pair of jobs?.items ?? []) {
-    const job = pair.value;
-    const stepsNode = job?.get?.("steps", true);
-    const steps = (stepsNode?.items ?? []).filter((step) => typeof step?.get === "function").map((step) => stepFacts(step, lineCounter, lines.length));
-    const from = lineCounter.linePos(job.range[0]).line - 1;
-    const to = Math.min(lines.length, lineCounter.linePos(Math.max(job.range[0], job.range[1] - 1)).line);
-    found.push({ steps, from, to });
-  }
-  return found;
-}
-
-function dockerFindings(file, lines, text, yaml) {
-  const isWorkflow = /^\.github\/workflows\//.test(file);
-  const jobs = isWorkflow ? workflowJobs(file, lines, text, yaml) : undefined;
-  if (jobs === undefined) {
-    const commands = commandsIn(lines, 0, lines.length);
-    const pushed = pushedImages(commands);
-    return [...commands.flatMap((command) => nameFindings(file, command, pushed)), ...scriptRunFindings(file, lines, commands)];
-  }
-  return jobs.flatMap(({ steps, from, to }) => {
-    const commands = commandsIn(lines, from, to);
-    const pushed = pushedImages(commands);
-    return [...commands.flatMap((command) => nameFindings(file, command, pushed)), ...jobRunFindings(file, steps, commands)];
-  });
 }
 
 // --- one file, the whole repository --------------------------------------------------------------------------
@@ -676,11 +357,11 @@ function dockerFindings(file, lines, text, yaml) {
  * Every finding of one file's text (`file` is the repository-relative path with forward slashes). `yaml` returns the yaml module and is called only
  * for a workflow: by default the guard's own resolution, which throws a `YamlMissingError` when there is none.
  */
-export function scanText(file, text, allowlist = [], yaml = () => loadYaml(undefined)) {
+export function scanText(file, text, allowlist = [], yaml = () => loadYaml(undefined), baseline = undefined) {
   const lines = text.split(/\r?\n/);
   const exemptions = readExemptions(file, lines);
   const docker = dockerFindings(file, lines, text, yaml).filter((entry) => !isExempt(exemptions, entry.cls, entry.line));
-  return [...exemptions.findings, ...lineFindings(file, lines, exemptions, allowlist), ...docker];
+  return [...exemptions.findings, ...lineFindings(file, lines, exemptions, allowlist, baseline), ...docker];
 }
 
 // --- the token ------------------------------------------------------------------------------------------------
@@ -859,16 +540,24 @@ export function updateAllowlist(repo, explicit) {
   return entries;
 }
 
+/** The applier of the repository's baseline (`true`, or `loadBaselineAt`'s result); `files` are what the scan will read, where a scope's proof must be. */
+function appliedBaseline(baseline, repo, files) {
+  const loaded = baseline === true ? loadBaselineAt(repo) : baseline;
+  return createApplier(loaded, repo, BASELINE_FILE, new Set(files));
+}
+
 /**
  * Scan a repository: `{ files, findings }`. `files` is how many files were read — zero is a broken discovery. `identity` is the repository column of the token's
  * row: this repository's own for its own token, else blank (fails closed). `profile` is a `--profile` (`node`). `resolvers` is the yaml seam of `loadYaml`.
+ * `baseline` is `true` (read the repository's one baseline path) or a loaded baseline (`loadBaselineAt`), else nothing: a baseline is read only when asked for.
  */
-export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "", allowlist, profile, resolvers } = {}) {
+export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "", allowlist, profile, resolvers, baseline } = {}) {
   const files = discover(repo, profile);
   const findings = [];
   const entries = Array.isArray(allowlist) ? allowlist : loadAllowlist(allowlist);
   let yamlModule;
   const yaml = () => (yamlModule ??= loadYaml(repo, resolvers)); // read at the first workflow, so a repository with none needs none
+  const applier = baseline === undefined || baseline === false ? undefined : appliedBaseline(baseline, repo, files);
   let read = 0;
   for (const file of files) {
     const absolute = path.join(repo, file);
@@ -876,8 +565,9 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = toke
     const bytes = fs.readFileSync(absolute);
     if (isBinary(bytes)) continue;
     read += 1;
-    findings.push(...scanText(file, bytes.toString("utf8"), entries, yaml));
+    findings.push(...scanText(file, bytes.toString("utf8"), entries, yaml, applier));
   }
+  if (applier !== undefined) findings.push(...applier.finalFindings()); // the global reconcile: every entry no line matched, whatever file it names
   const rulePath = resolveRule(repo, rule);
   const ruleText = rulePath === undefined ? "" : fs.readFileSync(rulePath, "utf8");
   const ruleName = ruleNameOf(rulePath);
@@ -886,79 +576,9 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = toke
   return { files: read, findings, rule: ruleName };
 }
 
-// --- the command line ----------------------------------------------------------------------------------------
-
-const USAGE = "usage: node tools/leftovers-check.mjs [--repo <dir>] [--token <t>] [--identity <row>] [--rule <path>] [--allowlist <path>] [--profile node] | --update-allowlist   (--identity: the repository column of the token's row; without it only this repository's own token passes; --profile node: a Node consumer's tests and scripts too)";
-
-/** Parse the arguments: `{ repo, token, rule, identity, profile }` (`identity` and `profile` stay unset unless given) or `{ error }`. */
-export function parseArguments(argv) {
-  const options = { repo: process.cwd(), token: REPO_TOKEN, rule: undefined, identity: undefined, allowlist: undefined, profile: undefined, update: false };
-  for (let index = 0; index < argv.length; index += 2) {
-    const name = argv[index].replace(/^--/, "");
-    if (argv[index] === "--update-allowlist") {
-      options.update = true;
-      index -= 1; // a flag takes no value
-      continue;
-    }
-    if (!["repo", "token", "identity", "rule", "allowlist", "profile"].includes(name) || !argv[index].startsWith("--") || argv[index + 1] === undefined) return { error: `unknown or incomplete argument \`${argv[index]}\`` };
-    options[name] = ["token", "identity", "profile"].includes(name) ? argv[index + 1] : path.resolve(argv[index + 1]);
-  }
-  if (options.profile !== undefined && !PROFILES.includes(options.profile)) return { error: `unknown profile \`${options.profile}\` (the only profile is \`${PROFILES.join("`, `")}\`)` };
-  return options;
-}
-
-function report(findings, io, ruleName) {
-  const printed = new Set();
-  const cures = curesFor(ruleName);
-  io.err(`leftovers-check: ${findings.length} finding(s) — see ${ruleName} §7`);
-  for (const entry of findings) {
-    io.err(`  ${entry.file}:${entry.line} — ${entry.cls} — ${entry.text}`);
-    printed.add(entry.cls);
-  }
-  io.err("");
-  for (const cls of Object.keys(cures).filter((name) => printed.has(name))) io.err(`  ${cls}: ${cures[cls]}`);
-}
-
-function runUpdate(options, io) {
-  try {
-    const entries = updateAllowlist(options.repo, options.allowlist);
-    io.out(`leftovers-check: allowlist rewritten — ${entries.length} entr${entries.length === 1 ? "y" : "ies"} from ${JANITOR_FILE}`);
-    return 0;
-  } catch (error) {
-    io.err(`leftovers-check: cannot update the allowlist: ${error.message.split("\n")[0]}`);
-    return 2;
-  }
-}
-
 /** Run the guard: the exit code (0 clean, 1 findings, 2 scanned nothing, no yaml or bad arguments). `io` and `resolvers` (where `yaml` is looked for) are seams for tests. */
 export function main(argv = process.argv.slice(2), io = { out: (text) => console.log(text), err: (text) => console.error(text) }, resolvers = undefined) {
-  const options = parseArguments(argv);
-  if (options.error !== undefined) {
-    io.err(`leftovers-check: ${options.error}\n${USAGE}`);
-    return 2;
-  }
-  if (options.update) return runUpdate(options, io);
-  let result;
-  try {
-    result = fs.existsSync(options.repo) ? scanRepository({ ...options, resolvers }) : { files: 0, findings: [] };
-  } catch (error) {
-    if (error instanceof YamlMissingError) {
-      io.err(error.message);
-      return 2;
-    }
-    io.err(`leftovers-check: cannot read ${options.repo}: ${error.message.split("\n")[0]}`);
-    return 2;
-  }
-  if (result.files === 0) {
-    io.err(`leftovers-check: scanned nothing under ${options.repo} — discovery broke; the repository is not clean`);
-    return 2;
-  }
-  if (result.findings.length === 0) {
-    io.out(`leftovers-check: clean (${result.files} files).`);
-    return 0;
-  }
-  report(result.findings, io, result.rule);
-  return 1;
+  return runCli(argv, io, resolvers, { scanRepository, updateAllowlist, JANITOR_FILE, YamlMissingError, curesFor });
 }
 
 const invokedDirectly = (() => {

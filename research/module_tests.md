@@ -1250,6 +1250,13 @@ release — is `todo/PLAN_test_leftovers_merged_core_release.md`.
   `token`; exit 0 clean, 1 with findings, 2 when it scanned nothing. `--profile node` is for a Node consumer that mounts it: it adds the consumer's tracked
   `*.test.<ext>` / `*.spec.<ext>` files and every text file under `scripts/`, `test/` and `tests/`, reads workflows with `yaml@2`, treats a wholly dynamic shell
   name as dynamic, and takes the token's row with `--token` and `--identity`.
+  The guard's command line is `tools/lib/leftovers-cli.mjs`, its docker pass `tools/lib/leftovers-docker.mjs` and the shell-value helpers both share `tools/lib/leftovers-shell.mjs` (moved out of `tools/leftovers-check.mjs` whole, to keep it under 800 lines).
+  The `raw-temp` baseline (`tools/lib/raw-temp-baseline.mjs`; rule §7, `todo/PLAN_raw_temp_baseline.md`; tests `tools/raw-temp-baseline.test.mjs`) adds three arguments and a class.
+  `--baseline` reads the one path `raw-temp-baseline.json` at the repository root (a regular file, never a symlink) only when given, and passes a `raw-temp` site up to its entries (a multiset keyed by file and the sha256 of the trimmed line; the line is a hint);
+  class `baseline` is a stale entry (reconciled over the whole file, so a deleted file counts), an entry under no scope or under a scope whose proof file lacks the marker for that
+  root, another class, or a malformed file (exit 1, one finding at line 1; only an unreadable path is exit 2). `--print-baseline` prints the current `raw-temp` sites to stdout, `scopes` empty, and writes
+  nothing. `--baseline-shrinks --base <ref> [--allow-create]` refuses a new key, a raised count, a new or wider scope, a narrowed scope that does not keep its base proof, a changed proof and any creation but the first (`--allow-create` only while the
+  path has no history behind the base ref, and only in the creation PR's own run; an unresolved base ref, or a shallow clone asked about a creation, is exit 2 naming the fetch). This repository ships no baseline file. The full definition is the companion rule `common/test-leftovers-baseline.md` (the detail's §7 points to it: the detail has no room under the per-read cap for it).
 - **`tools/sweeper-scan.mjs`** (the barrier's scan; `node tools/sweeper-scan.mjs [--root <dir>] [--system] [--honour-marker]`) lists the owner-blind sweepers still
   enabled on a machine: the caller's checkouts under `--root`, crontab, systemd user units and, on Windows, scheduled tasks; `--system` adds the system places.
   It deletes nothing. Exit 0: nothing found and everything read. Exit 1: owner-blind lines found. Exit 2: something in the requested scope could not be read, or
@@ -1259,7 +1266,7 @@ release — is `todo/PLAN_test_leftovers_merged_core_release.md`.
   2026-10-27, counted from the file) and `tools/owner-conformance.test.mjs` asks each of both implementations of the rule, `owned.mjs` and `janitor.sh`
   (cut out by function name, or run for real over a private temp root); a disagreement names the vector and both answers.
 - **The test files** (`ls tools/*.test.mjs`): `owned.test.mjs`, `owned-liveness.test.mjs`, `owned-for.test.mjs`, `leftovers-sweep.test.mjs`, `leftovers-check.test.mjs`,
-  `leftovers-check-consumers.test.mjs`, `janitor.test.mjs`, `janitor-liveness.test.mjs`, `janitor-paths.test.mjs`, `janitor-docker-live.test.mjs`,
+  `raw-temp-baseline.test.mjs`, `leftovers-check-consumers.test.mjs`, `janitor.test.mjs`, `janitor-liveness.test.mjs`, `janitor-paths.test.mjs`, `janitor-docker-live.test.mjs`,
   `owner-conformance.test.mjs`, `sweeper-scan.test.mjs`, `test-leftovers-rule.test.mjs`, `unmatchable-pid.test.mjs`. `sweeper-scan.test.mjs` also reads
   the E1 rule text kept as a fixture (`tools/fixtures/sweeper-scan/rule-2c96f83.md`).
 - **The latest suite** (9b62ba3, 2026-10-27, Ubuntu, non-root, lowered, private `TMPDIR`): 1099 tests, 1093 pass, 0 fail, 6 skipped (S4-21b needs real uid 0, S4-28 is the
