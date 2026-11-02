@@ -565,6 +565,45 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
 F17–F20 land together, with their tests, as one change released once (R7 of the remainder plan); the consumers that wrap the
 reference (coai E5, creds E2, the private sibling) take it with that pin. The ports E3 and E4 already behave this way.
 
+## F21 — The identity and exclusive-move helpers are private, so a consumer's clean-up copies them (found 2026-11-02, coai E5.S2-A)
+
+- **What.** `identityOf`, `isOwnEmptyPlaceholder`, `removeOwnEmptyPlaceholder`, `moveExclusively` and `moveToQuarantine` in
+  `tools/lib/leftovers-sweep.mjs` (~:133-270) are not exported, and they read `fs` and `process.platform` directly. coai's one-off
+  clean-up of old-prefix leftovers (E5.S2-A, `scripts/lib/old-coai-leftovers.mjs`) needs exactly this behaviour, with seams for its
+  failure tests (an `io` that throws, a platform), so it carries a copy (~70 lines).
+- **Why.** The reuse-first rule: a second implementation is a defect from the moment it compiles, because the two drift. coai's code
+  gate (session f478a03b, round 5, findings 2, 8 and 9) accepted removing the copy. Decision 11 already makes the pinned mount the Node
+  consumers' interface to the reference.
+- **Fix — widen, behaviour unchanged.** Export the five helpers. Each takes an optional last argument `{ io = fs, platform =
+  process.platform }`; every `fs.` call inside them goes through `io`, and the Windows branch reads `platform`. The sweep's own calls pass
+  nothing, so its behaviour and its tests are unchanged. `isTakenRename` stays as it is (already exported, already takes `platform`).
+- **Tests (RED → GREEN → RED):** a test imports the five names (RED: not exported); for each, an `io` seam proves the calls go through
+  it (a throwing `renameSync` reaches `moveExclusively`'s failure path; a `rmdirSync` spy sees the placeholder removed only when it is
+  our empty reservation); a `platform: "win32"` seam takes the Windows branch on Linux; the whole existing sweep suite stays green with
+  no change (the default arguments keep today's behaviour).
+- **Docs.** The README tool row of `tools/lib/leftovers-sweep.mjs` names the exported helpers; the header comment says they are the
+  family's one implementation and consumers import them, never copy them.
+- **Release.** Rides the same promotion as F16 (#107) and the `raw-temp` baseline (#108). coai then deletes its copy and imports these
+  after its pin bump (E5.S2-A, before that PR merges).
+- **Plan gate 2026-11-02** (coai session `ad098f3b`, `proceed`; 0 and 1 accepted, 2 rejected — RED → GREEN → RED is the family's check,
+  the suite ends green): [gate finding 0] the options object is forwarded through every internal call between the five helpers, with a
+  test that a mocked `io` given to `moveToQuarantine` is the one the inner helpers use; [gate finding 1] inside them `isTakenRename` is
+  called with `options.platform` (a string), its own exported signature unchanged, tested through `moveExclusively`'s taken path on
+  `platform: "win32"`.
+- **Progress 2026-11-02 — the helpers are EXPORTED (feat 657b311, RED fa661ea; test tightened 42239d6).** `identityOf`, `isOwnEmptyPlaceholder`, `removeOwnEmptyPlaceholder`, `moveExclusively` and
+  `moveToQuarantine` take a last `{ io = fs, platform = process.platform }`; the options object is forwarded through every call between them and `isTakenRename` is called with the platform
+  string. The sweep's own calls pass nothing: `tools/leftovers-sweep.test.mjs` is unchanged and green (59 tests). The new tests are in `tools/leftovers-sweep-helpers.test.mjs` (a new file: the
+  sweep's test file is already past the 800-line limit). RED observed: with the module as on main all 11 failed (not exported); GREEN with the change; RED again with the change stashed
+  (0 of 11 pass, the sweep suite still 59). Each forwarding point was also dropped on purpose, one at a time (`moveToQuarantine`, the placeholder check inside `moveExclusively`, the
+  failure-path remover, `isTakenRename` given the options object, the check inside `removeOwnEmptyPlaceholder`): each is caught by a test. The last one was NOT at first, so test `d` was
+  tightened (42239d6). Docs: the README tool row and the module header say the helpers are the family's one implementation. Not done: the release (rides F16 and the `raw-temp`
+  baseline), coai deleting its copy after its pin bump. The Windows branch ran only through the `platform` seam on Linux; no Windows machine ran it.
+  [code gate 0] (accepted) The exported `platform` option let a consumer on POSIX force the Windows direct-rename branch with the REAL fs, where `rename(2)` replaces an empty
+  directory and breaks the exclusive-move contract. `moveExclusively` now throws a clear error BEFORE any rename when `platform === "win32"`, the real `process.platform` is not
+  `win32` and `io` is the real fs (the `fs` namespace or its default export); an `io` of the caller's own keeps working, so tests i to k are unchanged. `moveToQuarantine` reaches it
+  through `moveExclusively`; no other code decides an fs operation on `platform`. Test `F21 l` (three forms: namespace, default export, no `io`): RED first (e2ab09e, 3 failed), GREEN
+  with the guard (d02d6c5), RED again with it stashed (3 failed, the other 11 pass).
+
 ## Definition of Done
 
 - [ ] Each of F1 to F20 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.

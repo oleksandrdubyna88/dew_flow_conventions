@@ -29,10 +29,16 @@
 // delete — is reported in `result.listed` as `unverified: <path> — the owner SID is not read on Windows (F16)`, and `removed` stays empty. The gate
 // is `withheld` (a verdict that says remove, or `foreign-uid`, which there is only the profile-path proxy: it is `unverified` too, never `foreign:`) and the quarantine pass; no other code path changes the disk. The Fix reads the SID and lifts the gate.
 //
+// The family's one implementation (F21). `identityOf`, `isOwnEmptyPlaceholder`, `removeOwnEmptyPlaceholder`, `moveExclusively` and `moveToQuarantine` are
+// exported with a last `{ io = fs, platform = process.platform }` argument: a consumer's own clean-up IMPORTS them through its pinned mount and never copies
+// them (a copy drifts). `io` replaces every `fs` call and `platform` the Windows branch, so a consumer's failure tests need no second implementation; the
+// options object is forwarded through every call between the helpers, and the sweep's own calls pass none.
+//
 // Order. Quarantine restores, worktrees (only those this repository lists), folders, orphaned claims. Never throws: every
 // failure is an `errors` entry, and the caller decides what to print — a sweep never changes a run's exit code.
 
 import * as crypto from "node:crypto";
+import fsDefault from "node:fs";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -129,10 +135,13 @@ function ownerFromLock(locked) {
 
 // --- identity ---------------------------------------------------------------------------------------------------
 
-/** `{ dev, ino, directory }` of an entry itself (a link is not followed), or `undefined` when it is not there. */
-function identityOf(target) {
+/**
+ * `{ dev, ino, directory }` of an entry itself (a link is not followed), or `undefined` when it is not there. `options` is the last argument of
+ * the five exported helpers (`identityOf` to `moveToQuarantine`): `{ io = fs, platform = process.platform }`, the seams a consumer's failure tests use.
+ */
+export function identityOf(target, { io = fs } = {}) {
   try {
-    const stat = fs.lstatSync(target, { bigint: true });
+    const stat = io.lstatSync(target, { bigint: true });
     return { dev: stat.dev, ino: stat.ino, directory: stat.isDirectory() };
   } catch {
     return undefined;
@@ -183,20 +192,22 @@ export function isTakenRename(error, thereAtTarget, platform = process.platform)
 }
 
 /** Is `placeholder` still the directory this move reserved: a directory, not a link, the reserved `(dev, ino)`, and empty? */
-function isOwnEmptyPlaceholder(placeholder, reserved) {
-  const now = identityOf(placeholder); // lstat: a link is its own entry, never a directory
+export function isOwnEmptyPlaceholder(placeholder, reserved, options = {}) {
+  const { io = fs } = options;
+  const now = identityOf(placeholder, options); // lstat: a link is its own entry, never a directory
   if (!sameIdentity(now, reserved) || !now.directory) return false;
   try {
-    return fs.readdirSync(placeholder).length === 0;
+    return io.readdirSync(placeholder).length === 0;
   } catch {
     return false;
   }
 }
 
 /** Remove the reserved placeholder only while it is still ours and empty (`rmdir`, never recursive): a name taken over in between is never touched. */
-function removeOwnEmptyPlaceholder(placeholder, reserved) {
+export function removeOwnEmptyPlaceholder(placeholder, reserved, options = {}) {
+  const { io = fs } = options;
   try {
-    if (isOwnEmptyPlaceholder(placeholder, reserved)) fs.rmdirSync(placeholder);
+    if (isOwnEmptyPlaceholder(placeholder, reserved, options)) io.rmdirSync(placeholder);
   } catch { /* gone, or not empty: leave it */ }
 }
 
@@ -209,33 +220,39 @@ function removeOwnEmptyPlaceholder(placeholder, reserved) {
  * the same user is not the threat this sweep guards against. A rename refused with ENOTEMPTY / EEXIST / ENOTDIR is the name taken after all
  * (EISDIR is the source that changed: it is thrown). When the rename fails the placeholder is removed — only while it is still our empty
  * directory with the reserved identity. `hooks.afterReserve(to, from)` and `hooks.beforeRename(to, from)` are the test seams between the
- * reservation and the pre-check, and between the pre-check and the rename.
+ * reservation and the pre-check, and between the pre-check and the rename. `options` (`{ io, platform }`) is forwarded to every helper it calls; `platform: "win32"` on a POSIX machine needs an `io` of its own and throws, before any rename, with the real `fs`.
  */
-function moveExclusively(from, to, hooks = {}) {
-  if (process.platform === "win32") {
+export function moveExclusively(from, to, hooks = {}, options = {}) {
+  const { io = fs, platform = process.platform } = options;
+  if (platform === "win32") {
+    // [code gate 0] The Windows branch renames directly and relies on the OS refusing an occupied name. On POSIX rename(2) REPLACES an empty directory, so
+    // `platform: "win32"` is a test seam for an `io` of the caller's own, never a way to run this branch on the real fs of a POSIX machine.
+    if (process.platform !== "win32" && (io === fs || io === fsDefault)) {
+      throw new Error(`moveExclusively: platform "win32" cannot be used with the real fs on ${process.platform}: rename(2) would replace an empty directory — pass an io of your own`);
+    }
     try {
-      fs.renameSync(from, to); // a directory rename onto an existing one fails here, so the move is exclusive by itself — unmeasured on Windows, which F9 settles
+      io.renameSync(from, to); // a directory rename onto an existing one fails here, so the move is exclusive by itself — unmeasured on Windows, which F9 settles
     } catch (error) {
-      if (isTakenRename(error, identityOf(to) !== undefined, "win32")) return false;
+      if (isTakenRename(error, identityOf(to, options) !== undefined, platform)) return false;
       throw error;
     }
     return true;
   }
   try {
-    fs.mkdirSync(to, { mode: 0o700 }); // exclusive: an existing folder, file or link under the name refuses
+    io.mkdirSync(to, { mode: 0o700 }); // exclusive: an existing folder, file or link under the name refuses
   } catch (error) {
     if (error?.code === "EEXIST") return false;
     throw error;
   }
-  const reserved = identityOf(to);
+  const reserved = identityOf(to, options);
   try {
     hooks.afterReserve?.(to, from);
-    if (!isOwnEmptyPlaceholder(to, reserved)) return false; // not ours any more: never renamed onto, never removed
+    if (!isOwnEmptyPlaceholder(to, reserved, options)) return false; // not ours any more: never renamed onto, never removed
     hooks.beforeRename?.(to, from);
-    fs.renameSync(from, to);
+    io.renameSync(from, to);
     return true;
   } catch (error) {
-    removeOwnEmptyPlaceholder(to, reserved);
+    removeOwnEmptyPlaceholder(to, reserved, options);
     if (TAKEN_CODES.has(error?.code)) return false;
     throw error;
   }
@@ -251,10 +268,10 @@ function restoreOnto(quarantined, original, hooks = {}) {
 }
 
 /** Move `dir` to a quarantine name that was free: a taken name draws a new suffix, at most `QUARANTINE_DRAWS` times; then the folder is kept (one error). Returns the name. */
-function moveToQuarantine(dir, hooks) {
+export function moveToQuarantine(dir, hooks, options = {}) {
   for (let draw = 0; draw < QUARANTINE_DRAWS; draw += 1) {
     const quarantine = quarantineName(dir);
-    if (moveExclusively(dir, quarantine, hooks)) return quarantine;
+    if (moveExclusively(dir, quarantine, hooks, options)) return quarantine;
   }
   throw new Error(`cannot move ${dir} into quarantine: no free name in ${QUARANTINE_DRAWS} draws — the folder is kept`);
 }
