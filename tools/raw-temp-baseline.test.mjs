@@ -971,3 +971,24 @@ test("40. the applier keys scanned paths and entries by forward slashes: a Windo
   const deep = createApplier({ scopes: [NODE_SCOPE, { root: "src/test/unit/", proof: "src/test/unit/u.test.mjs", guard: "node" }], entries: [entry(slashed("src/test/unit/b.test.mjs"), L3, 1)] }, repo, FILE, new Set([PROOF]));
   assert.ok(deep.finalFindings().some((finding) => finding.text.includes("proof missing") && finding.text.includes("src/test/unit/")), "the ancestor lookup finds the most specific scope of a backslash entry");
 });
+
+// 41 ---------------------------------------------------------------------------------------------------------------------------
+
+test("41. the run modes are mutually exclusive: any two of --update-allowlist, --baseline-shrinks and --print-baseline are a usage error naming both, exit 2, before a mode is chosen [CodeRabbit 4440549937]", async (t) => {
+  const { optionsProblem } = await import("./lib/leftovers-cli.mjs");
+  const { repo } = committed(t);
+  const modes = { "--update-allowlist": [], "--baseline-shrinks": ["--base", "HEAD"], "--print-baseline": [] };
+  const names = Object.keys(modes);
+  for (const [first, second] of [[0, 1], [0, 2], [1, 2]].map(([a, b]) => [names[a], names[b]])) {
+    const result = guard(repo, [first, ...modes[first], second, ...modes[second]]);
+    assert.equal(result.code, 2, `${first} ${second}: ${result.text}`);
+    assert.match(result.text, /usage:/);
+    assert.ok(result.text.includes(`\`${first}\``) && result.text.includes(`\`${second}\``), `the error names both options: ${result.text}`);
+  }
+  assert.equal(fs.existsSync(path.join(repo, "tools")), false, "no mode ran: the allowlist update wrote nothing");
+  assert.match(optionsProblem({ update: true, baselineShrinks: true, base: "HEAD" }), /`--update-allowlist`.*`--baseline-shrinks`/);
+  assert.match(optionsProblem({ update: true, printBaseline: true }), /`--update-allowlist`.*`--print-baseline`/);
+  assert.equal(optionsProblem({ baselineShrinks: true, base: "HEAD" }), undefined, "one mode alone is fine");
+  assert.equal(optionsProblem({ update: true }), undefined);
+  assert.equal(optionsProblem({ printBaseline: true }), undefined);
+});
