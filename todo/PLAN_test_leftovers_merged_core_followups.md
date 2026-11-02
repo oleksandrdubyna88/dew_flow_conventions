@@ -604,6 +604,28 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   through `moveExclusively`; no other code decides an fs operation on `platform`. Test `F21 l` (three forms: namespace, default export, no `io`): RED first (e2ab09e, 3 failed), GREEN
   with the guard (d02d6c5), RED again with it stashed (3 failed, the other 11 pass).
 
+## F22 — The reference sweep only sweeps its own token, so no wrapping consumer can collect its own folders (found 2026-11-02, creds E2.1)
+
+- **What.** `relationOf` (`tools/lib/leftovers-sweep.mjs` ~:75-82) compares every name's token with the module's own `REPO_TOKEN`
+  (`conventions`), and `sweepLeftovers` takes no token. `ownedFor({ token, row })` binds the token for naming, folders and worktrees,
+  but not for the sweep. A consumer that wraps the reference (decision 11: creds E2, coai E5's Node runners) therefore sweeps
+  nothing of its own: measured by the creds E2.1 coder — a dead-claimed `creds` folder beside a dead-claimed `conventions` folder in
+  one private root; only the `conventions` one was removed.
+- **Why.** Decision 11 makes the wrapped reference the Node consumers' only sweep; without this, a killed run's folders are never
+  collected by a Node consumer, and copying the sweep to change one constant is the reuse-first defect F21 just removed.
+- **Fix — widen, behaviour unchanged for this repository.** `sweepLeftovers({ ..., token = REPO_TOKEN })`: the given token
+  replaces `REPO_TOKEN` in the name relation (owner-form and legacy names alike), validated by the same `checkToken` as
+  `ownedFor`; an invalid token throws before anything is read. This repository's own call sites pass nothing. The F16 Windows
+  list-only gate and every other check are unchanged.
+- **Tests (RED → GREEN → RED):** a private root with a dead-claimed `creds` owner-form folder and a dead-claimed `conventions` one:
+  `token: "creds"` removes only the `creds` one (RED today: it is kept), the default removes only the `conventions` one (the
+  companion); a `creds` legacy name is `legacy:` under `token: "creds"` and `other` under the default; an invalid token throws and
+  nothing is read; on `platform: "win32"` the `creds` folder is `unverified:`, untouched (F16).
+- **Docs.** The README tool row and the module header say the sweep takes the consumer's token; the detail §4 needs no change (it
+  already says each repository sweeps its own token).
+- **Release.** A release of its own, then the pin bumps of the consumers that sweep through the reference (creds first, for E2.1);
+  E2.1 merges only after creds pins it (rollout ledger 2.1).
+
 ## Definition of Done
 
 - [ ] Each of F1 to F20 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
