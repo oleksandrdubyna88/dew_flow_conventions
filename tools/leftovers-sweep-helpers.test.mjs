@@ -9,6 +9,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import fsDefault from "node:fs";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -189,3 +190,22 @@ test("F21 k. moveToQuarantine on win32 forwards the platform: a taken draw there
   assert.equal(attempts.length, 2, "EPERM with the name occupied was taken, so a second name was drawn");
   assert.equal(quarantine, attempts[1]);
 });
+
+for (const [label, realIo] of [["the fs namespace", fs], ["fs's default export", fsDefault], ["no io at all", undefined]]) {
+  test(`F21 l (code gate 0). platform win32 with the REAL fs (${label}) on POSIX throws before any rename: the empty destination and the source survive`, (t) => {
+    if (process.platform === "win32") return t.skip("the real platform is win32: the Windows branch is the real one");
+    const dir = arena(t);
+    const from = path.join(dir, "from");
+    const to = path.join(dir, "to");
+    fs.mkdirSync(from);
+    fs.writeFileSync(path.join(from, "keep.txt"), "kept\n");
+    fs.mkdirSync(to); // rename(2) would replace this empty directory
+    const options = realIo === undefined ? { platform: "win32" } : { io: realIo, platform: "win32" };
+
+    assert.throws(() => sweep.moveExclusively(from, to, {}, options), /win32.*real fs|real fs.*win32/s);
+    assert.throws(() => sweep.moveToQuarantine(from, {}, options), /win32.*real fs|real fs.*win32/s, "and through moveToQuarantine");
+    assert.deepEqual(fs.readdirSync(from), ["keep.txt"], "the source was not moved");
+    assert.deepEqual(fs.readdirSync(to), [], "the empty destination was not replaced");
+    assert.deepEqual(fs.readdirSync(dir).sort(), ["from", "to"], "nothing else was made");
+  });
+}
