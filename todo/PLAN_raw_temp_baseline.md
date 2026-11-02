@@ -40,27 +40,42 @@ Narrowed: no — nothing got smaller: the scope, the Definition of Done, the mer
 
 | Work | Where | Verdict | Action |
 |---|---|---|---|
-| 9c3b62c docs(plans): the plan, first version | pushed, unmerged (#108) | — | — |
-| f753618 docs(plans): plan gate round 1 applied, epoch 1 opened | pushed, unmerged (#108) | — | — |
-| 55e44a5 merge of main (no work of this plan) | pushed, unmerged (#108) | — | — |
-| f1ae481 test(rules): the core phrase, the detail paragraph, CORE_CAP 9000 — RED | pushed, unmerged (#108) | — | — |
-| 13e8fbb feat(rules): §7's core sentence and the detail paragraph; bodies re-recorded | pushed, unmerged (#108) | — | — |
-| 23f115b test(leftovers): fifteen behaviours — RED | pushed, unmerged (#108) | — | — |
-| cb511e4 test(rules): the definition is a companion rule — RED | pushed, unmerged (#108) | — | — |
-| 92c1145 feat(leftovers): the guard's baseline pass, print, shrinks, class `baseline` | pushed, unmerged (#108) | — | — |
-| 5d915f2 feat(rules): the definition moves to the companion (N1); selection baseline | pushed, unmerged (#108) | — | — |
-| ecd47ef test(leftovers): the fixed path and the review findings — RED | pushed, unmerged (#108) | — | — |
-| af634a3 fix(leftovers): one fixed path, no symlink, strict proof, git failures exit 2, indexed matching | pushed, unmerged (#108) | — | — |
-| 5979588 refactor(leftovers): the guard under 800 lines — cli, docker and shell helpers to tools/lib | pushed, unmerged (#108) | — | — |
-| 70b4613 test(leftovers): code round 2 — RED | pushed, unmerged (#108) | — | — |
-| b23c70a fix(leftovers): code round 2 — one loader, guarded print read, cursor matching, option values | pushed, unmerged (#108) | — | — |
-| bc0e044 docs(plans): the rollout plan's epoch 2 (another plan's work, merged through main) | main | — | — |
-| 5e077ff fix(leftovers): F16 interim (another plan's work, merged through main) | main | — | — |
-| 217e6db merge of main (no work of this plan) | pushed, unmerged (#108) | — | — |
-| e015cf4 docs(plans): the stop — ledger 1.2 and 1.3 recorded | pushed, unmerged (#108) | — | — |
-  (Verdict and Action are left `—` for an Opus judge, step 5 of the full stop; this revision sorts nothing. `git branch -r
-  --contains` in this worktree lists no remote ref for these commits — its fetch is stale — so "pushed" is taken from #108's
-  existence, and the judge confirms it. Rows 15 and 16 are not this plan's work: they are on `main` and ride the merge commit.)
+| 9c3b62c docs(plans): the plan, first version | pushed, unmerged (#108) | fits | kept — the plan's first text; the revision replaces it in this file |
+| f753618 docs(plans): plan gate round 1 applied, epoch 1 opened | pushed, unmerged (#108) | fits | kept — the gate's five findings stand in the revision |
+| 55e44a5 merge of main (no work of this plan) | pushed, unmerged (#108) | fits | kept — main's text only, no work of this plan |
+| f1ae481 test(rules): the core phrase, the detail paragraph, CORE_CAP 9000 — RED | pushed, unmerged (#108) | fits | kept — its detail-paragraph check already replaced by cb511e4 (ledger 1.2) |
+| 13e8fbb feat(rules): §7's core sentence and the detail paragraph; bodies re-recorded | pushed, unmerged (#108) | fits | kept — the core sentence stands verbatim; its detail paragraph already replaced by 5d915f2's pointer |
+| 23f115b test(leftovers): fifteen behaviours — RED | pushed, unmerged (#108) | fits | kept; fix forward CodeRabbit 28 (test 11's `file://` URL) |
+| cb511e4 test(rules): the definition is a companion rule — RED | pushed, unmerged (#108) | fits | kept; fix forward E2-b (the module's global reconcile) and CodeRabbit 30 (`problemOf`) |
+| 92c1145 feat(leftovers): the guard's baseline pass, print, shrinks, class `baseline` | pushed, unmerged (#108) | fits | kept; fix forward E2-b (the guard wires the global reconcile); its path argument already replaced by af634a3 (ledger 1.1) |
+| 5d915f2 feat(rules): the definition moves to the companion (N1); selection baseline | pushed, unmerged (#108) | fits | kept; fix forward E2-a (`implement` not in the companion's tasks) and E2-b (§ *What a guard does with it*) |
+| ecd47ef test(leftovers): the fixed path and the review findings — RED | pushed, unmerged (#108) | fits | kept; fix forward CodeRabbit 28 (test 14's `file://`, tests 16, 20, 20b on Windows) and E2-b, which must also rewrite test 18's first case (see the note) |
+| af634a3 fix(leftovers): one fixed path, no symlink, strict proof, git failures exit 2, indexed matching | pushed, unmerged (#108) | fits | kept; fix forward E2-b (`proofHolds`: an undiscovered proof is `proof missing`), E2-c (the `--allow-create` reason), E2-a (tasks), CodeRabbit 27 (the regex marker parse) |
+| 5979588 refactor(leftovers): the guard under 800 lines — cli, docker and shell helpers to tools/lib | pushed, unmerged (#108) | fits | kept; fix forward CodeRabbit 30 (`optionsProblem` out of `parseArguments`) |
+| 70b4613 test(leftovers): code round 2 — RED | pushed, unmerged (#108) | fits | kept; fix forward CodeRabbit 28 (test 23's symlink on Windows) |
+| b23c70a fix(leftovers): code round 2 — one loader, guarded print read, cursor matching, option values | pushed, unmerged (#108) | fits | kept; fix forward E2-e (`loadBaselineAt` calls `locateBaseline(repo)` without `gitRoot`) |
+| bc0e044 docs(plans): the rollout plan's epoch 2 (another plan's work, merged through main) | main | fits | kept — another plan's merged work; nothing here contradicts it |
+| 5e077ff fix(leftovers): F16 interim (another plan's work, merged through main) | main | fits | kept — another plan's merged work; its 131 B in the detail are in the revision's 31,677 B |
+| 217e6db merge of main (no work of this plan) | pushed, unmerged (#108) | fits | kept — main's work only (bc0e044, 5e077ff), no work of this plan |
+| e015cf4 docs(plans): the stop — ledger 1.2 and 1.3 recorded | pushed, unmerged (#108) | fits | kept — the stop commit, step 1 |
+  (Judged 2026-11-02 by an Opus judge, step 5 of the full stop: each of the 18 rows read with `git show --stat` and its diff
+  where the revised plan names the code, against the REVISED plan — Goal 1-6, the file format, E2-a to E2-e, the Node
+  guard, the C# surface, the Definition of Done. Confirmed after `git fetch`: the 16 branch rows are ancestors of
+  `origin/feat/raw-temp-baseline` (e015cf4), #108 is OPEN and unmerged; bc0e044 and 5e077ff are on `origin/main`.
+  `fits` here means compatible with the revised plan; a row that is only partly right is `fits` with the fix forward
+  the revised plan already lists. No row contradicts the revised plan as a whole: 18 fits, 0 cut, nothing to revert.)
+  (Not a row: 7252683, local, is step 4's revision itself — the baseline epoch 2 is approved on, not sorted work.)
+  (A gap the revision does not list: test 18's first case, from ecd47ef, asserts that a proof present in the tree but
+  not discovered by the scan is `proof missing`. Under Goal 6 that scope is another guard's and is silent (`unread`),
+  so E2-b must rewrite that case too; it belongs in E2-b's test list beside tests 25 and 26.)
+  (Hygiene, not a cut: cb511e4, a test commit "RED before the file", also adds the 194-line module
+  `tools/lib/raw-temp-baseline.mjs`. Pushed history is not rewritten; it is recorded here.)
+  (The judge disagrees with `Narrowed: no`. Epoch 1's Goal 4 and Definition of Done named a GLOBAL reconcile over the
+  whole baseline [gate finding 0]; Goal 6 reconciles only the scopes a guard judges, and R6 admits a scope no guard
+  judges keeps dead entries nobody reports. That is a smaller guarantee in the contract and in the Definition of Done,
+  so the record should read `Narrowed: yes` and the owner approves epoch 2. Scope, the merge conditions and the release
+  are not smaller: the merge conditions grew (the re-review gate, CodeRabbit's threads), the release is unchanged, and
+  ledger 1.3's base-only history check replaces a check that could never pass.)
 
 ## Symptom
 
