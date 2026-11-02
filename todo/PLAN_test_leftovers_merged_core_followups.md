@@ -598,6 +598,11 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   failure-path remover, `isTakenRename` given the options object, the check inside `removeOwnEmptyPlaceholder`): each is caught by a test. The last one was NOT at first, so test `d` was
   tightened (42239d6). Docs: the README tool row and the module header say the helpers are the family's one implementation. Not done: the release (rides F16 and the `raw-temp`
   baseline), coai deleting its copy after its pin bump. The Windows branch ran only through the `platform` seam on Linux; no Windows machine ran it.
+  [code gate 0] (accepted) The exported `platform` option let a consumer on POSIX force the Windows direct-rename branch with the REAL fs, where `rename(2)` replaces an empty
+  directory and breaks the exclusive-move contract. `moveExclusively` now throws a clear error BEFORE any rename when `platform === "win32"`, the real `process.platform` is not
+  `win32` and `io` is the real fs (the `fs` namespace or its default export); an `io` of the caller's own keeps working, so tests i to k are unchanged. `moveToQuarantine` reaches it
+  through `moveExclusively`; no other code decides an fs operation on `platform`. Test `F21 l` (three forms: namespace, default export, no `io`): RED first (e2ab09e, 3 failed), GREEN
+  with the guard (d02d6c5), RED again with it stashed (3 failed, the other 11 pass).
 
 ## Definition of Done
 
