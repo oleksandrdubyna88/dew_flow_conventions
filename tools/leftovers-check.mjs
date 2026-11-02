@@ -80,7 +80,7 @@ import { OWNER_GRAMMAR } from "./lib/owned.mjs";
 import { PREFIX_OK, composeEnvHits, finding, isComment } from "./lib/leftovers-shell.mjs";
 import { dockerFindings } from "./lib/leftovers-docker.mjs";
 import { REPO_ROW, REPO_TOKEN } from "./lib/owned-token.mjs";
-import { BASELINE_FILE, PROOF_MARKER, createApplier, loadBaselineAt, siteSha256 } from "./lib/raw-temp-baseline.mjs";
+import { BASELINE_FILE, GUARD_NAME, PROOF_MARKER, createApplier, loadBaselineAt, siteSha256 } from "./lib/raw-temp-baseline.mjs";
 import { PROFILES, parseArguments, runCli } from "./lib/leftovers-cli.mjs";
 
 export { PROFILES, parseArguments };
@@ -544,7 +544,7 @@ export function updateAllowlist(repo, explicit) {
 /** The applier of the repository's baseline (`true`, or `loadBaselineAt`'s result); `files` are what the scan will read, where a scope's proof must be. */
 function appliedBaseline(baseline, repo, files) {
   const loaded = baseline === true ? loadBaselineAt(repo) : baseline;
-  return createApplier(loaded, repo, BASELINE_FILE, new Set(files));
+  return createApplier(loaded, repo, BASELINE_FILE, new Set(files), GUARD_NAME, (root) => NODE_TREE.test(`${root}x`)); // the node profile reads every file under scripts/, test/ and tests/
 }
 
 /**

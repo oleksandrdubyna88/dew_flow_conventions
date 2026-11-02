@@ -13,6 +13,8 @@
  * - each scope NAMES the guard that judges it (`node`, the shipped Node guard, or `csharp`, the C# guard a consumer copies; a closed list, any other value
  *   is a malformed file): a guard judges exactly the scopes that name it and reconciles every one of their entries globally, and it never checks another
  *   guard's scopes — the companion requires the named guard to run in CI, so every entry has one guard that reconciles it and that guard runs;
+ * - scopes that overlap name the same guard and no root is listed twice (else the file is malformed); a root holds no whitespace, star-slash or `-->`; a scope's files
+ *   are not read by another guard's walk (the Node guard reports a `csharp` scope under `scripts/`, `test/` or `tests/`);
  * - it only shrinks: `baselineShrinks` compares the working copy with the base ref and refuses a new key, a raised count, a new or wider scope, a
  *   changed proof, a changed guard and any creation but the first.
  */
@@ -49,8 +51,9 @@ const isTestFile = (file) => /(?:\.(?:test|spec)|Tests?|[_-]test)\.[A-Za-z0-9]+$
 export function scopeProblem(scope, index) {
   if (scope === null || typeof scope !== "object") return `\`scopes[${index}]\` is not an object`;
   if (!isFolder(scope.root)) return `\`scopes[${index}].root\` must be a repository-relative folder with a trailing \`/\` and forward slashes`;
+  if (/\s/.test(scope.root) || scope.root.includes("*/") || scope.root.includes("-->")) return `\`scopes[${index}].root\` must contain no whitespace, \`*/\` or \`-->\` — the marker line that proves a root cannot carry one`;
   if (!isRelative(scope.proof) || !scope.proof.startsWith(scope.root) || scope.proof.endsWith("/") || scope.proof === BASELINE_FILE) return `\`scopes[${index}].proof\` must be a file under its root \`${scope.root}\` (a test file the scan discovers)`;
-  if (!GUARDS.includes(scope.guard)) return `\`scopes[${index}].guard\` must be exactly one of ${GUARDS.map((name) => `\`${name}\``).join(", ")} — the guard that judges the scope (found ${scope.guard === undefined ? "none" : JSON.stringify(scope.guard)}); the list is closed`;
+  if (!GUARDS.includes(scope.guard)) return `\`scopes[${index}].guard\` must be exactly one of ${GUARDS.map((name) => `\`${name}\``).join(", ")} — the guard that judges the scope: \`node\` for the Node guard's suites, \`csharp\` for the C# guard's (found ${scope.guard === undefined ? "none" : JSON.stringify(scope.guard)}); the list is closed`;
   return undefined;
 }
 
@@ -63,13 +66,46 @@ export function entryProblem(item, index) {
   return undefined;
 }
 
+/** The first problem of a list under `check`, or `undefined`; it stops at the first, and reads nothing after it. */
+function firstProblem(list, check) {
+  for (const [index, item] of list.entries()) {
+    const problem = check(item, index);
+    if (problem !== undefined) return problem;
+  }
+  return undefined;
+}
+
+/** The folders above `root` (a folder with a trailing `/`), not `root` itself, outermost first. */
+function* ancestorsOf(root) {
+  for (let at = root.indexOf("/"); at >= 0 && at < root.length - 1; at = root.indexOf("/", at + 1)) yield root.slice(0, at + 1);
+}
+
+/**
+ * The first thing wrong with the scopes as a set, or `undefined`: no root listed twice, and scopes that overlap (one root a path-segment prefix of the other)
+ * name the SAME guard — otherwise two guards would both judge the files of the inner one.
+ */
+function overlapProblem(scopes) {
+  const byRoot = new Map();
+  for (const [index, scope] of scopes.entries()) {
+    if (byRoot.has(scope.root)) return `\`scopes[${index}].root\` repeats \`${scope.root}\` of \`scopes[${byRoot.get(scope.root).index}]\` — a root is listed once, and the one scope names one guard`;
+    byRoot.set(scope.root, { index, guard: scope.guard });
+  }
+  for (const [index, scope] of scopes.entries()) {
+    for (const above of ancestorsOf(scope.root)) {
+      const outer = byRoot.get(above);
+      if (outer !== undefined && outer.guard !== scope.guard) return `\`scopes[${index}]\` (\`${scope.root}\`, \`${scope.guard}\`) lies inside \`scopes[${outer.index}]\` (\`${above}\`, \`${outer.guard}\`): scopes that overlap must name the same guard`;
+    }
+  }
+  return undefined;
+}
+
 /** The first thing wrong with a parsed baseline, naming the field, or `undefined`. */
-function problemOf(data) {
+export function problemOf(data) {
   if (data === null || typeof data !== "object" || Array.isArray(data)) return "the file is not an object";
   if (data.class !== BASELINE_CLASS) return `\`class\` must be exactly \`${BASELINE_CLASS}\` (found ${data.class === undefined ? "none" : JSON.stringify(data.class)}); no other class has a baseline`;
   if (!Array.isArray(data.scopes)) return "`scopes` is missing or is not a list";
   if (!Array.isArray(data.entries)) return "`entries` is missing or is not a list";
-  return data.scopes.map(scopeProblem).find(Boolean) ?? data.entries.map(entryProblem).find(Boolean);
+  return firstProblem(data.scopes, scopeProblem) ?? firstProblem(data.entries, entryProblem) ?? overlapProblem(data.scopes);
 }
 
 /** `{ scopes, entries }` for a valid baseline text, else `{ problem }` naming the field. */
@@ -106,6 +142,11 @@ const realOrSelf = (target) => {
 export function locateBaseline(repo, { gitRoot = false } = {}) {
   const file = path.join(repo, BASELINE_FILE);
   const refused = (kind, why) => ({ file, absent: false, refusal: { kind, why } });
+  if (gitRoot) { // first: a baseline in a subfolder is a usage error whatever stands there, a link included
+    const top = runGit(repo, ["rev-parse", "--show-toplevel"]);
+    if (!top.ok) return refused("git", top.why);
+    if (path.relative(realOrSelf(top.out.trim()), realOrSelf(repo)) !== "") return refused("not-git-root", `${repo} is not the root of the git repository (${top.out.trim()}) — the baseline is judged at the repository root`);
+  }
   let stat;
   try {
     stat = fs.lstatSync(file);
@@ -115,11 +156,6 @@ export function locateBaseline(repo, { gitRoot = false } = {}) {
   if (stat?.isSymbolicLink()) return refused("symlink", `${BASELINE_FILE} is a symlink — the baseline is a regular file at the repository root and never a link (a link can point a grown baseline anywhere)`);
   if (stat !== undefined && !stat.isFile()) return refused("not-file", `${BASELINE_FILE} is not a regular file`);
   if (stat !== undefined && realOrSelf(path.dirname(file)) !== realOrSelf(repo)) return refused("outside", `${BASELINE_FILE} does not lie in the repository folder itself — the baseline is at the repository root`);
-  if (gitRoot) {
-    const top = runGit(repo, ["rev-parse", "--show-toplevel"]);
-    if (!top.ok) return refused("git", top.why);
-    if (path.relative(realOrSelf(top.out.trim()), realOrSelf(repo)) !== "") return refused("not-git-root", `${repo} is not the root of the git repository (${top.out.trim()}) — the baseline is judged at the repository root`);
-  }
   return { file, absent: stat === undefined };
 }
 
@@ -159,19 +195,22 @@ function declaredRoot(line) {
   return index === line.length ? candidate : undefined;
 }
 
-/** Whether `relative` is absent from the tree: a direct `lstat` of that one path under `repo`, never the scan's discovery. */
-function absentFromTree(repo, relative) {
+/** A direct `lstat` of one path under `repo`, never the scan's discovery: `{ absent }`, or `{ error }` — only ENOENT and ENOTDIR mean absent, any other error cannot be judged. */
+function lookAt(repo, relative) {
   try {
     fs.lstatSync(path.join(repo, relative));
-    return false;
+    return { absent: false };
   } catch (error) {
-    return error.code === "ENOENT" || error.code === "ENOTDIR";
+    if (error.code === "ENOENT" || error.code === "ENOTDIR") return { absent: true };
+    return { error: `${error.code ?? "error"}: ${String(error.message).split("\n")[0]}` };
   }
 }
 
-/** Why a scope's proof does not hold, or `undefined`: absent from the tree (by `lstat`), not a test file this scan discovered, or no marker line for exactly its root. */
-function proofFailure(repo, scope, discovered) {
-  if (absentFromTree(repo, scope.proof)) return `\`${scope.proof}\` is absent from the tree`;
+/** Why a scope's proof does not hold, or `undefined`: absent from the tree or not to be looked at (by `lstat`), not a test file this scan discovered, or no marker line for exactly its root. */
+function proofFailure(repo, look, scope, discovered) {
+  const seen = look(scope.proof);
+  if (seen.error !== undefined) return `\`${scope.proof}\` cannot be looked at (${seen.error})`;
+  if (seen.absent) return `\`${scope.proof}\` is absent from the tree`;
   const generic = `\`${scope.proof}\` is not a test file this scan discovered, or does not carry \`${PROOF_MARKER} ${scope.root}\` (the root exactly, then only whitespace or a comment closer)`;
   if (!discovered.has(scope.proof) || !isTestFile(scope.proof)) return generic;
   let text;
@@ -191,24 +230,43 @@ const keyOf = (entry) => `${entry.file}\0${entry.sha256}`;
  * a judged scope whose proof does not hold, an entry under no scope, and every entry of a judged scope no hit matched (its file absent from the tree by a direct
  * `lstat` is `file absent`, else `no line`). Nothing is applied from a malformed file.
  * `guard` is this guard's own name: it judges EXACTLY the scopes that name it and never looks at another guard's scopes, their proofs, their entries or their files.
+ * `walks(root)` is whether this guard's own walk reads the files under a scope root: a scope that names ANOTHER guard and lies inside it is a finding of this guard
+ * (its files would be read by both guards); the default reads nothing.
  * `label` is how the baseline file is named in a finding. `discovered` is the set of files the scan read: a proof must be one of them.
  * The entries that can still pass are indexed by key once, so a take is not a scan of the baseline.
  */
-export function createApplier(loaded, repo, label, discovered = new Set(), guard = GUARD_NAME) {
+export function createApplier(loaded, repo, label, discovered = new Set(), guard = GUARD_NAME, walks = () => false) {
   if (loaded.problem !== undefined) return { take: () => false, finalFindings: () => [finding(label, 1, loaded.problem)] };
-  const mine = loaded.scopes.filter((scope) => scope.guard === guard).map((scope) => ({ ...scope, failure: proofFailure(repo, scope, discovered) }));
-  const scopeOf = (file) => loaded.scopes.filter((scope) => file.startsWith(scope.root)).sort((a, b) => b.root.length - a.root.length)[0]; // the most specific, whatever the list's order and whoever judges it
+  const looked = new Map(); // one look per path per run
+  const look = (relative) => {
+    if (!looked.has(relative)) looked.set(relative, lookAt(repo, relative));
+    return looked.get(relative);
+  };
+  const roots = new Map(loaded.scopes.map((scope) => [scope.root, scope])); // a root is listed once (the parse refuses a repeat)
+  const scopeOf = (file) => { // the most specific scope that holds the file, whatever the list's order and whoever judges it: the longest folder above the file that is a root
+    for (let at = file.lastIndexOf("/"); at > 0; at = file.lastIndexOf("/", at - 1)) {
+      const scope = roots.get(file.slice(0, at + 1));
+      if (scope !== undefined) return scope;
+    }
+    return undefined;
+  };
+  const mine = new Map(loaded.scopes.filter((scope) => scope.guard === guard).map((scope) => [scope.root, { ...scope, failure: proofFailure(repo, look, scope, discovered) }]));
   const entries = loaded.entries.map((entry) => ({ ...entry, scope: scopeOf(entry.file), used: false }));
-  const judged = entries.filter((entry) => entry.scope !== undefined && entry.scope.guard === guard).map((entry) => ({ ...entry, scope: mine.find((scope) => scope.root === entry.scope.root) }));
+  const judged = entries.filter((entry) => mine.has(entry.scope?.root)).map((entry) => ({ ...entry, scope: mine.get(entry.scope.root) }));
   const available = new Map(); // key → { list: the entries that apply, in list order; next: how many were taken }
   for (const entry of judged) {
     if (entry.scope.failure !== undefined) continue;
     if (!available.has(keyOf(entry))) available.set(keyOf(entry), { list: [], next: 0 });
     available.get(keyOf(entry)).list.push(entry);
   }
-  const staleText = (entry) => (absentFromTree(repo, entry.file)
-    ? `entry's file is absent from the tree — file absent: \`${entry.file}\` is not there; remove the entry`
-    : "entry has no line — no `raw-temp` line of this file has this content (the site is gone or changed); remove the entry");
+  const staleText = (entry) => {
+    const seen = look(entry.file);
+    if (seen.error !== undefined) return `entry's file cannot be looked at — \`${entry.file}\` (${seen.error}); fix the path or remove the entry`;
+    return seen.absent
+      ? `entry's file is absent from the tree — file absent: \`${entry.file}\` is not there; remove the entry`
+      : "entry has no line — no `raw-temp` line of this file has this content (the site is gone or changed); remove the entry";
+  };
+  const walked = loaded.scopes.filter((scope) => scope.guard !== guard && walks(scope.root));
   return {
     take(file, sha256) {
       const slot = available.get(keyOf({ file, sha256 }));
@@ -219,7 +277,8 @@ export function createApplier(loaded, repo, label, discovered = new Set(), guard
       return true;
     },
     finalFindings: () => [
-      ...mine.filter((scope) => scope.failure !== undefined).map((scope) => finding(label, 1, `scope \`${scope.root}\`: proof missing — ${scope.failure}; no entry under it applies`)),
+      ...walked.map((scope) => finding(label, 1, `scope \`${scope.root}\`: a ${scope.guard} scope inside the ${guard} guard's walk: its files would be read by both guards — move the scope to a root the ${guard} guard does not read (a scope's files must not be read by another guard's walk)`)),
+      ...[...mine.values()].filter((scope) => scope.failure !== undefined).map((scope) => finding(label, 1, `scope \`${scope.root}\`: proof missing — ${scope.failure}; no entry under it applies`)),
       ...entries.filter((entry) => entry.scope === undefined).map((entry) => finding(entry.file, entry.line, "entry is outside every scope — it clears nothing; remove it")),
       ...judged.filter((entry) => entry.scope.failure === undefined && !entry.used).map((entry) => finding(entry.file, entry.line, staleText(entry))),
     ],

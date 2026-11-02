@@ -34,18 +34,18 @@ a raised count, a new or wider scope, a changed proof and any creation but the f
   "class": "raw-temp",
   "scopes": [
     { "root": "src/test/", "proof": "src/test/runFolder.test.mjs", "guard": "node" },
-    { "root": "tests/Unit/", "proof": "tests/Unit/RunFolderTests.cs", "guard": "csharp" }
+    { "root": "src/Tests/", "proof": "src/Tests/RunFolderTests.cs", "guard": "csharp" }
   ],
   "entries": [
     { "file": "src/test/a.test.mjs", "sha256": "<64 hex of the trimmed line>", "line": 18 },
     { "file": "src/test/a.test.mjs", "sha256": "<the same key, a second occurrence>", "line": 40 },
-    { "file": "tests/Unit/A.cs", "sha256": "<64 hex>", "line": 12 }
+    { "file": "src/Tests/A.cs", "sha256": "<64 hex>", "line": 12 }
   ]
 }
 ```
 
 - `class` is exactly `raw-temp`; anything else is a `baseline` finding, and no entry is applied.
-- `scopes[].root` is a repository-relative folder with a trailing `/`, in normal form (no `.` or empty segment);
+- `scopes[].root` is a repository-relative folder with a trailing `/`, in normal form (no `.` or empty segment); roots contain no whitespace, `*/` or `-->`, because a marker line could not carry one;
   `proof` is a test file under that root, never the baseline file, and a test file the guard discovered in this scan —
   a file that is present but not scanned is no proof. It carries a line with the marker
   `testsToDelete-baseline-proof: <root>`, then exactly the scope root, then only whitespace or a comment closer
@@ -54,7 +54,12 @@ a raised count, a new or wider scope, a changed proof and any creation but the f
   so in the pull request. An entry belongs to the most specific scope that holds its file, whatever the order of the list.
 - `scopes[].guard` names the guard that judges the scope — one of `node` (the shipped Node guard) or `csharp` (the C# guard
   a consumer copies from the template); the list is closed and grows only by a change to this rule. A scope that names
-  any other value, or none, is a malformed file, whichever guard reads it.
+  any other value, or none, is a malformed file, whichever guard reads it. Use `node` for the Node guard's suites,
+  `csharp` for the C# guard's. Scopes that overlap (one root a path-segment prefix of the other) must name the same guard,
+  and a root is listed once; otherwise the file is malformed for every guard. A scope's files must not be read by another
+  guard's walk: the shipped Node guard reads every file under `scripts/`, `test/` and `tests/`, whatever its extension,
+  so a `csharp` scope with a root there is a `baseline` finding in the Node guard — put it at a root that guard does not
+  read (for example `src/Tests/`).
 - `entries[].file` is repository-relative with forward slashes and starts with some scope's `root`; `sha256` is the
   sha256 of the line with leading and trailing whitespace and any `\r` removed, so a re-indent or a line-ending
   change keeps the entry; `line` is a 1-based hint. Order is free; two entries with one key are two occurrences.
