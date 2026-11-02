@@ -1254,3 +1254,21 @@ test("F16 (run-tests). the caller prints the listed `unverified:` folder and lea
   assert.ok(lines.includes(`run-tests: ${unverifiedLine(dir)}`), JSON.stringify(lines));
   assert.ok(fs.existsSync(dir), "and nothing was removed");
 });
+
+for (const kind of ["folder", "claim", "worktree"]) {
+  test(`F16 (shared root, ${kind}). on win32 a path outside the profile is not judged \`foreign:\` by the path proxy: it is \`unverified:\`, untouched`, (t) => {
+    const { own, work, tmp } = arena(t);
+    const repo = ownedRepo(own, work, `f16-shared-${kind}-repo`);
+    const made = KINDS[kind](own, work, tmp, repo);
+    const before = snapshotOf(tmp);
+    const outsideProfile = () => false; // what `isMine` answers on win32 for a shared TEMP outside the profile
+
+    const result = sweepLeftovers({ repo, tmp, probe: deadProbe, mine: outsideProfile, platform: "win32" });
+
+    assert.deepEqual(result.errors, []);
+    assert.deepEqual(result.removed, []);
+    assert.deepEqual(snapshotOf(tmp), before, "nothing changed");
+    assert.deepEqual(result.listed.filter((line) => line.startsWith("foreign:")), [], "the owner is not read, so nobody is called foreign");
+    assert.deepEqual(unverifiedOf(result), made.listed.map(unverifiedLine).sort());
+  });
+}
