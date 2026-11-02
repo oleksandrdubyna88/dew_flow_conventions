@@ -731,6 +731,7 @@ export function checkToken(token) {
   if (typeof token !== "string" || !TOKEN_SHAPE.test(token) || OWNER_GRAMMAR.test(token)) {
     throw new TypeError(`owned: \`token\` must match ${TOKEN_SHAPE} and must not be of the owner grammar ${OWNER_GRAMMAR}, got ${JSON.stringify(token)}`);
   }
+  return token;
 }
 
 /** `row` is the "repository" column of the token's row in the rule's `## Tokens` table: one non-blank line, or absent. */
