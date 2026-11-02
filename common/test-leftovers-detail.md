@@ -272,6 +272,10 @@ least ten characters and three words and not a placeholder (*needed*, *see above
 `shared-store` it carries `lock:`. A reason-less, class-less or unknown-class exemption is a finding of class
 `exemption`.
 
+**The `raw-temp` baseline — a second pass, for that one class only:** one ratcheting file may carry the `raw-temp`
+sites of a runner that makes an owned, claimed run folder (§2). Its full definition is the companion
+`common/test-leftovers-baseline.md`, read before writing, changing or reviewing one.
+
 ## The janitor
 
 The **host-wide** tool — every user, every token, every kind; neither a teardown nor the sweep of §4 — is ONE
