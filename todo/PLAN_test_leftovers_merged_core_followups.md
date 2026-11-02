@@ -480,7 +480,7 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   - **Docs.** Rule §4's detail (one sentence: the reference lists only on Windows until F16), the README tool row (which also drops its
     stale "unmarked and old": the sweep never removes an unmarked folder, the Opus judge's note of the rollout re-review), and this entry.
   - **Release.** Rides the same promotion as the `raw-temp` baseline rule (P2 of the rollout); E2 and E5 pin that release before their
-    first producer merges.
+    first producer merges. After the promotion every consumer bumps its pin alone, as in R7, each a PR with its CI as the check, and a revert of the bump is the rollback; only E2 and E5 must bump before their first producer merge.
   - **Plan gate 2026-11-01** (coai session `ba9ad4f1`, `proceed`; findings 0, 1, 3, 4 accepted, 2 rejected):
     - [gate finding 0] What is left on Windows is safe to leave: every kind carries a unique name (owner token, pid, random hex), so no
       later run reuses or depends on it. Test: a new run beside listed leftovers of every kind creates, uses and removes its own
@@ -502,6 +502,7 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   Second RED (the Opus review, then the legacy case): each gate removed on its own, the pinned tests failed — the quarantine gate: quarantine and new run; the claim gate: claim and new
   run; the judge gate (`withheld` in `judge`): folder, worktree, run-tests and new run. The review's minor point added `F16 (legacy)` (a legacy-name folder and a legacy orphan claim, both
   with a gone owner, read as a win32 reader): it fails with the judge gate off and with the claim gate off, one at a time (legacy and new run fail on the claim gate, legacy on the judge gate too).
+  CodeRabbit's finding on PR #107 (accepted): on win32 a `foreign-uid` verdict is only the profile-path proxy (a shared TEMP outside the profile), so it is `unverified` too, never `foreign:`; `F16 (shared root, folder|claim|worktree)` — RED observed (the three failed on the foreign line), GREEN with the gate.
 
 ## F17 — The rename into quarantine can replace an existing empty directory (found 2026-10-31, the E3 and E4 ports)
 
