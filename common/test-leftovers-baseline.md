@@ -57,7 +57,7 @@ a raised count, a new or wider scope, a changed proof and any creation but the f
   any other value, or none, is a malformed file, whichever guard reads it. Use `node` for the Node guard's suites,
   `csharp` for the C# guard's. Scopes that overlap (one root a path-segment prefix of the other) must name the same guard,
   and a root is listed once; otherwise the file is malformed for every guard. A scope's files must not be read by another
-  guard's walk: the shipped Node guard reads every file under `scripts/`, `test/` and `tests/`, whatever its extension,
+  guard's walk: the shipped Node guard reads every file under `scripts/`, `test/` and `tests/`, whatever the file type,
   so a `csharp` scope with a root there is a `baseline` finding in the Node guard — put it at a root that guard does not
   read (for example `src/Tests/`).
 - `entries[].file` is repository-relative with forward slashes and starts with some scope's `root`; `sha256` is the
