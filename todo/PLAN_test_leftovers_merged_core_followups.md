@@ -633,6 +633,9 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   unchanged, 73 pass). RED again with the lib stashed to main (4 of 5 failed, the sweep and helper suites still 73 pass). Docs: the README tool row and the module header say the sweep takes the consumer's token. Not done: the release and
   the consumers' pin bumps (creds first, for E2.1). Not tested: the token reaching the worktree, orphan-claim and quarantine relations (they call the same `relationOf` with the same `context.token`; only folders and
   legacy names have a test).
+  [PR review, CodeRabbit] (accepted) The exported `checkToken` is documented to return the token but returned `undefined`, so `sweepLeftovers({ token: checkToken("creds") })` fell back to `conventions`. It now returns the
+  validated token (`ownedFor` and the sweep ignore the value). Tests `F22 f` (returns the token, still throws) and `F22 g` (the passed-through token removes the creds folder): RED first (2 failed), GREEN with the change,
+  RED again with `owned.mjs` back to the previous commit (2 failed, the other 5 pass).
 
 ## Definition of Done
 
