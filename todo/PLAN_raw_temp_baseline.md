@@ -577,6 +577,13 @@ unchanged code), then the code, then RED again with the code stashed and with ta
   - [x] [epoch-2 Opus 4] a duplicate root is malformed, one guard or two (test 33).
   - [x] [epoch-2 Opus 5] a root holds no `*/` or `-->` either; test 17 gains the root cases and the CRLF case (GREEN before; break-it: a
         split on LF only).
+- [x] The second gate round on the epoch-2 fixes (proceed, ledger 2.1) — three findings applied, test first:
+  - [x] [epoch-2 code2 0] the applier normalises BOTH the scanned file paths and each entry's file to forward slashes before keying and
+        before the ancestor lookup, and the discovered set too (test 40, through `createApplier` with backslash paths: platform-independent;
+        the scan's own file list reaches the applier as given and the applier normalises it; break-its: each of the three normalisations).
+  - [x] [epoch-2 code2 1] a root also refuses control characters (below U+0020, U+007F); `\s` already covers the Unicode spaces (test 17 adds
+        U+0001, U+007F, U+00A0, U+2003; the companion says "no whitespace, control character, `*/` or `-->`").
+  - [x] [epoch-2 code2 3] the walk finding names `src/Tests/` as an example root (test 34).
 - [ ] Every open CodeRabbit thread on #108 answered (the Definition of Done's epoch-2 line stays open until then; the code gate and
       the Opus review have passed).
 

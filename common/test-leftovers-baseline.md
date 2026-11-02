@@ -45,7 +45,7 @@ a raised count, a new or wider scope, a changed proof and any creation but the f
 ```
 
 - `class` is exactly `raw-temp`; anything else is a `baseline` finding, and no entry is applied.
-- `scopes[].root` is a repository-relative folder with a trailing `/`, in normal form (no `.` or empty segment); roots contain no whitespace, `*/` or `-->`, because a marker line could not carry one;
+- `scopes[].root` is a repository-relative folder with a trailing `/`, in normal form (no `.` or empty segment); roots contain no whitespace, control character, `*/` or `-->`, because a marker line could not carry one;
   `proof` is a test file under that root, never the baseline file, and a test file the guard discovered in this scan —
   a file that is present but not scanned is no proof. It carries a line with the marker
   `testsToDelete-baseline-proof: <root>`, then exactly the scope root, then only whitespace or a comment closer

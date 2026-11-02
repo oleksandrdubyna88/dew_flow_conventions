@@ -51,7 +51,7 @@ const isTestFile = (file) => /(?:\.(?:test|spec)|Tests?|[_-]test)\.[A-Za-z0-9]+$
 export function scopeProblem(scope, index) {
   if (scope === null || typeof scope !== "object") return `\`scopes[${index}]\` is not an object`;
   if (!isFolder(scope.root)) return `\`scopes[${index}].root\` must be a repository-relative folder with a trailing \`/\` and forward slashes`;
-  if (/\s/.test(scope.root) || scope.root.includes("*/") || scope.root.includes("-->")) return `\`scopes[${index}].root\` must contain no whitespace, \`*/\` or \`-->\` — the marker line that proves a root cannot carry one`;
+  if (/[\s\u0000-\u001f\u007f]/.test(scope.root) || scope.root.includes("*/") || scope.root.includes("-->")) return `\`scopes[${index}].root\` must contain no whitespace, control character, \`*/\` or \`-->\` — the marker line that proves a root cannot carry one`;
   if (!isRelative(scope.proof) || !scope.proof.startsWith(scope.root) || scope.proof.endsWith("/") || scope.proof === BASELINE_FILE) return `\`scopes[${index}].proof\` must be a file under its root \`${scope.root}\` (a test file the scan discovers)`;
   if (!GUARDS.includes(scope.guard)) return `\`scopes[${index}].guard\` must be exactly one of ${GUARDS.map((name) => `\`${name}\``).join(", ")} — the guard that judges the scope: \`node\` for the Node guard's suites, \`csharp\` for the C# guard's (found ${scope.guard === undefined ? "none" : JSON.stringify(scope.guard)}); the list is closed`;
   return undefined;
@@ -222,6 +222,8 @@ function proofFailure(repo, look, scope, discovered) {
   return text.split(/\r?\n/).some((line) => declaredRoot(line) === scope.root) ? undefined : generic;
 }
 
+/** A repository-relative path with forward slashes: a scan on Windows lists backslash paths, a baseline is written with `/`. */
+const slashed = (name) => name.replaceAll("\\", "/");
 const keyOf = (entry) => `${entry.file}\0${entry.sha256}`;
 
 /**
@@ -237,6 +239,7 @@ const keyOf = (entry) => `${entry.file}\0${entry.sha256}`;
  */
 export function createApplier(loaded, repo, label, discovered = new Set(), guard = GUARD_NAME, walks = () => false) {
   if (loaded.problem !== undefined) return { take: () => false, finalFindings: () => [finding(label, 1, loaded.problem)] };
+  const discoveredHere = new Set([...discovered].map(slashed));
   const looked = new Map(); // one look per path per run
   const look = (relative) => {
     if (!looked.has(relative)) looked.set(relative, lookAt(repo, relative));
@@ -250,8 +253,8 @@ export function createApplier(loaded, repo, label, discovered = new Set(), guard
     }
     return undefined;
   };
-  const mine = new Map(loaded.scopes.filter((scope) => scope.guard === guard).map((scope) => [scope.root, { ...scope, failure: proofFailure(repo, look, scope, discovered) }]));
-  const entries = loaded.entries.map((entry) => ({ ...entry, scope: scopeOf(entry.file), used: false }));
+  const mine = new Map(loaded.scopes.filter((scope) => scope.guard === guard).map((scope) => [scope.root, { ...scope, failure: proofFailure(repo, look, scope, discoveredHere) }]));
+  const entries = loaded.entries.map((entry) => ({ ...entry, file: slashed(entry.file) })).map((entry) => ({ ...entry, scope: scopeOf(entry.file), used: false }));
   const judged = entries.filter((entry) => mine.has(entry.scope?.root)).map((entry) => ({ ...entry, scope: mine.get(entry.scope.root) }));
   const available = new Map(); // key → { list: the entries that apply, in list order; next: how many were taken }
   for (const entry of judged) {
@@ -269,7 +272,7 @@ export function createApplier(loaded, repo, label, discovered = new Set(), guard
   const walked = loaded.scopes.filter((scope) => scope.guard !== guard && walks(scope.root));
   return {
     take(file, sha256) {
-      const slot = available.get(keyOf({ file, sha256 }));
+      const slot = available.get(keyOf({ file: slashed(file), sha256 }));
       const entry = slot?.list[slot.next];
       if (entry === undefined) return false;
       slot.next += 1;
@@ -277,7 +280,7 @@ export function createApplier(loaded, repo, label, discovered = new Set(), guard
       return true;
     },
     finalFindings: () => [
-      ...walked.map((scope) => finding(label, 1, `scope \`${scope.root}\`: a ${scope.guard} scope inside the ${guard} guard's walk: its files would be read by both guards — move the scope to a root the ${guard} guard does not read (a scope's files must not be read by another guard's walk)`)),
+      ...walked.map((scope) => finding(label, 1, `scope \`${scope.root}\`: a ${scope.guard} scope inside the ${guard} guard's walk: its files would be read by both guards — move the scope to a root the ${guard} guard does not read, for example \`src/Tests/\` (a scope's files must not be read by another guard's walk)`)),
       ...[...mine.values()].filter((scope) => scope.failure !== undefined).map((scope) => finding(label, 1, `scope \`${scope.root}\`: proof missing — ${scope.failure}; no entry under it applies`)),
       ...entries.filter((entry) => entry.scope === undefined).map((entry) => finding(entry.file, entry.line, "entry is outside every scope — it clears nothing; remove it")),
       ...judged.filter((entry) => entry.scope.failure === undefined && !entry.used).map((entry) => finding(entry.file, entry.line, staleText(entry))),
