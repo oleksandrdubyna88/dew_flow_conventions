@@ -93,6 +93,7 @@ test("F21 d. removeOwnEmptyPlaceholder calls io.rmdirSync only for our empty res
 });
 
 test("F21 e. a throwing io.renameSync reaches moveExclusively's failure path: thrown, and the placeholder removed through io", (t) => {
+  if (process.platform === "win32") return t.skip("the POSIX reservation path: on win32 moveExclusively renames directly (F21 i-k model that branch through the platform seam)");
   const dir = arena(t);
   const from = path.join(dir, "from");
   const to = path.join(dir, "to");
@@ -106,6 +107,7 @@ test("F21 e. a throwing io.renameSync reaches moveExclusively's failure path: th
 });
 
 test("F21 f. a taken name answers false through io and the hooks keep their place before the options", (t) => {
+  if (process.platform === "win32") return t.skip("the POSIX reservation path: on win32 moveExclusively renames directly (F21 i-k model that branch through the platform seam)");
   const dir = arena(t);
   const from = path.join(dir, "from");
   const to = path.join(dir, "to");
@@ -121,6 +123,7 @@ test("F21 f. a taken name answers false through io and the hooks keep their plac
 });
 
 test("F21 g. moveToQuarantine hands its io to the inner helpers (gate finding 0)", (t) => {
+  if (process.platform === "win32") return t.skip("the POSIX reservation path: on win32 moveExclusively renames directly (F21 i-k model that branch through the platform seam)");
   const dir = arena(t);
   const target = path.join(dir, "folder");
   fs.mkdirSync(target);
@@ -138,6 +141,7 @@ test("F21 g. moveToQuarantine hands its io to the inner helpers (gate finding 0)
 });
 
 test("F21 h. moveToQuarantine with every draw taken: the placeholders are removed through io, then it throws", (t) => {
+  if (process.platform === "win32") return t.skip("the POSIX reservation path: on win32 moveExclusively renames directly (F21 i-k model that branch through the platform seam)");
   const dir = arena(t);
   const target = path.join(dir, "folder");
   fs.mkdirSync(target);
