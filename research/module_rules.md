@@ -220,25 +220,25 @@ the baseline reach every rule; the original cells did not change then. Re-measur
 `common/test-leftovers-baseline.md` (9,151 B after the named-guard text and the gate's rules, conditional) is now selected for `implement` as well as `test`, `audit`,
 `policy`, `release` and `pr`, so the `implement` column carries it; every cell of the four single-read tasks is as it was.
 Re-measured 2026-11-03 for F24 (`todo/PLAN_test_leftovers_merged_core_followups.md`): the companion's proof clause names the process-wide gate and says ordering is
-no part of the proof, and the companion is 10,287 B (+1,136 B, after the review's three additions: the child-run tests live in the proof file, the `TEMP`/`TMP`/`TMPDIR` mismatch case, a Never bullet); only the cells of the `implement`, `test`, `audit`, `pr` and `policy` columns that select it moved (+1,136 B each), and every cell of the four single-read tasks is as it was.
+no part of the proof, and the companion is 10,365 B (+1,214 B, after the review's additions: the child-run tests live in the proof file, each of `TEMP`, `TMP` and `TMPDIR` mismatched on its own, a Never bullet); only the cells of the `implement`, `test`, `audit`, `pr` and `policy` columns that select it moved (+1,214 B each), and every cell of the four single-read tasks is as it was.
 
 | Files | inspect | ui | gpu | storage | implement | test | audit | logging | dependencies | pr | policy |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| (no file) | 24,207 | 26,420 | 27,680 | 29,406 | 307,209 | 299,777 | 238,640 | 74,253 | 160,356 | 182,013 | 271,538 |
-| `src/x.cs` | 28,820 | 31,033 | 32,293 | 34,019 | 311,822 | 304,390 | 243,253 | 78,866 | 164,969 | 186,626 | 276,151 |
-| `src/x.csproj` | 31,902 | 34,115 | 35,375 | 37,101 | 314,904 | 307,472 | 246,335 | 81,948 | 164,969 | 189,708 | 279,233 |
-| `Directory.Build.props` | 27,289 | 29,502 | 30,762 | 32,488 | 310,291 | 302,859 | 241,722 | 77,335 | 160,356 | 185,095 | 274,620 |
-| `ui/a.ts` | 30,090 | 32,303 | 33,563 | 35,289 | 313,092 | 305,660 | 244,523 | 80,136 | 166,239 | 187,896 | 277,421 |
-| `src/a.mjs` | 24,207 | 26,420 | 27,680 | 29,406 | 307,209 | 299,777 | 238,640 | 74,253 | 160,356 | 182,013 | 271,538 |
-| `src/x.cs` + `ui/a.ts` | 34,703 | 36,916 | 38,176 | 39,902 | 317,705 | 310,273 | 249,136 | 84,749 | 170,852 | 192,509 | 282,034 |
-| `package.json` | 35,409 | 37,622 | 38,882 | 40,608 | 318,411 | 299,777 | 249,842 | 85,455 | 171,558 | 193,215 | 282,740 |
-| `tsconfig.json` | 24,207 | 26,420 | 27,680 | 29,406 | 307,209 | 299,777 | 238,640 | 74,253 | 160,356 | 182,013 | 271,538 |
-| `.npmrc` | 24,207 | 26,420 | 27,680 | 29,406 | 307,209 | 299,777 | 238,640 | 74,253 | 160,356 | 182,013 | 271,538 |
-| `src/webview/page.ts` | 30,090 | 32,303 | 33,563 | 35,289 | 313,092 | 305,660 | 244,523 | 80,136 | 166,239 | 187,896 | 277,421 |
-| `src/main.rs` | 40,743 | 42,956 | 44,216 | 45,942 | 311,588 | 316,313 | 243,019 | 78,632 | 176,892 | 198,549 | 288,074 |
-| `App.sln` | 40,676 | 42,889 | 44,149 | 45,875 | 323,678 | 305,044 | 255,109 | 90,722 | 176,825 | 198,482 | 288,007 |
-| `api/a.http` | 60,125 | 62,338 | 63,598 | 65,324 | 307,209 | 310,996 | 238,640 | 110,171 | 196,274 | 217,931 | 282,757 |
-| `common/testing.md` | 33,846 | 36,059 | 37,319 | 39,045 | 316,848 | 309,416 | 248,279 | 83,892 | 169,995 | 191,652 | 271,538 |
+| (no file) | 24,207 | 26,420 | 27,680 | 29,406 | 307,287 | 299,855 | 238,718 | 74,253 | 160,356 | 182,091 | 271,616 |
+| `src/x.cs` | 28,820 | 31,033 | 32,293 | 34,019 | 311,900 | 304,468 | 243,331 | 78,866 | 164,969 | 186,704 | 276,229 |
+| `src/x.csproj` | 31,902 | 34,115 | 35,375 | 37,101 | 314,982 | 307,550 | 246,413 | 81,948 | 164,969 | 189,786 | 279,311 |
+| `Directory.Build.props` | 27,289 | 29,502 | 30,762 | 32,488 | 310,369 | 302,937 | 241,800 | 77,335 | 160,356 | 185,173 | 274,698 |
+| `ui/a.ts` | 30,090 | 32,303 | 33,563 | 35,289 | 313,170 | 305,738 | 244,601 | 80,136 | 166,239 | 187,974 | 277,499 |
+| `src/a.mjs` | 24,207 | 26,420 | 27,680 | 29,406 | 307,287 | 299,855 | 238,718 | 74,253 | 160,356 | 182,091 | 271,616 |
+| `src/x.cs` + `ui/a.ts` | 34,703 | 36,916 | 38,176 | 39,902 | 317,783 | 310,351 | 249,214 | 84,749 | 170,852 | 192,587 | 282,112 |
+| `package.json` | 35,409 | 37,622 | 38,882 | 40,608 | 318,489 | 299,855 | 249,920 | 85,455 | 171,558 | 193,293 | 282,818 |
+| `tsconfig.json` | 24,207 | 26,420 | 27,680 | 29,406 | 307,287 | 299,855 | 238,718 | 74,253 | 160,356 | 182,091 | 271,616 |
+| `.npmrc` | 24,207 | 26,420 | 27,680 | 29,406 | 307,287 | 299,855 | 238,718 | 74,253 | 160,356 | 182,091 | 271,616 |
+| `src/webview/page.ts` | 30,090 | 32,303 | 33,563 | 35,289 | 313,170 | 305,738 | 244,601 | 80,136 | 166,239 | 187,974 | 277,499 |
+| `src/main.rs` | 40,743 | 42,956 | 44,216 | 45,942 | 311,666 | 316,391 | 243,097 | 78,632 | 176,892 | 198,627 | 288,152 |
+| `App.sln` | 40,676 | 42,889 | 44,149 | 45,875 | 323,756 | 305,122 | 255,187 | 90,722 | 176,825 | 198,560 | 288,085 |
+| `api/a.http` | 60,125 | 62,338 | 63,598 | 65,324 | 307,287 | 311,074 | 238,718 | 110,171 | 196,274 | 218,009 | 282,835 |
+| `common/testing.md` | 33,846 | 36,059 | 37,319 | 39,045 | 316,926 | 309,494 | 248,357 | 83,892 | 169,995 | 191,730 | 271,616 |
 
 ## Byte allowances per epic
 

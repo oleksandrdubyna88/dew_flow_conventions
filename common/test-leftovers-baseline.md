@@ -57,7 +57,8 @@ a raised count, a new or wider scope, a changed proof and any creation but the f
   there: not the process-wide gate, not the folder, not any order. The second thing — a run that cannot make the folder
   fails before any test — is proven by the consumer's own child-run tests, which live IN this proof file, the one file
   the baseline names, so that removing them changes that file: a child run of the suite with a forced folder failure, a
-  forced claim failure and a forced `TEMP`/`TMP`/`TMPDIR` mismatch must each exit non-zero before discovery. The first
+  forced claim failure, and each of `TEMP`, `TMP` and `TMPDIR` mismatched on its own (a run where only that one variable
+  names another folder) must each exit non-zero before discovery. The first
   thing — the runner makes the folder before the first test — is proven by the marked test's `TEMP` assertion and by the
   reviewer of the baseline's creation, who says so in the pull request. A repository with no such gate does not satisfy
   the proof and may not carry a baseline. An entry belongs to the most specific scope that holds its file, whatever the order of the list.
