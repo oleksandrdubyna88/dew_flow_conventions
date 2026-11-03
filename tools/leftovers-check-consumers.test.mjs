@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 import { git } from "./lib/git.mjs";
 import { ownedDir } from "./lib/owned.mjs";
-import { CURES, EXCLUDED_FILES, isScanned, loadYaml, main, scanRepository, tokenConstants, YamlMissingError } from "./leftovers-check.mjs";
+import { CURES, EXCLUDED_FILES, isPackageManifest, isScanned, loadYaml, main, scanRepository, tokenConstants, YamlMissingError } from "./leftovers-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -334,7 +334,10 @@ test("F3 4. a package.json under node_modules/ and under the two mount paths is 
   const repo = tree(t, { ...BASE, "node_modules/dep/package.json": bad, ".agents/conventions/package.json": bad, ".claude/rules/shared/package.json": bad, "packages/x/node_modules/y/package.json": bad });
   const result = node(repo);
   assert.equal(result.code, 0, result.text);
-  for (const file of ["node_modules/dep/package.json", ".agents/conventions/package.json", ".claude/rules/shared/package.json"]) assert.equal(foundIn(repo, file).length, 0, file);
+  for (const file of ["node_modules/dep/package.json", ".agents/conventions/package.json", ".claude/rules/shared/package.json", "packages/x/node_modules/y/package.json"]) assert.equal(foundIn(repo, file).length, 0, file);
+  for (const file of ["node_modules/dep/package.json", ".agents/conventions/package.json", ".claude/rules/shared/package.json", "packages/x/node_modules/y/package.json"]) assert.equal(isPackageManifest(file, "node"), false, `${file} is not a manifest the profile reads`);
+  assert.equal(isPackageManifest("packages/x/package.json", "node"), true);
+  assert.equal(isPackageManifest("packages/x/package.json"), false, "without the profile none is read");
 });
 
 test("F3 5. a package.json that is not valid JSON is ONE finding that names the file; the scan does not crash and does not skip it", (t) => {
@@ -397,17 +400,83 @@ test("F3 10. a package.json with no scripts field is valid and has nothing to sc
   assert.equal(result.code, 0, result.text);
 });
 
-test("F3 11. the manifest has no inline exemption: a marker inside a script value exempts nothing", (t) => {
+test("F3 11. the manifest has no inline exemption: a marker inside a script value exempts nothing, on its own line above or on the same line", (t) => {
   const marker = "testsToDelete-exempt: raw-temp — a reason that is long enough";
-  const repo = tree(t, { ...BASE, "package.json": manifest({ posttest: `mktemp -d # ${marker}`, pretest: `${SWEEP}\n# ${marker}` }) });
+  const repo = tree(t, { ...BASE, "package.json": manifest({ above: `# ${marker}\nmktemp -d`, same: `mktemp -d # ${marker}`, pretest: SWEEP }) });
   const found = foundIn(repo, "package.json");
-  assert.deepEqual(found.map((entry) => entry.cls).sort(), ["owner-blind", "raw-temp"], JSON.stringify(found));
+  assert.deepEqual(found.map((entry) => `${entry.cls}:${entry.line}`).sort(), ["owner-blind:7", "raw-temp:5", "raw-temp:6"], JSON.stringify(found));
 });
 
 test("F3 12. the header and the README say what the profile reads of a package.json and that it has no exemption", () => {
-  const header = read("tools", "leftovers-check.mjs").slice(0, 9000);
+  const header = read("tools", "leftovers-check.mjs").slice(0, 9500);
   assert.match(header, /package\.json/);
   assert.match(header, /`scripts`/);
   assert.match(header, /no (?:inline )?exemption/i);
+  assert.match(header, /always the line of the script's KEY/, "a finding's line is the key's line, also for a value with line breaks");
   assert.match(read("README.md"), /`scripts` values of every `package\.json`/);
+});
+
+// F3 review fixes -------------------------------------------------------------------------------------------------------------------
+
+test("F3 13. [Opus 1] a clean package.json does not hide `scanned nothing`: tests the profile does not find plus a manifest is still exit 2", (t) => {
+  const repo = tree(t, { "__tests__/a.ts": "const a = 1;\n", "package.json": manifest({ test: "jest" }) });
+  const result = node(repo);
+  assert.equal(result.code, 2, result.text);
+  assert.match(result.text, /scanned nothing/);
+  assert.equal(node(tree(t, { "__tests__/a.ts": "const a = 1;\n", "package.json": manifest({}), "b/package.json": "{}" })).code, 2, "manifests with no scripts count for nothing either");
+  assert.equal(node(tree(t, { "__tests__/a.ts": "const a = 1;\n", "package.json": manifest({ pretest: SWEEP }) })).code, 1, "a manifest that yields a finding is a finding, not 'scanned nothing'");
+  assert.equal(node(tree(t, { "package.json": "not json" })).code, 1, "an unreadable manifest alone stays exit 1");
+});
+
+test("F3 14. [Opus 2] --print-baseline lists no manifest site: no baseline can carry one", (t) => {
+  const repo = tree(t, { "src/a.test.ts": "const d = mkdtempSync(join(tmpdir(), 'x'));\n", "package.json": manifest({ posttest: "mktemp -d" }) });
+  const result = node(repo, ["--print-baseline"]);
+  assert.equal(result.code, 0, result.text);
+  const listed = JSON.parse(result.text);
+  assert.deepEqual(listed.entries.map((entry) => entry.file), ["src/a.test.ts"], "the test file's site is listed, the manifest's is not");
+});
+
+test("F3 15. [Opus 3] the `unreadable` cure points at a place that exists", () => {
+  assert.doesNotMatch(CURES.unreadable, /§7/, "the rule has no section for the node profile");
+  assert.match(CURES.unreadable, /leftovers-check\.mjs/);
+  assert.match(read("tools", "leftovers-check.mjs").slice(0, 9500), /`unreadable`/, "and the header it names does say what the class is");
+});
+
+test("F3 16. [code1 0] the BOM is written as an escape, not as an invisible character", () => {
+  assert.doesNotMatch(read("tools", "lib", "leftovers-package.mjs"), /\uFEFF/, "no U+FEFF character in the source: the regex says \\uFEFF");
+});
+
+test("F3 17. [Opus 4] the key walker: CRLF, a BOM, escaped quotes, and a nested `config.scripts` before the top-level one", (t) => {
+  const crlf = ["{", '  "name": "x",', '  "scripts": {', '    "a": "echo ok",', `    "pretest": ${JSON.stringify(SWEEP)}`, "  }", "}", ""].join("\r\n");
+  assert.equal(foundIn(tree(t, { ...BASE, "package.json": crlf }), "package.json")[0].line, 5, "CRLF");
+  assert.equal(foundIn(tree(t, { ...BASE, "package.json": `\uFEFF${crlf}` }), "package.json")[0].line, 5, "a BOM in front");
+  const escaped = ["{", '  "name": "a \\"scripts\\": {",', '  "scripts": {', '    "x\\"y": "echo ok",', `    "pre\\"test": ${JSON.stringify(SWEEP)},`, '    "q": "echo \\"pretest\\": 1"', "  }", "}", ""].join("\n");
+  const found = foundIn(tree(t, { ...BASE, "package.json": escaped }), "package.json");
+  assert.deepEqual(found.map((entry) => entry.line), [5], "escaped quotes in a value and in a key do not end the string early");
+  const nested = ["{", '  "config": {', '    "scripts": {', '      "pretest": "x"', "    }", "  },", '  "scripts": {', `    "pretest": ${JSON.stringify(SWEEP)}`, "  }", "}", ""].join("\n");
+  assert.equal(foundIn(tree(t, { ...BASE, "package.json": nested }), "package.json")[0].line, 8, "the top-level scripts, not the nested one");
+  const flat = `{"config":{"scripts":{"pretest":"x"}},"scripts":{"pretest":${JSON.stringify(SWEEP)}}}`;
+  assert.equal(foundIn(tree(t, { ...BASE, "package.json": flat }), "package.json")[0].line, 1);
+});
+
+test("F3 18. [code1 7] a manifest that cannot be read after discovery is ONE unreadable finding and the scan goes on", (t) => {
+  const repo = tree(t, { ...BASE, "good/package.json": manifest({ pretest: SWEEP }) });
+  fs.symlinkSync(".", path.join(repo, "package.json"), "dir"); // listed as a file by git, read as a directory
+  const found = scanRepository({ repo, profile: "node", rule: path.join(root, "common", "test-leftovers-detail.md") }).findings;
+  assert.deepEqual(found.filter((entry) => entry.file === "package.json").map((entry) => entry.cls), ["unreadable"]);
+  assert.deepEqual(found.filter((entry) => entry.file === "good/package.json").map((entry) => entry.cls), ["owner-blind"], "the next manifest is still scanned");
+});
+
+test("F3 19. [code1 8] a control character in a script name is escaped in the finding text", (t) => {
+  const scripts = { "pre\ntest": SWEEP, "x\u001b[31my": "mktemp -d" };
+  const repo = tree(t, { ...BASE, "package.json": manifest(scripts) });
+  const found = foundIn(repo, "package.json");
+  assert.equal(found.length, 2);
+  for (const entry of found) assert.doesNotMatch(entry.text, /[\u0000-\u001f\u007f]/, JSON.stringify(entry.text));
+  assert.match(found.map((entry) => entry.text).join("\n"), /script `pre\\u000atest`/);
+  assert.match(found.map((entry) => entry.text).join("\n"), /script `x\\u001b\[31my`/);
+  const text = node(repo).text;
+  assert.doesNotMatch(text.replaceAll("\n", ""), /\u001b/, "no raw ESC on the terminal");
+  const bad = foundIn(tree(t, { ...BASE, "package.json": '{ "scripts": {\n"a\u001b": }' }), "package.json");
+  assert.doesNotMatch(bad[0].text, /[\u0000-\u001f\u007f]/, "the reason of an unreadable manifest is escaped too");
 });
