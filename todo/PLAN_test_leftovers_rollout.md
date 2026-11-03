@@ -1,6 +1,12 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 3 open (2026-11-03), approved by the owner after the re-review.** Epoch 2 stopped at its second change
+> Status: **stopped for re-review (2026-11-03)** — epoch 3's second change after approval (entries 3.1 and 3.2, found
+> writing E5's S3 brief). No new code on any epic of this plan and no merge of a pull request carrying its work until
+> the full re-review is complete; when its record says `Narrowed: yes`, the owner has approved the revised plan; and
+> epoch 4 is opened with `state: open`. At the stop: F3 merged (#116, unreleased); E5's producer branch has no code
+> (only S3's brief, in the session's scratchpad); creds E2.1 is draft #294 (waits for P1 anyway).
+>
+> Was: **epoch 3 open (2026-11-03), approved by the owner after the re-review.** Epoch 2 stopped at its second change
 > (entry 2.2, 2026-11-03); the whole plan was revised (§ *Epoch 3*), the Opus judge sorted the done work, the plan gate
 > (session `4a07e86f`) and the interim document gate passed, and because the record says `Narrowed: yes` the owner
 > approved it, with § Epoch 3 item 7's questions 1, 3 and 4 answered as recommended.
@@ -158,7 +164,22 @@ Narrowed: yes — nothing of E5.S5 must land before E5's producer PR any more (S
   S5 therefore moved into the producer PR. The judge's rows stand as written: the local S5 work is the input of that
   commit.)
 
-> Epoch 3 · approved 2026-11-03 · by owner · state: open
+> Epoch 3 · approved 2026-11-03 · by owner · state: stopped
+
+- 3.1 · 2026-11-03 · agent · approach — E5's C# library cannot be a byte-identical copy of dew_flow_mcp's template (D2): the template hard-codes mcp's layout, mount path and identity
+  (found writing S3's build brief on coai branch feat/test-leftovers-e5-producer, verified by a scratchpad build of the
+  copy. dew_flow_mcp's `tests/Mcp.Tests/Leftovers/` at 197cc76 (51 files, not 54) hard-codes `.claude/rules/shared`
+  (`LeftoversGuardScripts.cs:20`), its helper paths (`LeftoversGuard.cs:47-48`, `:60-66`) and an mcp type
+  (`RepositoryIdentity.Row`); coai mounts the rules at `.agents/conventions` and cannot use `.claude/rules`. S3 needs
+  edits in four copied files and S6 in about eight guard files, and two needed files sit outside the folder. One cause:
+  the template is mcp-shaped. Question consultants be608fd9, both answers.)
+- 3.2 · 2026-11-03 · agent · dod — E5's DoD asks for all four C# suites green on three legs with the same counts, and coai's CI does not run them so
+  (the same brief: coai's CI runs the bugs suite on Linux only, and the server and bench suites are not on the Windows
+  job (`.github/workflows/ci.yml`). Either the DoD changes or CI gains legs. Independent of 3.1 (consultants be608fd9,
+  both answers: a second cause). It is the second change of epoch 3: the plan stops for re-review. Also found and
+  NOT counted as changes (fixes that satisfy the plan as written, or already-approved constraints): the brief's items
+  1, 3, 5-7, 10, 11, 13, 14 and 12 (P1). Item 8, the released baseline rule's "a test ordered first"
+  (`common/test-leftovers-baseline.md`) against parallel collections, is reported for a conventions follow-up.)
 
 ## Symptom
 
