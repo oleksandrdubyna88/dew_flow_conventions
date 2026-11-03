@@ -496,10 +496,37 @@ test("F3 20. [code2 0/2] a dangling symlink named package.json is ONE unreadable
 });
 
 test("F3 21. [code2 3] a bidi control character in a script name is escaped (Trojan Source)", (t) => {
-  const marks = ["‎", "‏", "‪", "‫", "‬", "‭", "‮", "⁦", "⁧", "⁨", "⁩"];
+  const marks = ["\u200e", "\u200f", "\u202a", "\u202b", "\u202c", "\u202d", "\u202e", "\u2066", "\u2067", "\u2068", "\u2069"];
   const scripts = Object.fromEntries(marks.map((mark, index) => [`a${mark}b${index}`, SWEEP]));
   const found = foundIn(tree(t, { ...BASE, "package.json": manifest(scripts) }), "package.json");
   assert.equal(found.length, marks.length);
-  for (const entry of found) assert.doesNotMatch(entry.text, /[‎‏‪-‮⁦-⁩]/, JSON.stringify(entry.text));
+  for (const entry of found) assert.doesNotMatch(entry.text, /[\u200e\u200f\u202a-\u202e\u2066-\u2069]/, JSON.stringify(entry.text));
   assert.match(found.map((entry) => entry.text).join("\n"), /script `a\\u202eb6`/);
+});
+
+test("F3 22. [PR 1] a manifest whose lstat fails with anything but ENOENT is present: ONE unreadable finding, not a skip", (t) => {
+  if (typeof process.getuid === "function" && process.getuid() === 0) return t.skip("root can read a folder with mode 000");
+  const repo = tree(t, { ...BASE, "locked/package.json": manifest({ pretest: SWEEP }) });
+  git(repo, "add", ".");
+  const locked = path.join(repo, "locked");
+  fs.chmodSync(locked, 0o000); // lstat of the child: EACCES
+  t.after(() => fs.chmodSync(locked, 0o755));
+  const found = scanRepository({ repo, profile: "node", rule: path.join(root, "common", "test-leftovers-detail.md") }).findings.filter((entry) => entry.file === "locked/package.json");
+  assert.deepEqual(found.map((entry) => entry.cls), ["unreadable"]);
+  assert.match(found[0].text, /EACCES/);
+});
+
+test("F3 23. [PR 2] a control character in a script VALUE does not reach the finding text", (t) => {
+  const repo = tree(t, { ...BASE, "package.json": manifest({ up: "COMPOSE_PROJECT_NAME=bad\u001b[2J\u202e docker compose up", other: "docker run --rm --name bad\u001b[2Jx img" }) });
+  const found = foundIn(repo, "package.json");
+  assert.ok(found.length >= 2, JSON.stringify(found));
+  for (const entry of found) assert.doesNotMatch(entry.text, /[\u0000-\u001f\u007f-\u009f\u202e]/, JSON.stringify(entry.text));
+  assert.match(found.map((entry) => entry.text).join("\n"), /\\u001b/, "the ESC is shown as an escape");
+});
+
+test("F3 24. [PR 3] no source of F3 holds a raw invisible or bidi character: each is written as an escape", () => {
+  const invisible = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff]/;
+  for (const file of [["tools", "leftovers-check-consumers.test.mjs"], ["tools", "leftovers-check.mjs"], ["tools", "lib", "leftovers-package.mjs"], ["tools", "lib", "raw-temp-baseline.mjs"]]) {
+    assert.doesNotMatch(read(...file), invisible, `${file.join("/")} holds a raw invisible character`);
+  }
 });
