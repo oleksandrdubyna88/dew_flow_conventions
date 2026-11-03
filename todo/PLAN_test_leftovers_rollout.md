@@ -190,7 +190,7 @@ Narrowed: yes — nothing of E5.S5 must land before E5's producer PR any more (S
 
 ### Re-review for epoch 4
 
-Narrowed: yes — E5's Definition of Done no longer asks for all four C# suites green on three CI legs with the same test counts: it names the suite × OS matrix coai's CI actually runs (the ingest suite on Linux only, the server and bench suites not on Windows), keeps only the ownership and startup proofs on all three OSes, and replaces "the same counts" with a named reconciliation of additions, removals and platform skips; the C# copy rule is not smaller (an adapted copy with a pinned manifest, permitted transformations and a diff check, in place of a byte-identical copy that cannot be built), and the prerequisites got wider (F24, the baseline proof rule, released and pinned before E5's S6 creates its baseline)
+Narrowed: yes — E5's Definition of Done no longer asks for all four C# suites green on three CI legs with the same test counts: it names the suite × OS matrix coai's CI actually runs (the ingest suite on Linux only, bench not on Windows), keeps the SHARED run-folder library's ownership and startup proofs on all three OSes and each suite's own proofs only on the OSes its CI step runs it on (the ingest suite's on Linux only, bench's on Linux and macOS), and replaces "the same counts" with a named reconciliation of additions, removals and platform skips; the C# copy rule is not smaller (an adapted copy with a pinned manifest, permitted transformations and a diff check, in place of a byte-identical copy that cannot be built), and the prerequisites got wider (F24, the baseline proof rule, released and pinned before E5's S6 creates its baseline)
 
 | Work | Where | Verdict | Action |
 |---|---|---|---|
@@ -204,6 +204,9 @@ Narrowed: yes — E5's Definition of Done no longer asks for all four C# suites 
   byte-identical, and 3.2, the DoD's three legs and same counts. Re-review consult `8d309111`; the question consultants
   `be608fd9` before it. A separate Opus judge sorts the work done since epoch 3 opened into the table, step 5 of the
   full stop. The epoch 4 line is written only when the owner approves.)
+  (Revised 2026-11-03 after the re-review plan gate, session `7c66b50d`, finding r3: the first text of the line above said
+  every suite's proofs run on all three OSes; the ingest suite cannot run off Linux. The line now says which proofs run
+  where; § *Epoch 4*, item 3 (f) names each CI step.)
 
 ## Symptom
 
@@ -876,6 +879,10 @@ plan's.
    changes so that a PROCESS-WIDE gate that enforces containment before discovery — E5's gated custom `Main`: exit 78,
    one line — satisfies "a run that cannot make it fails before any test". The marked assertion test stays; it no longer
    needs to be "ordered first". F24 is released and coai's pin carries it BEFORE E5's S6 creates its baseline.
+   *After the re-review plan gate (2026-11-03, session `7c66b50d`; all findings accepted)*, finding r2: **F24's completion evidence** is an acceptance check against the RELEASED guard and the REAL
+   E5 test host, run before S6 creates the baseline: a run under the gate passes the released guard's proof check; and a
+   forced folder failure and a forced claim failure each exit 78 before discovery, with the brief's `MemberData`
+   sentinel untouched. The check's output is recorded on the PR that creates the baseline.
 4. P2, P3 (the interim) and F22: done, as § *Epoch 3*, item 2. P2's proof clause is changed by F24.
 5. The coai feature review at the end, unchanged.
 
@@ -897,6 +904,28 @@ plan's.
 as in § *Epoch 3*; S6's repository-wide checks are green; (k) and (l) hold; the matrix of (f) is green; and every other
 condition — P1, the release, the gates, decision 6's shape — is still met. The E5 stories document, D8, carries the same.
 
+*After the re-review plan gate (2026-11-03, session `7c66b50d`; all findings accepted)*, findings r0 and r3. **(f) is replaced by named merge gates.** The run-folder LIBRARY is shared code, so its
+ownership and startup proofs (the owner-form run folder, claim first, fail closed with exit 78, the refusal) run on all
+three OSes through the suites that run there. Each suite's OWN wiring (its `RunTempStart.cs`, `TestEntryPoint.cs` and
+`RunFolderTests`) is proven on the OSes where a CI step runs that suite. Every cell with a step is a merge gate: the step
+is green on the PR's head (coai `ci.yml` line numbers at `004c55f`; S3 adds the steps marked NEW):
+
+| What is proven | Linux | macOS | Windows |
+|---|---|---|---|
+| the library (via `CoaiMcp.Tests`) and the mcp suite's wiring | job `build-test`, step `Test` (`ci.yml:58`) | job `macos`: NEW steps `The stat layout self-test` and `Leftovers` (the template's order), then `Test` (`:282`) | job `windows`: NEW `Step 0` first, then `Test` (`:317`) |
+| the server suite's wiring | `build-test`, `:77` | `macos`, `:285` | NEW filtered step in job `windows` after `Test`: `CoaiServer.Tests.exe --filter-class "*RunFolderTests"` (the job's `Build` step builds the whole solution, `:313-314`) |
+| the bench suite's wiring | `build-test`, `:64` | `macos`, `:288` | — bench never runs on Windows |
+| the bugs (ingest) suite's wiring | `build-test`, `:88` | — | — the suite runs on Linux only (`:258-259`; release time too) |
+
+The server suite also runs at release time on Windows (x64, arm64) and macOS arm64 (`release.yml` job `server-binaries`,
+`:619`, its test line `:694`; osx-x64 is cross-built and not tested there). That is release evidence, NOT a merge gate.
+"The same counts" stays a named reconciliation.
+
+**(m) NEW (finding r1).** E5's producer PR has a written ROLLBACK procedure (E5's D11), and this plan points to it:
+first switch off the destructive start-of-run sweep (S2-B) with a one-line, reviewed change, keeping owner-form creation
+and teardown; then list the resources already created (`janitor.sh --token coai --dry-run`); then revert or repair. A
+plain revert of the squash merge would bring back the old producers while owner-form folders already exist.
+
 ### 4. The adapted copy (3.1) and the suite × OS matrix (3.2)
 
 **The adapted copy.** A C# consumer copies `dew_flow_mcp · tests/Mcp.Tests/Leftovers/` at `197cc76` as an ADAPTED copy:
@@ -908,6 +937,15 @@ condition — P1, the release, the gates, decision 6's shape — is still met. T
   and the edits the consumer's stories list for each story (for E5: S3's and S6's);
 - a **diff check** (a test or a script) that rejects any change against the template that the manifest does not explain;
 - the **ownership, liveness and deletion algorithms unchanged**, unless a change is separately reviewed.
+
+*After the re-review plan gate (2026-11-03, session `7c66b50d`; all findings accepted)*, finding r5: **the diff check's golden source is inside coai and needs no network.** It is a committed
+manifest of the template at `197cc76` that holds, per file, the upstream path, the upstream git blob SHA and the
+expected list of transformations; the check reads the copy, undoes the listed transformations, and compares the
+result's blob SHA with the manifest's. No vendored copy of the upstream files is kept (the blob SHA identifies the
+upstream bytes; a reviewer fetches them from dew_flow_mcp when the check is red). Finding r4: **defence in depth**
+for the gate: besides the gated `Main`, a fallback check at the first point any test can reach (the assembly fixture)
+fails the run with the same one line when the gate did not run (a host that bypassed `Main`); the module initializer
+still makes the folder, and the fallback refuses when `RunTemp.IsActive` is false. Both are written in E5's S3.
 
 E5's D2 is the first such copy. E2, E6 and E7 follow the same form. Making the template itself parameterised (upstream,
 in dew_flow_mcp) is NOT done now; it is a possible later follow-up if the same adaptations recur.
@@ -968,6 +1006,17 @@ S3, S2-B, S4 and S5 do not wait for F24; only S6 does, because S6 creates the ba
 
 Nothing was rejected.
 
+**The re-review plan gate on this revision (2026-11-03, session `7c66b50d`).** Every finding was accepted:
+
+| Finding | Verified | Taken |
+|---|---|---|
+| r0 — name the exact CI step or job, per suite and per OS, that carries the proofs, and make each a merge gate | yes — coai `ci.yml` at `004c55f` | item 3 (f), the gate table |
+| r1 — a rollback procedure for the squash-merged producer PR: switch off the S2-B sweep first, keep creation and teardown, list what exists, then revert or repair | yes — a revert of a squash merge brings back the old producers while owner-form folders exist | item 3 (m); E5's D11 |
+| r2 — F24's completion evidence: an acceptance check against the RELEASED guard and the REAL E5 host | yes — the guard's proof check and the gate are in two repositories; only a run of both proves them together | item 2; E5's D8 |
+| r3 (blocking) — the bugs suite cannot run off Linux, so "every suite on all three OSes" is wrong | yes — `ci.yml:258-259`; `release.yml` `bugs-binaries` runs on linux-x64 and linux-arm64 only | item 3 (f): the library on three OSes, each suite where it runs; the `Narrowed` line |
+| r4 — a fallback check if the gate did not run | yes — a host could load the assembly without the project's `Main` | item 4; E5's S3 |
+| r5 — the diff check's golden source inside coai, with no network | yes — the template lives in another repository | item 4: a committed manifest with upstream path, blob SHA and transformation list |
+
 ### 7. Questions for the owner (blocking; each with the recommended answer)
 
 1. **Approve epoch 4 as narrowed?** The record says `Narrowed: yes`: E5's DoD names the suites CI actually runs on each
@@ -975,10 +1024,15 @@ Nothing was rejected.
    ran the ingest suite off Linux (it ships for Linux only) or bench on Windows, and the server suite reaches Windows only
    in the release workflow; the proofs that
    matter for this plan (ownership, fail closed, refusal) stay on all three OSes.
+   *After the re-review plan gate (2026-11-03, finding r3):* the proofs on all three OSes are the shared library's
+   (through the mcp suite) and the server suite's wiring (a filtered Windows step); bench's wiring is proven on Linux and
+   macOS, the ingest suite's on Linux only. *Recommended:* still yes.
 2. **P1, the Windows barrier record** — unchanged, still open.
 3. **A Windows check of the server and bench suites — later, or not at all?** It may widen the matrix. The server suite
    already passes on Windows in `release.yml`, so moving it into pull-request CI is cheap; bench is unmeasured there.
    *Recommended:* not now; ask again after E5's producer PR, with the measured cost of the step.
+   *After the re-review plan gate (2026-11-03, finding r0):* the server suite's run-folder tests now run on Windows in
+   pull-request CI as a filtered step (item 3 (f)); this question is about the server's WHOLE suite and about bench.
 4. **One release for F3 and F24?** *Recommended:* yes — both are guard and rule changes the first Node compliance PRs
    need; one release costs each consumer one pin bump. The over-cap bumps are asked when the release comes (as for
    epoch 3).
