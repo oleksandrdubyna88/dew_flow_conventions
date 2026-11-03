@@ -5,6 +5,9 @@
 > the full re-review is complete; when its record says `Narrowed: yes`, the owner has approved the revised plan; and
 > epoch 4 is opened with `state: open`. At the stop: F3 merged (#116, unreleased); E5's producer branch has no code
 > (only S3's brief, in the session's scratchpad); creds E2.1 is draft #294 (waits for P1 anyway).
+> The whole plan is revised for epoch 4 (2026-11-03, step 4 of the full stop): § *Epoch 4 — the plan as revised at the
+> re-review*, and the E5 stories document revised with it. The re-review record says `Narrowed: yes`; its table is the
+> Opus judge's; epoch 4 opens only with the owner's approval.
 >
 > Was: **epoch 3 open (2026-11-03), approved by the owner after the re-review.** Epoch 2 stopped at its second change
 > (entry 2.2, 2026-11-03); the whole plan was revised (§ *Epoch 3*), the Opus judge sorted the done work, the plan gate
@@ -185,6 +188,23 @@ Narrowed: yes — nothing of E5.S5 must land before E5's producer PR any more (S
   1, 3, 5-7, 10, 11, 13, 14 and 12 (P1). Item 8, the released baseline rule's "a test ordered first"
   (`common/test-leftovers-baseline.md`) against parallel collections, is reported for a conventions follow-up.)
 
+### Re-review for epoch 4
+
+Narrowed: yes — E5's Definition of Done no longer asks for all four C# suites green on three CI legs with the same test counts: it names the suite × OS matrix coai's CI actually runs (the ingest suite on Linux only, the server and bench suites not on Windows), keeps only the ownership and startup proofs on all three OSes, and replaces "the same counts" with a named reconciliation of additions, removals and platform skips; the C# copy rule is not smaller (an adapted copy with a pinned manifest, permitted transformations and a diff check, in place of a byte-identical copy that cannot be built), and the prerequisites got wider (F24, the baseline proof rule, released and pinned before E5's S6 creates its baseline)
+
+| Work | Where | Verdict | Action |
+|---|---|---|---|
+| the epoch-3 record — the re-review after entry 2.2, the judge's table, approved by the owner, conventions #115 `be7eb092` (merged 2026-11-03 10:45Z; epoch 3 opens here) | main, unreleased | fits | kept — a record; the § *Epoch 3* text that entries 3.1 and 3.2 overtake (a byte-identical C# copy, "three legs, the same counts") is rewritten by this stop's own revision of the whole plan (step 4), not by a separate PR |
+| E5 stories revised at the epoch-3 re-review — S5 is commit 4 of the producer PR, coai #942 `004c55fb` (branch `docs/e5-rereview-epoch3` at `d419703e`) | main of dew_flow_connect_other_ais | cut | corrected in a NEW coai PR on `todo/PLAN_test_leftovers_E5.md` (the rest is kept, and the epoch-3 cut of #850 is done by it): the merged text still says the C# library is a byte-identical copy (`:70`, `:264`, `:353`, `:364`, `:416`, `:580`, DoD `:1208`, Q `:1276-1277`), the DoD asks for "all four suites green on the three legs with the same test counts" (`:836`, `:982`, `:1123`), sc. 2 proves the run folder by "one test, ordered first in that assembly" (`:812`), and the fail-closed mechanism is open "for example … a startup hook or assembly fixture" (`:857-869`) — against entries 3.1, 3.2, the baseline-rule fix and S3's gated custom `Main` |
+| F3 — the guard's `node` profile reads `package.json` scripts, fail closed, conventions #116 `605e3e6e` (branch head `8fcf9f01`) | main, unreleased (`release` is still `cc24f9e`) | fits | kept — it adds manifest scanning (`tools/lib/leftovers-package.mjs`, `scanManifests` in `tools/leftovers-check.mjs`) and keeps manifest findings out of the baseline (`printBaseline`, 2 lines of `tools/lib/raw-temp-baseline.mjs`); the baseline-rule fix changes what proves a scope (rule text in `common/test-leftovers-baseline.md` "a test … ordered first", and `proofFailure`/`isTestFile` in `raw-temp-baseline.mjs`), which F3 does not touch, so the two overlap in files, not in behaviour — build the fix on `605e3e6` and release both together, so coai pins once before S6 and before the first Node compliance declaration |
+| coai `feat/test-leftovers-e5-producer` (worktree `coai-e5-producer`) — no commits over `004c55fb`, clean, never pushed; only a plan-gate session | local | fits | nothing to keep or drop; no code may start on it until epoch 4 is approved and the E5 correction above is merged (the S3 brief in the scratchpad is not repository work and is not a row, but it must be rewritten to the revision before use: an adapted copy with its diff to the template named, the suite × OS matrix, the gated custom `Main`, the process-wide gate) |
+| creds E2.1, draft #294 at `7571243d` (last commit 2026-11-03 09:14Z, last update 09:31Z) | pushed, unmerged (draft PR) | fits | unchanged in epoch 3; kept as a draft — none of entries 3.1, 3.2, the baseline fix or the custom `Main` touches E2 (Node, owner form per site); no merge until epoch 4 is approved, P1 and its by-hand records |
+| the stop record — entries 3.1 and 3.2, `state: stopped`, `c7f1ccb2` (branch `docs/rollout-stop-epoch3`, conventions PR #117) | pushed, unmerged (open PR) | fits | kept — merges before or with epoch 4's line; the re-review builds on it |
+  (Written 2026-11-03 with the revision of § *Epoch 4*, over both entries of epoch 3: 3.1, the copy that cannot be
+  byte-identical, and 3.2, the DoD's three legs and same counts. Re-review consult `8d309111`; the question consultants
+  `be608fd9` before it. A separate Opus judge sorts the work done since epoch 3 opened into the table, step 5 of the
+  full stop. The epoch 4 line is written only when the owner approves.)
+
 ## Symptom
 
 The owner, 2026-10-14: containers started by tests stay up for weeks and hold memory, CPU, ports and disk;
@@ -310,6 +330,9 @@ find nothing of the caller's scope with a `gone` record.
       (§ Epoch 3, item 4).
 - [ ] **Added 2026-11-03 (epoch 3):** F3 (the `node` profile reads `package.json` scripts) is released and pinned before
       the family's first compliance declaration under the shipped Node guard (E2.5 or E5's producer PR, whichever first).
+- [ ] **Added 2026-11-03 (epoch 4):** F24 (the baseline proof rule accepts a process-wide gate before discovery) is
+      released and pinned by coai before E5's S6 creates its baseline; every C# copy of the template is an adapted copy
+      with a pinned manifest and a green diff check (§ Epoch 4, items 2 and 4).
 - [ ] Every producer stage merged under decision 6's shape; every pin bump merged alone; the one-time hand clean-up of
       old names recorded per machine on the PR of the epic whose names they are.
 - [ ] The coai feature review (`mcp__coai__review_feature`, a plan of seven epics) ran once after the last epic, from a
@@ -544,6 +567,10 @@ plan's.
 4's own rule no S5 site is contained today, so **S5 has no stage-A part any more**: its renames become a commit of E5's
 producer PR, after S3, S2-B and S4. The items below carry a dated note where this changes them; the first text stays
 as the record of the revision.
+
+*Superseded in part 2026-11-03 by § Epoch 4* (entries 3.1 and 3.2): the C# copy is an ADAPTED copy, not byte-identical;
+E5's DoD names a suite × OS matrix; F24 (the baseline proof rule) is a new prerequisite of E5's S6. The rest of this
+section stands as the baseline that epoch 4 revises.
 
 ### 1. What this plan is now
 
@@ -792,6 +819,170 @@ new check); 4 — yes, F3 first. Not approved by that answer: the over-cap pin b
 The consultants added, for S3 and S4: "fail closed" covers a failed CLAIM write too, not only a failed folder (the
 reference's `ownedDir` writes the claim exclusively first and throws when it cannot). Question 2 (P1) stays open.
 
+## Epoch 4 — the plan as revised at the re-review (2026-11-03)
+
+The whole plan read again against what is known now, as step 4 of the full stop asks (`common/plan-change-control.md`),
+over both entries of epoch 3. Both were found writing E5's S3 build brief (2026-11-03): 3.1, the C# copy cannot be
+byte-identical to dew_flow_mcp's template; 3.2, the DoD asks for all four C# suites green on three legs with the same
+counts, and coai's CI does not run them so. Both are settled by the re-review consult `8d309111` (after the question
+consultants `be608fd9`), and each point was checked against the files. This section is the baseline epoch 4 is approved
+on. § *Epoch 3* stays as the record; where this section supersedes it, a dated note there points here. The E5 stories
+document (`dew_flow_connect_other_ais · todo/PLAN_test_leftovers_E5.md`) is revised the same day; its changes are this
+plan's.
+
+### 1. What this plan is now
+
+§ *Epoch 3*'s picture stands, with these facts brought up to date:
+
+- **Epoch 3 was approved by the owner** (2026-11-03, #115, `be7eb09`), and the E5 stories document was revised for it
+  (coai #942, `004c55fb`).
+- **F3 is merged, not released**: the guard's `node` profile reads `package.json` scripts and fails closed (#116,
+  `605e3e6`). The `release` branch is still at `cc24f9e`, and every consumer is pinned there.
+- **E5's producer branch has no code.** S3's build brief exists (in the coordinating session's scratchpad). It measured,
+  on a scratch build: the adapted copy compiles and its copied tests pass on WSL Linux (171 tests: 157 passed, 14
+  skipped, the Windows-only and macOS-only arms); an owned run folder made in a `[ModuleInitializer]` works; and a gated
+  custom `Main` refuses a run with exit 78 and one line, before discovery.
+- **The template is mcp-shaped** (entry 3.1). `dew_flow_mcp · tests/Mcp.Tests/Leftovers/` has 51 files at `197cc76`,
+  not 54; the copy also needs `tests/Mcp.Tests/DirectoryLinks.cs` and `tests/Mcp.Tests/RepositoryRoot.cs`, which sit
+  outside that folder. The template hard-codes mcp's mount path (`LeftoversGuardScripts.cs:20`:
+  `.claude/rules/shared/tools/lib/sweeper-scan.mjs`), its helper paths and an mcp type (`RepositoryIdentity.Row`).
+  coai mounts the rules at `.agents/conventions` and cannot use `.claude/rules`.
+- **coai's CI runs the C# suites on this matrix** (entry 3.2; coai `004c55f`, `.github/workflows/ci.yml`):
+
+  | Suite | Linux (`build-test`) | macOS | Windows |
+  |---|---|---|---|
+  | `CoaiMcp.Tests` | `:58` | `:282` | `:317` |
+  | `CoaiBench.Tests` | `:64` | `:288` | — |
+  | `CoaiServer.Tests` | `:77` | `:285` | — |
+  | `CoaiBugs.Tests` (the ingest server) | `:88` | — (`:258-259`: it ships for Linux only, and one of its tests runs the previous linux-x64 release) | — |
+
+  The copy also changes the counts: about 171 copied tests come in, and E2's two-valued tests are replaced.
+- **The released baseline rule asks for "a test per assembly or package, ordered first"**
+  (`common/test-leftovers-baseline.md:19`). The four xUnit v3 suites run collections in parallel (`maxParallelThreads: 8`
+  in each `xunit.runner.json`), so there is no first test. The guarantee is the process-wide gate in `Main`, which runs
+  before discovery. The rule must accept it (F24, item 2).
+
+**Goal (unchanged from epoch 2).** The goal of § *Epoch 2*, item 1, stands word for word, with § *Epoch 3*'s reading.
+
+### 2. Prerequisites
+
+1. **P1 — the owner's Windows barrier record.** OPEN. It blocks the first producer MERGE of E2 and of E5. Until it is
+   recorded, Windows evidence for E5 comes from the `windows-latest` CI leg only; no E5 branch runs its C# suites on the
+   Windows side of an unrecorded machine.
+2. **F3** — merged (#116), not released. Released and pinned before the first Node compliance declaration (§ *Epoch 3*,
+   item 4).
+3. **NEW — F24, the baseline proof rule** (a conventions follow-up; the next free number of the follow-ups plan; owner:
+   the main session). `common/test-leftovers-baseline.md` (and the guard's proof check, where it encodes the old wording)
+   changes so that a PROCESS-WIDE gate that enforces containment before discovery — E5's gated custom `Main`: exit 78,
+   one line — satisfies "a run that cannot make it fails before any test". The marked assertion test stays; it no longer
+   needs to be "ordered first". F24 is released and coai's pin carries it BEFORE E5's S6 creates its baseline.
+4. P2, P3 (the interim) and F22: done, as § *Epoch 3*, item 2. P2's proof clause is changed by F24.
+5. The coai feature review at the end, unchanged.
+
+### 3. Merge conditions (revised, per producer PR)
+
+§ *Epoch 3*, item 3 (with its gate revision) stands, with these changes:
+
+- **(a)** For E5 the release its stories cite is the one that carries F24 (and F3, if E5 is the first Node compliance
+  declaration); `cc24f9e` is the baseline.
+- **(f) read for E5** as the suite × OS matrix of item 1: every suite green on every leg CI runs it on, AND the ownership
+  and startup proofs (the run folder in the owner form, fail closed, the refusal) green for EVERY suite on ALL THREE
+  OSes — through filtered steps on the legs that do not run the whole suite, or a small cross-OS job if a suite cannot
+  run there. "The same counts" becomes a NAMED reconciliation: each test added, removed or skipped by platform, by name.
+- **(k) NEW.** F24 is released and pinned (a pin bump alone) before S6 creates the baseline.
+- **(l) NEW.** The adapted copy's diff check is green: no change against the template outside the manifest's permitted
+  transformations (item 4).
+
+**E5's producer PR** merges only when: S2-A (#940) is on `main`; ONE squash-merged PR carries S3 → S2-B → S4 → S5 → S6
+as in § *Epoch 3*; S6's repository-wide checks are green; (k) and (l) hold; the matrix of (f) is green; and every other
+condition — P1, the release, the gates, decision 6's shape — is still met. The E5 stories document, D8, carries the same.
+
+### 4. The adapted copy (3.1) and the suite × OS matrix (3.2)
+
+**The adapted copy.** A C# consumer copies `dew_flow_mcp · tests/Mcp.Tests/Leftovers/` at `197cc76` as an ADAPTED copy:
+
+- a **pinned file manifest**: the 51 files of the folder, plus `DirectoryLinks.cs` and `RepositoryRoot.cs`, each with
+  where it goes (the library, or the test project when it holds `[Fact]`s);
+- per file, the **permitted transformations**: the namespace; `OwnedToken.cs` rewritten; the mount path
+  `.claude/rules/shared` → `.agents/conventions`; the helper paths and folders; the mcp type `RepositoryIdentity.Row`;
+  and the edits the consumer's stories list for each story (for E5: S3's and S6's);
+- a **diff check** (a test or a script) that rejects any change against the template that the manifest does not explain;
+- the **ownership, liveness and deletion algorithms unchanged**, unless a change is separately reviewed.
+
+E5's D2 is the first such copy. E2, E6 and E7 follow the same form. Making the template itself parameterised (upstream,
+in dew_flow_mcp) is NOT done now; it is a possible later follow-up if the same adaptations recur.
+
+**The suite × OS matrix.** E5's DoD names what CI runs (item 1), not "all four suites on three legs". It is narrower,
+so the record says `Narrowed: yes`. Correction after the stop's PR review (2026-11-03, every coai workflow checked job by
+job at 004c55f): the server suite DOES run on Windows (x64, arm) and macOS — in `release.yml` server-binaries, at
+release time, not in pull-request CI; the bugs (ingest) suite runs on Linux only, also in release; bench never runs on
+Windows. So adding the server suite to pull-request CI on Windows is cheap and proven; a Windows check of bench (run
+its executable after the existing Windows build) MAY widen the matrix later; both are named here and not required
+(question 3).
+
+**The rest of S3's brief** is settled in the E5 stories document, not here (its § 14 items 3–7, 10–13): `TempDir` keeps
+re-throwing `LinkTargetLostException` and keeps its read-only clearing; the restore is registered after
+`OwnedDir.Create`; `RunTemp.cs` moves into the library and each test project gets `RunTempStart.cs` and
+`TestEntryPoint.cs`; S2-B registers the sweep fixture in each test assembly and its tests land when wired; the audit
+source lands unwired in S3; Sonar excludes `src_mcp/tests_leftovers/**`; a coai-owned cross-reader vectors file; S4
+puts every direct script and coverage invocation in containment or makes it refuse; S6 seeds violations in every actual
+test root, with missing-proof and stale-baseline cases.
+
+### 5. Build order (revised)
+
+```
+DONE   as § Epoch 3, item 5 → epoch 3 approved (#115) → coai #942 (E5 revised for epoch 3) → F3 merged (#116, not
+       released) → S3's build brief → the stop of epoch 3 (entries 3.1, 3.2) and this re-review.
+NEXT   P1 the owner's Windows barrier record            — the owner; blocks the first producer MERGE of E2 and of E5
+       F24, a conventions task (owner: the main session) — the baseline proof rule (and the guard's proof check): its own
+          PR and gates; then ONE release carrying F3 and F24 (promote-release) → coai's pin bump alone before S6 creates
+          its baseline, and the declaring repository's bump before its first Node compliance PR; the other consumers'
+          bumps follow, each alone, those over the PR cap with the owner's agreement
+       E2.1 (draft creds #294) after P1 and its by-hand records → E2.2 → … → E2.5, as § Epoch 3, item 5
+       E5 producer PR — one squash merge, commits S3 → S2-B → S4 → S5 → S6:
+          S3   the ADAPTED copy (manifest, permitted transformations, diff check); RunTemp in the library; RunTempStart.cs
+               and TestEntryPoint.cs in each of the four test projects; the gated custom Main (exit 78, one line);
+               the audit source unwired; Sonar excludes src_mcp/tests_leftovers/**; Windows evidence from CI only until P1
+          S2-B the sweep fixture registered in each test assembly; the sweep tests land here
+          S4   every direct script and coverage invocation in containment or refusing
+          S5   the renames, as § Epoch 3
+          S6   after F24's pin: the guards, one baseline, seeded violations in every test root, missing-proof and
+               stale-baseline cases
+          after P1, F24's pin, and F3's pin if this is the first declaration → E5.S7 the drain
+THEN   wave 3: E6 ∥ E7, as § Epoch 3; each C# copy is an adapted copy (item 4).
+LAST   as § Epoch 3.
+```
+
+S3, S2-B, S4 and S5 do not wait for F24; only S6 does, because S6 creates the baseline whose proof F24 defines.
+
+### 6. What the re-review consultant raised, and what was done with it
+
+| Point (consult `8d309111`) | Verified | Taken |
+|---|---|---|
+| (a) 3.1: make D2 an adapted copy — a pinned manifest, permitted transformations per file, a diff check; algorithms unchanged unless reviewed; upstream parameterisation later, only if the adaptations recur | yes — 51 files at `197cc76` (`git ls-tree`), `DirectoryLinks.cs` and `RepositoryRoot.cs` outside the folder, `.claude/rules/shared` at `LeftoversGuardScripts.cs:20` | yes — item 4; the E3 State line corrected; E5's D2 |
+| (b) 3.2: an explicit suite × OS matrix of what CI runs; the ownership and startup proofs on all three OSes; a named reconciliation of counts; `Narrowed: yes` | yes — coai `ci.yml:58`, `:64`, `:77`, `:88`, `:258-259`, `:282`, `:285`, `:288`, `:317` | yes — items 1, 3 (f), 4; the record; question 1 |
+| (c) the released baseline rule's "ordered first" cannot hold with parallel collections (S3 brief item 8) | yes — `common/test-leftovers-baseline.md:19`; `maxParallelThreads: 8` in all four `xunit.runner.json` | yes — F24, a prerequisite of S6 (items 2, 3 (k), 5) |
+| (d) S2-B registers the sweep fixture in EACH test assembly, and the sweep tests land when wired (S3 brief item 4) | yes — the copied sweep tests take the fixture as a constructor parameter (the brief) | yes — E5's S2-B |
+| (e) the fail-closed mechanism: a gated custom `Main` (`XunitAutoGeneratedEntryPoint=false`, xUnit's generated body behind `RunTemp.Gate`, exit 78, one line) | the brief's scratch measurement (xunit.v3 4.0.1, MTP 2.4.0): refused run exit 78, no discovery; a throw from a pipeline startup or a module initializer aborts the host (exit 134). Not re-run by this revision | yes — E5's S3 |
+| (f) the other S3-brief items (3, 5–7, 10–13) are fixes that satisfy the plan as written; write them into E5 explicitly | yes — each against the coai and mcp files the brief cites | yes — E5's S3, S4, S6 |
+
+Nothing was rejected.
+
+### 7. Questions for the owner (blocking; each with the recommended answer)
+
+1. **Approve epoch 4 as narrowed?** The record says `Narrowed: yes`: E5's DoD names the suites CI actually runs on each
+   OS, keeps the ownership and startup proofs on all three, and reconciles counts by name. *Recommended:* yes — CI never
+   ran the ingest suite off Linux (it ships for Linux only) or bench on Windows, and the server suite reaches Windows only
+   in the release workflow; the proofs that
+   matter for this plan (ownership, fail closed, refusal) stay on all three OSes.
+2. **P1, the Windows barrier record** — unchanged, still open.
+3. **A Windows check of the server and bench suites — later, or not at all?** It may widen the matrix. The server suite
+   already passes on Windows in `release.yml`, so moving it into pull-request CI is cheap; bench is unmeasured there.
+   *Recommended:* not now; ask again after E5's producer PR, with the measured cost of the step.
+4. **One release for F3 and F24?** *Recommended:* yes — both are guard and rule changes the first Node compliance PRs
+   need; one release costs each consumer one pin bump. The over-cap bumps are asked when the release comes (as for
+   epoch 3).
+
 ## Epics
 
 Seven epics, E = 7, so the cornerstone quota is Q = ⌈2·7/5⌉ = 3 ([common/subagent-models.md](../common/subagent-models.md)).
@@ -862,6 +1053,9 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
   *Epoch 3 (2026-11-03):* P2 and P3 DONE (`5863c60`); F21 and F22 released (`5863c60`, `cc24f9e`); F16's Fix (the owner
   SID) still open with F9 — only the interim (b) shipped. F3 is due at the FIRST real Node compliance declaration,
   whichever epic reaches it first — E2.5 or E5's producer PR (§ Epoch 3, item 4).
+  *Epoch 4 (2026-11-03):* F3 is merged (#116, `605e3e6`) and not yet released. F24 is new: the baseline proof rule
+  accepts a process-wide gate that enforces containment before discovery; it is released and pinned before E5's S6
+  (§ Epoch 4, items 2 and 5).
 - **Repository:** `dew_flow_conventions`. **Stories:** [research/PLAN_test_leftovers_E1.md](../research/PLAN_test_leftovers_E1.md) (IMPLEMENTED).
 - **Goal.** `common/test-leftovers.md` says what every consumer's helper, guard and tests must do; it carries
   decision 2 (shared stores exempt only when named where configured, reuse intentional, reset serialized;
@@ -969,6 +1163,14 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
   other epics take from here*. The pin is at `105d53c` (#60). It is the C# TEMPLATE: E2, E5, E6 and E7 copy `tests/Mcp.Tests/Leftovers/*.cs`
   by file (byte-identical except the namespace line; `OwnedToken.cs` rewritten; the Windows SID path and the Darwin path included) and
   send every defect they find back as a note, never fixing it alone. The hand clean-up of 682 old `mcp-*` folders is the owner's, recorded.
+  *Corrected 2026-11-03 (§ Epoch 4, item 4; entry 3.1):* the byte identity cannot hold. The template hard-codes mcp's
+  layout, its mount path `.claude/rules/shared` and an mcp type (`RepositoryIdentity.Row`), and needs two files outside
+  its folder (`DirectoryLinks.cs`, `RepositoryRoot.cs`); its folder has 51 files at `197cc76`, not 54. A consumer copy is
+  an ADAPTED copy: a pinned file manifest, the permitted transformations per file, and a diff check that rejects any
+  unexplained change; the ownership, liveness and deletion algorithms stay unchanged unless separately reviewed. E5's D2
+  is the first such copy; E2, E6 and E7 follow the same form when they copy (each stories document writes its own
+  manifest). Making the template itself parameterised is NOT done now; it is a possible later follow-up if the same
+  adaptations recur.
 - **Repository:** `dew_flow_mcp`. **Stories:** `dew_flow_mcp · research/PLAN_test_leftovers_E3.md` (was `todo/`; IMPLEMENTED). Depends on E1.
 - **Goal.** `tests/Mcp.Tests/` creates nothing it does not remove, and everything it creates is named
   `testsToDelete-mcp-…`.
@@ -983,6 +1185,7 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
   1 says. So E3 runs BEFORE E2's C# helper story (cadence consultation, 2026-10-15).
   *Superseded 2026-11-01:* copied BY FILE, not by shape (E3's § *What the other epics take*; E2's and E5's stories) — the code is still
   per repository, but a copy that is byte-identical except its token can be diffed against the template at every pin.
+  *Corrected 2026-11-03:* an adapted copy with a manifest and a diff check (the note in the State line above).
 - **Proven by.** RED first: a test that creates a scratch folder through the old path and asserts it is gone
   after the test fails; GREEN after the helper; an unwind test; the structural guard with its break-it.
 - **Risks.** Small. `SpoolUsageSinkTests.cs:157` appends `"\0x"` to a temp path to provoke a fault — the guard
@@ -1039,6 +1242,9 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
   *After the re-review gate (2026-11-03):* S5 has no stage-A part; its renames are a commit of the producer PR
   (S3 → S2-B → S4 → S5 → S6), and S3 and S4 make their runners fail closed and a direct start refuse (§ Epoch 3, items 1,
   3, 4, 5).
+  *Epoch 4 (2026-11-03):* the E5 stories were merged for epoch 3 as coai #942 (`004c55fb`). S3's build brief found
+  entries 3.1 and 3.2. D2 becomes an adapted copy; the DoD names the suite × OS matrix; S3's fail-closed mechanism is a
+  gated custom `Main` (exit 78); S6 waits for F24's pin (§ Epoch 4; the E5 stories document, revised the same day).
 - **Repository:** `dew_flow_connect_other_ais`. **Stories:** `dew_flow_connect_other_ais · todo/PLAN_test_leftovers_E5.md`. Depends on E1.
 - **Goal.** Tests create only `testsToDelete-coai-…`; the startup sweep collects both the new prefix and, for
   the migration window, the old `coai-` test literals; the product's `coai-*` runtime directories and their
