@@ -333,6 +333,9 @@ find nothing of the caller's scope with a `gone` record.
       (§ Epoch 3, item 4).
 - [ ] **Added 2026-11-03 (epoch 3):** F3 (the `node` profile reads `package.json` scripts) is released and pinned before
       the family's first compliance declaration under the shipped Node guard (E2.5 or E5's producer PR, whichever first).
+- [ ] **Added 2026-11-03 (epoch 4):** E5's suites are green as § *Epoch 4* item 3's per-suite, per-OS merge-gate table names
+      them (the shared run-folder library's proofs on all three OSes; each suite's wiring where CI runs it; the bugs suite
+      on Linux only), with counts reconciled by name — not "all four suites on three platforms" [interim gate, finding 1].
 - [ ] **Added 2026-11-03 (epoch 4):** F24 (the baseline proof rule accepts a process-wide gate before discovery) is
       released and pinned by coai before E5's S6 creates its baseline; every C# copy of the template is an adapted copy
       with a pinned manifest and a green diff check (§ Epoch 4, items 2 and 4).
@@ -873,7 +876,7 @@ plan's.
    recorded, Windows evidence for E5 comes from the `windows-latest` CI leg only; no E5 branch runs its C# suites on the
    Windows side of an unrecorded machine.
 2. **F3** — merged (#116), not released. Released and pinned before the first Node compliance declaration (§ *Epoch 3*,
-   item 4).
+   item 4). It is NOT released alone: it rides the ONE release that carries F24 (item 5) [interim gate, finding 3].
 3. **NEW — F24, the baseline proof rule** (a conventions follow-up; the next free number of the follow-ups plan; owner:
    the main session). `common/test-leftovers-baseline.md` (and the guard's proof check, where it encodes the old wording)
    changes so that a PROCESS-WIDE gate that enforces containment before discovery — E5's gated custom `Main`: exit 78,
@@ -885,6 +888,8 @@ plan's.
    sentinel untouched. The check's output is recorded on the PR that creates the baseline.
 4. P2, P3 (the interim) and F22: done, as § *Epoch 3*, item 2. P2's proof clause is changed by F24.
 5. The coai feature review at the end, unchanged.
+6. **E5's rollback procedure (coai D11), written and reviewed before E5's producer PR opens** — it is merge condition (m)
+   [interim gate, finding 2].
 
 ### 3. Merge conditions (revised, per producer PR)
 
@@ -1466,6 +1471,10 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
 - **Cornerstone area: yes** — see the ledger.
 
 ### Dependencies and order
+
+*Note 2026-11-03 (epoch 4):* where this section or the E3 entry speaks of a byte-identical copy of the C# template, read
+§ *Epoch 4* item 4: every C# consumer (E2, E5, E6, E7) makes an ADAPTED copy, with a pinned manifest of upstream blob
+SHAs, permitted transformations and an offline diff check [interim gate, finding 0].
 
 Superseded 2026-11-01 (kept for the record):
 
