@@ -693,7 +693,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   fails on the ten missing phrases; test 42 passes by design); GREEN with the text (63 of 63); RED again with the companion stashed (1 failed, the same
   test). `node tools/rule-bodies.mjs --update common.test-leftovers-baseline` recorded the body. Not done: the release, the pin bumps, E5's acceptance check.
 
-## F25 — A consumers test leaves its scratch repository behind when its locked folder is restored after the removal (found 2026-11-03, a benchmark session's leftover listing)
+## F25 — A consumers test leaves its scratch repository behind — possibly because its locked folder is restored only after the removal (found 2026-11-03, a benchmark session's leftover listing)
 
 - **What.** Eight `/tmp/testsToDelete-u1000-conventions-consumers-<rand>` folders and their `.owner` files are in the temp root of the WSL host, made on
   2026-11-03 between 12:20 and 18:21; every owner pid is gone. Each is a scratch git repository of `tree()` in
@@ -703,9 +703,15 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   `scope.after` right after the claim), BEFORE the test registers its chmod. If `node:test` runs a test's `after` hooks in registration order, the
   removal meets `locked/` at mode `000` and fails, and the chmod then restores `0o755` — which is the state every leftover shows (`locked/` is
   `drwxr-xr-x` and still holds `package.json`). *Checked:* the eight folders, their owners and their contents, and the two source lines. *Not checked:*
-  the hook order on this Node version, and whether the removal's failure is reported anywhere.
-- **Fix (to decide when it is built).** Either the test restores the mode in its own `try`/`finally` before the hooks run, or the owned folder's
-  removal gives a tree `u+w` before it removes it and names what it could not remove. The second also covers any other test that locks a folder.
+  the hook order on this Node version. *Known from the code:* a failed removal is not silent — `removeQuietly`
+  (`tools/lib/owned.mjs:606-615`) warns `could not remove <dir> … left for the start-of-run sweep` and keeps the claim; whether that warning is
+  visible in the test output, and whether CI checks it, is NOT checked. Also not checked: why the start-of-run sweep did not retire the eight folders
+  later, since their `locked/` is now `0o755` and every owner is gone.
+- **Fix (to decide when it is built).** First check the `after` hook order of `node:test` on the supported Node version. Then either the test restores the mode in its
+  own `try`/`finally` before the hooks run, or the owned folder's removal first gives every folder of the tree `u+rwx` (`0o700`: `u+w` alone cannot
+  list or enter a folder at mode `000`) and names what it still could not remove. The second also covers any other test that locks a folder. With
+  either fix the removal succeeds BEFORE the test's own `t.after(() => fs.chmodSync(locked, 0o755))` runs, so that hook would throw `ENOENT`: the
+  fix also drops that hook or skips the chmod when `locked/` is gone.
 - **Tests.** RED first: run the one test and list `testsToDelete-u<uid>-conventions-consumers-*` before and after (one more folder); GREEN with the
   fix; RED again with the fix taken out.
 - **State.** Parked by the owner on 2026-11-03 ("open it as a todo, do not build it"): the owner's goal now is the C# and Node comparison. The eight
