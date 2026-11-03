@@ -307,7 +307,7 @@ test("F3 1. a pretest that sweeps the prefix with no owner is a finding that nam
   const repo = tree(t, { ...BASE, "package.json": manifest({ pretest: SWEEP }) });
   const result = node(repo);
   assert.equal(result.code, 1, result.text);
-  assert.match(result.text, /package\.json:3 — owner-blind — /);
+  assert.match(result.text, /package\.json:5 — owner-blind — /);
   assert.match(result.text, /script `pretest`/);
   const [one, ...rest] = foundIn(repo, "package.json");
   assert.equal(rest.length, 0, "one finding for one line");
@@ -365,7 +365,7 @@ test("F3 7. a nested package.json is read and the finding names that path", (t) 
   const repo = tree(t, { ...BASE, "src_vs_code/package.json": manifest({ pretest: SWEEP }), "package.json": manifest({ test: "node a.mjs" }) });
   const result = node(repo);
   assert.equal(result.code, 1, result.text);
-  assert.match(result.text, /src_vs_code\/package\.json:3 — owner-blind — .*script `pretest`/);
+  assert.match(result.text, /src_vs_code\/package\.json:5 — owner-blind — .*script `pretest`/);
   assert.deepEqual(foundIn(repo, "package.json"), [], "the clean root manifest has none");
 });
 
@@ -387,7 +387,7 @@ test("F3 9. a chain is read like a shell line: the second command, a pipe, a `;`
     const found = foundIn(repo, "package.json");
     assert.equal(found.length, 1, `${what}: ${JSON.stringify(found)}`);
     assert.equal(found[0].cls, "owner-blind", what);
-    assert.equal(found[0].line, 3, `${what}: the line of the key`);
+    assert.equal(found[0].line, 5, `${what}: the line of the key`);
   }
 });
 

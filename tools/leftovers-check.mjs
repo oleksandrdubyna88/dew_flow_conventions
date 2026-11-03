@@ -82,6 +82,7 @@ import { dockerFindings } from "./lib/leftovers-docker.mjs";
 import { REPO_ROW, REPO_TOKEN } from "./lib/owned-token.mjs";
 import { BASELINE_FILE, GUARD_NAME, PROOF_MARKER, createApplier, loadBaselineAt, siteSha256 } from "./lib/raw-temp-baseline.mjs";
 import { PROFILES, parseArguments, runCli } from "./lib/leftovers-cli.mjs";
+import { MANIFEST_NAME, manifestFindings } from "./lib/leftovers-package.mjs";
 
 export { PROFILES, parseArguments };
 import { JANITOR_FILE, classifyLine, classifyLines, lineSha256 } from "./lib/sweeper-scan.mjs";
@@ -126,6 +127,7 @@ export const CURES = Object.freeze({
   "owner-blind": "Match the caller's owner after the prefix (^testsToDelete-<owner>-<repo>-), or delete the sweep and use the shipped janitor; this class takes no exemption — common/test-leftovers-detail.md §7 (owner-blind), the barrier.",
   "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers-detail.md §6, §7 (shared-store).",
   "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers-detail.md §5, §7 (ryuk-off).",
+  unreadable: "Make the package.json valid JSON whose `scripts` is an object of strings (or remove the field): the guard reads no other shape, and never skips one — common/test-leftovers-detail.md §7 (the `node` profile).",
   baseline: "Remove the stale or out-of-scope entry from the baseline, or move the site into the helper; nothing adds to it — common/test-leftovers-detail.md §7 (the `raw-temp` baseline).",
   exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers-detail.md §7 (the exemption grammar).",
   token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers-detail.md § Tokens (§1 of the rule) — and write it, with its row, in this repository's own tools/lib/owned-token.mjs beside the copied owned.mjs (never copy another repository's).",
@@ -224,6 +226,15 @@ export function isScanned(file, profile) {
     /\.(?:sh|ps1)$/.test(file) ||
     (profile === "node" && (NODE_TEST.test(file) || (NODE_TREE.test(file) && !BINARY_EXTENSION.test(file))))
   );
+}
+
+/**
+ * Whether a path is a `package.json` the `node` profile reads for its `scripts` (F3): any tracked one of the repository's own tree — the same exclusions as `isScanned`
+ * and `tokenConstants`. Not a text file to `isScanned`: `manifestFindings` reads it as JSON. Without the profile none is read.
+ */
+export function isPackageManifest(file, profile) {
+  checkProfile(profile);
+  return profile === "node" && path.posix.basename(file) === MANIFEST_NAME && !NODE_NEVER.test(file) && !EXCLUDED_FILES.includes(file) && !file.startsWith("tools/lib/");
 }
 
 /** A file that holds a NUL byte in its first 8 KiB is binary (git's own test, and a UTF-16 text file too): it is not text to be read for names. */
@@ -558,6 +569,7 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = toke
   const entries = Array.isArray(allowlist) ? allowlist : loadAllowlist(allowlist);
   let yamlModule;
   const yaml = () => (yamlModule ??= loadYaml(repo, resolvers)); // read at the first workflow, so a repository with none needs none
+  const manifests = listFiles(repo).filter((file) => isPackageManifest(file, profile));
   const applier = baseline === undefined || baseline === false ? undefined : appliedBaseline(baseline, repo, files);
   let read = 0;
   for (const file of files) {
@@ -567,6 +579,12 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = toke
     if (isBinary(bytes)) continue;
     read += 1;
     findings.push(...scanText(file, bytes.toString("utf8"), entries, yaml, applier));
+  }
+  for (const file of manifests) {
+    if (!fs.existsSync(path.join(repo, file))) continue;
+    const manifest = manifestFindings(file, fs.readFileSync(path.join(repo, file)), (name, text) => scanText(name, text, entries, yaml));
+    read += manifest.scanned ? 1 : 0;
+    findings.push(...manifest.findings);
   }
   if (applier !== undefined) findings.push(...applier.finalFindings()); // the global reconcile: every entry no line matched, whatever file it names
   const rulePath = resolveRule(repo, rule);
