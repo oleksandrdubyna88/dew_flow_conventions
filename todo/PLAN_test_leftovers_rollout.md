@@ -2,7 +2,8 @@
 
 > Status: **stopped for re-review (2026-11-03)** — epoch 2's second change after approval (entry 2.2, E5.S5's order
 > against the producer PR). No new code on any epic of this plan and no merge of a pull request carrying its work until
-> the re-review approves epoch 3. Unpushed local work at the stop: coai S5 branches (mcp: uncommitted; ext: 2 local
+> the full re-review is complete; when its record says `Narrowed: yes`, the owner has approved the revised plan; and epoch 3
+> is opened with `state: open`. Unpushed local work at the stop: coai S5 branches (mcp: uncommitted; ext: 2 local
 > commits; scripts: uncommitted); creds E2.1 is a draft PR (#294) and was not to merge before the owner's records anyway.
 >
 > Status: **epoch 2 open (2026-11-01), approved by the owner after the re-review.** Epoch 1 stopped at its second change after
@@ -102,6 +103,13 @@ Narrowed: yes — E5's producer PR may merge with the structural guard green-by-
   the order, S5's DoD and the producer PR's merge condition must change. Consult c137f641: two answers, A (narrow S5,
   move the sites to S3/S4, record the change) and B (keep S5 open). Both depend on a merge condition changing, so this
   is a change. It is the second of epoch 2: the plan stops for re-review.)
+  (Sources, dew_flow_connect_other_ais at a3b73534 [PR review, CodeRabbit]: `.github/workflows/ci.yml:197` is
+  `run: node --test "scripts/**/*.test.mjs"`, and `.github/workflows/sonarcloud.yml:302` is
+  `./node_modules/.bin/c8 --reporter=lcovonly --report-dir=../coverage/c8 --src=src node --test "out/test/"*.test.js`;
+  neither starts the extension's runner (`src_vs_code/scripts/run-tests.mjs`), which makes the run folder. The two
+  extension sites are `src_vs_code/src/test/kimiLinuxInstall.test.ts:60` and `runtimeSinceIsAhead.test.ts:147`, both among
+  the "tests under other prefixes" that § E5's re-read of 2026-11-01 says run INSIDE the run folder. That sentence holds
+  for `npm test` only, not for the SonarCloud job; the re-review corrects it.)
 
 ## Symptom
 
