@@ -1,6 +1,11 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **stopped for re-review (2026-11-03)** — epoch 2's second change after approval (entry 2.2, E5.S5's order
+> Status: **epoch 3 open (2026-11-03), approved by the owner after the re-review.** Epoch 2 stopped at its second change
+> (entry 2.2, 2026-11-03); the whole plan was revised (§ *Epoch 3*), the Opus judge sorted the done work, the plan gate
+> (session `4a07e86f`) and the interim document gate passed, and because the record says `Narrowed: yes` the owner
+> approved it, with § Epoch 3 item 7's questions 1, 3 and 4 answered as recommended.
+>
+> Was: **stopped for re-review (2026-11-03)** — epoch 2's second change after approval (entry 2.2, E5.S5's order
 > against the producer PR). No new code on any epic of this plan and no merge of a pull request carrying its work until
 > the full re-review is complete; when its record says `Narrowed: yes`, the owner has approved the revised plan; and epoch 3
 > is opened with `state: open`. Unpushed local work at the stop: coai S5 branches (mcp: uncommitted; ext: 2 local
@@ -90,7 +95,7 @@ Narrowed: yes — E5's producer PR may merge with the structural guard green-by-
   never remove an unmarked folder; only that README sentence, left by #77 and not updated by #82, still says so. Note 2: #58 and #64 checked
   (a)–(d) on the operator's WSL machine only; P1's record says whether the owner's Windows machine builds or tests mcp and sidecar_rust.)
 
-> Epoch 2 · approved 2026-11-01 · by owner · state: stopped
+> Epoch 2 · approved 2026-11-01 · by owner · state: closed
 
 - 2.1 · 2026-11-02 · agent · build-order — E2.1 and E5's Node runners wait for F22 (the reference sweep takes the consumer's token) and its release
   (the E2.1 coder measured it: `sweepLeftovers` compares every name with the reference's own `REPO_TOKEN`, so a wrapper cannot
@@ -152,6 +157,8 @@ Narrowed: yes — nothing of E5.S5 must land before E5's producer PR any more (S
   the machine temp is uncontained, and both coai runners fall back today, so no S5 site is contained before S3 and S4.
   S5 therefore moved into the producer PR. The judge's rows stand as written: the local S5 work is the input of that
   commit.)
+
+> Epoch 3 · approved 2026-11-03 · by owner · state: open
 
 ## Symptom
 
@@ -753,6 +760,12 @@ rejection is reversed: row (d).
 4. **F3 before the first Node compliance declaration** (§ 4): one more conventions release before E2.5 or E5's producer
    PR, whichever is first. *Recommended:* yes — the follow-ups plan already schedules F3 there; the change is only that
    E5 may be first.
+
+*Answered by the owner, 2026-11-03 (after the question consultants, `e000e85a`, both "yes"):* 1 — approved as narrowed;
+3 — yes, per resource (the test is whether a sweeper can reach this producer's resources; a shared endpoint later needs a
+new check); 4 — yes, F3 first. Not approved by that answer: the over-cap pin bumps of F3's release, asked when it comes.
+The consultants added, for S3 and S4: "fail closed" covers a failed CLAIM write too, not only a failed folder (the
+reference's `ownedDir` writes the claim exclusively first and throws when it cannot). Question 2 (P1) stays open.
 
 ## Epics
 
