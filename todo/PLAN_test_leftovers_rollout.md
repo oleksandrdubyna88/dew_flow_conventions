@@ -898,6 +898,8 @@ plan's.
    *[F24 review, 2026-11-03]* The check has a THIRD forced case: a run whose `TEMP`, `TMP` or `TMPDIR` does not name the run folder also exits 78 before
    discovery (the rule's gate refuses on a mismatch as well as on a folder or claim failure). The three child runs live in the scope's proof file, so removing
    them changes the one file the baseline names; the marked test's `TEMP` assertion and the review prove that the runner makes the folder before the first test.
+   *[PR review, CodeRabbit, 2026-11-03]* The third case is three: `TEMP`, `TMP` and `TMPDIR` are each mismatched ON THEIR OWN (only that one variable names another folder), because a gate
+   could check one variable and miss another. The acceptance check therefore has five forced runs — a folder failure, a claim failure and the three single-variable mismatches — each exiting 78 before discovery.
 4. P2, P3 (the interim) and F22: done, as § *Epoch 3*, item 2. P2's proof clause is changed by F24.
 5. The coai feature review at the end, unchanged.
 6. **E5's rollback procedure (coai D11), written and reviewed before E5's producer PR opens** — it is merge condition (m)
