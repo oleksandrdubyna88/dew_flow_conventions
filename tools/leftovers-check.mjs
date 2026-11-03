@@ -56,7 +56,7 @@
  * sentence that says to add `yaml@2` as a devDependency — and only when the repository has a workflow. Not here: a `module-load` class (needs a parser).
  * Under `--profile node` the guard also reads every `package.json` of the repository's own tree (`tools/lib/leftovers-package.mjs`; the same exclusions: no `node_modules/`, no mount path): it parses the JSON and scans
  * each `scripts` value as ONE shell line (a line break inside a value splits it), with the classes and detectors of a `.sh` file — a chain (`&&`, `||`, `;`, a pipe) and an environment prefix are covered. The finding keeps the
- * manifest's path, names the script, and takes the line of that key inside `scripts`. JSON has no comments, so a manifest takes NO exemption (a marker in a value exempts nothing, and the `raw-temp` baseline is not applied to it):
+ * manifest's path, names the script, and takes the line of that key inside `scripts` — always the line of the script's KEY in the file, also for a value with line breaks. JSON has no comments, so a manifest takes NO exemption (a marker in a value exempts nothing, and the `raw-temp` baseline is not applied to it):
  * a finding there is cured by rewriting the script, for example to call a script file the guard reads, which can carry the exemption comment. No `scripts` field is valid and has nothing to scan. Other manifests (`deno.json`, …) are not read.
  *
  * `--baseline` reads the repository's `raw-temp` baseline (rule §7, `common/test-leftovers-baseline.md`, `tools/lib/raw-temp-baseline.mjs`): ONE fixed path, `raw-temp-baseline.json`
@@ -87,7 +87,7 @@ import { dockerFindings } from "./lib/leftovers-docker.mjs";
 import { REPO_ROW, REPO_TOKEN } from "./lib/owned-token.mjs";
 import { BASELINE_FILE, GUARD_NAME, PROOF_MARKER, createApplier, loadBaselineAt, siteSha256 } from "./lib/raw-temp-baseline.mjs";
 import { PROFILES, parseArguments, runCli } from "./lib/leftovers-cli.mjs";
-import { MANIFEST_NAME, manifestFindings } from "./lib/leftovers-package.mjs";
+import { MANIFEST_NAME, scanManifest } from "./lib/leftovers-package.mjs";
 
 export { PROFILES, parseArguments };
 import { JANITOR_FILE, classifyLine, classifyLines, lineSha256 } from "./lib/sweeper-scan.mjs";
@@ -132,7 +132,7 @@ export const CURES = Object.freeze({
   "owner-blind": "Match the caller's owner after the prefix (^testsToDelete-<owner>-<repo>-), or delete the sweep and use the shipped janitor; this class takes no exemption — common/test-leftovers-detail.md §7 (owner-blind), the barrier.",
   "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers-detail.md §6, §7 (shared-store).",
   "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers-detail.md §5, §7 (ryuk-off).",
-  unreadable: "Make the package.json valid JSON whose `scripts` is an object of strings (or remove the field): the guard reads no other shape, and never skips one — common/test-leftovers-detail.md §7 (the `node` profile).",
+  unreadable: "Make the package.json valid JSON whose `scripts` is an object of strings (or remove the field): the guard reads no other shape, and never skips one — see the header of tools/leftovers-check.mjs (`--profile node`) and the README row of the guard.",
   baseline: "Remove the stale or out-of-scope entry from the baseline, or move the site into the helper; nothing adds to it — common/test-leftovers-detail.md §7 (the `raw-temp` baseline).",
   exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers-detail.md §7 (the exemption grammar).",
   token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers-detail.md § Tokens (§1 of the rule) — and write it, with its row, in this repository's own tools/lib/owned-token.mjs beside the copied owned.mjs (never copy another repository's).",
@@ -248,10 +248,10 @@ const isBinary = (bytes) => bytes.subarray(0, 8192).includes(0);
 /** Paths in code-unit order — the order a bare `.sort()` gives, stated, so it never depends on the locale. */
 const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
-/** The files to read, from git's own idea of the tree (tracked plus untracked-not-ignored). Throws when `repo` is not a repository. */
-export function discover(repo, profile) {
+/** The files to read, from git's own idea of the tree (tracked plus untracked-not-ignored), out of `listed` (every file git knows: one listing per scan). Throws when `repo` is not a repository. */
+export function discover(repo, profile, listed = listFiles(repo)) {
   checkProfile(profile);
-  return listFiles(repo).filter((file) => isScanned(file, profile));
+  return listed.filter((file) => isScanned(file, profile));
 }
 
 /** Every file git knows in `repo`, tracked or untracked-not-ignored, in code-unit order. */
@@ -569,12 +569,13 @@ function appliedBaseline(baseline, repo, files) {
  * `baseline` is `true` (read the repository's one baseline path) or a loaded baseline (`loadBaselineAt`), else nothing: a baseline is read only when asked for.
  */
 export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "", allowlist, profile, resolvers, baseline } = {}) {
-  const files = discover(repo, profile);
+  const listed = listFiles(repo);
+  const files = discover(repo, profile, listed);
   const findings = [];
   const entries = Array.isArray(allowlist) ? allowlist : loadAllowlist(allowlist);
   let yamlModule;
   const yaml = () => (yamlModule ??= loadYaml(repo, resolvers)); // read at the first workflow, so a repository with none needs none
-  const manifests = listFiles(repo).filter((file) => isPackageManifest(file, profile));
+  const manifests = profile === "node" ? listed.filter((file) => isPackageManifest(file, profile)) : [];
   const applier = baseline === undefined || baseline === false ? undefined : appliedBaseline(baseline, repo, files);
   let read = 0;
   for (const file of files) {
@@ -587,9 +588,9 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = toke
   }
   for (const file of manifests) {
     if (!fs.existsSync(path.join(repo, file))) continue;
-    const manifest = manifestFindings(file, fs.readFileSync(path.join(repo, file)), (name, text) => scanText(name, text, entries, yaml));
-    read += manifest.scanned ? 1 : 0;
-    findings.push(...manifest.findings);
+    const found = scanManifest(repo, file, (name, text) => scanText(name, text, entries, yaml));
+    read += found.length > 0 ? 1 : 0; // a clean manifest is no proof that discovery worked: only one that yields a finding counts as read
+    findings.push(...found);
   }
   if (applier !== undefined) findings.push(...applier.finalFindings()); // the global reconcile: every entry no line matched, whatever file it names
   const rulePath = resolveRule(repo, rule);

@@ -439,7 +439,7 @@ test("F3 14. [Opus 2] --print-baseline lists no manifest site: no baseline can c
 test("F3 15. [Opus 3] the `unreadable` cure points at a place that exists", () => {
   assert.doesNotMatch(CURES.unreadable, /§7/, "the rule has no section for the node profile");
   assert.match(CURES.unreadable, /leftovers-check\.mjs/);
-  assert.match(read("tools", "leftovers-check.mjs").slice(0, 9500), /`unreadable`/, "and the header it names does say what the class is");
+  assert.match(read("tools", "leftovers-check.mjs").slice(0, 9500), /unreadable\s+under `--profile node`/, "and the header it names does say what the class is");
 });
 
 test("F3 16. [code1 0] the BOM is written as an escape, not as an invisible character", () => {

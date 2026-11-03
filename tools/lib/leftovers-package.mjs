@@ -12,6 +12,9 @@
  * The raw-temp baseline is not applied to a manifest: a baseline entry is for a file the guard reads as text.
  */
 
+import * as fs from "node:fs";
+import * as path from "node:path";
+
 import { finding } from "./leftovers-shell.mjs";
 
 export const MANIFEST_NAME = "package.json";
@@ -19,6 +22,9 @@ export const MANIFEST_NAME = "package.json";
 const PSEUDO_FILE = "package-script.sh";
 // A marker inside a value must exempt nothing: `exempt:` becomes `exempt :`, which the exemption grammar does not read (the text stays, so the other classes still see it).
 const INERT_MARKER = new RegExp(`(${"testsTo" + "Delete"}-exempt):`, "g");
+
+/** `text` with every control character, backslash and line separator written as `\\uXXXX`: a script name or a parser message must not move the cursor of the terminal that prints it. */
+const visible = (text) => text.replace(/[\\\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, (char) => (char === "\\" ? "\\\\" : `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`));
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -63,12 +69,12 @@ export function scriptLines(text) {
 }
 
 /**
- * `{ findings, scanned }` of one manifest. `bytes` is its content; `scan(name, text)` is the guard's text scan (so this module imports nothing from it). `scanned` says whether
- * anything was read — a script, or an unreadable manifest — so a repository whose only manifests have no `scripts` is still "scanned nothing".
+ * The findings of one manifest's content `bytes`; `scan(name, text)` is the guard's text scan (so this module imports nothing from it). Each carries `manifest: true`: no
+ * baseline entry can carry a manifest site (its line is a JSON key, not the shell line the baseline hashes), so `--print-baseline` leaves them out.
  */
 export function manifestFindings(file, bytes, scan) {
-  const text = bytes.toString("utf8").replace(/^﻿/, "");
-  const unreadable = (why) => ({ findings: [finding(file, 1, "unreadable", `could not be read: ${why} — a package.json is read only as JSON whose \`scripts\` is an object of strings`)], scanned: true });
+  const text = bytes.toString("utf8").replace(/^\uFEFF/, "");
+  const unreadable = (why) => [{ ...finding(file, 1, "unreadable", visible(`could not be read: ${why} — a package.json is read only as JSON whose \`scripts\` is an object of strings`)), manifest: true }];
   let parsed;
   try {
     parsed = JSON.parse(text);
@@ -76,13 +82,23 @@ export function manifestFindings(file, bytes, scan) {
     return unreadable(`not valid JSON (${error.message.split("\n")[0]})`);
   }
   if (!isObject(parsed)) return unreadable("the top level is not an object");
-  if (!("scripts" in parsed)) return { findings: [], scanned: false };
+  if (!("scripts" in parsed)) return [];
   const entries = isObject(parsed.scripts) ? Object.entries(parsed.scripts) : undefined;
   if (entries === undefined || !entries.every(([, value]) => typeof value === "string")) return unreadable("`scripts` is not an object of strings");
   const where = scriptLines(text);
-  const findings = entries.flatMap(([name, value]) => {
+  return entries.flatMap(([name, value]) => {
     const line = where.keys.get(name) ?? where.scripts ?? 1;
-    return scan(PSEUDO_FILE, value.replace(INERT_MARKER, "$1 :").split(/\r?\n/).join("\n")).map((entry) => ({ ...entry, file, line, text: `${entry.text} — script \`${name}\`` }));
+    return scan(PSEUDO_FILE, value.replace(INERT_MARKER, "$1 :")).map((entry) => ({ ...entry, file, line, text: `${entry.text} — script \`${visible(name)}\``, manifest: true }));
   });
-  return { findings, scanned: entries.length > 0 };
+}
+
+/** `manifestFindings` of the file `file` of `repo`; a read that fails (the file went, or is no regular file) is ONE `unreadable` finding, never an abort of the scan. */
+export function scanManifest(repo, file, scan) {
+  let bytes;
+  try {
+    bytes = fs.readFileSync(path.join(repo, file));
+  } catch (error) {
+    return [{ ...finding(file, 1, "unreadable", visible(`could not be read: ${error.code ?? error.message.split("\n")[0]} — a package.json is read only as JSON whose \`scripts\` is an object of strings`)), manifest: true }];
+  }
+  return manifestFindings(file, bytes, scan);
 }

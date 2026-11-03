@@ -290,7 +290,7 @@ export function createApplier(loaded, repo, label, discovered = new Set(), guard
 
 /**
  * The baseline that lists every `raw-temp` finding of a scan, for the one creation: `{ baseline, missing }`, `scopes` empty, to be written by hand. A finding
- * whose line cannot be read (the file changed under the scan) is listed in `missing` as `file:line`, never a crash and never a guessed entry.
+ * whose line cannot be read (the file changed under the scan) is listed in `missing` as `file:line`, never a crash and never a guessed entry. A `package.json` script's finding (`manifest: true`) is never listed: no entry can carry its line.
  */
 export function printBaseline(findings, repo) {
   const cache = new Map();
@@ -304,7 +304,7 @@ export function printBaseline(findings, repo) {
     }
     return cache.get(file);
   };
-  const sites = findings.filter((entry) => entry.cls === BASELINE_CLASS).map((entry) => ({ entry, text: linesOf(entry.file)[entry.line - 1] }));
+  const sites = findings.filter((entry) => entry.cls === BASELINE_CLASS && entry.manifest !== true).map((entry) => ({ entry, text: linesOf(entry.file)[entry.line - 1] }));
   return {
     baseline: { about: "raw-temp sites inside the owned run folder; only shrinks — common/test-leftovers-detail.md §7", class: BASELINE_CLASS, scopes: [], entries: sites.filter((site) => site.text !== undefined).map(({ entry, text }) => ({ file: entry.file, sha256: siteSha256(text), line: entry.line })) },
     missing: sites.filter((site) => site.text === undefined).map(({ entry }) => `${entry.file}:${entry.line}`),
