@@ -233,13 +233,13 @@ export function isScanned(file, profile) {
   );
 }
 
-/** Whether something sits at `file` — a broken symlink included (`lstat` does not follow it; `existsSync` does). A tracked file deleted from the tree is not present. */
+/** Whether something sits at `file` — a broken symlink included (`lstat` does not follow it; `existsSync` does). A tracked file deleted from the tree (ENOENT) is not present; any other lstat error is present. */
 function isPresent(file) {
   try {
     fs.lstatSync(file);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    return error?.code !== "ENOENT"; // only "nothing there" is absent: EACCES, EIO, … mean it IS there and cannot be read, which `scanManifest` turns into a finding
   }
 }
 
@@ -573,6 +573,34 @@ function appliedBaseline(baseline, repo, files) {
   return createApplier(loaded, repo, BASELINE_FILE, new Set(files), GUARD_NAME, (root) => NODE_TREE.test(`${root}x`)); // the node profile reads every file under scripts/, test/ and tests/
 }
 
+/** Scan the text `files`: `{ read, findings }`; a file that is gone or binary is not read. `scan(file, text)` is the guard's text scan. */
+function scanTexts(repo, files, scan) {
+  const findings = [];
+  let read = 0;
+  for (const file of files) {
+    const absolute = path.join(repo, file);
+    if (!fs.existsSync(absolute)) continue;
+    const bytes = fs.readFileSync(absolute);
+    if (isBinary(bytes)) continue;
+    read += 1;
+    findings.push(...scan(file, bytes.toString("utf8")));
+  }
+  return { read, findings };
+}
+
+/** Scan the `manifests`: `{ read, findings }`. A manifest counts as read only when it yields a finding: a clean one is no proof that discovery worked. */
+function scanManifests(repo, manifests, scan) {
+  const findings = [];
+  let read = 0;
+  for (const file of manifests) {
+    if (!isPresent(path.join(repo, file))) continue; // a broken link is present (lstat), so it is read and becomes an `unreadable` finding
+    const found = scanManifest(repo, file, scan);
+    read += found.length > 0 ? 1 : 0;
+    findings.push(...found);
+  }
+  return { read, findings };
+}
+
 /**
  * Scan a repository: `{ files, findings }`. `files` is how many files were read — zero is a broken discovery. `identity` is the repository column of the token's
  * row: this repository's own for its own token, else blank (fails closed). `profile` is a `--profile` (`node`). `resolvers` is the yaml seam of `loadYaml`.
@@ -581,27 +609,15 @@ function appliedBaseline(baseline, repo, files) {
 export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "", allowlist, profile, resolvers, baseline } = {}) {
   const listed = listFiles(repo);
   const files = discover(repo, profile, listed);
-  const findings = [];
   const entries = Array.isArray(allowlist) ? allowlist : loadAllowlist(allowlist);
   let yamlModule;
   const yaml = () => (yamlModule ??= loadYaml(repo, resolvers)); // read at the first workflow, so a repository with none needs none
   const manifests = profile === "node" ? listed.filter((file) => isPackageManifest(file, profile)) : [];
   const applier = baseline === undefined || baseline === false ? undefined : appliedBaseline(baseline, repo, files);
-  let read = 0;
-  for (const file of files) {
-    const absolute = path.join(repo, file);
-    if (!fs.existsSync(absolute)) continue;
-    const bytes = fs.readFileSync(absolute);
-    if (isBinary(bytes)) continue;
-    read += 1;
-    findings.push(...scanText(file, bytes.toString("utf8"), entries, yaml, applier));
-  }
-  for (const file of manifests) {
-    if (!isPresent(path.join(repo, file))) continue; // a broken link is present (lstat), so it is read and becomes an `unreadable` finding
-    const found = scanManifest(repo, file, (name, text) => scanText(name, text, entries, yaml));
-    read += found.length > 0 ? 1 : 0; // a clean manifest is no proof that discovery worked: only one that yields a finding counts as read
-    findings.push(...found);
-  }
+  const texts = scanTexts(repo, files, (file, text) => scanText(file, text, entries, yaml, applier));
+  const found = scanManifests(repo, manifests, (name, text) => scanText(name, text, entries, yaml));
+  const findings = [...texts.findings, ...found.findings];
+  const read = texts.read + found.read;
   if (applier !== undefined) findings.push(...applier.finalFindings()); // the global reconcile: every entry no line matched, whatever file it names
   const rulePath = resolveRule(repo, rule);
   const ruleText = rulePath === undefined ? "" : fs.readFileSync(rulePath, "utf8");

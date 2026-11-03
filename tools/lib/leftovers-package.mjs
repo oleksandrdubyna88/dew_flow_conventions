@@ -23,49 +23,54 @@ const PSEUDO_FILE = "package-script.sh";
 // A marker inside a value must exempt nothing: `exempt:` becomes `exempt :`, which the exemption grammar does not read (the text stays, so the other classes still see it).
 const INERT_MARKER = new RegExp(`(${"testsTo" + "Delete"}-exempt):`, "g");
 
-/** `text` with every control character, backslash, line separator and Unicode bidi control (Trojan Source) written as `\\uXXXX`: a script name or a parser message must not move the cursor of the terminal that prints it. */
-const visible = (text) => text.replace(/[\\\u0000-\u001f\u007f-\u009f\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, (char) => (char === "\\" ? "\\\\" : `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`));
+const BACKSLASH = "\u005c";
+/** One character as `\uXXXX` (a backslash as two backslashes). */
+const escapeChar = (char) => (char === BACKSLASH ? BACKSLASH + BACKSLASH : `${BACKSLASH}u${char.codePointAt(0).toString(16).padStart(4, "0")}`);
+/** `text` with every control character, backslash, line separator and Unicode bidi control (Trojan Source) written as `\uXXXX`: a script name, a script value or a parser message must not move the cursor of the terminal that prints it. */
+const visible = (text) => text.replace(/[\\\u0000-\u001f\u007f-\u009f\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, escapeChar);
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+
+/** A JSON string, or one of the characters the walker follows: a bracket, a comma, a line break. */
+const TOKEN = /"(?:[^"\\]|\\[\s\S])*"|[{}[\],\n]/g;
+
+/** A key was read at the walker's depth: the `scripts` key of the top level arms the walk; a key inside the armed object is a script. */
+function readKey(state, key) {
+  if (state.depth === 1 && key === "scripts") Object.assign(state, { armed: true, scripts: state.line });
+  else if (state.depth === 2 && state.inScripts) state.keys.set(key, state.line);
+}
+
+/** A bracket or a comma moves the depth; the `{` that follows the `scripts` key opens the object whose keys are scripts (the last such object wins). */
+function readBracket(state, char) {
+  if (char === "{" || char === "[") {
+    state.depth += 1;
+    if (state.armed && char === "{") {
+      state.inScripts = true;
+      state.keys.clear();
+    }
+    state.armed = false;
+  } else if (char === "}" || char === "]") {
+    if (state.inScripts && state.depth === 2) state.inScripts = false;
+    state.depth -= 1;
+  } else state.armed = false; // a comma: the value of `scripts` was not an object
+}
 
 /**
  * Where the keys of the top-level `scripts` object sit: `{ scripts, keys }` (1-based lines; `scripts` is undefined without one). A walk over the text that tracks strings and
  * depth, so a key of the same name in `dependencies` or in a nested object is never taken for a script. The last `scripts` wins, as `JSON.parse` does.
  */
 export function scriptLines(text) {
-  const keys = new Map();
-  let scripts;
-  let line = 1;
-  let depth = 0;
-  let armed = false; // the key `scripts` at depth 1 was just read: the next `{` opens it
-  let inScripts = false;
+  const state = { keys: new Map(), scripts: undefined, line: 1, depth: 0, armed: false, inScripts: false };
   const colon = /\s*:/y;
-  for (let at = 0; at < text.length; at += 1) {
-    const char = text[at];
-    if (char === "\n") line += 1;
-    else if (char === '"') {
-      let end = at + 1;
-      while (end < text.length && text[end] !== '"') end += text[end] === "\\" ? 2 : 1;
-      colon.lastIndex = end + 1;
-      if (colon.test(text)) {
-        const key = JSON.parse(text.slice(at, end + 1));
-        if (depth === 1 && key === "scripts") [armed, scripts] = [true, line];
-        else if (depth === 2 && inScripts) keys.set(key, line);
-      }
-      at = end;
-    } else if (char === "{" || char === "[") {
-      depth += 1;
-      if (armed && char === "{") {
-        inScripts = true;
-        keys.clear();
-      }
-      armed = false;
-    } else if (char === "}" || char === "]") {
-      if (inScripts && depth === 2) inScripts = false;
-      depth -= 1;
-    } else if (char === ",") armed = false;
+  for (const match of text.matchAll(TOKEN)) {
+    const [token] = match;
+    if (token === "\n") state.line += 1;
+    else if (token.startsWith('"')) {
+      colon.lastIndex = match.index + token.length;
+      if (colon.test(text)) readKey(state, JSON.parse(token));
+    } else readBracket(state, token);
   }
-  return { scripts, keys };
+  return { scripts: state.scripts, keys: state.keys };
 }
 
 /**
@@ -84,11 +89,11 @@ export function manifestFindings(file, bytes, scan) {
   if (!isObject(parsed)) return unreadable("the top level is not an object");
   if (!("scripts" in parsed)) return [];
   const entries = isObject(parsed.scripts) ? Object.entries(parsed.scripts) : undefined;
-  if (entries === undefined || !entries.every(([, value]) => typeof value === "string")) return unreadable("`scripts` is not an object of strings");
+  if (!entries?.every(([, value]) => typeof value === "string")) return unreadable("`scripts` is not an object of strings");
   const where = scriptLines(text);
   return entries.flatMap(([name, value]) => {
     const line = where.keys.get(name) ?? where.scripts ?? 1;
-    return scan(PSEUDO_FILE, value.replace(INERT_MARKER, "$1 :")).map((entry) => ({ ...entry, file, line, text: `${entry.text} — script \`${visible(name)}\``, manifest: true }));
+    return scan(PSEUDO_FILE, value.replace(INERT_MARKER, "$1 :")).map((entry) => ({ ...entry, file, line, text: `${visible(entry.text)} — script \`${visible(name)}\``, manifest: true }));
   });
 }
 
