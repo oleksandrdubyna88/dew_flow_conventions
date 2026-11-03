@@ -18,7 +18,8 @@
  *                 variable the same file assigns a value holding the prefix (a name from another file, the environment or an
  *                 argument is not traced) — the shape of a sweeper that cannot tell one user's leftovers from another's. It takes NO inline exemption: the one pass is
  *                 `tools/fixtures/owner-blind-allowlist.json`, keyed by file, line and the sha256 of the line
- * plus two that are about the guard's own grammar:
+ * plus three that are about the guard's own grammar and inputs:
+ *   unreadable    under `--profile node`, a `package.json` that is not valid JSON, is not an object, or whose `scripts` is not an object of strings (never skipped in silence)
  *   exemption     a `testsToDelete-exempt:` comment that is not well-formed
  *   token         this repository's token is not a row of the rule's `## Tokens` table (§1), or is of the owner grammar, or a copied `owned.mjs` has
  *                 no `owned-token.mjs` beside it (the shipped helper holds no token: each repository writes its OWN `tools/lib/owned-token.mjs` — `REPO_TOKEN`, `REPO_ROW` — and never copies another's)
@@ -53,6 +54,10 @@
  * `'${name}'` is no expansion in a shell, so it is the literal text `${name}`.
  * Workflows are read with `yaml@2`: this guard's own copy first, then the scanned repository's (`node_modules` of the consumer), else exit 2 with the one
  * sentence that says to add `yaml@2` as a devDependency — and only when the repository has a workflow. Not here: a `module-load` class (needs a parser).
+ * Under `--profile node` the guard also reads every `package.json` of the repository's own tree (`tools/lib/leftovers-package.mjs`; the same exclusions: no `node_modules/`, no mount path): it parses the JSON and scans
+ * each `scripts` value as ONE shell line (a line break inside a value splits it), with the classes and detectors of a `.sh` file — a chain (`&&`, `||`, `;`, a pipe) and an environment prefix are covered. The finding keeps the
+ * manifest's path, names the script, and takes the line of that key inside `scripts`. JSON has no comments, so a manifest takes NO exemption (a marker in a value exempts nothing, and the `raw-temp` baseline is not applied to it):
+ * a finding there is cured by rewriting the script, for example to call a script file the guard reads, which can carry the exemption comment. No `scripts` field is valid and has nothing to scan. Other manifests (`deno.json`, …) are not read.
  *
  * `--baseline` reads the repository's `raw-temp` baseline (rule §7, `common/test-leftovers-baseline.md`, `tools/lib/raw-temp-baseline.mjs`): ONE fixed path, `raw-temp-baseline.json`
  * at the repository root, a regular file, never a symlink (a link is a `baseline` finding in a scan and exit 2 in the shrink check). It is a multiset of `raw-temp` sites — file and

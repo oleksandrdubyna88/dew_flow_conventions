@@ -296,7 +296,7 @@ test("S8 review 4c. a yaml of another version is reported as the wrong version, 
 
 // 5 — F3: under --profile node the guard also reads the `scripts` of every package.json of the repository's own tree -----------------
 
-const SWEEP = "rm -rf /tmp/testsToDelete-*"; // an owner-blind sweep: the prefix, no owner segment
+const SWEEP = ["rm -rf /tmp/tests", "ToDelete-*"].join(""); // an owner-blind sweep: the prefix, no owner segment (in pieces, so the sweeper scan of this repository does not read it as one)
 const manifest = (scripts, extra = {}) => `${JSON.stringify({ name: "consumer", version: "1.0.0", ...extra, scripts }, null, 2)}\n`;
 const node = (repo, extra = []) => guard(repo, ["--profile", "node", ...extra]);
 /** The findings of one file, from the structured scan. */
@@ -402,4 +402,12 @@ test("F3 11. the manifest has no inline exemption: a marker inside a script valu
   const repo = tree(t, { ...BASE, "package.json": manifest({ posttest: `mktemp -d # ${marker}`, pretest: `${SWEEP}\n# ${marker}` }) });
   const found = foundIn(repo, "package.json");
   assert.deepEqual(found.map((entry) => entry.cls).sort(), ["owner-blind", "raw-temp"], JSON.stringify(found));
+});
+
+test("F3 12. the header and the README say what the profile reads of a package.json and that it has no exemption", () => {
+  const header = read("tools", "leftovers-check.mjs").slice(0, 9000);
+  assert.match(header, /package\.json/);
+  assert.match(header, /`scripts`/);
+  assert.match(header, /no (?:inline )?exemption/i);
+  assert.match(read("README.md"), /`scripts` values of every `package\.json`/);
 });

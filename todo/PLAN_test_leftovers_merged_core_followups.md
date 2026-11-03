@@ -53,6 +53,9 @@ future re-discovery by the same method. Anchors are `file:line` at the commit th
   pseudo-file with the script's name in the finding. A RED test: the consumer above, plus one that stays clean.
 - **When.** At the first consumer migration to the guard's `--profile node` (E2 onward of the rollout), before the consumer is
   declared compliant.
+- **Progress 2026-11-03 — fixed on `fix/f3-node-profile-package-scripts`, not released.** Under `--profile node` the guard reads every `package.json` of the repository's own tree
+  (`tools/lib/leftovers-package.mjs`): each `scripts` value is one shell line, the finding names the file and the script and takes the line of that key. A manifest it cannot read is one
+  `unreadable` finding. A manifest takes no exemption (JSON has no comment). Other manifests (`deno.json`, `pnpm-workspace.yaml`, …) are not read; open an F23 if a consumer has one.
 
 ## F4 — One companion sentence on the owner override and daemon objects (L-5)
 
