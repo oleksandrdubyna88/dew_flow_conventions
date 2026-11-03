@@ -233,6 +233,16 @@ export function isScanned(file, profile) {
   );
 }
 
+/** Whether something sits at `file` — a broken symlink included (`lstat` does not follow it; `existsSync` does). A tracked file deleted from the tree is not present. */
+function isPresent(file) {
+  try {
+    fs.lstatSync(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Whether a path is a `package.json` the `node` profile reads for its `scripts` (F3): any tracked one of the repository's own tree — the same exclusions as `isScanned`
  * and `tokenConstants`. Not a text file to `isScanned`: `manifestFindings` reads it as JSON. Without the profile none is read.
@@ -248,7 +258,7 @@ const isBinary = (bytes) => bytes.subarray(0, 8192).includes(0);
 /** Paths in code-unit order — the order a bare `.sort()` gives, stated, so it never depends on the locale. */
 const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
-/** The files to read, from git's own idea of the tree (tracked plus untracked-not-ignored), out of `listed` (every file git knows: one listing per scan). Throws when `repo` is not a repository. */
+/** The TEXT files to read (`isScanned`), NOT the `package.json` manifests: `scanRepository` selects those separately with `isPackageManifest`, under `--profile node` only. From git's own idea of the tree (tracked plus untracked-not-ignored), out of `listed` (every file git knows: one listing per scan). Throws when `repo` is not a repository. */
 export function discover(repo, profile, listed = listFiles(repo)) {
   checkProfile(profile);
   return listed.filter((file) => isScanned(file, profile));
@@ -587,7 +597,7 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = toke
     findings.push(...scanText(file, bytes.toString("utf8"), entries, yaml, applier));
   }
   for (const file of manifests) {
-    if (!fs.existsSync(path.join(repo, file))) continue;
+    if (!isPresent(path.join(repo, file))) continue; // a broken link is present (lstat), so it is read and becomes an `unreadable` finding
     const found = scanManifest(repo, file, (name, text) => scanText(name, text, entries, yaml));
     read += found.length > 0 ? 1 : 0; // a clean manifest is no proof that discovery worked: only one that yields a finding counts as read
     findings.push(...found);

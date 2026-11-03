@@ -23,8 +23,8 @@ const PSEUDO_FILE = "package-script.sh";
 // A marker inside a value must exempt nothing: `exempt:` becomes `exempt :`, which the exemption grammar does not read (the text stays, so the other classes still see it).
 const INERT_MARKER = new RegExp(`(${"testsTo" + "Delete"}-exempt):`, "g");
 
-/** `text` with every control character, backslash and line separator written as `\\uXXXX`: a script name or a parser message must not move the cursor of the terminal that prints it. */
-const visible = (text) => text.replace(/[\\\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, (char) => (char === "\\" ? "\\\\" : `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`));
+/** `text` with every control character, backslash, line separator and Unicode bidi control (Trojan Source) written as `\\uXXXX`: a script name or a parser message must not move the cursor of the terminal that prints it. */
+const visible = (text) => text.replace(/[\\\u0000-\u001f\u007f-\u009f\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, (char) => (char === "\\" ? "\\\\" : `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`));
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
