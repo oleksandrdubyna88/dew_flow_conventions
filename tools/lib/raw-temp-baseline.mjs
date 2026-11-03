@@ -8,7 +8,7 @@
  *   "allowed creation"); the guard and the shrink check both refuse a link;
  * - a MULTISET: one entry per occurrence, keyed by the file and `siteSha256` (the trimmed line); `line` is a hint, never a key;
  * - a scope's `proof` is a TEST file under its `root`, discovered by the same scan, that carries a line of `testsToDelete-baseline-proof: <root>` (the root
- *   exactly, then only whitespace or a comment closer) — the guard checks the declaration, a reviewer checks the substance; an entry outside every scope, or
+ *   exactly, then only whitespace or a comment closer) — the guard checks the declaration and nothing else (no gate, no folder, and no order: the proof need not run first, parallel collections have no first test; F24), the consumer's tests and a reviewer check the substance; an entry outside every scope, or
  *   under a scope whose proof does not hold, clears nothing; an entry belongs to the most specific scope that holds its file;
  * - each scope NAMES the guard that judges it (`node`, the shipped Node guard, or `csharp`, the C# guard a consumer copies; a closed list, any other value
  *   is a malformed file): a guard judges exactly the scopes that name it and reconciles every one of their entries globally, and it never checks another
