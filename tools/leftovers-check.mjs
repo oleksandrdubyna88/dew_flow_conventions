@@ -62,7 +62,7 @@
  * `--baseline` reads the repository's `raw-temp` baseline (rule §7, `common/test-leftovers-baseline.md`, `tools/lib/raw-temp-baseline.mjs`): ONE fixed path, `raw-temp-baseline.json`
  * at the repository root, a regular file, never a symlink (a link is a `baseline` finding in a scan and exit 2 in the shrink check). It is a multiset of `raw-temp` sites — file and
  * the sha256 of the trimmed line, one entry per occurrence — for sites that run inside an owned run folder; a scope's proof is a test file this scan discovered that carries
- * `testsToDelete-baseline-proof: <root>`. Each scope NAMES its guard (`node` — this one — or `csharp`); this guard judges exactly the scopes that name `node` and never another guard's.
+ * `testsToDelete-baseline-proof: <root>` (the guard checks that marker only — never a gate, a folder or an order; F24). Each scope NAMES its guard (`node` — this one — or `csharp`); this guard judges exactly the scopes that name `node` and never another guard's.
  * It is read ONLY when `--baseline` is given, run at the git root (a subfolder, or a git failure, is exit 2). A site up to its entries passes; one more is `raw-temp`; a stale entry, an entry under no scope or
  * under a scope whose proof is missing, another class, a malformed file are class `baseline` (exit 1, with the cure). Only an unreadable path is exit 2.
  * `--print-baseline` prints, to stdout only, the baseline of the current scan's `raw-temp` findings (`scopes` empty, to be written by hand) for the one creation.

@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01.** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03.** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -650,9 +650,39 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   `leftovers-sweep.mjs` refreshed, as its `check_static.sh --vendored` requires), dew_flow_benchmark #152 (`c466652`). creds E2.1
   is wired to it (draft PR creds #294).
 
+## F24 — The raw-temp baseline's proof asks for a test "ordered first", which no parallel test framework can give (found 2026-11-03, the rollout's epoch 4 re-review)
+
+- **What.** `common/test-leftovers-baseline.md` (the *The `raw-temp` baseline* paragraph) made a scope *proven* by three things; the third was
+  "a test per assembly or package, **ordered first**, asserts that `TEMP` names the run folder and carries `testsToDelete-baseline-proof: <scope root>`".
+  xUnit v3 runs collections in parallel (`maxParallelThreads`), and no test framework the family uses has a portable "first test of the assembly",
+  so coai's four C# suites cannot meet the clause as written.
+- **Why.** What the clause guards — no test runs outside the run folder — is better given by a PROCESS-WIDE gate that runs before discovery and
+  refuses the run (coai E5's gated custom `Main`: exit 78, one line). A rule a consumer cannot meet is a rule it works around. The guard's code never
+  encoded the order: `proofFailure` and `isTestFile` (`tools/lib/raw-temp-baseline.mjs`) only check that the proof is a test file this scan discovered
+  and carries the marker for exactly its root (confirmed by reading; no behaviour change).
+- **Fix — the rule text only; the marker, the three things and the guard are unchanged.** The second thing ("a run that cannot make it fails before any
+  test") is met by a process-wide gate that runs before test discovery, refuses the run with one line and a non-zero exit when the folder cannot be made
+  or claimed, and also when `TEMP`, `TMP` or `TMPDIR` do not name it. The third thing loses "ordered first": the test is NOT required to run first, and the
+  text says why (parallel test collections have no first test). [plan gate, finding 0] The text says who verifies what: the guard checks only the marker;
+  the first two things are proven by the consumer's own tests — a child run of the suite with a forced folder failure and a forced claim failure must exit
+  non-zero before discovery — and by review; a repository with no such gate does not satisfy the proof and may not carry a baseline. "Ordered first"
+  appeared only in the baseline companion (grep over `common/`, `tools/` and the README).
+- **Tests (RED where text is pinned → GREEN → RED):** `S1 10` of `tools/test-leftovers-rule.test.mjs` pins ten new phrases of the companion and that
+  "ordered first" is gone. [plan gate, finding 2] Test 42 of `tools/raw-temp-baseline.test.mjs` is a companion, green before and after: a fixture with
+  a proof that sorts last by name (`zz-proof.test.mjs` after `aa.test.mjs`) and one that sorts first, neither with any ordering attribute, are accepted;
+  without the marker the same tree is `proof missing`. It pins that ordering never becomes a code check.
+- **Docs.** The companion; `research/rule-bodies.json` (the record of `common.test-leftovers-baseline`); the byte table of `research/module_rules.md`
+  (re-measured: +688 B on the companion); the guard's two header comments and the guard paragraph of `research/module_tests.md` say the guard checks the
+  marker only.
+- **Release.** ONE release with F3, and coai pins that release before E5's S6 creates its baseline (rollout plan § Epoch 4, items 2 and 5). E5's S6 runs
+  the acceptance check against the released guard.
+- **Progress 2026-11-03 — the rule text is changed on `fix/f24-baseline-proof-gate`, not released.** RED observed with the tests only (62 of 63 pass: `S1 10`
+  fails on the ten missing phrases; test 42 passes by design); GREEN with the text (63 of 63); RED again with the companion stashed (1 failed, the same
+  test). `node tools/rule-bodies.mjs --update common.test-leftovers-baseline` recorded the body. Not done: the release, the pin bumps, E5's acceptance check.
+
 ## Definition of Done
 
-- [ ] Each of F1 to F22 is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
+- [ ] Each of F1 to F22 and F24 (F23 is reserved by F3's note for other manifests) is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.
