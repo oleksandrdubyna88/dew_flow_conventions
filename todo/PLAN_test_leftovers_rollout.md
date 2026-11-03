@@ -1,5 +1,10 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
+> Status: **stopped for re-review (2026-11-03)** — epoch 2's second change after approval (entry 2.2, E5.S5's order
+> against the producer PR). No new code on any epic of this plan and no merge of a pull request carrying its work until
+> the re-review approves epoch 3. Unpushed local work at the stop: coai S5 branches (mcp: uncommitted; ext: 2 local
+> commits; scripts: uncommitted); creds E2.1 is a draft PR (#294) and was not to merge before the owner's records anyway.
+>
 > Status: **epoch 2 open (2026-11-01), approved by the owner after the re-review.** Epoch 1 stopped at its second change after
 > approval (2026-10-31; see Plan changes); the stop was recorded on 2026-11-01 and the work done between the two is sorted in the
 > re-review's table. The whole plan was revised on 2026-11-01 against what is known now (§ *Epoch 2 — the plan as revised at the
@@ -81,12 +86,22 @@ Narrowed: yes — E5's producer PR may merge with the structural guard green-by-
   never remove an unmarked folder; only that README sentence, left by #77 and not updated by #82, still says so. Note 2: #58 and #64 checked
   (a)–(d) on the operator's WSL machine only; P1's record says whether the owner's Windows machine builds or tests mcp and sidecar_rust.)
 
-> Epoch 2 · approved 2026-11-01 · by owner · state: open
+> Epoch 2 · approved 2026-11-01 · by owner · state: stopped
 
 - 2.1 · 2026-11-02 · agent · build-order — E2.1 and E5's Node runners wait for F22 (the reference sweep takes the consumer's token) and its release
   (the E2.1 coder measured it: `sweepLeftovers` compares every name with the reference's own `REPO_TOKEN`, so a wrapper cannot
   sweep `creds-` or `coai-` folders; decision 11 forbids a copy. F22 is in the follow-ups plan; E2.1 is built with a sweep seam
   that refuses loudly until the pin carries F22.)
+- 2.2 · 2026-11-03 · agent · build-order, dod, merge-conditions — E5.S5 cannot finish before E5's producer PR: its sites outside any run folder lose the bare prefix only after S4/S3 give them an owned folder
+  (found building S5, coai branches feat/test-leftovers-e5-s5-{mcp,ext,scripts}. CI runs `scripts/**/*.test.mjs` as plain
+  `node --test` (coai ci.yml:197), so about 35 sites in scripts/lib, scripts/ and src_server/tests make top-level folders
+  in the machine's real temp; two renamed extension sites also run in sonarcloud.yml:302 outside the run folder. Dropping
+  the prefix there leaves an unnamed leftover (rule section 1 allows no prefix only inside an owned resource). E5's
+  stages table puts S5 on main BEFORE the producer PR (S3 depends on "S2-A, S5 on main"), and S5's DoD is "zero
+  bare-prefix lines outside the two helper files"; S5's own text says these sites "move under S4's owned folder". So
+  the order, S5's DoD and the producer PR's merge condition must change. Consult c137f641: two answers, A (narrow S5,
+  move the sites to S3/S4, record the change) and B (keep S5 open). Both depend on a merge condition changing, so this
+  is a change. It is the second of epoch 2: the plan stops for re-review.)
 
 ## Symptom
 
