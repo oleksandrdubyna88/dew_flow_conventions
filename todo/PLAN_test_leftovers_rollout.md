@@ -961,6 +961,14 @@ for the gate: besides the gated `Main`, a fallback check at the first point any 
 fails the run with the same one line when the gate did not run (a host that bypassed `Main`); the module initializer
 still makes the folder, and the fallback refuses when `RunTemp.IsActive` is false. Both are written in E5's S3.
 
+**The manifest's format, the same for every consumer [PR review, CodeRabbit].** One committed manifest per consumer,
+one entry per copied file: the upstream path, the target path, the upstream git blob SHA, and an ORDERED list of
+exact-replace operations, each with its expected number of matches. The check works on the raw bytes with no text
+normalisation (no line-ending, encoding or whitespace change): it reads the target, undoes the operations in reverse
+order (each must match exactly its expected number of times), and computes the git blob SHA of those bytes
+(`blob <size>\0` + content). Any other difference fails. Each epic writes its manifest entries before its producer PR
+opens.
+
 E5's D2 is the first such copy. E2, E6 and E7 follow the same form. Making the template itself parameterised (upstream,
 in dew_flow_mcp) is NOT done now; it is a possible later follow-up if the same adaptations recur.
 
