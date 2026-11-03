@@ -18,7 +18,8 @@
  *                 variable the same file assigns a value holding the prefix (a name from another file, the environment or an
  *                 argument is not traced) — the shape of a sweeper that cannot tell one user's leftovers from another's. It takes NO inline exemption: the one pass is
  *                 `tools/fixtures/owner-blind-allowlist.json`, keyed by file, line and the sha256 of the line
- * plus two that are about the guard's own grammar:
+ * plus three that are about the guard's own grammar and inputs:
+ *   unreadable    under `--profile node`, a `package.json` that is not valid JSON, is not an object, or whose `scripts` is not an object of strings (never skipped in silence)
  *   exemption     a `testsToDelete-exempt:` comment that is not well-formed
  *   token         this repository's token is not a row of the rule's `## Tokens` table (§1), or is of the owner grammar, or a copied `owned.mjs` has
  *                 no `owned-token.mjs` beside it (the shipped helper holds no token: each repository writes its OWN `tools/lib/owned-token.mjs` — `REPO_TOKEN`, `REPO_ROW` — and never copies another's)
@@ -53,6 +54,10 @@
  * `'${name}'` is no expansion in a shell, so it is the literal text `${name}`.
  * Workflows are read with `yaml@2`: this guard's own copy first, then the scanned repository's (`node_modules` of the consumer), else exit 2 with the one
  * sentence that says to add `yaml@2` as a devDependency — and only when the repository has a workflow. Not here: a `module-load` class (needs a parser).
+ * Under `--profile node` the guard also reads every `package.json` of the repository's own tree (`tools/lib/leftovers-package.mjs`; the same exclusions: no `node_modules/`, no mount path): it parses the JSON and scans
+ * each `scripts` value as ONE shell line (a line break inside a value splits it), with the classes and detectors of a `.sh` file — a chain (`&&`, `||`, `;`, a pipe) and an environment prefix are covered. The finding keeps the
+ * manifest's path, names the script, and takes the line of that key inside `scripts` — always the line of the script's KEY in the file, also for a value with line breaks. JSON has no comments, so a manifest takes NO exemption (a marker in a value exempts nothing, and the `raw-temp` baseline is not applied to it):
+ * a finding there is cured by rewriting the script, for example to call a script file the guard reads, which can carry the exemption comment. No `scripts` field is valid and has nothing to scan. Other manifests (`deno.json`, …) are not read.
  *
  * `--baseline` reads the repository's `raw-temp` baseline (rule §7, `common/test-leftovers-baseline.md`, `tools/lib/raw-temp-baseline.mjs`): ONE fixed path, `raw-temp-baseline.json`
  * at the repository root, a regular file, never a symlink (a link is a `baseline` finding in a scan and exit 2 in the shrink check). It is a multiset of `raw-temp` sites — file and
@@ -82,6 +87,7 @@ import { dockerFindings } from "./lib/leftovers-docker.mjs";
 import { REPO_ROW, REPO_TOKEN } from "./lib/owned-token.mjs";
 import { BASELINE_FILE, GUARD_NAME, PROOF_MARKER, createApplier, loadBaselineAt, siteSha256 } from "./lib/raw-temp-baseline.mjs";
 import { PROFILES, parseArguments, runCli } from "./lib/leftovers-cli.mjs";
+import { MANIFEST_NAME, scanManifest } from "./lib/leftovers-package.mjs";
 
 export { PROFILES, parseArguments };
 import { JANITOR_FILE, classifyLine, classifyLines, lineSha256 } from "./lib/sweeper-scan.mjs";
@@ -126,6 +132,7 @@ export const CURES = Object.freeze({
   "owner-blind": "Match the caller's owner after the prefix (^testsToDelete-<owner>-<repo>-), or delete the sweep and use the shipped janitor; this class takes no exemption — common/test-leftovers-detail.md §7 (owner-blind), the barrier.",
   "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers-detail.md §6, §7 (shared-store).",
   "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers-detail.md §5, §7 (ryuk-off).",
+  unreadable: "Make the package.json valid JSON whose `scripts` is an object of strings (or remove the field): the guard reads no other shape, and never skips one — see the header of tools/leftovers-check.mjs (`--profile node`) and the README row of the guard.",
   baseline: "Remove the stale or out-of-scope entry from the baseline, or move the site into the helper; nothing adds to it — common/test-leftovers-detail.md §7 (the `raw-temp` baseline).",
   exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers-detail.md §7 (the exemption grammar).",
   token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers-detail.md § Tokens (§1 of the rule) — and write it, with its row, in this repository's own tools/lib/owned-token.mjs beside the copied owned.mjs (never copy another repository's).",
@@ -226,16 +233,35 @@ export function isScanned(file, profile) {
   );
 }
 
+/** Whether something sits at `file` — a broken symlink included (`lstat` does not follow it; `existsSync` does). A tracked file deleted from the tree (ENOENT) is not present; any other lstat error is present. */
+function isPresent(file) {
+  try {
+    fs.lstatSync(file);
+    return true;
+  } catch (error) {
+    return error?.code !== "ENOENT"; // only "nothing there" is absent: EACCES, EIO, … mean it IS there and cannot be read, which `scanManifest` turns into a finding
+  }
+}
+
+/**
+ * Whether a path is a `package.json` the `node` profile reads for its `scripts` (F3): any tracked one of the repository's own tree — the same exclusions as `isScanned`
+ * and `tokenConstants`. Not a text file to `isScanned`: `manifestFindings` reads it as JSON. Without the profile none is read.
+ */
+export function isPackageManifest(file, profile) {
+  checkProfile(profile);
+  return profile === "node" && path.posix.basename(file) === MANIFEST_NAME && !NODE_NEVER.test(file) && !EXCLUDED_FILES.includes(file) && !file.startsWith("tools/lib/");
+}
+
 /** A file that holds a NUL byte in its first 8 KiB is binary (git's own test, and a UTF-16 text file too): it is not text to be read for names. */
 const isBinary = (bytes) => bytes.subarray(0, 8192).includes(0);
 
 /** Paths in code-unit order — the order a bare `.sort()` gives, stated, so it never depends on the locale. */
 const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
-/** The files to read, from git's own idea of the tree (tracked plus untracked-not-ignored). Throws when `repo` is not a repository. */
-export function discover(repo, profile) {
+/** The TEXT files to read (`isScanned`), NOT the `package.json` manifests: `scanRepository` selects those separately with `isPackageManifest`, under `--profile node` only. From git's own idea of the tree (tracked plus untracked-not-ignored), out of `listed` (every file git knows: one listing per scan). Throws when `repo` is not a repository. */
+export function discover(repo, profile, listed = listFiles(repo)) {
   checkProfile(profile);
-  return listFiles(repo).filter((file) => isScanned(file, profile));
+  return listed.filter((file) => isScanned(file, profile));
 }
 
 /** Every file git knows in `repo`, tracked or untracked-not-ignored, in code-unit order. */
@@ -547,18 +573,9 @@ function appliedBaseline(baseline, repo, files) {
   return createApplier(loaded, repo, BASELINE_FILE, new Set(files), GUARD_NAME, (root) => NODE_TREE.test(`${root}x`)); // the node profile reads every file under scripts/, test/ and tests/
 }
 
-/**
- * Scan a repository: `{ files, findings }`. `files` is how many files were read — zero is a broken discovery. `identity` is the repository column of the token's
- * row: this repository's own for its own token, else blank (fails closed). `profile` is a `--profile` (`node`). `resolvers` is the yaml seam of `loadYaml`.
- * `baseline` is `true` (read the repository's one baseline path) or a loaded baseline (`loadBaselineAt`), else nothing: a baseline is read only when asked for.
- */
-export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "", allowlist, profile, resolvers, baseline } = {}) {
-  const files = discover(repo, profile);
+/** Scan the text `files`: `{ read, findings }`; a file that is gone or binary is not read. `scan(file, text)` is the guard's text scan. */
+function scanTexts(repo, files, scan) {
   const findings = [];
-  const entries = Array.isArray(allowlist) ? allowlist : loadAllowlist(allowlist);
-  let yamlModule;
-  const yaml = () => (yamlModule ??= loadYaml(repo, resolvers)); // read at the first workflow, so a repository with none needs none
-  const applier = baseline === undefined || baseline === false ? undefined : appliedBaseline(baseline, repo, files);
   let read = 0;
   for (const file of files) {
     const absolute = path.join(repo, file);
@@ -566,8 +583,41 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = toke
     const bytes = fs.readFileSync(absolute);
     if (isBinary(bytes)) continue;
     read += 1;
-    findings.push(...scanText(file, bytes.toString("utf8"), entries, yaml, applier));
+    findings.push(...scan(file, bytes.toString("utf8")));
   }
+  return { read, findings };
+}
+
+/** Scan the `manifests`: `{ read, findings }`. A manifest counts as read only when it yields a finding: a clean one is no proof that discovery worked. */
+function scanManifests(repo, manifests, scan) {
+  const findings = [];
+  let read = 0;
+  for (const file of manifests) {
+    if (!isPresent(path.join(repo, file))) continue; // a broken link is present (lstat), so it is read and becomes an `unreadable` finding
+    const found = scanManifest(repo, file, scan);
+    read += found.length > 0 ? 1 : 0;
+    findings.push(...found);
+  }
+  return { read, findings };
+}
+
+/**
+ * Scan a repository: `{ files, findings }`. `files` is how many files were read — zero is a broken discovery. `identity` is the repository column of the token's
+ * row: this repository's own for its own token, else blank (fails closed). `profile` is a `--profile` (`node`). `resolvers` is the yaml seam of `loadYaml`.
+ * `baseline` is `true` (read the repository's one baseline path) or a loaded baseline (`loadBaselineAt`), else nothing: a baseline is read only when asked for.
+ */
+export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = token === REPO_TOKEN ? REPO_ROW : "", allowlist, profile, resolvers, baseline } = {}) {
+  const listed = listFiles(repo);
+  const files = discover(repo, profile, listed);
+  const entries = Array.isArray(allowlist) ? allowlist : loadAllowlist(allowlist);
+  let yamlModule;
+  const yaml = () => (yamlModule ??= loadYaml(repo, resolvers)); // read at the first workflow, so a repository with none needs none
+  const manifests = profile === "node" ? listed.filter((file) => isPackageManifest(file, profile)) : [];
+  const applier = baseline === undefined || baseline === false ? undefined : appliedBaseline(baseline, repo, files);
+  const texts = scanTexts(repo, files, (file, text) => scanText(file, text, entries, yaml, applier));
+  const found = scanManifests(repo, manifests, (name, text) => scanText(name, text, entries, yaml));
+  const findings = [...texts.findings, ...found.findings];
+  const read = texts.read + found.read;
   if (applier !== undefined) findings.push(...applier.finalFindings()); // the global reconcile: every entry no line matched, whatever file it names
   const rulePath = resolveRule(repo, rule);
   const ruleText = rulePath === undefined ? "" : fs.readFileSync(rulePath, "utf8");
