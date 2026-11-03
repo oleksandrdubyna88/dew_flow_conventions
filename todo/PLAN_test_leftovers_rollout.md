@@ -1,6 +1,13 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **stopped for re-review (2026-11-03)** — epoch 3's second change after approval (entries 3.1 and 3.2, found
+> Status: **epoch 4 open (2026-11-03), approved by the owner after the re-review.** Epoch 3 stopped at entries 3.1 and 3.2;
+> the whole plan was revised (§ *Epoch 4*), the Opus judge sorted epoch 3's work, the plan gate (session `7c66b50d`) and
+> the interim document gate passed, and because the record says `Narrowed: yes` the owner approved it (question 1).
+> Questions 3 and 4 were settled by the question consultants (`4e52fac6`, both agreeing), as the owner's standing
+> instruction asks: the Windows whole-suite checks are decided after E5's producer PR with measured cost; F3 and F24
+> ship in ONE release.
+>
+> Was: **stopped for re-review (2026-11-03)** — epoch 3's second change after approval (entries 3.1 and 3.2, found
 > writing E5's S3 brief). No new code on any epic of this plan and no merge of a pull request carrying its work until
 > the full re-review is complete; when its record says `Narrowed: yes`, the owner has approved the revised plan; and
 > epoch 4 is opened with `state: open`. At the stop: F3 merged (#116, unreleased); E5's producer branch has no code
@@ -167,7 +174,7 @@ Narrowed: yes — nothing of E5.S5 must land before E5's producer PR any more (S
   S5 therefore moved into the producer PR. The judge's rows stand as written: the local S5 work is the input of that
   commit.)
 
-> Epoch 3 · approved 2026-11-03 · by owner · state: stopped
+> Epoch 3 · approved 2026-11-03 · by owner · state: closed
 
 - 3.1 · 2026-11-03 · agent · approach — E5's C# library cannot be a byte-identical copy of dew_flow_mcp's template (D2): the template hard-codes mcp's layout, mount path and identity
   (found writing S3's build brief on coai branch feat/test-leftovers-e5-producer, verified by a scratchpad build of the
@@ -207,6 +214,8 @@ Narrowed: yes — E5's Definition of Done no longer asks for all four C# suites 
   (Revised 2026-11-03 after the re-review plan gate, session `7c66b50d`, finding r3: the first text of the line above said
   every suite's proofs run on all three OSes; the ingest suite cannot run off Linux. The line now says which proofs run
   where; § *Epoch 4*, item 3 (f) names each CI step.)
+
+> Epoch 4 · approved 2026-11-03 · by owner · state: open
 
 ## Symptom
 
@@ -1041,6 +1050,12 @@ Nothing was rejected.
 4. **One release for F3 and F24?** *Recommended:* yes — both are guard and rule changes the first Node compliance PRs
    need; one release costs each consumer one pin bump. The over-cap bumps are asked when the release comes (as for
    epoch 3).
+
+*Answered 2026-11-03:* 1 — approved by the owner, as narrowed. 3 and 4 — settled by the question consultants (`4e52fac6`,
+both agreeing), under the owner's standing instruction to ask them first: 3 — later, not never; the server's whole suite
+and bench are judged separately after E5's producer PR, with the measured cost of each step (server has a proven Windows
+path in `release.yml`, bench has none); 4 — yes, one release, cut after F24 is built and its acceptance check passes;
+the over-cap pin bumps of that release are asked when it comes. Question 2 (P1) stays open.
 
 ## Epics
 
