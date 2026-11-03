@@ -293,3 +293,113 @@ test("S8 review 4c. a yaml of another version is reported as the wrong version, 
   assert.equal(lines.length, 1, "one sentence: " + lines.join("\n"));
   assert.match(lines[0], /not version 2/);
 });
+
+// 5 — F3: under --profile node the guard also reads the `scripts` of every package.json of the repository's own tree -----------------
+
+const SWEEP = "rm -rf /tmp/testsToDelete-*"; // an owner-blind sweep: the prefix, no owner segment
+const manifest = (scripts, extra = {}) => `${JSON.stringify({ name: "consumer", version: "1.0.0", ...extra, scripts }, null, 2)}\n`;
+const node = (repo, extra = []) => guard(repo, ["--profile", "node", ...extra]);
+/** The findings of one file, from the structured scan. */
+const foundIn = (repo, file) => scanRepository({ repo, profile: "node", rule: path.join(root, "common", "test-leftovers-detail.md") }).findings.filter((entry) => entry.file === file);
+const BASE = { "src/a.test.ts": "const a = 1;\n" }; // something else to read, so a clean tree is not "scanned nothing"
+
+test("F3 1. a pretest that sweeps the prefix with no owner is a finding that names the package.json and the script", (t) => {
+  const repo = tree(t, { ...BASE, "package.json": manifest({ pretest: SWEEP }) });
+  const result = node(repo);
+  assert.equal(result.code, 1, result.text);
+  assert.match(result.text, /package\.json:3 — owner-blind — /);
+  assert.match(result.text, /script `pretest`/);
+  const [one, ...rest] = foundIn(repo, "package.json");
+  assert.equal(rest.length, 0, "one finding for one line");
+  assert.equal(one.cls, "owner-blind");
+});
+
+test("F3 2. companion: an ordinary script is clean — the reader does not flag every script", (t) => {
+  const repo = tree(t, { ...BASE, "package.json": manifest({ test: "node scripts/run-tests.mjs", build: "tsc -p .", lint: "eslint . && prettier --check ." }) });
+  const result = node(repo);
+  assert.equal(result.code, 0, result.text);
+});
+
+test("F3 3. a posttest that makes a temp folder is raw-temp, as the same line in a .sh file is", (t) => {
+  const repo = tree(t, { ...BASE, "package.json": manifest({ posttest: "mktemp -d" }), "scripts/same.sh": "mktemp -d\n" });
+  const [one, ...rest] = foundIn(repo, "package.json");
+  assert.equal(rest.length, 0);
+  assert.equal(one.cls, "raw-temp");
+  assert.match(one.text, /mktemp/);
+  assert.equal(foundIn(repo, "scripts/same.sh")[0].cls, "raw-temp", "the shell line gives the same class");
+});
+
+test("F3 4. a package.json under node_modules/ and under the two mount paths is not read", (t) => {
+  const bad = manifest({ pretest: SWEEP });
+  const repo = tree(t, { ...BASE, "node_modules/dep/package.json": bad, ".agents/conventions/package.json": bad, ".claude/rules/shared/package.json": bad, "packages/x/node_modules/y/package.json": bad });
+  const result = node(repo);
+  assert.equal(result.code, 0, result.text);
+  for (const file of ["node_modules/dep/package.json", ".agents/conventions/package.json", ".claude/rules/shared/package.json"]) assert.equal(foundIn(repo, file).length, 0, file);
+});
+
+test("F3 5. a package.json that is not valid JSON is ONE finding that names the file; the scan does not crash and does not skip it", (t) => {
+  for (const [what, text] of [["truncated", '{ "scripts": { "pretest": '], ["empty", ""], ["binary", "{\u0000}"], ["a list", "[]"], ["scripts is a string", '{ "scripts": "npm test" }'], ["scripts is a list", '{ "scripts": ["a"] }'], ["a script is not a string", '{ "scripts": { "test": 1 } }'], ["scripts is null", '{ "scripts": null }']]) {
+    const repo = tree(t, { ...BASE, "package.json": text });
+    const found = foundIn(repo, "package.json");
+    assert.equal(found.length, 1, `${what}: ${JSON.stringify(found)}`);
+    assert.equal(found[0].cls, "unreadable", what);
+    assert.match(found[0].text, /package\.json|could not be read/, what);
+    const result = node(repo);
+    assert.equal(result.code, 1, `${what}: ${result.text}`);
+    assert.match(result.text, /package\.json:\d+ — unreadable — /, what);
+  }
+  const only = tree(t, { "package.json": "not json" });
+  assert.equal(node(only).code, 1, "a repository whose only input is an unreadable manifest is a finding, not 'scanned nothing'");
+});
+
+test("F3 6. without --profile node the same tree's package.json gives no finding", (t) => {
+  const repo = tree(t, { "tools/x.test.mjs": "const a = 1;\n", "package.json": manifest({ pretest: SWEEP, posttest: "mktemp -d" }), "bad/package.json": "{" });
+  const result = guard(repo);
+  assert.equal(result.code, 0, result.text);
+  assert.equal(scanRepository({ repo, rule: path.join(root, "common", "test-leftovers-detail.md") }).findings.filter((entry) => entry.file.endsWith("package.json")).length, 0);
+  assert.equal(isScanned("package.json"), false);
+  assert.equal(isScanned("package.json", "node"), false, "the manifest is read by its own reader, not as a text file");
+});
+
+test("F3 7. a nested package.json is read and the finding names that path", (t) => {
+  const repo = tree(t, { ...BASE, "src_vs_code/package.json": manifest({ pretest: SWEEP }), "package.json": manifest({ test: "node a.mjs" }) });
+  const result = node(repo);
+  assert.equal(result.code, 1, result.text);
+  assert.match(result.text, /src_vs_code\/package\.json:3 — owner-blind — .*script `pretest`/);
+  assert.deepEqual(foundIn(repo, "package.json"), [], "the clean root manifest has none");
+});
+
+test("F3 8. the line is the line of the key inside `scripts`, never the same key of another object", (t) => {
+  const text = ['{', '  "name": "x",', '  "dependencies": {', '    "pretest": "x"', '  },', '  "config": { "scripts": { "pretest": "y" } },', '  "scripts": {', '    "lint": "eslint .",', `    "pretest": ${JSON.stringify(SWEEP)}`, '  },', '  "devDependencies": { "pretest": "z" }', '}', ''].join("\n");
+  const repo = tree(t, { ...BASE, "package.json": text });
+  const [one, ...rest] = foundIn(repo, "package.json");
+  assert.equal(rest.length, 0);
+  assert.equal(one.line, 9, "the key `pretest` inside the top-level scripts object");
+  const reordered = tree(t, { ...BASE, "package.json": ['{', '  "scripts": {', `    "pretest": ${JSON.stringify(SWEEP)}`, '  },', '  "dependencies": { "pretest": "x" }', '}', ''].join("\n") });
+  assert.equal(foundIn(reordered, "package.json")[0].line, 3);
+  const oneLine = tree(t, { ...BASE, "package.json": `{ "dependencies": { "pretest": "x" }, "scripts": { "pretest": ${JSON.stringify(SWEEP)} } }\n` });
+  assert.equal(foundIn(oneLine, "package.json")[0].line, 1);
+});
+
+test("F3 9. a chain is read like a shell line: the second command, a pipe, a `;`, an environment prefix and a line break are found", (t) => {
+  for (const [what, value] of [["&&", `node a.mjs && ${SWEEP}`], ["||", `node a.mjs || ${SWEEP}`], [";", `node a.mjs; ${SWEEP}`], ["pipe", `echo y | ${SWEEP}`], ["env prefix", `FOO=1 ${SWEEP}`], ["line break", `node a.mjs\n${SWEEP}`]]) {
+    const repo = tree(t, { ...BASE, "package.json": manifest({ test: value }) });
+    const found = foundIn(repo, "package.json");
+    assert.equal(found.length, 1, `${what}: ${JSON.stringify(found)}`);
+    assert.equal(found[0].cls, "owner-blind", what);
+    assert.equal(found[0].line, 3, `${what}: the line of the key`);
+  }
+});
+
+test("F3 10. a package.json with no scripts field is valid and has nothing to scan: no finding", (t) => {
+  const repo = tree(t, { ...BASE, "package.json": `${JSON.stringify({ name: "x", dependencies: { pretest: "1" } }, null, 2)}\n`, "empty/package.json": "{}\n", "noscripts/package.json": manifest({}) });
+  const result = node(repo);
+  assert.equal(result.code, 0, result.text);
+});
+
+test("F3 11. the manifest has no inline exemption: a marker inside a script value exempts nothing", (t) => {
+  const marker = "testsToDelete-exempt: raw-temp — a reason that is long enough";
+  const repo = tree(t, { ...BASE, "package.json": manifest({ posttest: `mktemp -d # ${marker}`, pretest: `${SWEEP}\n# ${marker}` }) });
+  const found = foundIn(repo, "package.json");
+  assert.deepEqual(found.map((entry) => entry.cls).sort(), ["owner-blind", "raw-temp"], JSON.stringify(found));
+});
