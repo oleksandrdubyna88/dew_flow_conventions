@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03.** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner).** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -693,9 +693,27 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   fails on the ten missing phrases; test 42 passes by design); GREEN with the text (63 of 63); RED again with the companion stashed (1 failed, the same
   test). `node tools/rule-bodies.mjs --update common.test-leftovers-baseline` recorded the body. Not done: the release, the pin bumps, E5's acceptance check.
 
+## F25 — A consumers test leaves its scratch repository behind when its locked folder is restored after the removal (found 2026-11-03, a benchmark session's leftover listing)
+
+- **What.** Eight `/tmp/testsToDelete-u1000-conventions-consumers-<rand>` folders and their `.owner` files are in the temp root of the WSL host, made on
+  2026-11-03 between 12:20 and 18:21; every owner pid is gone. Each is a scratch git repository of `tree()` in
+  `tools/leftovers-check-consumers.test.mjs:21-29` (`ownedDir(t, "consumers")`) and holds `locked/package.json` and `src/a.test.ts` — the fixture of the
+  test at `:509-513`, which sets `locked/` to mode `000` and registers `t.after(() => fs.chmodSync(locked, 0o755))`.
+- **Why (a hypothesis, not yet confirmed by a RED run).** The folder's removal is registered when `ownedDir` makes it (`tools/lib/owned.mjs`,
+  `scope.after` right after the claim), BEFORE the test registers its chmod. If `node:test` runs a test's `after` hooks in registration order, the
+  removal meets `locked/` at mode `000` and fails, and the chmod then restores `0o755` — which is the state every leftover shows (`locked/` is
+  `drwxr-xr-x` and still holds `package.json`). *Checked:* the eight folders, their owners and their contents, and the two source lines. *Not checked:*
+  the hook order on this Node version, and whether the removal's failure is reported anywhere.
+- **Fix (to decide when it is built).** Either the test restores the mode in its own `try`/`finally` before the hooks run, or the owned folder's
+  removal gives a tree `u+w` before it removes it and names what it could not remove. The second also covers any other test that locks a folder.
+- **Tests.** RED first: run the one test and list `testsToDelete-u<uid>-conventions-consumers-*` before and after (one more folder); GREEN with the
+  fix; RED again with the fix taken out.
+- **State.** Parked by the owner on 2026-11-03 ("open it as a todo, do not build it"): the owner's goal now is the C# and Node comparison. The eight
+  folders stay as evidence until the fix is built; they carry the `testsToDelete-` prefix, so a sweep or a person may remove them at any time.
+
 ## Definition of Done
 
-- [ ] Each of F1 to F22 and F24 (F23 is reserved by F3's note for other manifests) is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
+- [ ] Each of F1 to F22, F24 and F25 (F23 is reserved by F3's note for other manifests) is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.
