@@ -116,7 +116,7 @@ Narrowed: yes — E5's producer PR may merge with the structural guard green-by-
 
 ### Re-review for epoch 3
 
-Narrowed: yes — what E5.S5 must finish BEFORE E5's producer PR got smaller (the bare prefix leaves only the enumerated sites contained under every invocation that runs them; the deferred sites leave it inside the producer PR, in S3 and S4), so the producer PR's merge condition changed; E5's final Definition of Done and this plan's did not get smaller (S6 keeps the repository-wide zero for `owner-blind` and `legacy-name`), and the prerequisites got wider (the invocation inventory of § *Epoch 3* item 4, F3 before the first Node compliance declaration)
+Narrowed: yes — nothing of E5.S5 must land before E5's producer PR any more (S5 has no stage-A part: its renames become a commit of the producer PR, after S3, S2-B and S4 give every site an owner-form, fail-closed run folder), so the producer PR's merge condition changed; E5's final Definition of Done and this plan's did not get smaller (S6 keeps the repository-wide zero for `owner-blind` and `legacy-name`), and the prerequisites got wider (the invocation inventory of § *Epoch 3* item 4, with its direct-run refusal, and F3 before the first Node compliance declaration)
 
 | Work | Where | Verdict | Action |
 |---|---|---|---|
@@ -147,6 +147,11 @@ Narrowed: yes — what E5.S5 must finish BEFORE E5's producer PR got smaller (th
   ended with release `cc24f9e`; and 2.2, E5.S5's order against the producer PR. Option A of consult `c137f641`,
   confirmed by the re-review consult `3ebddd39`. A separate Opus judge sorts the work done since epoch 2 opened into the
   table, step 5 of the full stop. The epoch 3 line is written only when the owner approves.)
+  (Revised 2026-11-03 after the re-review gate, findings 0–3, all accepted: the first text of the line above said S5
+  is narrowed to the sites contained under every invocation. By § *Epoch 3* item 4's own rule a runner's fallback to
+  the machine temp is uncontained, and both coai runners fall back today, so no S5 site is contained before S3 and S4.
+  S5 therefore moved into the producer PR. The judge's rows stand as written: the local S5 work is the input of that
+  commit.)
 
 ## Symptom
 
@@ -503,6 +508,11 @@ supersedes it, a dated note there points here. The E5 stories document (`dew_flo
 todo/PLAN_test_leftovers_E5.md`) is revised the same day; a stories document keeps no ledger, so its changes are this
 plan's.
 
+*Revised the same day after the re-review gate (2026-11-03; findings 0–3 of both reviewers, all accepted).* By item
+4's own rule no S5 site is contained today, so **S5 has no stage-A part any more**: its renames become a commit of E5's
+producer PR, after S3, S2-B and S4. The items below carry a dated note where this changes them; the first text stays
+as the record of the revision.
+
 ### 1. What this plan is now
 
 Epoch 2's picture (§ *Epoch 2*, item 1) stands, with these facts brought up to date:
@@ -532,6 +542,15 @@ Epoch 2's picture (§ *Epoch 2*, item 1) stands, with these facts brought up to 
   in place.
 - **The lesson of entry 2.2: containment is a property of each INVOCATION, not of the file.** A file run by two commands
   is inside an owned folder only when both give it one. Item 4 makes this a requirement of every remaining story.
+- **No S5 site is contained today** *(added after the re-review gate, findings 0 and 3)*. Both coai runners fall back to
+  the machine temp when they cannot make their folder — `RunTemp.Start` (`src_mcp/tests/RunTemp.cs:33-47`, a warning,
+  then the run goes on) and `run-tests.mjs` `beginRun` (`:221-230`, "the tests share the machine's temp as before") —
+  and item 4 counts a fallback as an uncontained invocation. The run folder is also still the legacy-named
+  `testsToDelete-coai-run-…` until S3 moves it to the owner form. A person can also start one test file directly
+  (`node --test out/test/x.test.js`), with no run folder at all (gate finding 2). So S5's renames wait for S3 (an
+  owner-form run folder that fails closed), S2-B and S4 (`beginRun` fails closed; the scripts and the SonarCloud job go
+  through a runner; a direct run refuses), and land as a commit of the producer PR. S5's classification work is that
+  commit's input.
 
 **Goal (unchanged from epoch 2).** The goal of § *Epoch 2*, item 1, stands word for word. One reading is added: "what
 lives inside an owned resource carries no prefix" (rule §1) applies to a site only when EVERY invocation that runs it
@@ -575,6 +594,15 @@ squash-merge together in that one PR, INCLUDING every site S5 deferred, with S6'
 `raw-temp` baseline left); and every other condition above — the barrier (P1), the release, the gates, the CI legs,
 decision 6's shape — is still met. The E5 stories document, D8, carries the same text.
 
+*Revised after the re-review gate (2026-11-03, findings 0 and 3).* "the REVISED S5 are on `main`" no longer holds: S5
+has no stage-A part. **E5's producer PR** merges only when: S2-A (#940, done) is on `main`; ONE squash-merged PR carries,
+in this commit order, S3 → S2-B → S4 → **S5 (the renames of every eligible site)** → S6, with every site S5 deferred
+handled in S3 or S4; S6's repository-wide checks are green (`owner-blind` and `legacy-name` at zero, unexempted, outside
+the helpers' own files; the expected-exemption inventory equal to the guard's list; only the authorised `raw-temp`
+baseline left); and every other condition above is still met — P1, the release (with F3 if this PR is the family's
+first Node compliance declaration), the gates, the CI legs, decision 6's shape. Condition (i) is read with item 4's
+direct-run rule: the inventory lists a person's direct start of each tree too.
+
 ### 4. The invocation inventory, and F3
 
 **Requirement.** Every remaining epic's prep or rename story — E2.2, E2.3, E2.4, E2.5; E5's S3 and S4 (and the
@@ -606,6 +634,24 @@ named only E2.5. F3 is fixed in the reference, released, and pinned by that repo
 (j)). F3 is the guard's half of the same lesson: a `package.json` script is an invocation, and the inventory names it
 by hand until the guard reads it.
 
+**Added after the re-review gate (2026-11-03, finding 2) — a direct start is an invocation too.** For each tree, the
+inventory also lists how a person starts one test file or one suite outside the runner: `node --test <compiled test>`
+or `node --test <source test>` for a Node tree; `dotnet test`, an IDE, or the test executable for a C# tree. A story
+that drops a prefix because "the runner gives a run folder" must do one of two things for each such start:
+
+- **make it refuse** — a test that needs the run folder checks the runner's marker (a variable the runner sets, or for
+  C# that `TEMP` names the run folder the assembly's own initializer made) and, when it is absent, fails with one line
+  that names the command to use, before it creates anything; or
+- **name it as uncontained** in the inventory, and the site keeps its prefix.
+
+In C# the run folder is made by the test assembly's own module initializer, so every start of the assembly runs it;
+there the refusal guards against a start that skips or loses it. In Node the runner is a separate process, so a direct
+`node --test` has no run folder unless the test refuses.
+
+**Where F3 sits** *(added after the re-review gate, finding 1)*: item 5's build order names it as a conventions task
+with an owner (the main session): the fix in the reference, its release, and each consumer's pin bump, all before the
+first Node compliance declaration.
+
 ### 5. Build order (revised)
 
 ```
@@ -628,6 +674,38 @@ LAST   the coai feature review; the promotion of this plan and its stories docum
 The owner's wave order (E3 + E4, E5 + E2, E6 + E7) stands. Inside wave 2, E2 and E5 are independent of each other; they
 share P1 and, if either is first, F3.
 
+**The build order as revised after the re-review gate (2026-11-03, findings 0–3).** It replaces the block above, which
+is kept as the record: its "E5 S5 (revised) … resumes when epoch 3 opens" line is withdrawn (S5 has no stage-A part),
+and F3 gets its own place.
+
+```
+DONE   as above.
+NEXT   P1 the owner's Windows barrier record            — the owner; blocks the first producer MERGE of E2 and of E5
+       F3, a conventions task (owner: the main session) — the fix in the reference (follow-ups plan F3: the node profile
+          reads package.json scripts), its own PR and gates → a release (promote-release) → the pin bumps, each alone
+          (as in R7); all before the first Node compliance declaration: E2.5, or E5's producer PR carrying S6,
+          whichever comes first
+       E2.1 (draft creds #294) merges after P1 and its by-hand records → E2.2 → E2.3 → E2.4 → E2.5, each with its
+          invocation inventory (direct starts included); E2.5 waits for F3's pin if it is the first declaration
+       E5 producer PR — one squash merge, commits S3 → S2-B → S4 → S5 → S6:
+          S3   the C# library; the run folder of all four C# suites in the owner form; fails closed; a test started
+               without its initializer's run folder refuses; S5's deferred C# sites
+          S2-B the owner-aware sweep
+          S4   the Node wrap; beginRun fails closed; a direct node --test refuses; scripts/** and the SonarCloud
+               extension job (sonarcloud.yml:302) go through a runner; S5's deferred Node sites
+          S5   the renames of every eligible site (the classification of 2026-11-03 is the input); the legacy
+               fixtures as plain literals with the inline legacy-name exemption
+          S6   the two guards at the repository-wide zero; the expected-exemption inventory; one raw-temp baseline
+          after P1, and after F3's pin if this is the first declaration → E5.S7 the drain (one PR per suite)
+THEN   wave 3: E6 ∥ E7 — as above, each stories document with its invocation inventory, direct starts included.
+LAST   as above.
+```
+
+S5 sits after S4 and before S6. Its renames need what S3 and S4 build: an owner-form, fail-closed run folder under
+every invocation, and a refusal for a direct start. S6's guard asserts the repository-wide zero, so it must read the
+tree after the renames. The squash merge makes the five commits one commit on `main`; the order is for the review and
+for a bisect on the branch.
+
 ### 6. What the re-review consultant raised, and what was done with it
 
 | Point | Verified | Taken |
@@ -635,7 +713,6 @@ share P1 and, if either is first, F3.
 | (a) two answers to entry 2.2 (consult `c137f641`): A — narrow S5 to the contained sites, move the rest into S3 and S4, record the change; B — keep S5 open until the producer PR | both need a merge condition to change (entry 2.2); A keeps S5's no-producer, no-sweep shape and lets the eligible renames land now; B would leave a story open across the producer PR with no smaller unit to merge | A — § 3 and the E5 stories document (S5 as revised, S3, S4, S6, D8) |
 | (b) `sonarcloud.yml:302` runs the extension's compiled tests directly, with no run folder, so the sites it reaches are not contained under every invocation (re-review consult `3ebddd39`) | yes — `c8 … node --test "out/test/"*.test.js` on `ubuntu-latest`, coai `a3b73534`; it reaches `kimiLinuxInstall.test.ts:60` and `runtimeSinceIsAhead.test.ts:147` | yes — the two sites are deferred to S4, and S4 routes that job through the runner; the requirement of item 4 |
 | (c) the record says `Narrowed: yes` (S5's required completion before the producer got smaller; E5's final DoD did not) | yes — S6 keeps the repository-wide zero; the producer PR's merge condition changed | yes — the record above; the owner approves before epoch 3 opens |
-
 | (d) a test whose meaning is a legacy or bare name must not build the prefix from pieces to hide it from the guard (the Opus judge of this re-review; a reviewer of the S5 plan round of 2026-11-03 had said the same, and that finding was REJECTED) | yes — rule §7 at `cc24f9e` defines `legacy-name` as "a name built without the owner segment", and its one exemption form is a comment on the line or the line above, `testsToDelete-exempt: legacy-name — <reason>`; a split constant only makes the guard's zero false | yes — **the rejection in the S5 plan round was wrong**; the E5 stories document (S5 as revised, S6, DoD) now says: such a fixture writes the name as a plain literal with that exemption, and each one is listed. The three local `legacyNames` modules of the S5 branches are rewritten before anything is pushed (the judge's cuts 3–5) |
 | (e) the two extension renames that `sonarcloud.yml:302` reaches go back to their prefixed names and move to S4 (the judge's cut 2) | yes — row (b) | yes — the E5 stories document, S5 as revised and S4 |
 | (f) the judge's inventory adds `release.yml:544` (`npm test` through the runner) and the release workflow's C# suites | yes — `release.yml:264`, `:353` (`CoaiMcp.Tests`), `:694` (`CoaiServer.Tests`), `:1110` (`CoaiBugs.Tests`) on coai `a3b73534` | yes — the E5 inventory (its § *Facts*); `run-tests.mjs` is contained there except its fallback |
@@ -645,11 +722,21 @@ The consultants' full answers are in their consult records (`c137f641`, `3ebddd3
 this revision takes from them, and rows (d)–(g) the Opus judge's points. Nothing they raised was rejected. One earlier
 rejection is reversed: row (d).
 
+**The re-review gate on this revision (2026-11-03).** Both reviewers agreed; every finding was accepted:
+
+| Finding | Verified | Taken |
+|---|---|---|
+| 0 and 3 — by item 4's own rule (a runner's fallback is uncontained), NO S5 site is contained today: `RunTemp.Start` and `run-tests.mjs` `beginRun` fall back to the machine temp, and the run folder is still the legacy name until S3, so S5's renames cannot merge before the producer PR | yes — `src_mcp/tests/RunTemp.cs:33-47` and `src_vs_code/scripts/run-tests.mjs:221-230` on coai `a3b73534`; the legacy run prefix at `RunTempFolder.cs:44` and `run-tests.mjs:125` | yes — S5 has no stage-A part; its renames are a commit of the producer PR after S3, S2-B and S4 (items 1, 3, 5; the `Narrowed` line; the E5 stories document). Row (a)'s "lets the eligible renames land now" is withdrawn; option A stands in its other parts (the named deferrals, the one producer PR) |
+| 1 — F3 needs a place in the build order | yes — item 4 tied it to a condition but named no task | yes — item 5: a conventions task, owner the main session: the fix, the release, the pin bumps, before the first Node compliance declaration |
+| 2 — the inventory must list a person's direct start of each tree, and a test that needs the run folder must refuse outside its runner, or the site keeps its prefix | yes — a direct `node --test out/test/x.test.js` gets no run folder (the S5 extension classification named it, 2026-11-03) | yes — item 4; E5's S3 and S4 |
+
 ### 7. Questions for the owner (blocking; each with the recommended answer)
 
 1. **Approve epoch 3 as narrowed?** The record says `Narrowed: yes`: what S5 must finish before E5's producer PR got
    smaller. *Recommended:* yes — nothing leaves E5's done-when; the deferred sites are named, each with its story, and
    the producer PR cannot merge without them.
+   *After the re-review gate (2026-11-03):* the narrowing is now that NOTHING of S5 lands before the producer PR; S5's
+   renames are a commit inside it. *Recommended:* still yes, for the same reason.
 2. **P1, the Windows barrier record** — unchanged from epoch 2's question 2, still open.
 3. **Merge condition (b) per resource kind** (§ 3): E7's open stage A blocks only E7's producer. *Recommended:* yes —
    the sampler drops collections in rag_qln's own store, which no producer of E2 or E5 makes; it is what epoch 2's
@@ -902,6 +989,9 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
   #941), so P2 and the F16 (b) release are met. S5 is NARROWED to the sites contained under every invocation that runs
   them; its deferred sites move to S3 (C#) and S4 (Node, and `sonarcloud.yml:302` through the runner); the producer PR
   carries them all, with S6's repository-wide zero (§ Epoch 3, items 1 and 3; the E5 stories document, revised the same day).
+  *After the re-review gate (2026-11-03):* S5 has no stage-A part; its renames are a commit of the producer PR
+  (S3 → S2-B → S4 → S5 → S6), and S3 and S4 make their runners fail closed and a direct start refuse (§ Epoch 3, items 1,
+  3, 4, 5).
 - **Repository:** `dew_flow_connect_other_ais`. **Stories:** `dew_flow_connect_other_ais · todo/PLAN_test_leftovers_E5.md`. Depends on E1.
 - **Goal.** Tests create only `testsToDelete-coai-…`; the startup sweep collects both the new prefix and, for
   the migration window, the old `coai-` test literals; the product's `coai-*` runtime directories and their
