@@ -480,3 +480,26 @@ test("F3 19. [code1 8] a control character in a script name is escaped in the fi
   const bad = foundIn(tree(t, { ...BASE, "package.json": '{ "scripts": {\n"a\u001b": }' }), "package.json");
   assert.doesNotMatch(bad[0].text, /[\u0000-\u001f\u007f]/, "the reason of an unreadable manifest is escaped too");
 });
+
+test("F3 20. [code2 0/2] a dangling symlink named package.json is ONE unreadable finding; a tracked manifest deleted from the working tree gives none", (t) => {
+  const repo = tree(t, { ...BASE, "good/package.json": manifest({ pretest: SWEEP }) });
+  fs.symlinkSync("nowhere.json", path.join(repo, "package.json")); // existsSync follows the link and says false
+  const found = scanRepository({ repo, profile: "node", rule: path.join(root, "common", "test-leftovers-detail.md") }).findings;
+  assert.deepEqual(found.filter((entry) => entry.file === "package.json").map((entry) => entry.cls), ["unreadable"]);
+  assert.deepEqual(found.filter((entry) => entry.file === "good/package.json").map((entry) => entry.cls), ["owner-blind"]);
+  const gone = tree(t, { ...BASE, "package.json": manifest({ pretest: SWEEP }) });
+  git(gone, "add", ".");
+  git(gone, ...COMMIT);
+  fs.rmSync(path.join(gone, "package.json"));
+  assert.deepEqual(foundIn(gone, "package.json"), [], "a tracked file that is not there is skipped, as every other tracked file is");
+  assert.equal(node(gone).code, 0, node(gone).text);
+});
+
+test("F3 21. [code2 3] a bidi control character in a script name is escaped (Trojan Source)", (t) => {
+  const marks = ["‎", "‏", "‪", "‫", "‬", "‭", "‮", "⁦", "⁧", "⁨", "⁩"];
+  const scripts = Object.fromEntries(marks.map((mark, index) => [`a${mark}b${index}`, SWEEP]));
+  const found = foundIn(tree(t, { ...BASE, "package.json": manifest(scripts) }), "package.json");
+  assert.equal(found.length, marks.length);
+  for (const entry of found) assert.doesNotMatch(entry.text, /[‎‏‪-‮⁦-⁩]/, JSON.stringify(entry.text));
+  assert.match(found.map((entry) => entry.text).join("\n"), /script `a\\u202eb6`/);
+});
