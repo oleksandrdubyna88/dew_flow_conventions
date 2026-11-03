@@ -173,9 +173,13 @@ Narrowed: yes — nothing of E5.S5 must land before E5's producer PR any more (S
   (`RepositoryIdentity.Row`); coai mounts the rules at `.agents/conventions` and cannot use `.claude/rules`. S3 needs
   edits in four copied files and S6 in about eight guard files, and two needed files sit outside the folder. One cause:
   the template is mcp-shaped. Question consultants be608fd9, both answers.)
-- 3.2 · 2026-11-03 · agent · dod — E5's DoD asks for all four C# suites green on three legs with the same counts, and coai's CI does not run them so
+- 3.2 · 2026-11-03 · agent · dod — E5's DoD asks for all four C# suites green on all three platforms with the same counts, and no coai workflow runs all four on all three
   (the same brief: coai's CI runs the bugs suite on Linux only, and the server and bench suites are not on the Windows
-  job (`.github/workflows/ci.yml`). Either the DoD changes or CI gains legs. Independent of 3.1 (consultants be608fd9,
+  job (`.github/workflows/ci.yml`). [PR review, CodeRabbit] Every workflow of coai at 004c55f, checked job by job:
+  `ci.yml` build-test (ubuntu: all four) and macos (mcp, server, bench); `release.yml` server-binaries runs the server
+  suite on ubuntu, arm Linux, windows-latest, windows-11-arm and macos, and bugs-binaries runs the bugs suite on Linux
+  x64 and arm only; `sonarcloud.yml` (ubuntu). So the bugs suite never runs off Linux, bench never on Windows, and
+  the server suite reaches Windows only in the release workflow, not in pull-request CI. Either the DoD changes or CI gains legs. Independent of 3.1 (consultants be608fd9,
   both answers: a second cause). It is the second change of epoch 3: the plan stops for re-review. Also found and
   NOT counted as changes (fixes that satisfy the plan as written, or already-approved constraints): the brief's items
   1, 3, 5-7, 10, 11, 13, 14 and 12 (P1). Item 8, the released baseline rule's "a test ordered first"
