@@ -895,6 +895,9 @@ plan's.
    E5 test host, run before S6 creates the baseline: a run under the gate passes the released guard's proof check; and a
    forced folder failure and a forced claim failure each exit 78 before discovery, with the brief's `MemberData`
    sentinel untouched. The check's output is recorded on the PR that creates the baseline.
+   *[F24 review, 2026-11-03]* The check has a THIRD forced case: a run whose `TEMP`, `TMP` or `TMPDIR` does not name the run folder also exits 78 before
+   discovery (the rule's gate refuses on a mismatch as well as on a folder or claim failure). The three child runs live in the scope's proof file, so removing
+   them changes the one file the baseline names; the marked test's `TEMP` assertion and the review prove that the runner makes the folder before the first test.
 4. P2, P3 (the interim) and F22: done, as § *Epoch 3*, item 2. P2's proof clause is changed by F24.
 5. The coai feature review at the end, unchanged.
 6. **E5's rollback procedure (coai D11), written and reviewed before E5's producer PR opens** — it is merge condition (m)

@@ -7,6 +7,8 @@
 > `common/test-leftovers-janitor.md`. Not one of them blocks the release of the merged core (the verdict: "none a reason to
 > hold the release").
 >
+> *Note 2026-11-03: the status line above is the state of 2026-10-26 and was never rewritten. Since then items have been fixed on their own branches, and some released: F16's interim, F21 and F22 are released (`5863c60`, `cc24f9e`); F3 and F24 are fixed and not released (they ride one release); the rest are parked as written. Each item's Progress and Released lines, not this status line, are the current state.*
+>
 > Related docs: [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) (the plan these findings belong to; promoted 2026-10-27),
 > [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md) (the remainder plan: S0, the merge, the sibling's side, the release; none of F1–F13 blocks it),
 > `common/recheck-followups.md` of the consumers' rule set (the format of this file; this repository does not carry that rule).
@@ -665,14 +667,20 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   or claimed, and also when `TEMP`, `TMP` or `TMPDIR` do not name it. The third thing loses "ordered first": the test is NOT required to run first, and the
   text says why (parallel test collections have no first test). [plan gate, finding 0] The text says who verifies what: the guard checks only the marker;
   the first two things are proven by the consumer's own tests — a child run of the suite with a forced folder failure and a forced claim failure must exit
-  non-zero before discovery — and by review; a repository with no such gate does not satisfy the proof and may not carry a baseline. "Ordered first"
+  non-zero before discovery — and by review; a repository with no such gate does not satisfy the proof and may not carry a baseline.
+  [F24 Opus 1–3, 2026-11-03] The child runs are three (a forced folder failure, a forced claim failure and a forced `TEMP`/`TMP`/`TMPDIR` mismatch) and live IN the
+  scope's proof file, so removing them changes the one file the baseline names; a Never bullet forbids weakening or removing the gate or those tests while a baseline names
+  its scope. The child runs prove the SECOND thing only; the first (the runner makes the folder before the first test) is proven by the marked test's `TEMP` assertion and by
+  review. "One line" belongs to the gate's description, not to the verification. "Ordered first"
   appeared only in the baseline companion (grep over `common/`, `tools/` and the README).
 - **Tests (RED where text is pinned → GREEN → RED):** `S1 10` of `tools/test-leftovers-rule.test.mjs` pins ten new phrases of the companion and that
   "ordered first" is gone. [plan gate, finding 2] Test 42 of `tools/raw-temp-baseline.test.mjs` is a companion, green before and after: a fixture with
   a proof that sorts last by name (`zz-proof.test.mjs` after `aa.test.mjs`) and one that sorts first, neither with any ordering attribute, are accepted;
   without the marker the same tree is `proof missing`. It pins that ordering never becomes a code check.
+  [F24 Opus 4] `S1 10` also refuses `ordered`, `sorted` and `runs first` anywhere in the proof clause (the one allowed phrase is `NOT required to run first`), so "ordered before
+  discovery" or "runs first" cannot come back: RED observed by planting each in the text (1 failed), GREEN with them removed.
 - **Docs.** The companion; `research/rule-bodies.json` (the record of `common.test-leftovers-baseline`); the byte table of `research/module_rules.md`
-  (re-measured: +688 B on the companion); the guard's two header comments and the guard paragraph of `research/module_tests.md` say the guard checks the
+  (re-measured: +1,136 B on the companion); the guard's two header comments and the guard paragraph of `research/module_tests.md` say the guard checks the
   marker only.
 - **Release.** ONE release with F3, and coai pins that release before E5's S6 creates its baseline (rollout plan § Epoch 4, items 2 and 5). E5's S6 runs
   the acceptance check against the released guard.
