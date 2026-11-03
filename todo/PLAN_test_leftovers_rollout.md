@@ -273,7 +273,7 @@ find nothing of the caller's scope with a `gone` record.
       *Epoch 3 (2026-11-03):* the rule is released (`5863c60`, #108) and pinned by coai alone (#939); the F16 interim (b)
       is released in the same promotion (#107). Not ticked: the private sibling's mirror is not recorded here (R4), the
       owner's Windows barrier section (P1) is not written, and F16's Fix is open with F9.
-- [ ] **Added 2026-11-03 (epoch 3):** every prep or rename story of E2.2–E2.5, E5 (S3, S4, the revised S5), E6 and E7
+- [ ] **Added 2026-11-03 (epoch 3):** every prep or rename story of E2.2–E2.5, E5's producer PR (S3, S4, S5), E6 and E7
       recorded its invocation inventory before it dropped a prefix, and every dropped prefix is backed by it
       (§ Epoch 3, item 4).
 - [ ] **Added 2026-11-03 (epoch 3):** F3 (the `node` profile reads `package.json` scripts) is released and pinned before
@@ -576,7 +576,8 @@ gives it the owned resource.
 The conditions (a)–(h) of § *Epoch 2*, item 3, stand, with these changes:
 
 - **(a)** "the release its stories document cites" is `cc24f9e` for every consumer today (it carries P2, P3's interim,
-  F21 and F22).
+  F21 and F22). `cc24f9e` is the BASELINE: the family's first Node compliance PR cites and pins the LATER release that
+  carries F3 (condition (j)), never `cc24f9e` [interim gate, finding 5].
 - **(b) corrected.** The sweep-only stage of every consumer whose sweep can reach the resources THIS producer makes is
   landed or recorded empty by a scan that also looks for age-based and non-prefix sweepers. For E2 and E5 that holds
   (creds: empty twice; coai: #940). E7's open stage A reaches only rag_qln's `qlntest_*` collections in rag_qln's store,
@@ -596,8 +597,10 @@ decision 6's shape — is still met. The E5 stories document, D8, carries the sa
 
 *Revised after the re-review gate (2026-11-03, findings 0 and 3).* "the REVISED S5 are on `main`" no longer holds: S5
 has no stage-A part. **E5's producer PR** merges only when: S2-A (#940, done) is on `main`; ONE squash-merged PR carries,
-in this commit order, S3 → S2-B → S4 → **S5 (the renames of every eligible site)** → S6, with every site S5 deferred
-handled in S3 or S4; S6's repository-wide checks are green (`owner-blind` and `legacy-name` at zero, unexempted, outside
+in this commit order, S3 → S2-B → S4 → **S5** → S6. S3 and S4 build only the CONTAINMENT S5's deferred sites need (an
+owner-form, fail-closed run folder; the scripts and the SonarCloud job through a runner; the refusal of a direct start);
+S5 then renames EVERY site, the eligible ones and the deferred ones, once that containment exists [interim gate,
+finding 0]; S6's repository-wide checks are green (`owner-blind` and `legacy-name` at zero, unexempted, outside
 the helpers' own files; the expected-exemption inventory equal to the guard's list; only the authorised `raw-temp`
 baseline left); and every other condition above is still met — P1, the release (with F3 if this PR is the family's
 first Node compliance declaration), the gates, the CI legs, decision 6's shape. Condition (i) is read with item 4's
@@ -605,8 +608,11 @@ direct-run rule: the inventory lists a person's direct start of each tree too.
 
 ### 4. The invocation inventory, and F3
 
-**Requirement.** Every remaining epic's prep or rename story — E2.2, E2.3, E2.4, E2.5; E5's S3 and S4 (and the
-revised S5); E6; E7 — records an **invocation inventory** before it approves dropping a prefix:
+**Requirement.** Every remaining epic's prep or rename story — E2.2, E2.3, E2.4, E2.5; E5's producer PR (S3, S4 and S5
+inside it; the inventory is also cited from coai's D10); E6; E7 — records an **invocation inventory** before it
+approves dropping a prefix. It lists every resource-creation site in scope and, for each site, every invocation that
+reaches it; its completeness is checked against every workflow job, `package.json` script, runner script and documented
+command of the tree, and that listing is attached to the PR [interim gate, findings 2 and 4]:
 
 | Invocation (the command or job that runs the files, with `file:line`) | The temp root it actually gets | Who provides the owner, the cleanup and the sweep | What must exist first |
 |---|---|---|---|
@@ -682,18 +688,21 @@ and F3 gets its own place.
 DONE   as above.
 NEXT   P1 the owner's Windows barrier record            — the owner; blocks the first producer MERGE of E2 and of E5
        F3, a conventions task (owner: the main session) — the fix in the reference (follow-ups plan F3: the node profile
-          reads package.json scripts), its own PR and gates → a release (promote-release) → the pin bumps, each alone
-          (as in R7); all before the first Node compliance declaration: E2.5, or E5's producer PR carrying S6,
-          whichever comes first
+          reads package.json scripts), its own PR and gates → a release (promote-release) → the DECLARING repository's
+          pin bump, before its first Node compliance PR merges (E2.5, or E5's producer PR carrying S6, whichever comes
+          first); the other consumers' bumps follow, each alone, those over the PR cap with the owner's agreement
+          [interim gate, finding 1]
        E2.1 (draft creds #294) merges after P1 and its by-hand records → E2.2 → E2.3 → E2.4 → E2.5, each with its
           invocation inventory (direct starts included); E2.5 waits for F3's pin if it is the first declaration
-       E5 producer PR — one squash merge, commits S3 → S2-B → S4 → S5 → S6:
+       E5 producer PR — one squash merge, commits S3 → S2-B → S4 → S5 → S6 (owner: the main session, through its
+          coders; S3's and S4's runner changes and refusals included [interim gate, finding 6]):
           S3   the C# library; the run folder of all four C# suites in the owner form; fails closed; a test started
-               without its initializer's run folder refuses; S5's deferred C# sites
+               without its initializer's run folder refuses; the containment for S5's deferred C# sites
           S2-B the owner-aware sweep
           S4   the Node wrap; beginRun fails closed; a direct node --test refuses; scripts/** and the SonarCloud
-               extension job (sonarcloud.yml:302) go through a runner; S5's deferred Node sites
-          S5   the renames of every eligible site (the classification of 2026-11-03 is the input); the legacy
+               extension job (sonarcloud.yml:302) go through a runner; the containment for S5's deferred Node sites
+          S5   the renames of EVERY site — the eligible ones (the classification of 2026-11-03 is the input) and the
+               deferred ones S3 and S4 made contained; the legacy
                fixtures as plain literals with the inline legacy-name exemption
           S6   the two guards at the repository-wide zero; the expected-exemption inventory; one raw-temp baseline
           after P1, and after F3's pin if this is the first declaration → E5.S7 the drain (one PR per suite)
