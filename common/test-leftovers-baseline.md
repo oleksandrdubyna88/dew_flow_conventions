@@ -16,8 +16,12 @@ ONE path: `raw-temp-baseline.json` at the repository root, a regular file, never
 owned, claimed run folder (§2) and points `TEMP`, `TMP` and `TMPDIR` at it before the first test may carry the
 `raw-temp` sites under that runner in a baseline file instead of exempting each line. *Proven* is three things in
 the tree, named by the file as a scope's proof: the runner makes the folder before the first test; a run that
-cannot make it fails before any test; a test per assembly or package, ordered first, asserts that `TEMP` names the
-run folder and carries `testsToDelete-baseline-proof: <scope root>`. The file — `{ "class": "raw-temp", "scopes":
+cannot make it fails before any test, by a **process-wide gate** that runs before test discovery, refuses the run
+with one line and a non-zero exit when the folder cannot be made or claimed, and also when `TEMP`, `TMP` or `TMPDIR`
+do not name it; a test per assembly or package asserts that `TEMP` names the run folder and carries
+`testsToDelete-baseline-proof: <scope root>`. That test is NOT required to run first: ordering is not part of the
+proof, because parallel test collections have no first test — the process-wide gate, not an order, keeps every test inside the
+folder. The file — `{ "class": "raw-temp", "scopes":
 [{ "root", "proof", "guard" }], "entries": [{ "file", "sha256", "line" }] }` — is a **multiset**: one entry per occurrence,
 keyed by the file and the sha256 of the trimmed line; `line` is a hint, never a key. A guard reads it only when
 told to, passes a key's occurrences up to its entries and no further, and finds an occurrence beyond them
@@ -49,9 +53,11 @@ a raised count, a new or wider scope, a changed proof and any creation but the f
   `proof` is a test file under that root, never the baseline file, and a test file the guard discovered in this scan —
   a file that is present but not scanned is no proof. It carries a line with the marker
   `testsToDelete-baseline-proof: <root>`, then exactly the scope root, then only whitespace or a comment closer
-  (`*/`, `-->`) to the end of the line; anything else is a malformed proof. A guard checks that the declaration is
-  there; the reviewer of the baseline's creation checks the substance — the three things the proof names — and says
-  so in the pull request. An entry belongs to the most specific scope that holds its file, whatever the order of the list.
+  (`*/`, `-->`) to the end of the line; anything else is a malformed proof. A guard checks only the declaration, that it is
+  there: not the process-wide gate, not the folder, not any order. The first two things are proven by the
+  consumer's own tests — a child run of the suite with a forced folder failure and a forced claim failure must exit
+  non-zero before discovery — and by the reviewer of the baseline's creation, who says so in the pull request. A
+  repository with no such gate does not satisfy the proof and may not carry a baseline. An entry belongs to the most specific scope that holds its file, whatever the order of the list.
 - `scopes[].guard` names the guard that judges the scope — one of `node` (the shipped Node guard) or `csharp` (the C# guard
   a consumer copies from the template); the list is closed and grows only by a change to this rule. A scope that names
   any other value, or none, is a malformed file, whichever guard reads it. Use `node` for the Node guard's suites,
