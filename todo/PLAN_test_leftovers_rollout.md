@@ -221,7 +221,11 @@ Narrowed: yes — E5's Definition of Done no longer asks for all four C# suites 
   (found writing E5's S2-B spec (Fable), coai branch feat/test-leftovers-e5-producer, spec § B.10 item 1. At the
   pin, the reference's `legacyOwnerState` answers `unknown` on Linux (a legacy record has no `<ns>`), the Windows
   sweep only lists (F16 interim), and E2's `win32`/`darwin` os tags cannot be parsed by `parseLegacyOwner`; so the
-  Node sweep never collects a legacy coai folder, and the C# sweep only lists one (its contract). The only removal of
+  Node sweep never collects a legacy coai folder, and the C# sweep only lists one (its contract). [PR review,
+  CodeRabbit] Scope of that claim: coai's E2 claim grammar allows only `win32`, `linux` and `darwin`
+  (`src_mcp/tests/OwnerClaim.cs`, the `Shape()` pattern), so these three are every legacy coai record there is. The
+  reference COULD collect a legacy record tagged `macos` whose pid is dead (`legacyOwnerState` defers to
+  `ownerState` there), but coai never wrote that tag. The only removal of
   those folders is S2-A's one-off clean-up (coai #940). E5's D4, S2-B item 3 and Q3 are corrected in the producer
   PR. Question consultants 08beb732 and 76d09c26: of the spec's 12 findings, items 3 (a real Windows CI leg for the
   Node sweep) and 8 (row 12's C# half, red on the Windows leg, macOS assertions kept) are met AS WRITTEN by S2-B;
