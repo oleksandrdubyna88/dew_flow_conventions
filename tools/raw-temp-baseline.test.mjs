@@ -992,3 +992,20 @@ test("41. the run modes are mutually exclusive: any two of --update-allowlist, -
   assert.equal(optionsProblem({ update: true }), undefined);
   assert.equal(optionsProblem({ printBaseline: true }), undefined);
 });
+
+// 42 — F24: ordering is not part of the proof ------------------------------------------------------------------------------------
+
+test("42. a proof file that sorts last by name, with no ordering attribute of any kind, is accepted; so is one that sorts first — the guard never checks an order [F24]", (t) => {
+  const marker = `// ${MARK}${ROOT}\nexport {};\n`;
+  const hits = lines(SOURCE);
+  const last = "src/test/zz-proof.test.mjs";
+  const first = "src/test/aa-proof.test.mjs";
+  const afterwards = fixture(t, { source: null, proof: null, baseline: baselineOf({ entries: [entry("src/test/aa.test.mjs", L3, 3)], scopes: [{ root: ROOT, proof: last, guard: "node" }] }), extra: { "src/test/aa.test.mjs": hits, [last]: marker } });
+  const one = withBaseline(afterwards.repo);
+  assert.equal(one.code, 0, one.text);
+  const before = fixture(t, { source: null, proof: null, baseline: baselineOf({ entries: [entry("src/test/zz.test.mjs", L3, 3)], scopes: [{ root: ROOT, proof: first, guard: "node" }] }), extra: { "src/test/zz.test.mjs": hits, [first]: marker } });
+  const two = withBaseline(before.repo);
+  assert.equal(two.code, 0, two.text);
+  const none = fixture(t, { source: null, proof: null, baseline: baselineOf({ entries: [entry("src/test/aa.test.mjs", L3, 3)], scopes: [{ root: ROOT, proof: last, guard: "node" }] }), extra: { "src/test/aa.test.mjs": hits, [last]: "export {};\n" } });
+  assert.match(withBaseline(none.repo).text, /proof missing/, "the companion: without the marker the same tree is refused, so the first two passed on the marker alone");
+});
