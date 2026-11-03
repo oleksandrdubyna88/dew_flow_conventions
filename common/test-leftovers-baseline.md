@@ -54,10 +54,13 @@ a raised count, a new or wider scope, a changed proof and any creation but the f
   a file that is present but not scanned is no proof. It carries a line with the marker
   `testsToDelete-baseline-proof: <root>`, then exactly the scope root, then only whitespace or a comment closer
   (`*/`, `-->`) to the end of the line; anything else is a malformed proof. A guard checks only the declaration, that it is
-  there: not the process-wide gate, not the folder, not any order. The first two things are proven by the
-  consumer's own tests — a child run of the suite with a forced folder failure and a forced claim failure must exit
-  non-zero before discovery — and by the reviewer of the baseline's creation, who says so in the pull request. A
-  repository with no such gate does not satisfy the proof and may not carry a baseline. An entry belongs to the most specific scope that holds its file, whatever the order of the list.
+  there: not the process-wide gate, not the folder, not any order. The second thing — a run that cannot make the folder
+  fails before any test — is proven by the consumer's own child-run tests, which live IN this proof file, the one file
+  the baseline names, so that removing them changes that file: a child run of the suite with a forced folder failure, a
+  forced claim failure and a forced `TEMP`/`TMP`/`TMPDIR` mismatch must each exit non-zero before discovery. The first
+  thing — the runner makes the folder before the first test — is proven by the marked test's `TEMP` assertion and by the
+  reviewer of the baseline's creation, who says so in the pull request. A repository with no such gate does not satisfy
+  the proof and may not carry a baseline. An entry belongs to the most specific scope that holds its file, whatever the order of the list.
 - `scopes[].guard` names the guard that judges the scope — one of `node` (the shipped Node guard) or `csharp` (the C# guard
   a consumer copies from the template); the list is closed and grows only by a change to this rule. A scope that names
   any other value, or none, is a malformed file, whichever guard reads it. Use `node` for the Node guard's suites,
@@ -113,4 +116,5 @@ deleted with its last entry; a repository with none ships none.
 - Never read a baseline at any other path, through a symlink, or without being told to.
 - Never leave `--allow-create` in a standing CI command.
 - Never name a guard the list does not have; never leave a named guard out of CI.
+- Never weaken or remove the process-wide gate, or its child-run tests, while a baseline names its scope.
 <!-- core:end -->
