@@ -217,6 +217,17 @@ Narrowed: yes — E5's Definition of Done no longer asks for all four C# suites 
 
 > Epoch 4 · approved 2026-11-03 · by owner · state: open
 
+- 4.1 · 2026-11-03 · agent · contract — E5's promise that a killed old coai run (legacy `testsToDelete-coai-run-*`) is collected by the next extension run cannot hold at the pinned reference
+  (found writing E5's S2-B spec (Fable), coai branch feat/test-leftovers-e5-producer, spec § B.10 item 1. At the
+  pin, the reference's `legacyOwnerState` answers `unknown` on Linux (a legacy record has no `<ns>`), the Windows
+  sweep only lists (F16 interim), and E2's `win32`/`darwin` os tags cannot be parsed by `parseLegacyOwner`; so the
+  Node sweep never collects a legacy coai folder, and the C# sweep only lists one (its contract). The only removal of
+  those folders is S2-A's one-off clean-up (coai #940). E5's D4, S2-B item 3 and Q3 are corrected in the producer
+  PR. Question consultants 08beb732 and 76d09c26: of the spec's 12 findings, items 3 (a real Windows CI leg for the
+  Node sweep) and 8 (row 12's C# half, red on the Windows leg, macOS assertions kept) are met AS WRITTEN by S2-B;
+  if item 8's Windows mutation cannot be shown red there, it is entry 4.2 and the plan stops. The other items are
+  repaired references and details.)
+
 ## Symptom
 
 The owner, 2026-10-14: containers started by tests stay up for weeks and hold memory, CPU, ports and disk;
