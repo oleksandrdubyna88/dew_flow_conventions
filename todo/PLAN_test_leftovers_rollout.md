@@ -899,6 +899,7 @@ plan's.
 1. **P1 — the owner's Windows barrier record.** OPEN. It blocks the first producer MERGE of E2 and of E5. Until it is
    recorded, Windows evidence for E5 comes from the `windows-latest` CI leg only; no E5 branch runs its C# suites on the
    Windows side of an unrecorded machine.
+   *[2026-11-04: CLOSED by the owner's written statement, P1's second option (§ *Epoch 2*, question 2): the owner's Windows machine does not build or test E2's and E5's repositories for now, so merge condition (c) is met for that machine; its barrier stays closed. Recorded in [research/security/machines.md](../research/security/machines.md). The same record re-attests the operator's WSL machine: open for every place the developer account can read; its condition (c) waits for one administrator scan of two root-only places.]*
 2. **F3** — merged (#116), not released. Released and pinned before the first Node compliance declaration (§ *Epoch 3*,
    item 4). It is NOT released alone: it rides the ONE release that carries F24 (item 5) [interim gate, finding 3].
 3. **NEW — F24, the baseline proof rule** (a conventions follow-up; the next free number of the follow-ups plan; owner:
@@ -1014,6 +1015,7 @@ test root, with missing-proof and stale-baseline cases.
 DONE   as § Epoch 3, item 5 → epoch 3 approved (#115) → coai #942 (E5 revised for epoch 3) → F3 merged (#116, not
        released) → S3's build brief → the stop of epoch 3 (entries 3.1, 3.2) and this re-review.
 NEXT   P1 the owner's Windows barrier record            — the owner; blocks the first producer MERGE of E2 and of E5
+          (P1 closed 2026-11-04 by the owner's statement — § 2, item 1; the WSL machine's administrator scan is open)
        F24, a conventions task (owner: the main session) — the baseline proof rule (and the guard's proof check): its own
           PR and gates; then ONE release carrying F3 and F24 (promote-release) → coai's pin bump alone before S6 creates
           its baseline, and the declaring repository's bump before its first Node compliance PR; the other consumers'
@@ -1070,6 +1072,7 @@ Nothing was rejected.
    (through the mcp suite) and the server suite's wiring (a filtered Windows step); bench's wiring is proven on Linux and
    macOS, the ingest suite's on Linux only. *Recommended:* still yes.
 2. **P1, the Windows barrier record** — unchanged, still open.
+   *[2026-11-04: closed — see § 2, item 1.]*
 3. **A Windows check of the server and bench suites — later, or not at all?** It may widen the matrix. The server suite
    already passes on Windows in `release.yml`, so moving it into pull-request CI is cheap; bench is unmeasured there.
    *Recommended:* not now; ask again after E5's producer PR, with the measured cost of the step.
@@ -1084,6 +1087,7 @@ both agreeing), under the owner's standing instruction to ask them first: 3 — 
 and bench are judged separately after E5's producer PR, with the measured cost of each step (server has a proven Windows
 path in `release.yml`, bench has none); 4 — yes, one release, cut after F24 is built and its acceptance check passes;
 the over-cap pin bumps of that release are asked when it comes. Question 2 (P1) stays open.
+*[2026-11-04: question 2 (P1) is answered — closed by the owner's statement; see § 2, item 1.]*
 
 ## Epics
 
