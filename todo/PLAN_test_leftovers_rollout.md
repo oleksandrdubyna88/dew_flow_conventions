@@ -44,7 +44,7 @@
 > Related: [common/test-leftovers.md](../common/test-leftovers.md) (the core),
 > [common/test-leftovers-detail.md](../common/test-leftovers-detail.md) (the detail; where the two differ the detail
 > decides), [common/testing.md](../common/testing.md),
-> [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md) (R1–R7, the owner decisions),
+> [PLAN_test_leftovers_merged_core_release.md](../research/PLAN_test_leftovers_merged_core_release.md) (R1–R7, the owner decisions),
 > [PLAN_test_leftovers_merged_core_followups.md](PLAN_test_leftovers_merged_core_followups.md) (F1–F22),
 > [research/PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) (the contract as built).
 
@@ -374,12 +374,12 @@ find nothing of the caller's scope with a `gone` record.
 
 The plan [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) (IMPLEMENTED 2026-10-27, promoted to `research/`) revises the contract E1 builds, so the consumer
 epics now wait for ITS release, not for E1's. What it left open — S0 on every machine, the merge of PR #82, the private sibling's side and the ONE release —
-is in [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md); its R5 is the release and its R6 is the two-stage migration below. Named on both sides:
+is in [PLAN_test_leftovers_merged_core_release.md](../research/PLAN_test_leftovers_merged_core_release.md); its R5 is the release and its R6 is the two-stage migration below. Named on both sides:
 
 | Item | Built by | This plan's part |
 |---|---|---|
 | The contract text, helper, sweep, janitor and guard in their owner-scoped form | the merged-core plan | E2–E7 consume its one release (R5 of the remainder plan); E1's stories document was promoted by it as IMPLEMENTED on 2026-10-27 — **superseded 2026-11-01: there were two releases (R5 `115bbf8`, R7 `105d53c`) and E5 needs a third (the `raw-temp` baseline rule); every consumer is pinned at `105d53c`, and a pin bump merges alone, so a further release costs each consumer one standalone PR, not a re-port** |
-| The machine barrier, the merge of PR #82, the private sibling's side and the ONE release | [the remainder plan](PLAN_test_leftovers_merged_core_release.md) R1–R5 | E2–E7 start no producer stage before R5; their sweep-only stages need no release |
+| The machine barrier, the merge of PR #82, the private sibling's side and the ONE release | [the remainder plan](../research/PLAN_test_leftovers_merged_core_release.md) R1–R5 | E2–E7 start no producer stage before R5; their sweep-only stages need no release |
 | The per-consumer rename, port and pin bump | epics E2–E7 here | Each epic splits into a sweep-only stage (its owner-blind sweeps replaced or disabled, no owner-form producer) and a producer stage (pin bump + rename + helper/guard port in one commit — **superseded by decision 4 (the pin bump merges alone) and decision 6 (one PR or a gated stack)**); all sweep-only stages land before any producer stage; the barrier checklist of the merged-core plan runs per machine before the first producer |
 
 Order: the merged core first, then R1–R5 of the remainder plan, then the epics below. Disjoint: neither edits a consumer repository.
@@ -392,7 +392,7 @@ recorded or merged (the barrier). The stories documents of E3 (dew_flow_mcp #53)
 against E1; an Opus delta check against `115bbf8` found the name, the creation order, the claim record, liveness, the sweep and the guard changed, so
 both are re-split before any producer code. The entries below still say E1 and `testsToDelete-<repo>-…`: read them through
 `common/test-leftovers.md` at `115bbf8` (`testsToDelete-<owner>-<repo>-…`). Three owner decisions of 2026-10-31 apply to every port, recorded in
-[R6 of the remainder plan](PLAN_test_leftovers_merged_core_release.md): a pin bump may merge alone; a Windows kernel owner needs the profile AND the
+[R6 of the remainder plan](../research/PLAN_test_leftovers_merged_core_release.md): a pin bump may merge alone; a Windows kernel owner needs the profile AND the
 owner SID; the `owner-blind` class in C# and Rust flags any bare-prefix literal outside the helper's file. E6 and E7.S3 wait for E3's merged producer
 stage, not for "E3.S2".
 

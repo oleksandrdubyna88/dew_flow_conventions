@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, the merged core: the owner segment scopes, the kernel authorises, liveness decides
 
-> Status: **IMPLEMENTED, 2026-10-27** — on PR #82 (merges after S0 of [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md));
+> Status: **IMPLEMENTED, 2026-10-27** — on PR #82 (merges after S0 of [the remainder plan](PLAN_test_leftovers_merged_core_release.md));
 > deviations in [Deviations](#deviations-from-the-plan-recorded-2026-10-27). What is NOT done — S0 on every machine, S7 (the
 > one `release` promotion and the consumer migration), the private sibling's side and the merge itself — moved to that
 > remainder plan; the Windows run is follow-up F9. Scope: `common/test-leftovers.md`, a new
@@ -10,7 +10,7 @@
 > `README.md`, `research/rule-bodies.json`. Plan-gate round 1 passed (good_enough); its findings are applied below.
 >
 > Related docs: [PLAN_test_leftovers_E1.md](PLAN_test_leftovers_E1.md) (the contract this one revises — promoted to
-> `research/` together with this plan, 2026-10-27), [PLAN_test_leftovers_merged_core_release.md](../todo/PLAN_test_leftovers_merged_core_release.md)
+> `research/` together with this plan, 2026-10-27), [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md)
 > (the remainder plan: what this one left open), [PLAN_test_leftovers_merged_core_followups.md](../todo/PLAN_test_leftovers_merged_core_followups.md)
 > (the findings parked by the security pass), [PLAN_test_leftovers_rollout.md](../todo/PLAN_test_leftovers_rollout.md) (the consumer
 > epics, which now wait for THE RELEASE and split into two stages), [rule-ownership.md](../common/rule-ownership.md).
@@ -48,11 +48,11 @@ first producer. The tools of this repository are the reference every consumer po
 |---|---|---|
 | The rule text, the owned-resource helper, the sweep, the janitor and the guard (the contract itself) | [PLAN_test_leftovers_E1.md](PLAN_test_leftovers_E1.md) built the first version; **this plan revises it** | E1's stories keep their first form; both documents were promoted to `research/` together on 2026-10-27, this one recorded as E1's revision |
 | Renaming each consumer's resources, ports of the helper, sweep and guard, consumer pin bumps | [PLAN_test_leftovers_rollout.md](../todo/PLAN_test_leftovers_rollout.md) epics E2–E7 | They wait for the ONE release the remainder plan ends with (its R5); each epic splits into a sweep-only stage and a producer stage (pin bump + rename + helper/guard port in one commit), all sweep-only stages before any producer stage (its R6) |
-| The machine barrier before the first owner-form producer | this plan built the scan and the checklist (§ *Barrier checklist*); [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md) runs it (R1, R2) | Each consumer epic runs it per machine before its first owner-form producer |
-| S0 on every machine, the PR's merge, the private sibling's side of the Definition of Done, S7 (the one promotion of `release`) | [PLAN_test_leftovers_merged_core_release.md](../todo/PLAN_test_leftovers_merged_core_release.md) R1–R5 | This plan keeps the build and its reviews; it records the machine it has and points at the remainder for every other item. Nothing is built twice: the remainder plan edits no tool |
+| The machine barrier before the first owner-form producer | this plan built the scan and the checklist (§ *Barrier checklist*); [the remainder plan](PLAN_test_leftovers_merged_core_release.md) runs it (R1, R2) | Each consumer epic runs it per machine before its first owner-form producer |
+| S0 on every machine, the PR's merge, the private sibling's side of the Definition of Done, S7 (the one promotion of `release`) | [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md) R1–R5 | This plan keeps the build and its reviews; it records the machine it has and points at the remainder for every other item. Nothing is built twice: the remainder plan edits no tool |
 | The findings the security pass parked, the stub-docker gaps, the Windows run | [PLAN_test_leftovers_merged_core_followups.md](../todo/PLAN_test_leftovers_merged_core_followups.md) F1–F9 | None of them blocks the release |
 
-Order: this plan first, then [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md), then the consumer epics. Disjoint: nothing here edits a consumer repository.
+Order: this plan first, then [the remainder plan](PLAN_test_leftovers_merged_core_release.md), then the consumer epics. Disjoint: nothing here edits a consumer repository.
 
 ## Facts the plan rests on (read on `origin/main` `2c96f83`, 2026-10-21)
 
@@ -151,7 +151,7 @@ S7 is the release step.
 
 ### S0 — The pre-merge barrier gate for this repository (`model: sonnet` records; a person attests)
 
-> **State 2026-10-27: recorded for ONE machine, open for the rest — moved to [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md) (R1, R2).**
+> **State 2026-10-27: recorded for ONE machine, open for the rest — moved to [the remainder plan](PLAN_test_leftovers_merged_core_release.md) (R1, R2).**
 > The record is one SECTION per machine in `research/security/machines.md`, not a file per machine as the text below says.
 
 - For every machine that builds or tests this repository: `node tools/sweeper-scan.mjs --root <checkout parent>` as the
@@ -334,7 +334,7 @@ S7 is the release step.
 ### S7 — Docs, the E1 promotion, the release (`model: sonnet`)
 
 > **State 2026-10-27: the README row of the scan and the E1 promotion are done (the promotion commit of this document); the release and
-> the consumer migration moved to [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md) (R5, R6).**
+> the consumer migration moved to [the remainder plan](PLAN_test_leftovers_merged_core_release.md) (R5, R6).**
 
 - `README.md:259-260` + the mounted-tools table (`sweeper-scan`, the companion, the allowlist); `todo/PLAN_test_leftovers_E1.md`
   → `research/` as IMPLEMENTED with this plan recorded as its revision; `todo/PLAN_test_leftovers_rollout.md`: every
@@ -368,7 +368,7 @@ test and S4 test 28 under Git for Windows' bash) is follow-up F9 since 2026-10-2
 ## Definition of Done
 
 State 2026-10-27. An unticked item names the remainder-plan item that owns it
-([PLAN_test_leftovers_merged_core_release.md](../todo/PLAN_test_leftovers_merged_core_release.md), R1–R6).
+([PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md), R1–R6).
 
 - [x] The two rule texts are the spec's companions byte for byte; both bodies under the cap (the inflated-copy RED
       observed); no owner-blind line.

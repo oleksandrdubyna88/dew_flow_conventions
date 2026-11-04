@@ -141,7 +141,7 @@ What shipped differently from the plan as first approved — the ledger above re
 9. **Not released.** `release` is at `e29883f`, and `main` is 11 commits ahead, including #82 (the test-leftovers merged
    core), whose plan allows its ONE promotion only after its R4 and with a warning first. Owner decision 2026-10-29: this
    rule reaches consumers with that promotion; consumer pin bumps follow its R6 order. Named on its side, in
-   `todo/PLAN_test_leftovers_merged_core_release.md`.
+   `research/PLAN_test_leftovers_merged_core_release.md` (promoted 2026-11-04).
 10. **The server plan merged** as `dew_flow_connect_other_ais` #935 (`80b829ef`) — plan only; its build replaces the interim
     path, and the rule's paragraph with it.
 11. **Locally, six janitor tests fail** (S4-23, S4-34, S4-35, S4-37, S4-38, S4-46) identically on clean `main` on this

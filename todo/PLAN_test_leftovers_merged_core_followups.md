@@ -12,7 +12,7 @@
 > *Note 2026-11-03 (what this document is):* it is a register of findings parked by the security pass, not a plan approved as a whole. Each F-item is gated on its own: the recorded plan gates sit under single items — F12 (2026-10-28), F13, F16 (session `ba9ad4f1`, 2026-11-01) and F21 (session `ad098f3b`, 2026-11-02). No plan round and no owner go-ahead ever approved the document as a whole, so `common/plan-change-control.md`'s ledger, which starts at a plan's first approval, is not opened here. Adding an item is filing a finding, and each item's own plan gate approves its fix. If the document is ever approved as a whole, its ledger opens then.
 >
 > Related docs: [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) (the plan these findings belong to; promoted 2026-10-27),
-> [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md) (the remainder plan: S0, the merge, the sibling's side, the release; none of F1–F13 blocks it),
+> [PLAN_test_leftovers_merged_core_release.md](../research/PLAN_test_leftovers_merged_core_release.md) (the remainder plan: S0, the merge, the sibling's side, the release; none of F1–F13 blocks it),
 > `common/recheck-followups.md` of the consumers' rule set (the format of this file; this repository does not carry that rule).
 
 ## Goal
