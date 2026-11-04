@@ -64,7 +64,7 @@ section here gets the scan and the checklist; until then the statement is void f
 ## The operator's WSL machine (Ubuntu 26.04 under WSL 2, one developer account) — 2026-11-04, re-attest
 
 The barrier on this machine first opened on 2026-10-31; that record is in the remainder plan
-([PLAN_test_leftovers_merged_core_release.md](../../todo/PLAN_test_leftovers_merged_core_release.md), "The machine scan,
+([PLAN_test_leftovers_merged_core_release.md](../PLAN_test_leftovers_merged_core_release.md), "The machine scan,
 2026-10-31" and "The barrier opened, 2026-10-31"). This section scans it again on 2026-11-04, with `tools/sweeper-scan.mjs` at
 `38fe4ec`, and walks the *Barrier checklist* item by item.
 
