@@ -794,7 +794,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   interleave; POSIX is unchanged (its `renameat2`/`renamex_np` has a single winner). An op in coai's template manifest.
 - **Fix for the others.** The template's owner takes the same fix, or a better one, before E2.3, E6 and E7 copy it; the sidecar's owner measures its
   `MoveFileExW` the same way. **The Node reference:** F16's Fix may arm a Windows removal only if its sweep coordinates concurrent sweeps per root across
-  processes (a lock held over the rename, the check, the removal and the claim's deletion) and a two-sweeps test is green on Windows; until then the
+  processes (a lock held over the rename, the check, the removal and the claim's deletion) and a test of two independent sweep processes is green on Windows; until then the
   Windows sweep stays list-only, as it is today. The probe is 25 lines of C#; its source is in the workflow of coai's throwaway run above.
 - **State.** Open. Not a prerequisite of E5 once its op lands; it IS to be read before E2.3, E6 and E7 copy the template, and before F16's Fix.
 
@@ -803,8 +803,9 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - [ ] Each of F1 to F22, F24 and F25 (F23 is reserved by F3's note for other manifests) is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] F26, which is not code, is closed by the owner's written confirmation of the private sibling's mirror, with the sha256 of each span and copied
       file recomputed here and recorded under F26, and the rollout plan's DoD line for the baseline rule's mirror ticked from that record.
-- [ ] F29 is closed when, for each of the template and the sidecar, EITHER a fix is in with a two-sweeps test green on Windows, OR a recorded decision says why not
-      (no test is then asked of that side); and F16's Fix either keeps the Node sweep list-only on Windows or meets F29's Node requirement.
+- [ ] F29 is closed when, for each of the template and the sidecar, ONE of these holds, recorded under F29: a fix is in, with a Windows test that runs two independent sweep
+      PROCESSES and is green; or that side's Windows sweep only lists, by a recorded decision; or a measurement on Windows of that side's OWN call shows a single winner (the
+      measurement above is of `Directory.Move`, not of `MoveFileExW`). And F16's Fix either keeps the Node sweep list-only on Windows or meets F29's Node requirement.
 - [ ] F27 is in a released rule text: the rule test for the new section was RED before the text and is GREEN after, and
       `node tools/rule-bodies.mjs` and `node tools/ownership-check.mjs` are clean.
 - [ ] F28, which is not code here, is closed when (1) dew_flow_mcp and dew_flow_benchmark each have a release ref that a person
