@@ -717,9 +717,25 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - **State.** Parked by the owner on 2026-11-03 ("open it as a todo, do not build it"): the owner's goal now is the C# and Node comparison. The eight
   folders stay as evidence until the fix is built; they carry the `testsToDelete-` prefix, so a sweep or a person may remove them at any time.
 
+## F26 — The private sibling's mirror of the rule spans that changed after `2602416` is not recorded (found 2026-11-04, the remainder plan's re-review)
+
+- **What.** R4 of the remainder plan (now `research/PLAN_test_leftovers_merged_core_release.md`) recorded the owner's written
+  confirmation that the private sibling's copies and rule spans equal this repository at `2602416`. Three later releases changed
+  the spans the sibling mirrors: `105d53c` (#102) moved the two spans into `common/test-leftovers-detail.md` and added a new core
+  span in `common/test-leftovers.md`; `5863c60` (#108) added the `raw-temp` baseline span (`common/test-leftovers-baseline.md`);
+  and F24 (#119) changed that baseline span after `cc24f9e`. No confirmation is recorded for any of them. The rollout plan names the
+  baseline's mirror "the owner's (R4)", but R4 is closed and covered `2602416` only.
+- **Why it matters.** One text in two rule repositories is the point of the merged core (R4's own reason): a drift is found by a
+  consumer, late.
+- **Fix.** Not code. The owner confirms in writing, as R4 did, that the sibling's spans and copied tools equal this repository at
+  the current `release`, naming the sha256 of each span and file; the values are recomputed here and recorded under this item.
+  The rollout plan's own DoD line for the baseline mirror is ticked from the same record.
+- **State.** Open, the owner's. Found by the Opus judge of the remainder plan's re-review (2026-11-04); it was a gap before the
+  hand-over, not one the hand-over made.
+
 ## Definition of Done
 
-- [ ] Each of F1 to F22, F24 and F25 (F23 is reserved by F3's note for other manifests) is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
+- [ ] Each of F1 to F22 and F24 to F26 (F23 is reserved by F3's note for other manifests) is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.
