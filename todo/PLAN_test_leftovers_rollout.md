@@ -1977,6 +1977,9 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
   tests' deliberate reuse is either exempt under decision 2a (named where configured, reset serialized) or
   abandoned on purpose — never both at once, as today; the test prefix is renamed in every place that pins
   it; temp sites go through the helper.
+- *[epoch 5, 2026-11-04, PR review, CodeRabbit]* The Scope paragraph below describes `InfrastructureSampler` as it was BEFORE stage A. Since
+  dew_flow_rag_qln #86 (`47998e7`) the daemon lists `qlntest_*` and drops none by name; the paragraph stays as the record of why stage A
+  was required, and its other facts (the fixed ids, the prefix's three places) are for E7's stories to read again.
 - **Scope — the contradiction the audit table missed.** The audit row says the `qlntest_*` collections are
   "kept on purpose (fixed ids)". They are not kept: the PRODUCT drops every collection starting with
   `qlntest_` on every sampler tick — `src/Rag.Application/Runtime/InfrastructureSampler.cs:104-109`, no age,
