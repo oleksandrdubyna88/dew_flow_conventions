@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans).** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (open: a process cap and shim rule for the next planned release; release refs for product submodules, other repositories' work).** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -8,6 +8,8 @@
 > hold the release").
 >
 > *Note 2026-11-03: the status line above is the state of 2026-10-26 and was never rewritten. Since then items have been fixed on their own branches, and some released: F16's interim, F21 and F22 are released (`5863c60`, `cc24f9e`); F3 and F24 are fixed and not released (they ride one release); the rest are parked as written. Each item's Progress and Released lines, not this status line, are the current state.*
+>
+> *Note 2026-11-04: the sentence above covers the line's first claim, "plan only, nothing implemented yet": that is the state of 2026-10-26. The "F… added <date>" clauses after it are kept current, up to F27 and F28.*
 >
 > *Note 2026-11-03 (what this document is):* it is a register of findings parked by the security pass, not a plan approved as a whole. Each F-item is gated on its own: the recorded plan gates sit under single items — F12 (2026-10-28), F13, F16 (session `ba9ad4f1`, 2026-11-01) and F21 (session `ad098f3b`, 2026-11-02). No plan round and no owner go-ahead ever approved the document as a whole, so `common/plan-change-control.md`'s ledger, which starts at a plan's first approval, is not opened here. Adding an item is filing a finding, and each item's own plan gate approves its fix. If the document is ever approved as a whole, its ledger opens then.
 >
@@ -733,11 +735,57 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - **State.** Open, the owner's. Found by the Opus judge of the remainder plan's re-review (2026-11-04); it was a gap before the
   hand-over, not one the hand-over made.
 
+## F27 — No family rule bounds the processes a test file may start, or stops a test shim from running itself (found 2026-11-02, the r9700 fork storm)
+
+- **What.** On 2026-11-02 a test shim in the r9700 repository put a `python3` in front of `PATH`, then looked up the "real"
+  `python3` through the same `PATH`, found itself, and ran itself without end: about 15,900 processes, and the session crashed.
+  No rule of this family asks a test runner to bound process creation, or asks a shim to resolve the real program outside its
+  own folder, so any repository with a custom runner or a `PATH` shim can do the same.
+- **What exists.** The r9700 repository fixed it on its own side (read on its `main`, `2f8cd71`): `tests/run.mjs:14-18` runs each
+  test file under `ulimit -u <cap>` (the user's thread count at the start plus a headroom), watches the file's session and fails
+  the file with `process cap reached (<cap>): a test forks without end`; `tests/test_runner.sh:274-286` proves it with a guarded
+  fork fixture; `tests/test_moe.sh:650-653` looks up `python3` with the shim folder removed from `PATH` and refuses a result
+  inside it. Linux counts every THREAD of the user against `RLIMIT_NPROC`, so the kernel limit is not a per-file quota on its
+  own; the session watch is what makes it one.
+- **Fix (decided 2026-11-04, the question consultants, `867ea464`, both answers).** A short addition to the existing testing
+  rule (`common/testing.md`), for repositories with a custom test runner or a `PATH` shim: (1) a runner bounds the processes of each test file and
+  fails the file when the bound is reached; (2) a shim resolves the program it wraps outside its own folder and refuses to
+  resolve to itself. It cites the r9700 implementation as the model and says the platform limit (`RLIMIT_NPROC` counts the
+  user's threads). No new framework. It goes into the **next planned release** of this repository, not a release of its own,
+  and it is **not** a prerequisite of the rollout (it does not block any epic of the rollout: no producer depends on it; when it was decided, adding it would also have been a plan change of the rollout).
+- **Tests.** The rule's own checks: `node tools/rule-bodies.mjs` and `node tools/ownership-check.mjs` clean with the new text;
+  a rule test that the new section is in the body (RED before the text is added). Adoption in other repositories is their own
+  work, scheduled apart from this item.
+- **State.** Open, queued for the next planned release.
+
+## F28 — A product's submodule pin follows another product's `main`, so every merge there makes the consumer's pin check red (found 2026-11-02, rag_qln)
+
+- **What.** rag_qln pins `external/dew_flow_mcp` and `external/dew_flow_benchmark` with no `branch` setting in `.gitmodules`, so
+  `tools/pin-check.mjs` compares each pin with the remote's default branch, `main`. Each merge in either repository makes every
+  open rag_qln pull request red until a pin bump lands (seen on rag_qln #80 and #81). This is the failure `pin-check.mjs`'s own
+  header records for the shared rules before 2026-09-14, which `branch = release` fixed for them.
+- **What exists.** `pin-check.mjs` already reads `submodule.<name>.branch` (its header, lines 9-12). Neither dew_flow_mcp nor
+  dew_flow_benchmark has a release branch today (`git ls-remote`, 2026-11-04: `main` only, plus one benchmark tag).
+- **Fix (decided 2026-11-04, the question consultants, `867ea464`, both answers).** Not code in this repository: (1) each upstream
+  product gets a release ref that a person moves deliberately to a tested commit; (2) rag_qln sets `branch = <that ref>` for
+  both submodules, in a form `tools/pin-check.mjs:77-78` reads: a plain name is a BRANCH (`release` means
+  `refs/heads/release`), and a tag must be written in full (`refs/tags/vX.Y`, since a plain `vX.Y` is read as a branch); (3) a rag_qln pull request bumps the gitlinks and builds and tests the whole solution, because rag_qln
+  compiles those projects and a release label does not prove they still fit. A ref that follows `main` by itself solves
+  nothing. Bumps are still needed at each promotion; this cuts the churn, it does not remove it. No release of this repository
+  is needed.
+- **State.** Open, the work of the rag_qln, dew_flow_mcp and dew_flow_benchmark sessions. Not a rollout prerequisite.
+
 ## Definition of Done
 
 - [ ] Each of F1 to F22, F24 and F25 (F23 is reserved by F3's note for other manifests) is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] F26, which is not code, is closed by the owner's written confirmation of the private sibling's mirror, with the sha256 of each span and copied
       file recomputed here and recorded under F26, and the rollout plan's DoD line for the baseline rule's mirror ticked from that record.
+- [ ] F27 is in a released rule text: the rule test for the new section was RED before the text and is GREEN after, and
+      `node tools/rule-bodies.mjs` and `node tools/ownership-check.mjs` are clean.
+- [ ] F28, which is not code here, is closed when (1) dew_flow_mcp and dew_flow_benchmark each have a release ref that a person
+      promoted to a commit whose CI was green (the promoting commit or pull request is linked), (2) rag_qln's `.gitmodules` names
+      that ref for both submodules in the form F28 states (a plain name for a branch, `refs/tags/…` for a tag), and (3) a rag_qln pull request with that setting built and tested the whole solution; the
+      three links are recorded under F28.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.
