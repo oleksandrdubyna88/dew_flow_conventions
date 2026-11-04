@@ -326,6 +326,16 @@ Narrowed: yes — E5's native measurement series (`native-(vibe|kimi)-<yyyymmdd>
 
 > Epoch 5 · approved 2026-11-04 · by owner · state: open
 
+- 5.1 · 2026-11-04 · agent · approach — on Windows a rename has no single winner, so E5's C# copy holds a per-root mutex around a whole sweep on Windows, an op on the template's text
+  (Measured on a hosted windows-latest runner, run 41873954643, a bare .NET console: two threads race Directory.Move on one
+  source, 40000 times; both calls succeeded in 39951, with one destination left. Found through S2-B's two-sweeps test, red on
+  Windows in two ways (coai ci runs 41843872560, 41867523353); consult e9d7aec0. The template's RenameExclusively assumes a
+  single winner. Consequences on Windows with two sweeps at once: a false report in Removed, and a schedule read in the code
+  where the winner of the claim deletion leaves the other sweep to restore an unclaimed, possibly half-deleted folder that
+  later sweeps keep as unmarked. No wrong deletion was found. Loosening the test would hide that. This departs from
+  "the template wins" for a defect that blocks the PR, so it is a change and not a fix inside the plan; the same report goes
+  to the template's owner as F29 of the follow-ups plan. E2.3, E6 and E7 copy the template later and read F29 first.)
+
 ## Symptom
 
 The owner, 2026-10-14: containers started by tests stay up for weeks and hold memory, CPU, ports and disk;
