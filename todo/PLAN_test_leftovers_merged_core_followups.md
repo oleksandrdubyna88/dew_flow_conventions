@@ -9,6 +9,8 @@
 >
 > *Note 2026-11-03: the status line above is the state of 2026-10-26 and was never rewritten. Since then items have been fixed on their own branches, and some released: F16's interim, F21 and F22 are released (`5863c60`, `cc24f9e`); F3 and F24 are fixed and not released (they ride one release); the rest are parked as written. Each item's Progress and Released lines, not this status line, are the current state.*
 >
+> *Note 2026-11-04: the sentence above covers the line's first claim, "plan only, nothing implemented yet": that is the state of 2026-10-26. The "F… added <date>" clauses after it are kept current, up to F27 and F28.*
+>
 > *Note 2026-11-03 (what this document is):* it is a register of findings parked by the security pass, not a plan approved as a whole. Each F-item is gated on its own: the recorded plan gates sit under single items — F12 (2026-10-28), F13, F16 (session `ba9ad4f1`, 2026-11-01) and F21 (session `ad098f3b`, 2026-11-02). No plan round and no owner go-ahead ever approved the document as a whole, so `common/plan-change-control.md`'s ledger, which starts at a plan's first approval, is not opened here. Adding an item is filing a finding, and each item's own plan gate approves its fix. If the document is ever approved as a whole, its ledger opens then.
 >
 > Related docs: [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) (the plan these findings belong to; promoted 2026-10-27),
@@ -766,7 +768,8 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   dew_flow_benchmark has a release branch today (`git ls-remote`, 2026-11-04: `main` only, plus one benchmark tag).
 - **Fix (decided 2026-11-04, the question consultants, `867ea464`, both answers).** Not code in this repository: (1) each upstream
   product gets a release ref that a person moves deliberately to a tested commit; (2) rag_qln sets `branch = <that ref>` for
-  both submodules; (3) a rag_qln pull request bumps the gitlinks and builds and tests the whole solution, because rag_qln
+  both submodules, in a form `tools/pin-check.mjs:77-78` reads: a plain name is a BRANCH (`release` means
+  `refs/heads/release`), and a tag must be written in full (`refs/tags/vX.Y`, since a plain `vX.Y` is read as a branch); (3) a rag_qln pull request bumps the gitlinks and builds and tests the whole solution, because rag_qln
   compiles those projects and a release label does not prove they still fit. A ref that follows `main` by itself solves
   nothing. Bumps are still needed at each promotion; this cuts the churn, it does not remove it. No release of this repository
   is needed.
@@ -781,7 +784,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
       `node tools/rule-bodies.mjs` and `node tools/ownership-check.mjs` are clean.
 - [ ] F28, which is not code here, is closed when (1) dew_flow_mcp and dew_flow_benchmark each have a release ref that a person
       promoted to a commit whose CI was green (the promoting commit or pull request is linked), (2) rag_qln's `.gitmodules` names
-      that ref for both submodules, and (3) a rag_qln pull request with that setting built and tested the whole solution; the
+      that ref for both submodules in the form F28 states (a plain name for a branch, `refs/tags/…` for a tag), and (3) a rag_qln pull request with that setting built and tested the whole solution; the
       three links are recorded under F28.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
