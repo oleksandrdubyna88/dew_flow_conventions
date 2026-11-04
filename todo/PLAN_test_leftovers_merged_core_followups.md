@@ -750,7 +750,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   fails the file when the bound is reached; (2) a shim resolves the program it wraps outside its own folder and refuses to
   resolve to itself. It cites the r9700 implementation as the model and says the platform limit (`RLIMIT_NPROC` counts the
   user's threads). No new framework. It goes into the **next planned release** of this repository, not a release of its own,
-  and it is **not** a prerequisite of the rollout (the rollout's epoch 4 already holds one change).
+  and it is **not** a prerequisite of the rollout (it does not block any epic of the rollout: no producer depends on it; when it was decided, adding it would also have been a plan change of the rollout).
 - **Tests.** The rule's own checks: `node tools/rule-bodies.mjs` and `node tools/ownership-check.mjs` clean with the new text;
   a rule test that the new section is in the body (RED before the text is added). Adoption in other repositories is their own
   work, scheduled apart from this item.
