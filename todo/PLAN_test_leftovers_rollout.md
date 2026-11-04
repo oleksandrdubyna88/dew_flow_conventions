@@ -1,6 +1,12 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **stopped for re-review (2026-11-04)** — epoch 4's second change after approval (entry 4.2, E5's native measurement
+> Status: **epoch 5 open (2026-11-04), approved by the owner after the re-review.** Epoch 4 stopped at entries 4.1 and 4.2;
+> the whole plan was revised (§ *Epoch 5*), the Opus judge sorted epoch 4's work (14 fit; coai #943 cut, fixed forward on
+> #945), the plan gate (session `5c89a4ce`, 2 findings accepted, 1 rejected with reason) and the interim document gate on
+> the E5 stories document (5 findings accepted) passed, an Opus review's fixes were applied, and because the record says
+> `Narrowed: yes` the owner approved it (2026-11-04).
+>
+> Was: **stopped for re-review (2026-11-04)** — epoch 4's second change after approval (entry 4.2, E5's native measurement
 > series fits neither S4 option; found writing E5's S4 brief). No new code on any epic of this plan and no merge of a pull request
 > carrying its work until the full re-review is complete; when its record says `Narrowed: yes`, the owner has approved the revised
 > plan; and epoch 5 is opened with `state: open`. At the stop: E5's producer PR coai #945 (draft) holds S3 and S2-B, pushed at
@@ -229,7 +235,7 @@ Narrowed: yes — E5's Definition of Done no longer asks for all four C# suites 
   every suite's proofs run on all three OSes; the ingest suite cannot run off Linux. The line now says which proofs run
   where; § *Epoch 4*, item 3 (f) names each CI step.)
 
-> Epoch 4 · approved 2026-11-03 · by owner · state: stopped
+> Epoch 4 · approved 2026-11-03 · by owner · state: closed
 
 - 4.1 · 2026-11-03 · agent · contract — E5's promise that a killed old coai run (legacy `testsToDelete-coai-run-*`) is collected by the next extension run cannot hold at the pinned reference
   (found writing E5's S2-B spec (Fable), coai branch feat/test-leftovers-e5-producer, spec § B.10 item 1. At the
@@ -317,6 +323,8 @@ Narrowed: yes — E5's native measurement series (`native-(vibe|kimi)-<yyyymmdd>
   docs commit on a branch already in the table; no verdict changes. What the review corrected in § *Epoch 5* and in the
   E5 stories document is marked `*[epoch 5, 2026-11-04, Opus review]*` in place; it is part of the baseline epoch 5 is
   approved on, not an entry.)
+
+> Epoch 5 · approved 2026-11-04 · by owner · state: open
 
 ## Symptom
 
