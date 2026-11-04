@@ -4,6 +4,9 @@
 			"path": "."
 		},
 		{
+			"path": "../dew_flow_amd_r9700_tuning_ai"
+		},
+		{
 			"path": "../dew_flow_benchmark"
 		},
 		{
