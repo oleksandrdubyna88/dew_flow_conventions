@@ -1327,7 +1327,17 @@ fails unless all of them hold exactly that text.
    and it removes one checked variable, never a glob. The rename adds no new path to it. Because the series root is a
    shared `/tmp` and the remover runs as root, S4 also makes it refuse (exit 78, one line) a folder whose owner is not
    uid 0 or that is group- or world-writable — a test for each refusal. A Fable security read of the four scripts is
-   part of S4's Opus review.
+   part of S4's Opus review. *[re-review gate, 2026-11-04, finding 0]* The race between the checks and `rm` is closed
+   by the series ROOT, not by timing: the remover also refuses a root that is not owned by uid 0, or that is
+   world-writable without the sticky bit (`/tmp` is `1777`). Under a sticky, root-owned root, no other user can
+   rename, replace or remove a uid-0 folder, and inside a folder that is not group- or world-writable no other user
+   can replace an entry; so what was checked is what `rm -rf` removes. Tests: a non-sticky world-writable root and a
+   root owned by another uid are each refused before any `rm`.
+5. *A phase whose series is gone (re-review gate, finding 1).* A reboot that clears `/tmp`, or a `remove-series.sh`,
+   between two phases leaves the next phase without its series. That phase stops with one line — the series
+   `<path>` is gone (removed, or cleared by a reboot); start a new series with `make-series.sh` — and a non-zero exit,
+   before it writes anything; the measurement's partial results are what the earlier phases already printed. Test: a
+   phase started on a removed series gives that line and that exit.
 
 **Size and the forgotten series.** A series holds the run folders of its phases (probe outputs, transcripts, small
 binaries); its size is measured at its first use after S4 and written in the native documents with the command that
