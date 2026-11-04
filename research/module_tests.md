@@ -1202,7 +1202,8 @@ This repository's own tests obey `common/test-leftovers.md` and its companion `c
 (`research/PLAN_test_leftovers_merged_core.md`, IMPLEMENTED 2026-10-27, deviations in that document) rebuilt what epic E1 shipped on
 2026-10-15. The first subsection is the code as it is on the branch of PR #82 (read from the files on 2026-10-27); the second is E1's
 record as it was written. What is not done — the machine barrier on every machine, the merge, the private sibling's side and the
-release — was `todo/PLAN_test_leftovers_merged_core_release.md`, done and promoted on 2026-11-04 as
+release — was `todo/PLAN_test_leftovers_merged_core_release.md`, promoted on 2026-11-04 (the barrier on the owner's Windows machine is
+still closed, and the sibling's confirmation holds at `2602416` only, F26) as
 `research/PLAN_test_leftovers_merged_core_release.md`; its open tail, the consumer migration, is `todo/PLAN_test_leftovers_rollout.md`.
 
 ### The code as it is (2026-10-27)

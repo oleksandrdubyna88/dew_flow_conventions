@@ -2,7 +2,8 @@
 
 > Status: **IMPLEMENTED, 2026-11-04.** R1–R5, R7 and the Darwin path of the C# helper are done. R6, the consumer migration, is
 > handed over to [the rollout plan](../todo/PLAN_test_leftovers_rollout.md), which is its open tail; R6's box here is ticked
-> together with that plan's final completion record, once its other conditions hold (§ *Epoch 2*, item 3). Epoch 2 was
+> together with that plan's final completion record, once the rollout plan's other Definition of Done conditions hold
+> (§ *Epoch 2*, item 3). Epoch 2 was
 > approved by the owner on 2026-11-04, after the late-recorded stop and the re-review (narrowed).
 >
 > Deviations from the plan as written:
@@ -13,14 +14,14 @@
 > - **Items added after approval.** R7, the core split riding it, and the Darwin item (entries 1.4–1.6).
 > - **The change ledger was recorded late.** The rule reached this repository on 2026-10-29; this plan's ledger opened on
 >   2026-11-04 with six entries, and the stop belonged at entry 1.2 (2026-10-31). Wave 1 (E3, E4), R7 and the Darwin item
->   were built after that unrecorded stop. The Opus judge found that all of it fits the revised plan: the breach is timing.
+>   were built after that unrecorded stop. The Opus judge found that all of it fits the revised plan (the breach is timing);
+>   it checked every sha and pull request of its table (git log, gh).
 > - **R6 handed over, not done.** Its barrier order is read as the rollout plan's merge condition (b): a producer waits only
 >   for the sweep-only stages that can reach its resources. That is narrower than "every sweep-only stage before any
 >   producer stage": wave 1 merged before coai's age-only sweep was retired (coai #940, 2026-11-02), and E7's stage A is open.
 > - **R4's guarantee holds at `2602416` only.** The private sibling's mirror of the spans changed later (the core split, the
 >   baseline rule, F24) is not recorded: F26 of [the follow-ups plan](../todo/PLAN_test_leftovers_merged_core_followups.md),
->   the owner's. Checked: every sha and pull request of the judge's table (git log, gh). Not checked: the private sibling's
->   current copies (another owner's repository, not visible from here).
+>   the owner's. Not checked: the private sibling's current copies (another owner's repository, not visible from here).
 >
 > Was: **stopped for re-review (2026-11-04).** The change-control rule (`common/plan-change-control.md`, #86) reached
 > this repository on 2026-10-29. This plan had no ledger then, and six changes after that date were never recorded here
@@ -61,7 +62,7 @@
 - 1.5 · 2026-11-01 · owner · scope — the core and detail split of common/test-leftovers.md rides R7's release
   (Question consultant e03cae48.)
 - 1.6 · 2026-11-01 · owner · dod — the Darwin path of the C# helper is measured on a macOS leg and merged before E5 and E2 copy it
-  (Not a change: the row of 2026-10-29 in the boundary table, the plan-change rule riding R5's promotion, which by its
+  (Entry 1.6 is the last change. Left out of the ledger because they are not changes: the row of 2026-10-29 in the boundary table, the plan-change rule riding R5's promotion, which by its
   own words changed nothing in R5's what, when or done-when; and the R6 records of 2026-10-31, which apply the barrier
   as R6 already stated it.)
 
@@ -96,8 +97,9 @@ Narrowed: yes — R6 (the consumer migration) is handed over to the rollout plan
 | coai #850 `ee7a7b70`, #942 `004c55fb`: the E5 stories (rollout work) | main of coai | cut | already corrected — #942 fixed #850, coai #943 `8dc0765c` fixed #942 (the rollout plan's epoch-3 and epoch-4 tables); no new PR |
 | the stop commit `7e03915` (entries 1.1–1.6, state stopped) | pushed, branch `docs/promote-merged-core-release` | fits | kept — merges with epoch 2's line |
   (The Verdict and Action columns were filled by an Opus judge (step 5 of the full stop), 2026-11-04, against § Epoch 2.
-  It checked each consumer pull request with gh (state, merge sha, merge time) and each sha here with git log. No merged
-  work contradicts the revised plan; the breach is the timing that entry 1.2 names.)
+  It checked each consumer pull request with gh (state, merge sha, merge time) and each sha here with git log. Only coai
+  #850 and #942 did not fit (cut), and the rollout plan had already corrected them (coai #942, #943); all other merged
+  work fits the revised plan. The breach is the timing that entry 1.2 names.)
 
 > Epoch 2 · approved 2026-11-04 · by owner · state: open
 
@@ -131,6 +133,8 @@ What goes wrong if the order is not kept:
 PR #82 merges with the barrier recorded for every machine that builds or tests this repository (or with the owner's written statement that a
 machine no longer does); the private sibling's rebuild is byte-identical and confirmed; `release` is promoted ONCE; the consumer
 migration starts with every sweep-only stage before any producer stage.
+*Revised 2026-11-04 (§ Epoch 2, item 1):* R6's part is read as the rollout plan's merge condition (b), and finishing the
+migration is the rollout plan's goal.
 
 ## Boundary with the plans around it (named on both sides)
 
@@ -163,7 +167,8 @@ consultants `e40c6313` and `5e6e52c5` were asked first whether to promote and ho
 - **R6 is handed over** to [the rollout plan](../todo/PLAN_test_leftovers_rollout.md). Its content (E2–E7), its order and its
   merge conditions have lived there since that plan's epoch 2 (2026-11-01). This plan kept only a pointer and the owner's
   three decisions of 2026-10-31 (entries 1.1–1.3), which the rollout plan records as its entries 1.2–1.4 and took as its
-  decisions 4 and 5. From epoch 2 this plan holds no open work.
+  decisions 4 and 5. From epoch 2 this plan has no work of its own to do: R6's box stays open only to be ticked with the
+  rollout plan's final completion record (item 3).
 - **Goal (revised).** R1–R5 and R7 as written. R6's part of the goal — "the consumer migration starts with every sweep-only
   stage before any producer stage" — is met as a START only when the order is read as the rollout plan's condition (b)
   (item 2): wave 1 (E3 dew_flow_mcp #58 and E4 dew_flow_sidecar_rust #64) merged on 2026-10-31, before coai's age-only
@@ -187,12 +192,15 @@ consultants `e40c6313` and `5e6e52c5` were asked first whether to promote and ho
   rollout plan points the baseline's mirror at "R4". It is parked as F26 of
   [the follow-ups plan](../todo/PLAN_test_leftovers_merged_core_followups.md), the owner's. Until F26 records a mirror, R4's
   guarantee ("one text in two repositories") holds at `2602416` only; for every span changed after it, this repository's
-  text is the authoritative one, because the private sibling copies it byte for byte (plan gate finding 5).
+  text is the authoritative one: the private sibling's practice is to copy it byte for byte, but no record shows that it
+  has copied the current text (plan gate finding 5; code gate finding 3). What waits for that record: E5's producer PR,
+  through the rollout plan's DoD line for the baseline rule's mirror. No other consumer's work is gated on F26.
 
 ### 3. How R6 is closed
 
 R6's box is ticked in this plan's research record together with the rollout plan's final completion record, once that
-plan's OTHER Definition of Done conditions hold. Neither plan waits for the other's box. A ticked box is not a change in
+plan's OTHER Definition of Done conditions hold. R6's box does not wait for the rollout plan's last DoD line; that line
+then waits for R6's box, so neither plan blocks the other. A ticked box is not a change in
 either plan, so the rollout plan's line "the remainder plan's R6 is ticked" stands as written.
 
 ### 4. Build order and merge conditions
@@ -210,7 +218,7 @@ The rollout plan's (§ *Epoch 4*, items 3 and 5). This plan's § *Build order* a
 
 Rejected: nothing.
 
-### 6. The re-review plan gate (2026-11-04, coai session `8207413f`, 2 of 2 reviewers, `proceed`, 5 gating against 6)
+### 6. The re-review plan gate (2026-11-04, coai session `8207413f`, 2 of 2 reviewers, `proceed`: 6 findings, 5 of them gating, against a threshold of 6)
 
 | Finding | Verified | Taken |
 |---|---|---|
@@ -223,6 +231,14 @@ Rejected: nothing.
 
 The gate's operator commands (split into two or three epics, Fable for the split, cadence consults) do not fit a re-review
 with nothing left to build; none was applied, and this sentence is the record of that decision.
+
+**The code gate on the branch** (the same session, 8 of 8 reviewers, `proceed`: 4 findings, all gating, against a
+threshold of 5). 0 — close epoch 2 before promotion: rejected, because the rule closes only the earlier epochs and the
+promoted `PLAN_plan_change_control.md` keeps its last epoch open. 1 — tick or drop the R6 box in `research/`: rejected,
+because a ticked box is not a change and ticking it now would record an open migration as done (the promoted
+`PLAN_test_leftovers_merged_core.md` also keeps open boxes that name their new owner). 2 — mark R6's stricter order in
+place: accepted (the note under R6). 3 — the sibling's byte-for-byte copy is not verified: accepted (item 2). Its
+operator commands (work autonomously, consultants first) were followed; there is no code, so no RED-GREEN-RED test.
 
 ### 7. Question for the owner (blocking)
 
@@ -306,7 +322,11 @@ with nothing left to build; none was applied, and this sentence is the record of
 ### R6 — The consumer migration
 
 > **Handed over 2026-11-04 (§ *Epoch 2*).** The open tail of this plan lives in [the rollout plan](../todo/PLAN_test_leftovers_rollout.md);
-> its barrier order is read as that plan's merge condition (b). The records below stay as written.
+> its barrier order is read as that plan's merge condition (b): where the text below says "every sweep-only stage before
+> any producer stage", the operative order is (b) (code gate finding 2). The records below stay as written, and two of
+> them are known to be wrong: the records of 2026-10-31 call the stage A of coai and of rag_qln empty, but that scan missed
+> coai's age-only `coai-` sweep (retired by coai #940) and rag_qln's `qlntest_*` drop (E7's stage A, open) — the rollout
+> plan, § *Epoch 3*, item 3 (b).
 
 - **What.** The epics E2–E7 of [the rollout plan](../todo/PLAN_test_leftovers_rollout.md), in two stages: every consumer's SWEEP-ONLY stage (its
   owner-blind sweeps replaced or disabled as a committed, merged change; no owner-form producer) lands before ANY producer stage (pin bump,
