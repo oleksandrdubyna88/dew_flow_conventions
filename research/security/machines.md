@@ -1,6 +1,9 @@
 # Barrier records — one section per machine that builds or tests this repository
 
-> Status: **two machines recorded, 2026-10-27: the Ubuntu dev VM's barrier is OPEN; the owner's Windows machine was not tested, so its barrier is closed.** The checklist
+> Status: **three machines recorded. The Ubuntu dev VM's barrier is OPEN (2026-10-27). The operator's WSL machine's barrier is
+> OPEN for every place a developer account can read (2026-11-04); two root-only places are not read, so its merge condition (c)
+> waits for one administrator scan. The owner's Windows machine was not tested, so its barrier is closed; since 2026-11-04 it does
+> not build or test E2's and E5's repositories, which meets condition (c) for it (P1 closed).** The checklist
 > each section answers is the merged-core plan's *Barrier checklist* ([PLAN_test_leftovers_merged_core.md](../PLAN_test_leftovers_merged_core.md)).
 > A machine with no section here is a machine whose barrier is closed. Names of other repositories are not written here.
 
@@ -48,3 +51,69 @@ files. With the root scan, **the barrier on this machine is open** (2026-10-27).
 since. Until a section here records a scan of it, it builds or tests this repository only with `TMPDIR`, `TEMP` and `TMP` set to a
 private folder under the user's own profile, and the janitor stays `--dry-run` there (follow-up F9 of
 [the follow-ups plan](../../todo/PLAN_test_leftovers_merged_core_followups.md); `JANITOR_WINDOWS_E2E_GREEN` is not set).
+
+**Owner statement, 2026-11-04 (temporary):** this machine does not build or test E2's and E5's repositories (the rollout's wave 2)
+for now. P1 of the rollout plan ([PLAN_test_leftovers_rollout.md](../../todo/PLAN_test_leftovers_rollout.md), § 7, question 2)
+offers two ways to meet merge condition (c) for this machine: the scan and the checklist, OR a written statement that the
+machine no longer builds or tests those repositories. This is the second way, so **P1 is closed and condition (c) is met for
+this machine for E2 and E5**: a machine that does not run their suites cannot be hit by their producers. The barrier itself is
+not opened; it stays **closed**, and the other merge conditions of each PR still apply. Checked on 2026-11-04 from the WSL machine below, through its Windows side: `where node` finds no Node, and the user
+profile holds no git checkout (only tool folders). **Before this machine builds or tests E2's or E5's repository again**, its
+section here gets the scan and the checklist; until then the statement is void for any repository the machine runs.
+
+## The operator's WSL machine (Ubuntu 26.04 under WSL 2, one developer account) — 2026-11-04, re-attest
+
+The barrier on this machine first opened on 2026-10-31; that record is in the remainder plan
+([PLAN_test_leftovers_merged_core_release.md](../PLAN_test_leftovers_merged_core_release.md), "The machine scan,
+2026-10-31" and "The barrier opened, 2026-10-31"). This section scans it again on 2026-11-04, with `tools/sweeper-scan.mjs` at
+`38fe4ec`, and walks the *Barrier checklist* item by item.
+
+**Scan of the checkouts parent** (`--root <checkouts parent>`, as the developer account, not root): exit 2, **196 owner-blind
+lines in 98 checkouts and worktrees** of other repositories, and 4 files it could not read. Each kind of line was read in its
+file. None removes anything by the prefix; the classes, with their counts:
+
+| Class | Lines | Why it is not an enabled sweeper |
+|---|---|---|
+| Test assertions: a stderr text check, an empty-listing check after a run, a name-shape match, a protection-list test case | 108 | they read and compare; nothing is removed |
+| A listing that reports every prefixed name and removes none (a comment on the line says so) | 23 | it lists |
+| A test that checks source files for folder creators without the prefix | 23 | it reads source text |
+| A test helper that removes ONE folder it made, by its full path, at process exit; the prefix is in a comment | 23 | it removes the folder it just made, not by the prefix |
+| A process probe in a test support file (`systemctl --user list-units` names and `/proc` command lines, filtered by text) | 6 | it reads |
+| A doc comment that describes an owner-form sweep pattern | 6 | a comment |
+| A protection list (`neverMatches`) in a product's settings contract: a glob a user may NOT allow | 4 | it refuses the prefix; it removes nothing |
+| A wait loop in a test that waits until a name starts with the prefix | 3 | it waits |
+
+**System scan** (`--system`, as the same developer account): exit 2. Its owner-blind lines are a subset of the lines above (194
+of 196). It could not read 12 places:
+- **Ten too-large or unlistable places:** five generated source files over 4 MiB in a pre-commit tool cache, one Python package
+  cache that git cannot list, and one static HTML asset over 4 MiB in four checkouts of one other project.
+  `grep -rIliF teststodelete` over each: **0 matches**.
+- **Two root-only places:** root's user systemd folder and `/var/spool/cron/crontabs` (EACCES). They were **not read again**:
+  the developer account has no password-less `sudo`, and the account did not go around that. What was checked instead:
+  - no `systemd --user` manager runs as root, so units in root's user folder do not start;
+  - the crontabs folder was last changed on 2025-11-05, almost a year before the prefix rule was written (2026-10-14). The
+    `crontab` command replaces a file there, which changes the folder, so no crontab was added or edited THROUGH IT after that
+    date. This is supporting evidence, not proof: a direct edit by root could leave the folder's date unchanged.
+  An administrator can close this gap with one command: `sudo node tools/sweeper-scan.mjs --system`.
+
+**Scheduled jobs read by hand.** The developer account has no crontab and no user timer that touches a sweep (its three user
+timers are distribution timers). `grep -rliF teststodelete` over `/etc/cron*`, the system and user systemd unit folders and the
+tmpfiles configuration: 0 matches. The system timers are distribution timers and one site timer that runs a product's own
+maintenance command; in that product's source, the only prefix line is the protection list in the table. No old `janitor.sh` is scheduled.
+
+**Consumer sweeps.** This scan finds no deleting copy in any checkout or worktree on this machine, including those of ended
+sessions. That is a local fact only; the state of each consumer's sweep-only stage is the rollout plan's record, not this
+one's (on 2026-11-04 it keeps E7's stage A — rag_qln's `qlntest_*` store collections, not a temp folder — open, which blocks
+only E7's producer).
+
+**Legacy resources** (inventory only, nothing removed): `/tmp` holds 10 legacy-form folders of one other repository's
+benchmark tests (6 and 4, of two kinds), all made on 2026-11-04, so a suite that is not yet migrated still makes them. Their
+epic removes them after its producer stage merges. `/var/tmp` holds none. `bash tools/janitor.sh --dry-run` from this
+repository's worktree: no Docker binary, nothing to list.
+
+**Attested** on 2026-11-04 by the operator's session, on the evidence above, at the owner's request ("re-attest this WSL
+machine's barrier, do it yourself"), for every class in the table and the ten unreadable places — NOT for the two root-only
+places, which were not read. With the 2026-10-31 record, **the barrier is open for every place the developer account can
+read.** The checklist says the barrier is never declared open on unread evidence, so **merge condition (c) for this machine is
+not complete**: the open item is the administrator's `sudo node tools/sweeper-scan.mjs --system`. When it exits 0, or each line
+it prints is resolved here, this section records it and condition (c) is met for this machine.
