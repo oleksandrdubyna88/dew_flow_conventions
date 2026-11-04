@@ -438,7 +438,7 @@ the same file under a guard name the companion must first add to its closed list
 
 ## The release and the pins
 
-The usual path, as R5 and R7 ran it (`todo/PLAN_test_leftovers_merged_core_release.md:118-133`, `:185-205`):
+The usual path, as R5 and R7 ran it (`research/PLAN_test_leftovers_merged_core_release.md` § R5 and § R7):
 
 1. #108 merges after the re-review gate approves epoch 2, the epoch-2 items are built and reviewed (code gate, Opus),
    CodeRabbit's open threads are answered, and `npm test`, `npm run check` are green.

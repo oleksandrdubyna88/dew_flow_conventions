@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner).** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans).** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -12,7 +12,7 @@
 > *Note 2026-11-03 (what this document is):* it is a register of findings parked by the security pass, not a plan approved as a whole. Each F-item is gated on its own: the recorded plan gates sit under single items — F12 (2026-10-28), F13, F16 (session `ba9ad4f1`, 2026-11-01) and F21 (session `ad098f3b`, 2026-11-02). No plan round and no owner go-ahead ever approved the document as a whole, so `common/plan-change-control.md`'s ledger, which starts at a plan's first approval, is not opened here. Adding an item is filing a finding, and each item's own plan gate approves its fix. If the document is ever approved as a whole, its ledger opens then.
 >
 > Related docs: [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) (the plan these findings belong to; promoted 2026-10-27),
-> [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md) (the remainder plan: S0, the merge, the sibling's side, the release; none of F1–F13 blocks it),
+> [PLAN_test_leftovers_merged_core_release.md](../research/PLAN_test_leftovers_merged_core_release.md) (the remainder plan: S0, the merge, the sibling's side, the release; none of F1–F13 blocks it),
 > `common/recheck-followups.md` of the consumers' rule set (the format of this file; this repository does not carry that rule).
 
 ## Goal
@@ -717,9 +717,27 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - **State.** Parked by the owner on 2026-11-03 ("open it as a todo, do not build it"): the owner's goal now is the C# and Node comparison. The eight
   folders stay as evidence until the fix is built; they carry the `testsToDelete-` prefix, so a sweep or a person may remove them at any time.
 
+## F26 — The private sibling's mirror of the rule spans that changed after `2602416` is not recorded (found 2026-11-04, the remainder plan's re-review)
+
+- **What.** R4 of the remainder plan (now `research/PLAN_test_leftovers_merged_core_release.md`) recorded the owner's written
+  confirmation that the private sibling's copies and rule spans equal this repository at `2602416`. Two later releases and one
+  unreleased change on `main` changed the spans the sibling mirrors: `105d53c` (#102) moved the two spans into `common/test-leftovers-detail.md` and added a new core
+  span in `common/test-leftovers.md`; `5863c60` (#108) added the `raw-temp` baseline span (`common/test-leftovers-baseline.md`);
+  and F24 (#119, on `main`, not released yet) changed that baseline span after `cc24f9e`. No confirmation is recorded for any of them. The rollout plan names the
+  baseline's mirror "the owner's (R4)", but R4 is closed and covered `2602416` only.
+- **Why it matters.** One text in two rule repositories is the point of the merged core (R4's own reason): a drift is found by a
+  consumer, late.
+- **Fix.** Not code. The owner confirms in writing, as R4 did, that the sibling's spans and copied tools equal this repository at
+  the first release that carries F24 (or a later one), naming the sha256 of each span and file; the values are recomputed here and recorded under this item.
+  The rollout plan's own DoD line for the baseline mirror is ticked from the same record.
+- **State.** Open, the owner's. Found by the Opus judge of the remainder plan's re-review (2026-11-04); it was a gap before the
+  hand-over, not one the hand-over made.
+
 ## Definition of Done
 
 - [ ] Each of F1 to F22, F24 and F25 (F23 is reserved by F3's note for other manifests) is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
+- [ ] F26, which is not code, is closed by the owner's written confirmation of the private sibling's mirror, with the sha256 of each span and copied
+      file recomputed here and recorded under F26, and the rollout plan's DoD line for the baseline rule's mirror ticked from that record.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.

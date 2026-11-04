@@ -11,7 +11,7 @@
 > Revised by [PLAN_test_leftovers_merged_core.md](PLAN_test_leftovers_merged_core.md) (2026-10-21): the contract this
 > document builds gains an owner segment, kernel ownership and one companion janitor document before its release. That plan
 > owns the revised text and tools and promoted this document when it shipped; the stories here keep their first form.
-> What it left open is in [PLAN_test_leftovers_merged_core_release.md](../todo/PLAN_test_leftovers_merged_core_release.md).
+> What it left open is in [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md).
 
 **Committed together with this document** (one commit, [planning-docs.md](../common/planning-docs.md) § *A plan split
 into epics and stories*): its row in [todo/README.md](../todo/README.md), and the parent's ledger line replaced by
@@ -34,7 +34,7 @@ this section and a story differ, this section describes the repository.
 - **The one release never happened alone.** S5's `promote-release.yml` dispatch, its Definition of Done (`release` at the
   merged sha, `release-distance` 0, the private twin holding the spans, our seven token rows and the pinned script) and the
   parent's "one release carries it all" were overtaken: the contract was revised by the merged core before any release, so
-  the release is now item R5 of [the remainder plan](../todo/PLAN_test_leftovers_merged_core_release.md), after the merge
+  the release is now item R5 of [the remainder plan](PLAN_test_leftovers_merged_core_release.md), after the merge
   of PR #82 and the sibling's confirmation.
 - **The merge of E1 was #77 (2c96f83, 2026-10-15)**; `research/module_tests.md` § *Test leftovers* describes it as built.
 - **Superseded by the merged core** (the file or text each one names no longer matches this document):
