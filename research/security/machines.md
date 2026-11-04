@@ -101,8 +101,10 @@ timers are distribution timers). `grep -rliF teststodelete` over `/etc/cron*`, t
 tmpfiles configuration: 0 matches. The system timers are distribution timers and one site timer that runs a product's own
 maintenance command; in that product's source, the only prefix line is the protection list in the table. No old `janitor.sh` is scheduled.
 
-**Consumer sweeps.** Every consumer's sweep-only stage is landed or empty (R6, 2026-10-31, in the remainder plan); this scan
-finds no deleting copy in any checkout or worktree, including those of ended sessions.
+**Consumer sweeps.** This scan finds no deleting copy in any checkout or worktree on this machine, including those of ended
+sessions. That is a local fact only; the state of each consumer's sweep-only stage is the rollout plan's record, not this
+one's (on 2026-11-04 it keeps E7's stage A — rag_qln's `qlntest_*` store collections, not a temp folder — open, which blocks
+only E7's producer).
 
 **Legacy resources** (inventory only, nothing removed): `/tmp` holds 10 legacy-form folders of one other repository's
 benchmark tests (6 and 4, of two kinds), all made on 2026-11-04, so a suite that is not yet migrated still makes them. Their
