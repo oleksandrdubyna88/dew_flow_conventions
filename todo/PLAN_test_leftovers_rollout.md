@@ -1961,11 +1961,25 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
   *Epoch 3 (2026-11-03):* stage A is still NOT done — `src/Rag.Application/Runtime/InfrastructureSampler.cs:104` still
   drops `TestCorpusSweep.Sweepable(...)` collections (read on rag_qln `ae9c7d6`; remote `main` `b40c0ae` is only the
   `cc24f9e` pin bump #81). The pin is at `cc24f9e` (#80, #81).
+  *[epoch 5, 2026-11-04]* **Stage A LANDED 2026-11-04, dew_flow_rag_qln #86** (`47998e7`): `InfrastructureSampler` lists `qlntest_*` and
+  never drops them; the listing is its own step of the tick. Its plan (`todo/PLAN_test_leftovers_E7_stage_a.md` there, a stories document, no
+  ledger) stays open for the live check and measurement: not run, because the build machine has no Qdrant, daemon or Docker.
+  **A must-settle for E7's stories** (found by the stage-A session, checked in the code): `ResidentSet.MakeRoomAsync` with a budget set
+  (off by default: with no cap it does not even list the store) evicts by DELETE the coldest unprotected collection of the WHOLE store
+  (`EvictionPolicy.cs:90-91`, ordered by last served; `ResidentSet.cs` gives a never-served collection `DateTimeOffset.MinValue`, so a
+  `qlntest_*` goes first). It deletes on no name, but it is owner-blind and ordered by age, so the barrier's "no owner-blind or age-based
+  sweeper remains enabled" (rule § The barrier) reaches it wherever a cap is set on a store that tests also use. Not a plan change: the goal
+  already asks that every sweep be owner-aware or retired before the first producer, and this epic must already settle the shared store
+  before any rename. E7's stories decide it before E7's first producer: a test collection is protected from eviction, or tests never share
+  a capped store, with a test either way.
 - **Repository:** `dew_flow_rag_qln`. **Stories:** `dew_flow_rag_qln · todo/PLAN_test_leftovers_E7.md`. Depends on E1.
 - **Goal.** A test corpus in the shared Qdrant store is dropped only when nothing alive owns it; the live
   tests' deliberate reuse is either exempt under decision 2a (named where configured, reset serialized) or
   abandoned on purpose — never both at once, as today; the test prefix is renamed in every place that pins
   it; temp sites go through the helper.
+- *[epoch 5, 2026-11-04, PR review, CodeRabbit]* The Scope paragraph below describes `InfrastructureSampler` as it was BEFORE stage A. Since
+  dew_flow_rag_qln #86 (`47998e7`) the daemon lists `qlntest_*` and drops none by name; the paragraph stays as the record of why stage A
+  was required, and its other facts (the fixed ids, the prefix's three places) are for E7's stories to read again.
 - **Scope — the contradiction the audit table missed.** The audit row says the `qlntest_*` collections are
   "kept on purpose (fixed ids)". They are not kept: the PRODUCT drops every collection starting with
   `qlntest_` on every sampler tick — `src/Rag.Application/Runtime/InfrastructureSampler.cs:104-109`, no age,
