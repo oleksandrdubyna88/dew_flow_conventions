@@ -1,6 +1,13 @@
 # PLAN — Test leftovers, the merged core: what is left before PR #82 merges and the release is promoted
 
-> Status: **in progress, 2026-10-27 — R1, R2 and R3 done (PR #82 merged as 72ae2f3, its ci, CodeQL and sonarcloud runs green); R4 DONE 2026-10-30 (the owner's written confirmation: the private sibling's copies equal this repository's `2602416`, which carries F12 #90 and F13 #89); R5 DONE 2026-10-30 (`release` promoted to `115bbf8`, `release-distance` 0); R6's sweep-only stage scanned for the private sibling's consumers; R6 and the producer stages open (the barrier record: the Ubuntu dev VM open, the owner's Windows machine not tested).** Scope: the open part of
+> Status: **stopped for re-review (2026-11-04).** The change-control rule (`common/plan-change-control.md`, #86) reached
+> this repository on 2026-10-29. This plan had no ledger then, and six changes after that date were never recorded here
+> (see Plan changes): the second of them, on 2026-10-31, is where the plan should have stopped. The stop is recorded now,
+> found while preparing the plan's promotion. No new code on any item of this plan and no merge of a pull request that
+> carries its work (R6: the consumer epics) until the full re-review is complete, the owner has approved epoch 2 (the
+> re-review narrows the plan), and epoch 2 is opened with `state: open`. At the stop: R1–R5 and R7 are done; R6 is open.
+>
+> Was: **in progress, 2026-10-27 — R1, R2 and R3 done (PR #82 merged as 72ae2f3, its ci, CodeQL and sonarcloud runs green); R4 DONE 2026-10-30 (the owner's written confirmation: the private sibling's copies equal this repository's `2602416`, which carries F12 #90 and F13 #89); R5 DONE 2026-10-30 (`release` promoted to `115bbf8`, `release-distance` 0); R6's sweep-only stage scanned for the private sibling's consumers; R6 and the producer stages open (the barrier record: the Ubuntu dev VM open, the owner's Windows machine not tested).** Scope: the open part of
 > [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) — the machine barrier on every machine that
 > builds or tests this repository (`research/security/machines.md`), the merge of PR #82, the private sibling's side of the
 > merged core's Definition of Done, the ONE promotion of `release`, and the consumer migration of
@@ -13,6 +20,28 @@
 > [research/security/machines.md](../research/security/machines.md) (the barrier record), [common/test-leftovers.md](../common/test-leftovers.md).
 >
 > The private sibling rule repository is never named here; it is "the private sibling".
+
+## Plan changes
+
+> Epoch 1 · approved 2026-10-27 · by reviewers · state: stopped
+
+- 1.1 · 2026-10-31 · owner · merge-conditions — a pin bump may merge alone in a consumer with no owner-blind sweeper and no owner form (R6, decision 1)
+  (The same cause as the rollout plan's entry 1.2. Entries 1.1 to 1.6 are recorded late, on 2026-11-04: this plan
+  was approved before the rule reached this repository, so its ledger should have opened at its first change after
+  2026-10-29, which is entry 1.1. Each date is the day the change was accepted, as R6 and R7 record it.)
+- 1.2 · 2026-10-31 · owner · contract — a Windows kernel owner in a ported helper needs the profile AND the owner SID, fail closed (R6, decision 2)
+  (The same cause as the rollout plan's entry 1.3. The plan should have stopped here; it did not, and R7 was added
+  and built after this point.)
+- 1.3 · 2026-10-31 · owner · contract — the owner-blind class in C# and Rust flags any bare-prefix literal outside the helper's file (R6, decision 3)
+  (The same cause as the rollout plan's entry 1.4.)
+- 1.4 · 2026-11-01 · owner · epics, build-order, dod — R7 added: F17 to F20 fixed and released once before E5 and E2 wrap the Node reference
+  (Question consultant 3ba92abb. No ledger recorded it as an entry; the rollout plan's epoch-2 re-review sorted its work.)
+- 1.5 · 2026-11-01 · owner · scope — the core and detail split of common/test-leftovers.md rides R7's release
+  (Question consultant e03cae48.)
+- 1.6 · 2026-11-01 · owner · dod — the Darwin path of the C# helper is measured on a macOS leg and merged before E5 and E2 copy it
+  (Not a change: the row of 2026-10-29 in the boundary table, the plan-change rule riding R5's promotion, which by its
+  own words changed nothing in R5's what, when or done-when; and the R6 records of 2026-10-31, which apply the barrier
+  as R6 already stated it.)
 
 ## Symptom
 
