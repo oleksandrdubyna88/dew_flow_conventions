@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (open: a process cap and shim rule for the next planned release; release refs for product submodules, other repositories' work).** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (open: a process cap and shim rule for the next planned release; release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner).** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -775,11 +775,36 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   is needed.
 - **State.** Open, the work of the rag_qln, dew_flow_mcp and dew_flow_benchmark sessions. Not a rollout prerequisite.
 
+## F29 — On Windows an exclusive rename has no single winner, so two sweeps at once can report falsely and restore an unclaimed folder (found 2026-11-04, E5's S2-B race test)
+
+- **What.** Measured on a hosted `windows-latest` runner (coai run 41873954643, a bare .NET console, no project code): two threads race
+  `Directory.Move(src, a)` against `Directory.Move(src, b)`, 40000 times. **Both calls succeeded in 39951**, with one destination
+  left and `src` gone; the loser, in the other 49, got `DirectoryNotFoundException`. `MoveFile` opens the source and renames by handle, and refusing
+  an existing destination does not make the source single-owner.
+- **Who assumes otherwise.** dew_flow_mcp's C# template (`Native.RenameExclusively`, used by `LeftoversSweep.MoveToQuarantine`) and its copies;
+  dew_flow_sidecar_rust's sweep (`rename::move_without_replace`, `MoveFileExW` with no flags, `src/test_scratch/sweep.rs:147-148`): read only, not
+  measured there. The Node reference's Windows sweep lists and changes nothing today (F16 interim), so **F16's Fix must read this item
+  before it arms a Windows removal.**
+- **What it does, read in the template's code.** With two sweeps at once on Windows: (1) the sweep whose quarantine name holds nothing
+  finds it absent, `RemoveEntry` treats that as success, and it reports a removal it did not do; (2) when one sweep has deleted the claim and the other has not
+  yet checked, the other's `ClaimUnchanged` fails and it restores the folder under its old name, without a claim and possibly half-deleted; later
+  sweeps keep it as `unmarked`. No wrong deletion was found: what is removed is the judged folder. Exposure today is small: hosted runners run one suite at a
+  time and are discarded, and the owner's Windows machine does not test E2's and E5's repositories.
+- **Fix in coai (E5, the rollout's entry 5.1).** On Windows a sweep holds a per-root named mutex across its whole pass, so two sweeps never
+  interleave; POSIX is unchanged (its `renameat2`/`renamex_np` has a single winner). An op in coai's template manifest.
+- **Fix for the others.** The template's owner takes the same fix, or a better one, before E2.3, E6 and E7 copy it; the sidecar's owner measures its
+  `MoveFileExW` the same way. **The Node reference:** F16's Fix may arm a Windows removal only if its sweep coordinates concurrent sweeps per root across
+  processes (a lock held over the rename, the check, the removal and the claim's deletion) and a two-sweeps test is green on Windows; until then the
+  Windows sweep stays list-only, as it is today. The probe is 25 lines of C#; its source is in the workflow of coai's throwaway run above.
+- **State.** Open. Not a prerequisite of E5 once its op lands; it IS to be read before E2.3, E6 and E7 copy the template, and before F16's Fix.
+
 ## Definition of Done
 
 - [ ] Each of F1 to F22, F24 and F25 (F23 is reserved by F3's note for other manifests) is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] F26, which is not code, is closed by the owner's written confirmation of the private sibling's mirror, with the sha256 of each span and copied
       file recomputed here and recorded under F26, and the rollout plan's DoD line for the baseline rule's mirror ticked from that record.
+- [ ] F29 is closed when, for each of the template and the sidecar, EITHER a fix is in with a two-sweeps test green on Windows, OR a recorded decision says why not
+      (no test is then asked of that side); and F16's Fix either keeps the Node sweep list-only on Windows or meets F29's Node requirement.
 - [ ] F27 is in a released rule text: the rule test for the new section was RED before the text and is GREEN after, and
       `node tools/rule-bodies.mjs` and `node tools/ownership-check.mjs` are clean.
 - [ ] F28, which is not code here, is closed when (1) dew_flow_mcp and dew_flow_benchmark each have a release ref that a person
