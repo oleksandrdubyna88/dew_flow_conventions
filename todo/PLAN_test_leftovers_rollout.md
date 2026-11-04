@@ -278,6 +278,9 @@ Narrowed: yes — E5's native measurement series (`native-(vibe|kimi)-<yyyymmdd>
   scratchpad, not repository work); and this revision commit itself, which is the baseline epoch 5 is approved on,
   never an entry.
   The epoch 5 line is written only when the owner approves.)
+  (Added the same day, after the table was written: the E5 stories document's epoch-5 commit (coai `ba526043`) was
+  pushed on the producer branch, and that push carried `d3791c00` with it, so the row "coai local `d3791c00`" now
+  stands at "pushed, unmerged (draft PR)"; `ba526043` itself is a revision commit of this re-review, not a row.)
 
 ## Symptom
 
