@@ -1,6 +1,14 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 4 open (2026-11-03), approved by the owner after the re-review.** Epoch 3 stopped at entries 3.1 and 3.2;
+> Status: **stopped for re-review (2026-11-04)** — epoch 4's second change after approval (entry 4.2, E5's native measurement
+> series fits neither S4 option; found writing E5's S4 brief). No new code on any epic of this plan and no merge of a pull request
+> carrying its work until the full re-review is complete; when its record says `Narrowed: yes`, the owner has approved the revised
+> plan; and epoch 5 is opened with `state: open`. At the stop: E5's producer PR coai #945 (draft) holds S3 and S2-B, pushed at
+> `6ec356a1`, plus one local docs commit; S4 is a brief only (no code). creds E2.1 is draft #294 at `3422500` (its by-hand records
+> in progress on the throwaway branch `tmp/e21-byhand`; it could not merge anyway before the WSL administrator scan of
+> `research/security/machines.md`).
+>
+> Was: **epoch 4 open (2026-11-03), approved by the owner after the re-review.** Epoch 3 stopped at entries 3.1 and 3.2;
 > the whole plan was revised (§ *Epoch 4*), the Opus judge sorted epoch 3's work, the plan gate (session `7c66b50d`) and
 > the interim document gate passed, and because the record says `Narrowed: yes` the owner approved it (question 1).
 > Questions 3 and 4 were settled by the question consultants (`4e52fac6`, both agreeing), as the owner's standing
@@ -215,7 +223,7 @@ Narrowed: yes — E5's Definition of Done no longer asks for all four C# suites 
   every suite's proofs run on all three OSes; the ingest suite cannot run off Linux. The line now says which proofs run
   where; § *Epoch 4*, item 3 (f) names each CI step.)
 
-> Epoch 4 · approved 2026-11-03 · by owner · state: open
+> Epoch 4 · approved 2026-11-03 · by owner · state: stopped
 
 - 4.1 · 2026-11-03 · agent · contract — E5's promise that a killed old coai run (legacy `testsToDelete-coai-run-*`) is collected by the next extension run cannot hold at the pinned reference
   (found writing E5's S2-B spec (Fable), coai branch feat/test-leftovers-e5-producer, spec § B.10 item 1. At the
@@ -231,6 +239,11 @@ Narrowed: yes — E5's Definition of Done no longer asks for all four C# suites 
   Node sweep) and 8 (row 12's C# half, red on the Windows leg, macOS assertions kept) are met AS WRITTEN by S2-B;
   if item 8's Windows mutation cannot be shown red there, it is entry 4.2 and the plan stops. The other items are
   repaired references and details.)
+- 4.2 · 2026-11-04 · agent · approach — E5's native measurement series (`scripts/lib/native-run.mjs` `SERIES_SHAPE`, `scripts/native/*.sh`) outlives the script that makes it, so neither S4 option fits; it leaves the prefix family
+  (Found writing E5's S4 brief, its decision D-a. S4 gives each deferred site an owned folder of the wrap or an owner-form
+  name; a series is a root-run, multi-phase folder that make-series.sh creates and remove-series.sh removes later, so an
+  owned folder dies too early and an owner-form claim of a gone pid is swept ten minutes later. The question consultants
+  (b5c30429, both rows) call it a change. This second change of epoch 4 stops the plan.)
 
 ## Symptom
 
