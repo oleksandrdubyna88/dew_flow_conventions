@@ -205,7 +205,8 @@ either plan, so the rollout plan's line "the remainder plan's R6 is ticked" stan
 
 ### 4. Build order and merge conditions
 
-The rollout plan's (§ *Epoch 4*, items 3 and 5). This plan's § *Build order* and R6 are kept as the record.
+The rollout plan's § *Epoch 4*, items 3 and 5, set the build order and the merge conditions of what is left of R6. This
+plan's § *Build order* and R6 are kept as the record.
 
 ### 5. What the re-review consultant raised, and what was done with it
 
