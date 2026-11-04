@@ -10,6 +10,9 @@
 > The whole plan is revised for epoch 5 (2026-11-04, step 4 of the full stop): § *Epoch 5 — the plan as revised at the
 > re-review*, and the E5 stories document revised with it. The re-review record says `Narrowed: yes`; its table is the
 > Opus judge's (step 5), and the owner's approval comes after it; epoch 5 opens only with that approval.
+> Since the stop (2026-11-04, records only, no epic code): creds #294's by-hand records are complete — run 2 of
+> `tmp/e21-byhand` green on macOS and Windows (`be47183`), the throwaway branch deleted — and its public-hygiene fix
+> (`9a6e9fa`); coai `d3791c00` is pushed on #945 with the E5 document's revision.
 >
 > Was: **epoch 4 open (2026-11-03), approved by the owner after the re-review.** Epoch 3 stopped at entries 3.1 and 3.2;
 > the whole plan was revised (§ *Epoch 4*), the Opus judge sorted epoch 3's work, the plan gate (session `7c66b50d`) and
@@ -1200,7 +1203,11 @@ this adds that nothing collects a legacy `testsToDelete-coai-run-*` folder at al
 - **E2 (wave 2).** creds #294 (draft) at `3422500`: E2.1 is built; its by-hand records are part 7 of its plan
   (`70da168`, `3422500`). The first full Windows unit run on the throwaway branch `tmp/e21-byhand` found one test bug,
   fixed test-only (`22e16a7`; coai code round 9 `proceed`); run 2 of that branch (`cdc116b6`, run 41812168328) was
-  running when this was written. E2.2 is cut from E2.1's MERGE commit, not from the draft branch.
+  running when this was written. *[later the same day]* Run 2 finished GREEN on both jobs (macOS: the five socket files,
+  32 binds, longest 63 bytes; Windows: 6024 tests, 0 failed, 0 · 0 compared), recorded as `[E2.1 byhand 10]`
+  (`be47183`); the branch is deleted. The by-hand items (b) and (c) of E2.1 are complete; what is left for its merge is
+  (c) for the WSL machine, the PR's gates and this plan's epoch 5. E2.2 is cut from E2.1's MERGE commit, not from the
+  draft branch.
 - **The waves.** Wave 1 (E3, E4) is merged. Wave 2 (E5, E2) is in progress as above. Wave 3 (E6, E7) is not started.
 - **The two lessons of epoch 4.** (4.1) Two different things were written as one: the one-off clean-up of LEGACY
   folders (names without the owner segment, made before E5; a person's tool, S2-A) and the automatic collection of
@@ -1315,6 +1322,19 @@ fails unless all of them hold exactly that text.
    `make-series.sh`'s `mkdir` under another class, S6 names the line with the inline exemption of rule §7 and the reason
    `the native measurement series — § Epoch 5 item 4`, and the expected-exemption inventory lists it.
 
+4. *The remover's ownership check (added at the judge's question, 2026-11-04).* `remove-series.sh` already refuses a
+   symlinked or missing folder, a `SERIES_PATH` that is not the folder given or its real path, and a name off the shape,
+   and it removes one checked variable, never a glob. The rename adds no new path to it. Because the series root is a
+   shared `/tmp` and the remover runs as root, S4 also makes it refuse (exit 78, one line) a folder whose owner is not
+   uid 0 or that is group- or world-writable — a test for each refusal. A Fable security read of the four scripts is
+   part of S4's Opus review.
+
+**Size and the forgotten series.** A series holds the run folders of its phases (probe outputs, transcripts, small
+binaries); its size is measured at its first use after S4 and written in the native documents with the command that
+measures it (`du -sh`). A series a person forgets is found with `ls -d <root>/native-*` (the native documents say so)
+and removed with `remove-series.sh`; nothing else removes it, by design. On a box whose `/tmp` is cleared at boot, a
+reboot also clears it — the documents say that a measurement in progress does not survive one.
+
 **Bound.** The exception is one shape in one family of scripts. A second durable resource anywhere in the family is a
 new plan change, not a second use of this item.
 
@@ -1353,6 +1373,10 @@ NEXT   the owner approves epoch 5 (question 1)               — nothing of this
                seeded violations in every test root; the guard also reads src_vs_code/scripts/*.mjs (item 6 P13)
           after (c), F24's pin, and F3's pin if this is the first declaration → E5.S7 the drain
 THEN   wave 3: E6 ∥ E7, as § Epoch 3; each C# copy an adapted copy (§ Epoch 4, item 4).
+          Before E6's stories are written: the boundary with dew_flow_benchmark's
+          todo/PLAN_bench_test_leftovers_followups.md (its stories own the spikes/lang-bench, spikes/minigit-bench/test
+          and spikes/lang-explore/test leftovers it lists; E6 lists those sites in its inventory and does not redo
+          them) is written in BOTH plans — here now, there by a docs PR in that repository before E6 starts.
 LAST   the coai feature review; the promotion of this plan and its stories documents; R6 ticked in the remainder plan.
 ```
 
