@@ -1399,7 +1399,11 @@ fails unless all of them hold exactly that text.
    world-writable without the sticky bit (`/tmp` is `1777`). Under a sticky, root-owned root, no other user can
    rename, replace or remove a uid-0 folder, and inside a folder that is not group- or world-writable no other user
    can replace an entry; so what was checked is what `rm -rf` removes. Tests: a non-sticky world-writable root and a
-   root owned by another uid are each refused before any `rm`.
+   root owned by another uid are each refused before any `rm`. *[PR review, CodeRabbit, 2026-11-04]* The same holds for
+   a GROUP: a root that is group-writable without the sticky bit is refused too (a group member could rename the
+   checked folder and plant its own `run/` script for root to run). So the root is uid 0, and when it is group- or
+   world-writable it must be sticky; this rule applies to the caller's `stat` check (evidence 7) and to the copy. Tests
+   add modes `0775` and `0770`; accepted are `1777`, `0755` and `0700`.
 5. *A phase whose series is gone (re-review gate, finding 1).* A reboot that clears `/tmp`, or a `remove-series.sh`,
    between two phases leaves the next phase without its series. That phase stops with one line — the series
    `<path>` is gone (removed, or cleared by a reboot); start a new series with `make-series.sh` — and a non-zero exit,
@@ -1471,7 +1475,11 @@ names under rule §1. At the pin the Node reference answers `unknown` for them o
 record has no `<ns>`), lists and changes nothing on Windows (F16 (b)), and cannot parse E2's `win32`/`darwin` tags; the
 C# copy lists a legacy name and never reads its claim. So nothing collects them: S2-A's one-off clean-up is the only
 removal, and both sweeps print the `legacy:` line per folder. E5's D4, S2-B item 3 and Q3 say so since coai #945
-(`89494366`); this plan's E5 entry (§ *Epics*) is read with this paragraph.
+(`89494366`); this plan's E5 entry (§ *Epics*) is read with this paragraph. *[PR review, CodeRabbit, 2026-11-04]* "Both
+sweeps" are the Node and the C# start-of-run sweeps. The janitor is another tool: with `--token coai` it narrows to
+`teststodelete[-_]<owner>[-_]coai[-_]` (`tools/janitor.sh:157`) and does NOT list a legacy name, so S2-B's
+`--token coai --dry-run` proves nothing about legacy folders; a person lists them with `janitor.sh --dry-run` (no
+`--token`) or with S2-A's tool.
 
 ### 5. Build order (revised)
 
@@ -1482,6 +1490,7 @@ DONE   as § Epoch 4, item 5 → epoch 4 approved (#118) → coai #943 (E5 revis
        → P1 closed by the owner's statement (PR #124, open) → S4's brief → the stop of epoch 4 (entry 4.2) and this
        re-review.
 NEXT   the owner approves epoch 5 (question 1)               — nothing of this plan merges before it
+          (DONE: the owner approved on 2026-11-04; the first step still waiting is the administrator scan below.)
        the WSL administrator scan (condition (c))             — the administrator; one command; blocks the first producer MERGE
                                                                 of E2 (E2.1) and of E5, not their build
        F24's acceptance check at the F24 sha (ff0ea790)       — FIRST, pre-release (item 2.2; Opus review 2026-11-04)
@@ -1553,6 +1562,9 @@ documented exemption — the native measurement series of item 4, with its evide
 epoch-3 line on the invocation inventory is read with (i) as revised; nothing else of the list changes.
 
 ### 7. Questions for the owner (blocking; each with the recommended answer)
+
+**Answered 2026-11-04:** 1 — approved (epoch 5 opens `by owner`). 2 — not answered yet: the administrator scan stays open
+and still blocks the first producer merge of E2 and of E5.
 
 1. **Approve epoch 5 as narrowed?** The record says `Narrowed: yes`: the native measurement series leaves the prefix
    family and loses the ownership and automatic-collection guarantee (it is made and removed only by its own scripts,
