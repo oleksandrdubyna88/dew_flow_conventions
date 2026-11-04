@@ -52,6 +52,8 @@ const COMMIT = ["-c", "user.name=Janitor test", "-c", "user.email=janitor@exampl
 // Exactly what the script calls (a private PATH of symlinks proves it; `cut` and `xargs` joined with the one-inspect capture).
 const LINUX_TOOLS = ["bash", "sed", "awk", "grep", "find", "head", "tr", "cut", "xargs", "git", "hostname", "uname", "date", "stat", "rm", "env", "sleep", "readlink", "mv", "mkdir", "rmdir", "id", "sha256sum"];
 const ME = thisOwnerToken(); // the caller's owner token: the janitor under test derives the same one from its own uid
+// Another user's owner token, whoever runs this. A fixed `u1000` is the runner's OWN token on a usual Linux desktop: the "stranger" was the caller, and six tests failed there and nowhere in CI.
+const OTHER = ME === "u1000" ? "u1001" : "u1000";
 const PREFIX = ["tests", "ToDelete"].join(""); // a name of the form before the owner segment is built from pieces: this file never spells one
 
 // --- bash and PATH ---------------------------------------------------------------------------------------------
@@ -1850,7 +1852,7 @@ test("S4-21. root is a scope like any other: every owner is inventoried, only u0
   const tmp = makeTmp(w);
   const dead = unmatchablePid();
   const mine = rawFolder(tmp, `${PREFIX}-u0-conventions-rootown-abc123`, ownerOf(dead, { owner: "u0" }));
-  const other = rawFolder(tmp, `${PREFIX}-u1000-conventions-alice-abc123`, ownerOf(dead, { owner: "u1000" }));
+  const other = rawFolder(tmp, `${PREFIX}-${OTHER}-conventions-alice-abc123`, ownerOf(dead, { owner: OTHER }));
   const forged = rawFolder(tmp, `${PREFIX}-u0-conventions-forged-abc123`, ownerOf(dead, { owner: "u0" }));
   // `stat` that says root owns u0's entries (and the temp root), and someone else owns the forged one: the real files are this test user's
   const stat = toolStub(w, "stat", `if [ "$1" = "-c" ] && [ "$2" = "%u" ]; then case "$3" in *-u0-conventions-forged*) echo 4242; exit 0;; "$STUB_ROOT"|*-u0-*) echo 0; exit 0;; esac; fi`);
@@ -1859,14 +1861,14 @@ test("S4-21. root is a scope like any other: every owner is inventoried, only u0
 
   assert.equal(run.status, 0, run.text);
   assert.equal(exists(mine) || exists(`${mine}.owner`), false, `u0's own dead folder goes\n${run.text}`);
-  assert.ok(exists(other) && exists(`${other}.owner`), `u1000's folder is another scope: root deletes nothing of it\n${run.text}`);
-  assert.ok(mentions(run, `foreign: folder ${named(other)} — owner u1000`), `inventoried, listed, never an exit code\n${run.text}`);
+  assert.ok(exists(other) && exists(`${other}.owner`), `${OTHER}'s folder is another scope: root deletes nothing of it\n${run.text}`);
+  assert.ok(mentions(run, `foreign: folder ${named(other)} — owner ${OTHER}`), `inventoried, listed, never an exit code\n${run.text}`);
   assert.ok(exists(forged), `a u0 name on a folder another uid owns is a forgery: kept\n${run.text}`);
   assert.ok(mentions(run, `foreign: folder ${named(forged)} — owner u0`), run.text);
   assert.ok(run.seams.some((line) => line.includes("JANITOR_TEST_UID")), `the seam is announced: ${run.seams.join(" // ")}`);
 });
 
-test("S4-21b. run as root (the suite runs as uid 0 in CI): u0's own folder goes, u1000's is listed and kept", { timeout: TIMEOUT }, (t) => {
+test("S4-21b. run as root (the suite runs as uid 0 in CI): u0's own folder goes, another user's is listed and kept", { timeout: TIMEOUT }, (t) => {
   if (!root) {
     t.skip("this run is not uid 0; the uid seam in S4-21 stands for it");
     return;
@@ -1875,7 +1877,7 @@ test("S4-21b. run as root (the suite runs as uid 0 in CI): u0's own folder goes,
   if (w === null) return;
   const tmp = makeTmp(w);
   const mine = folder(w, tmp, "rootreal", { owner: NOBODY() });
-  const other = rawFolder(tmp, `${PREFIX}-u1000-conventions-alice-abc123`, ownerOf(unmatchablePid(), { owner: "u1000" }));
+  const other = rawFolder(tmp, `${PREFIX}-${OTHER}-conventions-alice-abc123`, ownerOf(unmatchablePid(), { owner: OTHER }));
   fs.chownSync(other, 1000, 1000);
   fs.chownSync(`${other}.owner`, 1000, 1000);
 
@@ -1883,7 +1885,7 @@ test("S4-21b. run as root (the suite runs as uid 0 in CI): u0's own folder goes,
 
   assert.equal(run.status, 0, run.text);
   assert.equal(exists(mine), false, run.text);
-  assert.ok(exists(other) && mentions(run, `foreign: folder ${named(other)} — owner u1000`), run.text);
+  assert.ok(exists(other) && mentions(run, `foreign: folder ${named(other)} — owner ${OTHER}`), run.text);
 });
 
 test("S4-22. both name versions side by side: the owner-form row is judged, the legacy row prints its command and is kept — exit stays 0", { timeout: TIMEOUT }, (t) => {
@@ -1940,16 +1942,16 @@ test("S4-23. a forged owner is never believed: a folder or a claim another user 
   const tmp = makeTmp(w);
   const stranger = rawFolder(tmp, owned("conventions-stranger-abc123"), NOBODY()); // this user's name, a dead record — on a folder the seam says another uid owns
   const planted = folder(w, tmp, "plantedclaim", { owner: NOBODY() }); // a good folder whose CLAIM file another uid wrote
-  const wrongRecord = folder(w, tmp, "wrongrecord", { owner: ownerOf(unmatchablePid(), { owner: "u1000" }) }); // this user's name, another owner's record
-  const wrongName = rawFolder(tmp, `${PREFIX}-u1000-conventions-wrongname-abc123`, NOBODY()); // another owner's name, this user's record
+  const wrongRecord = folder(w, tmp, "wrongrecord", { owner: ownerOf(unmatchablePid(), { owner: OTHER }) }); // this user's name, another owner's record
+  const wrongName = rawFolder(tmp, `${PREFIX}-${OTHER}-conventions-wrongname-abc123`, NOBODY()); // another owner's name, this user's record
 
   const first = runJanitor(w, { tmp, env: { JANITOR_TEST_OWNER_CHECK: `foreign:${posix(stranger)}`, ...timeoutStub() } });
 
   assert.equal(first.status, 0, `foreign lines never change the exit code\n${first.text}`);
   assert.ok(exists(stranger), first.text);
   assert.ok(mentions(first, `foreign: folder ${named(stranger)}`), first.text);
-  assert.ok(exists(wrongRecord) && mentions(first, `foreign: folder ${named(wrongRecord)} — owner u1000`), `a record naming another owner is a forgery: listed with the owner it claims, kept\n${first.text}`);
-  assert.ok(exists(wrongName) && mentions(first, `foreign: folder ${named(wrongName)} — owner u1000`), first.text);
+  assert.ok(exists(wrongRecord) && mentions(first, `foreign: folder ${named(wrongRecord)} — owner ${OTHER}`), `a record naming another owner is a forgery: listed with the owner it claims, kept\n${first.text}`);
+  assert.ok(exists(wrongName) && mentions(first, `foreign: folder ${named(wrongName)} — owner ${OTHER}`), first.text);
   assert.equal(exists(planted) || exists(`${planted}.owner`), false, "control: the ordinary dead folder beside them goes");
   const reads = callsOf(w, "timeout").filter((line) => line.includes(named(stranger)) || line.includes(named(wrongName)));
   assert.deepEqual(reads, [], `neither the forged folder nor the other owner's name was entered or read\n${reads.join("\n")}`);
@@ -2275,25 +2277,25 @@ test("S4-34. an entry named for another owner is never entered or opened: a FIFO
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const strangerClaim = rawFolder(tmp, `${PREFIX}-u1000-conventions-fifoclaim-abc123`, null);
+  const strangerClaim = rawFolder(tmp, `${PREFIX}-${OTHER}-conventions-fifoclaim-abc123`, null);
   plantFifo(w, `${strangerClaim}.owner`);
-  const strangerGit = rawFolder(tmp, `${PREFIX}-u1000-conventions-fifogit-abc123`, null);
+  const strangerGit = rawFolder(tmp, `${PREFIX}-${OTHER}-conventions-fifogit-abc123`, null);
   plantFifo(w, path.join(strangerGit, ".git"));
-  const strangerWt = rawFolder(tmp, `${PREFIX}-u1000-conventions-gitfile-abc123`, null);
+  const strangerWt = rawFolder(tmp, `${PREFIX}-${OTHER}-conventions-gitfile-abc123`, null);
   fs.writeFileSync(path.join(strangerWt, ".git"), "gitdir: /nonexistent/clone/.git/worktrees/x\n");
-  const orphan = path.join(tmp, `${PREFIX}-u1000-conventions-orphanclaim-abc123.owner`);
+  const orphan = path.join(tmp, `${PREFIX}-${OTHER}-conventions-orphanclaim-abc123.owner`);
   fs.writeFileSync(orphan, `${NOBODY()}\n`);
   age(orphan, OLD);
-  plantFifo(w, path.join(tmp, `${PREFIX}-u1000-conventions-orphanfifo-abc123.owner`)); // not even a regular file: never listed, never opened
+  plantFifo(w, path.join(tmp, `${PREFIX}-${OTHER}-conventions-orphanfifo-abc123.owner`)); // not even a regular file: never listed, never opened
 
   const run = runJanitor(w, { tmp, timeoutMs: 60_000 });
 
   assert.equal(run.error, undefined, "the run finished instead of blocking on a FIFO");
   assert.equal(run.status, 0, run.text);
-  assert.ok(mentions(run, `foreign: folder ${named(strangerClaim)} — owner u1000`), run.text);
-  assert.ok(mentions(run, `foreign: folder ${named(strangerGit)} — owner u1000`), run.text);
-  assert.ok(mentions(run, `foreign: worktree ${named(strangerWt)} — owner u1000`), `a foreign folder holding a .git FILE is a foreign worktree: its .git is not read\n${run.text}`);
-  assert.ok(mentions(run, `foreign: marker ${named(orphan)} — owner u1000`), `another owner's claim: listed, never opened\n${run.text}`);
+  assert.ok(mentions(run, `foreign: folder ${named(strangerClaim)} — owner ${OTHER}`), run.text);
+  assert.ok(mentions(run, `foreign: folder ${named(strangerGit)} — owner ${OTHER}`), run.text);
+  assert.ok(mentions(run, `foreign: worktree ${named(strangerWt)} — owner ${OTHER}`), `a foreign folder holding a .git FILE is a foreign worktree: its .git is not read\n${run.text}`);
+  assert.ok(mentions(run, `foreign: marker ${named(orphan)} — owner ${OTHER}`), `another owner's claim: listed, never opened\n${run.text}`);
 });
 
 test("S4-35. branches: one goes only WITH the worktree it was checked out in when this run removed that worktree (by its captured tip); every other prefixed branch is an `unmarked:` line — a live run's standalone branch, one whose worktree is kept, another owner's (`foreign:`) and a legacy name (`legacy:`)", { timeout: TIMEOUT }, async (t) => {
@@ -2301,7 +2303,7 @@ test("S4-35. branches: one goes only WITH the worktree it was checked out in whe
   if (w === null) return;
   const tmp = makeTmp(w);
   const [alone, goneBr, movedBr, aliveBr] = ["bralone", "brgone", "brmoved", "bralive"].map((what) => ownedName(what));
-  const theirs = `${PREFIX}-u1000-conventions-brtheirs-abc123`;
+  const theirs = `${PREFIX}-${OTHER}-conventions-brtheirs-abc123`;
   const legacy = `${PREFIX}-conventions-brlegacy-abc123`;
   const wtOf = (what, branch, owner) => {
     const leaf = path.join(tmp, ownedName(what));
@@ -2332,7 +2334,7 @@ test("S4-35. branches: one goes only WITH the worktree it was checked out in whe
   assert.ok(branchesOf(w.clone).includes(movedBr) && run.lines.some((line) => line.includes(`skipped: branch ${movedBr}`) && line.includes("its tip moved")), `... by its captured tip: one that moved is kept\n${run.stderr}`);
   assert.ok(branchesOf(w.clone).includes(alone) && run.lines.some((line) => line === `unmarked: branch ${alone}`), `a standalone branch (a live run's, or one whose worktree has not been registered yet) is only listed\n${run.stderr}`);
   assert.ok(exists(aliveWt) && branchesOf(w.clone).includes(aliveBr) && run.lines.some((line) => line === `unmarked: branch ${aliveBr}`), `the branch of a kept worktree is only listed\n${run.stderr}`);
-  assert.ok(branchesOf(w.clone).includes(theirs) && run.lines.some((line) => line === `foreign: branch ${theirs} — owner u1000`), run.stderr);
+  assert.ok(branchesOf(w.clone).includes(theirs) && run.lines.some((line) => line === `foreign: branch ${theirs} — owner ${OTHER}`), run.stderr);
   assert.ok(branchesOf(w.clone).includes(legacy) && run.lines.some((line) => line.startsWith(`legacy: branch ${legacy} — remove with: git branch -D `)), run.stderr);
 });
 
@@ -2392,14 +2394,14 @@ test("S4-37. a name with a control character: this user's scope is refused (exit
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const stranger = rawFolder(tmp, `${PREFIX}-u1000-conventions-ctl\nline-abc123`, null);
+  const stranger = rawFolder(tmp, `${PREFIX}-${OTHER}-conventions-ctl\nline-abc123`, null);
   const legacy = rawFolder(tmp, `${PREFIX}-conventions-ctl\nline-abc123`, null);
 
   const quiet = runJanitor(w, { tmp });
 
   assert.equal(quiet.status, 0, `another owner's and a legacy name never change the exit code\n${quiet.text}`);
   assert.ok(exists(stranger) && exists(legacy), "both kept");
-  assert.ok(mentions(quiet, "foreign: entry", "owner u1000"), quiet.text);
+  assert.ok(mentions(quiet, "foreign: entry", `owner ${OTHER}`), quiet.text);
   assert.ok(mentions(quiet, "legacy: entry"), quiet.text);
   assert.equal(/[\x00-\x09\x0b-\x1f\x7f]/.test(quiet.stderr.join("\n")), false, "no control byte reaches stderr");
   const own = rawFolder(tmp, `${owned("conventions-ctl")}\nline-abc123`, null);
@@ -2447,21 +2449,21 @@ test("S4-38. two users, one daemon: a daemon object has no kernel owner, so the 
   const dead = unmatchablePid();
   setDocker(w, {
     ps: [
-      ["c1", `${PREFIX}-u1000-conventions-bobs-abc123`, ownerOf(dead, { owner: "u1000" }), dockerTime(OLD)], // another user's, dead: theirs to remove
-      ["c2", owned("conventions-forged"), ownerOf(dead, { owner: "u1000" }), dockerTime(OLD)], // this user's name, another owner's label
+      ["c1", `${PREFIX}-${OTHER}-conventions-bobs-abc123`, ownerOf(dead, { owner: OTHER }), dockerTime(OLD)], // another user's, dead: theirs to remove
+      ["c2", owned("conventions-forged"), ownerOf(dead, { owner: OTHER }), dockerTime(OLD)], // this user's name, another owner's label
       ["c3", owned("conventions-mine"), NOBODY(), dockerTime(OLD)],
     ],
-    net: [["a1", `${PREFIX}-u1000-conventions-bobnet-abc123`, ownerOf(dead, { owner: "u1000" }), dockerTime(OLD)]],
-    vol: [[`${PREFIX}-u1000-conventions-bobvol-abc123`, ownerOf(dead, { owner: "u1000" })]], volCreated: [[`${PREFIX}-u1000-conventions-bobvol-abc123`, volumeTime(OLD)]],
+    net: [["a1", `${PREFIX}-${OTHER}-conventions-bobnet-abc123`, ownerOf(dead, { owner: OTHER }), dockerTime(OLD)]],
+    vol: [[`${PREFIX}-${OTHER}-conventions-bobvol-abc123`, ownerOf(dead, { owner: OTHER })]], volCreated: [[`${PREFIX}-${OTHER}-conventions-bobvol-abc123`, volumeTime(OLD)]],
   });
 
   const run = runJanitor(w, { tmp });
 
   assert.equal(run.status, 0, `foreign lines never change the exit code\n${run.text}`);
   assert.deepEqual(rmCalls(w), ["rm -f -v c3"], `only this user's own dead container was removed\n${run.text}`);
-  assert.ok(mentions(run, `foreign: container ${PREFIX}-u1000-conventions-bobs-abc123 — owner u1000`), run.text);
-  assert.ok(mentions(run, `foreign: container ${owned("conventions-forged")} — owner u1000`), `a label that names another owner under this user's name is unknown: kept, listed with the owner it claims\n${run.text}`);
-  assert.ok(mentions(run, "foreign: network ", "owner u1000") && mentions(run, "foreign: volume ", "owner u1000"), run.text);
+  assert.ok(mentions(run, `foreign: container ${PREFIX}-${OTHER}-conventions-bobs-abc123 — owner ${OTHER}`), run.text);
+  assert.ok(mentions(run, `foreign: container ${owned("conventions-forged")} — owner ${OTHER}`), `a label that names another owner under this user's name is unknown: kept, listed with the owner it claims\n${run.text}`);
+  assert.ok(mentions(run, "foreign: network ", `owner ${OTHER}`) && mentions(run, "foreign: volume ", `owner ${OTHER}`), run.text);
 });
 
 test("S4-39. a volume has no id: it is re-inspected just before it is removed, and one whose creation time or label changed since the capture is kept", { timeout: TIMEOUT }, async (t) => {
@@ -2711,8 +2713,8 @@ test("S4-45. another owner's folder is never ENTERED: its name is read first, so
   const w = makeWorld(t);
   if (w === null) return;
   const tmp = makeTmp(w);
-  const theirs = rawFolder(tmp, `${PREFIX}-u1000-conventions-noenter-abc123`, null);
-  const theirsWt = rawFolder(tmp, `${PREFIX}-u1000-conventions-noenterwt-abc123`, null);
+  const theirs = rawFolder(tmp, `${PREFIX}-${OTHER}-conventions-noenter-abc123`, null);
+  const theirsWt = rawFolder(tmp, `${PREFIX}-${OTHER}-conventions-noenterwt-abc123`, null);
   fs.writeFileSync(path.join(theirsWt, ".git"), "gitdir: /nowhere/.git/worktrees/x\n");
   const mine = rawFolder(tmp, `${PREFIX}-${ME}-conventions-enters-abc123`, null);
   const log = path.join(w.state, "strace.log");
@@ -2736,7 +2738,7 @@ test("S4-46. the worktree the janitor runs from: this user's scope is `skipped` 
   if (w === null) return;
   const tmp = makeTmp(w);
   const legacyLeaf = path.join(tmp, `${PREFIX}-conventions-selfleg-abc123`);
-  const foreignLeaf = path.join(tmp, `${PREFIX}-u1000-conventions-selfforeign-abc123`);
+  const foreignLeaf = path.join(tmp, `${PREFIX}-${OTHER}-conventions-selfforeign-abc123`);
   const mineLeaf = path.join(tmp, ownedName("selfmine"));
   for (const leaf of [legacyLeaf, foreignLeaf, mineLeaf]) {
     // testsToDelete-exempt: raw-worktree — the three names the helper never makes (a legacy one, another owner's) and one of this user's, run FROM
@@ -2751,7 +2753,7 @@ test("S4-46. the worktree the janitor runs from: this user's scope is `skipped` 
 
   const foreign = runJanitor(w, { tmp, cwd: foreignLeaf });
   assert.equal(foreign.status, 0, foreign.text);
-  assert.ok(mentions(foreign, `foreign: worktree ${named(foreignLeaf)} — owner u1000`), foreign.text);
+  assert.ok(mentions(foreign, `foreign: worktree ${named(foreignLeaf)} — owner ${OTHER}`), foreign.text);
 
   const mine = runJanitor(w, { tmp, cwd: mineLeaf });
   assert.equal(mine.status, 3, mine.text);
