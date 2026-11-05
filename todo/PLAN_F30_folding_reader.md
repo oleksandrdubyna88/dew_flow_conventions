@@ -1,6 +1,14 @@
 # PLAN — F30: the shipped Node guard reads a prefix however it is spelled
 
-> Status: **built on `feat/f30-folding-reader`, 2026-11-05; no PR yet, not released.** The plan gate passed it the same day. The item is F30 of `todo/PLAN_test_leftovers_merged_core_followups.md`. Owner: this repository. Deadline 2026-11-19, or before creds' E2.5 merges if that is earlier. Not a prerequisite of coai's E5 producer PR.
+> Status: **stopped for re-review, 2026-11-05.** The build at `f5b3b16` (pushed, unmerged) and an independent Opus review found two independent changes of this plan, and more defects of the same reader. The item is F30 of `todo/PLAN_test_leftovers_merged_core_followups.md`. Owner: this repository. Deadline 2026-11-19, or before creds' E2.5 merges if that is earlier. Not a prerequisite of coai's E5 producer PR.
+
+## Plan changes
+
+> Epoch 1 · approved 2026-11-05 · by reviewers · state: stopped
+
+- 1.1 · 2026-11-05 · agent · approach — D4's bare word and its gate do not hold on real trees; the reader reads the classifier's verdict with extras, and on every line with a quote
+- 1.2 · 2026-11-05 · agent · scope — D2's lists are too narrow; .tsx, .jsx, any yaml, and .join over any literal were added
+  (Both found by the Opus review of f5b3b16. The second change stopped the plan. The same review measured a false finding on coai main, quadratic regular expressions, and spellings still missed.)
 
 ## Goal
 
