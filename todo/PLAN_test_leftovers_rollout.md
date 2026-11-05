@@ -360,7 +360,7 @@ Narrowed: yes — two things got smaller, both in E5's producer PR: (1) must-not
   mutex (built on #945, not narrowed, kept); 5.2, row 2's Node half; 5.3, D8 (b) and the 54 lines no baseline scope can
   carry. Re-review consult `7f55e578`; the question consultants before it: `5d804d0c` (the split literal). The Verdict
   and Action cells are `—` until an Opus judge fills them (step 5 of the full stop). Not rows: coai #948 (the SQLite WAL
-  switch, outside); conventions #130 (a test-only janitor fix that rode the release, outside this plan's epics) and
+  switch, outside; the judge gave it a `—` row at the coordinator's request) and
   conventions #131 (F26's values, the owner's item); the shared-rules plan's ledger (#127, another plan); and this
   revision commit itself, which is the baseline epoch 6 is approved on, never an entry. The epoch 6 line is written
   only when the owner approves.)
@@ -1693,6 +1693,9 @@ must change in it is listed in item 4.7, and an Opus author revises it after thi
   mcp #64, sidecar_rust #70, vscode_kit #23, wsl_care #186 (rag_qln's not opened yet), and benchmark #166, r9700 #14 under
   the cap. **coai's `main` and the producer branch still pin `cc24f9e`** (read in the gitlink): S6 cannot create its
   baseline, and the SECOND F24 acceptance run cannot run, before #947 merges and the branch takes it.
+  *[the judge, 2026-11-05]* Since this was written: the eight bumps merged at 09:50Z; rag_qln's is open as #88; coai's
+  `main` pins `bd79584` (read through the API); the producer branch still pins `cc24f9e`, so the step still to come is
+  the merge of `main` into the branch. "In flight", "pending" and "not opened yet" below are read with this.
 - **E5 (wave 2).** coai #945 (draft) at `524df50e` holds S3, S2-B, S4 (`93c3092a` … `bd03bb3e`), entry 5.1
   (`SweepLock.cs`, three ops, strict tests, RED runs 41875636356, 41878243091, 41893469970, Windows green twice on run
   41881044878) and S5 (`d8dff1a6`, `cab9a172`, `524df50e`; the fixture bug it exposed is fixed). Every job is green on
@@ -1755,20 +1758,20 @@ says "not re-verified here" is one the revision took from the PR's record withou
 | (a) | S2-A on `main` | coai #940 `d02ed40e` | both runners | the characterization test of S2-A, green on `main` | DONE |
 | (b) | one squash PR S3 → S2-B → S4 → S5 → S6, with S6's repository-wide checks | S3, S2-B, S4, S5 on #945; S6: `LeftoversRepositoryGuardTests.cs` (C#, the copied `Scan` + the baseline) and `src_vs_code/src/test/testLeftovers.test.mjs` (Node) — **not written yet, specified in the brief §§ 7.1, 7.4** | the four C# executables; `npm test` through `run-tests.mjs`; `run-lib-tests.mjs` | the two wrappers green on the three legs; the planted violation per root red then reverted (brief § 13) | S3–S5 built; **S6 unmapped until built** |
 | (c) | the barrier per machine | `research/security/machines.md`; the Windows machine met by the owner's statement (#124) | the WSL machine; hosted runners need no record | `sudo node tools/sweeper-scan.mjs --system` once, its output in the record | **OPEN — the owner's item** |
-| (d) | the legacy clean-up per machine | `scripts/old-coai-leftovers.mjs` (S2-A's tool) | a person, per machine | the record per machine on the PR | the WSL record is in `module_tests.md`; not re-verified here |
-| (e) | the gates and the three legs | coai plan and code sessions; `ci.yml` `build-test`, `macos`, `windows` | every job of `ci.yml` | `proceed` on both gates; every job green on the head | green at `524df50e` but the pin check |
+| (d) | the legacy clean-up per machine | `scripts/old-coai-leftovers.mjs` (S2-A's tool) | a person, per machine | the record per machine on the PR | **OPEN, no record found** (the judge, 2026-11-05): `module_tests.md` describes the tool (`:439`) and holds no run of it on any machine, and `machines.md` lists an inventory with nothing removed; `/tmp` holds 0 `testsToDelete-coai-run-*` and 17 `coai-*` entries |
+| (e) | the gates and the three legs | coai plan and code sessions; `ci.yml` `build-test`, `macos`, `windows` | every job of `ci.yml` | `proceed` on both gates; every job green on the head | green at `524df50e` but the pin check and the four `build-test` steps after it, which it skipped (Adapter check, Gate snippet, Build flags, Workflows parse) |
 | (f) | the baseline rule released and pinned | `common/test-leftovers-baseline.md` at `5863c60`; coai's pin `cc24f9e` | the guard with `--baseline` | the pin check | DONE |
-| (g) | F3 released and pinned before the first Node compliance declaration | `tools/lib/leftovers-package.mjs` in `bd795847`; coai #947 | `package.json` scripts | `leftovers-check.mjs --profile node` reads the manifests at the new pin (F3's own tests) | released; **pin pending (#947)** |
+| (g) | F3 released and pinned before the first Node compliance declaration | `tools/lib/leftovers-package.mjs` in `bd795847`; coai #947 | `package.json` scripts | `leftovers-check.mjs --profile node` reads the manifests at the new pin (F3's own tests) | released; #947 merged; **the branch still pins `cc24f9e`** |
 | (h) | every other condition of the parent | this section | — | — | read here |
-| (i) | F24 released and pinned before S6 creates the baseline | `common/test-leftovers-baseline.md` at `bd795847`; coai #947 | the proof marker, no order | the pin check; (l) | released; **pin pending (#947)** |
+| (i) | F24 released and pinned before S6 creates the baseline | `common/test-leftovers-baseline.md` at `bd795847`; coai #947 | the proof marker, no order | the pin check; (l) | released; #947 merged; **the branch still pins `cc24f9e`** |
 | (j) | the adapted copy's diff check | `src_mcp/tests/Leftovers/TheAdaptedCopyTests.cs`, `template-manifest.json` | the `Leftovers` filter on three legs | green on the head; one unexplained byte ⇒ red | green at `524df50e` |
 | (k) | the suite × OS merge gates | `ci.yml` steps per § *Epoch 4* (f) and D8's table | each cell with a step | every cell green on the head | green at `524df50e` |
 | (l) | F24's SECOND acceptance check against the released guard and the real host | the brief § 16: `--baseline --profile node` for the Node scopes; `LeftoversBaselineTests` `TheProofCheck_ClosesForEachScope` for the C# scopes; the five forced runs (`DiscoverySentinel`, `COAI_RUNTEMP_SELFTEST` = `fail-claim`, `mismatch-temp`, `mismatch-tmp`, `mismatch-tmpdir`, present in `src_vs_code/scripts/owned.mjs:61` and the C# gate) | the four C# executables, both Node runners | exit 78, one line, the sentinel untouched, five times; the proof check 2 → 0 (Node), 4 → 0 (C#) | **after #947; the C# test of the proof check is not written yet** |
-| (m) | the rollback procedure in the PR text | D11's one switch (S2-B); the PR description | — | a reviewer reads the description | not re-verified here |
-| (n) | the native series' evidence, Linux leg | S4 on #945 (`1edf7157`, `49e75da2`, `f3f74b57`, `8ffc20fb`): the survival test, the remover's grammar tests, the caller's `stat` check, the phase on a gone series, the size figure, the documents | the Linux leg | the S4 tests green; the PR record names each of the seven items | built; not re-verified item by item here |
+| (m) | the rollback procedure in the PR text | D11's one switch (S2-B); the PR description | — | a reviewer reads the description | **OPEN** (the judge, 2026-11-05): the description lists it as still to do and says "This draft holds S3 only" |
+| (n) | the native series' evidence, Linux leg | S4 on #945 (`1edf7157`, `49e75da2`, `f3f74b57`, `8ffc20fb`): the survival test, the remover's grammar tests, the caller's `stat` check, the phase on a gone series, the size figure, the documents | the Linux leg | the S4 tests green; the PR record names each of the seven items | built; read item by item by the judge: in `scripts/native/native.test.mjs` (1) `:609`, (2) the table at `:531` and the `LC_ALL` test `:189`, (4) `:561`–`:603`, (5) `:650`, (7) `:712`–`:742`, with `scripts/lib/native-run.test.mjs:172`–`:250`; (3) and (6) in `module_tests.md:6194`; **the PR record does not name them yet** |
 | (o) NEW | the end-of-run audit reads the run folder BEFORE it is removed | `src_mcp/tests_leftovers/LeftoversAudit.cs:41`: `Discover` returns `[]` when `!Directory.Exists(tmp)`, so a CLAIM-ONLY leftover (an orphan claim of a folder the test removed itself, absent from the registry) is invisible once the run folder is gone; the brief's § 11 says the fixture order does not matter — **not established** | the four C# suites' assembly fixtures | plant an orphan claim inside the run folder, absent from the registry; run both fixture orders; if only audit-first reports it, the fixture order is fixed audit-first and a test pins the order | **unmapped: no test today** |
-| (p) NEW | `src_server/smoke-image.sh` leaves nothing on a failure before its trap | `src_server/smoke-image.sh`: `work=$(mktemp -d)` at `:73`, `trap finish EXIT` at `:102`; `mkdir`, `chmod 0777`, `seed`, `new_key`, the mask line run in between under `set -e` | `TheImageSmokeUsesTheServerTests` (a `docker` stub on PATH); the pull-request image job | move `finish` and its `trap` to right after the globals (`:70`), before `mktemp`; RED first with a failing `chmod` (or `openssl`) stub on PATH: the folder stays today, is gone after; unsolved and said so: a `kill -9` between `mktemp` and the trap line, which no trap sees — the folder is a raw temp without a claim, and only the inline exemption's reason names that window | **unmapped: no test today** |
-| (q) NEW | the baseline's FINAL content is validated, not only its creation | the brief § 12.4 skips the standing shrink step on PR 945 by number, so a later edit of the committed baseline on the same PR is checked by nothing; the guard's own `--baseline` run (N1; the C# wrapper) validates membership, hash and count against the tree but not that the file equals what the tree generates | the creation PR | at the PR's LAST head, before the squash merge: `leftovers-check.mjs --print-baseline` equals the committed `raw-temp-baseline.json` byte for byte for the Node scopes (a `diff` of zero, recorded on the PR), the C# wrapper's equivalent for the `csharp` scopes, and the standing step's `number != 945` clause is removed by S7's first PR as the brief says; **whether `--print-baseline` covers the `csharp` scopes is not verified here** | **unmapped: no step today** |
+| (p) NEW | `src_server/smoke-image.sh` leaves nothing on a failure before its trap | `src_server/smoke-image.sh`: `work=$(mktemp -d)` at `:73`, `trap finish EXIT` at `:102`; `mkdir`, `chmod 0777`, `seed`, `new_key`, the mask line run in between under `set -e` | `TheImageSmokeUsesTheServerTests` (a `docker` stub on PATH); the pull-request image job | move `finish` and its `trap` to right after the globals (`:70`), before `mktemp`; RED first with a failing `chmod` (or `openssl`) stub on PATH: the folder stays today, is gone after; unsolved and said so: a `kill -9` at any moment from `mktemp` to the end of the script, which no trap sees (after the move the trap stands before `mktemp`, so the window is the whole run, not a line) — the folder is a raw temp without a claim, and only the inline exemption's reason names that window | **unmapped: no test today** |
+| (q) NEW | the baseline's FINAL content is validated, not only its creation | the brief § 12.4 skips the standing shrink step on PR 945 by number, so a later edit of the committed baseline on the same PR is checked by nothing; the guard's own `--baseline` run (N1; the C# wrapper) validates membership, hash and count against the tree but not that the file equals what the tree generates | the creation PR | at the PR's LAST head, before the squash merge: `leftovers-check.mjs --print-baseline` equals the committed `raw-temp-baseline.json` byte for byte for the Node scopes (a `diff` of zero, recorded on the PR), the C# wrapper's equivalent for the `csharp` scopes, and the standing step's `number != 945` clause is removed by S7's first PR as the brief says; **checked by the judge at `bd795847`: `--print-baseline` covers no `csharp` scope (it reads no `.cs`) and prints `scopes: []`, so this byte comparison cannot go green as written — the record's judge note proposes the wording** | **unmapped: no step today** |
 
 **E2 — creds, its remaining PRs (E2.1 merge; E2.2–E2.5), from its D8 and S5:**
 
@@ -1787,7 +1790,7 @@ says "not re-verified here" is one the revision took from the PR's record withou
 | # | Condition | Implementation (file) | Invocations covered | Executable acceptance check | State 2026-11-05 |
 |---|---|---|---|---|---|
 | E6 stage A | the held-out sweep lists, never removes | #125 `6a963a4` | the held-out runner | its test | DONE |
-| E6 pin | `bd795847` | #166 (open) | — | the pin check | pending |
+| E6 pin | `bd795847` | #166 (merged 2026-11-05) | — | the pin check | DONE |
 | E6 boundary | written on both sides | this plan (§ *Epoch 5* item 5); benchmark's follow-ups plan: **one mention, no table** | — | the table present in both files | **unmapped on the benchmark side** |
 | E6 producer | the Testcontainers label, the per-test databases' exemption, the worktree seam, the C# adapted copy, the guard over `tests/` and `tools/` | — (no stories) | — | — | **unmapped: the stories document opens with this table filled** |
 
@@ -1796,7 +1799,7 @@ says "not re-verified here" is one the revision took from the PR's record withou
 | # | Condition | Implementation (file) | Invocations covered | Executable acceptance check | State 2026-11-05 |
 |---|---|---|---|---|---|
 | E7 stage A | the sampler drops nothing by name | #86 `47998e7`; promoted #87 | the daemon tick | the live check: the same count after a second run; the listing line in the log | DONE, measured |
-| E7 pin | `bd795847` | not opened yet | — | the pin check | **the bump is still to open** |
+| E7 pin | `bd795847` | #88 (open) | — | the pin check | **open, not merged** |
 | E7 must-settle | `ResidentSet.MakeRoomAsync` with a budget evicts the coldest collection of the WHOLE store, owner-blind | `EvictionPolicy.cs:90-91`, `ResidentSet.cs` (read 2026-11-04) | a capped store that tests also use | a test: a test collection is protected, or tests never share a capped store | **unmapped: the stories decide** |
 | E7 docs | `research/module_tests.md` exists, as `common.knowledge-base` requires | **absent in rag_qln** (checked `origin/main` `88577ff`) | — | the file exists with the harness, the command and the flow catalogue | **unmapped: a finding; E7's stories create it** |
 | E7 live suite | `SearchLiveTests.AQuestionInWords_FindsTheMemberThatAnswersIt` fails in both runs | `research/module_search.md` records it | the live tests | fixed or recorded as a known failure BEFORE E7's producer makes the live tests its proof | **open; not E7's cause, E7's blocker** |
@@ -1830,10 +1833,10 @@ CALLERS, not about the line:
 
 | Line (read 2026-11-05) | What it is | What proves the reason |
 |---|---|---|
-| `live-agent.mjs:78-80` — three `mkdtempSync(join(tmpdir(), 'coai-agent-…'))` | a verification harness; `startOwnedRun({ what: 'live-agent' })` at `:24` moves `TEMP`/`TMP`/`TMPDIR` into its run folder first | a test (or the S4 record) that `startOwnedRun` is the first effect of every such entry script and that `tmpdir()` answers the run folder after it; the 17 other entry scripts with the same reason are proved the same way, once, by the list of entries whose first import is the wrap |
+| `live-agent.mjs:78-80` — three `mkdtempSync(join(tmpdir(), 'coai-agent-…'))` | a verification harness; `startOwnedRun({ what: 'live-agent' })` at `:24` moves `TEMP`/`TMP`/`TMPDIR` into its run folder first | a test (or the S4 record) that `startOwnedRun` is the first effect of every such entry script and that `tmpdir()` answers the run folder after it; the 17 other entry scripts with the same reason are proved the same way, once, by the list of entries whose first statement after the imports is the wrap (their first import is `node:fs` or the like); `src_vs_code/src/test/runnerScripts.test.mjs` E1, E2, E3 pin that today, as a standing test |
 | `browserLayout.mjs:51`, `:79`; `seam-catalog.mjs:69`; the other `seam-*.mjs` lines | libraries: they allocate under whatever `tmpdir()` is when called | the reason "the entry or the test that imports it runs inside a run folder" holds only if EVERY caller does: the PR lists every importer of each library (`git grep -l`) and shows each is an entry script with the wrap or a test under the runner; one caller outside a run folder makes the line a finding, not an exemption |
 | `run-tests.mjs:103` `REAL_TEMP_ROOT = tmpdir()`; `ownedRun.mjs:34`, `:36` | the runner reads the real root before it makes its run folder — a READ, not an allocation | a read record: the line creates nothing; the rule's "a `tmpdir` import used only to read the root is migrated, not baselined" applies — these two files are helper-own, and the reason says "reads the root; allocates nothing" |
-| `src_server/smoke-image.sh:73` | a raw `mktemp -d` in the machine temp, in a test script | item 4.3: the trap moves before it, proved RED first; the exemption's reason names the one window left (a kill between `mktemp` and the trap) |
+| `src_server/smoke-image.sh:73` | a raw `mktemp -d` in the machine temp, in a test script | item 4.3: the trap moves before it, proved RED first; the exemption's reason names what stays open (a `kill -9` at any moment of the run) |
 
 D8 (b) reads, from this epoch: "zero unexempted `owner-blind` and `legacy-name`; only the authorised `raw-temp` baseline
 and the inline `raw-temp` exemptions of the expected-exemption inventory are left, each exemption with a reason proved
@@ -1843,9 +1846,11 @@ as above; the inventory equals the guard's exemption list exactly". **Narrowed: 
 the globals line (`work='' id='' logs_pid='' ok=false`, `:70`), before `work=$(mktemp -d)` (`:73`); `finish` already
 tolerates empty globals. RED first: `TheImageSmokeUsesTheServerTests` gains a case with a failing `chmod` (or `openssl`)
 stub on PATH — today the folder stays (the script exits under `set -e` before `:102`), after the move it is gone. What
-stays unsolved and is written in the exemption's reason: a `kill -9` between `mktemp` and the trap line, and the
-process-group kill a CI cancel sends; the folder then carries no claim and no prefix, and the janitor does not see it.
-That window is one shell line wide after the move; a shell port of the helper is not asked for.
+stays unsolved and is written in the exemption's reason: a `kill -9`, or the hard kill that ends a CI cancel, at any
+moment from `mktemp` to the end of the script; the folder then carries no claim and no prefix, and the janitor does not
+see it. No trap sees that signal, and after the move the trap stands before `mktemp`, so this window is the whole run,
+not one line (*[the judge, 2026-11-05]*: the text said "one shell line wide"; a person's run is the case, as a test's
+run has `TMPDIR` in its run folder and a hosted runner is discarded). A shell port of the helper is not asked for.
 
 **4.4 The audit runs BEFORE the run folder is removed.** `LeftoversAudit.Discover` returns `[]` once the run folder is
 gone (`LeftoversAudit.cs:41`). The registry still reports a leaked `OwnedDir`, but a CLAIM-ONLY leftover — an orphan
@@ -1863,7 +1868,7 @@ recorded in `module_tests.md`.**
 number; after the temporary creation step is removed, nothing on that PR compares the committed file with the tree.
 S6 adds, at the PR's LAST head before the squash merge: `leftovers-check.mjs --print-baseline` diffed against the
 committed `raw-temp-baseline.json` (zero lines), recorded on the PR, and the C# wrapper's equivalent for the `csharp`
-scopes (to be checked: whether `--print-baseline` covers them; if not, the C# wrapper prints its own). The standing
+scopes (checked by the judge at `bd795847`: `--print-baseline` does not cover them; the brief's C# listing is a throwaway of § 8.3, so nothing prints them at the last head today). The standing
 `--baseline` runs (N1, the C# wrapper) stay as they are. This narrows nothing; it is a check the plan lacked.
 
 **4.6 Entry 5.1, for the record.** The Windows mutex is built and kept (`SweepLock.cs`, three manifest ops, strict
@@ -1889,7 +1894,8 @@ revises it after approval; this revision does not edit it):
    is new code of S6 and is listed in § 5 *Files*.
 7. § 18 (the DoD) — the rows for (o), (p), (q) of item 3; the Node half of row 2 as narrowed; the S7 note that "the two
    baseline files" is one file with scopes.
-8. § 21 *Assumptions* — "the C# guard's folding reader covers coai's Node trees" is removed; F30 is cited.
+8. § 21 *Assumptions* — items 2 and 8 (Decision 1's option A) are removed; F30 is cited; § 5's `foldedPrefix.mjs` row
+   and § 18's N8 and R3 cells go with item 1. (*[the judge, 2026-11-05]*: this item quoted a sentence § 21 does not hold.)
 
 ### 5. Build order (revised)
 
@@ -1948,7 +1954,7 @@ and E7 tables of item 3; the rag_qln `module_tests.md` finding; item 8.
    before creds' E2.5 merges if earlier. Until then every Node compliance declaration says "zero whole literals, F30
    open". *Recommended:* accept the date; a release of the guard alone is one PR here and pin bumps alone.
 4. **E7's pin bump** — the seventh over-cap bump (rag_qln) is agreed but not opened. *Recommended:* open it with the
-   others; E7's stories start after it.
+   others; E7's stories start after it. *[the judge, 2026-11-05]* Opened since: #88.
 
 ### 8. The way of working — so a fifth stop becomes less likely
 
