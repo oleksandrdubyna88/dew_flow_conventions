@@ -1097,11 +1097,43 @@ that makes a splice refuses one that changes nothing):
 | `(tests/run.mjs)` inserted | the address guard |
 | the Definition of Done line removed | the Definition of Done case |
 
+**Revised 2026-11-05 after the review.** The section now also says that the kernel limit fails nothing (a fork past it gets
+`EAGAIN`) and the watch must fire below the headroom, that a shim resolves once at install by real path and bakes the result
+in, that the fixture lives outside the folder the runner discovers and refuses without an enforced kernel limit, and the
+wider limits (root and the exempting capabilities). The suite is **7 cases** as the runner prints it. The case *each pinned
+sentence comes from this section and nowhere else*, and the Definition of Done twin of it, are dropped: their reason was
+false. Every pin check reads the section alone, so a sentence copied elsewhere cannot make a check green or red, and the
+header comment that claimed otherwise is gone. In its place each pin has a splice in the saying case: the one occurrence of
+the pin is removed from the section text and that pin, and only that pin, must be reported (so a pin that occurs twice
+cannot hide: `RLIMIT_NPROC` became `the kernel limit (\`RLIMIT_NPROC\`` and `nothing fails the file` became `or the kernel
+limit comes first and nothing fails the file`, each of which occurs once; `Only that session is ever signalled` is pinned
+with the capital the text has). The law case also refuses a fraction (`half`, `a third`, `a quarter`, a percentage) and
+splices `20 %`; the address guard is a file-extension pattern plus a case-insensitive token pattern, with four splices
+(`tests/run.mjs`, `test.sh`, `R9700`, a 40-hex sha) and a positive control (`CAP_SYS_ADMIN`, `RLIMIT_NPROC`, `EAGAIN`,
+`setsid`, `PATH` are not addresses); the Definition of Done line is pinned by five phrases and a splice that drops `by real
+path` must be reported as lacking it. **RED on the 7c4e3e9 text**: `tests 7, pass 4, fail 3`. The saying case reported 14
+pins missing (`EAGAIN`, `or the kernel limit comes first and nothing fails the file`, `a session of its own`, `fires well
+below the headroom`, `Only that session is ever signalled`, `once, at install`, `comparing REAL paths`, `bakes the result
+in`, `resolve to each other`, `outside the folder the runner discovers`, `refuses to start unless told to AND an enforced
+kernel limit is in force`, `never counted or ended by the watch`, `outlives the run`, `have the watch alone`), the limits
+case the last three of them as limit pins, and the Definition of Done case `by real path`; placement, count, law and
+address stayed green. **GREEN** after the text: 7 of 7. RED-GREEN-RED on the file: the 7c4e3e9 text in place gave 3 failed
+of 7, the new text restored 7 of 7. The splice rows that changed:
+
+| Splice (in memory) | The check that must go red |
+|---|---|
+| each pin's one occurrence removed from the section text | that pin, and only that pin, is reported missing |
+| `20 %` inserted | the law case: a fraction as law |
+| `(see test.sh)`, `R9700`, a 40-hex sha inserted | the address guard |
+| `by real path` dropped from the Definition of Done line | the line is reported as lacking `by real path` |
+| a pin copied into `## Scope` (the old twin) | dropped with its case: nothing reads outside the section |
+
 **What it does not prove.** No runner, shim or fixture exists in this repository: the section is advice for the repositories
 that run tests through a runner of their own, and the repository that owns one proves the bound there. The formula (the
 count at the start of the run plus a headroom) is not verified at run time, and the section says so itself. Prose that
-describes the mechanism wrongly passes: the cases pin sentences, their place and their absence elsewhere, not whether the
-mechanism the sentences describe works.
+describes the mechanism wrongly passes: the cases pin sentences and their place in the section, not whether the mechanism the
+sentences describe works. Whether a real-path compare or a session watch works anywhere is not shown here, and neither is
+how a platform without the kernel limit behaves.
 
 ## The consultant half moved here (`common/coai-consultant.md`, 2026-09-25)
 

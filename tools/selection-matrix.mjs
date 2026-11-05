@@ -45,10 +45,10 @@ const PINNED = {
 // Bytes of the scopes that were over one read when they were first recorded: 18 at the baseline (E1, after the whitespace
 // splits) and 12 more with the file sets App.sln, api/a.http and common/testing.md, added so that every rule is recorded.
 const OVER = {
-  inspect: { "src/x.cs + ui/a.ts": 34703, "package.json": 35409, "src/main.rs": 40743, "App.sln": 40676, "api/a.http": 60125, "common/testing.md": 33846 },
-  ui: { "package.json": 37622, "src/main.rs": 42956, "App.sln": 42889, "api/a.http": 62338, "common/testing.md": 36059 },
-  gpu: { "src/x.csproj": 35375, "ui/a.ts": 33563, "src/x.cs + ui/a.ts": 38176, "package.json": 38882, "src/webview/page.ts": 33563, "src/main.rs": 44216, "App.sln": 44149, "api/a.http": 63598, "common/testing.md": 37319 },
-  storage: { "src/x.cs": 34019, "src/x.csproj": 37101, "ui/a.ts": 35289, "src/x.cs + ui/a.ts": 39902, "package.json": 40608, "src/webview/page.ts": 35289, "src/main.rs": 45942, "App.sln": 45875, "api/a.http": 65324, "common/testing.md": 39045 },
+  inspect: { "src/x.cs + ui/a.ts": 34703, "package.json": 35409, "src/main.rs": 40743, "App.sln": 40676, "api/a.http": 63188, "common/testing.md": 33846 },
+  ui: { "package.json": 37622, "src/main.rs": 42956, "App.sln": 42889, "api/a.http": 65401, "common/testing.md": 36059 },
+  gpu: { "src/x.csproj": 35375, "ui/a.ts": 33563, "src/x.cs + ui/a.ts": 38176, "package.json": 38882, "src/webview/page.ts": 33563, "src/main.rs": 44216, "App.sln": 44149, "api/a.http": 66661, "common/testing.md": 37319 },
+  storage: { "src/x.cs": 34019, "src/x.csproj": 37101, "ui/a.ts": 35289, "src/x.cs + ui/a.ts": 39902, "package.json": 40608, "src/webview/page.ts": 35289, "src/main.rs": 45942, "App.sln": 45875, "api/a.http": 68387, "common/testing.md": 39045 },
 };
 const UI_LANGUAGE = { "src/x.cs": null, "src/x.csproj": 34115, "ui/a.ts": null, "src/a.mjs": null, "src/x.cs + ui/a.ts": 36916, "src/webview/page.ts": null };
 const D5 = "D5: ui with a language file is off the single-read list (plan section 5)";

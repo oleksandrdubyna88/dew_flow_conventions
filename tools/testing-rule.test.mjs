@@ -6,10 +6,10 @@
  * about review, never about meaning (`plan-change-rule.test.mjs` made the same argument for the plan-change rule).
  *
  * So the section is pinned: it stands immediately before the RED-test section, it states three numbered obligations,
- * it says each pinned sentence and none of them stands anywhere else in the file (without that second case the first
- * passes on a file where the words happen to occur elsewhere), it makes no number into law, it keeps its limits, it names
- * no address, and the Definition of Done carries its line. Every case runs against the real file AND against in-memory
- * splices of it that must turn it red, so a case that cannot fail shows itself on every run.
+ * it says each pinned sentence (and each pin has a splice that removes its one occurrence and must be reported, so a
+ * pin that cannot fail shows itself on every run), it makes no number into law, it keeps its limits, it names no
+ * address, and the Definition of Done carries its line. Every case runs against the real file AND against in-memory
+ * splices of it that must turn it red.
  *
  * PURE: strings in, strings out. Nothing here writes a file, makes a folder or spawns a process, so
  * `common/test-leftovers.md` asks nothing of this file.
@@ -34,21 +34,32 @@ const phrase = (text) => new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").
 
 const PINS = [
   { text: "reaching the bound FAILS the file", why: "reaching the bound must fail the file, not warn" },
-  { text: "names the bound", why: "a failure that does not name the bound reads as a crash" },
-  { text: "`RLIMIT_NPROC`", why: "the kernel limit the bound is built on" },
+  { text: "with a message that names the bound", why: "a failure that does not name the bound reads as a crash" },
+  { text: "the kernel limit (`RLIMIT_NPROC`", why: "the kernel limit the bound is built on" },
   { text: "counts every THREAD of the whole user", why: "the limit is not per process and not per run" },
   { text: "count at the start of the run plus a headroom", why: "the shape of the cap: a count taken at the start, plus room" },
-  { text: "only that session is ever signalled", why: "the watch must never signal anything outside the file's own session" },
+  { text: "`EAGAIN`", why: "the kernel limit alone fails nothing: a fork past it is refused and the file goes on" },
+  { text: "or the kernel limit comes first and nothing fails the file", why: "a watch that fires after the kernel limit never fails the file" },
+  { text: "a session of its own", why: "the watch is per file only if the file has a session to watch" },
+  { text: "fires well below the headroom", why: "the watch must fire before the kernel limit does" },
+  { text: "Only that session is ever signalled", why: "the watch must never signal anything outside the file's own session" },
+  { text: "once, at install", why: "a shim that resolves at run time can meet another such shim" },
   { text: "with its own folder removed from the lookup", why: "the shim's first duty: it never finds itself" },
   { text: "refuses a result inside that folder", why: "the shim's second duty: a result inside its folder is an error" },
-  { text: "Setup that runs twice is the normal case", why: "the reason the second duty exists" },
-  { text: "guarded fixture that forks", why: "the proof is a fixture that cannot take the machine with it" },
-  { text: "forks without end", why: "the proof forks for real" },
+  { text: "comparing REAL paths", why: "a folder reached through a link is the same folder; a spelling compare lets it through" },
+  { text: "bakes the result in", why: "the lookup is not repeated at run time" },
+  { text: "resolve to each other", why: "the failure the install-time lookup prevents" },
+  { text: "guarded fixture that forks without end", why: "the proof forks for real, behind a guard" },
+  { text: "outside the folder the runner discovers", why: "a fixture the runner discovers runs with every suite" },
+  { text: "refuses to start unless told to AND an enforced kernel limit is in force", why: "the fixture must not run unbounded under root or without the limit" },
   { text: "`setsid`", why: "a descendant that leaves the session is named as a limit" },
+  { text: "never counted or ended by the watch", why: "what the watch does not do for a descendant that leaves the session" },
+  { text: "outlives the run", why: "such a descendant outlives the run" },
+  { text: "have the watch alone", why: "root, the exempting capabilities and a platform without the limit have the watch alone" },
   { text: "weaker, not equal", why: "a platform without the kernel limit is not equal" },
   { text: "not a number this rule's tests verify", why: "the formula is a shape, not a verified number" },
 ];
-const LIMIT_PINS = PINS.filter((pin) => ["`setsid`", "weaker, not equal", "not a number this rule's tests verify"].includes(pin.text));
+const LIMIT_PINS = PINS.slice(-6);
 
 function rule() {
   const file = path.join(root, SOURCE);
@@ -63,15 +74,6 @@ function section(body, heading) {
   assert.notEqual(start, -1, `${SOURCE} has no section ${heading} — the section F27 writes`);
   const end = text.indexOf("\n## ", start + 1);
   return text.slice(start + 1, end === -1 ? undefined : end);
-}
-
-/** The body with that section spliced out. */
-function without(body, heading) {
-  const text = outsideFencedBlocks(body);
-  const start = text.indexOf(`\n${heading}\n`);
-  assert.notEqual(start, -1, `${SOURCE} has no section ${heading} — the section F27 writes`);
-  const end = text.indexOf("\n## ", start + 1);
-  return text.slice(0, start) + (end === -1 ? "" : text.slice(end));
 }
 
 // ---- in-memory splices: each must change the text, or it proves nothing ----
@@ -105,29 +107,34 @@ function placementProblem(body) {
 }
 
 const numberedItems = (body) => (section(body, HEADING).match(/^\d+\. \*\*/gm) ?? []).length;
-const missingPins = (body, pins = PINS) => {
-  const text = section(body, HEADING);
-  return pins.filter((pin) => !phrase(pin.text).test(text));
-};
-const pinsElsewhere = (body) => {
-  const rest = without(body, HEADING);
-  return PINS.filter((pin) => phrase(pin.text).test(rest));
-};
+/** The pins missing from a text. */
+const missingIn = (text, pins = PINS) => pins.filter((pin) => !phrase(pin.text).test(text));
+const missingPins = (body, pins = PINS) => missingIn(section(body, HEADING), pins);
 function lawProblems(body) {
   const text = section(body, HEADING).replaceAll("2026-11-02", "").replaceAll("15,900", "");
   const found = [];
   const digits = text.match(/\d{3,}/g);
   if (digits !== null) found.push(`a number of three digits or more: ${digits.join(", ")}`);
   if (/half of the headroom/.test(text)) found.push("the headroom is a fraction of something");
+  if (/\b(half|a third|a quarter)\b|\d+ ?%/.test(text)) found.push("a fraction as law");
   return found;
 }
 const hasParagraph = (body) => /^What this does not give/m.test(section(body, HEADING));
-const ADDRESS = /\bdew_flow_|\br9700\b|\w+\/\w+\.(mjs|sh|py)\b|\b[0-9a-f]{7,40}\b/;
-const DOD_BOUNDS = "bounds each test file's processes";
-const DOD_SHIM = "resolves the program it wraps outside its own folder";
+const ADDRESS = /\bdew_flow_|[\w./-]+\.(mjs|cjs|js|ts|cs|rs|sh|ps1|py|md)\b|\b[0-9a-f]{7,40}\b/;
+const ADDRESS_CI = /\br9700/i;
+const DOD_PINS = [
+  "bounds each test file's processes",
+  "and FAILS the file at the bound",
+  "resolves the program it wraps outside its own folder",
+  "by real path",
+  "proves the bound with a guarded fixture",
+];
+/** The one `- [ ]` item that opens the way the line does, and the pins of the line it lacks; null without such an item. */
 function dodLine(body) {
   const items = section(body, DOD).split(/\n(?=- \[)/);
-  return items.find((item) => phrase(DOD_BOUNDS).test(item) && phrase(DOD_SHIM).test(item)) ?? null;
+  const line = items.find((item) => phrase(DOD_PINS[0]).test(item));
+  if (line === undefined) return null;
+  return { line, missing: DOD_PINS.filter((pin) => !phrase(pin).test(line)) };
 }
 
 // ---- cases ----
@@ -151,26 +158,18 @@ test("the section states the three obligations as three numbered bold items", ()
   assert.notEqual(numberedItems(two), 3, "a missing second item is still accepted");
 });
 
-test("the section says each pinned sentence", () => {
-  const body = rule();
+test("the section says each pinned sentence, and each pin is reported when its one occurrence is removed", () => {
+  const text = section(rule(), HEADING);
+  const absent = missingIn(text);
+  assert.deepEqual(absent.map((pin) => pin.text), [],
+    `${SOURCE} § ${HEADING} no longer carries: ${absent.map((pin) => `${JSON.stringify(pin.text)} (${pin.why})`).join("; ")}. The hash freeze cannot see this.`);
+  // the splice, per pin: removing the pin's text must report that pin, and only that pin
   for (const pin of PINS) {
-    assert.match(section(body, HEADING), phrase(pin.text),
-      `${SOURCE} § ${HEADING} no longer carries ${JSON.stringify(pin.text)} — ${pin.why}. The hash freeze cannot see this.`);
+    const found = phrase(pin.text).exec(text);
+    const reported = missingIn(text.replace(found[0], "")).map((other) => other.text);
+    assert.ok(reported.includes(pin.text), `removing ${pin.text} was not reported (it must occur once in the section: lengthen the pin)`);
+    assert.deepEqual(reported, [pin.text], `removing ${pin.text} also reported ${reported.filter((t) => t !== pin.text).join(", ")}: two pins share their words`);
   }
-});
-
-test("each pinned sentence comes from this section and nowhere else", () => {
-  // The teeth: ask what case 3 would SEE if the section were deleted. If a pin also occurs elsewhere in the file, the
-  // answer is "nothing", and the assertion is decoration.
-  const body = rule();
-  const elsewhere = pinsElsewhere(body);
-  assert.deepEqual(elsewhere.map((pin) => pin.text), [],
-    `these sentences also occur outside the section, so the case above would stay green without it: ${elsewhere.map((pin) => JSON.stringify(pin.text)).join(", ")}`);
-  // the twin: a pin copied into `## Scope` keeps case 3 green and makes this case red
-  const copied = replaceOnce(body, "## Scope\n", "## Scope\n\nonly that session is ever signalled.\n");
-  assert.deepEqual(missingPins(copied).map((pin) => pin.text), [], "the copy must leave the section as it was");
-  assert.deepEqual(pinsElsewhere(copied).map((pin) => pin.text), ["only that session is ever signalled"],
-    "a pinned sentence copied into another section was not noticed");
 });
 
 test("no number becomes law", () => {
@@ -180,6 +179,8 @@ test("no number becomes law", () => {
   assert.notDeepEqual(lawProblems(withDefault), [], "an inserted default of 3000 is still accepted");
   const withHalf = replaceOnce(body, "and the headroom has to cover", "and half of the headroom has to cover");
   assert.notDeepEqual(lawProblems(withHalf), [], "an inserted fraction of the headroom is still accepted");
+  const withPercent = replaceOnce(body, "plus a headroom, and", "plus a headroom of 20 %, and");
+  assert.notDeepEqual(lawProblems(withPercent), [], "an inserted percentage is still accepted");
   assert.doesNotMatch(section(body, HEADING), /half of the headroom/);
 });
 
@@ -195,19 +196,29 @@ test("the section keeps the limits", () => {
 test("the section names no address", () => {
   // `ownership-check.mjs` does not know every address (a consumer's short token, a file path, a sha): this is the guard.
   const body = rule();
-  assert.doesNotMatch(section(body, HEADING), ADDRESS, `${HEADING} names an address — a shared rule keeps the story and loses the address`);
-  const withPath = replaceOnce(body, "plus a headroom, and", "plus a headroom (tests/run.mjs), and");
-  assert.match(section(withPath, HEADING), ADDRESS, "an inserted file path is still accepted");
+  const text = section(body, HEADING);
+  assert.doesNotMatch(text, ADDRESS, `${HEADING} names an address — a shared rule keeps the story and loses the address`);
+  assert.doesNotMatch(text, ADDRESS_CI, `${HEADING} names the example repository by its token`);
+  // each splice must be seen by one of the two patterns
+  for (const inserted of ["(tests/run.mjs)", "(see test.sh)", "R9700", "0123456789abcdef0123456789abcdef01234567"]) {
+    const spliced = section(replaceOnce(body, "plus a headroom, and", `plus a headroom ${inserted}, and`), HEADING);
+    assert.ok(ADDRESS.test(spliced) || ADDRESS_CI.test(spliced), `an inserted ${inserted} is still accepted`);
+  }
+  // the positive control: the words the section is entitled to are not addresses
+  for (const word of ["CAP_SYS_ADMIN", "RLIMIT_NPROC", "EAGAIN", "setsid", "PATH"]) {
+    assert.doesNotMatch(word, ADDRESS, `${word} is read as an address`);
+    assert.doesNotMatch(word, ADDRESS_CI, `${word} is read as an address`);
+  }
 });
 
 test("the Definition of Done carries its line", () => {
   const body = rule();
-  assert.notEqual(dodLine(body), null, `${DOD} has no "- [ ]" line that ${DOD_BOUNDS} and ${DOD_SHIM}`);
-  assert.match(dodLine(body), /^- \[ \] /);
+  const found = dodLine(body);
+  assert.notEqual(found, null, `${DOD} has no "- [ ]" line that opens with "${DOD_PINS[0]}"`);
+  assert.match(found.line, /^- \[ \] /);
+  assert.deepEqual(found.missing, [], `the ${DOD} line no longer carries: ${found.missing.join(", ")}`);
   const removed = cut(body, "- [ ] A runner of the repository's own bounds", null);
   assert.equal(dodLine(removed), null, "a Definition of Done without the line is still accepted");
-  // the phrases are the DoD's and the DoD's alone
-  const rest = without(body, DOD);
-  assert.doesNotMatch(rest, phrase(DOD_BOUNDS), `"${DOD_BOUNDS}" occurs outside ${DOD}, so the case above could stay green without the line`);
-  assert.doesNotMatch(rest, phrase(DOD_SHIM), `"${DOD_SHIM}" occurs outside ${DOD}, so the case above could stay green without the line`);
+  const noRealPath = replaceOnce(body, ", by real path,", ",");
+  assert.deepEqual(dodLine(noRealPath).missing, ["by real path"], "a line without `by real path` is not reported as lacking it");
 });

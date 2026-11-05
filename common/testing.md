@@ -327,16 +327,26 @@ Where a repository runs its tests through a runner of its own, or a test puts a 
    message that names the bound. On Linux the kernel limit (`RLIMIT_NPROC`, `ulimit -u`) counts every
    THREAD of the whole user — concurrent runs, editors, everything else the user has open share it — so
    the cap is the user's count at the start of the run plus a headroom, and the headroom has to cover
-   what else the user runs while the file does. That limit alone is not per file: a watch on the file's
-   own session is what makes it one, and only that session is ever signalled.
-2. **A shim resolves the program it wraps with its own folder removed from the lookup, and refuses a
-   result inside that folder.** Setup that runs twice is the normal case, not the odd one.
+   what else the user runs while the file does. That limit alone is not per file, and it fails nothing:
+   a fork past it gets `EAGAIN` and the file goes on. A watch on the file's own session is what makes
+   the bound per file — the file starts in a session of its own, or "its session" is the runner's — and
+   it fires well below the headroom, or the kernel limit comes first and nothing fails the file. Only
+   that session is ever signalled.
+2. **A shim resolves the program it wraps once, at install, with its own folder removed from the lookup,
+   refuses a result inside that folder, and bakes the result in** — comparing REAL paths, because a
+   folder reached through a link is the same folder and a spelling compare lets it through. A shim that
+   looks the program up at run time can meet another such shim, and the two resolve to each other.
+   Setup that runs twice is the normal case, not the odd one.
 3. **The repository that owns the runner proves the bound** with a guarded fixture that forks without
-   end: the file fails, the message names the bound, and the user's process count comes back.
+   end: the file fails, the message names the bound, and the user's process count comes back. The
+   fixture lives outside the folder the runner discovers, and it refuses to start unless told to AND an
+   enforced kernel limit is in force.
 
-What this does not give: a descendant that calls `setsid` leaves the session watch, and only the kernel
-cap bounds it; a platform without such a limit has the watch alone, which is weaker, not equal; and the
-formula is the shape one repository used, not a number this rule's tests verify.
+What this does not give: a descendant that calls `setsid` is never counted or ended by the watch, so
+nothing fails the file for it, only the kernel cap bounds it, and it outlives the run; root, and the
+capabilities that exempt a process from `RLIMIT_NPROC`, have the watch alone, and so does a platform
+without such a limit — weaker, not equal, which is why the fixture refuses there; and the formula is the
+shape one repository used, not a number this rule's tests verify.
 
 ## Every bug fix starts with a RED test (MANDATORY)
 
@@ -407,5 +417,5 @@ is a red build. Do not relax it to make a reference convenient — the reference
 - [ ] Any flow added in this task shipped with its scenario test, and `research/module_tests.md` names it
       — [scenario-tests.md](scenario-tests.md).
 - [ ] A runner of the repository's own bounds each test file's processes and FAILS the file at the bound;
-      a shim on `PATH` resolves the program it wraps outside its own folder; the repository that owns the
-      runner proves the bound with a guarded fixture.
+      a shim on `PATH` resolves the program it wraps outside its own folder, by real path, at install; the
+      repository that owns the runner proves the bound with a guarded fixture outside the folder it discovers.

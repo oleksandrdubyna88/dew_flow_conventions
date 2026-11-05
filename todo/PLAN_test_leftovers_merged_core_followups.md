@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (open: a process cap and shim rule for the next planned release; release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner).** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (F27 fixed 2026-11-05, not released: a process cap and shim rule for the next planned release; F28 open: release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner).** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -781,10 +781,27 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   `node tools/selection-matrix.mjs --bytes`: `common/testing.md` is 26,822 B (+2,123 B), the `implement`, `test`, `audit` and
   `policy` cells moved +2,123 B each, `release` 283,766 → 285,889 B; `research/module_rules.md` carries the table and
   `research/module_tests.md` the RED-GREEN-RED.
+- **Progress 2026-11-05 — the review, on the same branch, not released.** The text now says that the kernel limit alone fails
+  nothing (a fork past it gets `EAGAIN`) and that the session watch must fire well below the headroom; that a shim resolves the
+  program it wraps once, at install, with its own folder removed, compares REAL paths and bakes the result in; that the fixture
+  lives outside the folder the runner discovers and refuses to start without an enforced kernel limit; and that root and the
+  capabilities that exempt a process from the limit have the watch alone. The suite is 7 cases: RED on the first commit's text
+  was 3 failed of 7 (14 pins missing in the saying case, three limit pins, `by real path` in the Definition of Done line), GREEN
+  after the text 7 of 7. The record moved again with `node tools/rule-bodies.mjs --update common.testing`
+  (`12bc098b61be → a426215c3131`). Re-measured with `node tools/selection-matrix.mjs --bytes`: `common/testing.md` is 27,762 B
+  (+3,063 B over the released text), the `implement`, `test`, `audit` and `policy` cells moved +3,063 B each, `release`
+  283,766 → 286,829 B; the `api/a.http` row moved with it, so its four `OVER` values in `tools/selection-matrix.mjs` and the
+  four `why` strings of `research/selection-matrix.json` were set to the new cells (63,188, 65,401, 66,661 and 68,387 B).
 - **Deviation from the Fix bullet.** The Fix says the rule "cites the r9700 implementation as the model". `common/rule-ownership.md`
   forbids naming a repository in a shared rule, so the text says "one repository here, 2026-11-02" and this register keeps the
-  address: `tests/run.mjs`, `tests/test_moe.sh` and `tests/test_runner.sh` on the r9700 `main`; the `test_moe.sh` lines are 648-653
-  on its `main` at `3b3d3eb` and 650-653 at the cited `2f8cd71`.
+  address: `tests/run.mjs`, `tests/test_moe.sh` and `tests/test_runner.sh` on the r9700 `main`; the lookup and refusal are
+  `tests/test_moe.sh:652-653` (function head 648, comment 650-651), identical at `2f8cd71` and today's `3b3d3eb`; the cap tests are
+  `tests/test_runner.sh:274-304` (the guarded run 278-291 with the count-back at 289-291, the fixture's refusal test 293-304), not
+  274-286.
+- **Todo, the example repository's own (not built here).** its shim compares spellings, so a linked `PATH` entry pointing at the
+  shim folder gets through (verified: realpath says it IS the shim); its fixture checks the switch and a finite hard limit but not
+  that the limit is enforced, so under root or `CAP_SYS_ADMIN`/`CAP_SYS_RESOURCE` it runs unbounded; its watch fires at half the
+  headroom and that fraction is its own choice.
 - **State.** Fixed, not released; queued for the next planned release.
 
 ## F28 — A product's submodule pin follows another product's `main`, so every merge there makes the consumer's pin check red (found 2026-11-02, rag_qln)
