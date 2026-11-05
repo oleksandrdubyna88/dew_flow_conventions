@@ -1,6 +1,10 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 6 open (2026-11-05), approved by the owner after the re-review.** Epoch 5 stopped at entries 5.2 and 5.3; the whole plan was revised (§ *Epoch 6*), the Opus judge sorted epoch 5's work (16 fit; 2 cut, both fixed forward, nothing merged contradicts), the plan gate (session `ff8f7dd0`, 2 findings accepted, 1 rejected with reason) and the interim document gate on the E5 stories document (3 accepted, 1 rejected with reason) passed, a final Opus read's fixes were applied, and because the record says `Narrowed: yes` the owner approved it. F30's date of 2026-11-19 is accepted. All nine pin bumps to `bd795847` are merged. The owner's scan (merge condition (c)) is still open.
+> Status: **stopped for re-review (2026-11-05)** — epoch 6's second change after approval (entry 6.2, found by S6's Windows run). No new code on any epic of this plan and no merge of a pull request
+> carrying its work until the full re-review is complete; when its record says `Narrowed: yes`, the owner has approved the revised plan; and epoch 7 is opened with `state: open`. At the stop: E5's
+> producer PR coai #945 (draft) holds S3, S2-B, S4, entry 5.1, S5 and most of S6; the plant of merge condition (o) is red on Windows and is not changed until epoch 7 opens.
+>
+> Was: **epoch 6 open (2026-11-05), approved by the owner after the re-review.** Epoch 5 stopped at entries 5.2 and 5.3; the whole plan was revised (§ *Epoch 6*), the Opus judge sorted epoch 5's work (16 fit; 2 cut, both fixed forward, nothing merged contradicts), the plan gate (session `ff8f7dd0`, 2 findings accepted, 1 rejected with reason) and the interim document gate on the E5 stories document (3 accepted, 1 rejected with reason) passed, a final Opus read's fixes were applied, and because the record says `Narrowed: yes` the owner approved it. F30's date of 2026-11-19 is accepted. All nine pin bumps to `bd795847` are merged. The owner's scan (merge condition (c)) is still open.
 >
 > Was: **stopped for re-review (2026-11-05)** — epoch 5's second and third changes after approval (entries 5.2 and 5.3, found writing E5's S6 brief). No new code on any epic of this
 > plan and no merge of a pull request carrying its work until the full re-review is complete; when its record says `Narrowed: yes`, the owner has approved the revised plan; and epoch 6 is
@@ -407,10 +411,16 @@ Narrowed: yes — two things got smaller, both in E5's producer PR: (1) must-not
   Condition (d): no WSL record exists; the E5 document's D8 (d) is another condition, and the brief's § 18 reads it as "no condition on this PR" while the parent's Definition of Done keeps the per-machine record: the two must agree.
   Could not check: the audit's order in a real suite run (the audit is not wired until S6); the private sibling; Windows behaviour of any of this.)
 
-> Epoch 6 · approved 2026-11-05 · by owner · state: open
+> Epoch 6 · approved 2026-11-05 · by owner · state: stopped
 
 - 6.1 · 2026-11-05 · agent · approach — tracing the S6 inventory's rows showed that the kinds of reason, written before the trace, fit 11 of them badly: the fourth kind's standing test keeps "names" and holds a pinned list of the test files that name a file without reaching the line, and a fifth kind covers a line a test reaches whose product caller is not a test run, pinned by an assertion in each test
   (Found by the Opus author revising the S6 brief. Seven rows: a test file names the file and reads its text, or runs or sources it without reaching the line. Four rows: `install-cli.sh:22`, `install-agy.sh:61`, `deploy/bugs/install-env.sh:101`, `deploy/systemd-release.sh:161`. The plan said of the first two that those tests pin the TMPDIR; none did, it was only inherited. The count, the ceiling of 77 and the runtime barrier are unchanged. The owner's approval named standing tests; this keeps them and adds the pinned list.)
+- 6.2 · 2026-11-05 · agent · merge-conditions, approach — on the elevated hosted Windows runner a new file is owned by `BUILTIN\Administrators`, so `LeftoversAudit` reads a real orphan claim as a stranger's and never names it; merge condition (o) cannot hold there as written, and its plant proves the ordered call on Windows only for a claim re-owned to the caller
+  (Found by S6's own run: coai run 42026897727, job 127243250229, 14631 tests, one red: `AnOrphanClaim_IsReportedByTheAudit_BeforeTheRunFolderEnds`, exit code 0. The limit is old and is written in the copied
+  `LeftoversAudit.cs:10` and in the template's plan, `dew_flow_mcp · research/PLAN_test_leftovers_E3.md`; D9 copies the audit "as in the template", but no text of this plan or of E5's says it, and the S6 brief's § 11.3 row
+  says "red through `Discover`" with no limit. Counted because the doubt is real: the one line added to the plant is a build line of the brief, and the condition now proves less on Windows than it reads.
+  Consultants `ee497a76`: both answers take the owner fixture over a skip; one counts the change, the other counts it unless the approved baseline already states the limit, and it does not. The fixture is
+  `WindowsOwnership.OwnedByCaller`, which needs no privilege; `RunTempGateTests.cs:261-262` already uses it. Not applied until epoch 7 opens.)
 
 ## Symptom
 
