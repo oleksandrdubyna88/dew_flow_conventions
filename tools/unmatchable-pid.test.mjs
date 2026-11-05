@@ -32,7 +32,7 @@ test("3. the real probe answers `gone` for such a pid, three-named: the state is
   for (const i of SAMPLE) {
     const pid = unmatchablePid(i);
     assert.deepEqual(processProbe(pid), { state: "dead" }, `pid ${pid}`);
-    assert.equal(ownerState({ host: thisOwner().host, pid }), "gone", `pid ${pid}`);
+    assert.equal(ownerState({ owner: thisOwner().owner, host: thisOwner().host, ...(thisOwner().ns === undefined ? {} : { ns: thisOwner().ns }), pid }, processProbe, { hidepid: false }), "gone", `pid ${pid}`);
   }
 });
 

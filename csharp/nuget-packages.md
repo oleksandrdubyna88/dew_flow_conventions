@@ -38,7 +38,9 @@ Two family-wide decisions are already load-bearing and are commented in each rep
 
 ## Bumping
 
-Monthly, to the latest **stable** — never a preview; the family is strictly .NET 10. Bump the whole set
+Monthly, to the latest **stable** — never a preview; the family is strictly .NET 10.
+
+Bump the whole set
 together and run the suite; a transitive constraint that forces an older pin gets a comment saying which
 package forces it and when to revisit, not a silent downgrade.
 

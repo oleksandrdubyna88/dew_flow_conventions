@@ -998,6 +998,174 @@ their order and the verb between them, which is strictly more than either bare c
 assertion that a stronger one subsumes is not a loss; an assertion the uniqueness case has to be
 taught to ignore is a hole with a comment over it.
 
+## The change ledger and its rule (`tools/plan-ledger.test.mjs`, `tools/plan-lifecycle.test.mjs`, `tools/plan-change-rule.test.mjs`, 2026-10-29)
+
+Three files guard `common/plan-change-control.md` and the check that reads the ledger it describes. Counts are what the
+runner printed on 2026-10-29, on Node 26.12.1, not typed from memory.
+
+- **`tools/plan-ledger.test.mjs`** (pure; 152 cases). The E1.S1 scenarios and one red case per row of the parent's
+  findings table, each beside its clean twin. Every fixture runs with `\n` and with `\r\n` line ends and the two must
+  agree. The lists (`KINDS`, `SOURCES`, `STATES`, `APPROVERS`, `VERDICTS`, `STOP_PHRASE`) are iterated from the lib and
+  pinned ONCE to the parent's § 2, because they are the contract.
+- **`tools/plan-lifecycle.test.mjs`** (12 cases, spawned). A plan without a ledger stays clean; two open entries exit 1
+  with the hint line; a stories document's ledger is red only while its parent is in `todo/`; a red ledger in `research/`
+  is ignored; a stopped plan that says what is done is not `misfiled`; the throw seam (a `module.registerHooks` stub
+  swapped in through `--import`, Node 22.15 or later, skipped with a reason below that) gives a finding and exit 1, not
+  a crash.
+- **The dry run over the estate** (E1.S4): zero `changes` lines added in any of the eleven checkouts, twice; the record is
+  the *Dry run record* section of `research/PLAN_plan_change_control_E1.md`.
+- **`tools/plan-change-rule.test.mjs`** (pure, 8 cases) and three selection cases in `tools/rules.test.mjs`. The freeze
+  proves a body changed, never that it still says what it exists to say, so the rule's three sentences (one change is
+  allowed and the second stops all new code; an owner's request counts exactly like one you find; the interim path is the
+  only case where a plan goes to the document review) are asserted. Each has a splice case that removes its paragraph and
+  requires the phrase to vanish with it, and a placement case that finds it in its section, cut from the text outside
+  fences because the rule's example opens with a column-0 `## Plan changes`. Then the agreement half, A1 to A5: the
+  rule's fenced example goes through `ledgerFindings` and must be clean; the same example with epoch 1 left open is red;
+  a second change in the open epoch is red and its stopped twin is clean; free text at column 0, an entry behind one
+  space and an entry behind two list markers are each a finding; and the rule's ledger section names every word the lib
+  accepts (the three verdicts as code spans, because the dash alone is everywhere in the prose), with both separators by
+  code point. The selection cases: the rule is selected for the fourteen split-read tasks and none of the four single-read ones; a plan file does not pull it into a single-read scope (with a companion
+  that `planning-docs` is still selected there, so the negative is not vacuous); and it brings `planning-docs` into
+  `audit`, `http`, `benchmark` and `logging` as `dependency:common.plan-change-control`. The existing *every single-read
+  scope still fits one read* test gets no `todo/` scope: that scope is 38 612 B on `main`.
+
+**The RED run**, before the rule existed, for the right reason: the three selection cases failed with
+`audit must select common.plan-change-control`, `the rule exists in the catalog — otherwise every negative below is
+vacuous` (the first assertion, so the red is never a `TypeError`) and `audit: common.planning-docs must arrive as the
+rule's dependency`; all 8 cases of `plan-change-rule.test.mjs` failed with `common/plan-change-control.md does not exist
+— the rule E2 writes`. After the rule, the pointer lines and the body freeze they passed: 8 of 8 and 3 of 3. Before the
+freeze was recorded `node tools/rule-bodies.mjs` printed `UNRECORDED common.plan-change-control` and
+`DRIFT common.planning-docs`, exit 1; after `--update` of both ids it printed `OK — 39 rule(s)`, exit 0.
+
+**RED-GREEN-RED**, each break made in the working tree only, watched red, restored and watched green:
+
+| Break | Went red |
+|---|---|
+| delete pinned sentence 1's paragraph | the sentences, the splice and the placement cases (3 of 8): `no longer carries "After the first approval, ONE change is allowed …"` |
+| copy "counts exactly like one you find" into `## Never` | the splice case alone (1 of 8): `survives its paragraph being removed` |
+| move pinned sentence 3's paragraph into `## The check` | the placement case alone: `must stand in ## Reviewing the revised plan` |
+| in the example, `by owner` to `by reviewers` | the example case and the stopped twin: `epoch 2 is narrowed (Narrowed: yes) and approved by reviewers` |
+| in the example, the first ` · ` of entry 2.1 to a pipe | the example case and the open-epoch case: `unreadable entry … expected 4 fields separated by " · " (U+00B7) before " — " (U+2014)` |
+| remove `dod` from `## The ledger` | the vocabulary case: `never names "dod", a word of KINDS` |
+| add `paths: ["todo/**"]` to the rule | the plan-file case: `inspect --file todo/PLAN_x.md selects common.plan-change-control` |
+| add `depends: ["common.plan-change-control"]` to `planning-docs` | all 3 selection cases: `Rule dependency cycle: common.plan-change-control -> common.planning-docs -> common.plan-change-control` |
+
+The pipe break also turns the open-epoch case red, because an unreadable entry is not counted: the same cause, a second
+case. `npm test` on the final tree: 1279 tests, 1265 passed, 6 failed, 8 skipped; the 6 are the janitor cases S4-23,
+S4-34, S4-35, S4-37, S4-38 and S4-46, which fail identically on clean `main` on this machine and belong to the
+test-leftovers work. `npm test` does not run the family checks (`ownership-check`, `rule-bodies`, `plan-lifecycle`,
+`pin-check`, `adapter-check`); CI runs them as steps, and since this work CI runs `plan-lifecycle` over this repository's
+own plans too. Turning that step red by removing a plan's `todo/README.md` row gave exit 1 with
+`index todo/README.md omits PLAN_plan_change_control_E2.md`; the row was restored.
+
+**What it does not prove.** That an agent counts, stops or re-reviews: no loader output and no check is evidence of
+behaviour. An unrecorded change, a plan with no ledger and code written during a stop are invisible by design, and a
+stopped plan is clean by design. Two heading shapes are not seen: a setext heading, and a heading styled with inline
+markup or a character reference. (Two list markers are detected since E1's K1 fix.) Git history is never read, entry
+dates are not ordered (only epoch dates are), and where the section stands in the file is not checked. The agreement
+cases compare the rule's example with the lib, not the rule's prose with the lib: a sentence that describes the check
+wrongly passes them.
+
+## The process bound and the shim (`tools/testing-rule.test.mjs`, 2026-11-05)
+
+F27 adds one section to `common/testing.md` (*A runner bounds what a test file may start, and a shim never resolves to
+itself*) and one Definition of Done line. The freeze proves that body CHANGED; **`tools/testing-rule.test.mjs`** (pure, 8
+cases at 7c4e3e9 and 7 since the review of 2026-11-05, below: strings in, strings out, so `common/test-leftovers.md` asks nothing of it) proves it still SAYS what F27 put there.
+It runs with `npm test` and by itself: `node --test tools/testing-rule.test.mjs`.
+
+**The RED run**, before the section existed, for the right reason: `node --test tools/testing-rule.test.mjs` printed
+`tests 8, pass 0, fail 8`. Seven cases failed with `common/testing.md has no section ## A runner bounds what a test file may
+start, and a shim never resolves to itself — the section F27 writes` (the first assertion of the section helper, so the red is
+never a `TypeError`), and the Definition of Done case failed with `## Definition of Done has no "- [ ]" line that bounds each
+test file's processes and resolves the program it wraps outside its own folder`. After the text: 8 of 8. The first GREEN run
+was 7 of 8: `FAILS the file` and `guarded fixture` also stand in the Definition of Done line, so the case *each pinned sentence
+comes from this section and nowhere else* refused them. The two pins were narrowed (`reaching the bound FAILS the file`,
+`guarded fixture that forks`) rather than the case weakened. Before the freeze was recorded `node tools/rule-bodies.mjs`
+printed `DRIFT common.testing`, exit 1; after `--update common.testing` it printed `OK — 41 rule(s)`, exit 0.
+
+**RED-GREEN-RED.** Whole file: `git show HEAD:common/testing.md` in place of the text gave 0 of 8 (RED), the text restored
+gave 8 of 8 (GREEN). The cases then break the text in memory, in every run, and each splice must turn its check red (the helper
+that makes a splice refuses one that changes nothing):
+
+| Splice (in memory) | The check that must go red |
+|---|---|
+| the section moved to after the RED-test section | placement: not immediately before `## Every bug fix starts with a RED test` |
+| a `4. **…**` item appended; item 2 deleted | the count of numbered bold items is not 3 |
+| one pinned sentence copied into `## Scope` | the pins stay present in the section (the saying case stays green) and the *nowhere else* case goes red |
+| `(default 3000)` inserted; `half of the headroom` inserted | no number becomes law |
+| the `What this does not give` paragraph removed | the limits case: the paragraph and the three limit pins |
+| `(tests/run.mjs)` inserted | the address guard |
+| the Definition of Done line removed | the Definition of Done case |
+
+**Revised 2026-11-05 after the review.** The section now also says that the kernel limit fails nothing (a fork past it gets
+`EAGAIN`) and the watch must fire below the headroom, that a shim resolves once at install by real path and bakes the result
+in, that the fixture lives outside the folder the runner discovers and refuses without an enforced kernel limit, and the
+wider limits (root and the exempting capabilities). The suite is **7 cases** as the runner prints it. The case *each pinned
+sentence comes from this section and nowhere else*, and the Definition of Done twin of it, are dropped: their reason was
+false. Every pin check reads the section alone, so a sentence copied elsewhere cannot make a check green or red, and the
+header comment that claimed otherwise is gone. In its place each pin has a splice in the saying case: the one occurrence of
+the pin is removed from the section text and that pin, and only that pin, must be reported (so a pin that occurs twice
+cannot hide: `RLIMIT_NPROC` became `the kernel limit (\`RLIMIT_NPROC\`` and `nothing fails the file` became `or the kernel
+limit comes first and nothing fails the file`, each of which occurs once; `Only that session is ever signalled` is pinned
+with the capital the text has). The law case also refuses a fraction (`half`, `a third`, `a quarter`, a percentage) and
+splices `20 %`; the address guard is a file-extension pattern plus a case-insensitive token pattern, with four splices
+(`tests/run.mjs`, `test.sh`, `R9700`, a 40-hex sha) and a positive control (`CAP_SYS_ADMIN`, `RLIMIT_NPROC`, `EAGAIN`,
+`setsid`, `PATH` are not addresses); the Definition of Done line is pinned by five phrases and a splice that drops `by real
+path` must be reported as lacking it. **RED on the 7c4e3e9 text**: `tests 7, pass 4, fail 3`. The saying case reported 14
+pins missing (`EAGAIN`, `or the kernel limit comes first and nothing fails the file`, `a session of its own`, `fires well
+below the headroom`, `Only that session is ever signalled`, `once, at install`, `comparing REAL paths`, `bakes the result
+in`, `resolve to each other`, `outside the folder the runner discovers`, `refuses to start unless told to AND an enforced
+kernel limit is in force`, `never counted or ended by the watch`, `outlives the run`, `have the watch alone`), the limits
+case the last three of them as limit pins, and the Definition of Done case `by real path`; placement, count, law and
+address stayed green. **GREEN** after the text: 7 of 7. RED-GREEN-RED on the file: the 7c4e3e9 text in place gave 3 failed
+of 7, the new text restored 7 of 7. The splice rows that changed:
+
+| Splice (in memory) | The check that must go red |
+|---|---|
+| each pin's one occurrence removed from the section text | that pin, and only that pin, is reported missing |
+| `20 %` inserted | the law case: a fraction as law |
+| `(see test.sh)`, `R9700`, a 40-hex sha inserted | the address guard |
+| `by real path` dropped from the Definition of Done line | the line is reported as lacking `by real path` |
+| a pin copied into `## Scope` (the old twin) | dropped with its case: nothing reads outside the section |
+
+**Second review, 2026-11-05.** The paragraphs above record what the pins WERE; this one records what they say now. The suite
+stays at 7 cases. (1) Nothing NAMES the bound at the kernel limit: the fork is refused and what the program does then is its
+own (measured: one program dies, another goes on; the rule carries no exit codes), so the pins say `nothing names the bound
+at it` and `or the kernel limit comes first and nothing names the bound` instead of "fails nothing" and `EAGAIN`, and the cap
+must be `small enough that the machine survives reaching it`. (2) A shim resolves at its FIRST install, a later install keeps
+what the first one baked, and nothing looks the program up at run time, because baking alone left the two-shim walk open (A
+bakes the program, B bakes A, A re-installed bakes B, and real-path compares pass throughout): `once, at its FIRST install`,
+`A later install keeps what the first one baked`, `never looks the program up at run time` and `two shims that re-resolve can
+bake each other` replace `once, at install` and `resolve to each other`. (3) The fixture refuses unless the cap in force is
+the runner's own, because a distribution's default is an enforced limit too (about eleven times the count that killed a
+session): `refuses to start unless told to AND the cap in force is the runner's own` and `a distribution's default is
+enforced too`. (4) The root pin is the full clause (`root, and the capabilities that exempt a process from \`RLIMIT_NPROC\`,
+have the watch alone`), so deleting root or the capabilities is reported. The Definition of Done case also pins `, at
+install` and `outside the folder it discovers`; the law, address and fraction splices are anchored on words present in both
+wrappings of the text. **RED on the 5bbf9b4 text**: `tests 7, pass 6, fail 1`; the saying case reported 9 pins missing
+(`small enough that the machine survives reaching it`, `nothing names the bound at it`, `or the kernel limit comes first and
+nothing names the bound`, `once, at its FIRST install`, `A later install keeps what the first one baked`, `never looks the
+program up at run time`, `two shims that re-resolve can bake each other`, `refuses to start unless told to AND the cap in
+force is the runner's own`, `a distribution's default is enforced too`); the root pin was NOT reported, because the 5bbf9b4
+text already carries that clause word for word, and so the limits case stayed green. **GREEN** after the text: 7 of 7;
+RED-GREEN-RED on the file: the 5bbf9b4 text in place gave 1 failed of 7, the new text restored 7 of 7.
+
+**Third review, 2026-11-05.** The second review's fixture clause let a guard pass under root, while the limits paragraph says
+the fixture refuses there; this review restored "enforced". Item 3 now says the cap in force is the runner's own AND enforced
+(`so not under root or the exempting capabilities`), and the pins are `refuses to start unless told to AND the cap in force is
+the runner's own and enforced` (lengthened) and `so not under root or the exempting capabilities`. The limits paragraph's
+`which is why the fixture refuses there` is pinned too, and `LIMIT_PINS` is now the last seven pins, exactly the limits
+paragraph's. **RED on the 36406f8 text**: `tests 7, pass 6, fail 1`, the saying case reporting those two pins missing (the
+limits case stayed green: that paragraph is unchanged); **GREEN** after the text: 7 of 7; RED-GREEN-RED on the file: the
+36406f8 text in place gave 1 failed of 7, the new text restored 7 of 7.
+
+**What it does not prove.** No runner, shim or fixture exists in this repository: the section is advice for the repositories
+that run tests through a runner of their own, and the repository that owns one proves the bound there. The formula (the
+count at the start of the run plus a headroom) is not verified at run time, and the section says so itself. Prose that
+describes the mechanism wrongly passes: the cases pin sentences and their place in the section, not whether the mechanism the
+sentences describe works. Whether a real-path compare or a session watch works anywhere is not shown here, and neither is
+how a platform without the kernel limit behaves.
+
 ## The consultant half moved here (`common/coai-consultant.md`, 2026-09-25)
 
 Until today the consultant half of the pasted snippet was the product's own file, on the operator's ruling
@@ -1139,9 +1307,92 @@ gate rule when it was not read); they were red with *"rule common.subagent-model
 Paid runs: on the OLD rule text the model answered `resolve_with_humandecision` for *"the person says ship it in chat"*,
 quoting the rule — the RED that motivated the text change; the GREEN run on the new text is still to do.
 
-## Test leftovers (`tools/lib/owned.mjs`, `tools/lib/leftovers-sweep.mjs`, `tools/leftovers-check.mjs`, `tools/janitor.sh`; epic E1, 2026-10-15)
+## Test leftovers (the merged core: owner segment, kernel owner, liveness — `tools/lib/owned.mjs`, `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/sweeper-scan.mjs`; first built as epic E1, 2026-10-15; merged core on PR #82, 2026-10-27)
 
-This repository's own tests obey `common/test-leftovers.md`, in four pieces that each answer one clause of it.
+This repository's own tests obey `common/test-leftovers.md` and its companion `common/test-leftovers-janitor.md`. The merged core
+(`research/PLAN_test_leftovers_merged_core.md`, IMPLEMENTED 2026-10-27, deviations in that document) rebuilt what epic E1 shipped on
+2026-10-15. The first subsection is the code as it is on the branch of PR #82 (read from the files on 2026-10-27); the second is E1's
+record as it was written. What is not done — the machine barrier on every machine, the merge, the private sibling's side and the
+release — was `todo/PLAN_test_leftovers_merged_core_release.md`, promoted on 2026-11-04 (the barrier on the owner's Windows machine is
+still closed, and the sibling's confirmation holds at `2602416` only, F26) as
+`research/PLAN_test_leftovers_merged_core_release.md`; its open tail, the consumer migration, is `todo/PLAN_test_leftovers_rollout.md`.
+
+### The code as it is (2026-10-27)
+
+- **The name and the owner.** Every resource a run creates outside its process is named `testsToDelete-<owner>-<repo>-<what>-<id>`
+  (at most 63 characters; the owner is budgeted before `<what>`; the id is six characters). The owner is `u<uid>` on POSIX (`u0` is root's own
+  scope, not every scope) and `w<digits>` on Windows: the account name without its domain, `A`-`Z` lower-cased, UTF-8, SHA-256, the first
+  four bytes as one unsigned number in decimal (`windowsOwnerToken`; a collision confers no authority, the kernel owner decides).
+  `TESTSTODELETE_OWNER` overrides it only when it matches `^[uw][0-9]{1,10}$`; anything else throws in Node and exits 2 in the janitor. The
+  repository's token is `conventions`, written in ONE file, `tools/lib/owned-token.mjs` (`REPO_TOKEN`, `REPO_ROW`).
+- **The owner record.** `<owner>:<host>@<os>:<pid>[:<start>[:<ns>]]` — one grammar for a claim file and for a worktree's lock reason. The start is
+  written only where no process must be spawned (a `/proc` read on Linux), and on Linux the pid namespace rides with it. A resource of the
+  caller is judged by TWO keys: its name's owner, its record's owner and the caller's token are one, AND the entry's own kernel owner (read
+  without following a link) is the caller; then liveness decides. On Windows the Node side (`isMine`) reads no file owner: it fails
+  closed to a path inside the caller's profile, compared on resolved real paths, and keeps everything else; the janitor reads the owner
+  there with `stat %u`. Only "no process has that pid" is `gone`; a refused or failed query, two
+  starts that disagree by more than 2 s, a record of another owner, host or namespace, a legacy record on a Linux reader, and a resource another uid
+  owns are all `unknown` — kept and named. A legacy name (from before the owner segment) is a `legacy:` line, never a removal on a Linux
+  reader; an owner-form resource with no claim is `unmarked`, listed and never collected, however old.
+- **`tools/lib/owned.mjs`** (the shipped helper; it holds no token) — `ownedDir(scope, what)` and `ownedWorktree(scope, repo, what)`: the claim
+  is written FIRST, with an exclusive create; a claim that already exists, or a folder that already exists under the claimed name, draws a new id
+  (a squatter's folder is never adopted and never removed, and the helper removes its own claim in that case); teardown never throws and removes
+  the folder before its claim. `cleanupScope()`, `ownerState`, `legacyOwnerState`, `processProbe`, `parseOwner`, `readOwner`, `classifyName` and
+  `runRecord` (an inherited `TESTSTODELETE_RUN` is accepted only for a live run of the caller) are the rest of the surface. `ownedFor({ token, row })`
+  binds the same API to ANOTHER repository's token, so a Node consumer wraps the shipped file instead of porting it (story S8, decision 11).
+- **`tools/lib/leftovers-sweep.mjs`** (the start-of-run sweep, called by `tools/run-tests.mjs` before `node --test`; it never changes the exit code)
+  removes this repository's own prefixed folders, worktrees and orphaned claims only on both keys; a resource younger than ten minutes is kept
+  (age selects, it never authorises). A plain folder is renamed to a hidden sibling quarantine, checked again there by device, inode and claim, then
+  removed; a worktree is never renamed and goes through `git worktree remove --force --force`; a quarantine a killed sweep left is restored onto a
+  free name only. The result lists `removed`, `preserved`, `listed` (`foreign:`, `legacy:`, `unmarked:`) and `errors`.
+- **`tools/janitor.sh`** (874 lines, 78 060 bytes, sha256 `842386b8…aa02f0c5`, measured with `wc -l`, `wc -c` and `sha256sum` on 2026-10-27; last changed
+  in 9b62ba3, so re-measure before quoting; LF through `.gitattributes`, mode 100755) is the host-wide tool of the rule's `## The janitor`, its contract the
+  companion `common/test-leftovers-janitor.md`. Usage: `bash tools/janitor.sh [--dry-run] [--token <t>]` from inside the repository whose worktrees and
+  branches are swept; `JANITOR_MIN_AGE_MINUTES` (default 60, digits only, at least 1) is the window. One capture of every prefixed resource of every user
+  (containers, volumes, networks, worktrees, branches, temp folders); only the caller's scope is swept, only captured and authorised items, by identity
+  (device and inode, claim re-read). Exit 0: nothing in the caller's scope was skipped. Exit 3: something was skipped, named on stderr. Exit 1: a listing or a
+  docker or git step failed, or the age setting is refused (nothing removed). Exit 2: bad arguments or an invalid owner override (nothing touched).
+  `--dry-run` prints `would run:` lines on stdout and removes nothing; its exit code is the real run's. **On Windows the run is forced to `--dry-run`**
+  unless `JANITOR_WINDOWS_E2E_GREEN` is set to a non-empty value (an operator switch, to be set only after the end-to-end check S4-28 has passed on that
+  machine; the Windows run is follow-up F9). **The volume template:** `docker volume inspect --format` does not turn a bare `\t` into a tab (measured 2026-10-27
+  on Docker 29.9.1; `ps` and `network ls` do), so the script uses the Go literal `{{"\t"}}`; the stub-docker suite had stayed green while no volume
+  was swept on a real daemon, and `tools/janitor-docker-live.test.mjs` is the live check. Its reason texts are ASCII (`; `, not an em dash).
+- **`tools/leftovers-check.mjs`** (the guard, `common/test-leftovers.md` §7; `node tools/leftovers-check.mjs`, also run by `npm test`) refuses the classes
+  `raw-temp`, `raw-worktree`, `docker-run`, `docker-name`, `shared-store`, `ryuk-off` (never exemptible), `legacy-name`, `owner-blind` (no inline exemption: the one
+  pass is `tools/fixtures/owner-blind-allowlist.json`, keyed by file, line and the sha256 of the line, regenerated with `--update-allowlist`), `exemption` and
+  `token`; exit 0 clean, 1 with findings, 2 when it scanned nothing. `--profile node` is for a Node consumer that mounts it: it adds the consumer's tracked
+  `*.test.<ext>` / `*.spec.<ext>` files and every text file under `scripts/`, `test/` and `tests/`, reads workflows with `yaml@2`, treats a wholly dynamic shell
+  name as dynamic, and takes the token's row with `--token` and `--identity`.
+  The guard's command line is `tools/lib/leftovers-cli.mjs`, its docker pass `tools/lib/leftovers-docker.mjs` and the shell-value helpers both share `tools/lib/leftovers-shell.mjs` (moved out of `tools/leftovers-check.mjs` whole, to keep it under 800 lines).
+  The `raw-temp` baseline (`tools/lib/raw-temp-baseline.mjs`; rule §7, `todo/PLAN_raw_temp_baseline.md`; tests `tools/raw-temp-baseline.test.mjs`) adds three arguments and a class.
+  `--baseline` reads the one path `raw-temp-baseline.json` at the repository root (a regular file, never a symlink) only when given, and passes a `raw-temp` site up to its entries (a multiset keyed by file and the sha256 of the trimmed line; the line is a hint);
+  class `baseline` is a stale entry (reconciled over the whole file, so a deleted file counts), an entry under no scope or under a scope whose proof file lacks the marker for that
+  root, another class, or a malformed file — a scope whose `guard` is missing or not `node` or `csharp` included (exit 1, one finding at line 1; only an unreadable path, or a run that is not at the git root, is exit 2). Each scope names the guard that judges it: this guard judges only the `node` scopes, reports a file or a proof of its own scopes absent from the tree by a direct `lstat`, and never checks a `csharp` scope — except that a `csharp` scope inside this guard's own walk (`scripts/`, `test/`, `tests/`) is a finding. Scopes that overlap name one guard, a root is listed once and holds no whitespace, star-slash or `-->`; the git-root check comes before the symlink check. `--print-baseline` prints the current `raw-temp` sites to stdout, `scopes` empty, and writes
+  nothing. `--baseline-shrinks --base <ref> [--allow-create]` refuses a new key, a raised count, a new or wider scope, a narrowed scope that does not keep its base proof and guard, a changed proof, a changed guard and any creation but the first (`--allow-create` only while the
+  path has no history behind the base ref, and only in the creation PR's own run; an unresolved base ref, or a shallow clone asked about a creation, is exit 2 naming the fetch). The guard checks a proof's marker only: no order of the proof among the tests is checked, and the gate that refuses a run before discovery is proven by the consumer's own tests and review, not by this guard (F24; `tools/raw-temp-baseline.test.mjs` test 42 pins that a proof that sorts last is accepted). This repository ships no baseline file. The full definition is the companion rule `common/test-leftovers-baseline.md` (the detail's §7 points to it: the detail has no room under the per-read cap for it).
+- **`tools/sweeper-scan.mjs`** (the barrier's scan; `node tools/sweeper-scan.mjs [--root <dir>] [--system] [--honour-marker]`) lists the owner-blind sweepers still
+  enabled on a machine: the caller's checkouts under `--root`, crontab, systemd user units and, on Windows, scheduled tasks; `--system` adds the system places.
+  It deletes nothing. Exit 0: nothing found and everything read. Exit 1: owner-blind lines found. Exit 2: something in the requested scope could not be read, or
+  nothing was scanned (2 outranks 1). The classifier is `tools/lib/sweeper-scan.mjs` (`classifyLine`, and `classifyLines` for a whole file, which also reads a prefix held in a variable the same file assigns a value holding it — `tools/lib/prefix-bindings.mjs` — except a variable assigned on a line the allowlist passes), the only implementation: the guard and the scan both call it.
+  The barrier records are in `research/security/machines.md`; the security pass is `research/security/test-leftovers-merged-core.md`.
+- **The vectors.** `tools/fixtures/owner-vectors.json` holds seven tables (grammar, hostnames, verdicts, names, windows-owner, record, scope — 204 vectors on
+  2026-10-27, counted from the file) and `tools/owner-conformance.test.mjs` asks each of both implementations of the rule, `owned.mjs` and `janitor.sh`
+  (cut out by function name, or run for real over a private temp root); a disagreement names the vector and both answers.
+- **The test files** (`ls tools/*.test.mjs`): `owned.test.mjs`, `owned-liveness.test.mjs`, `owned-for.test.mjs`, `leftovers-sweep.test.mjs`, `leftovers-check.test.mjs`,
+  `raw-temp-baseline.test.mjs`, `leftovers-check-consumers.test.mjs`, `janitor.test.mjs`, `janitor-liveness.test.mjs`, `janitor-paths.test.mjs`, `janitor-docker-live.test.mjs`,
+  `owner-conformance.test.mjs`, `sweeper-scan.test.mjs`, `test-leftovers-rule.test.mjs`, `unmatchable-pid.test.mjs`. `sweeper-scan.test.mjs` also reads
+  the E1 rule text kept as a fixture (`tools/fixtures/sweeper-scan/rule-2c96f83.md`).
+- **The latest suite** (9b62ba3, 2026-10-27, Ubuntu, non-root, lowered, private `TMPDIR`): 1099 tests, 1093 pass, 0 fail, 6 skipped (S4-21b needs real uid 0, S4-28 is the
+  Windows end-to-end check, four are Windows-only or opt-in). Windows was not run (F9). `janitor-docker-live.test.mjs` ran against Docker 29.9.1 and passed; a real-daemon
+  smoke of `tools/janitor.sh` removed the dead-owned container, network and volume, kept the live-owned container and did not touch another owner's.
+
+### The first version (epic E1, merged in #77, 2c96f83, 2026-10-15) — history
+
+Everything below is the record of E1 as it was written. A file size, a line count, a hash, a test count or a behaviour named here is the figure AT E1 (2026-10-15),
+not the code now: the merged core replaced the janitor, the owner record's grammar, the unmarked-folder rule of the sweep and the place of the token constant (see the
+list above and `research/PLAN_test_leftovers_E1.md`, § Deviations). The reasons the paragraphs give still hold.
+
+At E1 this repository's own tests obeyed `common/test-leftovers.md` in four pieces that each answered one clause of it.
 
 - **The helper.** `tools/lib/owned.mjs` is the only way a test makes a temp folder or a worktree: `ownedDir(scope, what)` and
   `ownedWorktree(scope, repo, what)` name the resource with the repository's token, write its owner (this process, with its
@@ -1154,21 +1405,21 @@ This repository's own tests obey `common/test-leftovers.md`, in four pieces that
 - **The start-of-run sweep.** `run-tests.mjs` calls `tools/lib/leftovers-sweep.mjs` before `node --test`: it removes
   what a killed earlier run left (owner gone, or unmarked and older than ten minutes), preserves with a reason what is
   live, foreign, unreadable, young or another clone's, prints one report line, and never changes the exit code even
-  when the sweep itself throws. `leftovers-sweep.test.mjs` pins the ten scenarios plus `2b`, `3b` and `10b` (thirteen tests). The entry-point
+  when the sweep itself throws. At E1 (2026-10-15) `leftovers-sweep.test.mjs` pinned the ten scenarios plus `2b`, `3b` and `10b` (thirteen tests). The entry-point
   scenario (10) sweeps a disposable repository: `run-tests.mjs` reads `RUN_TESTS_REPO_ROOT` (documented in its header) so the child process
   never lists this checkout's worktrees, which every concurrently running test shares.
 - **The guard.** `tools/leftovers-check.mjs` is rule §7 as code, and `leftovers-check.test.mjs` runs it over the real
   repository (test 1) and asserts no `mkdtemp` / `tmpdir` / `TEMP` read remains in any `tools/*.test.mjs` (test 1b). Its
   classes are `raw-temp`, `raw-worktree`, `docker-run`, `docker-name`, `shared-store`, `ryuk-off` (never exemptible) and
-  `exemption` (a malformed exemption). Observed RED over the unmigrated repository: **38 findings** (34 `mkdtemp` lines,
+  `exemption` (a malformed exemption). At E1 (2026-10-15), observed RED over the unmigrated repository: **38 findings** (34 `mkdtemp` lines,
   `selftest.test.mjs:291`'s `process.env.TEMP`, 4 worktree creations), then green after the migration. The one place that
   legitimately makes worktrees the helper cannot (a `--relative-paths` worktree, a `-b <branch>` worktree) is
   `janitor.test.mjs`'s `rawWorktree`, under one inline `testsToDelete-exempt: raw-worktree` exemption. When the three
   story branches were first combined, the guard reddened on that file (**4 findings**: two in prose, two in the
   helper) and, through 1b, on one comment in `leftovers-sweep.test.mjs`; both were fixed in the integration and the guard
-  reports `clean (42 files)`.
-- **The janitor.** `tools/janitor.sh` (308 lines, 25 644 B, sha256 `bf9f0c64…9ed8e1`, LF through `.gitattributes`, mode 100755) is the
-  host-wide tool of the rule's `## The janitor` heading — a shipped file, not a block to paste. `janitor.test.mjs` holds
+  reported `clean (42 files)` at E1 (2026-10-15).
+- **The janitor.** `tools/janitor.sh` (at E1, 2026-10-15: 308 lines, 25 644 B, sha256 `bf9f0c64…9ed8e1`, LF through `.gitattributes`, mode 100755; replaced by the janitor of the merged core above) was the
+  host-wide tool of the rule's `## The janitor` heading — a shipped file, not a block to paste. At E1 `janitor.test.mjs` held
   its twelve verdicts, `8b` (the `--dry-run` announcement) and `13`–`19` (the code gate and the Opus review: malformed owners, one row per
   worktree, one volume inspect, one `tasklist` snapshot, three-valued liveness on both branches, the running clone) as `node:test`: a stub
   `docker` first on `PATH`, two disposable clones, a private temp root, Git for Windows' bash located from `git --exec-path`, owners from
@@ -1188,15 +1439,15 @@ and `janitor.test.mjs` asserts that premise before and after every run; the Node
 that runs in a child process (10) uses the unmatchable pid. Every assertion that follows a janitor run now prints the run's
 stderr, so the next survivor explains itself.
 
-**Wall time of the suite before and after the helper (S2's DoD).** The whole suite, run from temporary worktrees on a 24-thread Windows machine at `--test-concurrency=8`, took 260.0 s at `3f6acf1^` (the helper present, the tests still on raw `mkdtemp`) and 265.8 s at `3f6acf1` (every site on the helper), and 221.8 s on a second run of the latter — a difference well inside the run-to-run spread, so adopting the helper has no measurable cost (7 and 6 tests failed in those two trees, a worktree in the temp root being a place some tests do not expect — the guard's repository scan, two real-CLI tests, a real-Git test and sweep case 10, which the new repository seam fixes; the same kind of failures on both sides). `owned.test.mjs` alone: 12.6 s at its first commit (25 tests), 9.0 s now (28). The full `npm test` at the tip of this branch: 540 tests, 536 pass, 4 skipped, 0 fail, 798 s — 15 more tests than the trees above, 7 of them the janitor's, whose file alone takes about 8.5 minutes on Windows.
+**Wall time of the suite before and after the helper (S2's DoD).** The whole suite, run from temporary worktrees on a 24-thread Windows machine at `--test-concurrency=8`, took 260.0 s at `3f6acf1^` (the helper present, the tests still on raw `mkdtemp`) and 265.8 s at `3f6acf1` (every site on the helper), and 221.8 s on a second run of the latter — a difference well inside the run-to-run spread, so adopting the helper has no measurable cost (7 and 6 tests failed in those two trees, a worktree in the temp root being a place some tests do not expect — the guard's repository scan, two real-CLI tests, a real-Git test and sweep case 10, which the new repository seam fixes; the same kind of failures on both sides). `owned.test.mjs` alone: 12.6 s at its first commit (25 tests), 9.0 s now (28). The full `npm test` at the tip of E1's branch (2026-10-15): 540 tests, 536 pass, 4 skipped, 0 fail, 798 s — 15 more tests than the trees above, 7 of them the janitor's, whose file alone takes about 8.5 minutes on Windows.
 
-**On Linux (WSL 2, Node 20.20.2, git 2.43).** `owned`, `leftovers-sweep`, `janitor`, `leftovers-check` and `unmatchable-pid` tests,
+**On Linux at E1, 2026-10-15 (WSL 2, Node 20.20.2, git 2.43).** `owned`, `leftovers-sweep`, `janitor`, `leftovers-check` and `unmatchable-pid` tests,
 serial: 97 tests, 95 pass, 0 fail, 2 skipped (this git has no `--relative-paths` for a worktree: janitor case 5 and owned case 12 skip with that reason, and 12b covers the same read with a hand-made relative gitdir) in 20 s — the janitor file takes seconds there against about eight minutes on Windows. The
 first Linux run found what Windows could not: the private `PATH` of the janitor test lacked `cut` and `xargs`, which the one-inspect
 capture added, so cases 2 and 15 failed with `cut: command not found`; the tool list now names them. The run was made in a WSL-native
 copy of the tree (`git archive` into a scratch repository), because a worktree's `.git` file names a Windows path that WSL's git cannot read.
 
-**Round 3 of the code gate (the janitor, owner and guard hardening).** Four branches were merged into the epic, and one integration pass added the rest. The janitor is now 308 lines, 25 644 B (sha in § The janitor above); new test files, each runnable alone with `node --test --test-concurrency=1 <file>`:
+**Round 3 of the code gate (the janitor, owner and guard hardening).** Four branches were merged into the epic, and one integration pass added the rest. At E1 (2026-10-15) the janitor was 308 lines, 25 644 B (sha in the janitor bullet above); new test files, each runnable alone with `node --test --test-concurrency=1 <file>`:
 
 - `tools/owned-liveness.test.mjs` — `processProbe` answers a named `state`; a pid that is not a positive safe integer is `unknown` and the OS is never asked; `sweepRepoRoot(env)` keeps the real repository root.
 - `tools/owner-conformance.test.mjs` over `tools/fixtures/owner-vectors.json` — ONE table of vectors (owner grammar, verdicts, host names) asked of both `owned.mjs` and `janitor.sh`; a disagreement names the vector and both answers. The harness feeds the janitor's `owner_ok` the raw claim text through `claim_norm` (command substitution alone drops trailing newlines, which made the multi-line vector i29 look valid to bash only because of the harness). The Linux run found one more disagreement, vector i30 (a no-break space in the host): Node's whitespace class knows it, bash's `[[:space:]]` is ASCII-only in a C locale, so `owner_ok` now names the Unicode spaces explicitly (`uspace`).
@@ -1226,3 +1477,162 @@ copy of the tree (`git archive` into a scratch repository), because a worktree's
 **Core-text items of the integration.** The rule gained: a store the run owns counts as a container, an old lock-owned name is judged by its old lock, not by age (no tool in this repository matches an old prefix, so text only), the janitor sweeps no images, one helper per test language with the guard checking the token constants, `RUNNER_TEMP` is job-scoped and no `raw-temp` finding (the guard never matched it; a test now pins that), the CI owner pid only for a resource that outlives its step, a workflow `services:` container is the §6(b) shape, `--rm` acts when the container stops, no resource at module load, a child that makes its own temp paths is handed an owned folder, and a store with no lock of its own is lock-owned on one lock server. The one behaviour change is the token check: `leftovers-check.mjs` finds every `REPO_TOKEN` / `RepoToken` constant by shape in the tracked source files (`.mjs .cjs .js .ts .cs .sh .ps1 .py .rs`, comments skipped, `tools/lib` included because the helper lives there) and reports class `token` when two differ or one is not a row of the table that names this repository (RED: two helpers holding `conventions` and `other` were `clean`).
 
 Also in the integration: `leftovers-check.mjs` covers `docker compose -p`/`--project-name` (global options only; `-p` after the subcommand is `--publish`) and `COMPOSE_PROJECT_NAME`, and C#'s `Directory.CreateTempSubdirectory` and `Path.GetTempFileName`; `leftovers-sweep.mjs` judges an orphan claim (`<name>.owner` with no folder, left by a helper that claims first) by its owner instead of by age alone; the token check proves the token BELONGS to this repository (the `## Tokens` row of `REPO_TOKEN` must carry `REPO_ROW`, the helper's statement of which row is this repository's; no identity fails closed — the table holds descriptions, not repository names, so the identity is that constant); the rule's contract text gained the DNS host name and its normalisation, the CI owner pid, the claim-first folder variant, the old-prefix end date and the janitor's `--token` and `JANITOR_MIN_AGE_MINUTES`.
+
+## `path_tasks` and gate provenance (rule-parity E1.S1)
+
+`tools/rules.test.mjs` gains eleven cases beside the original 24 (unchanged, `normalized.filter(file=>match(file))`
+mutation included). Selection: a gated rule is selected by its paths only with a task inside its gate (a task outside, no
+file, a non-matching file, two gate tasks in one reason); an ungated rule with the same paths is unaffected; plain
+`tasks` and dependencies ignore the gate. Metadata: the six refusals (no `paths`, `paths: []`, an empty list, an unknown
+task, a string, a `load: always` rule) and a repeated task (`path_tasks must not repeat a task`, so a selection reason names each
+task once). `explain` shows `path_tasks` on every rule with the same ids and bytes. The
+provenance cases cover `provenanceFindings` (mirror equal / different tasks / path-only source, declared with a short
+reason or a different set, both or neither key, an absent rule's record before and after its epic lands, the real
+catalog with `gates: {}`).
+
+Observed RED: with the module missing the file does not load; with a stub module the 24 old tests pass and eleven fail
+on `unknown metadata key path_tasks`. Mutations, one at a time, each red in the named case: dropping the gate filter
+fails the selection, ungated-sibling, dependency and explain cases; dropping the `needs paths` check fails the refusals
+case; dropping the CLI field fails the explain case; dropping the set comparison fails the two provenance mirror cases.
+
+Not proved: that any real rule is correctly gated. No real rule carries `path_tasks` in the first epic; the selection
+baseline (`research/selection-matrix.json`) is the control that a later gate does not drop a rule from a scope silently.
+
+## The selection baseline (rule-parity E1.S2)
+
+`tools/selection-matrix.test.mjs` (nine cases) and the new cases of `tools/rules.test.mjs`:
+
+- The committed `research/selection-matrix.json` equals what `render(catalog)` produces from the real catalog, byte for byte.
+- Every rule of the catalog appears in the id list of at least one recorded scope. Mutation: restoring the file from before
+  `App.sln`, `api/a.http`, `common/testing.md`, `pr` and `policy` were added names `common.pull-requests`, `common.rule-ownership`
+  and `csharp.dotnet-build`; a scratch `path_tasks: ["audit"]` on `common/http-contracts.md` moves `inspect api/a.http` and eight more scopes.
+- The file holds the 165 scopes once each in the tool's order, sorted unique ids, exactly the 22 pins (9, 4, 5, 4 per
+  single-read task), a reason of at least 10 characters on every other single-read scope, and no `ui` scope with a language
+  file on the list (D5).
+- A copy of the corpus with `tasks: ["dependencies"]` removed from `csharp/nuget-packages.md`: `idDrift` names
+  `dependencies (no file)` and `csharp.nuget-packages`, while `drifted` of the body freeze answers `[]` — the point of D12.
+- The tool on a copy: exit 0 `in step`; after a hand edit exit 1 naming the scope; `--write` restores the committed bytes and
+  leaves no `.tmp`; `--bytes` equals `bytesTable`; an unknown argument is usage, exit 2.
+- The 22 pins are named as a literal list in the test, independent of the tool's own table: swapping a pinned scope for an unpinned one of the same task keeps every count green and fails that list.
+- `gates` is `{}` (E1 declares nothing); the test is renamed when the first epic writes a record.
+- `rules.test.mjs`: every pin (read from the matrix file) selects at most 32,768 B (the original test name kept); every cap
+  of `CAPS` holds on the real catalog; a cap is red one byte over, for the core, for a rule, and for a rule capped from an
+  epic that has not landed (`typescript.doctrine`); `caseFindings`: a gated rule whose only positive is selected by its
+  `tasks:` line (task `audit`, a `.cs` file) has no positive through the gate, one finding; the selection fixture of a positive and the defined
+  negatives passes, each missing negative and a case the selector contradicts is one finding, an ungated mirror needs its
+  no-path negative, an unknown task or a non-root-relative file is a finding.
+
+Observed RED: both files fail to load while the tool is missing. Mutations, each red in the named case: deleting one id from
+the recorded file (the byte-equality case and the tool case); pinning `inspect package.json` (the pins case, 35,409 B, and
+the 22-pin count); pinning `ui ui/a.ts` (the pins case, D5, while the one-read test stays green); lowering the core cap to
+15,054 B (the cap cases).
+
+Not proved: that the 165 scopes are the right ones (they are the representative file sets of the plan, not every path), that
+a pinned scope is the best list, or that a gate record's cases are sufficient for a rule's whole path list.
+
+## The allowances and the empty gate schema (rule-parity E1.S5)
+
+Two additions to the selection baseline's tests. `the selection matrix carries no gate declaration at E1` asserts the
+recorded `gates` and the tool's `GATES` are both `{}`: E1 ships the schema and the check, every record is written by the epic
+that lands its file, and the test is renamed when the first one is (the comment says what it becomes). `the allowances
+section of research/module_rules.md states every cap the tests enforce` reads the `## Byte allowances per epic` section and
+fails when a cap of `CAPS` is missing from it or an epic E2 to E6 has no row.
+
+Observed: the allowances case failed while the section did not exist, and after the section was written failed again when
+the core's cap was changed to 15,350 B in the prose only; writing one gate record into `GATES` and regenerating the file made
+the no-declaration case red. Not proved: that the interim ("after E3") numbers are what the epics will measure; they are the
+plan's estimates, and each epic replaces them with `--bytes`.
+
+## The parity matrix and inventory (rule-parity E1.S3)
+
+`tools/parity-matrix.test.mjs` (twelve cases) over the two data files and `parityFindings`:
+
+- The real files: 31 entries and 31 rows, one to one, no finding against the catalog, the section records and
+  `LANDED_EPICS`; every row `planned` or `deliberately-absent` (P8, R4, R5, G4, G5); the present side of P8, R4 and R5 is
+  accepted only on a deliberately-absent row, and a row-level `suppression` or a reason on the wrong row is a finding.
+- The real-row proof (its delivery sets are asserted equal to the real P2 and P3 rows of the matrix), on an owned folder holding the real C# doctrine, the always core, a TypeScript doctrine with E3's planned
+  front matter, a compiler-strictness rule and a fixture check tool: P2 and P3 as `equal` rows pass the union on source and
+  manifest scopes, and the same rows without the TypeScript source-file statement fail, naming the task and the pair.
+- P4 may be `stronger-ts` with a reason; P2 may not.
+- An equal row naming a missing rule or a missing section is one finding each; a planned row with no epic, with `E9`, or with a
+  side planned for `E1` is one finding each; an entry with no row, a row with no entry, two rows, a different status or epic,
+  or a deliberately-absent row with a reason is one finding each; a planned row of a landed epic is a finding.
+- Heading inheritance on the real sections: `MUST` on a subsection of the reliability rule (its H1 is marked) passes and
+  `SHOULD` there is a finding; `SHOULD` on a section of the testing rule passes and `MUST` there is a finding.
+- An active side against reality: a `selectors` list that is not exactly its delivery ids (an empty list is a finding), a selectors item that differs from the front matter, a check tool that does not list a
+  delivery id, a hook naming no file.
+
+Observed RED: with the data files absent the real-file cases fail with the test's own message. On the real files, giving P10
+an active shape with the delivery `common.testng` failed naming P10; dropping P13's epic failed naming P13. Replacing the
+union by an intersection failed the P2/P3 proof, the missing-rule case and the reality case.
+
+Not proved: that any real row is correct once it is active (none is in the first epic); the first real-catalog proof is the
+third epic's. The correspondence pairs are the plan's file sets, not every path a language can name.
+
+## The move verifier (rule-parity E1.S4)
+
+`tools/moved-blocks.test.mjs` (nineteen cases) runs in an owned git repository with a ten-line source (`é` on line 3, an
+indented line 4, a fence on lines 8-10) and a destination:
+
+- Baselines record the exact range (the commit as 40 hex, `é` as two bytes, a single line as `N-N`); a range that starts or ends
+  inside the fence is refused with the fence message and the whole fence is recorded; a column range and every other form is
+  refused naming E1.S0b; lines past the end, an unknown commit, an existing id and a bad epic are refused, and a refusal writes
+  nothing. `fenceDepth` (added to `tools/lib/rule-body.mjs`) has its own case, including a longer fence not closed by a shorter run.
+- An unchanged block is activated (the destination lines found in the working tree) and verifies after the move commit; a
+  changed block is superseded, the new entry carries `justifiedBy` and `justifiedFiles`, and the old entry gains `supersededBy`
+  and no other byte changes; a justifying commit that also touches another file or is a merge commit, a different epic from the baseline's, a missing flag, and a destination holding the
+  old words are each refused or a checker finding.
+- The checker: an unpaired baseline survives two lines inserted above it and fails on one changed byte or a landed epic; an
+  activation is one finding each for the block twice, mid-line, changed, absent in the destination, or left in the source;
+  two activations, an activation with a supersession, and a dangling reference are one finding each.
+- Append-only: a hand-formatted first entry is still byte for byte there after a fourth is appended. A copy of the fixture with
+  no `.git` gives the same findings. The real manifest holds exactly the 25 baselines, none activated, with F8's byte lengths in
+  F8's order; the tool prints `moved-blocks: OK — 25 baseline(s), 0 activated, 0 superseded`.
+
+Observed RED: the module missing. Mutations, each red in the named case: dropping the fence check (the fence case); accepting
+column ranges (the mid-line case and the command-line case); judging an unpaired baseline by its line numbers (the
+unpaired-baseline case); dropping the `justifiedFiles` check (the supersession-refusal case); re-serialising on append (the
+append-only case); changing one byte of line 110 of the reliability rule (the real-manifest case, naming `reliability-timeout`).
+
+Not proved: that no entry was edited after it was written (the diff and the review are the control); that a block moved to a
+destination keeps its meaning there (only its bytes).
+
+## The two lock fixtures and their required job (rule-parity E1.S4b)
+
+`tools/lock-fixtures.test.mjs` (five cases) over `tools/fixtures/locks/` (about 1.2 KB). Each fixture is copied into an owned
+folder and its commands run with a cleared environment plus `PATH`, its own `HOME`, npm cache and NuGet cache, so nothing is
+written to the checkout or to the real caches.
+
+- **npm.** `package.json` asks `picomatch` 4.0.6 and `package-lock.json` says 4.0.7: `npm ci --ignore-scripts --offline` exits 1
+  with `EUSAGE` and `lock file's picomatch@4.0.7 does not satisfy picomatch@4.0.6`, and installs nothing. The same project with
+  an honest lock installs, so the refusal is the lock's. **Deviation recorded:** the 4.0.6 is a local stub
+  (`file:./picomatch`) rather than a registry version. Resolving a registry spec needs its packument, which a cold npm cache
+  does not have offline (`ENOTCACHED`, measured here with an empty cache; the refusal the plan probed came from a warm
+  cache), while a local directory resolves from disk and the refusal text is identical.
+- **NuGet.** Two projects restored with a lock file; a project reference then makes the lock stale. A locked restore exits 1
+  with `NU1004`, `--force-evaluate` exits 0, a locked restore exits 0. No package source is contacted (a project reference, no
+  package). The SDK is the one `global.json` asks for.
+- **The case never goes quiet.** The SDK is probed inside the copied fixture, where `global.json` applies, so an image that
+  carries only other SDK bands counts as having none. With no compatible SDK the case is a failure under `CI` (`dotnet SDK
+  missing under CI — the NU1004 fixture must run here`), a named skip otherwise, and a named skip whenever `LOCK_FIXTURES_JOB`
+  is set. The jobs that run the whole suite without pinning the SDK (`Selftest` in `tools · selftest`, and the coverage step of
+  `SonarCloud Scan`) set that variable; the runner image ships .NET 8, 9 and 10 but not necessarily the fixture's band. So the
+  NuGet case runs only in the `tools · lock fixtures` job (`actions/setup-dotnet` pinned by sha, the SDK taken from the
+  fixture's `global.json`). A test reads the workflows and the protection file: the job, the sha pin of every `uses:`, the
+  variable in each suite-running step, the variable ABSENT from the workflow-level env, the locks job env and every locks step
+  env (so the required job can never skip its own case), and the context on `release` and not on `main`. The children get
+  `TMPDIR`, `TEMP` and `TMP` in an owned folder, so the SDK's scratch files never reach the shared temp root.
+
+The job runs on every push and pull request. It is required on `release` only, in `.github/branch-protection.json`; applying
+that file (`node .github/scripts/branch-protection.mjs --apply`) is an administrator's action after the job has reported once,
+because a required check that never reports blocks every merge. `node .github/scripts/branch-protection.mjs --selftest` stays
+green.
+
+Observed RED: both fixture folders missing (the test's own message). Mutations, each red: no project reference added (the
+stale restore returns 0, the NuGet case fails); the npm lock set to 4.0.6 (the refusal text changes, the npm case fails);
+`dotnet` removed from `PATH` with `CI=true` (the NuGet case fails with the SDK message), without `CI` (a named skip), with
+`LOCK_FIXTURES_JOB` set (a named skip).
+
+Not proved: a consumer's real lock (that is the dependency epic's policy and the final epic's remediation); that the job
+reports green on GitHub (it is observed on the pull request, not here).
+

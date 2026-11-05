@@ -100,7 +100,7 @@ export function run(argv,installedRoot=sharedRoot) {
   const selected=options.command === "check" ? catalog : selectRules(catalog,options.tasks,options.files);
   for(const id of options.only) if(!selected.some(rule=>rule.id===id)) throw new Error(`--only ${id} is not selected for this scope`);
   const emitted=options.only.length?selected.filter(rule=>options.only.includes(rule.id)):selected;
-  const rules=selected.map(({id,file,hash,bytes,load,paths,tasks,depends,reasons})=>({id,source:path.relative(repo,file).replaceAll("\\","/"),hash,bytes,load,paths,tasks,depends,reasons}));
+  const rules=selected.map(({id,file,hash,bytes,load,paths,pathTasks,tasks,depends,reasons})=>({id,source:path.relative(repo,file).replaceAll("\\","/"),hash,bytes,load,paths,path_tasks:pathTasks,tasks,depends,reasons}));
   const manifest={status:"resolved",advisory:true,repo,version,tasks:options.tasks,files:options.files,
     instructions:instructions.map(({text,...item})=>item),rules,
     bytes:selected.reduce((sum,rule)=>sum+rule.bytes,0),

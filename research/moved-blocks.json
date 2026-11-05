@@ -1,0 +1,252 @@
+[
+  {
+    "id": "testing-runner",
+    "status": "planned",
+    "epic": "E6",
+    "source": "common/testing.md",
+    "lines": "12-31",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "ba26375c5c637bdf86b5e58332916cdcc61f557f4ccac4be639879bacf0f4f92",
+    "length": 1113
+  },
+  {
+    "id": "testing-runner-rust",
+    "status": "planned",
+    "epic": "E6",
+    "source": "common/testing.md",
+    "lines": "32-33",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "c6fd6e8ff2c5f6bf61cfda2a3de492c0e84a44217d0e5673a79fd5d80d3aedcb",
+    "length": 116
+  },
+  {
+    "id": "testing-architecture",
+    "status": "planned",
+    "epic": "E6",
+    "source": "common/testing.md",
+    "lines": "355-359",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "aa8fb598a67e1621374bed0660afbc38c3cfec2c876080f5269070f136f9a2bc",
+    "length": 252
+  },
+  {
+    "id": "reliability-scope",
+    "status": "planned",
+    "epic": "E5",
+    "source": "common/reliability.md",
+    "lines": "49-54",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "033ac2db7a4a0af89ac47384de6c5059837ddbc0ca8844524e681115229f5184",
+    "length": 433
+  },
+  {
+    "id": "reliability-fire-and-forget",
+    "status": "planned",
+    "epic": "E5",
+    "source": "common/reliability.md",
+    "lines": "55-59",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "8884f72d7305a2c2656021cc266a947e9d7df4013fa47de697c2d13c8952af66",
+    "length": 436
+  },
+  {
+    "id": "reliability-sweep-at-start",
+    "status": "planned",
+    "epic": "E5",
+    "source": "common/reliability.md",
+    "lines": "66-69",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "ebbac16bf0cb6e5bc5c558527987cbc8ee464964b76449d534034e206aa684c8",
+    "length": 375
+  },
+  {
+    "id": "reliability-token",
+    "status": "planned",
+    "epic": "E5",
+    "source": "common/reliability.md",
+    "lines": "97-98",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "75299177e4b813442812447fd8fe9d6e95dace1034d6914136c32048d1a5b429",
+    "length": 160
+  },
+  {
+    "id": "reliability-signals",
+    "status": "planned",
+    "epic": "E5",
+    "source": "common/reliability.md",
+    "lines": "99-102",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "2ebce9e1f3d7df7456bd9c8b5b3e494a02545cd9f69a836f7ff550626917529e",
+    "length": 322
+  },
+  {
+    "id": "reliability-timeout",
+    "status": "planned",
+    "epic": "E5",
+    "source": "common/reliability.md",
+    "lines": "104-133",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "cbc81dca5b19712dbcbad8b1f7435f12f634b1f4820e6b167dbc33e6e843dee3",
+    "length": 1698
+  },
+  {
+    "id": "logging-colour",
+    "status": "planned",
+    "epic": "E6",
+    "source": "common/logging-serilog.md",
+    "lines": "61-90",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "823566f2e211476ab9e3415c3e28886eb5017f3d661e4aa546a90b2e3916715a",
+    "length": 1640
+  },
+  {
+    "id": "logging-shape",
+    "status": "planned",
+    "epic": "E6",
+    "source": "common/logging-serilog.md",
+    "lines": "153-171",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "986a0996114d1ac9574ef659f8d5d4ae572abc2c7f583c911580239302f8581c",
+    "length": 497
+  },
+  {
+    "id": "logging-rust",
+    "status": "planned",
+    "epic": "E6",
+    "source": "common/logging-serilog.md",
+    "lines": "172-187",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "1478a2b6648cab7e075d990768034526f8564d70afc2ccd4d2e56df8486c3d7e",
+    "length": 875
+  },
+  {
+    "id": "utc-csharp-fence",
+    "status": "planned",
+    "epic": "E6",
+    "source": "common/utc-timestamps.md",
+    "lines": "41-47",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "51d73eaa03af399a33b568718f20dc9386a8f5842c9a7d5227c8bbe7749a2f66",
+    "length": 311
+  },
+  {
+    "id": "utc-rust",
+    "status": "planned",
+    "epic": "E6",
+    "source": "common/utc-timestamps.md",
+    "lines": "65-69",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "fde30c167bdfaa0e0ac6eb44bee4f7e8db5e74f7f5dbae6328e8f8edf538a0b7",
+    "length": 219
+  },
+  {
+    "id": "ts-script",
+    "status": "planned",
+    "epic": "E4",
+    "source": "typescript/doctrine.md",
+    "lines": "15-48",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "67edf8f65d6c71829d4d988a25658074de114415cda39a4bbb8ed835c26957e0",
+    "length": 2016
+  },
+  {
+    "id": "ts-backtick",
+    "status": "planned",
+    "epic": "E4",
+    "source": "typescript/doctrine.md",
+    "lines": "49-65",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "d829ccb967c4e4a315064f8a14af4c154d272186df8c77aa7801ca92a0c100b5",
+    "length": 755
+  },
+  {
+    "id": "ts-cast",
+    "status": "planned",
+    "epic": "E4",
+    "source": "typescript/doctrine.md",
+    "lines": "66-79",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "3d3e3eb150576a6f5079c8b098c30b737c5161debbb131a1740ff0e9873c08a8",
+    "length": 932
+  },
+  {
+    "id": "ts-tsc",
+    "status": "planned",
+    "epic": "E4",
+    "source": "typescript/doctrine.md",
+    "lines": "80-97",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "c16a8fd55572820d1ed7296b608a6999ece4d5169c5afbf900d413cebe8f55e8",
+    "length": 1151
+  },
+  {
+    "id": "ts-script-box",
+    "status": "planned",
+    "epic": "E4",
+    "source": "typescript/doctrine.md",
+    "lines": "100-101",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "2e2fc8bd3cd5dfeb3381e73ce896d738ba53f0a90d6e977a21455af0c9fdb75a",
+    "length": 166
+  },
+  {
+    "id": "ts-boxes-testing",
+    "status": "planned",
+    "epic": "E4",
+    "source": "typescript/doctrine.md",
+    "lines": "102-105",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "5b71f4d699686a28c91cc8d89cb542e43aa082ef7e183ff57750f5465bb04fd9",
+    "length": 278
+  },
+  {
+    "id": "nuget-before",
+    "status": "planned",
+    "epic": "E2",
+    "source": "csharp/nuget-packages.md",
+    "lines": "12-23",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "02b48389eec06b303afb79e058a8d6aa67441bde1f07568e17e8a29de2760179",
+    "length": 824
+  },
+  {
+    "id": "nuget-licence",
+    "status": "planned",
+    "epic": "E2",
+    "source": "csharp/nuget-packages.md",
+    "lines": "25-29",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "5efe50eb81d08e2f06786d8f3170e42604e8e470c9bf2bc8b860261e9eb729da",
+    "length": 334
+  },
+  {
+    "id": "nuget-bumping-heading",
+    "status": "planned",
+    "epic": "E2",
+    "source": "csharp/nuget-packages.md",
+    "lines": "39-39",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "6acf61e0ba72c88a71a7c46fabc07048576f4cc119987ec298ef68e836eb18b7",
+    "length": 11
+  },
+  {
+    "id": "nuget-bumping-cadence",
+    "status": "planned",
+    "epic": "E2",
+    "source": "csharp/nuget-packages.md",
+    "lines": "43-45",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "ec1a943341e3c3cdbfd8f17f0158430f5f8e660853119757ade4bd5a5afb1775",
+    "length": 187
+  },
+  {
+    "id": "nuget-prefer",
+    "status": "planned",
+    "epic": "E2",
+    "source": "csharp/nuget-packages.md",
+    "lines": "52-56",
+    "beforeCommit": "48124774fa793a49b5660ae39f0e5701a293eb14",
+    "sha256": "9da0b9b0a1a26bcf67c31d7c96ffa33eeb3d030be1ac0d099abd45b95ab4f91f",
+    "length": 286
+  }
+]

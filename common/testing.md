@@ -30,7 +30,8 @@ Runner flags are xUnit v3 MTP syntax — **not** VSTest (`--filter "FullyQualifi
 | Global timeout | `--timeout 5m` |
 
 The Rust sidecar runs `cargo test` — the executables-only rule is about the VSTest mismatch and is
-.NET-specific. Everything below applies everywhere.
+.NET-specific.
+Everything below applies everywhere.
 
 ## Every feature ships with tests, in the same task
 
@@ -313,6 +314,42 @@ through the transport that matters. One line in the release job, on every platfo
 and where a platform's binary cannot be executed on the runner, the skip is explicit and reasoned, not
 an absence.
 
+## A runner bounds what a test file may start, and a shim never resolves to itself
+
+Measured 2026-11-02, in one repository here: a test put an interpreter shim in front of `PATH`, then
+looked the "real" interpreter up through that same `PATH`. The first call was fine; the second found the
+shim installed a moment earlier, which ran itself without end — about 15,900 processes, and the session
+died with them. No ceiling on a test file's TIME catches this; the machine goes first.
+
+Where a repository runs its tests through a runner of its own, or a test puts a shim on `PATH`:
+
+1. **The runner bounds the processes of each test file, and reaching the bound FAILS the file** with a
+   message that names the bound. On Linux the kernel limit (`RLIMIT_NPROC`, `ulimit -u`) counts every
+   THREAD of the whole user — concurrent runs, editors, everything else the user has open share it — so
+   the cap is the user's count at the start of the run plus a headroom: enough for what else the user
+   runs while the file does, and small enough that the machine survives reaching it. That limit alone
+   is not per file, and nothing names the bound at it: the fork is refused, and what the program does
+   then is its own. A watch on the file's own session is what makes the bound per file — the file
+   starts in a session of its own, or "its session" is the runner's — and it fires well below the
+   headroom, or the kernel limit comes first and nothing names the bound. Only that session is ever
+   signalled.
+2. **A shim resolves the program it wraps once, at its FIRST install, with its own folder removed from
+   the lookup, refuses a result inside that folder, and bakes the result in** — comparing REAL paths,
+   because a folder reached through a link is the same folder and a spelling compare lets it through.
+   A later install keeps what the first one baked, and a shim never looks the program up at run time:
+   two shims that re-resolve can bake each other, and real paths pass. Setup that runs twice is normal.
+3. **The repository that owns the runner proves the bound** with a guarded fixture that forks without
+   end: the file fails, the message names the bound, and the user's process count comes back. The
+   fixture lives outside the folder the runner discovers, and it refuses to start unless told to AND
+   the cap in force is the runner's own and enforced (so not under root or the exempting capabilities)
+   — a distribution's default is enforced too, and reaching it is the incident.
+
+What this does not give: a descendant that calls `setsid` is never counted or ended by the watch, so
+nothing fails the file for it, only the kernel cap bounds it, and it outlives the run; root, and the
+capabilities that exempt a process from `RLIMIT_NPROC`, have the watch alone, and so does a platform
+without such a limit — weaker, not equal, which is why the fixture refuses there; and the formula is the
+shape one repository used, not a number this rule's tests verify.
+
 ## Every bug fix starts with a RED test (MANDATORY)
 
 The order is fixed — never fix first and test after:
@@ -381,3 +418,6 @@ is a red build. Do not relax it to make a reference convenient — the reference
 - [ ] No test asserts that a delegated option was SENT as though that were evidence it takes effect.
 - [ ] Any flow added in this task shipped with its scenario test, and `research/module_tests.md` names it
       — [scenario-tests.md](scenario-tests.md).
+- [ ] A runner of the repository's own bounds each test file's processes and FAILS the file at the bound;
+      a shim on `PATH` resolves the program it wraps outside its own folder, by real path, at install; the
+      repository that owns the runner proves the bound with a guarded fixture outside the folder it discovers.

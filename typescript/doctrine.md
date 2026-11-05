@@ -30,13 +30,13 @@ calls, and that also closes `<!--`. Never a hand-rolled `.replace()` at the call
 second helper beside the first: that is how the second instance happened, and two escapers drift
 while both look correct.
 
-**Three instances, three different people, one of them shipped.** `webauthnPrf.ts` escaped by
-hand; `entityFormScript.ts` did not; `depPickerScript.ts` reintroduced it in new code written
-*beside* the fix for the previous one — and that build was cut, installed and running against a
-real vault for an hour before it was found. The values were folder and entry names arriving from
-a **synced** vault, so it was never bounded by what the local user types.
+**Three instances, three different people, one of them shipped.** One module escaped by hand; a
+second did not; a third reintroduced it in new code written *beside* the fix for the previous one
+— and that build was cut, installed and running against a real credential store for an hour
+before it was found. The values were folder and entry names arriving from
+a **synced** credential store, so it was never bounded by what the local user types.
 
-**The rule is enforced, not remembered.** `scriptInterpolation.test.ts` scans every shipped source
+**The rule is enforced, not remembered.** The scan test scans every shipped source
 file and fails, naming file and line, on any `${JSON.stringify(…)}` inside a template literal. A
 new repository that renders a webview copies that test before it renders anything.
 

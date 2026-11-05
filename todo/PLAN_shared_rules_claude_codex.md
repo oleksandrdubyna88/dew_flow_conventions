@@ -4,6 +4,21 @@ paths: ["__conventions_planning_documentation_only__/**"]
 # PLAN — единый источник правил для Claude Code и Codex
 
 > Status: **IN PROGRESS, 2026-09-10.** Scope: общий контракт инструкций, подключение Claude Code/Codex и миграция шести потребителей conventions. Resolver и self-host bootstrap написаны; rollout ещё не выполнен.
+>
+> Progress, 2026-11-04 (read from each repository's default branch, `AGENTS.md` present or not): migrated —
+> `dew_flow_connect_other_ais`, `dew_flow_benchmark` (#113), `dew_flow_vscode_kit`, `wsl_care`, and `dew_flow_rag_qln`
+> (its PR #83, on the owner's request, entry 1.1); not migrated — `dew_flow_mcp`, `dew_flow_sidecar_rust`,
+> `dew_flow_creds_for_devs`.
+
+## Plan changes
+
+> Epoch 1 · approved 2026-09-10 · by reviewers · state: open
+
+- 1.1 · 2026-11-04 · owner · build-order — dew_flow_rag_qln migrates before dew_flow_mcp, dew_flow_sidecar_rust and dew_flow_creds_for_devs, not last
+  (Stage 3 said rag_qln is checked last, because it pins some of the others as submodules. The owner asked for its
+  entry on 2026-11-04: the loader refused the repository and every session there read rules by hand. Its pins do
+  not depend on the siblings' layout; its migration PR built and tested green with them unmigrated. This plan was
+  approved before the change-control rule reached this repository, so this entry opens its ledger.)
 
 ## Execution journal — 2026-09-10
 

@@ -23,7 +23,7 @@ const EMPTY = Symbol("empty mount folder");
 const STALE = Symbol("stale mount");
 
 function consumer(t, mount) {
-  const root = ownedDir(t, "low-priority-preload");
+  const root = ownedDir(t, "lowprio-preload");
   fs.mkdirSync(path.join(root, "scripts"));
   assert.match(template, MOUNT_LINE, "the template must keep exactly one MOUNT line for consumers to edit");
   fs.writeFileSync(path.join(root, "scripts", "lower-priority.mjs"),

@@ -40,9 +40,11 @@ source hashes prove identical model behavior or erase higher-priority instructio
    Check BEGIN/END boundaries and the hash. If your host truncates output, read that source
    in smaller consecutive ranges until complete. Never interpret truncation as full reading.
 7. Dependencies are mandatory even when their own paths/tasks do not match. Selection is
-   paths OR tasks, plus always rules and transitive dependencies, deduplicated by id.
-   Metadata in each rule is the only selection source; todo, research, fixtures and tool
-   comments are not policy catalogs. Local rules belong in `.agents/rules` with `local.*` ids.
+   paths (optionally gated by `path_tasks`) OR tasks, plus always rules and transitive
+   dependencies, deduplicated by id. A rule with `path_tasks` is selected by its paths only
+   in a scope that also names one of those tasks. Metadata in each rule is the only
+   selection source; todo, research, fixtures and tool comments are not policy catalogs.
+   Local rules belong in `.agents/rules` with `local.*` ids.
 8. Repeat selection and read newly needed sources **before** expanding to another language,
    file or task. After compaction, a new session, or a changed SHA/scope, re-read the entry,
    project and selected rules. No persistent read-cache is trusted. On another repository,
