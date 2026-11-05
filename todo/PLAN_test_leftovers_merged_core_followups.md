@@ -846,6 +846,14 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   creds' E2.5 merges if that is earlier — the owner confirms or moves the date (the rollout's § *Epoch 6*, item 7, question 3).
   Until it ships, every consumer's Node compliance declaration says in its PR that `legacy-name` and `owner-blind` are
   "zero whole literals, F30 open", and runs the interim scan with its output recorded.
+- **Re-measured by the epoch-6 judge (2026-11-05, `scanText` at `bd795847`; the brief's exact lines are not recorded).** The brief's table holds 16 spellings, not 15
+  (2 found, 14 not). The count depends on the line: `/testsToDelete[-_]/i` and `new RegExp('^testsToDelete[-_]')` answer `owner-blind` (the classifier's anchors), and the
+  bare word, the bare prefix or a `?` glob on a line with `rmSync` answer `owner-blind` too (its deletion reading); with no removal on the line the `?` glob and
+  `new RegExp('testsToDelete[-_]')` answer `[]`. What no line of this measure found: a split over `+`, `.concat`, `.join('')`, a template hole, `\u`, `\x`, a one-character
+  class, half of the word, and `rmSync` over a joined prefix. So "2 of 15" is a count of one set of lines, and the fixture of the Fix and of the Definition of Done must name its
+  lines. The Fix as written also leaves some of them at `[]`: folding changes nothing for a bare word or an unanchored regex string with no removal on the line; they need the C#
+  template's `BareWordHits` reading as well. The piece rule of the Fix (`sto` or `tod`) is the S6 brief's, stricter than the C# template's `PrefixPieces`, which gives false
+  positives on product words (the brief's measure); "as the C# template does" holds for the class, not for the pieces.
 - **State.** Open. Not a prerequisite of E5's producer PR (the rollout's entry 5.2, option C); covers coai and creds; E6 and E7
   read it before their first Node compliance declaration.
 
