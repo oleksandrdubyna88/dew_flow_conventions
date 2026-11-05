@@ -1,6 +1,6 @@
 # PLAN — F30: the shipped Node guard reads a prefix in the spellings it lists
 
-> Status: **epoch 2 open, 2026-11-05: the owner approved the narrowed plan; the rebuild is next.** The item is F30 of `todo/PLAN_test_leftovers_merged_core_followups.md`. Owner: this repository. Deadline 2026-11-19, or before creds' E2.5 merges if that is earlier. Not a prerequisite of coai's E5 producer PR.
+> Status: **epoch 2 open, 2026-11-05: the owner approved the narrowed plan; the rebuild is done on `feat/f30-folding-reader` (RED first, the mutants, the step counts and the real-tree record in `research/2026-11-05_f30_folding_reader.md` § 7), awaiting the code gate, an independent Opus review, the PR and one release.** The item is F30 of `todo/PLAN_test_leftovers_merged_core_followups.md`. Owner: this repository. Deadline 2026-11-19, or before creds' E2.5 merges if that is earlier. Not a prerequisite of coai's E5 producer PR.
 
 ## Plan changes
 
@@ -121,11 +121,11 @@ This measure reads literals by a rough regular expression. It is evidence for th
 
 ## Definition of Done
 
-- [ ] D5's checks RED on the old guard and GREEN on the new one, with the mutants recorded.
-- [ ] Every test of this repository green; `plan-lifecycle` clean.
+- [x] D5's checks RED on the old guard and GREEN on the new one, with the mutants recorded.
+- [x] Every test of this repository green; `plan-lifecycle` clean.
 - [ ] The real-tree record on the PR: nine consumers, default branches, each new finding listed and read, each lost finding explained, CI activation stated.
-- [ ] `common/test-leftovers-detail.md`, the guard's header and `research/` say what the guard reads and what it does not, and name D2's table.
-- [ ] F30's entry says what shipped, with the piece rule and the class, for the template's owner.
+- [x] `common/test-leftovers-detail.md`, the guard's header and `research/` say what the guard reads and what it does not, and name D2's table.
+- [x] F30's entry says what shipped, with the piece rule and the class, for the template's owner.
 - [ ] The real-tree comparison re-run immediately before the release, with its commits recorded.
 - [ ] One release; the consumers' fixes merged first; the pin bumps, each alone; each consumer that declared "zero whole literals, F30 open" runs the guard again at the new pin and records the result.
 

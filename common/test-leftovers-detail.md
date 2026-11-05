@@ -272,8 +272,9 @@ least ten characters and three words and not a placeholder (*needed*, *see above
 `shared-store` it carries `lock:`. A reason-less, class-less or unknown-class exemption is a finding of class
 `exemption`.
 
-**The Node guard folds one line (F30).** Before `legacy-name` and `owner-blind` it joins and decodes the string literals of the line (`+`, `.concat`, `.join`,
-`\u`, `\x`, `[T]`, touching shell quotes, PowerShell `-join`) and also refuses a bare word or a piece of 6 characters. It never follows a variable, a later line or run time.
+**The Node guard reads the spellings of one line (F30).** Its header lists what it reads. `legacy-name` and `owner-blind` see a line's string literals joined and decoded,
+comments removed; the bare word and the half word (a piece of 6 or more characters in the word's own form) are `legacy-name`, and a bare word with a pattern after it is
+`owner-blind`. A zero is zero for those spellings only.
 
 **The `raw-temp` baseline — a second pass, for that one class only:** one ratcheting file may carry the `raw-temp`
 sites of a runner that makes an owned, claimed run folder (§2). Its full definition is the companion
