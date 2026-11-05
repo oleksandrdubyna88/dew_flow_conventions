@@ -911,7 +911,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - **What it does.** On every Windows CI leg the audit's claim scan sees nothing, so an unregistered claim or folder does not turn that leg red. No leftover stays there: a hosted runner's machine ends with its job, and the owner's Windows machine runs no E2 or E5 tests, for now. A person who runs a suite in an elevated Windows shell keeps what a killed run leaves, until that person removes it.
 - **Shape to weigh.** The helper re-owns what it makes to the caller's own SID on Windows (WRITE_OWNER, no privilege; `WindowsOwnership.OwnedByCaller` is the test-side form). It changes the template, every adapted copy and the Node reference. Never widen the key so that `Administrators` counts as the caller: that key is what keeps a folder of another account safe.
 - **The pin to read when this is fixed.** Coai's `AnUntouchedClaim_StaysUnseen_OnAnElevatedWindowsRun`: its assertion on a folder made by the helper goes red.
-- **Owner and date.** This repository, for the template and the rule. No deadline; not a prerequisite of any PR of the rollout (epoch 7, if the owner approves).
+- **Owner and date.** This repository, for the template and the rule. Reviewed, and either fixed or accepted again by the owner, at the first of: E2.3 starts (the next copy of the helper), a suite is to run on a Windows machine that persists, or 2026-12-05. Not a prerequisite of any PR of the rollout (epoch 7, if the owner approves).
 
 ## Definition of Done
 

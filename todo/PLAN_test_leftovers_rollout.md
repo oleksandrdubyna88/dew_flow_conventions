@@ -2166,7 +2166,7 @@ other rows state their condition as before, and the table's "State" cells are re
    limit is a fact a run checks. When F31 changes the helper, that assertion goes red and the text is read again.
 3. **F31**, a new follow-up in `todo/PLAN_test_leftovers_merged_core_followups.md`: on an elevated Windows run the audit's
    claim scan and the sweep's collection share one blind spot. Owner: this repository, for the template and the rule.
-   No deadline, not a prerequisite of any PR here. It lists the shape to weigh (the helper re-owns what it makes) and what
+   Reviewed at item 7's trigger; not a prerequisite of any PR here. It lists the shape to weigh (the helper re-owns what it makes) and what
    must not change (a folder of another account stays safe).
 4. **The brief.** § 11.3's row, § 11.4's child, the new test, R16's RED, § 19's rows on the plant and on the smoke stub
    are revised with this section, on the producer branch. The E5 document's goal, D8 (o), must-not-copy row 6 and its S6
@@ -2202,7 +2202,7 @@ Approve the narrowing: on an elevated Windows run, what a run leaves (killed, or
 a person; the audit's claim scan sees nothing on any Windows CI leg, so an unregistered claim or folder does not turn that
 leg red; and condition (o)'s plant proves the audit's order on Windows with a re-owned claim, the limit pinned by a test and
 F31 written. Recommended: yes.
-Its cost is item 1's paragraph *What this costs in practice*. The other answer is to fix the helper first (F31 as a prerequisite). That changes the
+Its cost is item 1's paragraph *What this costs in practice*. F31 is reviewed, and either fixed or accepted again by the owner, at the first of: E2.3 starts (the next copy of the helper), a suite is to run on a Windows machine that persists, or 2026-12-05 (consultants `30fab21d`: a follow-up with no trigger is where a gap stays; the strongest reason against accepting is the lost signal on Windows CI, not the leftovers). Nothing enforces it; this session tracks it. The other answer is to fix the helper first (F31 as a prerequisite). That changes the
 template, the Node reference and coai's unmerged copy (E2.3, E6 and E7 have not started theirs), before E5 can merge. No CI
 leg leaves anything behind in this state, but every Windows leg audits less because of it.
 
