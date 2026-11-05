@@ -734,6 +734,22 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   The rollout plan's own DoD line for the baseline mirror is ticked from the same record.
 - **State.** Open, the owner's. Found by the Opus judge of the remainder plan's re-review (2026-11-04); it was a gap before the
   hand-over, not one the hand-over made.
+- **Due, 2026-11-05: the values at `bd79584`, awaiting the owner's confirmation.** `release` is at `bd79584`, which carries F24 and F3, so the
+  confirmation is due now. These are computed here and NOT yet confirmed: nothing below says the private sibling holds them. Each value is
+  `git show bd79584:<path> | sha256sum`; each span is the LF text between `<!-- core:begin -->` and `<!-- core:end -->`, computed the way R4's were
+  (the 1872-byte span and the two files marked *same as R4* equal the values R4 recorded, which is the check on the method).
+  - the core span of `common/test-leftovers.md`: 8560 bytes `16b5e6fe2b4b2dba62bc0bce69b9a6bb7395d6f8126788aa844f07666bb047ce`
+  - the two spans of `common/test-leftovers-detail.md`: 27750 bytes `f9aca053d97465a73600af31ec66a146103aa0973c5500dd1432ff25bc1027fb` and 1872 bytes `f136caee10af20c47512c2feda2e749d2495fbd5d04081dee3b244c0d3e2522f` (*same as R4*)
+  - the span of `common/test-leftovers-baseline.md`: 10114 bytes `e1f93f7af81bc0414bb3dfdbd37dd7d5263e68cd6ebd6954ae48921744fb36cb`
+  - the janitor companion's span, `common/test-leftovers-janitor.md`: 14219 bytes `55a0bcc696842f9b2e91cdf5cf6206bf6abdd7f3fe3df3c3728d7cffc246eeef`
+  - `tools/lib/owned.mjs` `a55298df718725d8cdc88f17a7fbd1392a28b7c5b1c63f9a0dae17ac26e3fd32`
+  - `tools/leftovers-check.mjs` `4d5e2bbab5144f2e9137645220f4ba4d0639f3b252c3b863c3cce1ae3c8c2f7c`
+  - `tools/lib/sweeper-scan.mjs` `7f93b14eeffb0642d860ebc2d62a2ba558157b05add0940f464c794fefc1c564` (*same as R4*)
+  - `tools/lib/prefix-bindings.mjs` `34d2b01ab7f2c8fda627aef227909a1af86be1f6c8573860619b851681259e43` (*same as R4*)
+  - `tools/lib/rule-body.mjs` `ca25fbfc2a6ef1beefe6b9323a62a25185db11e60407ef2500ea278afe848d5c`
+  - the rest of what the guard, the scan and the janitor need, read as the import closure of `tools/leftovers-check.mjs` and `tools/sweeper-scan.mjs`: `tools/janitor.sh` `842386b8cd366d701d70e2e72e1cc65ceb003aa7c05388be2e0a858daa02f0c5`, `tools/sweeper-scan.mjs` `afa12ccaa8da4ac65ac0ba055752a44a2fdf47c817f7108659430497662828f8`, `tools/ownership-check.mjs` `7a3fe06089f9b9d27bc0029e064be8e6ee9ae17229752adaf061ecf98bf8a62d`, `tools/lib/git.mjs` `ed0c78156d864106f20694e41dedfb1419ff38e6f03685276bfae0613207c3b5`, `tools/lib/leftovers-cli.mjs` `164b3461f3b4d7e9bb0055fcf6d16933df3ed7da879692be0395702c1c63df9d`, `tools/lib/leftovers-docker.mjs` `524a20d27eed47eb4f6770e073d36fb804e78584bbd912711bf7623c393e09ae`, `tools/lib/leftovers-package.mjs` `e911e83de65253a089f8d5f4fc8d17c627f7f451a035dd80c71050f0781e636d`, `tools/lib/leftovers-shell.mjs` `0fb5348824e9158989cdb72f2ca04d5e62f81c7ea76ce069d525222a2eb6fa2d`, `tools/lib/owned-token.mjs` `a1d2e94e4e087d449069e71b4179d6f9b2c2499460bf1d8c918c1f0e9dc444bc`, `tools/lib/raw-temp-baseline.mjs` `5d7080c84022a6149e32dc2d8b19c85b78b59ffac6d7d7fb1da9fc37f9dbb06d`.
+  - the data files those tools read at run time, which an import closure cannot see (CodeRabbit on #131; the swept method is every `readFileSync` and `.json` in the list above): `tools/fixtures/owner-blind-allowlist.json` `7d729c0a8ca9d1668e2e6187b8e8af33155af4bf5899585165d21193a8bbb3a3` (it decides which lines of `tools/janitor.sh` pass `owner-blind`), `tools/fixtures/owner-vectors.json` `dd47763e6957d3947f758fa92b0878be60670a3437da445eef6afe4ad4eff12c` (the merged-core plan's S6 says the sibling copies it byte for byte). Everything else they read is the consumer's own tree or `/proc`.
+    *Checked:* this repository at `bd79584`. *Not checked:* which of these the private sibling copies (R4 named five and "the other seven" without names, and that list is not in this repository), and the sibling itself (another owner's repository, not on this machine). A later release that changes one of these moves the values; recompute at the release being confirmed.
 
 ## F27 — No family rule bounds the processes a test file may start, or stops a test shim from running itself (found 2026-11-02, the r9700 fork storm)
 
