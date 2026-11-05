@@ -904,6 +904,15 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - **State.** Open. Not a prerequisite of E5's producer PR (the rollout's entry 5.2, option C); covers coai and creds; E6 and E7
   read it before their first Node compliance declaration.
 
+## F31 — On an elevated Windows run the audit's claim scan and the sweep's collection cannot read the run's own leftovers (found 2026-11-05, coai E5's S6; the rollout's entry 6.2)
+
+- **What.** A new file and a new folder of an elevated Windows process are owned by `BUILTIN\Administrators`, not by the caller's SID (measured on the hosted runner: `dew_flow_mcp` #58, and coai run 42026897727's step 0). `Scope.WindowsIsMine` asks for the caller's SID, and the helper makes its claim with a plain create. So a real orphan claim, or an unregistered folder with its claim, is never named by the audit, and a folder a run left (killed, or not removable at its normal end) is kept as `foreign-uid` by every later sweep. The Node janitor and the Node sweep read the same keys or only list on Windows (F16).
+- **Who assumed otherwise.** The rollout's goal ("collected later: by a C# sweep that checks both keys, by the janitor once F9 arms it there, or by a person"), and coai's S6 brief ("red through `Discover`"). The template's source and its plan did say it, for both halves (`Scope.cs:27-28`; `dew_flow_mcp · research/PLAN_test_leftovers_E3.md:672`), and no document of the rollout carried it. A test on Windows that asserts collection re-owns its fixture or hands in an owner seam, so green tests hid the sweep half. The copied comments at `Removal.cs:33` ("left for the start-of-run sweep") read as if it held there too.
+- **What it does.** On a PR's Windows leg (`windows-latest`, measured; a release's `windows-11-arm` is not) the audit's claim scan sees nothing, so an unregistered claim or folder does not turn that leg red. No leftover stays there: a hosted runner's machine ends with its job, and the owner's Windows machine runs no E2 or E5 tests, for now. A person who runs a suite in an elevated Windows shell keeps what a killed run leaves, until that person removes it.
+- **Shape to weigh.** The helper re-owns what it makes to the caller's own SID on Windows (WRITE_OWNER, no privilege; `WindowsOwnership.OwnedByCaller` is the test-side form). It changes the template, every adapted copy and the Node reference. Never widen the key so that `Administrators` counts as the caller: that key is what keeps a folder of another account safe.
+- **The pin to read when this is fixed.** Coai's `AnUntouchedClaim_StaysUnseen_OnAnElevatedWindowsRun`: its assertion on a folder made by the helper goes red.
+- **Owner and date.** This repository, for the template and the rule. Reviewed, and either fixed or accepted again by the owner, at the first of: E2.3 starts (the next copy of the helper), a suite is to run on a Windows machine that persists, or 2026-12-05. Not a prerequisite of any PR of the rollout (epoch 7, the owner's answer, 2026-11-05).
+
 ## Definition of Done
 
 - [ ] Each of F1 to F22, F24 and F25 (F23 is reserved by F3's note for other manifests) is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
@@ -912,6 +921,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - [ ] F29 is closed when, for each of the template and the sidecar, ONE of these holds, recorded under F29: a fix is in, with a Windows test that runs two independent sweep
       PROCESSES and is green; or that side's Windows sweep only lists, by a recorded decision; or a measurement on Windows of that side's OWN call shows a single winner (the
       measurement above is of `Directory.Move`, not of `MoveFileExW`). And F16's Fix either keeps the Node sweep list-only on Windows or meets F29's Node requirement.
+- [ ] F31 is closed when the helper makes what an elevated Windows run can read back, with a Windows test on a natural claim and a natural folder, or when the owner records under F31 that it stays a documented limit.
 - [ ] F30 is closed when the shipped Node guard's folding reader is released with its fixture of the table's spellings, by exact line, RED first and GREEN after,
       the consumers' real trees at their recorded counts, and the consumers that declared "zero whole literals, F30 open" have re-run the
       guard at the new pin and recorded the result; or when the owner records, under F30, that the reader stays a documented limit.

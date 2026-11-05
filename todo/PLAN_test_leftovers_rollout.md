@@ -1,6 +1,12 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 6 open (2026-11-05), approved by the owner after the re-review.** Epoch 5 stopped at entries 5.2 and 5.3; the whole plan was revised (§ *Epoch 6*), the Opus judge sorted epoch 5's work (16 fit; 2 cut, both fixed forward, nothing merged contradicts), the plan gate (session `ff8f7dd0`, 2 findings accepted, 1 rejected with reason) and the interim document gate on the E5 stories document (3 accepted, 1 rejected with reason) passed, a final Opus read's fixes were applied, and because the record says `Narrowed: yes` the owner approved it. F30's date of 2026-11-19 is accepted. All nine pin bumps to `bd795847` are merged. The owner's scan (merge condition (c)) is still open.
+> Status: **epoch 7 open (2026-11-05), approved by the owner after the re-review.** Epoch 6 stopped at entries 6.1 and 6.2; the whole plan was revised (§ *Epoch 7*), the Opus judge sorted epoch 6's work (15 fit; 1 cut, unmerged and fixed forward; 3 outside; nothing merged contradicts), the plan gate on an operative extract, because the plan is over the gate's 256 KiB limit (the first read, session `05d66915`, no findings; the final text, session `a196b43c`, 3 findings rejected with reasons; each time 1 of 2 reviewers answered, the other out of quota) and the interim document gate on the E5 stories document (2 accepted) passed, a final Opus read's fixes were applied, and because the record says `Narrowed: yes` the owner approved it (2026-11-05). F31 is reviewed at the first of: E2.3 starts, a suite is to run on a Windows machine that persists, or 2026-12-05.
+>
+> Was: **stopped for re-review (2026-11-05)** — epoch 6's second change after approval (entry 6.2, found by S6's Windows run). No new code on any epic of this plan and no merge of a pull request
+> carrying its work until the full re-review is complete; when its record says `Narrowed: yes`, the owner has approved the revised plan; and epoch 7 is opened with `state: open`. At the stop: E5's
+> producer PR coai #945 (draft) holds S3, S2-B, S4, entry 5.1, S5 and most of S6; the plant of merge condition (o) is red on Windows and is not changed until epoch 7 opens.
+>
+> Was: **epoch 6 open (2026-11-05), approved by the owner after the re-review.** Epoch 5 stopped at entries 5.2 and 5.3; the whole plan was revised (§ *Epoch 6*), the Opus judge sorted epoch 5's work (16 fit; 2 cut, both fixed forward, nothing merged contradicts), the plan gate (session `ff8f7dd0`, 2 findings accepted, 1 rejected with reason) and the interim document gate on the E5 stories document (3 accepted, 1 rejected with reason) passed, a final Opus read's fixes were applied, and because the record says `Narrowed: yes` the owner approved it. F30's date of 2026-11-19 is accepted. All nine pin bumps to `bd795847` are merged. The owner's scan (merge condition (c)) is still open.
 >
 > Was: **stopped for re-review (2026-11-05)** — epoch 5's second and third changes after approval (entries 5.2 and 5.3, found writing E5's S6 brief). No new code on any epic of this
 > plan and no merge of a pull request carrying its work until the full re-review is complete; when its record says `Narrowed: yes`, the owner has approved the revised plan; and epoch 6 is
@@ -407,10 +413,63 @@ Narrowed: yes — two things got smaller, both in E5's producer PR: (1) must-not
   Condition (d): no WSL record exists; the E5 document's D8 (d) is another condition, and the brief's § 18 reads it as "no condition on this PR" while the parent's Definition of Done keeps the per-machine record: the two must agree.
   Could not check: the audit's order in a real suite run (the audit is not wired until S6); the private sibling; Windows behaviour of any of this.)
 
-> Epoch 6 · approved 2026-11-05 · by owner · state: open
+> Epoch 6 · approved 2026-11-05 · by owner · state: closed
 
 - 6.1 · 2026-11-05 · agent · approach — tracing the S6 inventory's rows showed that the kinds of reason, written before the trace, fit 11 of them badly: the fourth kind's standing test keeps "names" and holds a pinned list of the test files that name a file without reaching the line, and a fifth kind covers a line a test reaches whose product caller is not a test run, pinned by an assertion in each test
   (Found by the Opus author revising the S6 brief. Seven rows: a test file names the file and reads its text, or runs or sources it without reaching the line. Four rows: `install-cli.sh:22`, `install-agy.sh:61`, `deploy/bugs/install-env.sh:101`, `deploy/systemd-release.sh:161`. The plan said of the first two that those tests pin the TMPDIR; none did, it was only inherited. The count, the ceiling of 77 and the runtime barrier are unchanged. The owner's approval named standing tests; this keeps them and adds the pinned list.)
+- 6.2 · 2026-11-05 · agent · merge-conditions, approach — on the elevated hosted Windows runner a new file is owned by `BUILTIN\Administrators`, so `LeftoversAudit` reads a real orphan claim as a stranger's and never names it; merge condition (o) cannot hold there as written, and its plant proves the ordered call on Windows only for a claim re-owned to the caller
+  (Found by S6's own run: coai run 42026897727, job 127243250229, 14631 tests, one red: `AnOrphanClaim_IsReportedByTheAudit_BeforeTheRunFolderEnds`, exit code 0. The limit is old and is written in the copied
+  `LeftoversAudit.cs:10` and in the template's plan, `dew_flow_mcp · research/PLAN_test_leftovers_E3.md`; D9 copies the audit "as in the template", but no text of this plan or of E5's says it, and the S6 brief's § 11.3 row
+  says "red through `Discover`" with no limit. Counted because the doubt is real: the one line added to the plant is a build line of the brief, and the condition now proves less on Windows than it reads.
+  Consultants `ee497a76`: both answers take the owner fixture over a skip; one counts the change, the other counts it unless the approved baseline already states the limit, and it does not. The fixture is
+  `WindowsOwnership.OwnedByCaller`, which needs no privilege; `RunTempGateTests.cs:261-262` already uses it. Not applied until epoch 7 opens.)
+
+### Re-review for epoch 7
+
+Narrowed: yes — E5's merge condition (o) and the goal: on an elevated Windows run, which `windows-latest` is (measured; a PR's only Windows leg; the release's `windows-11-arm` is not measured), a real orphan claim or unregistered folder stays unseen by the audit, and what a run leaves (killed, or not removable at its normal end) is kept by every sweep, so it waits for a person; the plant proves the order on Windows with a re-owned claim, and a test pins the limit (§ *Epoch 7*, items 1 and 4).
+  (Written 2026-11-05 with the revision of § *Epoch 7*, over the two entries of epoch 6: 6.1, the kinds of reason; 6.2, the plant. Re-review consult `dd79d0aa`; the question consultants
+  before it: `ee497a76`. The Verdict and Action cells are `—` until an Opus judge fills them (step 5 of the full stop). The epoch 7 line is written only when the owner approves.)
+
+| Work | Where | Verdict | Action |
+|---|---|---|---|
+| the epoch-6 record, F30 and the owner's answers, conventions #132 `fd2d14f1` | main | fits | kept — a record; § *Epoch 7*'s opening names what it supersedes and § *Epoch 6* stands for the rest |
+| coai #947 `b9dd7229` and the other pin bumps to `bd795847`, rag_qln #88 `9852c1f0` | main of each repository | fits | kept — each merge read through `gh`; the epoch-6 table read their files (one gitlink, three on rag_qln). They end question 4 of § *Epoch 6* item 7, and the E7 pin row is now done |
+| coai #948 `ae52bd55`, the SQLite WAL switch | main of coai, outside this plan | — | outside this plan, no verdict. It reaches S6 through the merge of `main`: its patch to `SqliteMigratorTests.cs` holds no temp API and leaves that file's one baseline entry (`:21`) alone (read) |
+| conventions #133 `e45ad11`, F27, the peer session's | main, outside this plan's epics | — | outside this plan's epics, no verdict. Rule text and the follow-ups plan only; not in `release`, so no pin moves (read its file list) |
+| coai #945 (draft), the S6 brief's revision and the merge of `main`, `84b14a26`, `e8355d2b` and their neighbours up to `c17ef377` | pushed, unmerged (draft PR); a copy on `docs/e5-s6-brief-at-stop5` at `8b47dc20` | fits | kept — docs and one merge, never a rewrite; the parts § *Epoch 7* replaces are the next row |
+| the same brief's parts that § *Epoch 7* item 4.4 replaces, as they stood at `c17ef377`: § 11.3's orphan-claim row ("red through `Discover`"), § 11.4's child with no re-owning, R16 without the Windows RED, § 19's rows on the ordered call and on the smoke stub and the pins | pushed, unmerged (draft PR) | cut | fixed forward at `6f0b0a58`, never a rewrite; what the revision still leaves wrong is corrections C4, C5 and C9 of the note below |
+| coai #945 (draft), `6f0b0a58`, the E5 document and the S6 brief at the stop of epoch 6 (not in this table when it was written) | pushed, unmerged (draft PR) | fits | kept — docs only (`git diff --stat 3fcba8a0 6f0b0a58`: two files); it is the PR's head. Corrections C3, C4, C5, C8 and C9 go on top of it |
+| coai #945 (draft), S6's smoke script, RED `f1d7e122`, fix `47c04724` | pushed, unmerged (draft PR) | fits | kept open — the diff is the move of § 9.4, the owner-form name and its marker, nothing else. Row (p)'s and § 19's words on Windows are correction C5 |
+| coai #945 (draft), S6's ONE ordered call, RED `77db4917`, `26190d5c`, and the plant in four suites | pushed, unmerged (draft PR) | fits | kept open, fix forward by items 4.1 and 4.2 after approval. The op's text, `RegistryWithoutTheRunFolder` and `RunTempFixture` match § 11.1 and § 11.2. The plant stays with its assertions, and it is red on hosted Windows until the re-owning lines go in (`CoaiMcp.Tests` in job 127243250229; `CoaiServer.Tests` too, in the probe's log) |
+| coai #945 (draft), S6's guards, wrappers and pinned tests, `91e440ec` | pushed, unmerged (draft PR) | fits | kept open — the manifest's ops match § 6.3 and § 6.4, and 52 entries as § 5 says. `PlantedLines` (the tilde) is no widening; the PR says so in one sentence (the note, question 1) |
+| coai #945 (draft), S6's site work `d7dc67cf`, the inventory and markers `8391882a` (28 pairs, four more than the brief) | pushed, unmerged (draft PR) | fits | kept open — outside the test trees `8391882a` adds only comment lines (read). Item 4.5's reading done: the five kinds hold (33, 19, 6, 14, 4, and the one bounded exception = 77), each row's hash matches its site, and E10's search redone by hand finds the same 28 pairs |
+| coai #945 (draft), S6's CI legs `db8f895d`, the baseline `14370fdd` (778 entries), the repository check `72707ef6`, the creation step `b29c00c7` and its removal `3fcba8a0` | pushed, unmerged (draft PR) | fits | kept open — the legs match § 12; the creation step is gone (`ci.yml` equals `72707ef6`'s), and F4 is green on `6f0b0a58`. A dry run of (q) at this head says "only shrinks", exit 0; (q) itself stays for the last head. `72707ef6` only reports more at once: a failure stays red |
+| the coder's draft section, a copy on `docs/e5-s6-section-at-stop6` (`564c63c5`) | pushed, no PR, not for merge | fits | kept as the source of item 5 step 2; the branch goes once `module_tests.md` § E5 S6 is written. It says nothing yet of the epoch 7 limit, so the section adds it |
+| coai `tmp/e5-s6-audit-red` `54966789`, a throwaway: the audit disabled, the self-test step on three legs, run 42026952168 (not in this table when it was written) | pushed, branch deleted, its run kept | fits | nothing to do — it never reaches `main`. It is R6's red on Linux, macOS and Windows: all three jobs failed in that step |
+| coai `tmp/e5-s6-win-probe` `24d87dff`, a throwaway: run 42031613818, job 127259212955 (not in this table when it was written) | pushed, branch deleted, its run kept | fits | nothing to do — one workflow file only. The job's green is not the plant's: see the note, question 4 |
+| dew_flow_benchmark #164, #165, #168, #169, #170, #171, merged in this epoch (not in this table when it was written) | main of benchmark, outside this plan | — | outside this plan, no verdict. The language comparison, model arms and a research note. #164, #169 and #170 edit `PLAN_bench_test_leftovers_followups.md`, but only its timing-test list; no E6 code, and the E6 boundary is still not written on that side (read) |
+| the stop record, entry 6.2, `a280286` (this branch) | pushed, unmerged | fits | kept — merges before or with epoch 7's line |
+| F31 and this revision (this branch) | pushed, unmerged | fits | kept — the baseline epoch 7 is approved on, never an entry; corrections C1, C2, C6 and C7 of the note below go in before the owner reads it |
+| creds #294 (draft) at `9a6e9faf`, no commit since epoch 6's table | pushed, unmerged (draft PR) | fits | kept open, draft — read through `gh`: the same head, last updated 2026-11-04. E2's own revision takes item 8.3's sentence |
+  (Judged 2026-11-05 by an Opus judge against § *Epoch 7*, § *Epoch 6*, the E5 document and the S6 brief at coai `6f0b0a58`: 15 rows fit; 1 is cut, unmerged and fixed forward; 3 are outside this plan. Nothing merged contradicts the revised plan.
+  The judge added the rows for the brief's replaced parts, `6f0b0a58`, the two throwaways and benchmark's PRs, and corrected two plain facts in § *Epoch 7* item 1's State line on E5: #945's head, and why the baseline holds 778.
+  Read: the diff `c17ef377..3fcba8a0`, commit by commit, against the brief's table (the copied guard files through the manifest's ops, not line by line); `Scope.cs`, `OwnedDir.cs`, `LeftoversAudit.cs`, `LeftoversSweep.cs`, `Removal.cs`, `RunTemp.cs`, `RunTempFolder.cs`, `WindowsOwnership.cs`, `Native.cs`'s Windows reads; `ci.yml`'s `windows` job, `release.yml`'s test lines; the logs of runs 42026897727, 42031613818, 42026952168, and 42033133576 on `6f0b0a58`, still running when this was written (extension and actionlint are green).
+  Run, read-only: the Node guard with `--baseline --profile node` at the head, clean, 628 files; `--baseline-shrinks --base 14370fdd5`, "only shrinks", exit 0; the baseline's count per scope (458, 57, 26, 8, 219, 10); each inventory row's hash against its site, 0 differ; E10's search by hand, 1746 test files, 28 pairs, equal to `namedBy`.
+  Question 1, the coder's three deviations: none is a quiet widening, and none counts as a change. The 778: both sites were already flagged at the brief's measure. Their `Path.GetTempPath()` did move to `TempDir.Root`, and the line stays flagged only for its fake path string (`"/tmp/schema.json"`), the same shape as the 18 entries beside it in `LocalRuntimeTests.cs`. So 776 was a forecast that counted two lines as leaving, not a number the tree outgrew; nothing new entered. § 8.1 asks for the difference by file in the PR, and the draft has it.
+  The 28: `template-manifest.json` holds the frozen list as an op's `new` text, and the folder is one of E10's test roots. It is data and starts nothing. § 10.6 allows a pair found at creation when the line is not reached, so kind 4 did not grow. The tilde (`LeftoversBaselineTests.cs:256-260`): text written into private fixture trees, never a call, and the template's own device with another character (`§`, `LeftoversGuardTests.cs:30`). It is not the shape cut in epoch 6: that was a legacy NAME the guard could not see, fed to a refusal as real data, and the rule has an exemption for it. Still, nothing bounds this device, and `testLeftovers.test.mjs:31` does the same with `.join('')`, so the PR names both in one sentence beside the split-piece scan's output.
+  Also seen, no change: the commits `91e440ec` to `14370fdd` share one timestamp, so they were cut after the work; R1's RED is a statement in a commit message, read from the draft, not from history. § 4 step 7 (F24's C# half recorded before the baseline) was not done in that order; item 5 step 5 now carries it. `(i)`'s pin order holds.
+  Question 2, what a natural Administrators-owned file breaks. Among the rows (a) to (q), no other row claims natural collection or a natural read: the revision is right there. But the same fact reaches these promises outside the rows. C3: `PLAN_test_leftovers_E5.md:144`, the E5 goal, says a killed run is "collected by that user's next run"; and must-not-copy row 6 (`:795`) says "the helper's own claim is `mine`", which is false on the hosted runner (`ScopeTests.cs:22-31` asserts the measured false), while the Definition of Done needs every row. Item 4.4 names neither. C4: brief § 11.3 keeps "The run was killed … The next run's sweep collects it" and "The run folder cannot be removed … The next sweep judges it"; `RunTemp.cs:22` and `Removal.cs:33` say the same. Plain comment and text fixes, no behaviour.
+  C2, the one that reaches the owner: the goal's exception names only a KILLED run. A run folder that could not be removed at a normal end also stays Administrators-owned and waits for a person. And the audit's blindness is wider than item 1's "a real orphan claim": an unregistered FOLDER with its claim is unseen as well (`LeftoversAudit.cs:58`, through `Captured.Read`). Question 7 should say both before the owner approves, as the epoch-6 judge said of a narrowing under-named.
+  C6: "The audit, now on, found no leak in any suite" is wider than measured. On Windows only the registry half looked, and of `CoaiServer.Tests` only `*RunFolderTests` ran there. Item 3's new column, which item 8.1 asks of "each row", is filled only for (o) and (p). Row (k) needs its sentence: Windows `Test` proves collection only on fixtures; B4 and B5 survive there by the owner key, not by liveness (`StartOfRunSweepTests.cs:79`, `:138`, logged `foreign-uid` in job 127243250229), though `AKilledRun_IsCollected_ByTheSweep` does reach `live` on a re-owned folder; and R4 (`LeftoversCoaiLayoutTests.cs:79`) cannot go red on Windows by reading, because `Discover` reads nothing there, so Linux and macOS carry must-not-copy row 1.
+  C5: "Not proved on Windows" in row (p) and § 19 is true of a PR gate only. `TheImageSmokeUsesTheServerTests` went 5 of 5 on hosted Windows under Git Bash in the probe (R20's name check is POSIX only), and `release.yml:860` runs the whole server suite on two Windows runners at release; row (p)'s invocations omit that. C4 also: § 19's new row says "the pins in `CoaiMcp.Tests`"; there are none. All four are in `CoaiServer.Tests` (three) and `src_bugs/tests/ShellScript.cs:85`, so no pin runs on Windows in a PR. Two of the three server classes went green there in the probe.
+  Question 3, the planned re-owning and the pin: both work as written, by reading. `RunTemp.Folder` lies under the profile on the runner (log: `C:\Users\runneradmin\AppData\Local\Temp\…`), and the child's is nested inside it. `Scope.IsMine` checks the claim itself, not its folder, so the Administrators-owned run folder above it does not matter. The owner changes before `OfOrphan` captures anything, and `SameIdentity` and the verified read compare device and file id only, so neither `IsRegular` nor the identity moves. `RemoveCapturedClaim` re-reads through the same predicate, sees the same text and deletes. `WindowsOwnership` is internal, with `InternalsVisibleTo` for all four suites, and its `Dispose` undoes no owner. `RunTempGateTests.cs:258-263` and `ScopeTests.cs` already prove the same steps, green on that job.
+  The pin's child: `Discover` finds nothing, the verdict is null, and the end of the run deletes the folder with the unreadable claim in it, because `Removal` never asks who owns (`Removal.cs:6`). So exit 0, nothing left, and the parent's empty-root line holds; R5 shows that path on Windows. C9, in the brief: it does not say where its "new file" goes. It must not be in `root`, or the empty-root line fails. And § 11.4's gate (a new file reads `IsMine` false) is not item 4.2's (an elevated process): with a temp outside the profile, a shell that is not elevated would run the pin, which passes for another reason. Ask for both. In that same place the plant's child throws, loudly, as intended.
+  Question 4: true, with one wrong citation. The sweep asks the owner before liveness (`LeftoversSweep.cs:276-277`). `RunTempGateTests.cs:258-263` and `LeftoversSweepTests.cs:590-597` do re-own. C1: `Collection_is_proven_…` (`:585`) does NOT keep the Administrators owner as `foreign-uid`: it re-owns and asserts removal. The keeper is `On_windows_a_folder_that_is_not_the_callers_by_the_kernel_owner_is_listed_and_kept` (`:609`), on a fixture; the natural evidence is B4's logged `foreign-uid`. Also "every collection test re-owns": most hand a seam instead (`Options`, `:822`, `mine ?? (_ => true)`). And step 0 measures in `RUNNER_TEMP` on `D:`, outside the profile; a natural owner inside the profile rests on B4.
+  The PowerShell step and its run id are right: `never disposed` and `disposed but not removed` both named, nothing left. But job 127259212955's green says nothing of its plant step: two plants are red in that log, and the step passes because pwsh ends on its last command's exit code. And the real `ci.yml` steps after `Test` have never run on Windows (skipped in job 127243250229); the head of item 5 step 4 is their first run.
+  C7, a plain fact in F31: "The template's source and its plan did say it, for the audit only" is wrong. `Scope.cs:27-28` (the template's bytes) says an elevated run's files "are kept for a person to look at", and `dew_flow_mcp · research/PLAN_test_leftovers_E3.md:672` says the sweep lists them as `foreign-uid` and never removes them. So the sweep half was written down too, and epoch 7's lesson is stronger than "green tests hid it". C8: the brief's status line (`:3`) still says "plan only, nothing implemented yet".
+  Could not check: any of items 4.1 and 4.2 on Windows (nothing is built, and there is no Windows here; reading and the logs only); `windows-11-arm` at release; a Windows shell that is not elevated; head `6f0b0a58`'s Linux, macOS and Windows jobs, still running; the janitor's key on Windows once F9 arms it, so "no janitor removes them" is read from the rule, not its code; R1's RED, as above; the copied guard tests line by line.)
+
+> Epoch 7 · approved 2026-11-05 · by owner · state: open
 
 ## Symptom
 
@@ -2016,6 +2075,159 @@ tool, the tree or the CI. Each was approved first and checked after. From epoch 
   requires it of every repository); the `ResidentSet` eviction is settled with a test; the failing
   `SearchLiveTests.AQuestionInWords_FindsTheMemberThatAnswersIt` is fixed or recorded as known before the live tests
   become E7's proof; the growth paragraph carries 0.2 GB measured (`du`), not 8 GB; the C# copy as E6's; F30 cited.
+
+## Epoch 7 — the plan as revised at the re-review (2026-11-05)
+
+The whole plan read again against what is known now, as step 4 of the full stop asks (`common/plan-change-control.md`),
+over the two entries of epoch 6: 6.1, the kinds of reason for the inline `raw-temp` exemptions; 6.2, the orphan-claim
+plant on the elevated hosted Windows runner. The re-review consult is `dd79d0aa` (the question consultants before it:
+`ee497a76`). It is advice, and each point was checked against the files (item 6). This section is the baseline epoch 7
+is approved on. § *Epoch 6* stays as the plan for everything this section does not name. § *Epoch 7* is short because
+one fact changed: it supersedes § *Epoch 6* item 3's rows (o) and (p), the goal's killed-run sentence for an elevated
+Windows run, and the S6 brief's § 11.3, § 11.4 and § 19 rows named in item 4.
+
+### 1. What this plan is now
+
+**The one fact (measured).** On the elevated hosted Windows runner a new file AND a new folder are owned by
+`BUILTIN\Administrators` (`S-1-5-32-544`), not by the caller's SID (`…-500`): `ci.yml` step 0, run 42026897727, job
+127243250229. `Scope.WindowsIsMine` asks for the caller's SID (`Scope.cs:73`). The helper makes its claim with a plain
+`FileStream` (`OwnedDir.cs:87`), so a real claim and a real folder of that run read as a stranger's. Two things follow:
+
+1. **The audit.** Its claim scan cannot name a real orphan claim there, or an unregistered folder with its claim (`LeftoversAudit.cs:58`). The copied source says so (`LeftoversAudit.cs:10`),
+   and the template's plan says so (`dew_flow_mcp · research/PLAN_test_leftovers_E3.md`). The registry check still sees a
+   registered folder: the PowerShell audit step is green on hosted Windows for both of its values (throwaway run
+   42031613818, job 127259212955).
+2. **The sweep.** A real folder of a killed run on that runner is kept as `foreign-uid`: the sweep asks the owner before
+   liveness (`LeftoversSweep.cs:276-277`), and `Scope.cs:27-28` says so. B4 logs that answer for a real run folder
+   (`StartOfRunSweepTests.cs:79`), and `On_windows_a_folder_that_is_not_the_callers_…` (`LeftoversSweepTests.cs:609`) keeps a
+   prepared one. No test contradicts this, because a test on Windows that asserts collection either re-owns its fixture
+   (`RunTempGateTests.cs:258-263`, `LeftoversSweepTests.cs:585-597`) or hands in an owner seam. So those green tests prove
+   collection of a prepared fixture, not of a real run's leftovers.
+
+**What this costs in practice.** Two things. (1) On a PR's Windows leg (`windows-latest`, the only one) the audit's claim scan sees nothing; only its
+registry half works there (`ci.yml` step 0 is red if the runner is not elevated). So an unregistered claim or folder does
+not turn a Windows leg red; Linux and macOS still catch one a test makes on every OS. (2) What a run leaves in an elevated
+process, killed or not removable at its end, waits for a person. On a hosted runner nothing stays, because the machine ends
+with its job. The owner's Windows machine runs no E2 or E5 tests, by the owner's statement (#124, "temporarily we do not
+test on Windows"), until those repositories run there again; a person who runs a suite in an elevated Windows shell gets the
+limit. The exception also reaches E6 and E7 when they copy the helper. By reading, not measured: a shell that is not
+elevated, with its temp folder inside the profile, is not affected. Step 0 shows `windows-latest` is elevated; the arm
+runner of a release (`windows-11-arm`) is not measured.
+
+**State at the stop (read 2026-11-05).**
+
+- **E5.** Coai #945 (draft) at `bde2e16c`, its code at `3fcba8a0`: S3, S2-B, S4, entry 5.1, S5 and S6 except what item 5 lists. Local counts and
+  the run on `b29c00c7` are in the coder's draft section (`docs/e5-s6-section-at-stop6`, a copy). Linux, macOS and
+  actionlint are green; Windows has one red, the plant; the only other red was F4, by design, and the temporary step that
+  caused it is removed at `3fcba8a0`. The audit, now on, found no leak in any suite; on Windows only its registry half looked. The baseline holds 778 entries (the
+  brief's 776 counted two lines as leaving that keep a `/tmp/…` literal, `ApiRuntimeTests.cs:28` and `LocalRuntimeTests.cs:131`; the count at creation binds), the inventory 112 rows (77 `raw-temp`), `namedBy` 28
+  pairs (24 in the brief; E10 found four more, by the brief's own § 10.6 rule). The creation commit for (q) is `14370fdd`.
+- **Release and pins.** `release` = `bd795847`; every consumer's bump is merged, rag_qln's as #88 (`9852c1f0`). Coai
+  `main` = `ae52bd55`; #945 needs one more merge of `main` before its last head.
+- **E2.** Creds #294 (draft) unchanged at `9a6e9faf`. **E6, E7.** Not started past their stage A. Benchmark holds an old
+  draft of E6 stories, #103; E6 reads it before it writes its own (item 8.3).
+- **The conventions tree.** F27 merged as #133 (`e45ad11`), by the peer session, outside this plan's epics.
+- **The owner's open item is unchanged:** merge condition (c), the WSL administrator scan.
+
+**Goal.** The goal of § *Epoch 6* stands word for word, with **one more bounded exception** (the owner approves it with
+item 7): a run on Windows in an ELEVATED process makes folders and claims owned by `Administrators`. What such a run
+leaves, because it was killed or because a folder could not be removed at its normal end, is removed by no sweep and no
+janitor, because it reads as a stranger's under rule §4's two keys. The audit's claim scan does not name it either, unless
+the folder is in the registry. It waits for a person. The goal's "collected later: by a C# sweep that checks both keys, by the janitor
+once F9 arms it there, or by a person" is read with this: for an elevated run only the person remains. No rule key is
+weakened to change this; rule §4 is what keeps a folder of another account safe.
+
+**Definition of Done, read for epoch 7** (the list is not edited): the line on Windows sweeps is read with the exception
+above. Nothing else of the list changes.
+
+### 2. Prerequisites
+
+As § *Epoch 6* item 2, with these states: item 2's release and pin steps are DONE, and the second F24 check's Node half
+is DONE (issuecomment-6656216417), its C# half to be posted from S6's record. (c) stays OPEN. F30 stays not a
+prerequisite, deadline 2026-11-19.
+
+### 3. Merge conditions
+
+§ *Epoch 6* item 3's table stands, with the three rows below replaced. **Where a check prepares or substitutes something,
+its row now also says what real-run behaviour it does not prove** (item 8.1); that column is filled for these three. The
+other rows state their condition as before, and the table's "State" cells are read with item 1 of this section.
+
+| # | Condition | Implementation (file) | Invocations covered | Executable acceptance check | What the check prepares, and what it does not prove |
+|---|---|---|---|---|---|
+| (o) | The audit runs BEFORE the run folder ends, on every leg of each suite. A claim the caller's SID owns, absent from the registry, turns the run red | The ONE ordered call (`LeftoversSweepFixture.cs`, the fourth manifest op); `LeftoversAudit.Discover`; the plant `OrphanClaimChild` in four suites; `WindowsOwnership.OwnedByCaller` on the plant on Windows | `CoaiMcp.Tests` and `CoaiServer.Tests` on three legs; `CoaiBench.Tests` on Linux and macOS; `CoaiBugs.Tests` on Linux (D8's table) | Each suite's `--filter-method "*AnOrphanClaim_IsReportedByTheAudit*"` green on the head; R16's RED shown on Linux, and once on hosted Windows with the old order (a throwaway run). The pin shows as PASSED, not skipped, in the Windows log | On Windows the plant re-owns its claim, and asserts `Scope.IsMine` of it, so the child fails loudly if the profile key does not hold. It does NOT prove that a real claim of an elevated run is seen: it is not. `AnUntouchedClaim_StaysUnseen_OnAnElevatedWindowsRun` (`CoaiMcp.Tests`) pins that limit. It does not prove WHO removes the claim: the final empty-root assertion cannot tell the audit from the end of the run. `A_run_that_left_a_folder_…` proves the removal, with the owner seam |
+| (p) | `src_server/smoke-image.sh` leaves nothing on a failure before its trap | As § *Epoch 6*: built, `47c04724`, RED `f1d7e122` | `TheImageSmokeUsesTheServerTests` where `CoaiServer.Tests` runs whole: Linux and macOS in a PR; both Windows runners at a release (`release.yml:860`). The PR's `windows` job runs only `*RunFolderTests` of that executable (`ci.yml`) | The test green on the two PR legs | A `chmod` or `openssl` stub stands in for the failure. No PR gate proves it on Windows: one throwaway probe did (5 of 5), and a release will. The script's real use is the Linux image job |
+| (k) | The suite × OS merge gates, as § *Epoch 6* | `ci.yml` | each cell with a step | every cell green on the head, including the steps after `Test` in the `windows` job, which have never run in that job (they were skipped in 127243250229) | On Windows B4 and B5 keep a run folder by the owner key, not by liveness, and by reading R4 (`LeftoversCoaiLayoutTests.cs:79`) cannot go red there for the same reason. So the liveness half of those proofs comes from Linux and macOS |
+
+### 4. The disposition of entry 6.2
+
+1. **The plant.** It stays in all four suites, with the brief's assertions. No skip. On Windows the child sets the planted
+   claim's owner to the caller (`WindowsOwnership.OwnedByCaller`: WRITE_OWNER, no privilege), BEFORE discovery, and asserts
+   `Scope.IsMine(claim)`. Reversing the order must still make it red: one throwaway Windows run shows that. No product
+   file and no copied template file changes for this.
+2. **The pin of the limit.** One new test in `CoaiMcp.Tests`, `AnUntouchedClaim_StaysUnseen_OnAnElevatedWindowsRun`: the
+   same child with no re-owning, on a Windows process that is elevated (skipped elsewhere, saying why). The child exits 0.
+   It also makes one `_owned.Dir` the natural way and asserts that neither the folder nor its claim is `Scope.IsMine`. So the
+   limit is a fact a run checks. When F31 changes the helper, that assertion goes red and the text is read again.
+3. **F31**, a new follow-up in `todo/PLAN_test_leftovers_merged_core_followups.md`: on an elevated Windows run the audit's
+   claim scan and the sweep's collection share one blind spot. Owner: this repository, for the template and the rule.
+   Reviewed at item 7's trigger; not a prerequisite of any PR here. It lists the shape to weigh (the helper re-owns what it makes) and what
+   must not change (a folder of another account stays safe).
+4. **The brief.** § 11.3's row, § 11.4's child, the new test, R16's RED, § 19's rows on the plant and on the smoke stub
+   are revised with this section, on the producer branch. The E5 document's goal, D8 (o), must-not-copy row 6 and its S6
+   box say the same. S6's remainder corrects the comment at `RunTemp.cs:22`; `Removal.cs:33` is a copied file, so F31 names it.
+5. **Entry 6.1 stays as built.** The judge reads the five kinds and the 28 pairs against the tree.
+
+### 5. Build order
+
+Unchanged in its order (§ *Epoch 6* item 5). What is left of S6 once epoch 7 opens, on `feat/test-leftovers-e5-producer`,
+in this order: (1) item 4.1 and 4.2, with the throwaway Windows RED; (2) `research/module_tests.md` § E5 S6 from the draft
+copy, and `todo/README.md`; (3) a merge of `main`; (4) every job green on the head, Windows included; (5) the F24 C# comment,
+(q) at the last head, the PR description's evidence lines for (a) to (q) and D11's rollback; (6) the code gate and an Opus
+review of the delta; (7) merge when (c) is recorded. Then E5.S7, E2.1, and wave 3.
+
+### 6. What the re-review consultant raised, and what was done with it
+
+| The point | Checked | Done |
+|---|---|---|
+| Narrowing only (o) is not enough: the same fact limits killed-run recovery | True: step 0's printed owners; `Scope.cs:73`; every Windows collection test re-owns first | The goal's exception in item 1; F31 names both |
+| The table connected promises to files and commands, but not fixture preparation to real behaviour | True: step 0 measured the owner, `LeftoversAudit.cs:10` said the limit, and a test already compensated, all before this stop | Item 8.1, one sentence and one trace |
+| No second direct contradiction among (a) to (q) comparable to (o) | Read for (e), (j), (k), (l): none claims natural collection. The judge reads again | Recorded |
+| The brief's § 19 says the smoke stub runs in the `windows` job; `ci.yml` runs only `*RunFolderTests` there | True (`ci.yml`, step `Run folder — Team server`) | Row (p), item 4.4 |
+| Re-own before discovery; ownership alone does not meet the profile key | True: `Scope.cs:73-79` asks both. `RemoveCapturedClaim` re-reads through the same predicate | Item 4.1's assertion |
+| Prove the order red, the untouched claim unseen, a registered leak still red, and say who removes | Registered leak: the PowerShell audit step. Removal: the template's test | Row (o), items 4.1 and 4.2 |
+| The follow-up should cover audit visibility and sweep recovery | True: one predicate | F31 |
+| Carry the limit into E2.3, E6 and E7 | Their tables do not claim more, but their documents do not state it | Item 8.3 |
+| The judge's C1 to C9: a wrong citation, the exception too narrow (a normal end that could not remove; an unregistered folder), the E5 document's goal and row 6, the § 19 pin row, row (p) and row (k), F31's "for the audit only", the brief's status, the pin's gates | Each read against the file | Applied to this section, the E5 documents and F31 (2026-11-05) |
+| The final Opus read: item 7 understated the cost (every Windows CI leg audits less), the pin would not have gone red under F31 (the child's claim is not the helper's), an unmeasured sentence on shells that are not elevated, the row count, two comments | Each read against the file; the child built in all four suites with warnings as errors, 0 errors | Applied to this section, F31 and the brief (2026-11-05). Row (p)'s Windows filter stays as it is: the script's real use is Linux |
+
+### 7. Question for the owner (answered below)
+
+Approve the narrowing: on an elevated Windows run, what a run leaves (killed, or not removable at its normal end) waits for
+a person; the audit's claim scan sees nothing on a PR's Windows leg (`windows-latest`), so an unregistered claim or folder
+does not turn that leg red; and condition (o)'s plant proves the audit's order on Windows with a re-owned claim, the limit pinned by a test and
+F31 written. Recommended: yes.
+Its cost is item 1's paragraph *What this costs in practice*. F31 is reviewed, and either fixed or accepted again by the owner, at the first of: E2.3 starts (the next copy of the helper), a suite is to run on a Windows machine that persists, or 2026-12-05 (consultants `30fab21d`: a follow-up with no trigger is where a gap stays; the strongest reason against accepting is the lost signal on Windows CI, not the leftovers). Nothing enforces it; this session tracks it. The other answer is to fix the helper first (F31 as a prerequisite). That changes the
+template, the Node reference and coai's unmerged copy (E2.3, E6 and E7 have not started theirs), before E5 can merge. No CI
+leg leaves anything behind in this state, but that Windows leg audits less because of it.
+
+**The owner's answer (2026-11-05, after the question consultants `30fab21d`):** approved as recommended, with F31's review
+trigger. Epoch 7 opens `by owner`.
+
+### 8. The way of working
+
+**8.1 One addition to § *Epoch 6* item 8.1, and nothing more.** The table caught what files and commands implement a
+condition, and missed this because a row could say "green on Windows" while the test had prepared what the real run does
+not make. So: **each row says what its check prepares or substitutes, and what real-run behaviour it therefore does not
+prove. For a row that reads ownership, one resource made the natural way is traced through the reader before the row is
+approved.** No new document and no new gate. The same words apply to entry 6.1's lesson: naming a file, reaching a line
+and containing what it allocates are three kinds of evidence.
+
+**8.2 The surprises still likely.** § *Epoch 6* item 8.2's table stands. Add one row: any C# copy in E2.3, E6 or E7 inherits
+this limit, and any test in it that says "collected" on Windows re-owns first.
+
+**8.3 What the other documents' own revisions must say**, in addition to § *Epoch 6* item 8.3: E2.3, E6 and E7 state this
+goal exception where they copy the C# helper, and each brief's table carries the new sentence. E6 reads benchmark's draft
+#103 before it writes its stories; that draft predates the owner form.
 
 ## Epics
 
