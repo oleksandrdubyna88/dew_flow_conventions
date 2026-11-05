@@ -772,7 +772,20 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - **Tests.** The rule's own checks: `node tools/rule-bodies.mjs` and `node tools/ownership-check.mjs` clean with the new text;
   a rule test that the new section is in the body (RED before the text is added). Adoption in other repositories is their own
   work, scheduled apart from this item.
-- **State.** Open, queued for the next planned release.
+- **Progress 2026-11-05 — the rule text is changed on `feat/f27-test-process-bound`, not released.** RED observed with the test
+  only: `node --test tools/testing-rule.test.mjs` printed 8 failed of 8, seven with `common/testing.md has no section ## A runner
+  bounds what a test file may start, and a shim never resolves to itself — the section F27 writes` and the Definition of Done case
+  with its missing phrase. GREEN after `common/testing.md` gained the section and the Definition of Done line: 8 of 8. The record
+  was moved with `node tools/rule-bodies.mjs --update common.testing` (`DRIFT common.testing` before, `OK — 41 rule(s)` after);
+  `node tools/ownership-check.mjs` and `node tools/selection-matrix.mjs` are clean. Re-measured with
+  `node tools/selection-matrix.mjs --bytes`: `common/testing.md` is 26,822 B (+2,123 B), the `implement`, `test`, `audit` and
+  `policy` cells moved +2,123 B each, `release` 283,766 → 285,889 B; `research/module_rules.md` carries the table and
+  `research/module_tests.md` the RED-GREEN-RED.
+- **Deviation from the Fix bullet.** The Fix says the rule "cites the r9700 implementation as the model". `common/rule-ownership.md`
+  forbids naming a repository in a shared rule, so the text says "one repository here, 2026-11-02" and this register keeps the
+  address: `tests/run.mjs`, `tests/test_moe.sh` and `tests/test_runner.sh` on the r9700 `main`; the `test_moe.sh` lines are 648-653
+  on its `main` at `3b3d3eb` and 650-653 at the cited `2f8cd71`.
+- **State.** Fixed, not released; queued for the next planned release.
 
 ## F28 — A product's submodule pin follows another product's `main`, so every merge there makes the consumer's pin check red (found 2026-11-02, rag_qln)
 

@@ -1066,6 +1066,43 @@ dates are not ordered (only epoch dates are), and where the section stands in th
 cases compare the rule's example with the lib, not the rule's prose with the lib: a sentence that describes the check
 wrongly passes them.
 
+## The process bound and the shim (`tools/testing-rule.test.mjs`, 2026-11-05)
+
+F27 adds one section to `common/testing.md` (*A runner bounds what a test file may start, and a shim never resolves to
+itself*) and one Definition of Done line. The freeze proves that body CHANGED; **`tools/testing-rule.test.mjs`** (pure, 8
+cases: strings in, strings out, so `common/test-leftovers.md` asks nothing of it) proves it still SAYS what F27 put there.
+It runs with `npm test` and by itself: `node --test tools/testing-rule.test.mjs`.
+
+**The RED run**, before the section existed, for the right reason: `node --test tools/testing-rule.test.mjs` printed
+`tests 8, pass 0, fail 8`. Seven cases failed with `common/testing.md has no section ## A runner bounds what a test file may
+start, and a shim never resolves to itself — the section F27 writes` (the first assertion of the section helper, so the red is
+never a `TypeError`), and the Definition of Done case failed with `## Definition of Done has no "- [ ]" line that bounds each
+test file's processes and resolves the program it wraps outside its own folder`. After the text: 8 of 8. The first GREEN run
+was 7 of 8: `FAILS the file` and `guarded fixture` also stand in the Definition of Done line, so the case *each pinned sentence
+comes from this section and nowhere else* refused them. The two pins were narrowed (`reaching the bound FAILS the file`,
+`guarded fixture that forks`) rather than the case weakened. Before the freeze was recorded `node tools/rule-bodies.mjs`
+printed `DRIFT common.testing`, exit 1; after `--update common.testing` it printed `OK — 41 rule(s)`, exit 0.
+
+**RED-GREEN-RED.** Whole file: `git show HEAD:common/testing.md` in place of the text gave 0 of 8 (RED), the text restored
+gave 8 of 8 (GREEN). The cases then break the text in memory, in every run, and each splice must turn its check red (the helper
+that makes a splice refuses one that changes nothing):
+
+| Splice (in memory) | The check that must go red |
+|---|---|
+| the section moved to after the RED-test section | placement: not immediately before `## Every bug fix starts with a RED test` |
+| a `4. **…**` item appended; item 2 deleted | the count of numbered bold items is not 3 |
+| one pinned sentence copied into `## Scope` | the pins stay present in the section (the saying case stays green) and the *nowhere else* case goes red |
+| `(default 3000)` inserted; `half of the headroom` inserted | no number becomes law |
+| the `What this does not give` paragraph removed | the limits case: the paragraph and the three limit pins |
+| `(tests/run.mjs)` inserted | the address guard |
+| the Definition of Done line removed | the Definition of Done case |
+
+**What it does not prove.** No runner, shim or fixture exists in this repository: the section is advice for the repositories
+that run tests through a runner of their own, and the repository that owns one proves the bound there. The formula (the
+count at the start of the run plus a headroom) is not verified at run time, and the section says so itself. Prose that
+describes the mechanism wrongly passes: the cases pin sentences, their place and their absence elsewhere, not whether the
+mechanism the sentences describe works.
+
 ## The consultant half moved here (`common/coai-consultant.md`, 2026-09-25)
 
 Until today the consultant half of the pasted snippet was the product's own file, on the operator's ruling
