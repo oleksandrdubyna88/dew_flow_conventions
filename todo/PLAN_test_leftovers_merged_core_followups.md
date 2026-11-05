@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (F27 fixed 2026-11-05, not released: a process cap and shim rule for the next planned release; F28 open: release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner).** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (F27 fixed 2026-11-05, not released: a process cap and shim rule for the next planned release; F28 open: release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner). F30 added 2026-11-05 (open, with an owner and a proposed deadline: the shipped Node guard has no folding reader).** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -862,6 +862,48 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   Windows sweep stays list-only, as it is today. The probe is 25 lines of C#; its source is in the workflow of coai's throwaway run above.
 - **State.** Open. Not a prerequisite of E5 once its op lands; it IS to be read before E2.3, E6 and E7 copy the template, and before F16's Fix.
 
+## F30 — The shipped Node guard reads only whole literals: a prefix split, joined, escaped or built from a template hole is not a finding (found 2026-11-05, E5's S6 brief; the rollout's entry 5.2)
+
+- **What.** `tools/leftovers-check.mjs` (`scanText`) has no folding reader. Measured at release `bd79584` with fifteen spellings of
+  the prefix in a `scripts/zz.mjs` line (the E5 S6 brief, Decision 1; the split and the `.join('')` spellings re-run at the epoch-6
+  re-review, both `[]`): a whole legacy literal (`testsToDelete-coai-x-abc123`) is `legacy-name`, and a bare-word glob passed to a
+  removal is `owner-blind` — 2 of 15. The word split over `+`, `.concat`, `['testsTo', 'Delete-'].join('')`, a template hole, a
+  `\u` or `\x` escape, a one-character class, a regex over the word, the bare word and half of the word each answer `[]`. The
+  consult `5d804d0c` reproduced the split literal.
+- **Who assumes otherwise.** The C# template's guard folds (`LeftoversGuardLiterals.cs`; its `IsFolded` reads `.cs` only), and the
+  consumers' documents assumed the Node guard does the same: E5's must-not-copy row 2 asks for "the same twelve in a `.mjs` under
+  the `node` profile, RED when the folding reader is switched off"; E2's D9 row 2 says "the shipped Node guard reads the same way"
+  and its S5 sc. 2 plants `"testsTo" + "Delete-"` in a `.cjs` and a `.sh` and expects a finding each. Neither can be met by the
+  shipped tool today. Two coai fixtures were invisible to it (`scripts/lib/native-run.test.mjs:42`, `scripts/native/native.test.mjs:506`)
+  and become plain literals with the inline `legacy-name` exemption (E5's S6).
+- **What it does.** A test file that builds the prefix from pieces hides a legacy name or an owner-blind pattern from the Node guard,
+  and a repository's "zero `legacy-name`" is then only "zero WHOLE literals". It does not hide a `raw-temp` site (that class reads
+  the API call, not the name). The interim scan the consumers run by hand (`'testsTo'`, `"tests", "To"`, `.join('')`,
+  `string.Concat` beside `Delete`) finds the spellings a person thought of; **it is not a proof that no other spelling exists.**
+- **Fix.** A folding reader in the shipped guard, for the `node` profile's files (`.mjs`, `.cjs`, `.js`, `.ts`, `.sh`, `.ps1`,
+  workflows): join string literals over `+`, `.concat(...)`, `[...].join('')` and `${'…'}` holes on one line, decode `\uXXXX`
+  and `\xXX`, read a one-character class as its character, then run the existing classes over the folded line; a literal
+  that holds `sto` or `tod`, the pieces that cross the word's join, and not the whole word is `owner-blind` (no longer piece: a shorter or wider rule gave false positives, as below),
+  as the C# template does, with the template's folding allowances for the guard's own files. RED first: the spellings of the table above in a fixture, each with its exact line, because the count depends on the line (the judge's note); each one finding; the consumers' real trees must stay at their current counts (a false positive on a
+  product word such as `chatModelEdits` is a defect of the reader; the S6 brief measured zero in coai with the `sto`/`tod`
+  rule). One release, then pin bumps alone.
+- **Not the fix.** A second detector of coai's own with different semantics, whose findings could not carry the rule's
+  exemption and would leave creds behind (option A of the S6 brief, rejected at the epoch-6 re-review).
+- **Owner and deadline.** The conventions repository (the guard's maintainer); **deadline 2026-11-19, accepted by the owner on 2026-11-05**, or before
+  creds' E2.5 merges if that is earlier — the owner confirms or moves the date (the rollout's § *Epoch 6*, item 7, question 3).
+  Until it ships, every consumer's Node compliance declaration says in its PR that `legacy-name` and `owner-blind` are
+  "zero whole literals, F30 open", and runs the interim scan with its output recorded.
+- **Re-measured by the epoch-6 judge (2026-11-05, `scanText` at `bd795847`; the brief's exact lines are not recorded).** The brief's table holds 16 spellings, not 15
+  (2 found, 14 not). The count depends on the line: `/testsToDelete[-_]/i` and `new RegExp('^testsToDelete[-_]')` answer `owner-blind` (the classifier's anchors), and the
+  bare word, the bare prefix or a `?` glob on a line with `rmSync` answer `owner-blind` too (its deletion reading); with no removal on the line the `?` glob and
+  `new RegExp('testsToDelete[-_]')` answer `[]`. What no line of this measure found: a split over `+`, `.concat`, `.join('')`, a template hole, `\u`, `\x`, a one-character
+  class, half of the word, and `rmSync` over a joined prefix. So "2 of 15" is a count of one set of lines, and the fixture of the Fix and of the Definition of Done must name its
+  lines. The Fix as written also leaves some of them at `[]`: folding changes nothing for a bare word or an unanchored regex string with no removal on the line; they need the C#
+  template's `BareWordHits` reading as well. The piece rule of the Fix (`sto` or `tod`) is the S6 brief's, stricter than the C# template's `PrefixPieces`, which gives false
+  positives on product words (the brief's measure); "as the C# template does" holds for the class, not for the pieces.
+- **State.** Open. Not a prerequisite of E5's producer PR (the rollout's entry 5.2, option C); covers coai and creds; E6 and E7
+  read it before their first Node compliance declaration.
+
 ## Definition of Done
 
 - [ ] Each of F1 to F22, F24 and F25 (F23 is reserved by F3's note for other manifests) is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
@@ -870,6 +912,9 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - [ ] F29 is closed when, for each of the template and the sidecar, ONE of these holds, recorded under F29: a fix is in, with a Windows test that runs two independent sweep
       PROCESSES and is green; or that side's Windows sweep only lists, by a recorded decision; or a measurement on Windows of that side's OWN call shows a single winner (the
       measurement above is of `Directory.Move`, not of `MoveFileExW`). And F16's Fix either keeps the Node sweep list-only on Windows or meets F29's Node requirement.
+- [ ] F30 is closed when the shipped Node guard's folding reader is released with its fixture of the table's spellings, by exact line, RED first and GREEN after,
+      the consumers' real trees at their recorded counts, and the consumers that declared "zero whole literals, F30 open" have re-run the
+      guard at the new pin and recorded the result; or when the owner records, under F30, that the reader stays a documented limit.
 - [ ] F27 is in a released rule text: the rule test for the new section was RED before the text and is GREEN after, and
       `node tools/rule-bodies.mjs` and `node tools/ownership-check.mjs` are clean.
 - [ ] F28, which is not code here, is closed when (1) dew_flow_mcp and dew_flow_benchmark each have a release ref that a person
