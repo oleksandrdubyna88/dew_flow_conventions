@@ -90,8 +90,10 @@ has reached `proceed`.**
    of your options, and neither is resolving your way past it: recording decisions no longer
    reopens it. Call `ask_human`. Their answer decides: *keep going* and *stop and act on the
    findings* each grant a fresh set of rounds, *stop and talk to me* advances nothing, and if they
-   would rather ship with the findings open they say so and you pass
-   `humanDecision: "proceed"` to `resolve`.
+   would rather ship with the findings open they press *Proceed despite the findings* on the
+   hold's own notice card. When `status` says a person pressed Proceed, call `resolve` to advance.
+   **Never pass `humanDecision` yourself.** No argument of yours releases a held gate: the server
+   refuses one that would change the outcome and ignores one that would not.
 
    This is enforced because it was not, and the cost is measured: on a three-round budget a stage
    reached round TEN, every round after the third a full panel of reviewers. The AI running it

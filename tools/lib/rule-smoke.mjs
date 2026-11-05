@@ -257,17 +257,25 @@ function roleRowsFor(fixture,root) {
   return table?roleRowsOf(fs.readFileSync(path.join(root,table),"utf8")):[];
 }
 
+/** The rules a rule-loading fixture is judged on: the ones it loads, else the subagent-models rule. */
+const rulesUnderTest=fixture=>fixture.loadOnly?.length>0?fixture.loadOnly:[GATE_RULE];
+
 /**
  * Pure verdict of a behaviour trace. A fixture that loads rules is never judged on a rule the session did not
- * read completely: that is `inconclusive`, whatever the answers or launches were.
+ * read completely: that is `inconclusive`, whatever the answers or launches were. So is a `loadOnly` run that read
+ * another rule as well: the answer may then come from that rule, so it says nothing about the rule under test.
  */
 export function judgeBehaviour({fixture,out,expected,origin,root}) {
   const {events,parseFailed}=parseEvents(out);
   const evidence=delegationEvidence(events,{marker:DENY_MARKER});
   const verdict=behaviourVerdict(evidence,fixture.expectation,roleRowsFor(fixture,root));
   const rulesRead=fixture.loadRules?rulesReadIn(out,expected,origin):[];
-  if(fixture.loadRules&&!rulesRead.includes(GATE_RULE))
-    return {evidence,verdict:{outcome:"inconclusive",reasons:[`rule ${GATE_RULE} was not loaded`]},parseFailed,rulesRead};
+  const unread=fixture.loadRules?rulesUnderTest(fixture).filter(id=>!rulesRead.includes(id)):[];
+  if(unread.length>0)
+    return {evidence,verdict:{outcome:"inconclusive",reasons:unread.map(id=>`rule ${id} was not loaded`)},parseFailed,rulesRead};
+  const beyond=fixture.loadOnly?.length>0?rulesRead.filter(id=>!fixture.loadOnly.includes(id)):[];
+  if(beyond.length>0)
+    return {evidence,verdict:{outcome:"inconclusive",reasons:beyond.map(id=>`rule ${id} was read beyond the fixture's loadOnly`)},parseFailed,rulesRead};
   return {evidence,verdict,parseFailed,rulesRead};
 }
 
