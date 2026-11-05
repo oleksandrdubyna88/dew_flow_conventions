@@ -209,7 +209,12 @@ function regexEnd(line, from, ctx) {
   return -1;
 }
 
-const quoteFollows = (line, from) => isQuote(line.charCodeAt(skipSpaces(line, from)));
+/** Whether a literal (a quote or a backtick), maybe in parentheses, starts at `from` after spaces. */
+function operandFollows(line, from) {
+  let j = skipSpaces(line, from);
+  while (line.charCodeAt(j) === 40) j = skipSpaces(line, j + 1);
+  return isQuote(line.charCodeAt(j)) || line.charCodeAt(j) === 96;
+}
 
 /**
  * The next thing the driver must decide, from `from` on: sets `state.at` and returns an EVENT. Whitespace, identifiers, numbers, punctuation, a regex literal and a
@@ -233,7 +238,7 @@ function nextEvent(line, from, ctx, state) {
       ctx.steps += i - start - 1;
       const length = i - start;
       prev = (length === 4 || length === 6) && KEYWORDS_BEFORE_REGEX.has(line.slice(start, i)) ? OPENER : VALUE;
-    } else if (isQuote(c) || c === 96 || (c === 91 && state.arrays && quoteFollows(line, i + 1))) {
+    } else if (isQuote(c) || c === 96 || (c === 91 && state.arrays && operandFollows(line, i + 1))) {
       state.at = i;
       state.prev = prev;
       return c === 96 ? EVENT.TICK : c === 91 ? EVENT.BRACKET : EVENT.QUOTE;
@@ -285,12 +290,12 @@ function readLiteral(line, at, ctx) {
   const c = line.charCodeAt(at);
   if (isQuote(c)) {
     const end = lexQuoted(line, at, ctx);
-    return end < 0 ? null : { end, value: decodeJs(line.slice(at + 1, end - 1)) };
+    return end < 0 ? null : { end, value: decodeJs(line.slice(at + 1, end - 1)), quote: line[at] };
   }
   if (c === 96) {
     const inner = { stack: [T], ts: newTemplate(at, true), commentLine: 0 };
     const end = lexTemplate(line, at + 1, inner, new Out(true), ctx);
-    return inner.stack.length === 0 ? { end, value: inner.ts.value } : null;
+    return inner.stack.length === 0 ? { end, value: inner.ts.value, quote: "`" } : null;
   }
   return null;
 }
@@ -308,7 +313,7 @@ function readPsLiteral(line, at, ctx) {
       if (line.charCodeAt(j + 1) === quote) j += 2;
       else {
         ctx.steps += j - at;
-        return { end: j + 1, value: line.slice(at + 1, j) };
+        return { end: j + 1, value: line.slice(at + 1, j), quote: line[at] };
       }
     } else j += 1;
   }
@@ -323,6 +328,35 @@ function plusFollows(line, end) {
   return line.charCodeAt(j) === 43 && line.charCodeAt(j + 1) !== 43 && line.charCodeAt(j + 1) !== 61;
 }
 
+/** A literal with any number of parentheses around it, spaces allowed: `{ end, value, quote }`, or null. `read` is the language's `readLiteral`. */
+function readOperand(line, at, ctx, read = readLiteral) {
+  let j = skipSpaces(line, at);
+  let open = 0;
+  while (line.charCodeAt(j) === 40) {
+    open += 1;
+    j = skipSpaces(line, j + 1);
+  }
+  ctx.steps += j - at;
+  const literal = read(line, j, ctx);
+  if (literal === null) return null;
+  let end = literal.end;
+  for (let t = 0; t < open; t += 1) {
+    const m = skipSpaces(line, end);
+    if (line.charCodeAt(m) !== 41) return null;
+    end = m + 1;
+  }
+  return { end, value: literal.value, quote: literal.quote };
+}
+
+/** The position of the `(` of `. name (` that starts at `at` (the dot), or -1: spaces are allowed around the dot and before the parenthesis. */
+function methodOpen(line, at, name) {
+  if (line.charCodeAt(at) !== 46) return -1;
+  const k = skipSpaces(line, at + 1);
+  if (!line.startsWith(name, k)) return -1;
+  const open = skipSpaces(line, k + name.length);
+  return line.charCodeAt(open) === 40 ? open : -1;
+}
+
 const isPlus = (line, j) => line.charCodeAt(j) === 43 && line.charCodeAt(j + 1) !== 43 && line.charCodeAt(j + 1) !== 61;
 
 /** The literal arguments of a `.concat(` whose `(` is just before `from`: `{ value, end, closed, count }`; `end` is after the `)` when closed, else at the first argument that is no literal. */
@@ -331,7 +365,7 @@ function concatArguments(line, from, ctx) {
   let value = "";
   let count = 0;
   for (;;) {
-    const lit = isQuote(line.charCodeAt(j)) || line.charCodeAt(j) === 96 ? readLiteral(line, j, ctx) : null;
+    const lit = readOperand(line, j, ctx);
     if (lit === null) return { value, end: j, closed: false, count };
     count += 1;
     value += lit.value;
@@ -363,25 +397,13 @@ function chain(line, end, value, ctx, js) {
     }
     ctx.steps += j - e + 1;
     if (isPlus(line, j)) {
-      j = skipSpaces(line, j + 1);
-      let k = 0;
-      while (line.charCodeAt(j) === 40) {
-        k += 1;
-        j = skipSpaces(line, j + 1);
-      }
-      const operand = j >= n ? null : (js ? readLiteral(line, j, ctx) : readPsLiteral(line, j, ctx));
+      const operand = readOperand(line, j + 1, ctx, js ? readLiteral : readPsLiteral);
       if (operand === null) break;
-      let after = operand.end;
-      for (let t = 0; t < k && after >= 0; t += 1) {
-        const m = skipSpaces(line, after);
-        after = line.charCodeAt(m) === 41 ? m + 1 : -1;
-      }
-      if (after < 0) break;
       joined += operand.value;
       closers += c;
-      e = after;
-    } else if (js && line.startsWith(".concat(", j)) {
-      const args = concatArguments(line, j + 8, ctx);
+      e = operand.end;
+    } else if (js && methodOpen(line, j, "concat") >= 0) {
+      const args = concatArguments(line, methodOpen(line, j, "concat") + 1, ctx);
       if (args.count === 0) break;
       joined += args.value;
       closers += c;
@@ -395,14 +417,15 @@ function chain(line, end, value, ctx, js) {
   return { value: joined, end: e, closers, carry };
 }
 
-/** `['a', 'b'].join('-')` that opens at `at`: `{ end, value, quote }`, or null. */
+/** `['a', 'b'].join('-')` that opens at `at` (spaces around its operators, a literal in parentheses anywhere a literal stands): `{ end, value, quote }`, or null. */
 function tryJoinArray(line, at, ctx) {
   let j = skipSpaces(line, at + 1);
-  const quote = line[j];
   const items = [];
+  let quote;
   for (;;) {
-    const lit = readLiteral(line, j, ctx);
+    const lit = readOperand(line, j, ctx);
     if (lit === null) return null;
+    quote ??= lit.quote;
     items.push(lit.value);
     j = skipSpaces(line, lit.end);
     if (line.charCodeAt(j) === 44) {
@@ -411,10 +434,9 @@ function tryJoinArray(line, at, ctx) {
     } else if (line.charCodeAt(j) === 93) break;
     else return null;
   }
-  j = skipSpaces(line, j + 1);
-  if (!line.startsWith(".join(", j)) return null;
-  j = skipSpaces(line, j + 6);
-  const separator = readLiteral(line, j, ctx);
+  const open = methodOpen(line, skipSpaces(line, j + 1), "join");
+  if (open < 0) return null;
+  const separator = readOperand(line, open + 1, ctx);
   if (separator === null) return null;
   j = skipSpaces(line, separator.end);
   if (line.charCodeAt(j) !== 41) return null;
