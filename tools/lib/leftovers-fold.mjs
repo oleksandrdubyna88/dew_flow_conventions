@@ -163,8 +163,7 @@ const continuedByPlus = (text, literal) => new RegExp(`${literal.replace(/[.*+?^
  * The word, whole, in a literal and followed by none of: an owner segment (a literal owner, a class `[uw]`, a variable or a placeholder: the classifier's own
  * `owner-aware`, `sweeper-scan.mjs`), a narrow literal second segment (a name, which the class `legacy-name` judges, and the marker words `exempt` and
  * `quarantine`), an environment variable's tail, the label key `.owner`, a space (prose), the owner letter at the end of the literal with a `+` after it
- * (`'testsToDelete-u' + uid`: `text` is the folded line, and the number is the next operand). What is left is `testsToDelete`, `testsToDelete-`, `testsToDelete-*`,
- * `testsToDelete[-_]`: the C# template's `BareWordHits`, so the unanchored regex string and the bare word are seen with no removal on the line.
+ * (`'testsToDelete-u' + uid`: `text` is the folded line, and the number is the next operand). What is left is the bare word, the word and a separator, a glob of it, a regex over it: the C# template's `BareWordHits`, so the unanchored regex string and the bare word are seen with no removal on the line.
  */
 export function bareWordHits(literals, text = "") {
   return literals.flatMap((literal) => [...literal.matchAll(WORD_ANYWHERE)].flatMap((word) => {

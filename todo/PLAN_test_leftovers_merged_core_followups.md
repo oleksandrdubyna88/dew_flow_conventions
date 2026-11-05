@@ -902,8 +902,14 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   template's `BareWordHits` reading as well. The piece rule of the Fix (`sto` or `tod`) is the S6 brief's, stricter than the C# template's `PrefixPieces`, which gives false
   positives on product words (the brief's measure); "as the C# template does" holds for the class, not for the pieces.
 - **The piece rule above is replaced (measured 2026-11-05, `todo/PLAN_F30_folding_reader.md`).** `sto` or `tod` hits 2386 literals in coai and 2454 in creds (`restore`, `history`, `todo/`). The rule is crossing pieces of 6 or more, any case. The plan is the current text for this item.
-- **State.** Open. Not a prerequisite of E5's producer PR (the rollout's entry 5.2, option C); covers coai and creds; E6 and E7
-  read it before their first Node compliance declaration.
+- **Shipped on its branch (2026-11-05, `feat/f30-folding-reader`; not merged, not released).** `tools/lib/leftovers-fold.mjs` joins and decodes the string literals of one line (`+`, `.concat`, `.join(…)`,
+  `${'…'}` holes, `\u`, `\x`, `[T]`; touching quotes and `$'…'` in `.sh` and workflow lines; `+` and `-join` in `.ps1`); `legacy-name` and `owner-blind` read the folded line, and `owner-blind` also reads the
+  bare word and a crossing piece of **6 or more characters, any case** (the corrected piece rule). Ten files of this repository that spell the word in pieces on purpose are the frozen list
+  `FOLDING_ALLOWANCES`. The record of the measure and of the seven consumers' real trees is `research/2026-11-05_f30_folding_reader.md`: one new finding, creds
+  `src_vs_code/src/test/leftoversSites.test.ts:74`, real; three false findings of the first reader are rows of the second table. What the reader does not read is in `common/test-leftovers-detail.md` § 7
+  and in the guard's header.
+- **State.** Fixed on the branch, awaiting the code gate, the PR and one release; then the pin bumps, each alone (the plan's Order). Not a prerequisite of E5's producer PR (the rollout's entry 5.2, option C);
+  covers coai and creds; E6 and E7 read it before their first Node compliance declaration.
 
 ## F31 — On an elevated Windows run the audit's claim scan and the sweep's collection cannot read the run's own leftovers (found 2026-11-05, coai E5's S6; the rollout's entry 6.2)
 

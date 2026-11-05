@@ -18,6 +18,9 @@
  *                 variable the same file assigns a value holding the prefix (a name from another file, the environment or an
  *                 argument is not traced) — the shape of a sweeper that cannot tell one user's leftovers from another's. It takes NO inline exemption: the one pass is
  *                 `tools/fixtures/owner-blind-allowlist.json`, keyed by file, line and the sha256 of the line
+ * `legacy-name` and `owner-blind` read each line TWICE: as written, and folded (`tools/lib/leftovers-fold.mjs`, F30): the string literals of the line joined over `+`, `.concat(…)`, `[…].join('…')` and `${'…'}` holes of a literal (js/ts), over touching quotes
+ * (sh, workflow lines; `$'…'`) and over `+` and `-join` (ps1), with `\uXXXX`, `\u{…}`, `\xXX` and a one-character class `[T]` decoded. On the joined literals it also reads the whole word with no owner segment after it and a piece of
+ * the word of 6 characters or more that crosses the join of `tests` and `Delete`. A spelling reader of ONE line: a name built from a variable, across lines or at run time is not seen. `FOLDING_ALLOWANCES` lists this repository's files that spell the word in pieces on purpose.
  * plus three that are about the guard's own grammar and inputs:
  *   unreadable    under `--profile node`, a `package.json` that is not valid JSON, is not an object, or whose `scripts` is not an object of strings (never skipped in silence)
  *   exemption     a `testsToDelete-exempt:` comment that is not well-formed

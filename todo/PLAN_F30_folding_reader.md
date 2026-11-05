@@ -1,6 +1,6 @@
 # PLAN — F30: the shipped Node guard reads a prefix however it is spelled
 
-> Status: **plan only, 2026-11-05.** The item is F30 of `todo/PLAN_test_leftovers_merged_core_followups.md`. Owner: this repository. Deadline 2026-11-19, or before creds' E2.5 merges if that is earlier. Not a prerequisite of coai's E5 producer PR.
+> Status: **built on `feat/f30-folding-reader`, 2026-11-05; no PR yet, not released.** The plan gate passed it the same day. The item is F30 of `todo/PLAN_test_leftovers_merged_core_followups.md`. Owner: this repository. Deadline 2026-11-19, or before creds' E2.5 merges if that is earlier. Not a prerequisite of coai's E5 producer PR.
 
 ## Goal
 
@@ -64,9 +64,9 @@ A finding on a line is counted once per class, whichever reading found it. An ex
 
 ## What changes in the consumers
 
-- **creds:** `src_vs_code/src/test/leftoversSites.test.ts:74` builds `'testsTo' + 'Delete-agent-'` so the file does not find itself. It becomes a finding. It is fixed in creds by the rule's way, a plain literal with the inline `legacy-name` exemption, **in a PR that merges before creds' pin bump**. Otherwise the bump goes red.
-- **coai:** none measured at the piece rule. The folded reading may add lines the rough search cannot see; D5's real-tree record decides. coai's `testLeftovers.test.mjs` N8 pins only what is detected, so it stays green.
-- **Any other new finding** from D5's record is listed in this plan before the release, with its fix in that consumer.
+- **creds:** `src_vs_code/src/test/leftoversSites.test.ts:74` builds `'testsTo' + 'Delete-agent-'` so the file does not find itself. It becomes a finding (D5's record, creds `41aca25c`: the one new finding of seven trees). It is fixed in creds by the rule's way, a plain literal with the inline `legacy-name` exemption, **in a PR that merges before creds' pin bump**. Otherwise the bump goes red.
+- **coai:** none. D5's record at coai `b3bdd472` gives zero new findings, so coai's `testLeftovers.test.mjs` N8 stays green. (The first reader gave seven at `.github/workflows/ci.yml`, an owner written as `[uw]`; they were false and are a row of the second table.)
+- **benchmark, rag_qln, sidecar_rust, vscode_kit, mcp:** none (record: `research/2026-11-05_f30_folding_reader.md`).
 - **The sentence "zero whole literals, F30 open"** in E5, E2 and their PRs stays true until each repository pins the release. E2.5 then reads "zero".
 
 ## Order
@@ -85,11 +85,11 @@ A finding on a line is counted once per class, whichever reading found it. An ex
 
 ## Definition of Done
 
-- [ ] D5's two tables RED on the old guard and GREEN on the new one; a check that the first table goes RED with the reader switched off.
+- [x] D5's two tables RED on the old guard and GREEN on the new one; a check that the first table goes RED with the reader switched off. (Table 1: 26 of 31 rows RED on `bd795847` and with the reader off; table 2 cannot go red on a guard that finds nothing, and went red three times on the first reader.)
 - [ ] Every test of this repository green; `plan-lifecycle` clean.
-- [ ] The real-tree record on the PR: seven consumers, each new finding listed and read.
-- [ ] `common/test-leftovers-detail.md` says what the guard reads and what it does not, and `research/` records the measure.
-- [ ] F30's entry says what shipped, with the corrected piece rule.
+- [x] The real-tree record on the PR: seven consumers, each new finding listed and read. (`research/2026-11-05_f30_folding_reader.md`.)
+- [x] `common/test-leftovers-detail.md` says what the guard reads and what it does not (the detail is at its read cap: the full statement is the guard's header and the research record), and `research/` records the measure.
+- [x] F30's entry says what shipped, with the corrected piece rule.
 - [ ] The real-tree comparison re-run immediately before the release, with its commits recorded.
 - [ ] One release; the consumers' fixes merged first; the pin bumps, each alone.
 

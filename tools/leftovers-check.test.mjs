@@ -1081,7 +1081,7 @@ test("F30 reader: foldLine joins, decodes and keeps the quotes; a hole that hold
     [".mjs", "const n = ['a', 'b'].join('-') + 'c';", "const n = 'a-bc';", ["a-bc"]],
     [".ts", "const n = 'tests\\x54o' + \"Del\\u0065te\";", "const n = 'testsToDelete';", ["testsToDelete"]],
     [".mjs", 'const n = "a" + id + "b";', 'const n = "a" + id + "b";', ["a", "b"]],
-    [".sh", "rm -rf $'tests\\x54oDelete-*' \"a\"'b'", "rm -rf 'testsToDelete-*' \"ab\"", ["testsToDelete-*", "ab"]],
+    [".sh", "rm -rf $'tests\\x54oDelete-*' \"a\"'b'", `rm -rf '${Q}-*' "ab"`, [`${Q}-*`, "ab"]],
     [".yml", "      - run: echo 'a''b'", "      - run: echo 'ab'", ["ab"]],
     [".ps1", '$n = ("testsTo", "Delete-agent-1") -join ""', '$n = "testsToDelete-agent-1"', ["testsToDelete-agent-1"]],
     [".ps1", "$n = 'a' + \"b\" + 'c'", "$n = 'abc'", ["abc"]],
