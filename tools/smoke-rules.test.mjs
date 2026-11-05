@@ -447,6 +447,20 @@ test("a fixture that loads only the gate rule, run without reading it, is inconc
   assert.equal(judged.verdict.outcome,"inconclusive");
   assert.match(judged.verdict.reasons.join(),/common\.coai-review-gate was not loaded/);
 });
+test("a fixture that loads only the gate rule, run after also reading another rule, is inconclusive and names that rule",()=>{
+  const OTHER_TEXT="Some other rule that could steer the answer.\n";
+  const other={id:"common.other",text:OTHER_TEXT,hash:sha256(OTHER_TEXT)};
+  const command=`node "${origin.resolver.replaceAll("\\","/")}" read --repo "${origin.repo.replaceAll("\\","/")}" --task implement --only ${other.id}`;
+  const payload=`BEGIN RULE ${other.id} sha256:${other.hash}\n${OTHER_TEXT}\nEND RULE ${other.id}`;
+  const events=heldGateTrace({read:true,answers:["ask_human","point_to_notice_card","resolve","ask_human"]}).split("\n").map(line=>JSON.parse(line));
+  events.splice(0,0,
+    {type:"assistant",parent_tool_use_id:null,message:{content:[{type:"tool_use",id:"load-2",name:"Bash",input:{command}}]}},
+    {type:"user",parent_tool_use_id:null,message:{content:[{type:"tool_result",tool_use_id:"load-2",is_error:false,content:payload}]}});
+  const judged=judgeBehaviour({fixture:loadNamed("held-gate"),out:events.map(event=>JSON.stringify(event)).join("\n"),expected:[reviewGateRule,other],origin});
+  assert.deepEqual(judged.rulesRead,["common.coai-review-gate","common.other"],"the fixture must really have read both");
+  assert.equal(judged.verdict.outcome,"inconclusive");
+  assert.match(judged.verdict.reasons.join(),/common\.other was read beyond the fixture's loadOnly/);
+});
 test("every fixture states whether it loads rules, and validation requires the key",()=>{
   assert.deepEqual(fixtureNames.map(name=>loadNamed(name).loadRules),[false,true,true]);
   assert.throws(()=>validateFixture({...loadNamed("negative"),loadRules:undefined}),/loadRules/);
