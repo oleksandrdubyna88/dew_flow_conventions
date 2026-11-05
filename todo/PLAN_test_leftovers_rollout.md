@@ -5,6 +5,13 @@
 > opened with `state: open`. At the stop: E5's producer PR coai #945 (draft) holds S3, S2-B, S4 and S5, pushed at `524df50e`; the S6 brief is local at `6b3f143e`. The ONE release carrying F3
 > and F24 is promoted (`release` = `bd795847`, 2026-11-05, the owner agreed to the over-cap bumps), and its pin bumps are in flight: they are not epic code, they end the red pins the promotion
 > caused, and they go on during the stop. Coai #948 (the SQLite WAL switch) is outside this plan.
+> The whole plan is revised for epoch 6 (2026-11-05, step 4 of the full stop): § *Epoch 6 — the plan as revised at the
+> re-review*, and the E5 stories document revised with it (coai branch `feat/test-leftovers-e5-producer`, local; a copy
+> on `docs/e5-s6-brief-at-stop5`). The re-review record says `Narrowed: yes`; its table's verdicts are the Opus judge's
+> (step 5), and the owner's approval comes after it; epoch 6 opens only with that approval. § *Epoch 6* item 3 is the
+> one table the re-review consultant (`7f55e578`) asked for: every remaining merge condition of E5, E2, E6 and E7 mapped
+> to its implementation, its invocations and its executable check, read against the real trees; its unmapped rows are
+> the findings of this re-review.
 >
 > Was: **epoch 5 open (2026-11-04), approved by the owner after the re-review.** Epoch 4 stopped at entries 4.1 and 4.2;
 > the whole plan was revised (§ *Epoch 5*), the Opus judge sorted epoch 4's work (14 fit; coai #943 cut, fixed forward on
@@ -345,6 +352,32 @@ Narrowed: yes — E5's native measurement series (`native-(vibe|kimi)-<yyyymmdd>
   Found writing E5's S6 brief; reproduced by the consultant (consult 5d804d0c: a split literal through `scanText` answers `[]`). A coai-own reader, a new conventions release or a narrowed row each changes a contract or a prerequisite. E2 has the same gap.
 - 5.3 · 2026-11-05 · agent · merge-conditions — D8 (b) says only the authorised `raw-temp` baseline is left, but the guard must read `src_vs_code/scripts` (P13), which holds 54 `raw-temp` lines no baseline scope can carry, and `src_server/smoke-image.sh:73` is a raw temp outside every scope
   A scope needs a proof that is a test file under its root, and that folder has none. The brief's answer was inline exemptions; the consultant reads that as narrowing D8 (b), and I agree. The brief's premise for `smoke-image.sh` was also wrong: its trap is set after fallible work (`:73`, `:102`), so a failure can leave the folder without a kill.
+
+### Re-review for epoch 6
+
+Narrowed: yes — two things got smaller, both in E5's producer PR: (1) must-not-copy row 2's NODE half — the shipped Node guard has no folding reader (2 of 15 planted spellings found at `bd795847`), so S6 pins only what the shipped guard does detect in a `.mjs` (a whole legacy literal, a bare-word glob that is removed), says plainly what it does not, and the folding reader for Node is F30 of the follow-ups plan with an owner and a proposed date, not a condition of the PR (option C of entry 5.2); the C# half of row 2 stands; (2) E5's D8 (b) — "only the authorised `raw-temp` baseline is left" becomes "only the authorised `raw-temp` baseline and the inline `raw-temp` exemptions of the expected-exemption inventory are left", each exemption with a containment reason proved line by line in S6 (the `raw-temp` lines of `src_vs_code/scripts/` that the guard reads under P13, and `src_server/smoke-image.sh:73`). The goal, this plan's Definition of Done, S7's zero and the runtime barrier do not get smaller; the prerequisites got WIDER in three places that narrow nothing by themselves (the audit runs before the run folder is removed; the baseline's FINAL content is validated at the PR's last head; the smoke script's trap moves before its `mktemp`).
+  (Written 2026-11-05 with the revision of § *Epoch 6*, over the three entries of epoch 5: 5.1, the Windows sweep
+  mutex (built on #945, not narrowed, kept); 5.2, row 2's Node half; 5.3, D8 (b) and the 54 lines no baseline scope can
+  carry. Re-review consult `7f55e578`; the question consultants before it: `5d804d0c` (the split literal). The Verdict
+  and Action cells are `—` until an Opus judge fills them (step 5 of the full stop). Not rows: coai #948 (the SQLite WAL
+  switch, outside); conventions #130 (a test-only janitor fix that rode the release, outside this plan's epics) and
+  conventions #131 (F26's values, the owner's item); the shared-rules plan's ledger (#127, another plan); and this
+  revision commit itself, which is the baseline epoch 6 is approved on, never an entry. The epoch 6 line is written
+  only when the owner approves.)
+
+| Work | Where | Verdict | Action |
+|---|---|---|---|
+| the epoch-5 record — the re-review after entry 4.2, the judge's table, approved by the owner, conventions #126 `02bf273` (merged 2026-11-04 13:05Z; epoch 5 opens here) | main | — | — |
+| the E7 stage-A record and the `ResidentSet` must-settle, conventions #128 `0acd8c9`; entry 5.1 and F29, conventions #129 `e61e74a` | main | — | — |
+| the release `bd795847` — F3 (#116), F24 (#119) and the test-only #130, promoted 2026-11-05 with the owner's agreement to the over-cap bumps; the F24 FIRST acceptance run before it (the guard's proof check closes both ways under `--profile node`; the five forced runs exit 78 on the C# host, `RunTempTests` 21 of 21; both Node proof files 6 of 6) | `release` = `bd795847` | — | — |
+| the pin bumps to `bd795847`, each alone and OPEN when this was written: coai #947, creds #297, mcp #64, sidecar_rust #70, vscode_kit #23, wsl_care #186 (the seven over-cap bumps the owner agreed to on 2026-11-05; rag_qln's not opened yet), benchmark #166 and r9700 #14 under the cap | pushed, unmerged (open PRs) | — | — |
+| coai #945 (draft), S4 — the Node wrap, `beginRun` fails closed, the first-import refusal, the native series renamed `native-(vibe or kimi)-…` with the caller's `stat` check, SonarCloud and the Windows step through the runner, the Windows throwaway record (`test:host` 24/24 + 1/1); commits `93c3092a` … `bd03bb3e` (2026-11-04/05) | pushed, unmerged (draft PR) | — | — |
+| coai #945 (draft), entry 5.1 — `SweepLock.cs` (a per-root named mutex across a whole Windows sweep), three manifest ops, the strict tests; RED runs 41875636356, 41878243091, 41893469970; Windows green twice on run 41881044878; commits `aaeb5e81`, `7d6048e1`, `68528ef5`, `e250a14d`, `ef8baeba`, `826b977f`, `ab789672` | pushed, unmerged (draft PR) | — | — |
+| coai #945 (draft), S5 — the bare prefix leaves every eligible site, the legacy fixtures plain literals with the inline exemption, the fixture bug it exposed fixed; `d8dff1a6`, `cab9a172`, `524df50e` (the PR's head; every job green but the pin check — the promotion's known result — and the `continue-on-error` real-editor job, a transient VS Code version lookup before any editor started) | pushed, unmerged (draft PR) | — | — |
+| coai local `548f14a1` … `6b3f143e` on `feat/test-leftovers-e5-producer` — the S6 build brief (`todo/PLAN_test_leftovers_E5_S6_brief.md`), five docs commits; its Decisions 1 and 2 are entries 5.2 and 5.3 | local (a copy pushed to `docs/e5-s6-brief-at-stop5` with this revision) | — | — |
+| dew_flow_rag_qln #86 `47998e7` — E7 stage A: the daemon lists `qlntest_*` and drops none by name (merged 2026-11-04, after epoch 5 opened; not in epoch 5's table) and #87 `88577ff` — its plan promoted with the live check: 8 collections, 18867 points, 84 MB of vectors, 221 MB on disk, a second run adds none; the "about 8 GB per recipe change" refuted (about 0.2 GB) | main of dew_flow_rag_qln | — | — |
+| creds #294 (draft) at `9a6e9fa` — no commit since epoch 5's table | pushed, unmerged (draft PR) | — | — |
+| the stop record — entries 5.2 and 5.3, `state: stopped`, `b3658f67` (branch `docs/rollout-stop-epoch5`; this revision builds on it) | pushed, unmerged (no PR yet) | — | — |
 
 ## Symptom
 
@@ -1599,6 +1632,348 @@ and still blocks the first producer merge of E2 and of E5.
 3. **The over-cap pin bumps of the F3 + F24 release** — asked when the release comes, as the owner answered in
    epoch 4 (question 4). No answer is needed now.
 
+## Epoch 6 — the plan as revised at the re-review (2026-11-05)
+
+The whole plan read again against what is known now, as step 4 of the full stop asks (`common/plan-change-control.md`),
+over the three entries of epoch 5. All three were found on E5's producer branch: 5.1 (2026-11-04, S2-B's two-sweeps test
+on Windows), a rename has no single winner there, so the C# copy holds a per-root mutex around a whole sweep — built on
+#945, an op on the template's text, F29 for the template's owner; 5.2 (2026-11-05, the S6 brief), must-not-copy row 2
+asks for twelve planted spellings in a `.mjs`, RED when the folding reader is off, and the shipped Node guard has no
+folding reader; 5.3 (2026-11-05, the same brief), D8 (b) says only the authorised `raw-temp` baseline is left, but the
+guard must read `src_vs_code/scripts/` (P13), which holds 54 `raw-temp` lines no baseline scope can carry, and
+`src_server/smoke-image.sh:73` is a raw temp outside every scope. The re-review consult is `7f55e578` (the question
+consultants before it: `5d804d0c`); it is advice, and each point was checked against the files (item 6). This section
+is the baseline epoch 6 is approved on. § *Epoch 5* stays as the record. Superseded by this section, read from here:
+E5's must-not-copy row 2, its Node half (item 4.1); E5's D8 (b) and the S6 line of § *Epoch 5* item 5 ("the guards, one
+baseline, the expected-exemption inventory") — read with item 4.2; the S6 brief's Decision 5 (an exemption for
+`smoke-image.sh:73` with the reason "its EXIT trap removes this folder") — item 4.3; the S6 brief's § 11 ("the disposal
+order of the two assembly fixtures must not matter") — item 4.4; the S6 brief's § 12.4 (the standing shrink step skipped
+on the creation PR) — item 4.5. The E5 stories document (`dew_flow_connect_other_ais · todo/PLAN_test_leftovers_E5.md`)
+is revised the same day on the producer branch; its changes are this plan's. The S6 brief is NOT rewritten here; what
+must change in it is listed in item 4.7, and an Opus author revises it after this epoch is approved.
+
+### 1. What this plan is now
+
+§ *Epoch 5*'s picture stands, with these facts brought up to date (each read in git or GitHub on 2026-11-05):
+
+- **Epoch 5 was approved by the owner** (2026-11-04, #126, `02bf273`). It then took THREE changes in one day. The
+  pattern of the four stops is the same: a story's build brief found that a mechanism the plan named does not fit the
+  tool, the tree or the CI as they are. The plan specified the mechanism before anyone checked the fit. Item 8 changes
+  the way of working so the check comes first.
+- **The ONE release carrying F3 and F24 is promoted:** `release` = `bd795847` (F3 #116, F24 #119, and the test-only
+  #130), 2026-11-05. The F24 FIRST acceptance run passed before it (the guard's proof check closes both ways under
+  `--profile node`; the five forced runs exit 78 on the C# host, `RunTempTests` 21 of 21; both Node proof files 6 of 6).
+  The pin bumps are in flight, each alone, over the cap with the owner's agreement of 2026-11-05: coai #947, creds #297,
+  mcp #64, sidecar_rust #70, vscode_kit #23, wsl_care #186 (rag_qln's not opened yet), and benchmark #166, r9700 #14 under
+  the cap. **coai's `main` and the producer branch still pin `cc24f9e`** (read in the gitlink): S6 cannot create its
+  baseline, and the SECOND F24 acceptance run cannot run, before #947 merges and the branch takes it.
+- **E5 (wave 2).** coai #945 (draft) at `524df50e` holds S3, S2-B, S4 (`93c3092a` … `bd03bb3e`), entry 5.1
+  (`SweepLock.cs`, three ops, strict tests, RED runs 41875636356, 41878243091, 41893469970, Windows green twice on run
+  41881044878) and S5 (`d8dff1a6`, `cab9a172`, `524df50e`; the fixture bug it exposed is fixed). Every job is green on
+  that head except the pin check (the promotion's known result, ended by #947) and the `continue-on-error` real-editor
+  job (a transient VS Code version lookup, before any editor started). **S6 is a brief only** (local `6b3f143e`; a copy
+  on `docs/e5-s6-brief-at-stop5`); S7 is not started.
+- **E2 (wave 2).** creds #294 (draft) is unchanged at `9a6e9fa` since epoch 5's table. Its merge waits for (c), the WSL
+  administrator scan, and this epoch's approval. E2.2–E2.5 are not started. E2's own document has the same two gaps as
+  E5 (item 8.3), and its revision is its own plan-gate work, not this section's.
+- **E7 (wave 3).** Stage A is DONE and its plan promoted: dew_flow_rag_qln #86 (`47998e7`) and #87 (`88577ff`,
+  `research/PLAN_test_leftovers_E7_stage_a.md`). The live check ran on the WSL machine with native stores: 8 `qlntest`
+  collections, 18867 points, 84 MB of vectors, 221 MB on disk; a second run adds none. The plan's "about 8 GB per recipe
+  change" is REFUTED (about 0.2 GB). `SearchLiveTests.AQuestionInWords_FindsTheMemberThatAnswersIt` failed in both runs,
+  not caused by stage A (recorded in `research/module_search.md` there). **rag_qln has no `research/module_tests.md`**,
+  which `common.knowledge-base` requires of every repository; E7's stories must create it (item 8.3).
+- **E6 (wave 3).** Not started; no stories document. The boundary with dew_flow_benchmark's
+  `todo/PLAN_bench_test_leftovers_followups.md` is written on THIS side (§ *Epoch 5* item 5) and NOT yet on the
+  benchmark side (its plan mentions a boundary once, `:97`, without a table).
+- **The owner's open item is unchanged:** one administrator scan of the two root-only places of the WSL machine
+  (merge condition (c)); it blocks the first producer MERGE of E2 (E2.1) and of E5, not their build.
+- **The owner's standing wish:** no heavy bureaucracy, but control is kept. This revision removes a check only where it
+  proves nothing (item 8.1 names each one) and trades no part of the barrier for fewer steps.
+
+**Goal (unchanged).** The goal of § *Epoch 5*, item 1, stands word for word, with its exception and its clarification.
+
+**Definition of Done, read for epoch 6** (the list of § *Definition of Done* is not edited; this paragraph is read with
+it and with § *Epoch 5*'s reading): the "structural guard per language" line is read with F30's limit — until the
+shipped Node guard folds, a Node consumer's zero for `legacy-name` and `owner-blind` is a zero of WHOLE literals, said
+so in the PR; and item 1's "documented exemption" includes the inline `raw-temp` exemptions of E5's expected-exemption
+inventory, each with a containment reason proved as item 4.2 says. Nothing else of the list changes.
+
+### 2. Prerequisites
+
+1. **Merge condition (c) for the WSL machine** — OPEN: the administrator scan (`sudo node tools/sweeper-scan.mjs
+   --system`), recorded in `research/security/machines.md`. Blocks E2.1's and E5's producer MERGE.
+2. **The release `bd795847`** — DONE. Still to come, in this order: coai #947 merges (a pin bump alone) → the producer
+   branch merges `main` (a merge, not a rewrite) → the SECOND F24 acceptance check against the released guard and the real
+   E5 host (the brief's § 16), recorded on #945 and in coai's `research/module_tests.md` → S6 creates the baseline.
+3. **F30** (the shipped Node guard's folding reader) — NOT a prerequisite of any PR of this plan. A follow-up with an
+   owner (the conventions repository) and a proposed deadline (2026-11-19, question 3), covering coai and creds.
+4. **E5's rollback procedure (D11)** — built (the one switch, S2-B); merge condition (m) checks it is in the PR text.
+5. **The S6 brief's revision** by an Opus author (item 4.7) — a prerequisite of S6's CODE, not of this epoch's approval.
+6. **The coai feature review** at the end, unchanged.
+7. **Not prerequisites:** F25–F29 (parked or other owners); coai #948; the Windows code-signing PRs; the private
+   sibling's mirror (F26, the owner's).
+
+### 3. Merge conditions — ONE table: each remaining condition, its implementation, its invocations, its check
+
+The re-review consultant's root cause for the four stops: approval precedes integration discovery. Its check, taken: a
+table that maps every REMAINING merge condition to its ACTUAL implementation, the invocations it covers and an executable
+acceptance check. **A row with "—" in the implementation or the check column is an unmapped condition: still a design
+decision, and a finding of this re-review.** Each row was read against the real tree on 2026-11-05 (the producer branch
+at `524df50e`; coai `main`; creds `9a6e9fa`; rag_qln `88577ff`; benchmark `main`), not against the plan text; a row that
+says "not re-verified here" is one the revision took from the PR's record without running it.
+
+**E5 — the producer PR (coai #945), conditions (a)–(n) of D8 as read for epoch 5, plus (o)–(q) added here:**
+
+| # | Condition | Implementation (file) | Invocations covered | Executable acceptance check | State 2026-11-05 |
+|---|---|---|---|---|---|
+| (a) | S2-A on `main` | coai #940 `d02ed40e` | both runners | the characterization test of S2-A, green on `main` | DONE |
+| (b) | one squash PR S3 → S2-B → S4 → S5 → S6, with S6's repository-wide checks | S3, S2-B, S4, S5 on #945; S6: `LeftoversRepositoryGuardTests.cs` (C#, the copied `Scan` + the baseline) and `src_vs_code/src/test/testLeftovers.test.mjs` (Node) — **not written yet, specified in the brief §§ 7.1, 7.4** | the four C# executables; `npm test` through `run-tests.mjs`; `run-lib-tests.mjs` | the two wrappers green on the three legs; the planted violation per root red then reverted (brief § 13) | S3–S5 built; **S6 unmapped until built** |
+| (c) | the barrier per machine | `research/security/machines.md`; the Windows machine met by the owner's statement (#124) | the WSL machine; hosted runners need no record | `sudo node tools/sweeper-scan.mjs --system` once, its output in the record | **OPEN — the owner's item** |
+| (d) | the legacy clean-up per machine | `scripts/old-coai-leftovers.mjs` (S2-A's tool) | a person, per machine | the record per machine on the PR | the WSL record is in `module_tests.md`; not re-verified here |
+| (e) | the gates and the three legs | coai plan and code sessions; `ci.yml` `build-test`, `macos`, `windows` | every job of `ci.yml` | `proceed` on both gates; every job green on the head | green at `524df50e` but the pin check |
+| (f) | the baseline rule released and pinned | `common/test-leftovers-baseline.md` at `5863c60`; coai's pin `cc24f9e` | the guard with `--baseline` | the pin check | DONE |
+| (g) | F3 released and pinned before the first Node compliance declaration | `tools/lib/leftovers-package.mjs` in `bd795847`; coai #947 | `package.json` scripts | `leftovers-check.mjs --profile node` reads the manifests at the new pin (F3's own tests) | released; **pin pending (#947)** |
+| (h) | every other condition of the parent | this section | — | — | read here |
+| (i) | F24 released and pinned before S6 creates the baseline | `common/test-leftovers-baseline.md` at `bd795847`; coai #947 | the proof marker, no order | the pin check; (l) | released; **pin pending (#947)** |
+| (j) | the adapted copy's diff check | `src_mcp/tests/Leftovers/TheAdaptedCopyTests.cs`, `template-manifest.json` | the `Leftovers` filter on three legs | green on the head; one unexplained byte ⇒ red | green at `524df50e` |
+| (k) | the suite × OS merge gates | `ci.yml` steps per § *Epoch 4* (f) and D8's table | each cell with a step | every cell green on the head | green at `524df50e` |
+| (l) | F24's SECOND acceptance check against the released guard and the real host | the brief § 16: `--baseline --profile node` for the Node scopes; `LeftoversBaselineTests` `TheProofCheck_ClosesForEachScope` for the C# scopes; the five forced runs (`DiscoverySentinel`, `COAI_RUNTEMP_SELFTEST` = `fail-claim`, `mismatch-temp`, `mismatch-tmp`, `mismatch-tmpdir`, present in `src_vs_code/scripts/owned.mjs:61` and the C# gate) | the four C# executables, both Node runners | exit 78, one line, the sentinel untouched, five times; the proof check 2 → 0 (Node), 4 → 0 (C#) | **after #947; the C# test of the proof check is not written yet** |
+| (m) | the rollback procedure in the PR text | D11's one switch (S2-B); the PR description | — | a reviewer reads the description | not re-verified here |
+| (n) | the native series' evidence, Linux leg | S4 on #945 (`1edf7157`, `49e75da2`, `f3f74b57`, `8ffc20fb`): the survival test, the remover's grammar tests, the caller's `stat` check, the phase on a gone series, the size figure, the documents | the Linux leg | the S4 tests green; the PR record names each of the seven items | built; not re-verified item by item here |
+| (o) NEW | the end-of-run audit reads the run folder BEFORE it is removed | `src_mcp/tests_leftovers/LeftoversAudit.cs:41`: `Discover` returns `[]` when `!Directory.Exists(tmp)`, so a CLAIM-ONLY leftover (an orphan claim of a folder the test removed itself, absent from the registry) is invisible once the run folder is gone; the brief's § 11 says the fixture order does not matter — **not established** | the four C# suites' assembly fixtures | plant an orphan claim inside the run folder, absent from the registry; run both fixture orders; if only audit-first reports it, the fixture order is fixed audit-first and a test pins the order | **unmapped: no test today** |
+| (p) NEW | `src_server/smoke-image.sh` leaves nothing on a failure before its trap | `src_server/smoke-image.sh`: `work=$(mktemp -d)` at `:73`, `trap finish EXIT` at `:102`; `mkdir`, `chmod 0777`, `seed`, `new_key`, the mask line run in between under `set -e` | `TheImageSmokeUsesTheServerTests` (a `docker` stub on PATH); the pull-request image job | move `finish` and its `trap` to right after the globals (`:70`), before `mktemp`; RED first with a failing `chmod` (or `openssl`) stub on PATH: the folder stays today, is gone after; unsolved and said so: a `kill -9` between `mktemp` and the trap line, which no trap sees — the folder is a raw temp without a claim, and only the inline exemption's reason names that window | **unmapped: no test today** |
+| (q) NEW | the baseline's FINAL content is validated, not only its creation | the brief § 12.4 skips the standing shrink step on PR 945 by number, so a later edit of the committed baseline on the same PR is checked by nothing; the guard's own `--baseline` run (N1; the C# wrapper) validates membership, hash and count against the tree but not that the file equals what the tree generates | the creation PR | at the PR's LAST head, before the squash merge: `leftovers-check.mjs --print-baseline` equals the committed `raw-temp-baseline.json` byte for byte for the Node scopes (a `diff` of zero, recorded on the PR), the C# wrapper's equivalent for the `csharp` scopes, and the standing step's `number != 945` clause is removed by S7's first PR as the brief says; **whether `--print-baseline` covers the `csharp` scopes is not verified here** | **unmapped: no step today** |
+
+**E2 — creds, its remaining PRs (E2.1 merge; E2.2–E2.5), from its D8 and S5:**
+
+| # | Condition | Implementation (file) | Invocations covered | Executable acceptance check | State 2026-11-05 |
+|---|---|---|---|---|---|
+| E2 (c) | the barrier per machine | as E5 (c) | the WSL machine | the same scan | **OPEN** |
+| E2 (d) | the legacy clean-up recorded | the six legacy-name sites migrated by E2.1/E2.2; a person's record | per machine | the record on the PR | E2.1's by-hand records are in its part 7 |
+| E2.1 | the Node unit-test lifecycle, by-hand macOS and Windows records | #294 at `9a6e9fa` | `npm test`, the runner | run 2 of `tmp/e21-byhand` green (`be47183`); CI green | built; waits for (c) and this epoch |
+| E2.5 sc. 2 | planted `"testsTo" + "Delete-"` in a `.cs`, a `.cjs` and a `.sh` ⇒ one finding each | the C# guard folds `.cs` only (`IsFolded`); the shipped Node guard folds nothing (F30) | the `.cjs` and `.sh` plants | — | **unmapped: cannot be met for `.cjs`/`.sh` as written; E2's revision narrows it as E5 did (item 8.3)** |
+| E2.5 N6 | `${TMPDIR:-/tmp}` in `.sh` is unseen by the shipped guard (E2's own measurement) | no detector | `mcp-listen-smoke.sh:35`, `version-smoke.sh:30` | E2.4 migrates the two scripts regardless | mapped by migration, not by detection; a conventions follow-up is still open (E2's N6) |
+| E2.3 | the C# copy | an ADAPTED copy with a manifest (entry 3.1; E5's D2 is the form); F29 read first | five xUnit executables | the diff check green | not started; E2's document still says "a byte copy save the five named files" (DoD) |
+| E2.4 | `owned.sh` claim-first; the smoke scripts' traps | E2's S4 | bash on three OSes | the kill-between test; the trap before any fallible step (the same class as E5 (p)) | not started |
+
+**E6 — benchmark (no stories document yet):**
+
+| # | Condition | Implementation (file) | Invocations covered | Executable acceptance check | State 2026-11-05 |
+|---|---|---|---|---|---|
+| E6 stage A | the held-out sweep lists, never removes | #125 `6a963a4` | the held-out runner | its test | DONE |
+| E6 pin | `bd795847` | #166 (open) | — | the pin check | pending |
+| E6 boundary | written on both sides | this plan (§ *Epoch 5* item 5); benchmark's follow-ups plan: **one mention, no table** | — | the table present in both files | **unmapped on the benchmark side** |
+| E6 producer | the Testcontainers label, the per-test databases' exemption, the worktree seam, the C# adapted copy, the guard over `tests/` and `tools/` | — (no stories) | — | — | **unmapped: the stories document opens with this table filled** |
+
+**E7 — rag_qln:**
+
+| # | Condition | Implementation (file) | Invocations covered | Executable acceptance check | State 2026-11-05 |
+|---|---|---|---|---|---|
+| E7 stage A | the sampler drops nothing by name | #86 `47998e7`; promoted #87 | the daemon tick | the live check: the same count after a second run; the listing line in the log | DONE, measured |
+| E7 pin | `bd795847` | not opened yet | — | the pin check | **the bump is still to open** |
+| E7 must-settle | `ResidentSet.MakeRoomAsync` with a budget evicts the coldest collection of the WHOLE store, owner-blind | `EvictionPolicy.cs:90-91`, `ResidentSet.cs` (read 2026-11-04) | a capped store that tests also use | a test: a test collection is protected, or tests never share a capped store | **unmapped: the stories decide** |
+| E7 docs | `research/module_tests.md` exists, as `common.knowledge-base` requires | **absent in rag_qln** (checked `origin/main` `88577ff`) | — | the file exists with the harness, the command and the flow catalogue | **unmapped: a finding; E7's stories create it** |
+| E7 live suite | `SearchLiveTests.AQuestionInWords_FindsTheMemberThatAnswersIt` fails in both runs | `research/module_search.md` records it | the live tests | fixed or recorded as a known failure BEFORE E7's producer makes the live tests its proof | **open; not E7's cause, E7's blocker** |
+| E7 size | the growth figure | 0.2 GB measured, not 8 GB | — | the stories carry the measured figure and the `du` command | the stories carry it |
+
+**E5's producer PR merges only when:** every E5 row above is DONE or green on the head, including (o), (p) and (q) built
+with their RED first; (c) is recorded; coai's pin carries `bd795847` and the second F24 check is recorded; the rest as
+§ *Epoch 5* item 3. The E5 stories document, D8, carries the same (its dated note of 2026-11-05).
+
+### 4. The dispositions of entries 5.2 and 5.3, and the three checks the consultant added
+
+**4.1 Row 2 — option C, now; F30 as the follow-up.** The shipped Node guard finds 2 of 15 planted spellings in a `.mjs`
+(re-measured here: a split literal and a `.join('')` both answer `[]`; a whole legacy literal is `legacy-name`). So:
+S6's Node test pins what the shipped guard DOES detect (a whole legacy literal ⇒ `legacy-name`; a bare-word glob that is
+removed ⇒ `owner-blind`), RED with the detection removed from a fixture copy of the rule text is not possible, so the
+positive test stands alone and the PR says in one sentence what the guard does not see (the thirteen other spellings).
+The two split fixtures become plain literals with the inline `legacy-name` exemption (`scripts/lib/native-run.test.mjs:42`,
+`scripts/native/native.test.mjs:506`). The by-hand split-piece scan is kept and its output recorded, labelled as what it
+is: a search for the spellings a person thought of, **not a proof that no such spelling exists**. The folding reader for
+Node is F30 of the follow-ups plan (an owner, a proposed date, coai and creds covered). **Rejected:** option A (a
+coai-own folding check with different semantics: its findings could not carry the rule's exemption, and creds would be
+left behind); option B as a PREREQUISITE (one more release before S6 for a detector the C# half already has).
+
+**4.2 D8 (b) — inline exemptions plus the inventory, with verified reasons; the folder stays in the guard.** The 54
+`raw-temp` lines of `src_vs_code/scripts/` (the brief's § 10.5, the C# guard's count; this revision counted 87 lines
+with `mkdtemp` or `tmpdir()` by grep, imports included — the guard's class count is the one that binds) each take the
+rule's inline form `testsToDelete-exempt: raw-temp — <reason>` and a row of the expected-exemption inventory.
+**Rejected:** taking `src_vs_code/scripts/` out of the guard — that would hide every future allocation there. **The
+reason must be proved, line by line, with a test or a read record in the PR**, because "contained" is a claim about the
+CALLERS, not about the line:
+
+| Line (read 2026-11-05) | What it is | What proves the reason |
+|---|---|---|
+| `live-agent.mjs:78-80` — three `mkdtempSync(join(tmpdir(), 'coai-agent-…'))` | a verification harness; `startOwnedRun({ what: 'live-agent' })` at `:24` moves `TEMP`/`TMP`/`TMPDIR` into its run folder first | a test (or the S4 record) that `startOwnedRun` is the first effect of every such entry script and that `tmpdir()` answers the run folder after it; the 17 other entry scripts with the same reason are proved the same way, once, by the list of entries whose first import is the wrap |
+| `browserLayout.mjs:51`, `:79`; `seam-catalog.mjs:69`; the other `seam-*.mjs` lines | libraries: they allocate under whatever `tmpdir()` is when called | the reason "the entry or the test that imports it runs inside a run folder" holds only if EVERY caller does: the PR lists every importer of each library (`git grep -l`) and shows each is an entry script with the wrap or a test under the runner; one caller outside a run folder makes the line a finding, not an exemption |
+| `run-tests.mjs:103` `REAL_TEMP_ROOT = tmpdir()`; `ownedRun.mjs:34`, `:36` | the runner reads the real root before it makes its run folder — a READ, not an allocation | a read record: the line creates nothing; the rule's "a `tmpdir` import used only to read the root is migrated, not baselined" applies — these two files are helper-own, and the reason says "reads the root; allocates nothing" |
+| `src_server/smoke-image.sh:73` | a raw `mktemp -d` in the machine temp, in a test script | item 4.3: the trap moves before it, proved RED first; the exemption's reason names the one window left (a kill between `mktemp` and the trap) |
+
+D8 (b) reads, from this epoch: "zero unexempted `owner-blind` and `legacy-name`; only the authorised `raw-temp` baseline
+and the inline `raw-temp` exemptions of the expected-exemption inventory are left, each exemption with a reason proved
+as above; the inventory equals the guard's exemption list exactly". **Narrowed: yes** covers this and 4.1.
+
+**4.3 `src_server/smoke-image.sh` — the trap before `mktemp`.** `finish()` and `trap finish EXIT` move to right after
+the globals line (`work='' id='' logs_pid='' ok=false`, `:70`), before `work=$(mktemp -d)` (`:73`); `finish` already
+tolerates empty globals. RED first: `TheImageSmokeUsesTheServerTests` gains a case with a failing `chmod` (or `openssl`)
+stub on PATH — today the folder stays (the script exits under `set -e` before `:102`), after the move it is gone. What
+stays unsolved and is written in the exemption's reason: a `kill -9` between `mktemp` and the trap line, and the
+process-group kill a CI cancel sends; the folder then carries no claim and no prefix, and the janitor does not see it.
+That window is one shell line wide after the move; a shell port of the helper is not asked for.
+
+**4.4 The audit runs BEFORE the run folder is removed.** `LeftoversAudit.Discover` returns `[]` once the run folder is
+gone (`LeftoversAudit.cs:41`). The registry still reports a leaked `OwnedDir`, but a CLAIM-ONLY leftover — an orphan
+claim whose folder a test removed by hand, never registered — is seen only by `Discover`. The brief's § 11 claim that
+the fixture order does not matter is therefore not established. S6 plants exactly that orphan claim inside the run folder,
+absent from the registry, and runs both fixture orders; if only audit-first reports it (expected from the code), the
+audit fixture is ordered before `RunTempFixture` ends the run folder, and a test pins that order. **Deferred: detector
+expansion. Not deferred: containment and the audit's proof.** S7 drains contained debt; it does not discover whether
+containment works. Before merge, as before: owner survival, fail-closed start, discovery coverage (a scan of nothing is
+red), baseline reconciliation, and REAL audit failures. **Disposition of a leak the audit exposes: it is fixed in the
+test that made it before the PR merges; the audit is never weakened and no entry is added to skip it; each one found is
+recorded in `module_tests.md`.**
+
+**4.5 The baseline's final content.** The brief's § 12.4 makes the creation PR skip the standing shrink step by PR
+number; after the temporary creation step is removed, nothing on that PR compares the committed file with the tree.
+S6 adds, at the PR's LAST head before the squash merge: `leftovers-check.mjs --print-baseline` diffed against the
+committed `raw-temp-baseline.json` (zero lines), recorded on the PR, and the C# wrapper's equivalent for the `csharp`
+scopes (to be checked: whether `--print-baseline` covers them; if not, the C# wrapper prints its own). The standing
+`--baseline` runs (N1, the C# wrapper) stay as they are. This narrows nothing; it is a check the plan lacked.
+
+**4.6 Entry 5.1, for the record.** The Windows mutex is built and kept (`SweepLock.cs`, three manifest ops, strict
+tests, RED first). It changes the template's text by an op, so F29 carries the report to the template's owner; E2.3, E6
+and E7 read F29 before they copy. Nothing of 5.1 is narrowed.
+
+**4.7 What must change in the S6 brief** (`todo/PLAN_test_leftovers_E5_S6_brief.md`, `6b3f143e`; an Opus author
+revises it after approval; this revision does not edit it):
+
+1. § *Decisions* — the five answers are written: 1 = C (strike § 7.4's `foldedPrefix.mjs` and rows R3/N8; N8 becomes the
+   positive test of 4.1 and the one sentence of what is not detected); 2 = inline exemptions with the proof per line of
+   4.2 (not "the smallest option" alone); 3 = kept, with 4.5 added; 4 = kept; 5 = REPLACED by 4.3 (the trap moves, RED
+   first; the exemption's reason names the kill window, not "its EXIT trap removes this folder").
+2. § 10.5 — the reason column gets a fourth column, "proved by", per 4.2's table; the libraries' rows name their callers.
+3. § 11 — "the disposal order of the two assembly fixtures must not matter either" and the table row "`RunTempFixture`
+   disposes first … a leak is still red" are corrected: a claim-only leftover is NOT red in that order; the orphan-claim
+   plant of 4.4 is added, and the fixture order is fixed audit-first if it reports only there.
+4. § 12.4 — the final-content check of 4.5 at the last head, recorded; `--print-baseline` for the Node scopes, the C#
+   equivalent named.
+5. § 9.2 — unchanged in substance; it says the two fixtures were invisible to the shipped guard (F30), not only "a
+   prefix built from pieces is a defect".
+6. § 16 — runs after coai #947, not "after the pin carries `bd79584`" in the abstract; the C# proof-check test it names
+   is new code of S6 and is listed in § 5 *Files*.
+7. § 18 (the DoD) — the rows for (o), (p), (q) of item 3; the Node half of row 2 as narrowed; the S7 note that "the two
+   baseline files" is one file with scopes.
+8. § 21 *Assumptions* — "the C# guard's folding reader covers coai's Node trees" is removed; F30 is cited.
+
+### 5. Build order (revised)
+
+```
+DONE   as § Epoch 5, item 5 → epoch 5 approved (#126) → entry 5.1 on #945 (the Windows mutex; F29 #129) → S4 on #945
+       → E7 stage A (rag_qln #86) and its live check (#87) → F24's first acceptance run → the release bd795847
+       (F3 + F24 + #130) → S5 on #945 (524df50e) → the S6 brief (local) → the stop of epoch 5 (entries 5.2, 5.3) and
+       this re-review.
+NEXT   the owner approves epoch 6 (question 1)               — nothing of this plan merges before it
+       the pin bumps to bd795847 merge, each alone            — in flight; coai #947 before S6; rag_qln's is still to open
+       the WSL administrator scan (condition (c))             — the owner; one command; blocks E2.1's and E5's MERGE
+       the S6 brief revised by an Opus author (item 4.7)      — before S6's code
+       E2.1 (creds #294) merges after (c)                     — then E2.2 → E2.3 → E2.4 → E2.5, each with ITS table
+                                                                (item 8.2) in its brief before its plan gate
+       E5 producer PR (coai #945) — one squash merge, S3 ✓ → S2-B ✓ → S4 ✓ → S5 ✓ → S6:
+          S6   after #947 and the merge of main: F24's second check (brief § 16) → the trap move (4.3, RED first)
+               → the orphan-claim plant and the fixture order (4.4) → the guards' wrappers, the one baseline file
+               with its scopes, the expected-exemption inventory with the proof per line (4.2), the positive Node
+               detection test and its one sentence (4.1), the planted violation per root → the one creation → the
+               final-content diff at the last head (4.5) → the squash merge
+          after (c) and the gates → E5.S7 the drain (contained debt only)
+THEN   wave 3: E6 ∥ E7, as § Epoch 3; each stories document OPENS with item 3's table filled for its epic (item 8.2);
+       E6's boundary written on the benchmark side first; E7's stories create research/module_tests.md, settle the
+       ResidentSet eviction and the failing live test, and carry the measured 0.2 GB.
+LAST   the coai feature review; the promotion of this plan and its stories documents; R6 ticked in the remainder plan.
+```
+
+### 6. What the re-review consultant raised, and what was done with it
+
+| Point (consult `7f55e578`) | Verified | Taken |
+|---|---|---|
+| (a) Root cause: approval precedes integration discovery; before reopening, ONE table mapping each remaining merge condition to its implementation, paths and executable check; an unmapped row is a design decision | yes — each of the four stops came from a build brief (S3, S4, S6 twice) that found the named mechanism does not fit the tree | yes — item 3 (E5, E2, E6, E7); item 8 makes the table a step of every story's brief |
+| (b) 5.2: option C now; positive tests for what the shipped guard detects; say what it does not; fix the two split fixtures; option B as F-number with an owner and a date, coai and creds; reject A | yes — `scanText` answers `[]` for a split literal and a `.join('')`, `legacy-name` for a whole literal; the fixtures at `native-run.test.mjs:42`, `native.test.mjs:506` | yes — item 4.1; F30 in the follow-ups plan (this branch); E5's row 2, D6 and S6 revised |
+| (c) 5.3: inline exemptions plus the inventory, verified reasons; reject removing the folder from the guard; "contained" must be proved through every allocating library's callers; D8 (b) reworded; Narrowed: yes | yes — `live-agent.mjs:78-80` under `startOwnedRun` (`:24`); `browserLayout.mjs:51`, `:79` and `seam-catalog.mjs:69` are libraries; `run-tests.mjs:103` and `ownedRun.mjs:34`, `:36` only read the root | yes — item 4.2, the record's line |
+| (d) `smoke-image.sh`: `finish` and its trap before `mktemp`; RED with a failing `seed`/`chmod` stub; say what stays unsolved (a kill) | yes — `mktemp` at `:73`, `trap` at `:102`, `mkdir`/`chmod`/`seed`/`new_key` between, under `set -e`; the test drives the script with a stub on PATH | yes — item 4.3; condition (p) |
+| (e) keep S6's runtime barrier; defer detector expansion, not containment or audit proof; S7 drains contained debt; a leak the audit exposes is fixed before merge | yes — the brief's § 11 already says "never weaken the audit" | yes — item 4.4's disposition, written |
+| (f) § 11's "order does not matter" is not established for claim-only leftovers: `Discover` returns `[]` once the run folder is gone; plant an orphan claim, run both orders, order the audit first if needed | yes — `LeftoversAudit.cs:41` | yes — item 4.4; condition (o) |
+| (g) § 12.4 must validate the FINAL baseline content; the standing check is skipped on PR 945 after the temporary step goes | yes — the brief's `if: … number != 945` on the standing step | yes — item 4.5; condition (q) |
+| (h) Narrowed: yes applies to C and the inline exceptions; the trap order, the audit order, the final-content check and the repaired references narrow nothing | agreed | the record's line says exactly that |
+
+Nothing the consultant raised was rejected. Not taken from it: nothing. Added by this revision beyond it: the E2, E6
+and E7 tables of item 3; the rag_qln `module_tests.md` finding; item 8.
+
+### 7. Questions for the owner (blocking; each with the recommended answer; they go to the question consultants first)
+
+1. **Approve epoch 6 as narrowed?** The record says `Narrowed: yes`: row 2's Node half pins what the shipped guard
+   detects (2 of 15 spellings) and the rest is F30; D8 (b) admits the inline `raw-temp` exemptions of the inventory,
+   each with a proved reason. *Recommended:* yes — the barrier is intact (owner survival, fail closed, discovery
+   coverage, the audit with teeth, the baseline reconciliation), the Node detection gap is the C# template's E4 defect
+   in the shipped tool and has an owner and a date, and the alternative (a coai-own detector) would make a finding
+   nobody can exempt and leave creds behind.
+2. **The WSL administrator scan** (merge condition (c)) — unchanged: `sudo node tools/sweeper-scan.mjs --system`
+   once, the output into `research/security/machines.md`. *Recommended:* run it; it is the last barrier item between
+   E2.1 and its merge, and between E5's producer PR and its merge.
+3. **F30's owner and deadline.** The conventions repository as the owner; the proposed deadline **2026-11-19**, or
+   before creds' E2.5 merges if earlier. Until then every Node compliance declaration says "zero whole literals, F30
+   open". *Recommended:* accept the date; a release of the guard alone is one PR here and pin bumps alone.
+4. **E7's pin bump** — the seventh over-cap bump (rag_qln) is agreed but not opened. *Recommended:* open it with the
+   others; E7's stories start after it.
+
+### 8. The way of working — so a fifth stop becomes less likely
+
+**8.1 What changes, and what is dropped because it proves nothing.** The four stops share one shape: the plan named a
+mechanism (a byte-identical copy; three CI legs with the same counts; an owned folder for a durable series; a folding
+reader in the Node guard; a baseline scope for a folder with no test file) and a build brief found it does not fit the
+tool, the tree or the CI. Each was approved first and checked after. From epoch 6:
+
+- **A story's build brief opens with item 3's table for that story** — each merge condition and each promised test of
+  the story mapped to the file that implements it, the invocations it covers and the command that checks it, read
+  against the tree at the pin, BEFORE the brief's plan gate. A row the author cannot fill is a question to the
+  coordinator in the brief's Decisions section (as the S6 brief did), raised before the gate — a change found there is
+  still an entry, but it is found before approval, not after.
+- **A test that cannot go RED is not written as a RED-GREEN-RED row.** Dropped: the twelve `.mjs` spellings "RED when
+  the folding reader is off" (there is no reader to switch off); kept as a positive test plus one sentence of what is
+  not detected. Dropped: the two baseline FILES' only-shrinks tests (the released rule has one file with scopes); kept
+  as the one file's tests. Nothing of the barrier is dropped.
+- **A by-hand scan is recorded as a search, never as a proof.** The split-piece scan says which spellings it looked for.
+- **"Contained" is proved through the callers**, as 4.2 says, not asserted per line.
+- **The owner's wish is met so:** no new gate, no new document; the table is one section of a brief that is written
+  anyway, and the plan-gate reviewers read it instead of guessing the fit.
+
+**8.2 Which remaining stories are likely to hit the same class of surprise.** In order of likelihood:
+
+| Story | The surprise it is likely to meet | Why |
+|---|---|---|
+| E2.5 (creds, the two guards) | S5 sc. 2's `.cjs` and `.sh` plants cannot be findings (F30); N6's `${TMPDIR:-/tmp}` is unseen; the C# guard's folding allowance for the Node wrapper file | the same tool gap as entry 5.2, written into E2's D9 row 2 as "the shipped Node guard reads the same way" |
+| E2.3 (creds, the C# copy) | the DoD still says "a byte copy save the five named files" — entry 3.1 made every copy an ADAPTED copy with a manifest; F29's Windows mutex op is on the template's text | the same class as entry 3.1 |
+| E2.4 (creds, bash, the smoke scripts) | the trap after fallible work (`mcp-listen-smoke.test.sh:19` and `version-smoke.test.sh:14` have `rm -rf` and no trap; E5's `smoke-image.sh` had the trap after `mktemp`); bash 3.2 on macOS | the same class as condition (p) |
+| E2.2 (creds, the harnesses) | harnesses that keep run folders away from the temp root on purpose (the two WSL harnesses) need an invocation inventory line each, as E5's series did | the same class as entry 4.2 (a durable resource outside the family) |
+| E7 (rag_qln) | no `research/module_tests.md`; the `ResidentSet` eviction; the failing live test; Qdrant's naming for the prefix; the C# adapted copy and F29 | the stories are not written; the store sweep lives in product code |
+| E6 (benchmark) | the boundary missing on the benchmark side; the Testcontainers label and Ryuk; `ScratchWorktree`'s seam in product code; stage A's age removal of un-prefixed `score-tmp/*` (an open question since epoch 2); the C# adapted copy and F29 | the stories are not written |
+
+**8.3 What the other documents' own revisions must say** (read, not edited here; each is its own plan-gate work):
+
+- **E2** (`dew_flow_creds_for_devs · todo/PLAN_test_leftovers_E2.md` at `9a6e9fa`): D9 row 2 — the shipped Node guard
+  does NOT read split spellings (F30); S5 sc. 2's `.cjs` and `.sh` plants become the positive test of what the guard
+  detects plus one sentence, as E5's 4.1; the DoD's "byte copy save the five named files" becomes the adapted copy with
+  a manifest and a diff check (entry 3.1), and E2.3 reads F29 before it copies; S4's bash scripts set their trap before
+  any fallible step, with a RED test (E5's 4.3); E2.5's `docs.yml` guard step says "zero whole literals, F30 open" until
+  F30 ships; every E2.2–E2.5 brief opens with item 3's table. E2's audit runs in the PARENT after `node --test` returns
+  (its D9 row 1), so E5's 4.4 order question does not arise there in the same form; its revision says so.
+- **E6** (no document yet): the stories document opens with item 3's table filled; the boundary with
+  `todo/PLAN_bench_test_leftovers_followups.md` is written there FIRST (a docs PR in benchmark); the C# copy is an adapted
+  copy with a manifest, reading F29 and entry 5.1; the Node guard's F30 limit is cited; the `score-tmp/*` age removal is
+  settled (retire or make owner-aware) before any producer.
+- **E7** (no stories document; stage A promoted): `research/module_tests.md` is created in E7's first PR (the rule
+  requires it of every repository); the `ResidentSet` eviction is settled with a test; the failing
+  `SearchLiveTests.AQuestionInWords_FindsTheMemberThatAnswersIt` is fixed or recorded as known before the live tests
+  become E7's proof; the growth paragraph carries 0.2 GB measured (`du`), not 8 GB; the C# copy as E6's; F30 cited.
+
 ## Epics
 
 Seven epics, E = 7, so the cornerstone quota is Q = ⌈2·7/5⌉ = 3 ([common/subagent-models.md](../common/subagent-models.md)).
@@ -1733,6 +2108,10 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
   CI-green as DRAFT creds #294 (every check green, read 2026-11-03), wired to F22; it waits for P1 and the by-hand macOS
   and Windows records its plan names (D8). E2.2–E2.5 each record the invocation inventory before they drop a prefix
   (§ Epoch 3, item 4), and E2.5 needs F3 if it is the family's first Node compliance declaration.
+  *Epoch 6 (2026-11-05):* #294 unchanged at `9a6e9fa`; F3 is released (`bd795847`), creds' pin bump #297 is open. E2's
+  document has the same two gaps as E5's (its D9 row 2 assumes the shipped Node guard folds — it does not, F30; its DoD
+  still says "a byte copy"), and its S4 bash scripts have the trap-order class of § Epoch 6 condition (p). What its
+  revision must say is § Epoch 6, item 8.3; each E2.2–E2.5 brief opens with the table of § Epoch 6, item 3.
 - **Repository:** `dew_flow_creds_for_devs`. **Stories:** `dew_flow_creds_for_devs · todo/PLAN_test_leftovers_E2.md`. Depends on E1.
 - **Goal.** Every temp site goes through the helper; the acme state and the stub files are removed by the run that
   made them; and the CI smoke follows the E1 carve-out. On the GitHub-hosted runner the workflow uses
@@ -1861,6 +2240,12 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
   *Epoch 4 (2026-11-03):* the E5 stories were merged for epoch 3 as coai #942 (`004c55fb`). S3's build brief found
   entries 3.1 and 3.2. D2 becomes an adapted copy; the DoD names the suite × OS matrix; S3's fail-closed mechanism is a
   gated custom `Main` (exit 78); S6 waits for F24's pin (§ Epoch 4; the E5 stories document, revised the same day).
+  *Epoch 5 (2026-11-04) and epoch 6 (2026-11-05):* #945 at `524df50e` holds S3, S2-B, S4, entry 5.1 (the Windows sweep
+  mutex, `SweepLock.cs`) and S5; S6 is a brief only. Entries 5.2 and 5.3 (the S6 brief) stopped the plan: row 2's Node
+  half is narrowed to what the shipped guard detects (F30 for the rest), D8 (b) admits the inline `raw-temp` exemptions
+  of the inventory with proved reasons, and three checks are added — the audit before the run folder goes, the smoke
+  script's trap before `mktemp`, the baseline's final content at the last head (§ Epoch 6, items 3 and 4; the E5
+  stories document revised the same day on the producer branch).
 - **Repository:** `dew_flow_connect_other_ais`. **Stories:** `dew_flow_connect_other_ais · todo/PLAN_test_leftovers_E5.md`. Depends on E1.
 - **Goal.** Tests create only `testsToDelete-coai-…`; the startup sweep collects both the new prefix and, for
   the migration window, the old `coai-` test literals; the product's `coai-*` runtime directories and their
@@ -1992,6 +2377,14 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
   already asks that every sweep be owner-aware or retired before the first producer, and this epic must already settle the shared store
   before any rename. E7's stories decide it before E7's first producer: a test collection is protected from eviction, or tests never share
   a capped store, with a test either way.
+  *[epoch 6, 2026-11-05]* **Stage A's plan is PROMOTED** (dew_flow_rag_qln #87 `88577ff`, `research/PLAN_test_leftovers_E7_stage_a.md`):
+  the live check ran on the WSL machine with native stores (no Docker): 8 `qlntest` collections, 18867 points, 84 MB of vectors,
+  221 MB on disk; a second run adds none and the daemon's log shows the listing line and no drop. The "about 8 GB per recipe change"
+  of the stage-A plan is REFUTED — about 0.2 GB; E7's stories carry the measured figure and the `du` command, not the projection.
+  Carried to E7's stories as well: `SearchLiveTests.AQuestionInWords_FindsTheMemberThatAnswersIt` failed in both runs (not caused by
+  stage A; recorded in `research/module_search.md` there) and is fixed or recorded as known before the live tests become E7's proof;
+  rag_qln has NO `research/module_tests.md`, which `common.knowledge-base` requires of every repository — E7's first PR creates it;
+  the `ResidentSet` must-settle above; the pin bump to `bd795847` is agreed (the owner, 2026-11-05) and not yet opened.
 - **Repository:** `dew_flow_rag_qln`. **Stories:** `dew_flow_rag_qln · todo/PLAN_test_leftovers_E7.md`. Depends on E1.
 - **Goal.** A test corpus in the shared Qdrant store is dropped only when nothing alive owns it; the live
   tests' deliberate reuse is either exempt under decision 2a (named where configured, reset serialized) or
