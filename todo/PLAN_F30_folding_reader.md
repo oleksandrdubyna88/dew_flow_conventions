@@ -47,16 +47,16 @@ A template hole that holds anything but a literal stays as it is, so `${LEGACY_W
 - `legacyNameHits(text)` runs on the folded text.
 - `classifyLine` runs on the folded text; `broad` is `owner-blind`.
 - The bare word (the template's `BareWordHits`): a literal that holds the whole word and is followed by neither the owner form nor an allowed word is `owner-blind`, even with no removal on the line. This covers the unanchored regex string and the bare word, which folding alone leaves at `[]` (the epoch-6 judge's note).
-- The piece rule: a literal that holds a crossing piece of 6 or more, any case, and not the whole word, is `owner-blind`.
+- The piece rule: a JOINED literal of `literals` that holds a crossing piece of 6 or more, any case, and not the whole word, is `owner-blind`. It reads what D1 joined, and never an operand: `'testsTo' + 'Delete-u1000-coai-x-'` is one literal holding the whole word in the owner form, so it is no piece and no finding.
 
 A finding on a line is counted once per class, whichever reading found it. An exemption works exactly as it does today: `legacy-name` takes an inline exemption, and `owner-blind` takes only the allowlist.
 
 **D5. The acceptance check.** Two checks, both in `tools/leftovers-check.test.mjs`, both RED first.
 
 1. **The table of spellings:** each row an exact line in a fixture, an expected class, because the count depends on the line (the judge's note). It holds at least the sixteen spellings of F30: `+`, `.concat`, `.join('')`, a template hole, `\u`, `\x`, a one-character class, half of the word, the bare word, an unanchored regex string, `rmSync` over a joined prefix, and the whole-literal and glob rows that already work. Plus `.sh` adjacency and `$'…'`, and `.ps1` `+` and `-join`.
-2. **No false finding:** a table of real product words and paths that must stay `[]`: `restore`, `history`, `todo/PLAN_x.md`, `hostStopped`, `chatModelEdits`, `snapshotsToPrune`, `tellClientsToCatchUp`, and a `${LEGACY_WORD}x` hole.
+2. **No false finding:** a table of real product words and paths that must stay `[]`: `restore`, `history`, `todo/PLAN_x.md`, `hostStopped`, `chatModelEdits`, `snapshotsToPrune`, `tellClientsToCatchUp`, a `${LEGACY_WORD}x` hole, and an owner-form name split over `+`.
 
-**The real trees, by hand, recorded on the PR:** the guard at this branch against each consumer's current head, with the finding list compared by class and file to the same guard at the current release. Each new finding is listed and read.
+**The real trees, by hand, recorded on the PR:** the guard at this branch against each consumer's current head, with the finding list compared by class and file to the same guard at the current release. Each new finding is listed and read. The record names each consumer's exact commit and the command. **The same command runs again immediately before the release, against each consumer's head at that moment, and the release waits until any difference is read** (plan gate, finding 0).
 
 **D6. The guard's own files.** `EXCLUDED_FILES` already excludes the guard's two test files. Each other file of this repository that holds the pieces on purpose (for example the sweep's quarantine word in `janitor.sh` and `tools/lib/*`) is listed in one new frozen list, `FOLDING_ALLOWANCES`, with a test that every listed file exists and still needs its place, as the template's `FoldingAllowances`. Nothing else is allowed by name. A consumer has no such list: it uses the exemption grammar.
 
@@ -90,4 +90,9 @@ A finding on a line is counted once per class, whichever reading found it. An ex
 - [ ] The real-tree record on the PR: seven consumers, each new finding listed and read.
 - [ ] `common/test-leftovers-detail.md` says what the guard reads and what it does not, and `research/` records the measure.
 - [ ] F30's entry says what shipped, with the corrected piece rule.
+- [ ] The real-tree comparison re-run immediately before the release, with its commits recorded.
 - [ ] One release; the consumers' fixes merged first; the pin bumps, each alone.
+
+## Plan gate
+
+Round 1, session `73a0a295`, `proceed`, 1 of 2 reviewers (Antigravity out of quota). Finding 0 accepted: the real-tree comparison names its commits and runs again before the release. Finding 1 rejected, because its example reads an operand and the rule reads the joined literal; the plan now says so, and an owner-form split is a row of D5's second table.
