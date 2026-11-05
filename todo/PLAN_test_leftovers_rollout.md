@@ -1,6 +1,8 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **stopped for re-review (2026-11-05)** — epoch 6's second change after approval (entry 6.2, found by S6's Windows run). No new code on any epic of this plan and no merge of a pull request
+> Status: **epoch 7 open (2026-11-05), approved by the owner after the re-review.** Epoch 6 stopped at entries 6.1 and 6.2; the whole plan was revised (§ *Epoch 7*), the Opus judge sorted epoch 6's work (15 fit; 1 cut, unmerged and fixed forward; 3 outside; nothing merged contradicts), the plan gate (session `05d66915`, on an operative extract, 1 of 2 reviewers answered, the other out of quota, no findings) and the interim document gate on the E5 stories document (2 accepted) passed, a final Opus read's fixes were applied, and because the record says `Narrowed: yes` the owner approved it (2026-11-05). F31 is reviewed at the first of: E2.3 starts, a suite is to run on a Windows machine that persists, or 2026-12-05.
+>
+> Was: **stopped for re-review (2026-11-05)** — epoch 6's second change after approval (entry 6.2, found by S6's Windows run). No new code on any epic of this plan and no merge of a pull request
 > carrying its work until the full re-review is complete; when its record says `Narrowed: yes`, the owner has approved the revised plan; and epoch 7 is opened with `state: open`. At the stop: E5's
 > producer PR coai #945 (draft) holds S3, S2-B, S4, entry 5.1, S5 and most of S6; the plant of merge condition (o) is red on Windows and is not changed until epoch 7 opens.
 >
@@ -411,7 +413,7 @@ Narrowed: yes — two things got smaller, both in E5's producer PR: (1) must-not
   Condition (d): no WSL record exists; the E5 document's D8 (d) is another condition, and the brief's § 18 reads it as "no condition on this PR" while the parent's Definition of Done keeps the per-machine record: the two must agree.
   Could not check: the audit's order in a real suite run (the audit is not wired until S6); the private sibling; Windows behaviour of any of this.)
 
-> Epoch 6 · approved 2026-11-05 · by owner · state: stopped
+> Epoch 6 · approved 2026-11-05 · by owner · state: closed
 
 - 6.1 · 2026-11-05 · agent · approach — tracing the S6 inventory's rows showed that the kinds of reason, written before the trace, fit 11 of them badly: the fourth kind's standing test keeps "names" and holds a pinned list of the test files that name a file without reaching the line, and a fifth kind covers a line a test reaches whose product caller is not a test run, pinned by an assertion in each test
   (Found by the Opus author revising the S6 brief. Seven rows: a test file names the file and reads its text, or runs or sources it without reaching the line. Four rows: `install-cli.sh:22`, `install-agy.sh:61`, `deploy/bugs/install-env.sh:101`, `deploy/systemd-release.sh:161`. The plan said of the first two that those tests pin the TMPDIR; none did, it was only inherited. The count, the ceiling of 77 and the runtime barrier are unchanged. The owner's approval named standing tests; this keeps them and adds the pinned list.)
@@ -466,6 +468,8 @@ Narrowed: yes — E5's merge condition (o) and the goal: on an elevated Windows 
   The PowerShell step and its run id are right: `never disposed` and `disposed but not removed` both named, nothing left. But job 127259212955's green says nothing of its plant step: two plants are red in that log, and the step passes because pwsh ends on its last command's exit code. And the real `ci.yml` steps after `Test` have never run on Windows (skipped in job 127243250229); the head of item 5 step 4 is their first run.
   C7, a plain fact in F31: "The template's source and its plan did say it, for the audit only" is wrong. `Scope.cs:27-28` (the template's bytes) says an elevated run's files "are kept for a person to look at", and `dew_flow_mcp · research/PLAN_test_leftovers_E3.md:672` says the sweep lists them as `foreign-uid` and never removes them. So the sweep half was written down too, and epoch 7's lesson is stronger than "green tests hid it". C8: the brief's status line (`:3`) still says "plan only, nothing implemented yet".
   Could not check: any of items 4.1 and 4.2 on Windows (nothing is built, and there is no Windows here; reading and the logs only); `windows-11-arm` at release; a Windows shell that is not elevated; head `6f0b0a58`'s Linux, macOS and Windows jobs, still running; the janitor's key on Windows once F9 arms it, so "no janitor removes them" is read from the rule, not its code; R1's RED, as above; the copied guard tests line by line.)
+
+> Epoch 7 · approved 2026-11-05 · by owner · state: open
 
 ## Symptom
 
