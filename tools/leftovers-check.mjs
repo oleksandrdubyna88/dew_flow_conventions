@@ -88,15 +88,35 @@ import { REPO_ROW, REPO_TOKEN } from "./lib/owned-token.mjs";
 import { BASELINE_FILE, GUARD_NAME, PROOF_MARKER, createApplier, loadBaselineAt, siteSha256 } from "./lib/raw-temp-baseline.mjs";
 import { PROFILES, parseArguments, runCli } from "./lib/leftovers-cli.mjs";
 import { MANIFEST_NAME, scanManifest } from "./lib/leftovers-package.mjs";
+import { bareWordHits, foldLine, pieceHits } from "./lib/leftovers-fold.mjs";
 
 export { PROFILES, parseArguments };
-import { JANITOR_FILE, classifyLine, classifyLines, lineSha256 } from "./lib/sweeper-scan.mjs";
+import { JANITOR_FILE, classifyLine, classifyLines, lineSha256, passes } from "./lib/sweeper-scan.mjs";
 import { isReason } from "./ownership-check.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 /** The files the scan never reads: the guard's own tests carry the violations as fixture strings. A test pins this list. */
 export const EXCLUDED_FILES = Object.freeze(["tools/leftovers-check.test.mjs", "tools/leftovers-check-consumers.test.mjs"]);
+
+/**
+ * The files that spell the prefix in pieces on purpose, so the folding reader (`tools/lib/leftovers-fold.mjs`) does not read their lines: each one HOLDS the
+ * detector words or builds the break-it fixtures of its tests out of them. Pinned by a test that every listed file exists and still draws a finding when
+ * the allowance is taken away (a stale entry is removed, as the C# template's `FoldingAllowances`); a new entry is a decision, not a convenience.
+ * Nothing else is allowed by name. A consumer has no such list: it uses the exemption grammar.
+ */
+export const FOLDING_ALLOWANCES = Object.freeze([
+  "tools/janitor-liveness.test.mjs",
+  "tools/janitor.sh",
+  "tools/janitor.test.mjs",
+  "tools/leftovers-sweep-token.test.mjs",
+  "tools/leftovers-sweep.test.mjs",
+  "tools/owned.test.mjs",
+  "tools/owner-conformance.test.mjs",
+  "tools/raw-temp-baseline.test.mjs",
+  "tools/sweeper-scan.test.mjs",
+  "tools/test-leftovers-rule.test.mjs",
+]);
 
 /** Every class an exemption may name (`ryuk-off` never; `exemption` and `token` are not resources). */
 export const EXEMPTIBLE = Object.freeze(["raw-temp", "raw-worktree", "docker-run", "docker-name", "legacy-name", "shared-store"]);
@@ -349,7 +369,21 @@ function legacyNameHits(line) {
   return LEGACY_BUILT.test(line) ? [...literal, "a prefix built from the repository token"] : literal;
 }
 
-function lineFindings(file, lines, exemptions, allowlist, baseline) {
+/** What the folded reading adds for one line: the `legacy-name` hits of the folded text, and the `owner-blind` reasons (empty when the line is passed by the allowlist). */
+function foldedReading(file, line, number, allowlist, allowances) {
+  if (allowances.includes(file)) return { legacy: [], blind: [] };
+  const folded = foldLine(line, path.extname(file));
+  if (folded.text === line && folded.literals.length === 0) return { legacy: [], blind: [] };
+  const changed = folded.text !== line;
+  const blind = passes(allowlist, file, number, line) ? [] : [
+    ...(changed && classifyLine(folded.text) === "broad" ? ["matches the prefix with no owner segment after it, read after folding the line's string literals"] : []),
+    ...bareWordHits(folded.literals).map((word) => `the bare prefix \`${word}\` in a string literal, with no owner segment after it`),
+    ...pieceHits(folded.literals).map((piece) => `a string literal that holds ${piece}`),
+  ];
+  return { legacy: changed ? legacyNameHits(folded.text) : [], blind };
+}
+
+function lineFindings(file, lines, exemptions, allowlist, baseline, allowances = FOLDING_ALLOWANCES) {
   const extra = RAW_TEMP_BY_EXTENSION[path.extname(file)] ?? [];
   const found = [];
   const add = (index, cls, text) => {
@@ -358,13 +392,14 @@ function lineFindings(file, lines, exemptions, allowlist, baseline) {
   const verdicts = classifyLines(lines.join("\n"), { allowlist, file }); // the file's own prefix bindings are read once, for every line
   lines.forEach((line, index) => {
     if (isComment(line)) return;
+    const folded = foldedReading(file, line, index + 1, allowlist, allowances);
     const checks = [
       ["raw-temp", allMatches([...RAW_TEMP, ...extra], line)],
       ["raw-worktree", allMatches(RAW_WORKTREE, line).slice(0, 1)],
       ["shared-store", sharedStoreHit(line)],
       ["ryuk-off", RYUK_OFF.test(line) ? ["TESTCONTAINERS_RYUK_DISABLED"] : []],
       ["docker-name", composeEnvHits(line)],
-      ["legacy-name", LEGACY_NAME_PENDING.includes(file) ? [] : legacyNameHits(line)],
+      ["legacy-name", LEGACY_NAME_PENDING.includes(file) ? [] : [...legacyNameHits(line), ...folded.legacy]],
     ];
     for (const [cls, hits] of checks) {
       if (hits.length === 0) continue;
@@ -372,8 +407,9 @@ function lineFindings(file, lines, exemptions, allowlist, baseline) {
       if (cls === "raw-temp" && baseline !== undefined && !isExempt(exemptions, cls, index + 1) && baseline.take(file, siteSha256(line))) continue;
       add(index, cls, [...new Set(hits)].map((hit) => `\`${hit}\``).join(", "));
     }
-    // owner-blind: no exemption of any kind — the allowlist (file, line, hash) is the one pass
+    // owner-blind: no exemption of any kind — the allowlist (file, line, hash) is the one pass. One finding per line, whichever reading found it.
     if (verdicts[index] === "broad") found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
+    else if (folded.blind.length > 0) found.push(finding(file, index + 1, "owner-blind", folded.blind.join("; ")));
   });
   return found;
 }
@@ -384,11 +420,11 @@ function lineFindings(file, lines, exemptions, allowlist, baseline) {
  * Every finding of one file's text (`file` is the repository-relative path with forward slashes). `yaml` returns the yaml module and is called only
  * for a workflow: by default the guard's own resolution, which throws a `YamlMissingError` when there is none.
  */
-export function scanText(file, text, allowlist = [], yaml = () => loadYaml(undefined), baseline = undefined) {
+export function scanText(file, text, allowlist = [], yaml = () => loadYaml(undefined), baseline = undefined, { foldingAllowances = FOLDING_ALLOWANCES } = {}) {
   const lines = text.split(/\r?\n/);
   const exemptions = readExemptions(file, lines);
   const docker = dockerFindings(file, lines, text, yaml).filter((entry) => !isExempt(exemptions, entry.cls, entry.line));
-  return [...exemptions.findings, ...lineFindings(file, lines, exemptions, allowlist, baseline), ...docker];
+  return [...exemptions.findings, ...lineFindings(file, lines, exemptions, allowlist, baseline, foldingAllowances), ...docker];
 }
 
 // --- the token ------------------------------------------------------------------------------------------------

@@ -14,8 +14,9 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 import { git } from "./lib/git.mjs";
+import { bareWordHits, foldLine, foldKind, pieceHits } from "./lib/leftovers-fold.mjs";
 import { MAX_CLAIM_BYTES, OWNER_GRAMMAR, REPO_ROW, REPO_TOKEN, TOKEN_SHAPE, classifyName, ownedDir } from "./lib/owned.mjs";
-import { EXCLUDED_FILES, LEGACY_NAME_PENDING, isScanned, main, parseArguments, resolveRule, scanRepository, scanText, tokenConstants, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
+import { EXCLUDED_FILES, FOLDING_ALLOWANCES, LEGACY_NAME_PENDING, isScanned, main, parseArguments, resolveRule, scanRepository, scanText, tokenConstants, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RULE = path.join(root, "common", "test-leftovers-detail.md"); // the rule file that holds the Tokens table since the split
@@ -939,4 +940,163 @@ test("M-1. the shipped allowlist, read from beside the tool, still passes this r
   assert.equal(guard(repo).code, 0, "no allowlist in the scanned tree: the shipped one passes the identical janitor line");
   fs.writeFileSync(path.join(repo, "tools", "fixtures", "owner-blind-allowlist.json"), JSON.stringify({ entries: [] }));
   assert.equal(guard(repo).code, 0, "an empty allowlist in the scanned tree does not remove the shipped pass");
+});
+
+// F30 — the folding reader (todo/PLAN_F30_folding_reader.md, D5) ----------------------------------------------------------
+//
+// Two tables. The first: each row is ONE exact line of a fixture file and the classes the guard answers on it, because the count
+// depends on the line (the epoch-6 judge's note). The second: real product words and paths that must stay `[]`: a false finding is
+// a defect of the reader, and its cure is a new row here.
+
+/** The classes the guard answers for `line` as the whole text of `file`, sorted, one entry per class. */
+const classesOf = (file, line) => [...new Set(scanText(file, `${line}\n`).map((entry) => entry.cls))].sort();
+
+const SPELLINGS = [
+  // [kind of row, file, the exact line, the classes]
+  // the rows that already work: a whole literal, and a glob or a regex over the word
+  ["a whole legacy literal", "scripts/zz.mjs", `const n = "${Q}-coai-x-abc123";`, ["legacy-name"]],
+  ["a bare-word glob passed to a removal", "scripts/zz.mjs", `fs.rmSync(path.join(base, "${Q}-*"), { recursive: true });`, ["owner-blind"]],
+  ["a regex literal over the word", "scripts/zz.mjs", `const rx = /${Q}[-_]/i;`, ["owner-blind"]],
+  ["an anchored RegExp string", "scripts/zz.mjs", `const rx = new RegExp("^${Q}[-_]");`, ["owner-blind"]],
+  // the spellings of F30 that no line of the measure found
+  ["a split over +", "scripts/zz.mjs", 'const n = "testsTo" + "Delete-agent-" + id;', ["legacy-name"]],
+  ["a split over .concat", "scripts/zz.mjs", 'const n = "testsTo".concat("Delete-agent-", id);', ["legacy-name"]],
+  ["an array joined with an empty string", "scripts/zz.mjs", "const n = ['testsTo', 'Delete-agent-'].join('');", ["legacy-name"]],
+  ["a template hole that holds a literal", "scripts/zz.mjs", "const n = `testsTo${'Delete'}-agent-${id}`;", ["legacy-name"]],
+  ["a \\u escape", "scripts/zz.mjs", 'const n = "tests\\u0054oDelete-agent-";', ["legacy-name"]],
+  ["a \\u{} escape", "scripts/zz.mjs", 'const n = "tests\\u{54}oDelete-agent-";', ["legacy-name"]],
+  ["a \\x escape", "scripts/zz.mjs", 'const n = "tests\\x54oDelete-agent-";', ["legacy-name"]],
+  ["a one-character class", "scripts/zz.mjs", 'const rx = new RegExp("^tests[T]oDelete[-_]");', ["owner-blind"]],
+  ["half of the word", "scripts/zz.mjs", 'const half = "testsTo";', ["owner-blind"]],
+  ["the other half, with the join in it", "scripts/zz.mjs", 'const half = "stoDele";', ["owner-blind"]],
+  ["the bare word", "scripts/zz.mjs", `const w = "${Q}";`, ["owner-blind"]],
+  ["the bare word in single quotes", "scripts/zz.mjs", `const w = '${P}';`, ["owner-blind"]],
+  ["an unanchored regex string", "scripts/zz.mjs", `const rx = new RegExp("${Q}[-_]");`, ["owner-blind"]],
+  ["rmSync over a joined prefix", "scripts/zz.mjs", 'fs.rmSync(path.join(tmp, "testsTo" + "Delete"), { recursive: true });', ["owner-blind"]],
+  ["a joined glob passed to a removal", "scripts/zz.mjs", 'fs.rmSync(path.join(tmp, "testsTo" + "Delete-*"));', ["owner-blind"]],
+  ["the same split in a .cjs", "scripts/zz.cjs", 'const n = "testsTo" + "Delete-agent-";', ["legacy-name"]],
+  ["the same split in a .ts", "src/zz.test.ts", 'const n: string = "testsTo" + "Delete-agent-";', ["legacy-name"]],
+  // .sh: adjacent quoted strings, and $'...'
+  ["a .sh adjacency, legacy", "scripts/zz.sh", "mkdir \"$TMPDIR\"/'testsTo''Delete-agent-1'", ["legacy-name"]],
+  ["a .sh adjacency, glob", "scripts/zz.sh", "rm -rf \"$TMPDIR\"/'testsTo''Delete-*'", ["owner-blind"]],
+  ["a .sh adjacency of double quotes", "scripts/zz.sh", 'rm -rf "$TMPDIR"/"testsTo""Delete-"*', ["owner-blind"]],
+  ["a .sh $'...' with a \\x escape", "scripts/zz.sh", "rm -rf $'tests\\x54oDelete-*'", ["owner-blind"]],
+  ["a .sh half of the word", "scripts/zz.sh", "HALF='testsTo'", ["owner-blind"]],
+  // .ps1: + and -join
+  ["a .ps1 split over +", "scripts/zz.ps1", 'Remove-Item ("testsTo" + "Delete-*")', ["owner-blind"]],
+  ["a .ps1 legacy split over +", "scripts/zz.ps1", '$n = "testsTo" + "Delete-agent-1"', ["legacy-name"]],
+  ["a .ps1 -join", "scripts/zz.ps1", '$n = ("testsTo", "Delete-agent-1") -join ""', ["legacy-name"]],
+  // a workflow reads as .sh
+  ["a workflow run line", ".github/workflows/zz.yml", "jobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - run: rm -rf /tmp/'testsTo''Delete-*'", ["owner-blind"]],
+];
+
+test("F30 table 1: each spelling of the prefix is a finding on its exact line, with its class", () => {
+  const wrong = [];
+  for (const [kind, file, line, expected] of SPELLINGS) {
+    const found = scanText(file, `${line}\n`);
+    const classes = [...new Set(found.map((entry) => entry.cls))].sort();
+    const last = line.split("\n").length;
+    if (classes.join() !== expected.join() || !found.every((entry) => entry.line === last)) wrong.push(`${kind} [${file}] ${JSON.stringify(line)}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(found.map((entry) => `${entry.line}:${entry.cls}`))}`);
+  }
+  assert.deepEqual(wrong, [], "rows that answer the wrong classes or the wrong line");
+});
+
+test("F30 table 1: the table holds at least the sixteen spellings of F30, and every row's line is a distinct line", () => {
+  assert.ok(SPELLINGS.length >= 16);
+  assert.equal(new Set(SPELLINGS.map((row) => row[2])).size, SPELLINGS.length);
+});
+
+const PRODUCT_WORDS = [
+  // [the line, why it is no finding]
+  ['const a = "restore";', "`sto` is in restore"],
+  ['const a = "history";', "`sto` is in history"],
+  ['const a = "stop";', "`sto` is in stop"],
+  ['const a = "todo/PLAN_x.md";', "`tod` is in todo/"],
+  ['const a = "hostStopped";', "the C# piece rule hit this"],
+  ['const a = "chatModelEdits";', "the C# piece rule hit this"],
+  ['const a = "snapshotsToPrune";', "a product name with To in it"],
+  ['const a = "tellClientsToCatchUp";', "a product name with To in it"],
+  ['const a = "latestToDo";', "a product name with To in it"],
+  ["const n = `${LEGACY_WORD}x`;", "a template hole that holds a variable is not read: folding never invents a word"],
+  ["const n = `${LEGACY_WORD}-${id}`;", "a template hole that holds a variable is not read"],
+  [`const n = "testsTo" + "Delete-u1000-coai-x-" + id;`, "an owner-form name split over +: the joined literal holds the whole word in the owner form"],
+  [`const n = ["testsTo", "Delete-w42-coai-"].join("") + id;`, "an owner-form name split over .join"],
+  [`const n = \`testsTo\${"Delete"}-u1000-coai-\${id}\`;`, "an owner-form name split over a template hole"],
+  [`const n = "${Q}-u1000-coai-x-abc123";`, "the owner form, whole"],
+  [`const e = "// ${Q}-exempt: raw-temp — a probe the test removes";`, "the exempt marker word"],
+  [`const q = ".x.${P}-quarantine-1-ab";`, "the quarantine sibling's word"],
+  [`execFileSync("docker", ["volume", "create", "--label", \`${Q}.owner=\${owner}\`, name]);`, "the owner label key is a docker label's name, not a name"],
+  [`const e = process.env.${P.toUpperCase()}_RUN;`, "an environment variable, not in a literal"],
+  [`const e = "${P.toUpperCase()}_RUN";`, "an environment variable name in a literal"],
+  ["const t = 'tests' + 'Run' + 'ToDo';", "tests, Run, To and Do: the joined literal holds no crossing piece of 6"],
+  ["const t = 'testing' + ' Delete';", "tests and Delete apart"],
+];
+
+test("F30 table 2: real product words and paths are no finding; an owner-form name split over + is no finding", () => {
+  const wrong = PRODUCT_WORDS.flatMap(([line, why]) => {
+    const found = scanText("scripts/zz.mjs", `${line}\n`);
+    return found.length === 0 ? [] : [`${line} (${why}): ${JSON.stringify(found.map((entry) => `${entry.line}:${entry.cls}`))}`];
+  });
+  assert.deepEqual(wrong, [], "lines that must stay []");
+});
+
+test("F30 D6: the folding allowances are exactly the listed files; each exists and still needs its place", () => {
+  assert.ok(Object.isFrozen(FOLDING_ALLOWANCES));
+  assert.deepEqual([...FOLDING_ALLOWANCES], [...FOLDING_ALLOWANCES].sort(), "sorted, so a new entry shows in a diff");
+  assert.equal(new Set(FOLDING_ALLOWANCES).size, FOLDING_ALLOWANCES.length);
+  assert.deepEqual([...FOLDING_ALLOWANCES], [
+    "tools/janitor-liveness.test.mjs", "tools/janitor.sh", "tools/janitor.test.mjs", "tools/leftovers-sweep-token.test.mjs", "tools/leftovers-sweep.test.mjs",
+    "tools/owned.test.mjs", "tools/owner-conformance.test.mjs", "tools/raw-temp-baseline.test.mjs", "tools/sweeper-scan.test.mjs", "tools/test-leftovers-rule.test.mjs",
+  ], "a new entry is a decision, not a convenience: it is added here and in the plan's record");
+  for (const file of FOLDING_ALLOWANCES) {
+    assert.ok(fs.existsSync(path.join(root, file)), `${file} exists`);
+    assert.ok(isScanned(file), `${file} is a file the guard scans`);
+    const text = fs.readFileSync(path.join(root, file), "utf8");
+    const allowed = scanText(file, text, [], undefined, undefined, { foldingAllowances: FOLDING_ALLOWANCES });
+    const folded = scanText(file, text, [], undefined, undefined, { foldingAllowances: [] });
+    assert.ok(folded.length > allowed.length, `${file} still draws a finding from the folding reader without its allowance: remove a stale entry`);
+  }
+});
+
+test("F30 D6: an allowance silences the folded reading and nothing else: a whole legacy literal in a listed file is still a finding", () => {
+  const file = FOLDING_ALLOWANCES[0];
+  assert.deepEqual(scanText(file, 'const n = "testsTo" + "Delete-agent-";\n').map((entry) => entry.cls), []);
+  assert.deepEqual(scanText(file, `const n = "${Q}-agent-1";\n`).map((entry) => entry.cls), ["legacy-name"]);
+});
+
+test("F30 reader: foldLine joins, decodes and keeps the quotes; a hole that holds anything but a literal stays; a line with no quote is unchanged", () => {
+  const rows = [
+    // [extension, line, the folded text, the joined literals]
+    [".mjs", 'const n = "testsTo".concat("Delete-agent-", id);', 'const n = "testsToDelete-agent-".concat(id);', ["testsToDelete-agent-"]],
+    [".mjs", 'const n = "a".concat("b").concat("c", x);', 'const n = "abc".concat(x);', ["abc"]],
+    [".mjs", "const n = `testsTo${'Delete'}-${x}`;", "const n = `testsToDelete-${x}`;", ["testsToDelete-${x}"]],
+    [".mjs", "const n = `${LEGACY_WORD}x`;", "const n = `${LEGACY_WORD}x`;", ["${LEGACY_WORD}x"]],
+    [".mjs", "const n = ['a', 'b'].join('-') + 'c';", "const n = 'a-bc';", ["a-bc"]],
+    [".ts", "const n = 'tests\\x54o' + \"Del\\u0065te\";", "const n = 'testsToDelete';", ["testsToDelete"]],
+    [".mjs", 'const n = "a" + id + "b";', 'const n = "a" + id + "b";', ["a", "b"]],
+    [".sh", "rm -rf $'tests\\x54oDelete-*' \"a\"'b'", "rm -rf 'testsToDelete-*' \"ab\"", ["testsToDelete-*", "ab"]],
+    [".yml", "      - run: echo 'a''b'", "      - run: echo 'ab'", ["ab"]],
+    [".ps1", '$n = ("testsTo", "Delete-agent-1") -join ""', '$n = "testsToDelete-agent-1"', ["testsToDelete-agent-1"]],
+    [".ps1", "$n = 'a' + \"b\" + 'c'", "$n = 'abc'", ["abc"]],
+    [".mjs", "no quote on this line", "no quote on this line", []],
+    [".md", 'a "testsTo" + "Delete" in a document', 'a "testsTo" + "Delete" in a document', []],
+  ];
+  for (const [extension, line, text, literals] of rows) {
+    const folded = foldLine(line, extension);
+    assert.equal(folded.text, text, line);
+    assert.deepEqual(folded.literals, literals, line);
+  }
+  assert.deepEqual([".mjs", ".cjs", ".js", ".ts", ".mts", ".cts", ".tsx", ".jsx"].map(foldKind), Array(8).fill("js"));
+  assert.deepEqual([".sh", ".yml", ".yaml", ".ps1", ".md", ""].map(foldKind), ["sh", "sh", "sh", "ps1", undefined, undefined]);
+});
+
+test("F30 reader: the bare word and the piece rule read literals, and never an operand", () => {
+  assert.deepEqual(bareWordHits([`${Q}-u1000-coai-`, `${Q}[-_]w42[-_]`, `${Q}-exempt: x`, `.x.${P}-quarantine-1`, `${P.toUpperCase()}_RUN`, `${Q}.owner=u1`, `${Q}-agent-x`, `${Q}-\${owner}-`]), [], "an owner form, the marker words, an environment name, the label key, a name (legacy-name's) and a placed owner are no bare word");
+  assert.deepEqual(bareWordHits([Q, `${Q}-`, `${Q}-*`, `${Q}[-_]`, `${P}_`, `${Q} resources`]).length, 6);
+  assert.deepEqual(pieceHits(["restore", "history", "todo/x", "hostStopped", "chatModelEdits", `${Q}-x`]), [], "no piece of 6 in a product word; the whole word is judged by bareWordHits");
+  assert.equal(pieceHits(["testsTo"]).length, 1);
+  assert.equal(pieceHits(["xTODELETEx"]).length, 1, "any case");
+  assert.equal(pieceHits(["stoDel"]).length, 1, "6 characters that cross the join");
+  assert.equal(pieceHits(["stoDe"]).length, 0, "5 is below the minimum");
+  assert.equal(pieceHits(["Delete", "tests"]).length, 0, "a half that sits wholly inside one word is no crossing piece");
 });
