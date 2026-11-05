@@ -1,30 +1,18 @@
-// The folding reader of the structural guard (`tools/leftovers-check.mjs`, F30; `todo/PLAN_F30_folding_reader.md` D1 to D4): a SPELLING reader.
-// It reads the text a person wrote in their own repository, so the prefix cannot be hidden from the classes `legacy-name` and `owner-blind`
-// by how it is spelled on one line. It is not a defence against a hostile author, and it is not data flow: a name built from a variable, across
-// lines, from the environment or at run time is not seen.
+// The folding reader of the structural guard (`tools/leftovers-check.mjs`, F30; `todo/PLAN_F30_folding_reader.md` D1 to D4): a SPELLING reader of text a person wrote in their own
+// repository. It is not a defence against a hostile author and not data flow: a name built from a variable, across lines, from the environment or at run time is not seen.
 //
-// ONE forward-only scanner per file kind (D1). It walks the file once, and for each line answers `{ text, code, literals, size }`:
-//   text      the line with the comments removed and every string literal decoded and joined, each written back in its own quotes
-//   code      the line with the comments removed and nothing else changed (the decoded-code reading, `decodeCode`, reads it)
-//   literals  `[{ value, plus }]`, the joined literals in order (`plus`: a `+` follows the literal, so its owner letter is continued)
-// Nothing is re-tried: an unterminated quote ends that line's reading, a regex literal with no closer on its line is a division and the line gets
-// no second try, and a lookahead scans only the characters it can join. No marker character is put in the text, so a control byte in a line
-// turns nothing off. Only a block comment and a template (with its `${}` depth) cross lines; a join is read within one line.
+// ONE forward-only scanner per file kind (D1). It walks the file once and answers, for each line, `{ text, code, literals, size }`: `text` is the line with the comments removed and every string
+// literal decoded and joined, each written back in its own quotes; `code` the line with the comments removed and nothing else changed (`decodeCode` reads it); `literals` `[{ value, plus }]`, the
+// joined literals in order (`plus`: a `+` follows, so an owner letter at the literal's end is continued). Nothing is re-tried: an unterminated quote ends that line's reading, a regex literal with no
+// closer on its line is a division and the line gets no second try, and a lookahead scans only what it can join. No marker character is put in the text, so a control byte turns nothing off.
+// Only a block comment and a template (with its `${}` depth) cross lines; a join is read within one line.
 //
-// What it reads, by kind (D2; this is the promise, and any document that states the guard's reach names it):
-//   .mjs .cjs .js .ts .tsx .jsx .mts .cts
-//       comments `//`, `/* */`; literals '…', "…", `…` (a `${'a'}` hole that holds only a quoted literal is joined; any other hole stays as written);
-//       a regex literal is recognised after `( , = : [ ! & | ? { ;`, `=>`, `return`, `typeof`, `case` and at a line's start; joins `+`, `.concat('a', 'b')`,
-//       ['a', 'b'].join(<literal>), each with spaces around its operators and a literal in parentheses; decoded `\uXXXX`, `\u{…}`, `\xXX`, a class `[T]`
-//   .sh .yml .yaml
-//       comments `#` at the start of a word; literals '…', "…", $'…'; a word's touching pieces, quoted or not, are one literal; in $'…': \xXX, \uXXXX, octal
-//   .ps1
-//       comments `#`, `<# #>`; literals '…', "…"; joins `+`, binary `-join` over a literal array, a literal in parentheses; no decoding
-// Not read: a template nested in a hole, unary `-join`, a comment between operands, an extensionless script, every other kind (.py .bash .cmd). JSX text is not
-// told from code: `<p>don't</p>` stops that line's reading, and `<p>src/*.ts</p>` can hide the next line.
+// What it reads, by kind, is D2's table (the promise); the header of the guard states it. In short: .mjs .cjs .js .ts .tsx .jsx .mts .cts: comments `//` `/* */`, literals '…' "…" `…` (a `${'a'}` hole
+// that holds only a quoted literal), a regex literal, joins `+` `.concat(…)` `['a', 'b'].join(<literal>)`, decoded `\uXXXX` `\u{…}` `\xXX` and a class `[T]`; .sh .yml .yaml: comments `#` at the start of a
+// word, '…' "…" $'…', a word's touching pieces; .ps1: comments `#` `<# #>`, '…' "…", `+`, binary `-join`. Not read: a template nested in a hole, unary `-join`, a comment between operands, an
+// extensionless script, every other kind. JSX text is not told from code: `<p>don't</p>` stops that line's reading.
 //
-// The module holds the pure reading: `foldFile`, `decodeCode`, and the two literal-level readings the folded literals feed, `bareWordHits` and `pieceHits`.
-// The classes themselves (`legacyNameHits`, `classifyLines`) stay in the guard.
+// The module holds the pure reading: `foldFile`, `decodeCode`, and the two literal-level readings the folded literals feed, `bareWordHits` and `pieceHits`. The classes stay in the guard.
 
 import { verdictAfter } from "./sweeper-scan.mjs";
 
@@ -87,80 +75,75 @@ const decodeAnsi = (body) => body.replace(ANSI_ESCAPE, (_all, u4, u8, hex, octal
 
 // --- one line of output -----------------------------------------------------------------------------------------------------
 
+/** A string built in chunks that counts its size always and keeps the text only while `keep` is true. */
+class Chunks {
+  constructor() {
+    this.parts = [];
+    this.buffer = "";
+    this.size = 0;
+  }
+
+  add(piece, keep) {
+    this.size += piece.length;
+    if (!keep) return;
+    this.buffer += piece;
+    if (this.buffer.length > 32768) {
+      this.parts.push(this.buffer);
+      this.buffer = "";
+    }
+  }
+
+  value() {
+    return this.parts.join("") + this.buffer;
+  }
+}
+
 /**
- * The answer for one line. Text and code are built in chunks and stop being kept once either passes FOLD_LIMIT (`oversize`): the reader goes on
- * counting, so a 32 MB line costs no memory, and the guard answers one finding for it instead of running the quadratic classifier.
+ * The answer for one line. Text and code stop being kept once either passes FOLD_LIMIT (`oversize`): the reader goes on counting, so a 32 MB line costs no memory, and the guard answers one
+ * finding for it instead of running the quadratic classifier.
  */
 class Out {
   constructor(isJs) {
     this.isJs = isJs;
-    this.textParts = [];
-    this.textBuffer = "";
-    this.textSize = 0;
-    this.codeParts = [];
-    this.codeBuffer = "";
-    this.codeSize = 0;
+    this.text = new Chunks();
+    this.codeText = new Chunks();
     this.literals = [];
     this.oversize = false;
   }
 
-  appendText(piece) {
-    this.textSize += piece.length;
-    if (this.oversize) return;
-    this.textBuffer += piece;
-    if (this.textBuffer.length > 32768) {
-      this.textParts.push(this.textBuffer);
-      this.textBuffer = "";
+  append(chunks, piece) {
+    chunks.add(piece, !this.oversize);
+    if (!this.oversize && (this.text.size > FOLD_LIMIT || this.codeText.size > FOLD_LIMIT)) {
+      this.oversize = true;
+      this.text = Object.assign(new Chunks(), { size: this.text.size });
+      this.codeText = Object.assign(new Chunks(), { size: this.codeText.size });
+      this.literals = [];
     }
-    this.check();
-  }
-
-  appendCode(piece) {
-    if (!this.isJs) return;
-    this.codeSize += piece.length;
-    if (this.oversize) return;
-    this.codeBuffer += piece;
-    if (this.codeBuffer.length > 32768) {
-      this.codeParts.push(this.codeBuffer);
-      this.codeBuffer = "";
-    }
-    this.check();
-  }
-
-  check() {
-    if (this.textSize <= FOLD_LIMIT && this.codeSize <= FOLD_LIMIT) return;
-    this.oversize = true;
-    this.textParts = [];
-    this.textBuffer = "";
-    this.codeParts = [];
-    this.codeBuffer = "";
-    this.literals = [];
   }
 
   /** Code as written (the comments are already left out by the caller). */
   code(raw) {
     if (raw === "") return;
-    this.appendText(raw);
-    this.appendCode(raw);
+    this.append(this.text, raw);
+    if (this.isJs) this.append(this.codeText, raw);
   }
 
   /** Text only: the closers and the `.concat(` that a join leaves behind. */
   textOnly(piece) {
-    if (piece !== "") this.appendText(piece);
+    if (piece !== "") this.append(this.text, piece);
   }
 
   /** A literal: `raw` is its source (the code reading), `value` its decoded content. `opened` and `closed` say whether this line holds its quotes (a template spans lines). */
   lit(quote, value, raw, plus, opened = true, closed = true) {
     const flat = value.indexOf("\n") >= 0 || value.indexOf("\r") >= 0 ? value.replace(/[\r\n]/g, " ") : value; // a decoded line break never splits the folded line
-    this.appendText((opened ? quote : "") + flat + (closed ? quote : ""));
-    this.appendCode(raw);
+    this.append(this.text, (opened ? quote : "") + flat + (closed ? quote : ""));
+    if (this.isJs) this.append(this.codeText, raw);
     if (!this.oversize) this.literals.push({ value, plus });
   }
 
   finish() {
-    const size = Math.max(this.textSize, this.codeSize);
-    if (this.oversize) return { text: "", code: "", literals: [], size, oversize: true };
-    return { text: this.textParts.join("") + this.textBuffer, code: this.codeParts.join("") + this.codeBuffer, literals: this.literals, size, oversize: false };
+    const size = Math.max(this.text.size, this.codeText.size);
+    return this.oversize ? { text: "", code: "", literals: [], size, oversize: true } : { text: this.text.value(), code: this.codeText.value(), literals: this.literals, size, oversize: false };
   }
 }
 
@@ -630,6 +613,8 @@ function scanJsLine(line, number, st, out, ctx) {
   }
 }
 
+const openComment = (line) => [{ line, text: `the file ends inside a block comment that opens on line ${line}: the folded reading cannot tell what is code after it` }];
+
 function foldJs(lines, ctx) {
   const st = { stack: [], ts: null, commentLine: 0 };
   const result = lines.map((line, index) => {
@@ -637,8 +622,7 @@ function foldJs(lines, ctx) {
     scanJsLine(line, index + 1, st, out, ctx);
     return out.finish();
   });
-  const unreadable = st.stack[0] === C ? [{ line: st.commentLine, text: `the file ends inside a block comment that opens on line ${st.commentLine}: the folded reading cannot tell what is code after it` }] : [];
-  return { lines: result, unreadable };
+  return { lines: result, unreadable: st.stack[0] === C ? openComment(st.commentLine) : [] };
 }
 
 // --- shell and workflow lines -----------------------------------------------------------------------------------------------
@@ -854,8 +838,7 @@ function foldPs(lines, ctx) {
     scanPsLine(line, index + 1, st, out, ctx);
     return out.finish();
   });
-  const unreadable = st.stack.length > 0 ? [{ line: st.commentLine, text: `the file ends inside a block comment that opens on line ${st.commentLine}: the folded reading cannot tell what is code after it` }] : [];
-  return { lines: result, unreadable };
+  return { lines: result, unreadable: st.stack.length > 0 ? openComment(st.commentLine) : [] };
 }
 
 // --- the file ---------------------------------------------------------------------------------------------------------------
