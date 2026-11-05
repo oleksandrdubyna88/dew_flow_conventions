@@ -424,7 +424,7 @@ Narrowed: yes — two things got smaller, both in E5's producer PR: (1) must-not
 
 ### Re-review for epoch 7
 
-Narrowed: yes — E5's merge condition (o) and the goal: on an elevated Windows run a real orphan claim stays unseen by the audit and a killed run's leftovers are kept by every sweep, so they wait for a person; the plant proves the order on Windows with a re-owned claim, and a test pins the limit (§ *Epoch 7*, items 1 and 4).
+Narrowed: yes — E5's merge condition (o) and the goal: on an elevated Windows run, which every Windows CI leg is, a real orphan claim or unregistered folder stays unseen by the audit, and what a run leaves (killed, or not removable at its normal end) is kept by every sweep, so it waits for a person; the plant proves the order on Windows with a re-owned claim, and a test pins the limit (§ *Epoch 7*, items 1 and 4).
   (Written 2026-11-05 with the revision of § *Epoch 7*, over the two entries of epoch 6: 6.1, the kinds of reason; 6.2, the plant. Re-review consult `dd79d0aa`; the question consultants
   before it: `ee497a76`. The Verdict and Action cells are `—` until an Opus judge fills them (step 5 of the full stop). The epoch 7 line is written only when the owner approves.)
 
@@ -2100,14 +2100,19 @@ Windows run, and the S6 brief's § 11.3, § 11.4 and § 19 rows named in item 4.
    (`RunTempGateTests.cs:258-263`, `LeftoversSweepTests.cs:585-597`) or hands in an owner seam. So those green tests prove
    collection of a prepared fixture, not of a real run's leftovers.
 
-**What this costs in practice.** Little today. The hosted runner's machine ends with its job, so nothing stays there. The
-owner's Windows machine does not build or test coai (the owner's statement, #124, and "temporarily we do not test on
-Windows"). A person who runs a suite in an elevated Windows shell gets the limit: what a killed run leaves there waits for
-that person. A run in a shell that is not elevated is not affected, and no CI leg runs in that state.
+**What this costs in practice.** Two things. (1) On every Windows CI leg the audit's claim scan sees nothing; only its
+registry half works there (`ci.yml` step 0 is red if the runner is not elevated). So an unregistered claim or folder does
+not turn a Windows leg red; Linux and macOS still catch one a test makes on every OS. (2) What a run leaves in an elevated
+process, killed or not removable at its end, waits for a person. On a hosted runner nothing stays, because the machine ends
+with its job. The owner's Windows machine runs no E2 or E5 tests, by the owner's statement (#124, "temporarily we do not
+test on Windows"), until those repositories run there again; a person who runs a suite in an elevated Windows shell gets the
+limit. The exception also reaches E6 and E7 when they copy the helper. By reading, not measured: a shell that is not
+elevated, with its temp folder inside the profile, is not affected. Step 0 shows `windows-latest` is elevated; the arm
+runner of a release (`windows-11-arm`) is not measured.
 
 **State at the stop (read 2026-11-05).**
 
-- **E5.** Coai #945 (draft) at `6f0b0a58`, its code at `3fcba8a0`: S3, S2-B, S4, entry 5.1, S5 and S6 except what item 5 lists. Local counts and
+- **E5.** Coai #945 (draft) at `bde2e16c`, its code at `3fcba8a0`: S3, S2-B, S4, entry 5.1, S5 and S6 except what item 5 lists. Local counts and
   the run on `b29c00c7` are in the coder's draft section (`docs/e5-s6-section-at-stop6`, a copy). Linux, macOS and
   actionlint are green; Windows has one red, the plant; the only other red was F4, by design, and the temporary step that
   caused it is removed at `3fcba8a0`. The audit, now on, found no leak in any suite; on Windows only its registry half looked. The baseline holds 778 entries (the
@@ -2139,13 +2144,13 @@ prerequisite, deadline 2026-11-19.
 
 ### 3. Merge conditions
 
-§ *Epoch 6* item 3's table stands, with two rows replaced. **A row now also says what its check prepares or substitutes,
-and so what real-run behaviour it does not prove** (item 8.1). Rows (b) to (q) of the table state their condition as
-before, and the table's "State" cells are read with item 1 of this section.
+§ *Epoch 6* item 3's table stands, with the three rows below replaced. **Where a check prepares or substitutes something,
+its row now also says what real-run behaviour it does not prove** (item 8.1); that column is filled for these three. The
+other rows state their condition as before, and the table's "State" cells are read with item 1 of this section.
 
 | # | Condition | Implementation (file) | Invocations covered | Executable acceptance check | What the check prepares, and what it does not prove |
 |---|---|---|---|---|---|
-| (o) | The audit runs BEFORE the run folder ends, on every leg of each suite. A claim the caller's SID owns, absent from the registry, turns the run red | The ONE ordered call (`LeftoversSweepFixture.cs`, the fourth manifest op); `LeftoversAudit.Discover`; the plant `OrphanClaimChild` in four suites; `WindowsOwnership.OwnedByCaller` on the plant on Windows | `CoaiMcp.Tests` and `CoaiServer.Tests` on three legs; `CoaiBench.Tests` on Linux and macOS; `CoaiBugs.Tests` on Linux (D8's table) | Each suite's `--filter-method "*AnOrphanClaim_IsReportedByTheAudit*"` green on the head; R16's RED shown on Linux, and once on hosted Windows with the old order (a throwaway run) | On Windows the plant re-owns its claim, and asserts `Scope.IsMine` of it, so the child fails loudly if the profile key does not hold. It does NOT prove that a real claim of an elevated run is seen: it is not. `AnUntouchedClaim_StaysUnseen_OnAnElevatedWindowsRun` (`CoaiMcp.Tests`) pins that limit. It does not prove WHO removes the claim: the final empty-root assertion cannot tell the audit from the end of the run. `A_run_that_left_a_folder_…` proves the removal, with the owner seam |
+| (o) | The audit runs BEFORE the run folder ends, on every leg of each suite. A claim the caller's SID owns, absent from the registry, turns the run red | The ONE ordered call (`LeftoversSweepFixture.cs`, the fourth manifest op); `LeftoversAudit.Discover`; the plant `OrphanClaimChild` in four suites; `WindowsOwnership.OwnedByCaller` on the plant on Windows | `CoaiMcp.Tests` and `CoaiServer.Tests` on three legs; `CoaiBench.Tests` on Linux and macOS; `CoaiBugs.Tests` on Linux (D8's table) | Each suite's `--filter-method "*AnOrphanClaim_IsReportedByTheAudit*"` green on the head; R16's RED shown on Linux, and once on hosted Windows with the old order (a throwaway run). The pin shows as PASSED, not skipped, in the Windows log | On Windows the plant re-owns its claim, and asserts `Scope.IsMine` of it, so the child fails loudly if the profile key does not hold. It does NOT prove that a real claim of an elevated run is seen: it is not. `AnUntouchedClaim_StaysUnseen_OnAnElevatedWindowsRun` (`CoaiMcp.Tests`) pins that limit. It does not prove WHO removes the claim: the final empty-root assertion cannot tell the audit from the end of the run. `A_run_that_left_a_folder_…` proves the removal, with the owner seam |
 | (p) | `src_server/smoke-image.sh` leaves nothing on a failure before its trap | As § *Epoch 6*: built, `47c04724`, RED `f1d7e122` | `TheImageSmokeUsesTheServerTests` where `CoaiServer.Tests` runs whole: Linux and macOS in a PR; both Windows runners at a release (`release.yml:860`). The PR's `windows` job runs only `*RunFolderTests` of that executable (`ci.yml`) | The test green on the two PR legs | A `chmod` or `openssl` stub stands in for the failure. No PR gate proves it on Windows: one throwaway probe did (5 of 5), and a release will. The script's real use is the Linux image job |
 | (k) | The suite × OS merge gates, as § *Epoch 6* | `ci.yml` | each cell with a step | every cell green on the head, including the steps after `Test` in the `windows` job, which have never run in that job (they were skipped in 127243250229) | On Windows B4 and B5 keep a run folder by the owner key, not by liveness, and by reading R4 (`LeftoversCoaiLayoutTests.cs:79`) cannot go red there for the same reason. So the liveness half of those proofs comes from Linux and macOS |
 
@@ -2157,7 +2162,8 @@ before, and the table's "State" cells are read with item 1 of this section.
    file and no copied template file changes for this.
 2. **The pin of the limit.** One new test in `CoaiMcp.Tests`, `AnUntouchedClaim_StaysUnseen_OnAnElevatedWindowsRun`: the
    same child with no re-owning, on a Windows process that is elevated (skipped elsewhere, saying why). The child exits 0.
-   So the limit is a fact a run checks. When F31 changes the helper, this test goes red and the text is read again.
+   It also makes one `_owned.Dir` the natural way and asserts that neither the folder nor its claim is `Scope.IsMine`. So the
+   limit is a fact a run checks. When F31 changes the helper, that assertion goes red and the text is read again.
 3. **F31**, a new follow-up in `todo/PLAN_test_leftovers_merged_core_followups.md`: on an elevated Windows run the audit's
    claim scan and the sweep's collection share one blind spot. Owner: this repository, for the template and the rule.
    No deadline, not a prerequisite of any PR here. It lists the shape to weigh (the helper re-owns what it makes) and what
@@ -2188,13 +2194,17 @@ review of the delta; (7) merge when (c) is recorded. Then E5.S7, E2.1, and wave 
 | The follow-up should cover audit visibility and sweep recovery | True: one predicate | F31 |
 | Carry the limit into E2.3, E6 and E7 | Their tables do not claim more, but their documents do not state it | Item 8.3 |
 | The judge's C1 to C9: a wrong citation, the exception too narrow (a normal end that could not remove; an unregistered folder), the E5 document's goal and row 6, the § 19 pin row, row (p) and row (k), F31's "for the audit only", the brief's status, the pin's gates | Each read against the file | Applied to this section, the E5 documents and F31 (2026-11-05) |
+| The final Opus read: item 7 understated the cost (every Windows CI leg audits less), the pin would not have gone red under F31 (the child's claim is not the helper's), an unmeasured sentence on shells that are not elevated, the row count, two comments | Each read against the file; the child built in all four suites with warnings as errors, 0 errors | Applied to this section, F31 and the brief (2026-11-05). Row (p)'s Windows filter stays as it is: the script's real use is Linux |
 
 ### 7. Question for the owner (blocking; it goes to the question consultants first)
 
-Approve the narrowing: on an elevated Windows run, what a killed run leaves waits for a person, and condition (o)'s plant
-proves the audit's order on Windows with a re-owned claim, the limit pinned by a test and F31 written. Recommended: yes.
-Its cost is item 1's last paragraph. The other answer is to fix the helper first (F31 as a prerequisite). That changes the
-template's contract and every copy, before E5 can merge, for a state no CI leg leaves anything in.
+Approve the narrowing: on an elevated Windows run, what a run leaves (killed, or not removable at its normal end) waits for
+a person; the audit's claim scan sees nothing on any Windows CI leg, so an unregistered claim or folder does not turn that
+leg red; and condition (o)'s plant proves the audit's order on Windows with a re-owned claim, the limit pinned by a test and
+F31 written. Recommended: yes.
+Its cost is item 1's paragraph *What this costs in practice*. The other answer is to fix the helper first (F31 as a prerequisite). That changes the
+template, the Node reference and coai's unmerged copy (E2.3, E6 and E7 have not started theirs), before E5 can merge. No CI
+leg leaves anything behind in this state, but every Windows leg audits less because of it.
 
 ### 8. The way of working
 
