@@ -1064,6 +1064,12 @@ const SPELLINGS = [
   ["a legacy-name hit of the bare word is cleared by its exemption", "scripts/zz.mjs", [`const w = "${Q}"; // ${Q}-exempt: legacy-name — a probe the test removes`], [], []],
   ["a legacy-name hit of the piece is cleared by its exemption on the line above", "scripts/zz.mjs", [`// ${Q}-exempt: legacy-name — a probe the test removes`, 'const half = "testsTo";'], [], []],
   // the split sweeps of D4: the file's folded lines bind a prefix built in pieces as a whole one binds
+  // D2: a line that starts with # is code in JavaScript (a private field), and the code after #> is code in PowerShell: the folded readings read what the reader keeps; a comment line reads nothing
+  ["a private field line (starts with #) is code in JavaScript", "scripts/zz.mjs", ["  #p = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a private method that sweeps a joined glob", "scripts/zz.mjs", ["  #sweep = () => fs.rmSync('tests' + 'To' + 'Delete-*');"], ["1:owner-blind"], []],
+  ["the code after #> in PowerShell", "scripts/zz.ps1", ["<# a comment", "#> $n = 'tests' + 'To' + 'Delete-x'"], ["2:legacy-name"], []],
+  ["a # line in a multi-line template is template text", "scripts/zz.mjs", ["const t = `", "# 'testsTo'", "`;"], ["2:legacy-name"], []],
+  ["a // line in a multi-line template is template text", "scripts/zz.mjs", ["const t = `", "// testsTo", "`;"], ["2:legacy-name"], []],
   ["a prefix in pieces, a sweep over the name on the next line", "scripts/zz.mjs", ["const P = 'testsTo' + 'Delete-';", "fs.rmSync(P + x);"], ["1:legacy-name", "2:owner-blind"], []],
   ["a prefix in pieces, a sweep over the name; an exemption clears the first line only", "scripts/zz.mjs", [`const P = 'testsTo' + 'Delete-'; // ${Q}-exempt: legacy-name — a probe the test removes`, "fs.rmSync(P + x);"], ["2:owner-blind"], []],
   ["a RegExp over a joined prefix on one line", "scripts/zz.mjs", ['const rx = new RegExp("^testsTo" + "Delete-");'], ["1:owner-blind"], []],
@@ -1182,6 +1188,8 @@ const CLEAN = [
   [["const a = 1; /* a comment that opens", "const n = 'testsTo';", "and ends */ const b = 2;"], "scripts/zz.mjs", "a block comment that opens after code and holds a line of code"],
   [["const a = 1; // don't", "const b = 2;"], "scripts/zz.mjs", "an apostrophe in a comment pairs with nothing"],
   [["# const n = 'testsTo'"], "scripts/zz.sh", "a whole-line # comment in .sh"],
+  [[`# rm -rf ${Q}-*`], "scripts/zz.sh", "a whole-line # comment that holds a sweep"],
+  [["// const n = 'testsTo'; rm -rf 'tests' + 'To' + 'Delete-*'"], "scripts/zz.mjs", "a whole-line // comment: the folded readings read nothing"],
   [["echo hi # 'testsTo' 'tests''To''Delete-x'"], "scripts/zz.sh", "a trailing # comment in .sh"],
   [["echo don\\'t"], "scripts/zz.sh", "echo don\\'t: an escaped apostrophe opens no literal"],
   [['echo "it\'s fine"'], "scripts/zz.sh", "an apostrophe inside double quotes"],

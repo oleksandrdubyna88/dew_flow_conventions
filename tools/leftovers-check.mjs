@@ -452,11 +452,12 @@ function lineFindings(file, lines, exemptions, allowlist, baseline, allowances, 
   const verdicts = classifyLines(lines.join("\n"), { allowlist, file }); // the file's own prefix bindings are read once, for every line
   const fold = foldReading(file, lines, allowances, reader);
   for (const entry of fold.findings) found.push(entry);
-  const readings = fold.lines === undefined ? [] : foldedReadings(file, lines, fold.lines, verdicts, allowlist, foldKind(path.extname(file)) === "js");
+  const raw = verdicts.map((verdict, index) => (isComment(lines[index]) ? null : verdict)); // the raw readings skip a line that starts like a comment ...
+  const readings = fold.lines === undefined ? [] : foldedReadings(file, lines, fold.lines, raw, allowlist, foldKind(path.extname(file)) === "js");
   lines.forEach((line, index) => {
-    if (isComment(line)) return;
     const folded = readings[index] ?? { legacy: [], blind: undefined };
-    const checks = [
+    const comment = isComment(line); // ... but the reader has already removed the comments, so what it keeps of such a line is code (`#p = …` in JavaScript, the code after `#>`, a template's text)
+    const checks = comment ? [["legacy-name", folded.legacy]] : [
       ["raw-temp", allMatches([...RAW_TEMP, ...extra], line)],
       ["raw-worktree", allMatches(RAW_WORKTREE, line).slice(0, 1)],
       ["shared-store", sharedStoreHit(line)],
@@ -473,7 +474,7 @@ function lineFindings(file, lines, exemptions, allowlist, baseline, allowances, 
     // owner-blind: no exemption of any kind — the allowlist (file, line, hash) is the one pass. One finding per line, whichever reading found it.
     // A pattern in the tail of a bare word counts only when the line has no legacy-name reading, raw or folded, exempted or not (one class for one cause, D4).
     const legacyRead = checks[checks.length - 1][1].length > 0;
-    if (verdicts[index] === "broad") found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
+    if (raw[index] === "broad") found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
     else if (folded.blind !== undefined) found.push(finding(file, index + 1, "owner-blind", folded.blind));
     else if (folded.bareBlind !== undefined && !legacyRead) found.push(finding(file, index + 1, "owner-blind", folded.bareBlind));
   });
