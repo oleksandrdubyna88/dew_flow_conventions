@@ -988,6 +988,15 @@ const SPELLINGS = [
   // what the guard already finds: a whole literal, a glob or a regex over the word
   ["a whole legacy literal", "scripts/zz.mjs", [`const n = "${Q}-coai-x-abc123";`], ["1:legacy-name"], ["1:legacy-name"]],
   ["a bare-word glob passed to a removal", "scripts/zz.mjs", [`fs.rmSync(path.join(base, "${Q}-*"), { recursive: true });`], ["1:owner-blind"], ["1:owner-blind"]],
+  // D4: one class for one cause. A pattern in the tail of the bare word is owner-blind only when the line has no legacy-name reading (raw or folded, exempted or not)
+  ["a glob alone in a literal stays owner-blind", "scripts/zz.mjs", [`const a = '${Q}-*';`], ["1:owner-blind"], ["1:owner-blind"]],
+  ["an owner letter and a star: legacy-name alone, as at the release", "scripts/zz.mjs", [`const a = '${Q}-u*';`], ["1:legacy-name"], ["1:legacy-name"]],
+  ["an owner letter and .*: legacy-name alone", "scripts/zz.mjs", [`const a = '${Q}-u.*';`], ["1:legacy-name"], ["1:legacy-name"]],
+  ["a w and a ?: legacy-name alone", "scripts/zz.mjs", [`const a = '${Q}-w?';`], ["1:legacy-name"], ["1:legacy-name"]],
+  ["an owner letter and a group: legacy-name alone", "scripts/zz.mjs", [`const a = '${Q}-u(x)';`], ["1:legacy-name"], ["1:legacy-name"]],
+  ["the same, split over +: legacy-name alone", "scripts/zz.mjs", ["const a = 'tests' + 'To' + 'Delete-u*';"], ["1:legacy-name"], []],
+  ["a legacy-name exemption above an owner letter and a star clears the line, as at the release", "scripts/zz.mjs", [`// ${Q}-exempt: legacy-name — a probe the test removes`, `const a = '${Q}-u*';`], [], []],
+  ["a pattern with no legacy-name reading stays owner-blind (a regex string)", "scripts/zz.mjs", [`const a = new RegExp('${Q}[-_]u');`], ["1:owner-blind"], []],
   ["N8 of coai: a glob in a loop draws ONE class", "scripts/zz.mjs", [`for (const f of fs.globSync('${Q}-*')) fs.rmSync(f, { recursive: true });`], ["1:owner-blind"], ["1:owner-blind"]],
   ["a regex literal over the word", "scripts/zz.mjs", [`const rx = /${Q}[-_]/i;`], ["1:owner-blind"], ["1:owner-blind"]],
   ["an anchored RegExp string", "scripts/zz.mjs", [`const rx = new RegExp("^${Q}[-_]");`], ["1:owner-blind"], ["1:owner-blind"]],

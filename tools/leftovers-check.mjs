@@ -438,8 +438,8 @@ function foldedReadings(file, lines, folded, verdicts, allowlist, isJs) {
     }
     if (blind !== undefined) return { legacy, blind };
     const bare = bareWordHits(entry.literals);
-    if (bare.blind.length > 0) blind = `the bare prefix ${bare.blind.map((hit) => `\`${hit}\``).join(", ")} in a string literal, with a pattern after it and no owner segment`;
-    return { legacy: [...legacy, ...bare.legacy, ...pieceHits(entry.literals)], blind };
+    const bareBlind = bare.blind.length > 0 ? `the bare prefix ${bare.blind.map((hit) => `\`${hit}\``).join(", ")} in a string literal, with a pattern after it and no owner segment` : undefined; // kept apart: see lineFindings
+    return { legacy: [...legacy, ...bare.legacy, ...pieceHits(entry.literals)], blind, bareBlind };
   });
 }
 
@@ -471,8 +471,11 @@ function lineFindings(file, lines, exemptions, allowlist, baseline, allowances, 
       add(index, cls, [...new Set(hits)].map((hit) => `\`${hit}\``).join(", "));
     }
     // owner-blind: no exemption of any kind — the allowlist (file, line, hash) is the one pass. One finding per line, whichever reading found it.
+    // A pattern in the tail of a bare word counts only when the line has no legacy-name reading, raw or folded, exempted or not (one class for one cause, D4).
+    const legacyRead = checks[checks.length - 1][1].length > 0;
     if (verdicts[index] === "broad") found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
     else if (folded.blind !== undefined) found.push(finding(file, index + 1, "owner-blind", folded.blind));
+    else if (folded.bareBlind !== undefined && !legacyRead) found.push(finding(file, index + 1, "owner-blind", folded.bareBlind));
   });
   return found;
 }
