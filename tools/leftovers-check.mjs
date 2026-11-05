@@ -79,19 +79,22 @@
  * forward-only scanner that walks each file once, removes the comments and decodes and joins the string literals. It is a SPELLING check over text a person wrote in their own repository, not a
  * defence against a hostile author: a name built from a variable, across lines, from the environment or at run time is not seen, and a zero for these two classes is zero for the listed
  * spellings only. What it reads, by file kind (the promise; any document that states the guard's reach names it):
- *   .mjs .cjs .js .ts .tsx .jsx .mts .cts   comments `//` and `/* *\/` (across lines); literals '…', "…", `…` (a `${'a'}` hole that holds only a quoted literal; a regex literal is recognised, so its quotes
- *                                           shift nothing); joins `+`, `.concat('a', 'b')`, `['a', 'b'].join(<literal>)`, each with spaces around its operators and a literal in parentheses;
+ *   .mjs .cjs .js .ts .tsx .jsx .mts .cts   comments `//` and `/* *\/` (across lines); literals '…', "…", `…` (a `${'a'}` hole that holds only a quoted literal; a regex literal is recognised after `( , = : [ ! & | ? { ;`, after `=>`, `return`, `typeof`
+ *                                           or `case` and at a line's start, so its quotes shift nothing; after any other token (`)`, `else`, `+`, `throw`, `await`, `...`) a `/` is a division); joins `+`, `.concat('a', 'b')`, `['a', 'b'].join(<literal>)`, each with spaces around its operators and a literal in parentheses;
  *                                           decoded `\uXXXX`, `\u{…}`, `\xXX` and a one-character class `[T]`
  *   .sh .yml .yaml                          comments `#` at the start of a word; literals '…', "…", $'…'; a word's touching pieces, quoted or not (`testsTo"Delete-"`, `'a''b'`); in $'…' `\xXX`, `\uXXXX`, octal
  *   .ps1                                    comments `#` and `<# #>` (across lines); literals '…', "…"; joins `+` and a binary `-join` over a literal array; a literal in parentheses; no decoding
- * Not read: a template nested in a hole (`${`x`}`), unary `-join`, a comment between operands, an extensionless script, every other kind (.py, .bash, .cmd). JSX text is not told from code: `<p>don't</p>`
- * stops that line's reading and `<p>src/*.ts</p>` can hide the next line. Joins are read within one line; only a comment and a template cross lines.
+ * Not read: a template nested in a hole (`${`x`}`), a literal in an expression hole of a template (`${f('a')}`), unary `-join`, a comment between operands, `.ps1` here-strings, `.sh` heredocs and a
+ * nested `"$(…)"`, an extensionless script, every other kind (.py, .bash, .cmd). JSX text is not told from code: `<p>don't</p>` stops that line's reading, and `<p>src/*.ts</p>` opens a block comment that hides EVERY
+ * line up to the next `*\/`. **A limit, stated plainly: a backtick in JSX text, or in a regex at a position the list above does not name, leaves the reader inside a template; the supported spellings later in that file
+ * are then silently not read, and that is no finding** (a file that ends inside a block comment is one; a file that ends inside a template is not). Joins are read within one line; only a comment and a template cross lines.
+ * Nothing is read twice but the operand of a join that fails (an array or a `+` operand is lexed once to see whether it joins, and again as ordinary code): the bound is linear, and a test counts the steps.
  * The readings: the raw lines (comments included) as today; the folded text through `legacyNameHits` (`legacy-name`); the FILE's folded lines through `classifyLines`, so a prefix built in pieces binds as a whole one
  * does (`owner-blind`, no exemption); the code with escapes and classes decoded, for a regex literal (`owner-blind`); and on the joined literals the BARE WORD (a literal that holds the whole word with a boundary each
  * side and no owner after it) and a PIECE of the word (a crossing piece of 6 or more in the word's own form, no letter at its sides): both are class `legacy-name`, so an inline `legacy-name` exemption clears them, except a bare
  * word whose tail (the run of characters that touch it, up to a space) holds `[`, `(`, `?`, `*` or `\` (a pattern), which stays `owner-blind`. They read only a line that no `owner-blind` reading called broad: a line draws one class for one cause. `FOLDING_ALLOWANCES` lists this repository's own
- * files that spell the word in pieces on purpose and applies ONLY when the scan is of this repository's own root; a consumer has none. A folded line over 256 KiB (the classifier is quadratic on a repeated word) is not
- * read by the folded readings and is ONE `unreadable` finding; a file that ends inside a block comment, and any throw of the reader, are `unreadable` findings too. The raw readings are never skipped.
+ * files that spell the word in pieces on purpose and applies ONLY when the scan is of this repository's own root; a consumer has none. A folded line over 256 KiB is not
+ * read by the folded readings (a bound on their work; the classifier of a raw line is linear since the review of F30) and is ONE `unreadable` finding; a file that ends inside a block comment, and any throw of the reader, are `unreadable` findings too. The raw readings are never skipped.
  *
  * Exit 0 clean, 1 with every finding printed (`file:line — <class> — <text>`), 2 when it scanned nothing or its
  * arguments are bad — an empty scan is a broken discovery, never a clean repository.

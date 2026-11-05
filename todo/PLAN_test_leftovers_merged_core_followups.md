@@ -912,7 +912,8 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   finding in a consumer is cured by a comment, not by a rewrite; a `package.json` takes no exemption, so there the cure is a rewrite). A bare word with a pattern after it (`[`, `(`, `?`, `*` or `\` in the tail) stays `owner-blind` here too.
   The piece here is the word's own form with no letter at its sides, at 6 characters; the template's rule is any case at 5, which hits `hostStopped` and `chatModelEdits`. The record (the measure, the tables RED and GREEN, the mutants, the step
   counts, and the real trees of the nine consumers and two open branches against the release `bd795847`) is `research/2026-11-05_f30_folding_reader.md` § 7: one new finding, creds `src_vs_code/src/test/leftoversSites.test.ts:91`, real.
-  What the reader does not read is in `common/test-leftovers-detail.md` § 7 and in the guard's header.
+  What the reader does not read, and its stated limits, are in the guard's header (`tools/leftovers-check.mjs`); the rule's detail points there. **Left for after the release:** (a) `tools/lib/leftovers-fold.mjs` is over the 800-line style maximum because D1 asks for one file;
+  split the shell and PowerShell scanners into a second module; (b) a file that ends inside a template becomes one `unreadable` finding (today it is none, a stated limit).
 - **State.** Rebuilt on the branch, awaiting the code gate, an independent review, the PR and one release; then the pin bumps, each alone (the plan's Order). Not a prerequisite of E5's producer PR (the rollout's entry 5.2, option C);
   covers coai and creds; E6 and E7 read it before their first Node compliance declaration.
 

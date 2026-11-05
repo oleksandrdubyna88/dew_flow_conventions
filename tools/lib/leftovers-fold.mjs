@@ -3,20 +3,21 @@
 //
 // ONE forward-only scanner per file kind (D1). It walks the file once and answers, for each line, `{ text, code, literals, size }`: `text` is the line with the comments removed and every string
 // literal decoded and joined, each written back in its own quotes; `code` the line with the comments removed and nothing else changed (`decodeCode` reads it); `literals` `[{ value, plus }]`, the
-// joined literals in order (`plus`: a `+` follows, so an owner letter at the literal's end is continued). Nothing is re-tried: an unterminated quote ends that line's reading, a regex literal with no
-// closer on its line is a division and the line gets no second try, and a lookahead scans only what it can join. No marker character is put in the text, so a control byte turns nothing off.
+// joined literals in order (`plus`: a `+` follows, so an owner letter at the literal's end is continued). Nothing is re-tried but a join that fails: an unterminated quote ends that line's reading, a regex literal with no
+// closer on its line is a division and the line gets no second try, and a lookahead (an array, a `+` or `.concat` operand) scans only what it can join, once, and then the text is lexed as ordinary code (twice in all; a test counts the steps). No marker character is put in the text, so a control byte turns nothing off.
 // Only a block comment and a template (with its `${}` depth) cross lines; a join is read within one line.
 //
-// What it reads, by kind, is D2's table (the promise); the header of the guard states it. In short: .mjs .cjs .js .ts .tsx .jsx .mts .cts: comments `//` `/* */`, literals '…' "…" `…` (a `${'a'}` hole
-// that holds only a quoted literal), a regex literal, joins `+` `.concat(…)` `['a', 'b'].join(<literal>)`, decoded `\uXXXX` `\u{…}` `\xXX` and a class `[T]`; .sh .yml .yaml: comments `#` at the start of a
-// word, '…' "…" $'…', a word's touching pieces; .ps1: comments `#` `<# #>`, '…' "…", `+`, binary `-join`. Not read: a template nested in a hole, unary `-join`, a comment between operands, an
-// extensionless script, every other kind. JSX text is not told from code: `<p>don't</p>` stops that line's reading.
+// What it reads, by kind, is D2's table (the promise); the header of the guard states it, with what is not read and the limits. In short: .mjs .cjs .js .ts .tsx .jsx .mts .cts: comments `//` `/* */`, literals '…' "…" `…` (a `${'a'}` hole
+// that holds only a quoted literal), a regex literal (after `( , = : [ ! & | ? { ;`, `=>`, `return`, `typeof`, `case` and at a line's start; after any other token a `/` is a division), joins `+` `.concat(…)` `['a', 'b'].join(<literal>)`, decoded `\uXXXX` `\u{…}` `\xXX` and a class `[T]`; .sh .yml .yaml: comments `#` at the start of a
+// word, '…' "…" $'…', a word's touching pieces; .ps1: comments `#` `<# #>`, '…' "…", `+`, binary `-join`. Not read: a template nested in a hole, a literal in an expression hole, unary `-join`, a comment between operands,
+// `.ps1` here-strings, `.sh` heredocs, a nested `"$(…)"`, an extensionless script, every other kind. JSX text is not told from code: `<p>don't</p>` stops that line's reading, `<p>src/*.ts</p>` hides every line to the next `*/`, and a backtick in
+// JSX text or in a regex at an unlisted position leaves the reader inside a template: the later spellings of that file are silently not read, and that is no finding.
 //
 // The module holds the pure reading: `foldFile`, `decodeCode`, and the two literal-level readings the folded literals feed, `bareWordHits` and `pieceHits`. The classes stay in the guard.
 
 import { verdictAfter } from "./sweeper-scan.mjs";
 
-/** A folded line over this many characters does not go to the folded readings (the classifier is quadratic on a repeated word): the guard says so in one `unreadable` finding. */
+/** A folded line over this many characters does not go to the folded readings (a bound on their work; the plan's D5 keeps it): the guard says so in one `unreadable` finding. */
 export const FOLD_LIMIT = 256 * 1024;
 const WORD = "teststo" + "delete"; // the prefix, in two pieces: this module is a detector and the machine scan reads it too
 
