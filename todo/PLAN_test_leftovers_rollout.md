@@ -1,6 +1,8 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **stopped for re-review (2026-11-05)** — epoch 5's second and third changes after approval (entries 5.2 and 5.3, found writing E5's S6 brief). No new code on any epic of this
+> Status: **epoch 6 open (2026-11-05), approved by the owner after the re-review.** Epoch 5 stopped at entries 5.2 and 5.3; the whole plan was revised (§ *Epoch 6*), the Opus judge sorted epoch 5's work (16 fit; 2 cut, both fixed forward, nothing merged contradicts), the plan gate (session `ff8f7dd0`, 2 findings accepted, 1 rejected with reason) and the interim document gate on the E5 stories document (3 accepted, 1 rejected with reason) passed, a final Opus read's fixes were applied, and because the record says `Narrowed: yes` the owner approved it. F30's date of 2026-11-19 is accepted. All nine pin bumps to `bd795847` are merged. The owner's scan (merge condition (c)) is still open.
+>
+> Was: **stopped for re-review (2026-11-05)** — epoch 5's second and third changes after approval (entries 5.2 and 5.3, found writing E5's S6 brief). No new code on any epic of this
 > plan and no merge of a pull request carrying its work until the full re-review is complete; when its record says `Narrowed: yes`, the owner has approved the revised plan; and epoch 6 is
 > opened with `state: open`. At the stop: E5's producer PR coai #945 (draft) holds S3, S2-B, S4 and S5, pushed at `524df50e`; the S6 brief is local at `6b3f143e`. The ONE release carrying F3
 > and F24 is promoted (`release` = `bd795847`, 2026-11-05, the owner agreed to the over-cap bumps), and its pin bumps are in flight: they are not epic code, they end the red pins the promotion
@@ -337,7 +339,7 @@ Narrowed: yes — E5's native measurement series (`native-(vibe|kimi)-<yyyymmdd>
   E5 stories document is marked `*[epoch 5, 2026-11-04, Opus review]*` in place; it is part of the baseline epoch 5 is
   approved on, not an entry.)
 
-> Epoch 5 · approved 2026-11-04 · by owner · state: stopped
+> Epoch 5 · approved 2026-11-04 · by owner · state: closed
 
 - 5.1 · 2026-11-04 · agent · approach — on Windows a rename has no single winner, so E5's C# copy holds a per-root mutex around a whole sweep on Windows, an op on the template's text
   (Measured on a hosted windows-latest runner, run 41873954643, a bare .NET console: two threads race Directory.Move on one
@@ -404,6 +406,8 @@ Narrowed: yes — two things got smaller, both in E5's producer PR: (1) must-not
   The narrowing is under-named. The record and D8 (b) name 54 lines and `smoke-image.sh:73`; the brief's inventory holds 77 inline `raw-temp` rows: 22 more (§ 10.4: `deploy/**` 9, installers 2, `release.yml` 2, `scripts/probe-*` 5, `kimi.mjs` 1, `Serving.cs`, `TempDir.cs`; and `Owned.cs`); most fit none of the three proof kinds of D8 (b). `smoke-image.sh:73` has no containment reason at all (its folder is in the machine temp when a person runs it, and a `kill -9` at any moment leaves it with no claim and no prefix: a second instance of the goal's exception, which item 1 says stands word for word). The record's "the Definition of Done … does not get smaller" sits beside item 1's reading of it for every Node consumer, not only E5, and E5's S7 no longer ends "red on ANY raw temp call". Item 4.1's "RED … is not possible" is not so: the positive test goes red against a patched copy of the guard, by hand, once.
   Condition (d): no WSL record exists; the E5 document's D8 (d) is another condition, and the brief's § 18 reads it as "no condition on this PR" while the parent's Definition of Done keeps the per-machine record: the two must agree.
   Could not check: the audit's order in a real suite run (the audit is not wired until S6); the private sibling; Windows behaviour of any of this.)
+
+> Epoch 6 · approved 2026-11-05 · by owner · state: open
 
 ## Symptom
 
@@ -1952,6 +1956,13 @@ and E7 tables of item 3; the rag_qln `module_tests.md` finding; item 8.
    open". *Recommended:* accept the date; a release of the guard alone is one PR here and pin bumps alone.
 4. **E7's pin bump** — the seventh over-cap bump (rag_qln) is agreed but not opened. *Recommended:* open it with the
    others; E7's stories start after it. *[the judge, 2026-11-05]* Opened since: #88.
+
+**The owner's answers (2026-11-05, asked once, after the question consultants, consult `a96c990f`).**
+
+1. Epoch 6 is APPROVED as narrowed. What the owner was shown: Node files get no split-spelling detector for now, so the Node zero means "zero whole literals" for every Node consumer until F30 ships; "only the baseline is left" becomes "the baseline plus inline exemptions", at most 77 lines, each with a proved reason and kept true by standing tests; those inline rows stay after S7 ends, permanently; a `kill -9` of `smoke-image.sh` leaves one owner-named folder per killed run, which cleanup lists and never removes. **77 is a ceiling, not an allowance**: the inventory's count at creation binds, and a row only goes away after that.
+2. The WSL administrator scan is still the owner's to run.
+3. F30's date of **2026-11-19** is ACCEPTED, or before creds' E2.5 merges if that comes first. Nothing enforces it automatically; this plan records it, and the session that runs this plan tracks it. It is no longer "proposed" in the text above.
+4. Rag_qln's bump is merged (#88). **The nine pin bumps merged during the stop: the owner agrees with the reading**, that pin bumps a release caused may merge during a stop because they are not epic code and only end the red pin checks. The owner was told that the stop rule does not name them and that one consultant read its silence as no authorization. This holds for this case; it does not edit the rule.
 
 ### 8. The way of working — so a fifth stop becomes less likely
 

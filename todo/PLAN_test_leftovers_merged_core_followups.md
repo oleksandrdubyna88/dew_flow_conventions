@@ -842,7 +842,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   rule). One release, then pin bumps alone.
 - **Not the fix.** A second detector of coai's own with different semantics, whose findings could not carry the rule's
   exemption and would leave creds behind (option A of the S6 brief, rejected at the epoch-6 re-review).
-- **Owner and deadline.** The conventions repository (the guard's maintainer); **proposed deadline 2026-11-19**, or before
+- **Owner and deadline.** The conventions repository (the guard's maintainer); **deadline 2026-11-19, accepted by the owner on 2026-11-05**, or before
   creds' E2.5 merges if that is earlier — the owner confirms or moves the date (the rollout's § *Epoch 6*, item 7, question 3).
   Until it ships, every consumer's Node compliance declaration says in its PR that `legacy-name` and `owner-blind` are
   "zero whole literals, F30 open", and runs the interim scan with its output recorded.
