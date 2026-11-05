@@ -1150,6 +1150,15 @@ force is the runner's own`, `a distribution's default is enforced too`); the roo
 text already carries that clause word for word, and so the limits case stayed green. **GREEN** after the text: 7 of 7;
 RED-GREEN-RED on the file: the 5bbf9b4 text in place gave 1 failed of 7, the new text restored 7 of 7.
 
+**Third review, 2026-11-05.** The second review's fixture clause let a guard pass under root, while the limits paragraph says
+the fixture refuses there; this review restored "enforced". Item 3 now says the cap in force is the runner's own AND enforced
+(`so not under root or the exempting capabilities`), and the pins are `refuses to start unless told to AND the cap in force is
+the runner's own and enforced` (lengthened) and `so not under root or the exempting capabilities`. The limits paragraph's
+`which is why the fixture refuses there` is pinned too, and `LIMIT_PINS` is now the last seven pins, exactly the limits
+paragraph's. **RED on the 36406f8 text**: `tests 7, pass 6, fail 1`, the saying case reporting those two pins missing (the
+limits case stayed green: that paragraph is unchanged); **GREEN** after the text: 7 of 7; RED-GREEN-RED on the file: the
+36406f8 text in place gave 1 failed of 7, the new text restored 7 of 7.
+
 **What it does not prove.** No runner, shim or fixture exists in this repository: the section is advice for the repositories
 that run tests through a runner of their own, and the repository that owns one proves the bound there. The formula (the
 count at the start of the run plus a headroom) is not verified at run time, and the section says so itself. Prose that

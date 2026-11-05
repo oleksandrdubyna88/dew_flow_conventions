@@ -54,16 +54,18 @@ const PINS = [
   { text: "two shims that re-resolve can bake each other", why: "the walk: A bakes the program, B bakes A, A re-installed bakes B; real-path compares pass throughout, only keeping the first bake closes it" },
   { text: "guarded fixture that forks without end", why: "the proof forks for real, behind a guard" },
   { text: "outside the folder the runner discovers", why: "a fixture the runner discovers runs with every suite" },
-  { text: "refuses to start unless told to AND the cap in force is the runner's own", why: "a distribution's default is an enforced limit too, measured at about eleven times the count that killed a session; a guard that accepts it proves nothing" },
+  { text: "refuses to start unless told to AND the cap in force is the runner's own and enforced", why: "a distribution's default is an enforced limit too, measured at about eleven times the count that killed a session; a guard that accepts it proves nothing" },
+  { text: "so not under root or the exempting capabilities", why: "the limit is not enforced for root or those capabilities, so a fixture there has only the watch it is testing" },
   { text: "a distribution's default is enforced too", why: "the reason 'enforced' was not enough" },
   { text: "`setsid`", why: "a descendant that leaves the session is named as a limit" },
   { text: "never counted or ended by the watch", why: "what the watch does not do for a descendant that leaves the session" },
   { text: "outlives the run", why: "such a descendant outlives the run" },
   { text: "root, and the capabilities that exempt a process from `RLIMIT_NPROC`, have the watch alone", why: "root and those capabilities are exempt from the limit; the short pin survived deleting them" },
   { text: "weaker, not equal", why: "a platform without the kernel limit is not equal" },
+  { text: "which is why the fixture refuses there", why: "the limits paragraph says the fixture refuses where only the watch applies; item 3 must make that true" },
   { text: "not a number this rule's tests verify", why: "the formula is a shape, not a verified number" },
 ];
-const LIMIT_PINS = PINS.slice(-6);
+const LIMIT_PINS = PINS.slice(-7); // exactly the limits paragraph's pins: from `setsid` to the end
 
 function rule() {
   const file = path.join(root, SOURCE);

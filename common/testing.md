@@ -341,8 +341,8 @@ Where a repository runs its tests through a runner of its own, or a test puts a 
 3. **The repository that owns the runner proves the bound** with a guarded fixture that forks without
    end: the file fails, the message names the bound, and the user's process count comes back. The
    fixture lives outside the folder the runner discovers, and it refuses to start unless told to AND
-   the cap in force is the runner's own — a distribution's default is enforced too, and reaching it is
-   the incident.
+   the cap in force is the runner's own and enforced (so not under root or the exempting capabilities)
+   — a distribution's default is enforced too, and reaching it is the incident.
 
 What this does not give: a descendant that calls `setsid` is never counted or ended by the watch, so
 nothing fails the file for it, only the kernel cap bounds it, and it outlives the run; root, and the

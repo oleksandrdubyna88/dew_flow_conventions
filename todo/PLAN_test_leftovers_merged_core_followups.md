@@ -816,6 +816,10 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   `node tools/selection-matrix.mjs --bytes`: `common/testing.md` is 27,953 B (+3,254 B over the released text), the `implement`,
   `test`, `audit` and `policy` cells moved +3,254 B each, `release` 283,766 → 287,020 B; the four `api/a.http` values of `OVER` and
   the four `why` strings of `research/selection-matrix.json` are now 63,379, 65,592, 66,852 and 68,578 B.
+  A third review the same day restored "enforced": the fixture's cap must be the runner's own AND enforced (so not under root or
+  the exempting capabilities), or its refusal there, which the limits paragraph promises, would be false (RED 1 failed of 7, GREEN
+  7 of 7; `76ee721ca9f9 → 55fe34518846`); `common/testing.md` is then 28,016 B (+3,317 B over the released text), `release`
+  283,766 → 287,083 B, and the four `api/a.http` values are 63,442, 65,655, 66,915 and 68,641 B.
 - **State.** Fixed, not released; queued for the next planned release.
 
 ## F28 — A product's submodule pin follows another product's `main`, so every merge there makes the consumer's pin check red (found 2026-11-02, rag_qln)

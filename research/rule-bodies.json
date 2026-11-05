@@ -509,7 +509,7 @@
     {
       "id": "common.testing",
       "source": "common/testing.md",
-      "bodySha256": "76ee721ca9f95169367d05af1807c5fdab67153d821b58867f2f8b1415c14454",
+      "bodySha256": "55fe34518846ba19e5cc554fd85fb21cf7198ec49c29a8df5b7c63758f8811c2",
       "sections": [
         "# Testing",
         "## Running tests — executables only, never `dotnet test` (MANDATORY)",
