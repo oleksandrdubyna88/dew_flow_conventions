@@ -11,10 +11,12 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { spawnSync } from "node:child_process";
 import { git } from "./lib/git.mjs";
 import * as fold from "./lib/leftovers-fold.mjs";
+import * as sweeper from "./lib/sweeper-scan.mjs";
 import { MAX_CLAIM_BYTES, OWNER_GRAMMAR, REPO_ROW, REPO_TOKEN, TOKEN_SHAPE, classifyName, ownedDir } from "./lib/owned.mjs";
 import { CURES, EXCLUDED_FILES, FOLDING_ALLOWANCES, LEGACY_NAME_PENDING, isScanned, main, parseArguments, resolveRule, scanRepository, scanText, tokenConstants, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
 
@@ -1456,4 +1458,76 @@ test("F30 limit: any throw in the reader is ONE unreadable finding that names th
 test("F30 limit: the unreadable class names its wider use in its cure, and the guard's header says so", () => {
   assert.match(CURES.unreadable, /folded reading|folding reader/);
   assert.match(fs.readFileSync(path.join(root, "tools", "leftovers-check.mjs"), "utf8"), /256 KiB/);
+});
+
+// F30 review fix 2 — the classifier's cost on a raw line (todo/PLAN_F30_folding_reader.md, Goal: a hostile line never hangs) -----------
+
+/** The matcher test of `looseVerdicts` as it was at the release: a regular expression run on everything before each occurrence of the word, quadratic on a repeated word. The oracle of the differential test. */
+const OLD_MATCHER = /(?:\bgrep\b|\bfindstr\b|-i?match\b|-i?like\b|\.test\(|\.includes\(|\.match\(|\.search\(|\bre\.\w+\(|startswith\(|endswith\(|-iname\b|(?<![-\w])-name\b|-regex\b)[^|;]*$/;
+/** `looseVerdicts` as it was at the release, for a line that holds no deleting word (so only the matcher arms an occurrence). */
+function oldLooseVerdicts(lower) {
+  const verdicts = [];
+  for (const match of lower.matchAll(new RegExp(P, "g"))) {
+    const before = lower.slice(0, match.index);
+    const rest = lower.slice(match.index + match[0].length);
+    if (/[a-z0-9_.]$/.test(before) || rest.startsWith(".owner")) continue;
+    if (OLD_MATCHER.test(before)) verdicts.push(sweeper.verdictAfter(rest));
+  }
+  return verdicts;
+}
+
+const PIECES_OF_LINE = [P, `x${P}`, `${P}.owner`, `${P}x`, `${P}-`, `${P}-u1-`, ".", "grep ", "-name ", "-iname ", "-regex ", ".test(", ".includes(", ".match(", ".search(", "startswith(", "endswith(", "re.f(", "re.x" + P + "(", "findstr ", "-match ", "-imatch ", "-like ", "-ilike ", "-NAME ", "x-name ", "xgrep ", "grep", "|", ";", "(", ")", " ", "'", "a", "_", "*"];
+
+test("F30 classifier: looseVerdicts answers what the regular expression of the release answered, over every line of up to four pieces and 30000 random ones", () => {
+  assert.equal(typeof sweeper.looseVerdicts, "function");
+  const small = [P, `x${P}`, `${P}.owner`, `${P}-`, "grep ", "-name ", ".test(", "re.x" + P + "(", "|", ";", " ", "a"];
+  const lines = [""];
+  let frontier = [""];
+  for (let length = 1; length <= 4; length += 1) {
+    frontier = frontier.flatMap((head) => small.map((piece) => head + piece));
+    lines.push(...frontier);
+  }
+  let seed = 12345;
+  const next = (limit) => (seed = (seed * 1103515245 + 12345) % 2147483648) % limit;
+  for (let count = 0; count < 30000; count += 1) lines.push(Array.from({ length: 1 + next(14) }, () => PIECES_OF_LINE[next(PIECES_OF_LINE.length)]).join(""));
+  const wrong = lines.filter((line) => JSON.stringify(sweeper.looseVerdicts(line.toLowerCase())) !== JSON.stringify(oldLooseVerdicts(line.toLowerCase())));
+  assert.deepEqual(wrong.slice(0, 5), [], `${wrong.length} of ${lines.length} lines answer differently`);
+  assert.ok(lines.length > 40000);
+});
+
+test("F30 classifier: a token that holds the word arms a later occurrence and not an earlier one; a pipe or a semicolon disarms (the differential rows by hand)", () => {
+  assert.deepEqual(sweeper.looseVerdicts(`re.x${P}( ${P}-`), ["broad"], "the token re.x…( holds the first occurrence, a longer word: it arms the second");
+  assert.deepEqual(sweeper.looseVerdicts(`grep ${P} | ${P}-`), ["broad"], "armed for the first; the pipe disarms the second");
+  assert.deepEqual(sweeper.looseVerdicts(`grep ${P}-a ; ${P}-`), [null], "the semicolon disarms the second");
+  assert.deepEqual(sweeper.looseVerdicts(`${P}-a grep ${P}-b`), [null], "only the second is armed");
+});
+
+const MIB = 1024 * 1024;
+const CLASSIFIER_CHILD = `
+import { scanText } from ${JSON.stringify(pathToFileURL(path.join(root, "tools", "leftovers-check.mjs")).href)};
+const [unit, mib] = process.argv.slice(1);
+const line = "x = " + unit.repeat(Math.ceil(Number(mib) * 1048576 / unit.length));
+const started = Date.now();
+const found = scanText("scripts/zz.mjs", line + "\\n");
+console.log(JSON.stringify({ seconds: (Date.now() - started) / 1000, classes: [...new Set(found.map((entry) => entry.cls))].sort() }));
+`;
+const CLASSIFIER_UNITS = [
+  ["the word", `${Q} `], ["rm and the word", `rm ${Q} `], ["grep and the word", `grep ${Q} `], ["the word and a pipe", `${Q}| `], ["the word and a glob", `${Q}-*`],
+  ["a quoted name and a comma", `'${Q}-',`], ["a path anchor", `/${Q}-`],
+  ["an escaped single quote", "\\'"], ["an escaped double quote", '\\"'], ["a literal and a comma", "'a',"], ["spaces after a literal", `'a'${" ".repeat(61)}`], ["a backtick and a quote", '`"'], ["an open regex class", "= /[ "],
+];
+
+test("F30 time: scanText on one hostile line of 2 MiB ends within 60 s, for the repeated word and for D5's lines (the classifier is linear on a raw line)", () => {
+  const slow = [];
+  for (const [name, unit] of CLASSIFIER_UNITS) {
+    const child = spawnSync(process.execPath, ["--input-type=module", "-e", CLASSIFIER_CHILD, unit, "2"], { encoding: "utf8", timeout: 60_000 });
+    if (child.status !== 0) slow.push(`${name}: ${child.error?.code ?? `exit ${child.status}`} ${child.stderr.slice(0, 200)}`);
+  }
+  assert.deepEqual(slow, [], "lines that did not end in 60 s");
+});
+
+test("F30 time: a file with 300000 findings is read to the end (no call spreads the list of findings)", (t) => {
+  const repo = tree(t, { "scripts/many.sh": "t=$(mktemp)\n".repeat(300000) });
+  const found = scanRepository({ repo, rule: RULE }).findings.filter((entry) => entry.file === "scripts/many.sh");
+  assert.equal(found.length, 300000);
 });

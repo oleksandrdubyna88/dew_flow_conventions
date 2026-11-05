@@ -451,7 +451,7 @@ function lineFindings(file, lines, exemptions, allowlist, baseline, allowances, 
   };
   const verdicts = classifyLines(lines.join("\n"), { allowlist, file }); // the file's own prefix bindings are read once, for every line
   const fold = foldReading(file, lines, allowances, reader);
-  found.push(...fold.findings);
+  for (const entry of fold.findings) found.push(entry);
   const readings = fold.lines === undefined ? [] : foldedReadings(file, lines, fold.lines, verdicts, allowlist, foldKind(path.extname(file)) === "js");
   lines.forEach((line, index) => {
     if (isComment(line)) return;
@@ -693,7 +693,7 @@ function scanTexts(repo, files, scan) {
     const bytes = fs.readFileSync(absolute);
     if (isBinary(bytes)) continue;
     read += 1;
-    findings.push(...scan(file, bytes.toString("utf8")));
+    for (const entry of scan(file, bytes.toString("utf8"))) findings.push(entry); // a loop: a spread of a long list overflows the stack
   }
   return { read, findings };
 }
@@ -706,7 +706,7 @@ function scanManifests(repo, manifests, scan) {
     if (!isPresent(path.join(repo, file))) continue; // a broken link is present (lstat), so it is read and becomes an `unreadable` finding
     const found = scanManifest(repo, file, scan);
     read += found.length > 0 ? 1 : 0;
-    findings.push(...found);
+    for (const entry of found) findings.push(entry);
   }
   return { read, findings };
 }
