@@ -2089,14 +2089,16 @@ Windows run, and the S6 brief's § 11.3, § 11.4 and § 19 rows named in item 4.
 127243250229. `Scope.WindowsIsMine` asks for the caller's SID (`Scope.cs:73`). The helper makes its claim with a plain
 `FileStream` (`OwnedDir.cs:87`), so a real claim and a real folder of that run read as a stranger's. Two things follow:
 
-1. **The audit.** Its claim scan cannot name a real orphan claim there. The copied source says so (`LeftoversAudit.cs:10`),
+1. **The audit.** Its claim scan cannot name a real orphan claim there, or an unregistered folder with its claim (`LeftoversAudit.cs:58`). The copied source says so (`LeftoversAudit.cs:10`),
    and the template's plan says so (`dew_flow_mcp · research/PLAN_test_leftovers_E3.md`). The registry check still sees a
    registered folder: the PowerShell audit step is green on hosted Windows for both of its values (throwaway run
    42031613818, job 127259212955).
-2. **The sweep.** A real folder of a killed run on that runner is kept as `foreign-uid`. No test contradicts this, because
-   every collection test on Windows re-owns its fixture first (`RunTempGateTests.cs:258-263`,
-   `LeftoversSweepTests.cs:590-597`), and `Collection_is_proven_with_the_real_scope_key_…` keeps the `Administrators`
-   owner as `foreign-uid`. So those green tests prove collection of a prepared fixture, not of a real run's leftovers.
+2. **The sweep.** A real folder of a killed run on that runner is kept as `foreign-uid`: the sweep asks the owner before
+   liveness (`LeftoversSweep.cs:276-277`), and `Scope.cs:27-28` says so. B4 logs that answer for a real run folder
+   (`StartOfRunSweepTests.cs:79`), and `On_windows_a_folder_that_is_not_the_callers_…` (`LeftoversSweepTests.cs:609`) keeps a
+   prepared one. No test contradicts this, because a test on Windows that asserts collection either re-owns its fixture
+   (`RunTempGateTests.cs:258-263`, `LeftoversSweepTests.cs:585-597`) or hands in an owner seam. So those green tests prove
+   collection of a prepared fixture, not of a real run's leftovers.
 
 **What this costs in practice.** Little today. The hosted runner's machine ends with its job, so nothing stays there. The
 owner's Windows machine does not build or test coai (the owner's statement, #124, and "temporarily we do not test on
@@ -2108,7 +2110,7 @@ that person. A run in a shell that is not elevated is not affected, and no CI le
 - **E5.** Coai #945 (draft) at `6f0b0a58`, its code at `3fcba8a0`: S3, S2-B, S4, entry 5.1, S5 and S6 except what item 5 lists. Local counts and
   the run on `b29c00c7` are in the coder's draft section (`docs/e5-s6-section-at-stop6`, a copy). Linux, macOS and
   actionlint are green; Windows has one red, the plant; the only other red was F4, by design, and the temporary step that
-  caused it is removed at `3fcba8a0`. The audit, now on, found no leak in any suite. The baseline holds 778 entries (the
+  caused it is removed at `3fcba8a0`. The audit, now on, found no leak in any suite; on Windows only its registry half looked. The baseline holds 778 entries (the
   brief's 776 counted two lines as leaving that keep a `/tmp/…` literal, `ApiRuntimeTests.cs:28` and `LocalRuntimeTests.cs:131`; the count at creation binds), the inventory 112 rows (77 `raw-temp`), `namedBy` 28
   pairs (24 in the brief; E10 found four more, by the brief's own § 10.6 rule). The creation commit for (q) is `14370fdd`.
 - **Release and pins.** `release` = `bd795847`; every consumer's bump is merged, rag_qln's as #88 (`9852c1f0`). Coai
@@ -2119,9 +2121,10 @@ that person. A run in a shell that is not elevated is not affected, and no CI le
 - **The owner's open item is unchanged:** merge condition (c), the WSL administrator scan.
 
 **Goal.** The goal of § *Epoch 6* stands word for word, with **one more bounded exception** (the owner approves it with
-item 7): a run killed on Windows in an ELEVATED process leaves folders and claims owned by `Administrators`. No sweep and
-no janitor removes them, because they read as a stranger's under rule §4's two keys, and the claim scan of the audit does
-not name them. They wait for a person. The goal's "collected later: by a C# sweep that checks both keys, by the janitor
+item 7): a run on Windows in an ELEVATED process makes folders and claims owned by `Administrators`. What such a run
+leaves, because it was killed or because a folder could not be removed at its normal end, is removed by no sweep and no
+janitor, because it reads as a stranger's under rule §4's two keys. The audit's claim scan does not name it either, unless
+the folder is in the registry. It waits for a person. The goal's "collected later: by a C# sweep that checks both keys, by the janitor
 once F9 arms it there, or by a person" is read with this: for an elevated run only the person remains. No rule key is
 weakened to change this; rule §4 is what keeps a folder of another account safe.
 
@@ -2143,7 +2146,8 @@ before, and the table's "State" cells are read with item 1 of this section.
 | # | Condition | Implementation (file) | Invocations covered | Executable acceptance check | What the check prepares, and what it does not prove |
 |---|---|---|---|---|---|
 | (o) | The audit runs BEFORE the run folder ends, on every leg of each suite. A claim the caller's SID owns, absent from the registry, turns the run red | The ONE ordered call (`LeftoversSweepFixture.cs`, the fourth manifest op); `LeftoversAudit.Discover`; the plant `OrphanClaimChild` in four suites; `WindowsOwnership.OwnedByCaller` on the plant on Windows | `CoaiMcp.Tests` and `CoaiServer.Tests` on three legs; `CoaiBench.Tests` on Linux and macOS; `CoaiBugs.Tests` on Linux (D8's table) | Each suite's `--filter-method "*AnOrphanClaim_IsReportedByTheAudit*"` green on the head; R16's RED shown on Linux, and once on hosted Windows with the old order (a throwaway run) | On Windows the plant re-owns its claim, and asserts `Scope.IsMine` of it, so the child fails loudly if the profile key does not hold. It does NOT prove that a real claim of an elevated run is seen: it is not. `AnUntouchedClaim_StaysUnseen_OnAnElevatedWindowsRun` (`CoaiMcp.Tests`) pins that limit. It does not prove WHO removes the claim: the final empty-root assertion cannot tell the audit from the end of the run. `A_run_that_left_a_folder_…` proves the removal, with the owner seam |
-| (p) | `src_server/smoke-image.sh` leaves nothing on a failure before its trap | As § *Epoch 6*: built, `47c04724`, RED `f1d7e122` | `TheImageSmokeUsesTheServerTests` where `CoaiServer.Tests` runs whole: Linux and macOS. The `windows` job runs only `*RunFolderTests` of that executable (`ci.yml`) | The test green on those two legs | A `chmod` or `openssl` stub stands in for the failure. Not proved on Windows; the script's real use is the Linux image job |
+| (p) | `src_server/smoke-image.sh` leaves nothing on a failure before its trap | As § *Epoch 6*: built, `47c04724`, RED `f1d7e122` | `TheImageSmokeUsesTheServerTests` where `CoaiServer.Tests` runs whole: Linux and macOS in a PR; both Windows runners at a release (`release.yml:860`). The PR's `windows` job runs only `*RunFolderTests` of that executable (`ci.yml`) | The test green on the two PR legs | A `chmod` or `openssl` stub stands in for the failure. No PR gate proves it on Windows: one throwaway probe did (5 of 5), and a release will. The script's real use is the Linux image job |
+| (k) | The suite × OS merge gates, as § *Epoch 6* | `ci.yml` | each cell with a step | every cell green on the head, including the steps after `Test` in the `windows` job, which have never run in that job (they were skipped in 127243250229) | On Windows B4 and B5 keep a run folder by the owner key, not by liveness, and by reading R4 (`LeftoversCoaiLayoutTests.cs:79`) cannot go red there for the same reason. So the liveness half of those proofs comes from Linux and macOS |
 
 ### 4. The disposition of entry 6.2
 
@@ -2159,7 +2163,8 @@ before, and the table's "State" cells are read with item 1 of this section.
    No deadline, not a prerequisite of any PR here. It lists the shape to weigh (the helper re-owns what it makes) and what
    must not change (a folder of another account stays safe).
 4. **The brief.** § 11.3's row, § 11.4's child, the new test, R16's RED, § 19's rows on the plant and on the smoke stub
-   are revised with this section, on the producer branch. The E5 document's D8 (o) and its S6 box say the same.
+   are revised with this section, on the producer branch. The E5 document's goal, D8 (o), must-not-copy row 6 and its S6
+   box say the same. S6's remainder corrects the comment at `RunTemp.cs:22`; `Removal.cs:33` is a copied file, so F31 names it.
 5. **Entry 6.1 stays as built.** The judge reads the five kinds and the 28 pairs against the tree.
 
 ### 5. Build order
@@ -2182,6 +2187,7 @@ review of the delta; (7) merge when (c) is recorded. Then E5.S7, E2.1, and wave 
 | Prove the order red, the untouched claim unseen, a registered leak still red, and say who removes | Registered leak: the PowerShell audit step. Removal: the template's test | Row (o), items 4.1 and 4.2 |
 | The follow-up should cover audit visibility and sweep recovery | True: one predicate | F31 |
 | Carry the limit into E2.3, E6 and E7 | Their tables do not claim more, but their documents do not state it | Item 8.3 |
+| The judge's C1 to C9: a wrong citation, the exception too narrow (a normal end that could not remove; an unregistered folder), the E5 document's goal and row 6, the § 19 pin row, row (p) and row (k), F31's "for the audit only", the brief's status, the pin's gates | Each read against the file | Applied to this section, the E5 documents and F31 (2026-11-05) |
 
 ### 7. Question for the owner (blocking; it goes to the question consultants first)
 
