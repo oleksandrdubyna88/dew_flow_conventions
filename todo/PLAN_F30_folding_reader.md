@@ -1,10 +1,10 @@
 # PLAN — F30: the shipped Node guard reads a prefix in the spellings it lists
 
-> Status: **stopped for re-review, 2026-11-05.** The build at `f5b3b16` (pushed, unmerged) and an independent Opus review found two independent changes of this plan, and more defects of the same reader. The item is F30 of `todo/PLAN_test_leftovers_merged_core_followups.md`. Owner: this repository. Deadline 2026-11-19, or before creds' E2.5 merges if that is earlier. Not a prerequisite of coai's E5 producer PR.
+> Status: **epoch 2 open, 2026-11-05: the owner approved the narrowed plan; the rebuild is next.** The item is F30 of `todo/PLAN_test_leftovers_merged_core_followups.md`. Owner: this repository. Deadline 2026-11-19, or before creds' E2.5 merges if that is earlier. Not a prerequisite of coai's E5 producer PR.
 
 ## Plan changes
 
-> Epoch 1 · approved 2026-11-05 · by reviewers · state: stopped
+> Epoch 1 · approved 2026-11-05 · by reviewers · state: closed
 
 - 1.1 · 2026-11-05 · agent · approach — D4's bare word and its gate do not hold on real trees; the reader reads the classifier's verdict with extras, and on every line with a quote
 - 1.2 · 2026-11-05 · agent · scope — D2's lists are too narrow; .tsx, .jsx, any yaml, and .join over any literal were added
@@ -19,6 +19,8 @@ Narrowed: yes — epoch 1 promised that a zero means zero on any one-line spelli
 | reader, guard wiring, tables, 3849640 | pushed, unmerged | cut | fix forward: the regular-expression reader is replaced by D1's scanner; the helpers, allowance list and table rows stand |
 | three false-finding cures, 2adbe82 | pushed, unmerged | fits | keep the verdictAfter export and the rows; move the three rules into the scanner, tightened to D4 |
 | documents and real-tree record, f5b3b16 | pushed, unmerged | cut | fix forward: correct every text that says owner-blind or any case; keep the research record and add a dated section |
+
+> Epoch 2 · approved 2026-11-05 · by owner · state: open
 
 ## Goal
 
@@ -108,7 +110,7 @@ This measure reads literals by a rough regular expression. It is evidence for th
 2. A Sonnet coder builds it on `feat/f30-folding-reader`, keeping what the judge marks `fits`, with RED first.
 3. The code gate and an independent Opus review, because the gate's reviewers missed most of what the last Opus review found. The PR, CodeRabbit, the merge.
 4. The consumer fixes D5 found, each in its repository.
-5. One release. The pin bumps follow, each alone. **A new release needs the pin bumps in nine repositories, over the cap of three open PRs. The owner's agreement on 2026-11-05 covered release `bd79584` only, so it is asked for this release.**
+5. One release. The pin bumps follow, each alone. **A new release needs a pin bump in nine repositories. The cap is per repository. The owner allowed, on 2026-11-05, for this release only, one pin bump PR over the cap in each of coai, rag_qln, sidecar_rust, mcp and vscode_kit.**
 
 ## What this does not do
 
