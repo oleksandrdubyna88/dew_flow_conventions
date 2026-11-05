@@ -18,11 +18,11 @@
  *                 variable the same file assigns a value holding the prefix (a name from another file, the environment or an
  *                 argument is not traced) — the shape of a sweeper that cannot tell one user's leftovers from another's. It takes NO inline exemption: the one pass is
  *                 `tools/fixtures/owner-blind-allowlist.json`, keyed by file, line and the sha256 of the line
- * `legacy-name` and `owner-blind` read each line TWICE: as written, and folded (`tools/lib/leftovers-fold.mjs`, F30): the string literals of the line joined over `+`, `.concat(…)`, `[…].join('…')` and `${'…'}` holes of a literal (js/ts), over touching quotes
- * (sh, workflow lines; `$'…'`) and over `+` and `-join` (ps1), with `\uXXXX`, `\u{…}`, `\xXX` and a one-character class `[T]` decoded. On the joined literals it also reads the whole word with no owner segment after it and a piece of
- * the word of 6 characters or more that crosses the join of `tests` and `Delete`. A spelling reader of ONE line: a name built from a variable, across lines or at run time is not seen. `FOLDING_ALLOWANCES` lists this repository's files that spell the word in pieces on purpose.
+ * `legacy-name` and `owner-blind` also read each line through a FOLDING READER (F30, `tools/lib/leftovers-fold.mjs`): the comments removed, the string literals decoded and joined. A SPELLING check, not data flow and not a defence
+ * against a hostile author; what it reads and does not is the section "The folding reader" below.
  * plus three that are about the guard's own grammar and inputs:
- *   unreadable    under `--profile node`, a `package.json` that is not valid JSON, is not an object, or whose `scripts` is not an object of strings (never skipped in silence)
+ *   unreadable    under `--profile node`, a `package.json` that is not valid JSON, is not an object, or whose `scripts` is not an object of strings (never skipped in silence); and, for any file, a folded line
+ *                 over 256 KiB (`line <n> is <size>: the folded reading stops at 256 KiB`), a file that ends inside a block comment, or a throw of the folding reader
  *   exemption     a `testsToDelete-exempt:` comment that is not well-formed
  *   token         this repository's token is not a row of the rule's `## Tokens` table (§1), or is of the owner grammar, or a copied `owned.mjs` has
  *                 no `owned-token.mjs` beside it (the shipped helper holds no token: each repository writes its OWN `tools/lib/owned-token.mjs` — `REPO_TOKEN`, `REPO_ROW` — and never copies another's)
@@ -74,6 +74,25 @@
  * honoured only while the path has no history behind the base ref; an unresolved base ref, a git failure, or a shallow clone asked about a creation is exit 2 naming the cause and the fetch to
  * run. A CI checkout fetches the base ref first (`git fetch origin <base-branch> --depth=1`). No command writes a baseline.
  *
+ * The folding reader.
+ * `legacy-name` and `owner-blind` read each line more than once (F30, `tools/lib/leftovers-fold.mjs`, `todo/PLAN_F30_folding_reader.md` D1 to D4): as written, and through a folding reader, a
+ * forward-only scanner that walks each file once, removes the comments and decodes and joins the string literals. It is a SPELLING check over text a person wrote in their own repository, not a
+ * defence against a hostile author: a name built from a variable, across lines, from the environment or at run time is not seen, and a zero for these two classes is zero for the listed
+ * spellings only. What it reads, by file kind (the promise; any document that states the guard's reach names it):
+ *   .mjs .cjs .js .ts .tsx .jsx .mts .cts   comments `//` and `/* *\/` (across lines); literals '…', "…", `…` (a `${'a'}` hole that holds only a quoted literal; a regex literal is recognised, so its quotes
+ *                                           shift nothing); joins `+`, `.concat('a', 'b')`, `['a', 'b'].join(<literal>)`, each with spaces around its operators and a literal in parentheses;
+ *                                           decoded `\uXXXX`, `\u{…}`, `\xXX` and a one-character class `[T]`
+ *   .sh .yml .yaml                          comments `#` at the start of a word; literals '…', "…", $'…'; a word's touching pieces, quoted or not (`testsTo"Delete-"`, `'a''b'`); in $'…' `\xXX`, `\uXXXX`, octal
+ *   .ps1                                    comments `#` and `<# #>` (across lines); literals '…', "…"; joins `+` and a binary `-join` over a literal array; a literal in parentheses; no decoding
+ * Not read: a template nested in a hole (`${`x`}`), unary `-join`, a comment between operands, an extensionless script, every other kind (.py, .bash, .cmd). JSX text is not told from code: `<p>don't</p>`
+ * stops that line's reading and `<p>src/*.ts</p>` can hide the next line. Joins are read within one line; only a comment and a template cross lines.
+ * The readings: the raw lines (comments included) as today; the folded text through `legacyNameHits` (`legacy-name`); the FILE's folded lines through `classifyLines`, so a prefix built in pieces binds as a whole one
+ * does (`owner-blind`, no exemption); the code with escapes and classes decoded, for a regex literal (`owner-blind`); and on the joined literals the BARE WORD (a literal that holds the whole word with a boundary each
+ * side and no owner after it) and a PIECE of the word (a crossing piece of 6 or more in the word's own form, no letter at its sides): both are class `legacy-name`, so an inline `legacy-name` exemption clears them, except a bare
+ * word whose tail holds `[`, `(`, `?`, `*` or `\` (a pattern), which stays `owner-blind`. They read only a line that no `owner-blind` reading called broad: a line draws one class for one cause. `FOLDING_ALLOWANCES` lists this repository's own
+ * files that spell the word in pieces on purpose and applies ONLY when the scan is of this repository's own root; a consumer has none. A folded line over 256 KiB (the classifier is quadratic on a repeated word) is not
+ * read by the folded readings and is ONE `unreadable` finding; a file that ends inside a block comment, and any throw of the reader, are `unreadable` findings too. The raw readings are never skipped.
+ *
  * Exit 0 clean, 1 with every finding printed (`file:line — <class> — <text>`), 2 when it scanned nothing or its
  * arguments are bad — an empty scan is a broken discovery, never a clean repository.
  */
@@ -91,7 +110,7 @@ import { REPO_ROW, REPO_TOKEN } from "./lib/owned-token.mjs";
 import { BASELINE_FILE, GUARD_NAME, PROOF_MARKER, createApplier, loadBaselineAt, siteSha256 } from "./lib/raw-temp-baseline.mjs";
 import { PROFILES, parseArguments, runCli } from "./lib/leftovers-cli.mjs";
 import { MANIFEST_NAME, scanManifest } from "./lib/leftovers-package.mjs";
-import { bareWordHits, foldLine, pieceHits } from "./lib/leftovers-fold.mjs";
+import { FOLD_LIMIT, bareWordHits, decodeCode, foldFile, foldKind, pieceHits } from "./lib/leftovers-fold.mjs";
 
 export { PROFILES, parseArguments };
 import { JANITOR_FILE, classifyLine, classifyLines, lineSha256, passes } from "./lib/sweeper-scan.mjs";
@@ -103,10 +122,11 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const EXCLUDED_FILES = Object.freeze(["tools/leftovers-check.test.mjs", "tools/leftovers-check-consumers.test.mjs"]);
 
 /**
- * The files that spell the prefix in pieces on purpose, so the folding reader (`tools/lib/leftovers-fold.mjs`) does not read their lines: each one HOLDS the
- * detector words or builds the break-it fixtures of its tests out of them. Pinned by a test that every listed file exists and still draws a finding when
+ * The files of THIS repository that spell the prefix in pieces on purpose, so the folded readings (`tools/lib/leftovers-fold.mjs`) do not read their lines: each one HOLDS the
+ * detector words or builds the break-it fixtures of its tests out of them. It applies only when `realpath(repo)` is this repository's own root (`scanRepository`), and `scanText`
+ * defaults to none: a consumer that holds a `tools/janitor.sh` inherits nothing by the matching path. Pinned by a test that every listed file exists and still draws a finding when
  * the allowance is taken away (a stale entry is removed, as the C# template's `FoldingAllowances`); a new entry is a decision, not a convenience.
- * Nothing else is allowed by name. A consumer has no such list: it uses the exemption grammar.
+ * Nothing else is allowed by name. A consumer has no such list: its cure for the bare word and the piece is the inline `legacy-name` exemption, and for a real `owner-blind` line a rewrite.
  */
 export const FOLDING_ALLOWANCES = Object.freeze([
   "tools/janitor-liveness.test.mjs",
@@ -155,7 +175,7 @@ export const CURES = Object.freeze({
   "owner-blind": "Match the caller's owner after the prefix (^testsToDelete-<owner>-<repo>-), or delete the sweep and use the shipped janitor; this class takes no exemption — common/test-leftovers-detail.md §7 (owner-blind), the barrier.",
   "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers-detail.md §6, §7 (shared-store).",
   "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers-detail.md §5, §7 (ryuk-off).",
-  unreadable: "Make the package.json valid JSON whose `scripts` is an object of strings (or remove the field): the guard reads no other shape, and never skips one — see the header of tools/leftovers-check.mjs (`--profile node`) and the README row of the guard.",
+  unreadable: "Make the package.json valid JSON whose `scripts` is an object of strings (or remove the field): the guard reads no other shape, and never skips one — see the header of tools/leftovers-check.mjs (`--profile node`) and the README row of the guard. For a source file: the folded reading (tools/lib/leftovers-fold.mjs) stops at a folded line of 256 KiB (split the line), reads no file that ends inside a block comment (close the comment) and reports a throw of the folding reader; the raw readings were not skipped.",
   baseline: "Remove the stale or out-of-scope entry from the baseline, or move the site into the helper; nothing adds to it — common/test-leftovers-detail.md §7 (the `raw-temp` baseline).",
   exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers-detail.md §7 (the exemption grammar).",
   token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers-detail.md § Tokens (§1 of the rule) — and write it, with its row, in this repository's own tools/lib/owned-token.mjs beside the copied owned.mjs (never copy another repository's).",
@@ -372,30 +392,70 @@ function legacyNameHits(line) {
   return LEGACY_BUILT.test(line) ? [...literal, "a prefix built from the repository token"] : literal;
 }
 
-/** What the folded reading adds for one line: the `legacy-name` hits of the folded text, and the `owner-blind` reasons (empty when the line is passed by the allowlist). */
-function foldedReading(file, line, number, allowlist, allowances) {
-  if (allowances.includes(file)) return { legacy: [], blind: [] };
-  const folded = foldLine(line, path.extname(file));
-  if (folded.text === line && folded.literals.length === 0) return { legacy: [], blind: [] };
-  const changed = folded.text !== line;
-  const blind = passes(allowlist, file, number, line) ? [] : [
-    ...(changed && classifyLine(folded.text) === "broad" ? ["matches the prefix with no owner segment after it, read after folding the line's string literals"] : []),
-    ...bareWordHits(folded.literals, folded.text).map((word) => `the bare prefix \`${word}\` in a string literal, with no owner segment after it`),
-    ...pieceHits(folded.literals).map((piece) => `a string literal that holds ${piece}`),
-  ];
-  return { legacy: changed ? legacyNameHits(folded.text) : [], blind };
+const KIB = 1024;
+const THROWN_MARKER = /[\u0000-\u001f\u007f-\u009f]/g;
+
+/**
+ * The folding reader's answer for one file (`tools/lib/leftovers-fold.mjs`): `{ lines, findings }`, where `lines` is the reader's per-line answer (or undefined when the kind is not read or the file
+ * is one of this repository's allowances) and `findings` are the reader's own `unreadable` findings: a line over 256 KiB, a file that ends inside a block comment, and any throw (ONE finding, never a
+ * crash and never a clean result).
+ */
+function foldReading(file, lines, allowances, reader) {
+  if (allowances.includes(file) || foldKind(path.extname(file)) === undefined) return { lines: undefined, findings: [] };
+  let folded;
+  try {
+    folded = reader(lines, path.extname(file));
+  } catch (error) {
+    return { lines: undefined, findings: [finding(file, 1, "unreadable", `the folding reader failed on ${file}: ${String(error?.message ?? error).split("\n")[0].replace(THROWN_MARKER, "?")} — the raw readings were not skipped`)] };
+  }
+  if (folded === null) return { lines: undefined, findings: [] };
+  const findings = folded.unreadable.map((entry) => finding(file, entry.line, "unreadable", entry.text));
+  folded.lines.forEach((entry, index) => {
+    if (entry.oversize) findings.push(finding(file, index + 1, "unreadable", `line ${index + 1} is ${Math.ceil(entry.size / KIB)} KiB: the folded reading stops at ${FOLD_LIMIT / KIB} KiB`));
+  });
+  return { lines: folded.lines, findings };
 }
 
-function lineFindings(file, lines, exemptions, allowlist, baseline, allowances = FOLDING_ALLOWANCES) {
+/**
+ * What the folded readings add for each line of a file whose reader answered `folded` (D4): `{ legacy, blind }` per line. `legacy` are `legacyNameHits` of the folded text, then the bare word and the piece
+ * (only on a line that no `owner-blind` reading called broad); `blind` is the reason, or undefined: the FILE's folded lines through `classifyLines`, the decoded code of a JS line through `classifyLine`, or a
+ * bare word whose tail is a pattern. A line the allowlist passes, and a line over the limit, are not read.
+ */
+function foldedReadings(file, lines, folded, verdicts, allowlist, isJs) {
+  const usable = folded.map((entry, index) => !entry.oversize && !passes(allowlist, file, index + 1, lines[index]));
+  const texts = folded.map((entry, index) => (entry.oversize ? "" : usable[index] ? entry.text : lines[index])); // a line the allowlist passes keeps its raw text, so classifyLines passes it by its hash
+  const changed = texts.some((text, index) => text !== lines[index]);
+  const foldedVerdicts = changed ? classifyLines(texts.join("\n"), { allowlist, file }) : verdicts;
+  return folded.map((entry, index) => {
+    if (!usable[index]) return { legacy: [], blind: undefined };
+    const legacy = entry.text !== lines[index] ? legacyNameHits(entry.text) : [];
+    let blind;
+    if (verdicts[index] === "broad") return { legacy, blind };
+    if (foldedVerdicts[index] === "broad") blind = "matches the prefix with no owner segment after it, read after folding the line's string literals";
+    else if (isJs) {
+      const decoded = decodeCode(entry.code);
+      if (decoded !== entry.code && classifyLine(decoded) === "broad") blind = "matches the prefix with no owner segment after it, read after decoding the escapes and one-character classes of the line's code";
+    }
+    if (blind !== undefined) return { legacy, blind };
+    const bare = bareWordHits(entry.literals);
+    if (bare.blind.length > 0) blind = `the bare prefix ${bare.blind.map((hit) => `\`${hit}\``).join(", ")} in a string literal, with a pattern after it and no owner segment`;
+    return { legacy: [...legacy, ...bare.legacy, ...pieceHits(entry.literals)], blind };
+  });
+}
+
+function lineFindings(file, lines, exemptions, allowlist, baseline, allowances, reader) {
   const extra = RAW_TEMP_BY_EXTENSION[path.extname(file)] ?? [];
   const found = [];
   const add = (index, cls, text) => {
     if (cls === "ryuk-off" || !isExempt(exemptions, cls, index + 1)) found.push(finding(file, index + 1, cls, text));
   };
   const verdicts = classifyLines(lines.join("\n"), { allowlist, file }); // the file's own prefix bindings are read once, for every line
+  const fold = foldReading(file, lines, allowances, reader);
+  found.push(...fold.findings);
+  const readings = fold.lines === undefined ? [] : foldedReadings(file, lines, fold.lines, verdicts, allowlist, foldKind(path.extname(file)) === "js");
   lines.forEach((line, index) => {
     if (isComment(line)) return;
-    const folded = foldedReading(file, line, index + 1, allowlist, allowances);
+    const folded = readings[index] ?? { legacy: [], blind: undefined };
     const checks = [
       ["raw-temp", allMatches([...RAW_TEMP, ...extra], line)],
       ["raw-worktree", allMatches(RAW_WORKTREE, line).slice(0, 1)],
@@ -412,7 +472,7 @@ function lineFindings(file, lines, exemptions, allowlist, baseline, allowances =
     }
     // owner-blind: no exemption of any kind — the allowlist (file, line, hash) is the one pass. One finding per line, whichever reading found it.
     if (verdicts[index] === "broad") found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
-    else if (folded.blind.length > 0) found.push(finding(file, index + 1, "owner-blind", folded.blind.join("; ")));
+    else if (folded.blind !== undefined) found.push(finding(file, index + 1, "owner-blind", folded.blind));
   });
   return found;
 }
@@ -421,13 +481,15 @@ function lineFindings(file, lines, exemptions, allowlist, baseline, allowances =
 
 /**
  * Every finding of one file's text (`file` is the repository-relative path with forward slashes). `yaml` returns the yaml module and is called only
- * for a workflow: by default the guard's own resolution, which throws a `YamlMissingError` when there is none.
+ * for a workflow: by default the guard's own resolution, which throws a `YamlMissingError` when there is none. `foldingAllowances` lists the files whose folded readings are
+ * skipped: NONE by default, so a path that matches this repository's list inherits nothing (`scanRepository` passes `FOLDING_ALLOWANCES` only for this repository's own root, D6).
+ * `reader` is the folding reader (a seam: a test passes one that throws).
  */
-export function scanText(file, text, allowlist = [], yaml = () => loadYaml(undefined), baseline = undefined, { foldingAllowances = FOLDING_ALLOWANCES } = {}) {
+export function scanText(file, text, allowlist = [], yaml = () => loadYaml(undefined), baseline = undefined, { foldingAllowances = [], reader = foldFile } = {}) {
   const lines = text.split(/\r?\n/);
   const exemptions = readExemptions(file, lines);
   const docker = dockerFindings(file, lines, text, yaml).filter((entry) => !isExempt(exemptions, entry.cls, entry.line));
-  return [...exemptions.findings, ...lineFindings(file, lines, exemptions, allowlist, baseline, foldingAllowances), ...docker];
+  return [...exemptions.findings, ...lineFindings(file, lines, exemptions, allowlist, baseline, foldingAllowances, reader), ...docker];
 }
 
 // --- the token ------------------------------------------------------------------------------------------------
@@ -612,6 +674,15 @@ function appliedBaseline(baseline, repo, files) {
   return createApplier(loaded, repo, BASELINE_FILE, new Set(files), GUARD_NAME, (root) => NODE_TREE.test(`${root}x`)); // the node profile reads every file under scripts/, test/ and tests/
 }
 
+/** Whether `repo` is this guard's own repository (the same folder, links resolved): the only scan the folding allowances apply to. */
+function isOwnRoot(repo) {
+  try {
+    return fs.realpathSync(repo) === fs.realpathSync(path.join(HERE, ".."));
+  } catch {
+    return false;
+  }
+}
+
 /** Scan the text `files`: `{ read, findings }`; a file that is gone or binary is not read. `scan(file, text)` is the guard's text scan. */
 function scanTexts(repo, files, scan) {
   const findings = [];
@@ -653,8 +724,9 @@ export function scanRepository({ repo, token = REPO_TOKEN, rule, identity = toke
   const yaml = () => (yamlModule ??= loadYaml(repo, resolvers)); // read at the first workflow, so a repository with none needs none
   const manifests = profile === "node" ? listed.filter((file) => isPackageManifest(file, profile)) : [];
   const applier = baseline === undefined || baseline === false ? undefined : appliedBaseline(baseline, repo, files);
-  const texts = scanTexts(repo, files, (file, text) => scanText(file, text, entries, yaml, applier));
-  const found = scanManifests(repo, manifests, (name, text) => scanText(name, text, entries, yaml));
+  const folding = { foldingAllowances: isOwnRoot(repo) ? FOLDING_ALLOWANCES : [] }; // D6: the allowances are this repository's own, and only when the scan is of this repository
+  const texts = scanTexts(repo, files, (file, text) => scanText(file, text, entries, yaml, applier, folding));
+  const found = scanManifests(repo, manifests, (name, text) => scanText(name, text, entries, yaml, undefined, folding));
   const findings = [...texts.findings, ...found.findings];
   const read = texts.read + found.read;
   if (applier !== undefined) findings.push(...applier.finalFindings()); // the global reconcile: every entry no line matched, whatever file it names
