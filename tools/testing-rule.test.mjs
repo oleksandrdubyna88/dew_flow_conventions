@@ -38,24 +38,28 @@ const PINS = [
   { text: "the kernel limit (`RLIMIT_NPROC`", why: "the kernel limit the bound is built on" },
   { text: "counts every THREAD of the whole user", why: "the limit is not per process and not per run" },
   { text: "count at the start of the run plus a headroom", why: "the shape of the cap: a count taken at the start, plus room" },
-  { text: "`EAGAIN`", why: "the kernel limit alone fails nothing: a fork past it is refused and the file goes on" },
-  { text: "or the kernel limit comes first and nothing fails the file", why: "a watch that fires after the kernel limit never fails the file" },
+  { text: "small enough that the machine survives reaching it", why: "a cap the machine cannot survive is the incident with a number on it" },
+  { text: "nothing names the bound at it", why: "the kernel limit refuses the fork; what the program does then is its own (measured: one dies, another goes on), and nothing names the bound" },
+  { text: "or the kernel limit comes first and nothing names the bound", why: "a watch that fires after the kernel limit gives a file that may die or go on, and no message either way" },
   { text: "a session of its own", why: "the watch is per file only if the file has a session to watch" },
   { text: "fires well below the headroom", why: "the watch must fire before the kernel limit does" },
   { text: "Only that session is ever signalled", why: "the watch must never signal anything outside the file's own session" },
-  { text: "once, at install", why: "a shim that resolves at run time can meet another such shim" },
+  { text: "once, at its FIRST install", why: "the lookup happens once per shim, at its first install; a second install re-resolving is the walk that bakes two shims into each other" },
   { text: "with its own folder removed from the lookup", why: "the shim's first duty: it never finds itself" },
   { text: "refuses a result inside that folder", why: "the shim's second duty: a result inside its folder is an error" },
   { text: "comparing REAL paths", why: "a folder reached through a link is the same folder; a spelling compare lets it through" },
   { text: "bakes the result in", why: "the lookup is not repeated at run time" },
-  { text: "resolve to each other", why: "the failure the install-time lookup prevents" },
+  { text: "A later install keeps what the first one baked", why: "setup runs twice; a re-install that re-resolves can find a shim installed since, and bake it" },
+  { text: "never looks the program up at run time", why: "a run-time lookup reopens the walk a first-install bake closed" },
+  { text: "two shims that re-resolve can bake each other", why: "the walk: A bakes the program, B bakes A, A re-installed bakes B; real-path compares pass throughout, only keeping the first bake closes it" },
   { text: "guarded fixture that forks without end", why: "the proof forks for real, behind a guard" },
   { text: "outside the folder the runner discovers", why: "a fixture the runner discovers runs with every suite" },
-  { text: "refuses to start unless told to AND an enforced kernel limit is in force", why: "the fixture must not run unbounded under root or without the limit" },
+  { text: "refuses to start unless told to AND the cap in force is the runner's own", why: "a distribution's default is an enforced limit too, measured at about eleven times the count that killed a session; a guard that accepts it proves nothing" },
+  { text: "a distribution's default is enforced too", why: "the reason 'enforced' was not enough" },
   { text: "`setsid`", why: "a descendant that leaves the session is named as a limit" },
   { text: "never counted or ended by the watch", why: "what the watch does not do for a descendant that leaves the session" },
   { text: "outlives the run", why: "such a descendant outlives the run" },
-  { text: "have the watch alone", why: "root, the exempting capabilities and a platform without the limit have the watch alone" },
+  { text: "root, and the capabilities that exempt a process from `RLIMIT_NPROC`, have the watch alone", why: "root and those capabilities are exempt from the limit; the short pin survived deleting them" },
   { text: "weaker, not equal", why: "a platform without the kernel limit is not equal" },
   { text: "not a number this rule's tests verify", why: "the formula is a shape, not a verified number" },
 ];
@@ -115,7 +119,7 @@ function lawProblems(body) {
   const found = [];
   const digits = text.match(/\d{3,}/g);
   if (digits !== null) found.push(`a number of three digits or more: ${digits.join(", ")}`);
-  if (/half of the headroom/.test(text)) found.push("the headroom is a fraction of something");
+  if (/half\s+of\s+the\s+headroom/.test(text)) found.push("the headroom is a fraction of something");
   if (/\b(half|a third|a quarter)\b|\d+ ?%/.test(text)) found.push("a fraction as law");
   return found;
 }
@@ -127,7 +131,9 @@ const DOD_PINS = [
   "and FAILS the file at the bound",
   "resolves the program it wraps outside its own folder",
   "by real path",
+  ", at install",
   "proves the bound with a guarded fixture",
+  "outside the folder it discovers",
 ];
 /** The one `- [ ]` item that opens the way the line does, and the pins of the line it lacks; null without such an item. */
 function dodLine(body) {
@@ -175,11 +181,12 @@ test("the section says each pinned sentence, and each pin is reported when its o
 test("no number becomes law", () => {
   const body = rule();
   assert.deepEqual(lawProblems(body), [], `${HEADING} states a number as if it were the rule`);
-  const withDefault = replaceOnce(body, "plus a headroom, and", "plus a headroom (default 3000), and");
+  const withDefault = replaceOnce(body, "plus a headroom", "plus a headroom (default 3000)");
   assert.notDeepEqual(lawProblems(withDefault), [], "an inserted default of 3000 is still accepted");
-  const withHalf = replaceOnce(body, "and the headroom has to cover", "and half of the headroom has to cover");
+  // the anchor stops before the section's line break (the new text wraps after "the"), so it holds for either wrapping
+  const withHalf = replaceOnce(body, "it fires well below the", "it fires at half of the");
   assert.notDeepEqual(lawProblems(withHalf), [], "an inserted fraction of the headroom is still accepted");
-  const withPercent = replaceOnce(body, "plus a headroom, and", "plus a headroom of 20 %, and");
+  const withPercent = replaceOnce(body, "plus a headroom", "plus a headroom of 20 %");
   assert.notDeepEqual(lawProblems(withPercent), [], "an inserted percentage is still accepted");
   assert.doesNotMatch(section(body, HEADING), /half of the headroom/);
 });
@@ -201,7 +208,7 @@ test("the section names no address", () => {
   assert.doesNotMatch(text, ADDRESS_CI, `${HEADING} names the example repository by its token`);
   // each splice must be seen by one of the two patterns
   for (const inserted of ["(tests/run.mjs)", "(see test.sh)", "R9700", "0123456789abcdef0123456789abcdef01234567"]) {
-    const spliced = section(replaceOnce(body, "plus a headroom, and", `plus a headroom ${inserted}, and`), HEADING);
+    const spliced = section(replaceOnce(body, "plus a headroom", `plus a headroom ${inserted}`), HEADING);
     assert.ok(ADDRESS.test(spliced) || ADDRESS_CI.test(spliced), `an inserted ${inserted} is still accepted`);
   }
   // the positive control: the words the section is entitled to are not addresses

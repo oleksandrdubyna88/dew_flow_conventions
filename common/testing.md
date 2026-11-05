@@ -326,21 +326,23 @@ Where a repository runs its tests through a runner of its own, or a test puts a 
 1. **The runner bounds the processes of each test file, and reaching the bound FAILS the file** with a
    message that names the bound. On Linux the kernel limit (`RLIMIT_NPROC`, `ulimit -u`) counts every
    THREAD of the whole user — concurrent runs, editors, everything else the user has open share it — so
-   the cap is the user's count at the start of the run plus a headroom, and the headroom has to cover
-   what else the user runs while the file does. That limit alone is not per file, and it fails nothing:
-   a fork past it gets `EAGAIN` and the file goes on. A watch on the file's own session is what makes
-   the bound per file — the file starts in a session of its own, or "its session" is the runner's — and
-   it fires well below the headroom, or the kernel limit comes first and nothing fails the file. Only
-   that session is ever signalled.
-2. **A shim resolves the program it wraps once, at install, with its own folder removed from the lookup,
-   refuses a result inside that folder, and bakes the result in** — comparing REAL paths, because a
-   folder reached through a link is the same folder and a spelling compare lets it through. A shim that
-   looks the program up at run time can meet another such shim, and the two resolve to each other.
-   Setup that runs twice is the normal case, not the odd one.
+   the cap is the user's count at the start of the run plus a headroom: enough for what else the user
+   runs while the file does, and small enough that the machine survives reaching it. That limit alone
+   is not per file, and nothing names the bound at it: the fork is refused, and what the program does
+   then is its own. A watch on the file's own session is what makes the bound per file — the file
+   starts in a session of its own, or "its session" is the runner's — and it fires well below the
+   headroom, or the kernel limit comes first and nothing names the bound. Only that session is ever
+   signalled.
+2. **A shim resolves the program it wraps once, at its FIRST install, with its own folder removed from
+   the lookup, refuses a result inside that folder, and bakes the result in** — comparing REAL paths,
+   because a folder reached through a link is the same folder and a spelling compare lets it through.
+   A later install keeps what the first one baked, and a shim never looks the program up at run time:
+   two shims that re-resolve can bake each other, and real paths pass. Setup that runs twice is normal.
 3. **The repository that owns the runner proves the bound** with a guarded fixture that forks without
    end: the file fails, the message names the bound, and the user's process count comes back. The
-   fixture lives outside the folder the runner discovers, and it refuses to start unless told to AND an
-   enforced kernel limit is in force.
+   fixture lives outside the folder the runner discovers, and it refuses to start unless told to AND
+   the cap in force is the runner's own — a distribution's default is enforced too, and reaching it is
+   the incident.
 
 What this does not give: a descendant that calls `setsid` is never counted or ended by the watch, so
 nothing fails the file for it, only the kernel cap bounds it, and it outlives the run; root, and the

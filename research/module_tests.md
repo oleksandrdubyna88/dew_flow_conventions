@@ -1070,7 +1070,7 @@ wrongly passes them.
 
 F27 adds one section to `common/testing.md` (*A runner bounds what a test file may start, and a shim never resolves to
 itself*) and one Definition of Done line. The freeze proves that body CHANGED; **`tools/testing-rule.test.mjs`** (pure, 8
-cases: strings in, strings out, so `common/test-leftovers.md` asks nothing of it) proves it still SAYS what F27 put there.
+cases at 7c4e3e9 and 7 since the review of 2026-11-05, below: strings in, strings out, so `common/test-leftovers.md` asks nothing of it) proves it still SAYS what F27 put there.
 It runs with `npm test` and by itself: `node --test tools/testing-rule.test.mjs`.
 
 **The RED run**, before the section existed, for the right reason: `node --test tools/testing-rule.test.mjs` printed
@@ -1127,6 +1127,28 @@ of 7, the new text restored 7 of 7. The splice rows that changed:
 | `(see test.sh)`, `R9700`, a 40-hex sha inserted | the address guard |
 | `by real path` dropped from the Definition of Done line | the line is reported as lacking `by real path` |
 | a pin copied into `## Scope` (the old twin) | dropped with its case: nothing reads outside the section |
+
+**Second review, 2026-11-05.** The paragraphs above record what the pins WERE; this one records what they say now. The suite
+stays at 7 cases. (1) Nothing NAMES the bound at the kernel limit: the fork is refused and what the program does then is its
+own (measured: one program dies, another goes on; the rule carries no exit codes), so the pins say `nothing names the bound
+at it` and `or the kernel limit comes first and nothing names the bound` instead of "fails nothing" and `EAGAIN`, and the cap
+must be `small enough that the machine survives reaching it`. (2) A shim resolves at its FIRST install, a later install keeps
+what the first one baked, and nothing looks the program up at run time, because baking alone left the two-shim walk open (A
+bakes the program, B bakes A, A re-installed bakes B, and real-path compares pass throughout): `once, at its FIRST install`,
+`A later install keeps what the first one baked`, `never looks the program up at run time` and `two shims that re-resolve can
+bake each other` replace `once, at install` and `resolve to each other`. (3) The fixture refuses unless the cap in force is
+the runner's own, because a distribution's default is an enforced limit too (about eleven times the count that killed a
+session): `refuses to start unless told to AND the cap in force is the runner's own` and `a distribution's default is
+enforced too`. (4) The root pin is the full clause (`root, and the capabilities that exempt a process from \`RLIMIT_NPROC\`,
+have the watch alone`), so deleting root or the capabilities is reported. The Definition of Done case also pins `, at
+install` and `outside the folder it discovers`; the law, address and fraction splices are anchored on words present in both
+wrappings of the text. **RED on the 5bbf9b4 text**: `tests 7, pass 6, fail 1`; the saying case reported 9 pins missing
+(`small enough that the machine survives reaching it`, `nothing names the bound at it`, `or the kernel limit comes first and
+nothing names the bound`, `once, at its FIRST install`, `A later install keeps what the first one baked`, `never looks the
+program up at run time`, `two shims that re-resolve can bake each other`, `refuses to start unless told to AND the cap in
+force is the runner's own`, `a distribution's default is enforced too`); the root pin was NOT reported, because the 5bbf9b4
+text already carries that clause word for word, and so the limits case stayed green. **GREEN** after the text: 7 of 7;
+RED-GREEN-RED on the file: the 5bbf9b4 text in place gave 1 failed of 7, the new text restored 7 of 7.
 
 **What it does not prove.** No runner, shim or fixture exists in this repository: the section is advice for the repositories
 that run tests through a runner of their own, and the repository that owns one proves the bound there. The formula (the

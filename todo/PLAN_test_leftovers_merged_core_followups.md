@@ -782,7 +782,8 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   `policy` cells moved +2,123 B each, `release` 283,766 → 285,889 B; `research/module_rules.md` carries the table and
   `research/module_tests.md` the RED-GREEN-RED.
 - **Progress 2026-11-05 — the review, on the same branch, not released.** The text now says that the kernel limit alone fails
-  nothing (a fork past it gets `EAGAIN`) and that the session watch must fire well below the headroom; that a shim resolves the
+  nothing (a fork past it gets `EAGAIN`) (corrected 2026-11-05: the fork is refused and what the program does then is its own;
+  nothing names the bound) and that the session watch must fire well below the headroom; that a shim resolves the
   program it wraps once, at install, with its own folder removed, compares REAL paths and bakes the result in; that the fixture
   lives outside the folder the runner discovers and refuses to start without an enforced kernel limit; and that root and the
   capabilities that exempt a process from the limit have the watch alone. The suite is 7 cases: RED on the first commit's text
@@ -796,12 +797,25 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   forbids naming a repository in a shared rule, so the text says "one repository here, 2026-11-02" and this register keeps the
   address: `tests/run.mjs`, `tests/test_moe.sh` and `tests/test_runner.sh` on the r9700 `main`; the lookup and refusal are
   `tests/test_moe.sh:652-653` (function head 648, comment 650-651), identical at `2f8cd71` and today's `3b3d3eb`; the cap tests are
-  `tests/test_runner.sh:274-304` (the guarded run 278-291 with the count-back at 289-291, the fixture's refusal test 293-304), not
+  `tests/test_runner.sh:274-304` (the guarded run 278-291 with the count-back at 289-290, 289 the loop and 290 the assertion, 291 the closing brace; the fixture's refusal test 293-304), not
   274-286.
 - **Todo, the example repository's own (not built here).** its shim compares spellings, so a linked `PATH` entry pointing at the
   shim folder gets through (verified: realpath says it IS the shim); its fixture checks the switch and a finite hard limit but not
   that the limit is enforced, so under root or `CAP_SYS_ADMIN`/`CAP_SYS_RESOURCE` it runs unbounded; its watch fires at half the
-  headroom and that fraction is its own choice.
+  headroom and that fraction is its own choice; its fixture's guard allows any hard limit up to its own number (20000) and
+  reads the limit (`ulimit -H -u`) but not who set it, so on a machine whose default hard limit is at or under that number it
+  runs with no runner cap; where the default is above it (176,539 measured here) it refuses, by the number's accident, not by design.
+- **Progress 2026-11-05 — the second review, on the same branch, not released.** The text now says that nothing NAMES the bound at
+  the kernel limit (the fork is refused and what the program does then is its own; measured: one program dies, another goes on),
+  that the cap must be small enough that the machine survives reaching it, that a shim resolves at its FIRST install, a later
+  install keeps what the first one baked and nothing looks the program up at run time (baking alone left the two-shim walk open),
+  and that the fixture refuses unless the cap in force is the runner's own, because a distribution's default is enforced too.
+  The suite is 7 cases: RED on the previous commit's text was 1 failed of 7 (9 pins missing in the saying case; the full root
+  clause was already in that text, so the limits case stayed green), GREEN after the text 7 of 7. The record moved with
+  `node tools/rule-bodies.mjs --update common.testing` (`a426215c3131 → 76ee721ca9f9`). Re-measured with
+  `node tools/selection-matrix.mjs --bytes`: `common/testing.md` is 27,953 B (+3,254 B over the released text), the `implement`,
+  `test`, `audit` and `policy` cells moved +3,254 B each, `release` 283,766 → 287,020 B; the four `api/a.http` values of `OVER` and
+  the four `why` strings of `research/selection-matrix.json` are now 63,379, 65,592, 66,852 and 68,578 B.
 - **State.** Fixed, not released; queued for the next planned release.
 
 ## F28 — A product's submodule pin follows another product's `main`, so every merge there makes the consumer's pin check red (found 2026-11-02, rag_qln)
