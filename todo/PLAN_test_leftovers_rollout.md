@@ -1,6 +1,12 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 5 open (2026-11-04), approved by the owner after the re-review.** Epoch 4 stopped at entries 4.1 and 4.2;
+> Status: **stopped for re-review (2026-11-05)** — epoch 5's second and third changes after approval (entries 5.2 and 5.3, found writing E5's S6 brief). No new code on any epic of this
+> plan and no merge of a pull request carrying its work until the full re-review is complete; when its record says `Narrowed: yes`, the owner has approved the revised plan; and epoch 6 is
+> opened with `state: open`. At the stop: E5's producer PR coai #945 (draft) holds S3, S2-B, S4 and S5, pushed at `524df50e`; the S6 brief is local at `6b3f143e`. The ONE release carrying F3
+> and F24 is promoted (`release` = `bd795847`, 2026-11-05, the owner agreed to the over-cap bumps), and its pin bumps are in flight: they are not epic code, they end the red pins the promotion
+> caused, and they go on during the stop. Coai #948 (the SQLite WAL switch) is outside this plan.
+>
+> Was: **epoch 5 open (2026-11-04), approved by the owner after the re-review.** Epoch 4 stopped at entries 4.1 and 4.2;
 > the whole plan was revised (§ *Epoch 5*), the Opus judge sorted epoch 4's work (14 fit; coai #943 cut, fixed forward on
 > #945), the plan gate (session `5c89a4ce`, 2 findings accepted, 1 rejected with reason) and the interim document gate on
 > the E5 stories document (5 findings accepted) passed, an Opus review's fixes were applied, and because the record says
@@ -324,7 +330,7 @@ Narrowed: yes — E5's native measurement series (`native-(vibe|kimi)-<yyyymmdd>
   E5 stories document is marked `*[epoch 5, 2026-11-04, Opus review]*` in place; it is part of the baseline epoch 5 is
   approved on, not an entry.)
 
-> Epoch 5 · approved 2026-11-04 · by owner · state: open
+> Epoch 5 · approved 2026-11-04 · by owner · state: stopped
 
 - 5.1 · 2026-11-04 · agent · approach — on Windows a rename has no single winner, so E5's C# copy holds a per-root mutex around a whole sweep on Windows, an op on the template's text
   (Measured on a hosted windows-latest runner, run 41873954643, a bare .NET console: two threads race Directory.Move on one
@@ -335,6 +341,10 @@ Narrowed: yes — E5's native measurement series (`native-(vibe|kimi)-<yyyymmdd>
   later sweeps keep as unmarked. No wrong deletion was found. Loosening the test would hide that. This departs from
   "the template wins" for a defect that blocks the PR, so it is a change and not a fix inside the plan; the same report goes
   to the template's owner as F29 of the follow-ups plan. E2.3, E6 and E7 copy the template later and read F29 first.)
+- 5.2 · 2026-11-05 · agent · contract, approach — E5's must-not-copy row 2 asks for twelve planted spellings in a `.mjs`, RED when the folding reader is off, but the shipped Node guard has no folding reader (2 of 15 spellings found at `bd795847`), and D6 gives Node detection to the shipped tool
+  Found writing E5's S6 brief; reproduced by the consultant (consult 5d804d0c: a split literal through `scanText` answers `[]`). A coai-own reader, a new conventions release or a narrowed row each changes a contract or a prerequisite. E2 has the same gap.
+- 5.3 · 2026-11-05 · agent · merge-conditions — D8 (b) says only the authorised `raw-temp` baseline is left, but the guard must read `src_vs_code/scripts` (P13), which holds 54 `raw-temp` lines no baseline scope can carry, and `src_server/smoke-image.sh:73` is a raw temp outside every scope
+  A scope needs a proof that is a test file under its root, and that folder has none. The brief's answer was inline exemptions; the consultant reads that as narrowing D8 (b), and I agree. The brief's premise for `smoke-image.sh` was also wrong: its trap is set after fallible work (`:73`, `:102`), so a failure can leave the folder without a kill.
 
 ## Symptom
 
