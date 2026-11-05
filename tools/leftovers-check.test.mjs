@@ -1308,6 +1308,8 @@ test("F30 reader: foldFile joins, decodes, removes comments and keeps the quotes
     [".yml", "      - run: echo 'a''b'", "      - run: echo 'ab'", ["ab"]],
     [".ps1", '$n = ("testsTo", "Delete-agent-1") -join ""', '$n = ("testsToDelete-agent-1")', ["testsToDelete-agent-1"]],
     [".ps1", "$n = 'a' + \"b\" + 'c'", "$n = 'abc'", ["abc"]],
+    [".mjs", "const n = 'CORP\\alice';", "const n = 'CORPalice';", ["CORPalice"]], // \a is a BEL in a shell $'…' and not in JavaScript
+    [".sh", "echo $'a\\ab'", "echo 'a\u0007b'", ["a\u0007b"]],
     [".mjs", "no quote on this line", "no quote on this line", []],
   ];
   for (const [extension, line, text, literals] of rows) {

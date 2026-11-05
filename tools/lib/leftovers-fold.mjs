@@ -31,9 +31,10 @@ export const foldKind = (extension) => KIND_BY_EXTENSION[extension];
 
 // --- decoding ---------------------------------------------------------------------------------------------------------------
 
-const SIMPLE_ESCAPES = Object.freeze({ n: "\n", r: "\r", t: "\t", 0: "\0", b: "\b", f: "\f", v: "\v", a: "\u0007" });
+const SIMPLE_ESCAPES = Object.freeze({ n: "\n", r: "\r", t: "\t", 0: "\0", b: "\b", f: "\f", v: "\v" }); // JavaScript: `\a` is `a`
+const ANSI_ESCAPES = Object.freeze({ ...SIMPLE_ESCAPES, a: "\u0007" }); // a shell $'…' has the bell too
 const fromCode = (code) => (Number.isInteger(code) && code >= 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : "�");
-const simple = (letter) => SIMPLE_ESCAPES[letter] ?? letter;
+const simple = (letter, table = SIMPLE_ESCAPES) => table[letter] ?? letter;
 
 // one escape of a JavaScript literal, or a one-character class
 const JS_DECODE = /\\(?:u\{([0-9a-fA-F]+)\}|u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2})|([\s\S]))|\[([^\]\\^-])\]/g;
@@ -70,7 +71,7 @@ const decodeAnsi = (body) => body.replace(ANSI_ESCAPE, (_all, u4, u8, hex, octal
   if (u8 !== undefined) return fromCode(Number.parseInt(u8, 16));
   if (hex !== undefined) return fromCode(Number.parseInt(hex, 16));
   if (octal !== undefined) return fromCode(Number.parseInt(octal, 8));
-  return simple(plain);
+  return simple(plain, ANSI_ESCAPES);
 });
 
 // --- one line of output -----------------------------------------------------------------------------------------------------
