@@ -426,7 +426,7 @@ Narrowed: yes — two things got smaller, both in E5's producer PR: (1) must-not
 
 ### Re-review for epoch 7
 
-Narrowed: yes — E5's merge condition (o) and the goal: on an elevated Windows run, which every Windows CI leg is, a real orphan claim or unregistered folder stays unseen by the audit, and what a run leaves (killed, or not removable at its normal end) is kept by every sweep, so it waits for a person; the plant proves the order on Windows with a re-owned claim, and a test pins the limit (§ *Epoch 7*, items 1 and 4).
+Narrowed: yes — E5's merge condition (o) and the goal: on an elevated Windows run, which `windows-latest` is (measured; a PR's only Windows leg; the release's `windows-11-arm` is not measured), a real orphan claim or unregistered folder stays unseen by the audit, and what a run leaves (killed, or not removable at its normal end) is kept by every sweep, so it waits for a person; the plant proves the order on Windows with a re-owned claim, and a test pins the limit (§ *Epoch 7*, items 1 and 4).
   (Written 2026-11-05 with the revision of § *Epoch 7*, over the two entries of epoch 6: 6.1, the kinds of reason; 6.2, the plant. Re-review consult `dd79d0aa`; the question consultants
   before it: `ee497a76`. The Verdict and Action cells are `—` until an Opus judge fills them (step 5 of the full stop). The epoch 7 line is written only when the owner approves.)
 
@@ -2104,7 +2104,7 @@ Windows run, and the S6 brief's § 11.3, § 11.4 and § 19 rows named in item 4.
    (`RunTempGateTests.cs:258-263`, `LeftoversSweepTests.cs:585-597`) or hands in an owner seam. So those green tests prove
    collection of a prepared fixture, not of a real run's leftovers.
 
-**What this costs in practice.** Two things. (1) On every Windows CI leg the audit's claim scan sees nothing; only its
+**What this costs in practice.** Two things. (1) On a PR's Windows leg (`windows-latest`, the only one) the audit's claim scan sees nothing; only its
 registry half works there (`ci.yml` step 0 is red if the runner is not elevated). So an unregistered claim or folder does
 not turn a Windows leg red; Linux and macOS still catch one a test makes on every OS. (2) What a run leaves in an elevated
 process, killed or not removable at its end, waits for a person. On a hosted runner nothing stays, because the machine ends
@@ -2200,15 +2200,18 @@ review of the delta; (7) merge when (c) is recorded. Then E5.S7, E2.1, and wave 
 | The judge's C1 to C9: a wrong citation, the exception too narrow (a normal end that could not remove; an unregistered folder), the E5 document's goal and row 6, the § 19 pin row, row (p) and row (k), F31's "for the audit only", the brief's status, the pin's gates | Each read against the file | Applied to this section, the E5 documents and F31 (2026-11-05) |
 | The final Opus read: item 7 understated the cost (every Windows CI leg audits less), the pin would not have gone red under F31 (the child's claim is not the helper's), an unmeasured sentence on shells that are not elevated, the row count, two comments | Each read against the file; the child built in all four suites with warnings as errors, 0 errors | Applied to this section, F31 and the brief (2026-11-05). Row (p)'s Windows filter stays as it is: the script's real use is Linux |
 
-### 7. Question for the owner (blocking; it goes to the question consultants first)
+### 7. Question for the owner (answered below)
 
 Approve the narrowing: on an elevated Windows run, what a run leaves (killed, or not removable at its normal end) waits for
-a person; the audit's claim scan sees nothing on any Windows CI leg, so an unregistered claim or folder does not turn that
-leg red; and condition (o)'s plant proves the audit's order on Windows with a re-owned claim, the limit pinned by a test and
+a person; the audit's claim scan sees nothing on a PR's Windows leg (`windows-latest`), so an unregistered claim or folder
+does not turn that leg red; and condition (o)'s plant proves the audit's order on Windows with a re-owned claim, the limit pinned by a test and
 F31 written. Recommended: yes.
 Its cost is item 1's paragraph *What this costs in practice*. F31 is reviewed, and either fixed or accepted again by the owner, at the first of: E2.3 starts (the next copy of the helper), a suite is to run on a Windows machine that persists, or 2026-12-05 (consultants `30fab21d`: a follow-up with no trigger is where a gap stays; the strongest reason against accepting is the lost signal on Windows CI, not the leftovers). Nothing enforces it; this session tracks it. The other answer is to fix the helper first (F31 as a prerequisite). That changes the
 template, the Node reference and coai's unmerged copy (E2.3, E6 and E7 have not started theirs), before E5 can merge. No CI
-leg leaves anything behind in this state, but every Windows leg audits less because of it.
+leg leaves anything behind in this state, but that Windows leg audits less because of it.
+
+**The owner's answer (2026-11-05, after the question consultants `30fab21d`):** approved as recommended, with F31's review
+trigger. Epoch 7 opens `by owner`.
 
 ### 8. The way of working
 
