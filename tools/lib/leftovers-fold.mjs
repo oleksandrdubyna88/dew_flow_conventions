@@ -533,6 +533,7 @@ function lexTemplate(line, from, st, out, ctx) {
         ctx.steps += (close < 0 ? n : close + 2) - at;
         if (close < 0) {
           stack.push(C);
+          st.commentLine = st.line;
           i = n;
         } else i = close + 2;
       }
@@ -553,6 +554,7 @@ function lexTemplate(line, from, st, out, ctx) {
 }
 
 function scanJsLine(line, number, st, out, ctx) {
+  st.line = number;
   const n = line.length;
   const stack = st.stack;
   const state = { prev: 0, noRegex: false, hole: false, arrays: true, start: true, at: 0 };
@@ -644,7 +646,7 @@ function foldJs(lines, ctx) {
     scanJsLine(line, index + 1, st, out, ctx);
     return out.finish();
   });
-  return { lines: result, unreadable: st.stack[0] === C ? openComment(st.commentLine) : [] };
+  return { lines: result, unreadable: st.stack.includes(C) ? openComment(st.commentLine) : [] };
 }
 
 // --- shell and workflow lines -----------------------------------------------------------------------------------------------

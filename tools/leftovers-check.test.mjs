@@ -1344,7 +1344,11 @@ test("F30 reader: a file that ends inside a block comment is one unreadable find
   assert.deepEqual(found.map((entry) => `${entry.line}:${entry.cls}`), ["2:unreadable"]);
   assert.match(found[0].text, /block comment/);
   assert.deepEqual(scanText("scripts/zz.ps1", "<# never closed\n$a = 1\n").map((entry) => `${entry.line}:${entry.cls}`), ["1:unreadable"]);
-  assert.deepEqual(scanText("scripts/zz.mjs", "const a = `never closed\nconst b = 2;\n").map((entry) => entry.cls), [], "D1 names the block comment only");
+  assert.deepEqual(scanText("scripts/zz.mjs", "const a = `never closed\nconst b = 2;\n").map((entry) => entry.cls), [], "D1 names the block comment only: a file that ends inside a template is a stated limit, not a finding");
+  const inHole = scanText("scripts/zz.mjs", "const ok = 1;\nconst a = `${ /* never closes\nstill inside\n");
+  assert.deepEqual(inHole.map((entry) => `${entry.line}:${entry.cls}`), ["2:unreadable"], "a block comment anywhere on the stack: inside a hole too");
+  assert.match(inHole[0].text, /block comment that opens on line 2/);
+  assert.deepEqual(scanText("scripts/zz.mjs", "const a = `${ /* closes */ 1 }`;\n").map((entry) => entry.cls), [], "a block comment in a hole that closes is no finding");
 });
 
 test("F30 reader: the bare word and the piece rule read literals, and never an operand", () => {
