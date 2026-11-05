@@ -526,6 +526,7 @@ test("F3 22b. a run of test 22 leaves nothing in its TMPDIR: the locked subfolde
   const tmp = ownedDir(t, "tmp of test 22");
   const env = { ...process.env, TMPDIR: tmp };
   delete env.NODE_TEST_CONTEXT; // set by the runner of THIS file: a nested `node --test` would otherwise print nothing and run in the runner's child mode
+  env.NODE_OPTIONS = (process.env.NODE_OPTIONS ?? "").replace(/--test-reporter(?:-destination)?[= ]\S+/g, "").trim(); // a reporter set there would be counted against ours
   const child = spawnSync(process.execPath, ["--test", "--test-reporter=spec", "--test-name-pattern=^F3 22\\.", fileURLToPath(import.meta.url)], { env, encoding: "utf8", timeout: 120_000 }); // spec: Node 22 prints tap to a pipe by default
   assert.equal(child.status, 0, `${child.stdout}\n${child.stderr}`);
   assert.match(child.stdout, /^✔ F3 22\. /m, "the child ran test 22");
