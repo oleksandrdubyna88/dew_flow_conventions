@@ -509,7 +509,7 @@
     {
       "id": "common.testing",
       "source": "common/testing.md",
-      "bodySha256": "b6449c600fb4c0700668ca97ceb5f3b021c2d9d0d6128ea5fccb1a176fe84d3a",
+      "bodySha256": "55fe34518846ba19e5cc554fd85fb21cf7198ec49c29a8df5b7c63758f8811c2",
       "sections": [
         "# Testing",
         "## Running tests — executables only, never `dotnet test` (MANDATORY)",
@@ -527,6 +527,7 @@
         "## A test that reads the clock expires, and it expires green",
         "## A check that only runs during a release has never run",
         "## Starting is not working — a delivery check must USE the capability",
+        "## A runner bounds what a test file may start, and a shim never resolves to itself",
         "## Every bug fix starts with a RED test (MANDATORY)",
         "## Name the guarantee, and give a refuted approach a shape",
         "## Architecture is a test, not a review comment",

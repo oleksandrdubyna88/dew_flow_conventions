@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (open: a process cap and shim rule for the next planned release; release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner). F30 added 2026-11-05 (open, with an owner and a proposed deadline: the shipped Node guard has no folding reader).** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (F27 fixed 2026-11-05, not released: a process cap and shim rule for the next planned release; F28 open: release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner). F30 added 2026-11-05 (open, with an owner and a proposed deadline: the shipped Node guard has no folding reader).** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -772,7 +772,55 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - **Tests.** The rule's own checks: `node tools/rule-bodies.mjs` and `node tools/ownership-check.mjs` clean with the new text;
   a rule test that the new section is in the body (RED before the text is added). Adoption in other repositories is their own
   work, scheduled apart from this item.
-- **State.** Open, queued for the next planned release.
+- **Progress 2026-11-05 — the rule text is changed on `feat/f27-test-process-bound`, not released.** RED observed with the test
+  only: `node --test tools/testing-rule.test.mjs` printed 8 failed of 8, seven with `common/testing.md has no section ## A runner
+  bounds what a test file may start, and a shim never resolves to itself — the section F27 writes` and the Definition of Done case
+  with its missing phrase. GREEN after `common/testing.md` gained the section and the Definition of Done line: 8 of 8. The record
+  was moved with `node tools/rule-bodies.mjs --update common.testing` (`DRIFT common.testing` before, `OK — 41 rule(s)` after);
+  `node tools/ownership-check.mjs` and `node tools/selection-matrix.mjs` are clean. Re-measured with
+  `node tools/selection-matrix.mjs --bytes`: `common/testing.md` is 26,822 B (+2,123 B), the `implement`, `test`, `audit` and
+  `policy` cells moved +2,123 B each, `release` 283,766 → 285,889 B; `research/module_rules.md` carries the table and
+  `research/module_tests.md` the RED-GREEN-RED.
+- **Progress 2026-11-05 — the review, on the same branch, not released.** The text now says that the kernel limit alone fails
+  nothing (a fork past it gets `EAGAIN`) (corrected 2026-11-05: the fork is refused and what the program does then is its own;
+  nothing names the bound) and that the session watch must fire well below the headroom; that a shim resolves the
+  program it wraps once, at install, with its own folder removed, compares REAL paths and bakes the result in; that the fixture
+  lives outside the folder the runner discovers and refuses to start without an enforced kernel limit; and that root and the
+  capabilities that exempt a process from the limit have the watch alone. The suite is 7 cases: RED on the first commit's text
+  was 3 failed of 7 (14 pins missing in the saying case, three limit pins, `by real path` in the Definition of Done line), GREEN
+  after the text 7 of 7. The record moved again with `node tools/rule-bodies.mjs --update common.testing`
+  (`12bc098b61be → a426215c3131`). Re-measured with `node tools/selection-matrix.mjs --bytes`: `common/testing.md` is 27,762 B
+  (+3,063 B over the released text), the `implement`, `test`, `audit` and `policy` cells moved +3,063 B each, `release`
+  283,766 → 286,829 B; the `api/a.http` row moved with it, so its four `OVER` values in `tools/selection-matrix.mjs` and the
+  four `why` strings of `research/selection-matrix.json` were set to the new cells (63,188, 65,401, 66,661 and 68,387 B).
+- **Deviation from the Fix bullet.** The Fix says the rule "cites the r9700 implementation as the model". `common/rule-ownership.md`
+  forbids naming a repository in a shared rule, so the text says "one repository here, 2026-11-02" and this register keeps the
+  address: `tests/run.mjs`, `tests/test_moe.sh` and `tests/test_runner.sh` on the r9700 `main`; the lookup and refusal are
+  `tests/test_moe.sh:652-653` (function head 648, comment 650-651), identical at `2f8cd71` and today's `3b3d3eb`; the cap tests are
+  `tests/test_runner.sh:274-304` (the guarded run 278-291 with the count-back at 289-290, 289 the loop and 290 the assertion, 291 the closing brace; the fixture's refusal test 293-304), not
+  274-286.
+- **Todo, the example repository's own (not built here).** its shim compares spellings, so a linked `PATH` entry pointing at the
+  shim folder gets through (verified: realpath says it IS the shim); its fixture checks the switch and a finite hard limit but not
+  that the limit is enforced, so under root or `CAP_SYS_ADMIN`/`CAP_SYS_RESOURCE` it runs unbounded; its watch fires at half the
+  headroom and that fraction is its own choice; its fixture's guard allows any hard limit up to its own number (20000) and
+  reads the limit (`ulimit -H -u`) but not who set it, so on a machine whose default hard limit is at or under that number it
+  runs with no runner cap; where the default is above it (176,539 measured here) it refuses, by the number's accident, not by design.
+- **Progress 2026-11-05 — the second review, on the same branch, not released.** The text now says that nothing NAMES the bound at
+  the kernel limit (the fork is refused and what the program does then is its own; measured: one program dies, another goes on),
+  that the cap must be small enough that the machine survives reaching it, that a shim resolves at its FIRST install, a later
+  install keeps what the first one baked and nothing looks the program up at run time (baking alone left the two-shim walk open),
+  and that the fixture refuses unless the cap in force is the runner's own, because a distribution's default is enforced too.
+  The suite is 7 cases: RED on the previous commit's text was 1 failed of 7 (9 pins missing in the saying case; the full root
+  clause was already in that text, so the limits case stayed green), GREEN after the text 7 of 7. The record moved with
+  `node tools/rule-bodies.mjs --update common.testing` (`a426215c3131 → 76ee721ca9f9`). Re-measured with
+  `node tools/selection-matrix.mjs --bytes`: `common/testing.md` is 27,953 B (+3,254 B over the released text), the `implement`,
+  `test`, `audit` and `policy` cells moved +3,254 B each, `release` 283,766 → 287,020 B; the four `api/a.http` values of `OVER` and
+  the four `why` strings of `research/selection-matrix.json` are now 63,379, 65,592, 66,852 and 68,578 B.
+  A third review the same day restored "enforced": the fixture's cap must be the runner's own AND enforced (so not under root or
+  the exempting capabilities), or its refusal there, which the limits paragraph promises, would be false (RED 1 failed of 7, GREEN
+  7 of 7; `76ee721ca9f9 → 55fe34518846`); `common/testing.md` is then 28,016 B (+3,317 B over the released text), `release`
+  283,766 → 287,083 B, and the four `api/a.http` values are 63,442, 65,655, 66,915 and 68,641 B.
+- **State.** Fixed, not released; queued for the next planned release.
 
 ## F28 — A product's submodule pin follows another product's `main`, so every merge there makes the consumer's pin check red (found 2026-11-02, rag_qln)
 

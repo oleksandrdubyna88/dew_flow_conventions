@@ -1066,6 +1066,106 @@ dates are not ordered (only epoch dates are), and where the section stands in th
 cases compare the rule's example with the lib, not the rule's prose with the lib: a sentence that describes the check
 wrongly passes them.
 
+## The process bound and the shim (`tools/testing-rule.test.mjs`, 2026-11-05)
+
+F27 adds one section to `common/testing.md` (*A runner bounds what a test file may start, and a shim never resolves to
+itself*) and one Definition of Done line. The freeze proves that body CHANGED; **`tools/testing-rule.test.mjs`** (pure, 8
+cases at 7c4e3e9 and 7 since the review of 2026-11-05, below: strings in, strings out, so `common/test-leftovers.md` asks nothing of it) proves it still SAYS what F27 put there.
+It runs with `npm test` and by itself: `node --test tools/testing-rule.test.mjs`.
+
+**The RED run**, before the section existed, for the right reason: `node --test tools/testing-rule.test.mjs` printed
+`tests 8, pass 0, fail 8`. Seven cases failed with `common/testing.md has no section ## A runner bounds what a test file may
+start, and a shim never resolves to itself — the section F27 writes` (the first assertion of the section helper, so the red is
+never a `TypeError`), and the Definition of Done case failed with `## Definition of Done has no "- [ ]" line that bounds each
+test file's processes and resolves the program it wraps outside its own folder`. After the text: 8 of 8. The first GREEN run
+was 7 of 8: `FAILS the file` and `guarded fixture` also stand in the Definition of Done line, so the case *each pinned sentence
+comes from this section and nowhere else* refused them. The two pins were narrowed (`reaching the bound FAILS the file`,
+`guarded fixture that forks`) rather than the case weakened. Before the freeze was recorded `node tools/rule-bodies.mjs`
+printed `DRIFT common.testing`, exit 1; after `--update common.testing` it printed `OK — 41 rule(s)`, exit 0.
+
+**RED-GREEN-RED.** Whole file: `git show HEAD:common/testing.md` in place of the text gave 0 of 8 (RED), the text restored
+gave 8 of 8 (GREEN). The cases then break the text in memory, in every run, and each splice must turn its check red (the helper
+that makes a splice refuses one that changes nothing):
+
+| Splice (in memory) | The check that must go red |
+|---|---|
+| the section moved to after the RED-test section | placement: not immediately before `## Every bug fix starts with a RED test` |
+| a `4. **…**` item appended; item 2 deleted | the count of numbered bold items is not 3 |
+| one pinned sentence copied into `## Scope` | the pins stay present in the section (the saying case stays green) and the *nowhere else* case goes red |
+| `(default 3000)` inserted; `half of the headroom` inserted | no number becomes law |
+| the `What this does not give` paragraph removed | the limits case: the paragraph and the three limit pins |
+| `(tests/run.mjs)` inserted | the address guard |
+| the Definition of Done line removed | the Definition of Done case |
+
+**Revised 2026-11-05 after the review.** The section now also says that the kernel limit fails nothing (a fork past it gets
+`EAGAIN`) and the watch must fire below the headroom, that a shim resolves once at install by real path and bakes the result
+in, that the fixture lives outside the folder the runner discovers and refuses without an enforced kernel limit, and the
+wider limits (root and the exempting capabilities). The suite is **7 cases** as the runner prints it. The case *each pinned
+sentence comes from this section and nowhere else*, and the Definition of Done twin of it, are dropped: their reason was
+false. Every pin check reads the section alone, so a sentence copied elsewhere cannot make a check green or red, and the
+header comment that claimed otherwise is gone. In its place each pin has a splice in the saying case: the one occurrence of
+the pin is removed from the section text and that pin, and only that pin, must be reported (so a pin that occurs twice
+cannot hide: `RLIMIT_NPROC` became `the kernel limit (\`RLIMIT_NPROC\`` and `nothing fails the file` became `or the kernel
+limit comes first and nothing fails the file`, each of which occurs once; `Only that session is ever signalled` is pinned
+with the capital the text has). The law case also refuses a fraction (`half`, `a third`, `a quarter`, a percentage) and
+splices `20 %`; the address guard is a file-extension pattern plus a case-insensitive token pattern, with four splices
+(`tests/run.mjs`, `test.sh`, `R9700`, a 40-hex sha) and a positive control (`CAP_SYS_ADMIN`, `RLIMIT_NPROC`, `EAGAIN`,
+`setsid`, `PATH` are not addresses); the Definition of Done line is pinned by five phrases and a splice that drops `by real
+path` must be reported as lacking it. **RED on the 7c4e3e9 text**: `tests 7, pass 4, fail 3`. The saying case reported 14
+pins missing (`EAGAIN`, `or the kernel limit comes first and nothing fails the file`, `a session of its own`, `fires well
+below the headroom`, `Only that session is ever signalled`, `once, at install`, `comparing REAL paths`, `bakes the result
+in`, `resolve to each other`, `outside the folder the runner discovers`, `refuses to start unless told to AND an enforced
+kernel limit is in force`, `never counted or ended by the watch`, `outlives the run`, `have the watch alone`), the limits
+case the last three of them as limit pins, and the Definition of Done case `by real path`; placement, count, law and
+address stayed green. **GREEN** after the text: 7 of 7. RED-GREEN-RED on the file: the 7c4e3e9 text in place gave 3 failed
+of 7, the new text restored 7 of 7. The splice rows that changed:
+
+| Splice (in memory) | The check that must go red |
+|---|---|
+| each pin's one occurrence removed from the section text | that pin, and only that pin, is reported missing |
+| `20 %` inserted | the law case: a fraction as law |
+| `(see test.sh)`, `R9700`, a 40-hex sha inserted | the address guard |
+| `by real path` dropped from the Definition of Done line | the line is reported as lacking `by real path` |
+| a pin copied into `## Scope` (the old twin) | dropped with its case: nothing reads outside the section |
+
+**Second review, 2026-11-05.** The paragraphs above record what the pins WERE; this one records what they say now. The suite
+stays at 7 cases. (1) Nothing NAMES the bound at the kernel limit: the fork is refused and what the program does then is its
+own (measured: one program dies, another goes on; the rule carries no exit codes), so the pins say `nothing names the bound
+at it` and `or the kernel limit comes first and nothing names the bound` instead of "fails nothing" and `EAGAIN`, and the cap
+must be `small enough that the machine survives reaching it`. (2) A shim resolves at its FIRST install, a later install keeps
+what the first one baked, and nothing looks the program up at run time, because baking alone left the two-shim walk open (A
+bakes the program, B bakes A, A re-installed bakes B, and real-path compares pass throughout): `once, at its FIRST install`,
+`A later install keeps what the first one baked`, `never looks the program up at run time` and `two shims that re-resolve can
+bake each other` replace `once, at install` and `resolve to each other`. (3) The fixture refuses unless the cap in force is
+the runner's own, because a distribution's default is an enforced limit too (about eleven times the count that killed a
+session): `refuses to start unless told to AND the cap in force is the runner's own` and `a distribution's default is
+enforced too`. (4) The root pin is the full clause (`root, and the capabilities that exempt a process from \`RLIMIT_NPROC\`,
+have the watch alone`), so deleting root or the capabilities is reported. The Definition of Done case also pins `, at
+install` and `outside the folder it discovers`; the law, address and fraction splices are anchored on words present in both
+wrappings of the text. **RED on the 5bbf9b4 text**: `tests 7, pass 6, fail 1`; the saying case reported 9 pins missing
+(`small enough that the machine survives reaching it`, `nothing names the bound at it`, `or the kernel limit comes first and
+nothing names the bound`, `once, at its FIRST install`, `A later install keeps what the first one baked`, `never looks the
+program up at run time`, `two shims that re-resolve can bake each other`, `refuses to start unless told to AND the cap in
+force is the runner's own`, `a distribution's default is enforced too`); the root pin was NOT reported, because the 5bbf9b4
+text already carries that clause word for word, and so the limits case stayed green. **GREEN** after the text: 7 of 7;
+RED-GREEN-RED on the file: the 5bbf9b4 text in place gave 1 failed of 7, the new text restored 7 of 7.
+
+**Third review, 2026-11-05.** The second review's fixture clause let a guard pass under root, while the limits paragraph says
+the fixture refuses there; this review restored "enforced". Item 3 now says the cap in force is the runner's own AND enforced
+(`so not under root or the exempting capabilities`), and the pins are `refuses to start unless told to AND the cap in force is
+the runner's own and enforced` (lengthened) and `so not under root or the exempting capabilities`. The limits paragraph's
+`which is why the fixture refuses there` is pinned too, and `LIMIT_PINS` is now the last seven pins, exactly the limits
+paragraph's. **RED on the 36406f8 text**: `tests 7, pass 6, fail 1`, the saying case reporting those two pins missing (the
+limits case stayed green: that paragraph is unchanged); **GREEN** after the text: 7 of 7; RED-GREEN-RED on the file: the
+36406f8 text in place gave 1 failed of 7, the new text restored 7 of 7.
+
+**What it does not prove.** No runner, shim or fixture exists in this repository: the section is advice for the repositories
+that run tests through a runner of their own, and the repository that owns one proves the bound there. The formula (the
+count at the start of the run plus a headroom) is not verified at run time, and the section says so itself. Prose that
+describes the mechanism wrongly passes: the cases pin sentences and their place in the section, not whether the mechanism the
+sentences describe works. Whether a real-path compare or a session watch works anywhere is not shown here, and neither is
+how a platform without the kernel limit behaves.
+
 ## The consultant half moved here (`common/coai-consultant.md`, 2026-09-25)
 
 Until today the consultant half of the pasted snippet was the product's own file, on the operator's ruling
