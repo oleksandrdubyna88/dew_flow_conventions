@@ -377,7 +377,7 @@ function foldedReading(file, line, number, allowlist, allowances) {
   const changed = folded.text !== line;
   const blind = passes(allowlist, file, number, line) ? [] : [
     ...(changed && classifyLine(folded.text) === "broad" ? ["matches the prefix with no owner segment after it, read after folding the line's string literals"] : []),
-    ...bareWordHits(folded.literals).map((word) => `the bare prefix \`${word}\` in a string literal, with no owner segment after it`),
+    ...bareWordHits(folded.literals, folded.text).map((word) => `the bare prefix \`${word}\` in a string literal, with no owner segment after it`),
     ...pieceHits(folded.literals).map((piece) => `a string literal that holds ${piece}`),
   ];
   return { legacy: changed ? legacyNameHits(folded.text) : [], blind };

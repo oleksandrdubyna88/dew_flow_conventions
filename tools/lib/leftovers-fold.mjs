@@ -15,6 +15,8 @@
 // The module holds the pure reading: `foldLine`, and the two literal-level readings the folded line feeds — `bareWordHits` and
 // `pieceHits`. The classes themselves (`legacyNameHits`, `classifyLine`) stay in the guard; it runs them over `foldLine(...).text`.
 
+import { verdictAfter } from "./sweeper-scan.mjs";
+
 const OPEN = "\u0001";
 const CLOSE = "\u0002";
 const WORD = "teststo" + "delete"; // the prefix, in two pieces: this module is a detector and the machine scan reads it too
@@ -148,25 +150,26 @@ export function foldLine(line, extension) {
 // --- what the folded literals say -------------------------------------------------------------------------------------------
 
 const WORD_ANYWHERE = rx(WORD, "gi");
-/** What may follow the word without being a sweep: an owner segment between separators (a regex writes one as `[-_]`), the exempt marker word, the quarantine sibling's word. */
-const ALLOWED_AFTER_WORD = /^(?:[-_]|\[-_\])(?:[uw][0-9]{1,10}(?:[-_]|\[-_\])|(?:exempt|quarantine)(?![a-z0-9]))/i;
-/** The owner placed by a variable or a placeholder right after the separator (`-${owner}-`, `-$OWNER-`, `-<owner>-`): the classifier's own `owner-aware` shapes. */
-const PLACED_OWNER = /^(?:[-_]|\[-_\])(?:\$|\{|<[^<>]*owner)/i;
 /** The owner label key (`testsToDelete.owner`): a docker label's name, not a name and not a pattern — the classifier skips it too. */
 const LABEL_KEY = /^\.owner(?![a-z0-9])/i;
-/** A second segment that is a name: a legacy name, which the class `legacy-name` reads (or the owner form's own `u1000`, allowed above). */
-const SECOND_SEGMENT = /^(?:[-_])[a-z0-9]/i;
+/** A space right after the word: a sentence (`a testsToDelete entry is listed`). No name of the form has a space there, so no sweep of leftovers reaches it. */
+const PROSE = /^\s/;
 const ENVIRONMENT_USE = new RegExp(`^${WORD.toUpperCase()}_[A-Z]+(?![A-Za-z0-9])`);
+/** The owner letter and nothing more (`testsToDelete-u`): the number is the next operand of a `+`, so the literal builds the owner form at run time. */
+const OWNER_LETTER = /^[-_][uw]$/i;
+const continuedByPlus = (text, literal) => new RegExp(`${literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}['"\`]\\s*\\+`).test(text);
 
 /**
- * The word, whole, in a literal and followed by neither an owner segment, nor a marker word, nor an environment variable's tail, nor a
- * second segment that is a name (the class `legacy-name` judges that one): `testsToDelete`, `testsToDelete-`, `testsToDelete-*`,
- * `testsToDelete[-_]`. The C# template's `BareWordHits`, so the unanchored regex string and the bare word are seen with no removal on the line.
+ * The word, whole, in a literal and followed by none of: an owner segment (a literal owner, a class `[uw]`, a variable or a placeholder: the classifier's own
+ * `owner-aware`, `sweeper-scan.mjs`), a narrow literal second segment (a name, which the class `legacy-name` judges, and the marker words `exempt` and
+ * `quarantine`), an environment variable's tail, the label key `.owner`, a space (prose), the owner letter at the end of the literal with a `+` after it
+ * (`'testsToDelete-u' + uid`: `text` is the folded line, and the number is the next operand). What is left is `testsToDelete`, `testsToDelete-`, `testsToDelete-*`,
+ * `testsToDelete[-_]`: the C# template's `BareWordHits`, so the unanchored regex string and the bare word are seen with no removal on the line.
  */
-export function bareWordHits(literals) {
+export function bareWordHits(literals, text = "") {
   return literals.flatMap((literal) => [...literal.matchAll(WORD_ANYWHERE)].flatMap((word) => {
     const rest = literal.slice(word.index + word[0].length);
-    const allowed = ALLOWED_AFTER_WORD.test(rest) || LABEL_KEY.test(rest) || PLACED_OWNER.test(rest) || SECOND_SEGMENT.test(rest) || ENVIRONMENT_USE.test(literal.slice(word.index));
+    const allowed = (OWNER_LETTER.test(rest) && continuedByPlus(text, literal)) || verdictAfter(rest.toLowerCase()) !== "broad" || LABEL_KEY.test(rest) || PROSE.test(rest) || ENVIRONMENT_USE.test(literal.slice(word.index));
     return allowed ? [] : [`${word[0]}${rest.slice(0, 3)}`];
   }));
 }

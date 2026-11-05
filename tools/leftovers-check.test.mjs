@@ -976,6 +976,8 @@ const SPELLINGS = [
   ["a joined glob passed to a removal", "scripts/zz.mjs", 'fs.rmSync(path.join(tmp, "testsTo" + "Delete-*"));', ["owner-blind"]],
   ["the same split in a .cjs", "scripts/zz.cjs", 'const n = "testsTo" + "Delete-agent-";', ["legacy-name"]],
   ["the same split in a .ts", "src/zz.test.ts", 'const n: string = "testsTo" + "Delete-agent-";', ["legacy-name"]],
+  // a line that already drew `legacy-name` (benchmark's exec-probe-stop.test.mjs:86) draws no `owner-blind` for the owner letter that a + continues
+  ["the owner letter and a + after it", "scripts/zz.mjs", `const marker = '${Q}-u' + process.getuid() + '-bench-trackedchild-' + process.pid;`, ["legacy-name"]],
   // .sh: adjacent quoted strings, and $'...'
   ["a .sh adjacency, legacy", "scripts/zz.sh", "mkdir \"$TMPDIR\"/'testsTo''Delete-agent-1'", ["legacy-name"]],
   ["a .sh adjacency, glob", "scripts/zz.sh", "rm -rf \"$TMPDIR\"/'testsTo''Delete-*'", ["owner-blind"]],
@@ -1007,7 +1009,7 @@ test("F30 table 1: the table holds at least the sixteen spellings of F30, and ev
 });
 
 const PRODUCT_WORDS = [
-  // [the line, why it is no finding]
+  // [the line, why it is no finding, the file (a .mjs when absent)]
   ['const a = "restore";', "`sto` is in restore"],
   ['const a = "history";', "`sto` is in history"],
   ['const a = "stop";', "`sto` is in stop"],
@@ -1028,13 +1030,18 @@ const PRODUCT_WORDS = [
   [`execFileSync("docker", ["volume", "create", "--label", \`${Q}.owner=\${owner}\`, name]);`, "the owner label key is a docker label's name, not a name"],
   [`const e = process.env.${P.toUpperCase()}_RUN;`, "an environment variable, not in a literal"],
   [`const e = "${P.toUpperCase()}_RUN";`, "an environment variable name in a literal"],
+  // found on the real trees (D5's record, 2026-11-05): each was a false finding of the first reader
+  [`        run: grep -Eq "^[[:space:]]+$words: .*/${Q}-[uw][0-9]{1,10}-coai-$what-[A-Za-z0-9]{6}" "$LOG" || exit 1`, "an owner as a class [uw] is an owner segment (coai's ci.yml)", ".github/workflows/zz.yml"],
+  [`        run: first=$(grep -v "${Q}-[uw][0-9]" "$LOG" || true)`, "an owner as a class [uw] is an owner segment (coai's ci.yml)", ".github/workflows/zz.yml"],
+  [`assert.equal(existsSync(path.join(base, 'in-score')), true, 'a ${Q} entry under score-tmp is listed, never removed');`, "a sentence in an assertion message (benchmark's heldout-run.test.mjs): a space follows the word"],
+  [`const rx = new RegExp("${Q}-[uw]\\\\d{1,10}-x-");`, "an owner as a class [uw] before digits, in a RegExp string"],
   ["const t = 'tests' + 'Run' + 'ToDo';", "tests, Run, To and Do: the joined literal holds no crossing piece of 6"],
   ["const t = 'testing' + ' Delete';", "tests and Delete apart"],
 ];
 
 test("F30 table 2: real product words and paths are no finding; an owner-form name split over + is no finding", () => {
-  const wrong = PRODUCT_WORDS.flatMap(([line, why]) => {
-    const found = scanText("scripts/zz.mjs", `${line}\n`);
+  const wrong = PRODUCT_WORDS.flatMap(([line, why, file = "scripts/zz.mjs"]) => {
+    const found = scanText(file, `${line}\n`);
     return found.length === 0 ? [] : [`${line} (${why}): ${JSON.stringify(found.map((entry) => `${entry.line}:${entry.cls}`))}`];
   });
   assert.deepEqual(wrong, [], "lines that must stay []");
@@ -1092,8 +1099,11 @@ test("F30 reader: foldLine joins, decodes and keeps the quotes; a hole that hold
 
 test("F30 reader: the bare word and the piece rule read literals, and never an operand", () => {
   assert.deepEqual(bareWordHits([`${Q}-u1000-coai-`, `${Q}[-_]w42[-_]`, `${Q}-exempt: x`, `.x.${P}-quarantine-1`, `${P.toUpperCase()}_RUN`, `${Q}.owner=u1`, `${Q}-agent-x`, `${Q}-\${owner}-`]), [], "an owner form, the marker words, an environment name, the label key, a name (legacy-name's) and a placed owner are no bare word");
-  assert.deepEqual(bareWordHits([Q, `${Q}-`, `${Q}-*`, `${Q}[-_]`, `${P}_`, `${Q} resources`]).length, 6);
+  assert.equal(bareWordHits([Q, `${Q}-`, `${Q}-*`, `${Q}[-_]`, `${P}_`]).length, 5);
+  assert.deepEqual(bareWordHits([`${Q} resources`, `${Q}-[uw]\\d{1,10}-x`, `${Q}-[uw][0-9]`, `${Q}-\${"$"}{owner}`]), [], "a sentence, and an owner as a class or a placeholder");
   assert.deepEqual(pieceHits(["restore", "history", "todo/x", "hostStopped", "chatModelEdits", `${Q}-x`]), [], "no piece of 6 in a product word; the whole word is judged by bareWordHits");
+  assert.equal(bareWordHits([`${Q}-u`], `x = '${Q}-u' + id`).length, 0, "the owner letter and a + after it");
+  assert.equal(bareWordHits([`${Q}-u`], `x = '${Q}-u'`).length, 1, "the owner letter and nothing after it is a bare `u`: it reaches every owner");
   assert.equal(pieceHits(["testsTo"]).length, 1);
   assert.equal(pieceHits(["xTODELETEx"]).length, 1, "any case");
   assert.equal(pieceHits(["stoDel"]).length, 1, "6 characters that cross the join");

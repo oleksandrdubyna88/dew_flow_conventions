@@ -72,8 +72,8 @@ function looseVerdicts(lower) {
   return verdicts;
 }
 
-/** What the text after the prefix says: an owner segment, a narrow literal name, or (anything else) every owner. */
-function verdictAfter(rest) {
+/** What the text after the prefix says (`rest` lower-cased): an owner segment (`'owner-aware'`), a narrow literal name (`null`), or (anything else) every owner (`'broad'`). */
+export function verdictAfter(rest) {
   const separator = SEPARATOR_RE.exec(rest);
   if (separator === null) return "broad";
   const after = rest.slice(separator[0].length);
