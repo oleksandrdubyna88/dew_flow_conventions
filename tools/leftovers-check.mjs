@@ -89,7 +89,7 @@
  * The readings: the raw lines (comments included) as today; the folded text through `legacyNameHits` (`legacy-name`); the FILE's folded lines through `classifyLines`, so a prefix built in pieces binds as a whole one
  * does (`owner-blind`, no exemption); the code with escapes and classes decoded, for a regex literal (`owner-blind`); and on the joined literals the BARE WORD (a literal that holds the whole word with a boundary each
  * side and no owner after it) and a PIECE of the word (a crossing piece of 6 or more in the word's own form, no letter at its sides): both are class `legacy-name`, so an inline `legacy-name` exemption clears them, except a bare
- * word whose tail holds `[`, `(`, `?`, `*` or `\` (a pattern), which stays `owner-blind`. They read only a line that no `owner-blind` reading called broad: a line draws one class for one cause. `FOLDING_ALLOWANCES` lists this repository's own
+ * word whose tail (the run of characters that touch it, up to a space) holds `[`, `(`, `?`, `*` or `\` (a pattern), which stays `owner-blind`. They read only a line that no `owner-blind` reading called broad: a line draws one class for one cause. `FOLDING_ALLOWANCES` lists this repository's own
  * files that spell the word in pieces on purpose and applies ONLY when the scan is of this repository's own root; a consumer has none. A folded line over 256 KiB (the classifier is quadratic on a repeated word) is not
  * read by the folded readings and is ONE `unreadable` finding; a file that ends inside a block comment, and any throw of the reader, are `unreadable` findings too. The raw readings are never skipped.
  *
