@@ -901,6 +901,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   lines. The Fix as written also leaves some of them at `[]`: folding changes nothing for a bare word or an unanchored regex string with no removal on the line; they need the C#
   template's `BareWordHits` reading as well. The piece rule of the Fix (`sto` or `tod`) is the S6 brief's, stricter than the C# template's `PrefixPieces`, which gives false
   positives on product words (the brief's measure); "as the C# template does" holds for the class, not for the pieces.
+- **The piece rule above is replaced (measured 2026-11-05, `todo/PLAN_F30_folding_reader.md`).** `sto` or `tod` hits 2386 literals in coai and 2454 in creds (`restore`, `history`, `todo/`). The rule is crossing pieces of 6 or more, any case. The plan is the current text for this item.
 - **State.** Open. Not a prerequisite of E5's producer PR (the rollout's entry 5.2, option C); covers coai and creds; E6 and E7
   read it before their first Node compliance declaration.
 
