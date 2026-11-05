@@ -835,9 +835,8 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - **Fix.** A folding reader in the shipped guard, for the `node` profile's files (`.mjs`, `.cjs`, `.js`, `.ts`, `.sh`, `.ps1`,
   workflows): join string literals over `+`, `.concat(...)`, `[...].join('')` and `${'…'}` holes on one line, decode `\uXXXX`
   and `\xXX`, read a one-character class as its character, then run the existing classes over the folded line; a literal
-  that holds a piece of at least five letters of the word (`sto` or `tod` inside it) and not the whole word is `owner-blind`,
-  as the C# template does, with the template's folding allowances for the guard's own files. RED first: the fifteen spellings
-  above in a fixture, each one finding; the consumers' real trees must stay at their current counts (a false positive on a
+  that holds `sto` or `tod`, the pieces that cross the word's join, and not the whole word is `owner-blind` (no longer piece: a shorter or wider rule gave false positives, as below),
+  as the C# template does, with the template's folding allowances for the guard's own files. RED first: the spellings of the table above in a fixture, each with its exact line, because the count depends on the line (the judge's note); each one finding; the consumers' real trees must stay at their current counts (a false positive on a
   product word such as `chatModelEdits` is a defect of the reader; the S6 brief measured zero in coai with the `sto`/`tod`
   rule). One release, then pin bumps alone.
 - **Not the fix.** A second detector of coai's own with different semantics, whose findings could not carry the rule's
@@ -865,7 +864,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - [ ] F29 is closed when, for each of the template and the sidecar, ONE of these holds, recorded under F29: a fix is in, with a Windows test that runs two independent sweep
       PROCESSES and is green; or that side's Windows sweep only lists, by a recorded decision; or a measurement on Windows of that side's OWN call shows a single winner (the
       measurement above is of `Directory.Move`, not of `MoveFileExW`). And F16's Fix either keeps the Node sweep list-only on Windows or meets F29's Node requirement.
-- [ ] F30 is closed when the shipped Node guard's folding reader is released with its fifteen-spelling fixture RED first and GREEN after,
+- [ ] F30 is closed when the shipped Node guard's folding reader is released with its fixture of the table's spellings, by exact line, RED first and GREEN after,
       the consumers' real trees at their recorded counts, and the consumers that declared "zero whole literals, F30 open" have re-run the
       guard at the new pin and recorded the result; or when the owner records, under F30, that the reader stays a documented limit.
 - [ ] F27 is in a released rule text: the rule test for the new section was RED before the text and is GREEN after, and
