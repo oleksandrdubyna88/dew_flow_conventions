@@ -501,3 +501,13 @@ The whole suite, as the repository runs it (`node tools/run-tests.mjs`, lowered 
 Differences from the brief: (1) the one-pass patch for the classifier was not used as written (it cuts at the previous occurrence, which misreads a token that holds the word); the form built is in 8.3. (2) The review's whole-file shape took 70 s here and 0.12 s at the release only for a SPLIT first name; with the whole
 word the release is as slow (8.5). (3) A crash the brief did not name was found and fixed with fix 2: 300000 findings in one file overflowed the stack in `scanTexts`. (4) `composeEnvHits` is super-linear and is reported, not fixed (8.3). (5) Fix 1 needed one more step than the brief says: the child must also lose
 a reporter set in `NODE_OPTIONS`. (6) `tools/leftovers-check.mjs` is 761 lines (under D7's 800); `tools/lib/leftovers-fold.mjs` grew to 963 lines (it was 937); it is not split (the brief).
+
+### 8.8 The compose reading (found by 8.3, fixed after the review round, 2026-11-06)
+
+Section 8.3 reported `composeEnvHits` as super-linear and left it. The plan's Goal says a hostile line ends in linear time or as a named finding, so it is fixed, RED first. Before, each of six shapes of a repeated `COMPOSE_PROJECT_NAME=` at 2 MiB through `scanText` was cut at 60 s (the assignment, an open `$(`, an open `${`, an open quote, one long word, a bound name). There were two causes: `literalizeSingleQuoted` ran on the whole line once per assignment, and `maskExpansions` asked `closingOf` once per opener, which scans to the end when the opener never closes.
+
+- `composeEnvHits` reads the line once. It reads the first 64 assignments of one line; **a line with more is one more `docker-name` hit that says so**, so it is never a silent clean line. A value in a hit's text is cut at 200 characters, in the text only; the test for the name still reads all of it.
+- `closersOf` finds every opener's closer in one pass. A test compares it with `closingOf` over every line of up to 5 of 8 pieces and 5000 random longer ones.
+- After: the shape with `$(` at 256 KiB, 512 KiB, 1 MiB and 2 MiB took 112, 255, 459 and 945 ms (at 256 KiB it took 2861 ms before `closersOf`). `docker run --name x`, `docker run $(`, `docker compose -p x`, `-p $(` and `docker run -v ${`, each at 1 MiB: 208 to 264 ms.
+
+**The 65th assignment on a line is a difference from the release**: such a line gets a new hit or loses a later value's hit, on the line's existing class. No real tree holds it; the record of the real trees is the proof, and it is re-run before the release.

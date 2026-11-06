@@ -1,7 +1,7 @@
 /**
  * The line-level helpers the scan and the docker pass share (`tools/leftovers-check.mjs`, `tools/lib/leftovers-docker.mjs`): the owner-form name test, a finding, what a
  * comment line is, and the reading of a shell value that is wholly an expansion (`"${x}"`, `"$(f a)"`) or has a literal default. Moved whole out of the guard so it
- * stays under the file-size limit of the coding style; nothing here changed.
+ * stays under the file-size limit of the coding style. F30 made two readings linear on a line that repeats them, with the same answers on what a person writes: `composeEnvHits` and `maskExpansions`.
  */
 
 export const PREFIX_OK = /^teststodelete[-_][uw][0-9]{1,10}[-_]/i; // the OWNER form: one of the three spellings, then an owner segment
@@ -70,11 +70,28 @@ export function isWholeExpansion(value) {
   return /^\$[({]/.test(bare) && closingOf(bare, 1) === bare.length - 1;
 }
 
+/** Every `(` and `{` of `text` with its closer, in one pass: what `closingOf` answers for each, which a test compares. Asked once per opener, `closingOf` is quadratic on a line of openers that never close (F30). */
+export function closersOf(text) {
+  const closers = new Map();
+  const open = { "(": [], "{": [] };
+  const opener = { ")": "(", "}": "{" };
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === "(" || char === "{") open[char].push(index);
+    else if (char === ")" || char === "}") {
+      const at = open[opener[char]].pop();
+      if (at !== undefined) closers.set(at, index);
+    }
+  }
+  return closers;
+}
+
 /** `text` with the whitespace inside every balanced `$(…)` and `${…}` made `MASK`, so that splitting on whitespace keeps an expansion in one word. */
 export function maskExpansions(text) {
+  const closers = closersOf(text);
   let masked = "";
   for (let index = 0; index < text.length; index += 1) {
-    const end = text[index] === "$" && (text[index + 1] === "(" || text[index + 1] === "{") ? closingOf(text, index + 1) : -1;
+    const end = text[index] === "$" && (text[index + 1] === "(" || text[index + 1] === "{") ? closers.get(index + 1) ?? -1 : -1;
     if (end < 0) masked += text[index];
     else {
       masked += text.slice(index, end + 1).replace(/\s/g, MASK);
@@ -90,17 +107,26 @@ export function leadingExpansion(rest) {
   return end > 0 && /^(?:[\s"';,}]|$)/.test(rest.slice(end)) ? end : 0;
 }
 
-/** `COMPOSE_PROJECT_NAME=x` or `: x` on a line: one hit when x is not an owner-form leftover name — a compose project's containers carry the project's name. */
+const COMPOSE_ASSIGNMENTS_READ = 64; // a person writes one or two on a line. One reading can cost the rest of the line, so a line that repeats it is a named hit, not a hang (F30)
+const VALUE_SHOWN = 200; // the hit names the value; a long one is cut in the text, so the hits of one line stay small
+
+const shown = (value) => (value.length > VALUE_SHOWN ? `${value.slice(0, VALUE_SHOWN)}…` : value);
+
+/** `COMPOSE_PROJECT_NAME=x` or `: x` on a line: one hit when x is not an owner-form leftover name — a compose project's containers carry the project's name. A line that assigns it more than `COMPOSE_ASSIGNMENTS_READ` times is one more hit that says so. */
 export function composeEnvHits(line) {
-  return [...line.matchAll(/COMPOSE_PROJECT_NAME["']?\s*[:=]\s*["']?/g)].flatMap((match) => {
-    const rest = literalizeSingleQuoted(line).slice(match.index + match[0].length);
+  const matches = [...line.matchAll(/COMPOSE_PROJECT_NAME["']?\s*[:=]\s*["']?/g)];
+  if (matches.length === 0) return [];
+  const literal = literalizeSingleQuoted(line); // once for the line: per assignment it was quadratic on a repeated one
+  const hits = matches.slice(0, COMPOSE_ASSIGNMENTS_READ).flatMap((match) => {
+    const rest = literal.slice(match.index + match[0].length);
     const length = leadingExpansion(rest);
     if (length > 0) {
       const fallback = literalDefault(rest.slice(0, length));
-      return fallback === undefined || PREFIX_OK.test(fallback) ? [] : [`COMPOSE_PROJECT_NAME defaults to a name that is not an owner-form leftover name: ${fallback}`];
+      return fallback === undefined || PREFIX_OK.test(fallback) ? [] : [`COMPOSE_PROJECT_NAME defaults to a name that is not an owner-form leftover name: ${shown(fallback)}`];
     }
     const value = /^[^\s"';,}]*/.exec(rest)[0];
-    return PREFIX_OK.test(value) ? [] : [`COMPOSE_PROJECT_NAME is not an owner-form leftover name: ${value === "" ? "(empty)" : restoreDollar(value)}`];
+    return PREFIX_OK.test(value) ? [] : [`COMPOSE_PROJECT_NAME is not an owner-form leftover name: ${value === "" ? "(empty)" : shown(restoreDollar(value))}`];
   });
+  return matches.length > COMPOSE_ASSIGNMENTS_READ ? [...hits, `COMPOSE_PROJECT_NAME is assigned ${matches.length} times on this line: only the first ${COMPOSE_ASSIGNMENTS_READ} are read`] : hits;
 }
 
