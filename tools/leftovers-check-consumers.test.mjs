@@ -8,6 +8,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -510,10 +511,26 @@ test("F3 22. [PR 1] a manifest whose lstat fails with anything but ENOENT is pre
   git(repo, "add", ".");
   const locked = path.join(repo, "locked");
   fs.chmodSync(locked, 0o000); // lstat of the child: EACCES
-  t.after(() => fs.chmodSync(locked, 0o755));
-  const found = scanRepository({ repo, profile: "node", rule: path.join(root, "common", "test-leftovers-detail.md") }).findings.filter((entry) => entry.file === "locked/package.json");
+  let found;
+  try {
+    found = scanRepository({ repo, profile: "node", rule: path.join(root, "common", "test-leftovers-detail.md") }).findings.filter((entry) => entry.file === "locked/package.json");
+  } finally {
+    fs.chmodSync(locked, 0o755); // before the owned folder is removed: a t.after hook ran AFTER that removal had failed on the locked subfolder, and left the folder and its claim in TMPDIR
+  }
   assert.deepEqual(found.map((entry) => entry.cls), ["unreadable"]);
   assert.match(found[0].text, /EACCES/);
+});
+
+test("F3 22b. a run of test 22 leaves nothing in its TMPDIR: the locked subfolder is restored before the owned folder is removed", (t) => {
+  if (typeof process.getuid === "function" && process.getuid() === 0) return t.skip("root can read a folder with mode 000");
+  const tmp = ownedDir(t, "tmp of test 22");
+  const env = { ...process.env, TMPDIR: tmp };
+  delete env.NODE_TEST_CONTEXT; // set by the runner of THIS file: a nested `node --test` would otherwise print nothing and run in the runner's child mode
+  env.NODE_OPTIONS = (process.env.NODE_OPTIONS ?? "").replace(/--test-reporter(?:-destination)?[= ]\S+/g, "").trim(); // a reporter set there would be counted against ours
+  const child = spawnSync(process.execPath, ["--test", "--test-reporter=spec", "--test-name-pattern=^F3 22\\.", fileURLToPath(import.meta.url)], { env, encoding: "utf8", timeout: 120_000 }); // spec: Node 22 prints tap to a pipe by default
+  assert.equal(child.status, 0, `${child.stdout}\n${child.stderr}`);
+  assert.match(child.stdout, /^✔ F3 22\. /m, "the child ran test 22");
+  assert.deepEqual(fs.readdirSync(tmp), [], "the owned folder and its claim are removed");
 });
 
 test("F3 23. [PR 2] a control character in a script VALUE does not reach the finding text", (t) => {

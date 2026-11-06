@@ -11,11 +11,14 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
 
 import { git } from "./lib/git.mjs";
+import * as fold from "./lib/leftovers-fold.mjs";
+import * as sweeper from "./lib/sweeper-scan.mjs";
 import { MAX_CLAIM_BYTES, OWNER_GRAMMAR, REPO_ROW, REPO_TOKEN, TOKEN_SHAPE, classifyName, ownedDir } from "./lib/owned.mjs";
-import { EXCLUDED_FILES, LEGACY_NAME_PENDING, isScanned, main, parseArguments, resolveRule, scanRepository, scanText, tokenConstants, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
+import { CURES, EXCLUDED_FILES, FOLDING_ALLOWANCES, LEGACY_NAME_PENDING, isScanned, main, parseArguments, resolveRule, scanRepository, scanText, tokenConstants, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RULE = path.join(root, "common", "test-leftovers-detail.md"); // the rule file that holds the Tokens table since the split
@@ -701,6 +704,11 @@ test("2. the shipped allowlist is exactly the janitor's inventory line, and pins
   assert.equal(sha(lines[entry.line - 1]), entry.sha256, `tools/janitor.sh:${entry.line} is not the line the allowlist pins`);
 });
 
+/** The inventory line of this repository's janitor, as the shipped allowlist pins it. */
+const INVENTORY_LINE = JSON.parse(fs.readFileSync(ALLOWLIST, "utf8")).entries[0].line;
+/** The `owner-blind` findings on that line of the janitor in a scanned tree. A copy of the janitor in another tree draws the folded readings' findings elsewhere (D6: a consumer has no allowance), so the allowlist is judged on its line. */
+const inventoryBlind = (repo, allowlist) => scanRepository({ repo, rule: RULE, allowlist }).findings.filter((entry) => entry.file === JANITOR && entry.line === INVENTORY_LINE && entry.cls === "owner-blind");
+
 test("2. break-it: one byte changed on the janitor's inventory line makes the guard red until --update-allowlist", (t) => {
   const repo = tree(t, {});
   fs.mkdirSync(path.join(repo, "tools", "fixtures"), { recursive: true });
@@ -709,14 +717,15 @@ test("2. break-it: one byte changed on the janitor's inventory line makes the gu
   const named = path.join(repo, "tools", "fixtures", "owner-blind-allowlist.json");
   fs.copyFileSync(ALLOWLIST, named);
   fs.writeFileSync(path.join(repo, "tools", "x.test.mjs"), "const a = 1;\n");
-  assert.equal(guard(repo).code, 0, guard(repo).text);
+  assert.deepEqual(inventoryBlind(repo), [], "the shipped allowlist passes the inventory line");
   fs.writeFileSync(path.join(repo, JANITOR), script.replace(`GLOB='${P}[-_]*'`, `GLOB='${P}[-_]**'`));
+  assert.equal(inventoryBlind(repo).length, 1, "one byte changed: the line is red");
   const red = guard(repo);
   assert.equal(red.code, 1, red.text);
-  assert.match(red.text, /janitor\.sh:\d+ — owner-blind/);
+  assert.match(red.text, new RegExp(`janitor\\.sh:${INVENTORY_LINE} — owner-blind`));
   assert.equal(guard(repo, ["--update-allowlist"]).code, 0);
-  assert.equal(guard(repo).code, 1, "the scanned tree's own allowlist is never read: the shipped one still pins the old line");
-  assert.equal(guard(repo, ["--allowlist", named]).code, 0, "regenerated from the current file, named by the operator");
+  assert.equal(inventoryBlind(repo).length, 1, "the scanned tree's own allowlist is never read: the shipped one still pins the old line");
+  assert.deepEqual(inventoryBlind(repo, named), [], "regenerated from the current file, named by the operator");
 });
 
 test("2. no file is exempt from the legacy-name class: the pending list is empty, so a legacy literal in a janitor test is a finding", (t) => {
@@ -936,7 +945,953 @@ test("M-1. the shipped allowlist, read from beside the tool, still passes this r
   fs.mkdirSync(path.join(repo, "tools", "fixtures"), { recursive: true });
   fs.writeFileSync(path.join(repo, JANITOR), fs.readFileSync(path.join(root, JANITOR), "utf8").replace(/\r\n/g, "\n"));
   fs.writeFileSync(path.join(repo, "tools", "x.test.mjs"), "const a = 1;\n");
-  assert.equal(guard(repo).code, 0, "no allowlist in the scanned tree: the shipped one passes the identical janitor line");
+  assert.deepEqual(inventoryBlind(repo), [], "no allowlist in the scanned tree: the shipped one passes the identical janitor line");
   fs.writeFileSync(path.join(repo, "tools", "fixtures", "owner-blind-allowlist.json"), JSON.stringify({ entries: [] }));
-  assert.equal(guard(repo).code, 0, "an empty allowlist in the scanned tree does not remove the shipped pass");
+  assert.deepEqual(inventoryBlind(repo), [], "an empty allowlist in the scanned tree does not remove the shipped pass");
+});
+
+// F30 — the folding reader (todo/PLAN_F30_folding_reader.md, D1 to D6) ------------------------------------------------------
+//
+// Four checks (D5). 1: a table of spellings, each row a fixture file with a clean neighbour line before and after it, an exact line
+// and an exact class, compared as a LIST of `line:class` (a doubled class is a failure). 2: a table of lines that must stay `[]`: a
+// false finding is a defect of the reader and its cure is a new row. 3: each reading has a row that only it finds (the mutants of the
+// record, `research/2026-11-05_f30_folding_reader.md`, were each run by hand against these rows). 4: time, by a step counter on the
+// reader and not by a wall clock, and the 256 KiB limit with its finding.
+
+const NEIGHBOURS = {
+  ".mjs": ["const clean = 1;", "const clean2 = 2;"],
+  ".cjs": ["const clean = 1;", "const clean2 = 2;"],
+  ".ts": ["const clean: number = 1;", "const clean2 = 2;"],
+  ".tsx": ["const clean = 1;", "const clean2 = 2;"],
+  ".mts": ["const clean = 1;", "const clean2 = 2;"],
+  ".js": ["const clean = 1;", "const clean2 = 2;"],
+  ".jsx": ["const clean = 1;", "const clean2 = 2;"],
+  ".cts": ["const clean = 1;", "const clean2 = 2;"],
+  ".yaml": ["name: ci", "# clean"],
+  ".sh": ["echo clean", "echo clean2"],
+  ".ps1": ["Write-Output 'clean'", "Write-Output 'clean2'"],
+  ".yml": ["name: ci", "# clean"],
+};
+
+/** The findings of `scanText` as a sorted list of `line:class`, the line counted inside the row (the neighbour line before it is line 0). */
+const listOf = (found, offset = 1) => found.map((entry) => ({ line: entry.line - offset, cls: entry.cls }))
+  .sort((a, b) => a.line - b.line || (a.cls < b.cls ? -1 : a.cls > b.cls ? 1 : 0)).map((entry) => `${entry.line}:${entry.cls}`);
+
+/** The fixture of a row: a clean line, the row's lines, a clean line. */
+function fixtureOf(file, lines) {
+  const [before, after] = NEIGHBOURS[path.extname(file)];
+  return `${[before, ...lines, after].join("\n")}\n`;
+}
+
+/** Row = [kind, file, the row's lines, the list `line:class` the guard answers, the list it answers with the folded reading off (the file in `foldingAllowances`)]. */
+const SPELLINGS = [
+  // what the guard already finds: a whole literal, a glob or a regex over the word
+  ["a whole legacy literal", "scripts/zz.mjs", [`const n = "${Q}-coai-x-abc123";`], ["1:legacy-name"], ["1:legacy-name"]],
+  ["a bare-word glob passed to a removal", "scripts/zz.mjs", [`fs.rmSync(path.join(base, "${Q}-*"), { recursive: true });`], ["1:owner-blind"], ["1:owner-blind"]],
+  // D4: one class for one cause. A pattern in the tail of the bare word is owner-blind only when the line has no legacy-name reading (raw or folded, exempted or not)
+  ["a glob alone in a literal stays owner-blind", "scripts/zz.mjs", [`const a = '${Q}-*';`], ["1:owner-blind"], ["1:owner-blind"]],
+  ["an owner letter and a star: legacy-name alone, as at the release", "scripts/zz.mjs", [`const a = '${Q}-u*';`], ["1:legacy-name"], ["1:legacy-name"]],
+  ["an owner letter and .*: legacy-name alone", "scripts/zz.mjs", [`const a = '${Q}-u.*';`], ["1:legacy-name"], ["1:legacy-name"]],
+  ["a w and a ?: legacy-name alone", "scripts/zz.mjs", [`const a = '${Q}-w?';`], ["1:legacy-name"], ["1:legacy-name"]],
+  ["an owner letter and a group: legacy-name alone", "scripts/zz.mjs", [`const a = '${Q}-u(x)';`], ["1:legacy-name"], ["1:legacy-name"]],
+  ["the same, split over +: legacy-name alone", "scripts/zz.mjs", ["const a = 'tests' + 'To' + 'Delete-u*';"], ["1:legacy-name"], []],
+  ["a legacy-name exemption above an owner letter and a star clears the line, as at the release", "scripts/zz.mjs", [`// ${Q}-exempt: legacy-name — a probe the test removes`, `const a = '${Q}-u*';`], [], []],
+  ["a pattern with no legacy-name reading stays owner-blind (a regex string)", "scripts/zz.mjs", [`const a = new RegExp('${Q}[-_]u');`], ["1:owner-blind"], []],
+  ["N8 of coai: a glob in a loop draws ONE class", "scripts/zz.mjs", [`for (const f of fs.globSync('${Q}-*')) fs.rmSync(f, { recursive: true });`], ["1:owner-blind"], ["1:owner-blind"]],
+  ["a regex literal over the word", "scripts/zz.mjs", [`const rx = /${Q}[-_]/i;`], ["1:owner-blind"], ["1:owner-blind"]],
+  ["an anchored RegExp string", "scripts/zz.mjs", [`const rx = new RegExp("^${Q}[-_]");`], ["1:owner-blind"], ["1:owner-blind"]],
+  // F30's sixteen: the spellings that no line of the measure found
+  ["a split over +", "scripts/zz.mjs", ['const n = "testsTo" + "Delete-agent-" + id;'], ["1:legacy-name"], []],
+  ["a split over .concat", "scripts/zz.mjs", ['const n = "testsTo".concat("Delete-agent-", id);'], ["1:legacy-name"], []],
+  ["an array joined with an empty string", "scripts/zz.mjs", ["const n = ['testsTo', 'Delete-agent-'].join('');"], ["1:legacy-name"], []],
+  ["a template hole that holds a literal", "scripts/zz.mjs", ["const n = `testsTo${'Delete'}-agent-${id}`;"], ["1:legacy-name"], []],
+  ["a \\u escape", "scripts/zz.mjs", ['const n = "tests\\u0054\\u006fDelete-agent-";'], ["1:legacy-name"], []],
+  ["a \\u{} escape", "scripts/zz.mjs", ['const n = "tests\\u{54}\\u{6f}Delete-agent-";'], ["1:legacy-name"], []],
+  ["a \\x escape", "scripts/zz.mjs", ['const n = "tests\\x54\\x6fDelete-agent-";'], ["1:legacy-name"], []],
+  ["a one-character class in a plain literal (only the literal's decoding finds it)", "scripts/zz.mjs", ['const n = "tests[T][o]Delete-agent-";'], ["1:legacy-name"], []],
+  ["a whole word in a literal on a line the classifier already calls broad draws ONE class", "scripts/zz.mjs", [`fs.rmSync(path.join(tmp, "${Q}"), { recursive: true });`], ["1:owner-blind"], ["1:owner-blind"]],
+  ["a bare word on a line that the RAW reading calls broad (through its comment) draws ONE class", "scripts/zz.mjs", [`const w = "${Q}"; // rm -rf ${Q}-*`], ["1:owner-blind"], ["1:owner-blind"]],
+  ["a regex at the start of a line holds a quote", "scripts/zz.mjs", ["/'/.test(x); const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a regex after return holds a quote", "scripts/zz.mjs", ["  return /'/.test(s) ? 'tests' + 'To' + 'Delete-x' : null;"], ["1:legacy-name"], []],
+  ["a regex after => holds a quote", "scripts/zz.mjs", ["const f = (s) => /'/.test(s) && 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  // the review's mutants that stayed green, one row each (a fixture that only the right code answers)
+  ["a longer label key (.ownership) is no label key: the bare word", "scripts/zz.mjs", ["const a = 'testsToDelete.ownership';"], ["1:legacy-name"], []],
+  ["[uw] with no digit form after it reaches every owner", "scripts/zz.mjs", ["const a = 'testsToDelete[-_][uw]-x';"], ["1:owner-blind"], []],
+  ["a regex after !", "scripts/zz.mjs", ["const a = !/'/.test(s) && 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a regex after &", "scripts/zz.mjs", ["const a = s && /'/.test(s) ? 'tests' + 'To' + 'Delete-x' : 1;"], ["1:legacy-name"], []],
+  ["a regex after |", "scripts/zz.mjs", ["const a = s || /'/; const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a regex after ?", "scripts/zz.mjs", ["const a = x ? /'/ : 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a regex after {", "scripts/zz.mjs", ["{ /'/.test(s); const n = 'tests' + 'To' + 'Delete-x'; }"], ["1:legacy-name"], []],
+  ["a regex after ;", "scripts/zz.mjs", ["const z = 1; /'/.test(s); const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a regex after :", "scripts/zz.mjs", ["const o = {a: /'/, b: 'tests' + 'To' + 'Delete-x'};"], ["1:legacy-name"], []],
+  ["a regex after [", "scripts/zz.mjs", ["const a = [/'/]; const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a regex after ,", "scripts/zz.mjs", ["f(1, /'/, 'tests' + 'To' + 'Delete-x');"], ["1:legacy-name"], []],
+  ["a regex after (", "scripts/zz.mjs", ["f(/'/, 'tests' + 'To' + 'Delete-x');"], ["1:legacy-name"], []],
+  ["a regex after typeof", "scripts/zz.mjs", ["const t = typeof /'/; const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a regex after case", "scripts/zz.mjs", ["switch (x) { case /'/.source: return 'tests' + 'To' + 'Delete-x'; }"], ["1:legacy-name"], []],
+  ["a backslash in a regex", "scripts/zz.mjs", ["const a = /\\/'/; const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a backslash in a string", "scripts/zz.mjs", ["const s = 'it\\'s'; const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a backslash in a template body", "scripts/zz.mjs", ["const t = `\\``; const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a // comment in a hole ends the line", "scripts/zz.mjs", ["const t = `a${ // ` c","b}`; const n = 'tests' + 'To' + 'Delete-x';"], ["2:legacy-name"], []],
+  ["a block comment in a hole", "scripts/zz.mjs", ["const t = `${ /* ' */ x}`; const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a block comment in a hole that crosses lines", "scripts/zz.mjs", ["const t = `${ /* c"," ` */ x}`; const n = 'tests' + 'To' + 'Delete-x';"], ["2:legacy-name"], []],
+  ["a regex in a hole that holds a backtick", "scripts/zz.mjs", ["const t = `${/`/.test(x)}`; const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["the decoding of a hole's literal", "scripts/zz.mjs", ["const n = `tests${'\\x54\\x6f'}Delete-x`;"], ["1:legacy-name"], []],
+  ["a trailing comma in .concat", "scripts/zz.mjs", ["const n = 'tests'.concat('To','Delete-x',);"], ["1:legacy-name"], []],
+  ["a trailing comma in an array", "scripts/zz.mjs", ["const n = ['tests','To','Delete-x',].join('');"], ["1:legacy-name"], []],
+  ["spaces between ] and .join", "scripts/zz.mjs", ["const n = ['tests','To','Delete-x'] .join('');"], ["1:legacy-name"], []],
+  ["a .sh escaped double quote inside double quotes", "scripts/zz.sh", ["mkdir \"testsTo\\\"Delete-x\""], ["1:legacy-name"], []],
+  ["a .ps1 # inside a token is no comment", "scripts/zz.ps1", ["Write-Host a#b 'tests' + 'To' + 'Delete-x'"], ["1:legacy-name"], []],
+  ["a .ps1 doubled single quote", "scripts/zz.ps1", ["$n = 'testsTo''Delete-x'"], ["1:legacy-name"], []],
+  ["a .ps1 backtick escape", "scripts/zz.ps1", ["$n = \"it`\"s\"; $m = 'tests' + 'To' + 'Delete-x'"], ["1:legacy-name"], []],
+  ["a .ps1 -JOIN in capitals", "scripts/zz.ps1", ["$n = ('tests','To','Delete-x') -JOIN ''"], ["1:legacy-name"], []],
+  ["a .ps1 -join separator", "scripts/zz.ps1", ["$n = ('tests','Delete-x') -join 'To'"], ["1:legacy-name"], []],
+  ["the plan's row: a regex that holds a quote, then a split in two", "scripts/zz.mjs", ["const a = /'/; const n = 'testsTo' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a one-character class in a RegExp string", "scripts/zz.mjs", ['const rx = new RegExp("^tests[T]oDelete[-_]");'], ["1:owner-blind"], []],
+  ["a one-character class in a regex literal (the decoded-code reading is the only one)", "scripts/zz.mjs", ["const rx = /^tests[T]oDelete[-_]/;"], ["1:owner-blind"], []],
+  ["a \\x escape in a regex literal (the decoded-code reading)", "scripts/zz.mjs", ["const rx = /^tests\\x54oDelete[-_]/;"], ["1:owner-blind"], []],
+  ["half of the word", "scripts/zz.mjs", ['const half = "testsTo";'], ["1:legacy-name"], []],
+  ["the other half, with the join in it", "scripts/zz.mjs", ['const half = "sToDele";'], ["1:legacy-name"], []],
+  ["the bare word", "scripts/zz.mjs", [`const w = "${Q}";`], ["1:legacy-name"], []],
+  ["the bare word in single quotes, lower case", "scripts/zz.mjs", [`const w = '${P}';`], ["1:legacy-name"], []],
+  ["an unanchored regex string (a pattern tail stays owner-blind)", "scripts/zz.mjs", [`const rx = new RegExp("${Q}[-_]");`], ["1:owner-blind"], []],
+  ["rmSync over a joined prefix", "scripts/zz.mjs", ['fs.rmSync(path.join(tmp, "testsTo" + "Delete"), { recursive: true });'], ["1:owner-blind"], []],
+  ["a joined glob passed to a removal", "scripts/zz.mjs", ['fs.rmSync(path.join(tmp, "testsTo" + "Delete-*"));'], ["1:owner-blind"], []],
+  ["the classifier's own execSync line", "scripts/zz.mjs", ["execSync('rm -rf /tmp/testsTo' + 'Delete *');"], ["1:owner-blind"], []],
+  ["the same split in a .cjs", "scripts/zz.cjs", ['const n = "testsTo" + "Delete-agent-";'], ["1:legacy-name"], []],
+  ["the same split in a .ts", "src/zz.test.ts", ['const n: string = "testsTo" + "Delete-agent-";'], ["1:legacy-name"], []],
+  // the owner letter that a + continues is not a bare word: the line is a legacy-name of today (benchmark's exec-probe-stop.test.mjs:86)
+  ["the owner letter and a + after it", "scripts/zz.mjs", [`const marker = '${Q}-u' + process.getuid() + '-bench-trackedchild-' + process.pid;`], ["1:legacy-name"], ["1:legacy-name"]],
+  // the prefix built from the token alone: only the folded text holds it whole (D5 item 3, legacyNameHits on folded text)
+  ["a line of a child script in a multi-line template (benchmark's exec-probe-stop.test.mjs:86): a call a space away is no pattern tail", "scripts/zz.mjs", ["const child = `", `  const marker = '${Q}-u' + process.getuid() + '-bench-trackedchild-' + process.pid;`, "`;"], ["2:legacy-name"], ["2:legacy-name"]],
+  ["a prefix built from the repository token, split", "scripts/zz.mjs", ["const n = 'testsTo' + 'Delete-${REPO_TOKEN}';"], ["1:legacy-name"], []],
+  // a row that only the join finds: no half of it holds a crossing piece of 6, so a join that is off answers []
+  ["three pieces over +", "scripts/zz.mjs", ['const n = "tests" + "To" + "Delete-agent-" + id;'], ["1:legacy-name"], []],
+  ["three pieces over .concat", "scripts/zz.mjs", ['const n = "tests".concat("To", "Delete-agent-", id);'], ["1:legacy-name"], []],
+  ["three pieces over .concat, then another .concat", "scripts/zz.mjs", ['const n = "tests".concat("To").concat("Delete-agent-", id);'], ["1:legacy-name"], []],
+  ["three pieces in an array joined", "scripts/zz.mjs", ['const n = ["tests", "To", "Delete-agent-"].join("") + id;'], ["1:legacy-name"], []],
+  ["two pieces in an array joined with a separator that is part of the word", "scripts/zz.mjs", ['const n = ["tests", "Delete-agent-"].join("To");'], ["1:legacy-name"], []],
+  ["three pieces over a template hole", "scripts/zz.mjs", ["const n = `tests${'To'}Delete-agent-${id}`;"], ["1:legacy-name"], []],
+  ["three pieces, the first in parentheses", "scripts/zz.mjs", ['const n = ("tests") + ("To") + "Delete-agent-";'], ["1:legacy-name"], []],
+  ["three pieces, a template for one", "scripts/zz.mjs", ["const n = 'tests' + `To` + 'Delete-agent-';"], ["1:legacy-name"], []],
+  // D2: the joins read spaces around their operators and a literal in parentheses, in every place a literal can stand
+  ["an array of templates joined", "scripts/zz.mjs", ["const n = [`tests`,`To`,`Delete-x`].join('');"], ["1:legacy-name"], []],
+  ["a space before the ( of .concat", "scripts/zz.mjs", ["const n = 'tests'.concat ('To', 'Delete-x');"], ["1:legacy-name"], []],
+  ["spaces around the dot of .concat", "scripts/zz.mjs", ["const n = 'tests' . concat('To', 'Delete-x');"], ["1:legacy-name"], []],
+  ["a space before the ( of .join", "scripts/zz.mjs", ["const n = ['tests','To','Delete-x'].join ('');"], ["1:legacy-name"], []],
+  ["spaces everywhere in an array join, and a trailing comma", "scripts/zz.mjs", ["const n = [ 'tests' , 'To' , 'Delete-x' , ] . join ( '' );"], ["1:legacy-name"], []],
+  ["a literal in parentheses as a .concat argument", "scripts/zz.mjs", ["const n = 'tests'.concat(('To'), 'Delete-x');"], ["1:legacy-name"], []],
+  ["a literal in parentheses as an array item", "scripts/zz.mjs", ["const n = [('tests'),'To','Delete-x'].join('');"], ["1:legacy-name"], []],
+  ["a literal in parentheses as the separator of .join", "scripts/zz.mjs", ["const n = ['tests','To','Delete-x'].join((''));"], ["1:legacy-name"], []],
+  ["a split after a regex that holds a quote (the regex is recognised)", "scripts/zz.mjs", ["const a = /'/; const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a split after a regex that holds a slash in a class", "scripts/zz.mjs", ["const a = /[/']/; const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a split after a division", "scripts/zz.mjs", ["const a = b / c; const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a split after a string that holds //", "scripts/zz.mjs", ['const u = "http://x"; const n = "tests" + "To" + "Delete-x";'], ["1:legacy-name"], []],
+  ["a split after a block comment on the line", "scripts/zz.mjs", ["/* don't */ const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a split behind a control byte in the line", "scripts/zz.mjs", [`const c = "\u0001\u0002"; const n = 'tests' + 'To' + 'Delete-x';`], ["1:legacy-name"], []],
+  ["a split after a block comment that ends on an earlier line", "scripts/zz.mjs", ["/* a comment", "that ends here */ const n = 'tests' + 'To' + 'Delete-x';"], ["2:legacy-name"], []],
+  ["a split after a multi-line template that holds /* (the template tracks its state)", "scripts/zz.mjs", ["const css = `", "a { background: url(x/*.png) }", "`;", "const n = 'tests' + 'To' + 'Delete-x';"], ["4:legacy-name"], []],
+  ["a split after a template whose hole holds braces and a /* in the body", "scripts/zz.mjs", ["const t = `${ { a: 1 }.a } /* in the body`; const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a split after a template whose hole holds an object and a nested template (the hole's brace depth is counted)", "scripts/zz.mjs", ["const t = `${ { a: 1 }.a + `'` } `; const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a split in the line after a multi-line hole", "scripts/zz.mjs", ["const t = `a ${ f(", "  'x') } b`; const n = 'tests' + 'To' + 'Delete-x';"], ["2:legacy-name"], []],
+  ["a piece in the body of a multi-line template", "scripts/zz.mjs", ["const t = `", "fixture testsTo here", "`;"], ["2:legacy-name"], []],
+  ["a split in a .tsx file", "src/zz.tsx", ["const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a split in a .mts file", "src/zz.mts", ["const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a split in a .js file", "src/zz.js", ["const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a split in a .jsx file", "src/zz.jsx", ["const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a split in a .cts file", "src/zz.cts", ["const n = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  // an owner-blind line with a legacy-name exemption stays owner-blind (no exemption of that class exists)
+  ["an owner-blind line with a legacy-name exemption stays owner-blind", "scripts/zz.mjs", [`fs.rmSync("testsTo" + "Delete-*"); // ${Q}-exempt: legacy-name — a probe the test removes`], ["1:owner-blind"], []],
+  ["a legacy-name hit of the bare word is cleared by its exemption", "scripts/zz.mjs", [`const w = "${Q}"; // ${Q}-exempt: legacy-name — a probe the test removes`], [], []],
+  ["a legacy-name hit of the piece is cleared by its exemption on the line above", "scripts/zz.mjs", [`// ${Q}-exempt: legacy-name — a probe the test removes`, 'const half = "testsTo";'], [], []],
+  // the split sweeps of D4: the file's folded lines bind a prefix built in pieces as a whole one binds
+  // D2: a line that starts with # is code in JavaScript (a private field), and the code after #> is code in PowerShell: the folded readings read what the reader keeps; a comment line reads nothing
+  ["a private field line (starts with #) is code in JavaScript", "scripts/zz.mjs", ["  #p = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a private method that sweeps a joined glob", "scripts/zz.mjs", ["  #sweep = () => fs.rmSync('tests' + 'To' + 'Delete-*');"], ["1:owner-blind"], []],
+  ["the code after #> in PowerShell", "scripts/zz.ps1", ["<# a comment", "#> $n = 'tests' + 'To' + 'Delete-x'"], ["2:legacy-name"], []],
+  // D4, the comment gate: a line the raw readings call a comment gets folded readings in two cases only (a JS line that starts with # in code state, a .ps1 line where #> closes a block comment and code follows);
+  // every other comment-like line is EMPTY in the folded input, so it binds nothing and reads nothing, and the release reports nothing on it either
+  ["a # line in a multi-line template is template text: nothing is read", "scripts/zz.mjs", ["const t = `", "# 'testsTo'", "`;"], [], []],
+  ["a // line in a multi-line template is template text: nothing is read", "scripts/zz.mjs", ["const t = `", "// testsTo", "`;"], [], []],
+  ["a # line in a template that holds a sweep", "scripts/zz.mjs", ["const t = `", `# rm -rf ${Q}-*`, "`;"], [], []],
+  ["a // line in a template that holds a sweep", "scripts/zz.mjs", ["const t = `", `// rm -rf ${Q}-*`, "`;"], [], []],
+  ["a -- line in a template that holds a drop", "scripts/zz.mjs", ["const t = `", `-- drop ${Q}-*`, "`;"], [], []],
+  ["a -- line in JavaScript code state is not read either", "scripts/zz.mjs", [`-- drop ${Q}-*`], [], []],
+  ["a -- line in .sh", "scripts/zz.sh", [`-- drop ${Q}-*`], [], []],
+  ["a -- line in a workflow's run block", ".github/workflows/zz.yml", ["jobs:", "  j:", "    runs-on: ubuntu-latest", "    steps:", "      - run: |", `          -- drop ${Q}-*`], [], []],
+  ["a -- line in .sh that would bind a prefix", "scripts/zz.sh", ["-- P='testsTo''Delete-'", 'rm -rf "$P"*'], [], []],
+  ["a # line where a template closes and code follows is not read, as at the release", "scripts/zz.mjs", ["const t = `", "# x` + 'tests' + 'To' + 'Delete-x';"], [], []],
+  ["a // line where a block comment closes and code follows is not read, as at the release", "scripts/zz.mjs", ["/* open", "// x */ const n = 'tests' + 'To' + 'Delete-x';"], [], []],
+  ["a # line inside a .ps1 block comment that holds a sweep", "scripts/zz.ps1", ["<# a comment", `# Remove-Item ${Q}-*`, "#>"], [], []],
+  ["a .ps1 line where #> closes a block comment and a whole name follows: the whole name is read too", "scripts/zz.ps1", ["<# a comment", `#> $n = '${Q}-x'`], ["2:legacy-name"], []],
+  ["a private field line (starts with #): a whole name is read too", "scripts/zz.mjs", ["class A {", `  #p = '${Q}-agent-1';`, "}"], ["2:legacy-name"], []],
+  ["a private field line (starts with #): a regex over the word is owner-blind, in a class", "scripts/zz.mjs", ["class A {", `  #r = /^${Q}[-_]/;`, "}"], ["2:owner-blind"], []],
+  ["the same with a comment elsewhere in the file: the answer does not depend on it", "scripts/zz.mjs", ["const z = 1; // far", "class A {", `  #r = /^${Q}[-_]/;`, "}"], ["3:owner-blind"], []],
+  ["the same at the start of the line", "scripts/zz.mjs", ["class A {", `#r = /^${Q}[-_]/;`, "}"], ["2:owner-blind"], []],
+  ["an indented # line: the classifier's shell-comment cut hides the removal, so the bare word is legacy-name (the same line without # is owner-blind, next row)", "scripts/zz.mjs", ["class A {", `  #p = rmSync('${Q}-' + x);`, "}"], ["2:legacy-name"], []],
+  ["the same line without #", "scripts/zz.mjs", ["class A {", `  p = rmSync('${Q}-' + x);`, "}"], ["2:owner-blind"], ["2:owner-blind"]],
+  ["a raw binding from a comment stays, as at the release", "scripts/zz.mjs", [`// const P = '${Q}-';`, "rmSync(P + x);"], ["2:owner-blind"], ["2:owner-blind"]],
+  // D4, the occurrence rule: each occurrence of the word is its own cause. A pattern in the tail is dropped only when legacyNameHits reads that same occurrence
+  ["a piece and a pattern in two literals draw both classes", "scripts/zz.mjs", [`const a = 'testsTo'; const b = '${Q}[-_]';`], ["1:legacy-name", "1:owner-blind"], []],
+  ["the same, the other order", "scripts/zz.mjs", [`const b = '${Q}[-_]'; const a = 'testsTo';`], ["1:legacy-name", "1:owner-blind"], []],
+  ["the same, a legacy-name exemption clears the piece and leaves owner-blind", "scripts/zz.mjs", [`const a = 'testsTo'; const b = '${Q}[-_]'; // ${Q}-exempt: legacy-name — a probe the test removes`], ["1:owner-blind"], []],
+  ["two occurrences in one literal: a name, then a pattern", "scripts/zz.mjs", [`const a = '${Q}-old ${Q}[-_]';`], ["1:legacy-name", "1:owner-blind"], ["1:legacy-name"]],
+  ["two occurrences in one literal: a pattern, then a name", "scripts/zz.mjs", [`const a = '${Q}[-_] ${Q}-old';`], ["1:legacy-name", "1:owner-blind"], ["1:legacy-name"]],
+  ["two occurrences in one literal, exempted: legacy-name is cleared and owner-blind stays", "scripts/zz.mjs", [`const a = '${Q}-old ${Q}[-_]'; // ${Q}-exempt: legacy-name — a probe the test removes`], ["1:owner-blind"], []],
+  ["a bare word with a pattern tail and an owner letter is legacy-name alone, and its exemption clears it", "scripts/zz.mjs", [`const a = '${Q}-u*'; // ${Q}-exempt: legacy-name — a probe the test removes`], [], []],
+  ["a removal over the same tail draws both, as at the release", "scripts/zz.mjs", [`rmSync('${Q}-u*');`], ["1:legacy-name", "1:owner-blind"], ["1:legacy-name", "1:owner-blind"]],
+  ["on a line a classifier reading calls broad the bare word reads nothing", "scripts/zz.mjs", [`const a = '${Q}'; fs.globSync('${Q}-*');`], ["1:owner-blind"], ["1:owner-blind"]],
+  ["on a line a classifier reading calls broad the piece reads nothing", "scripts/zz.mjs", [`const a = 'testsTo'; fs.globSync('${Q}-*');`], ["1:owner-blind"], ["1:owner-blind"]],
+  ["a call a space after the word is not a pattern tail (the tail is the run that touches the word)", "scripts/zz.mjs", [`const a = '${Q} (x)';`], ["1:legacy-name"], []],
+  ["a prefix in pieces, a sweep over the name on the next line", "scripts/zz.mjs", ["const P = 'testsTo' + 'Delete-';", "fs.rmSync(P + x);"], ["1:legacy-name", "2:owner-blind"], []],
+  ["a prefix in pieces, a sweep over the name; an exemption clears the first line only", "scripts/zz.mjs", [`const P = 'testsTo' + 'Delete-'; // ${Q}-exempt: legacy-name — a probe the test removes`, "fs.rmSync(P + x);"], ["2:owner-blind"], []],
+  ["a RegExp over a joined prefix on one line", "scripts/zz.mjs", ['const rx = new RegExp("^testsTo" + "Delete-");'], ["1:owner-blind"], []],
+  ["a RegExp over a name the binding reading does not follow: the guard follows only what that reading follows (a stated limit)", "scripts/zz.mjs", ["const P = 'testsTo' + 'Delete-';", "const rx = new RegExp(`^${P}`);"], ["1:legacy-name"], []],
+  ["a whole prefix in a constant, startsWith on it (the binding reading of today: line 2 is owner-blind at the release too)", "scripts/zz.mjs", [`const P = '${Q}-';`, "names.filter((n) => n.startsWith(P));"], ["1:legacy-name", "2:owner-blind"], ["2:owner-blind"]],
+  ["a whole prefix passed to a call: legacy-name, and a person reads it", "scripts/zz.mjs", [`sweep('${Q}-');`], ["1:legacy-name"], []],
+  ["a prefix in two constants and a sum: the first piece only", "scripts/zz.mjs", ["const A = 'testsTo';", "const B = 'Delete-';", "rmSync(A + B + x);"], ["1:legacy-name"], []],
+  // D2: a call is not a parenthesis. A closer after a literal crosses only the parentheses that stand right before that literal; the outer one is a call when an identifier, `)` or `]` stands before it
+  ["a call before the +: its argument joins nothing (a piece, not the glob)", "scripts/zz.mjs", ["const a = f('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a method call before the +", "scripts/zz.mjs", ["const a = x.f('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a call after an index before the +", "scripts/zz.mjs", ["const a = x[0]('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a call with a space before its parenthesis", "scripts/zz.mjs", ["const a = f ('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a call that holds a group joined by .concat: the group's closer is spent, the call's is not", "scripts/zz.mjs", ["const a = f(('tests').concat('ToDel')) + 'ete-*';"], ["1:legacy-name"], []],
+  ["a call of a call's result before the +", "scripts/zz.mjs", ["const a = f(1)('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a call with the literal after another argument", "scripts/zz.mjs", ["const a = f(1, 'testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["two opens, the outer one a call", "scripts/zz.mjs", ["const a = f(('testsTo')) + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a call before .concat", "scripts/zz.mjs", ["const a = f('testsTo').concat('Delete-*');"], ["1:legacy-name"], []],
+  ["a call, then two pieces: they join each other and nothing the call holds", "scripts/zz.mjs", ["const a = f('tests') + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["a call that holds a group: the group's closer joins, the call's closer does not", "scripts/zz.mjs", ["const a = f(('tests') + 'To') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a regex with no closer on the line above does not stop the regexes of this line (one flag per line, not per file)", "scripts/zz.mjs", ["const bad = /[ b;", "const a = /'/; const n = 'tests' + 'To' + 'Delete-x';"], ["2:legacy-name"], []],
+  // a member name is a call whatever it is called (a keyword too), and `?.(` is a call; `default` and `new` are no call
+  ["a method named delete", "scripts/zz.mjs", ["const a = map.delete('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a private method named delete", "scripts/zz.mjs", ["const a = this.#delete('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a method named for", "scripts/zz.mjs", ["const a = Symbol.for('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a method named of", "scripts/zz.mjs", ["const a = Array.of('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a method named catch", "scripts/zz.mjs", ["const a = p.catch('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a method named return", "scripts/zz.mjs", ["const a = it.return('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a method name after spaces and a dot", "scripts/zz.mjs", ["const a = map . delete ('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a spread before a keyword is no member: a group joins", "scripts/zz.mjs", ["const a = [...await ('testsTo') + 'Delete-*'];"], ["1:owner-blind"], []],
+  ["an optional call", "scripts/zz.mjs", ["const a = f?.('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["an optional call of a member", "scripts/zz.mjs", ["const a = x.f?.('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["export default is no call: a group joins", "scripts/zz.mjs", ["export default ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["new is no call: a group joins", "scripts/zz.mjs", ["const a = new ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["throw is no call: a group joins", "scripts/zz.mjs", ["throw ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["if is no call: a group joins", "scripts/zz.mjs", ["if ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["a .ps1 command word and a group: the group joins (a stated limit: command mode would pass three arguments)", "scripts/zz.ps1", ["$x = foo ('testsTo') + 'Delete-*'"], ["1:owner-blind"], []],
+  // a template nested in a hole closes: the hole goes on after a value, so the next / is a division
+  ["a division after a nested template in a hole (the regex flag of the line is not spent)", "scripts/zz.mjs", ["const t = `${`a` / 2 + `/`}`;", "const n = 'tests' + 'To' + 'Delete-x';"], ["2:legacy-name"], []],
+  ["a division after a nested template, then a string, in a hole", "scripts/zz.mjs", ["const t = `${`a` / 2 + \"/\" + `b`}`;", "const n = 'tests' + 'To' + 'Delete-x';"], ["2:legacy-name"], []],
+  // the comment gate, the rows of the review: a block comment's start is not code, a template text line binds nothing, a .ps1 comment-like line in code state is a comment, a bare word's marker
+  ["an upper-case environment name with a star is a pattern", "scripts/zz.mjs", [`const a = '${Q.toUpperCase()}_U*';`], ["1:owner-blind"], []],
+  ["a -- line in .ps1 is a comment", "scripts/zz.ps1", ["-- 'tests' + 'To' + 'Delete-x'"], [], []],
+  ["a # line in a template that would bind a prefix in its folded form binds nothing", "scripts/zz.mjs", ["const t = `", "# const P = 'tests\\x54oDelete-';", "`;", "fs.rmSync(P + x);"], [], []],
+  ["a # line where a block comment started is not code", "scripts/zz.mjs", ["/* a", "# b */ const n = 'tests' + 'To' + 'Delete-x';"], [], []],
+  ["return is no call: a group joins", "scripts/zz.mjs", ["  return ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["typeof is no call: a group joins", "scripts/zz.mjs", ["const t = typeof ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["case is no call: a group joins", "scripts/zz.mjs", ["switch (x) { case ('testsTo') + 'Delete-*': break; }"], ["1:owner-blind"], []],
+  ["await is no call: a group joins", "scripts/zz.mjs", ["const a = await ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["a group of two opens joins", "scripts/zz.mjs", ["const a = (('testsTo')) + 'Delete-*';"], ["1:owner-blind"], []],
+  ["a group that closes in the middle of the chain joins", "scripts/zz.mjs", ["const a = ('tests' + 'To') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["a group after a call's argument list joins inside its own parentheses", "scripts/zz.mjs", ["const a = f(('tests') + 'To' + 'Delete-*');"], ["1:owner-blind"], []],
+  // .sh and workflow lines: touching pieces, quoted or not
+  ["a .sh adjacency, legacy", "scripts/zz.sh", ["mkdir \"$TMPDIR\"/'testsTo''Delete-agent-1'"], ["1:legacy-name"], []],
+  ["a .sh adjacency of three pieces", "scripts/zz.sh", ["mkdir \"$TMPDIR\"/'tests''To''Delete-agent-1'"], ["1:legacy-name"], []],
+  ["a .sh word of an unquoted and a quoted piece", "scripts/zz.sh", ['mkdir /tmp/testsTo"Delete-agent-1"'], ["1:legacy-name"], []],
+  ["a .sh word with the unquoted pieces around a quoted one", "scripts/zz.sh", ['mkdir /tmp/tests"To"Delete-agent-1'], ["1:legacy-name"], []],
+  ["a .sh adjacency, glob", "scripts/zz.sh", ["rm -rf \"$TMPDIR\"/'testsTo''Delete-*'"], ["1:owner-blind"], []],
+  ["a .sh adjacency of double quotes", "scripts/zz.sh", ['rm -rf "$TMPDIR"/"testsTo""Delete-"*'], ["1:owner-blind"], []],
+  ["a .sh $'...' with a \\x escape", "scripts/zz.sh", ["rm -rf $'tests\\x54oDelete-*'"], ["1:owner-blind"], []],
+  ["a .sh $'...' with an octal escape", "scripts/zz.sh", ["rm -rf $'tests\\124oDelete-*'"], ["1:owner-blind"], []],
+  ["a .sh $'...' with a \\u escape", "scripts/zz.sh", ["rm -rf $'tests\\u0054oDelete-*'"], ["1:owner-blind"], []],
+  ["a .sh half of the word", "scripts/zz.sh", ["HALF='testsTo'"], ["1:legacy-name"], []],
+  ["a .sh word after an escaped apostrophe", "scripts/zz.sh", ["echo don\\'t; mkdir 'tests''To''Delete-x'"], ["1:legacy-name"], []],
+  ["a .sh word after a comment sign inside a word", "scripts/zz.sh", ["echo a#b 'tests''To''Delete-x'"], ["1:legacy-name"], []],
+  ["a .sh prefix in pieces, a sweep over the name on the next line", "scripts/zz.sh", ["P='testsTo''Delete-'", 'rm -rf "$TMPDIR"/"$P"*'], ["1:legacy-name", "2:owner-blind"], []],
+  ["a .sh word after an assignment", "scripts/zz.sh", ["export NAME='tests''To''Delete-x'"], ["1:legacy-name"], []],
+  // a workflow reads as .sh
+  ["a workflow run line", ".github/workflows/zz.yml", ["jobs:", "  j:", "    runs-on: ubuntu-latest", "    steps:", "      - run: rm -rf /tmp/'testsTo''Delete-*'"], ["5:owner-blind"], []],
+  ["a .yaml workflow run line of three pieces", ".github/workflows/zz.yaml", ["jobs:", "  j:", "    runs-on: ubuntu-latest", "    steps:", "      - run: mkdir /tmp/'tests''To''Delete-x'"], ["5:legacy-name"], []],
+  ["a workflow run line of three pieces", ".github/workflows/zz.yml", ["jobs:", "  j:", "    runs-on: ubuntu-latest", "    steps:", "      - run: mkdir /tmp/'tests''To''Delete-x'"], ["5:legacy-name"], []],
+  // .ps1: + and -join
+  ["a .ps1 split over +", "scripts/zz.ps1", ['Remove-Item ("testsTo" + "Delete-*")'], ["1:owner-blind"], []],
+  ["a .ps1 legacy split over +", "scripts/zz.ps1", ['$n = "testsTo" + "Delete-agent-1"'], ["1:legacy-name"], []],
+  ["a .ps1 three pieces over +", "scripts/zz.ps1", ['$n = "tests" + "To" + "Delete-agent-1"'], ["1:legacy-name"], []],
+  ["a .ps1 three pieces, one in parentheses", "scripts/zz.ps1", ['$n = ("tests") + ("To") + "Delete-agent-1"'], ["1:legacy-name"], []],
+  ["a .ps1 -join", "scripts/zz.ps1", ['$n = ("testsTo", "Delete-agent-1") -join ""'], ["1:legacy-name"], []],
+  ["a .ps1 -join of three pieces", "scripts/zz.ps1", ['$n = ("tests", "To", "Delete-agent-1") -join ""'], ["1:legacy-name"], []],
+  // D2: a .ps1 list joins with the operator at any spacing, with its items or separator in parentheses; a call is not a parenthesis here either
+  ["a .ps1 -join over a separator in parentheses", "scripts/zz.ps1", ["$n = ('tests','To','Delete-x') -join ('')"], ["1:legacy-name"], []],
+  ["a .ps1 -join over a list item in parentheses", "scripts/zz.ps1", ["$n = ('tests',('To'),'Delete-x') -join ''"], ["1:legacy-name"], []],
+  ["a .ps1 -join with no space at the operator", "scripts/zz.ps1", ["$n = ('tests','To','Delete-x')-join''"], ["1:legacy-name"], []],
+  ["a .ps1 list of items each in parentheses", "scripts/zz.ps1", ["$n = ('tests'),('To'),('Delete-x') -join ''"], ["1:legacy-name"], []],
+  ["a .ps1 list of items each in parentheses, at the line's start", "scripts/zz.ps1", ["('tests'),('To'),('Delete-x') -join ''"], ["1:legacy-name"], []],
+  ["a .ps1 list whose closer belongs to a call joins nothing", "scripts/zz.ps1", ["$n = (f 'testsTo', 'Delete-*') -join ''"], ["1:legacy-name"], []],
+  ["a .ps1 call before the +: its argument joins nothing", "scripts/zz.ps1", ["$n = (f 'testsTo') + 'Delete-*'"], ["1:legacy-name"], []],
+  ["a .ps1 call, then two pieces: they join each other and nothing the call holds", "scripts/zz.ps1", ["$a = (f 'tests') + 'To' + 'Delete-x'"], ["1:legacy-name"], []],
+  ["a .ps1 split after a block comment on the line", "scripts/zz.ps1", ["<# a 'quote #> $n = 'tests' + 'To' + 'Delete-x'"], ["1:legacy-name"], []],
+  ["a .ps1 split after a multi-line block comment", "scripts/zz.ps1", ["<# a comment", "with 'a quote #> $n = 'tests' + 'To' + 'Delete-x'"], ["2:legacy-name"], []],
+  ["a .ps1 prefix in pieces, a sweep over the name on the next line", "scripts/zz.ps1", ['$P = "tests" + "To" + "Delete-"', 'Remove-Item "$P*"'], ["1:legacy-name", "2:owner-blind"], []],
+];
+
+const foldedOff = (file) => ({ foldingAllowances: [file] });
+
+test("F30 table 1: each spelling of the prefix is a finding on its exact line, with its class, as a list", () => {
+  const wrong = [];
+  for (const [kind, file, lines, expected] of SPELLINGS) {
+    const got = listOf(scanText(file, fixtureOf(file, lines)));
+    if (JSON.stringify(got) !== JSON.stringify(expected)) wrong.push(`${kind} [${file}] ${JSON.stringify(lines)}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(got)}`);
+  }
+  assert.deepEqual(wrong, [], "rows that answer the wrong list");
+});
+
+test("F30 table 1: the reader switched off (the file in foldingAllowances) leaves only the raw readings: the durable reader-off check", () => {
+  const wrong = [];
+  for (const [kind, file, lines, , raw] of SPELLINGS) {
+    const got = listOf(scanText(file, fixtureOf(file, lines), [], undefined, undefined, foldedOff(file)));
+    if (JSON.stringify(got) !== JSON.stringify(raw)) wrong.push(`${kind} [${file}]: raw expected ${JSON.stringify(raw)}, got ${JSON.stringify(got)}`);
+  }
+  assert.deepEqual(wrong, [], "rows whose raw reading is not what the table says");
+  const needReader = SPELLINGS.filter((row) => JSON.stringify(row[3]) !== JSON.stringify(row[4]));
+  assert.ok(needReader.length >= 60, `${needReader.length} rows are found only by the folding reader`);
+});
+
+test("F30 table 1: the table holds at least F30's sixteen, D2's kinds, and every row's lines are distinct", () => {
+  assert.ok(SPELLINGS.length >= 80);
+  assert.equal(new Set(SPELLINGS.map((row) => row[2].join("\n") + row[1])).size, SPELLINGS.length);
+  for (const extension of [".mjs", ".cjs", ".ts", ".tsx", ".mts", ".sh", ".ps1", ".yml"]) assert.ok(SPELLINGS.some((row) => row[1].endsWith(extension)), `a row for ${extension}`);
+});
+
+const WORDS = ["toDelete", "testStatus", "testString", "testStep", "testStart", "testStop", "testStore", "testStub", "latestStable", "latestStatus", "latestStore", "filesToDelete",
+  "snapshotsToDelete", "autoDelete", "doDelete", "repoDelete", "codelet", "modelEtag", "histoDelta", "hostStopped", "chatModelEdits", "restore", "history", "todo/PLAN_x.md",
+  "snapshotsToPrune", "tellClientsToCatchUp", "filesToDeleted"];
+const PIECES = ["testsTo", "ToDelete", "testsT", "sToDel", "oDelete", "teststo", "todelete", "TESTSTO", "TODELETE", "testsTo-", "ToDelete-*", "stsToD", "sToDelete"];
+
+test("F30 table 1: the 13 real pieces of the measure are each a legacy-name on their line", () => {
+  assert.equal(PIECES.length, 13);
+  for (const piece of PIECES) assert.deepEqual(listOf(scanText("scripts/zz.mjs", fixtureOf("x.mjs", [`const a = ${JSON.stringify(piece)};`]))), ["1:legacy-name"], piece);
+});
+
+/** Row = [the lines, the file, why it is no finding]. */
+const CLEAN = [
+  ...WORDS.map((word) => [[`const a = ${JSON.stringify(word)};`], "scripts/zz.mjs", `the product word ${word}`]),
+  [["const a = 'tests' + 'Run' + 'ToDo';"], "scripts/zz.mjs", "tests, Run, To and Do: the joined literal holds no crossing piece of 6"],
+  [["const a = 'testing' + ' Delete';"], "scripts/zz.mjs", "tests and Delete apart"],
+  [['const a = "TestsTo";'], "scripts/zz.mjs", "TestsTo, with a capital first letter, is not a form of the word"],
+  [['const a = "xtestsTo";'], "scripts/zz.mjs", "a letter touches the piece"],
+  [['const a = "testsToy";'], "scripts/zz.mjs", "a letter touches the piece"],
+  [['const a = "testsToDeleted";'], "scripts/zz.mjs", "a longer word"],
+  [['const a = "testsToDeleteCount";'], "scripts/zz.mjs", "a longer word"],
+  [['const a = "mytestsToDelete";'], "scripts/zz.mjs", "a longer word, on the left"],
+  [['const a = "a testsToDelete entry is listed";'], "scripts/zz.mjs", "prose: a space on each side"],
+  [['const a = "see testsToDelete, then stop";'], "scripts/zz.mjs", "prose: a comma and a space after the word"],
+  [['const a = "the testsToDelete.";'], "scripts/zz.mjs", "prose: a full stop at the literal's end"],
+  [['const a = "(the testsToDelete) rule";'], "scripts/zz.mjs", "prose: a bracket and a space after the word"],
+  [["const n = `${LEGACY_WORD}x`;"], "scripts/zz.mjs", "a template hole that holds a variable is not read: folding never invents a word"],
+  [["const n = `${LEGACY_WORD}-${id}`;"], "scripts/zz.mjs", "a template hole that holds a variable is not read"],
+  [["const n = `${'te'}${'st'}${id}`;"], "scripts/zz.mjs", "holes that hold literals, then a variable: no word"],
+  [['const n = "testsTo" + "Delete-u1000-coai-x-" + id;'], "scripts/zz.mjs", "an owner-form name split over +: the joined literal holds the whole word in the owner form"],
+  [['const n = ["testsTo", "Delete-w42-coai-"].join("") + id;'], "scripts/zz.mjs", "an owner-form name split over .join"],
+  [["const n = `testsTo${'Delete'}-u1000-coai-${id}`;"], "scripts/zz.mjs", "an owner-form name split over a template hole"],
+  [['const n = "testsTo" + "Delete-" + "u1000" + "-coai-x";'], "scripts/zz.mjs", "an owner-form name split over three +"],
+  [[`const n = "${Q}-u1000-coai-x-abc123";`], "scripts/zz.mjs", "the owner form, whole"],
+  [[`const e = "// ${Q}-exempt: raw-temp — a probe the test removes";`], "scripts/zz.mjs", "the exempt marker word"],
+  [[`const q = ".x.${P}-quarantine-1-ab";`], "scripts/zz.mjs", "the quarantine sibling's word"],
+  [[`execFileSync("docker", ["volume", "create", "--label", \`${Q}.owner=\${owner}\`, name]);`], "scripts/zz.mjs", "the owner label key is a docker label's name, not a name and not a pattern"],
+  [[`const e = process.env.${P.toUpperCase()}_RUN;`], "scripts/zz.mjs", "an environment variable, not in a literal"],
+  [[`const e = "${P.toUpperCase()}_RUN";`], "scripts/zz.mjs", "an environment variable name in a literal"],
+  // found on the real trees (2026-11-05): each was a false finding of the first reader
+  [[`        run: grep -Eq "^[[:space:]]+$words: .*/${Q}-[uw][0-9]{1,10}-coai-$what-[A-Za-z0-9]{6}" "$LOG" || exit 1`], ".github/workflows/zz.yml", "an owner as a class [uw] before digits is an owner segment (coai's ci.yml)"],
+  [[`        run: first=$(grep -v "${Q}-[uw][0-9]" "$LOG" || true)`], ".github/workflows/zz.yml", "an owner as a class [uw] before digits (coai's ci.yml)"],
+  [[`assert.equal(existsSync(path.join(base, 'in-score')), true, 'a ${Q} entry under score-tmp is listed, never removed');`], "scripts/zz.mjs", "a sentence in an assertion message (benchmark's heldout-run.test.mjs)"],
+  [[`const rx = new RegExp("${Q}-[uw]\\\\d{1,10}-x-");`], "scripts/zz.mjs", "an owner as a class [uw] before \\d, in a RegExp string"],
+  // comments of each kind hold pieces only: a comment is removed before the folded readings
+  [["// const n = 'tests' + 'To' + 'Delete-x';"], "scripts/zz.mjs", "a whole-line // comment"],
+  [["const a = 1; // const n = 'tests' + 'To' + 'Delete-x'; 'testsTo'"], "scripts/zz.mjs", "a trailing // comment"],
+  [["const a = 1; /* 'testsTo' + 'Delete-x' */"], "scripts/zz.mjs", "a trailing /* */ comment"],
+  [["/**", " * const n = 'tests' + 'To' + 'Delete-x'; 'testsTo'", " */"], "scripts/zz.mjs", "a JSDoc block"],
+  [["/*", "const n = 'tests' + 'To' + 'Delete-x';", "*/"], "scripts/zz.mjs", "commented-out code in a block comment with no stars"],
+  [["const a = 1; /* a comment that opens", "const n = 'testsTo';", "and ends */ const b = 2;"], "scripts/zz.mjs", "a block comment that opens after code and holds a line of code"],
+  [["const a = 1; // don't", "const b = 2;"], "scripts/zz.mjs", "an apostrophe in a comment pairs with nothing"],
+  [["const a = 'see testsToDelete: x';"], "scripts/zz.mjs", "prose: a colon and a space after the word"],
+  [["echo ok;# 'tests''To''Delete-x'"], "scripts/zz.sh", ".sh: a # after ; starts a comment"],
+  [["(echo ok)# 'tests''To''Delete-x'"], "scripts/zz.sh", ".sh: a # after ) starts a comment"],
+  [["echo ok|# 'tests''To''Delete-x'"], "scripts/zz.sh", ".sh: a # after | starts a comment"],
+  [["echo ok\t# 'tests''To''Delete-x'"], "scripts/zz.sh", ".sh: a # after a tab starts a comment"],
+  [["echo \" 'tests''To''Delete-x'"], "scripts/zz.sh", ".sh: a double quote that never closes stops the line's reading"],
+  [["# const n = 'testsTo'"], "scripts/zz.sh", "a whole-line # comment in .sh"],
+  [[`# rm -rf ${Q}-*`], "scripts/zz.sh", "a whole-line # comment that holds a sweep"],
+  [["// const n = 'testsTo'; rm -rf 'tests' + 'To' + 'Delete-*'"], "scripts/zz.mjs", "a whole-line // comment: the folded readings read nothing"],
+  [["echo hi # 'testsTo' 'tests''To''Delete-x'"], "scripts/zz.sh", "a trailing # comment in .sh"],
+  [["echo don\\'t"], "scripts/zz.sh", "echo don\\'t: an escaped apostrophe opens no literal"],
+  [['echo "it\'s fine"'], "scripts/zz.sh", "an apostrophe inside double quotes"],
+  [["      - run: echo 'it''s'  # 'testsTo'"], ".github/workflows/zz.yml", "a workflow line with a # comment"],
+  [["$a = 1 # 'testsTo'"], "scripts/zz.ps1", "a trailing # comment in .ps1"],
+  [["<# a block comment", "$n = 'tests' + 'To' + 'Delete-x'", "#>", "$b = 2"], "scripts/zz.ps1", "commented-out code in a .ps1 block comment"],
+  [["<# 'testsTo' #> $b = 2"], "scripts/zz.ps1", "a one-line .ps1 block comment"],
+  // a literal that is no code
+  [["const css = `", "a { background: url(x/*.png) }", "`;"], "scripts/zz.mjs", "a multi-line template that holds /* opens no block comment"],
+  [["const r = /'/; const s = 'a' + 'b';"], "scripts/zz.mjs", "a regex that holds a quote"],
+  // D2: an operand is a literal and its own closers; a comma list is not one (P18: with the closer not required, 'To' would join 'tests' and be a piece)
+  [["const n = 'tests' + ('To', 'Delete-x');"], "scripts/zz.mjs", "a comma expression is no operand of the +: its value is the last item"],
+  [["const n = 'tests'.concat(('To', 'Delete-x'));"], "scripts/zz.mjs", "a comma expression is no argument of .concat"],
+  [["$n = -join ('tests','To','Delete-x')"], "scripts/zz.ps1", "unary -join is not read (a stated limit of D2)"],
+  [["$n = ('tests','To','Delete-x') -joinx ''"], "scripts/zz.ps1", "-joinx is no operator"],
+];
+
+test("F30 table 2: product words, pieces that touch a letter, comments, prose and owner forms are no finding", () => {
+  const wrong = CLEAN.flatMap(([lines, file, why]) => {
+    const text = path.extname(file) === ".yml" ? `${lines.join("\n")}\n` : fixtureOf(file, lines);
+    const found = scanText(file, text);
+    return found.length === 0 ? [] : [`${JSON.stringify(lines)} (${why}): ${JSON.stringify(found.map((entry) => `${entry.line}:${entry.cls}`))}`];
+  });
+  assert.deepEqual(wrong, [], "lines that must stay []");
+  assert.ok(CLEAN.length >= 70);
+});
+
+test("F30 table 2: a whole name in a comment is a finding today and stays one; a whole-line comment is not read", () => {
+  assert.deepEqual(listOf(scanText("scripts/zz.mjs", fixtureOf("x.mjs", [`const a = 1; // ${Q}-coai-x-abc123`]))), ["1:legacy-name"]);
+  assert.deepEqual(listOf(scanText("scripts/zz.mjs", fixtureOf("x.mjs", [`// ${Q}-coai-x-abc123`]))), []);
+});
+
+test("F30 limits: JSX text is not told from code: an apostrophe stops that line's reading, and nothing crashes", () => {
+  assert.deepEqual(listOf(scanText("src/zz.tsx", fixtureOf("x.tsx", ["const el = <p>don't</p>; const n = 'tests' + 'To' + 'Delete-x';"]))), [], "the stated limit of D2");
+  assert.deepEqual(listOf(scanText("src/zz.tsx", fixtureOf("x.tsx", ["const el = <p>don't</p>;", "const n = 'tests' + 'To' + 'Delete-x';"]))), ["2:legacy-name"], "the next line is read");
+  assert.deepEqual(listOf(scanText("scripts/zz.mjs", fixtureOf("x.mjs", ["const n = `tests` + `To` + `Delete-x`;"]))), ["1:legacy-name"], "templates are operands too");
+  assert.deepEqual(listOf(scanText("scripts/zz.mjs", fixtureOf("x.mjs", ["const n = `${`tests`}${`To`}`;"]))), [], "a template nested in a hole is not read");
+  assert.deepEqual(listOf(scanText("scripts/zz.mjs", fixtureOf("x.mjs", ["const n = `${`}`}`; const m = 'tests' + 'To' + 'Delete-x';"]))), ["1:legacy-name"], "a nested template that holds a brace keeps the state");
+});
+
+// D5 item 5: the interactions, as an executable table, because each review round found its defects there ------------------------------
+//
+// One rule for every kept row. The answer is compared across (W) the whole against the split spelling, (F) the row alone against the row with a line elsewhere that holds an unrelated
+// comment, (P) one occurrence against two on the line, in both orders, and (E) exempted against not. The expected answers: (W) the same list; (F) the same list shifted, except a raw binding
+// from a comment; (P) the union of each alone, except a line the classifier calls broad, where the bare word and the piece read nothing, so it stays owner-blind with the legacy-name that
+// the release's raw reading gives the whole spelling (a name that legacyNameHits reads stays, split or whole); (E) the list without legacy-name.
+// If a relation does not hold over a row, that row is a report to the plan's owner (a ledger question), never an exception written here.
+
+const val = { js: (n, x) => `const v${n} = ${x};`, sh: (n, x) => `echo ${x}`, ps1: (n, x) => `$v${n} = ${x}` };
+const removal = { js: (n, x) => `fs.rmSync(${x});`, sh: (n, x) => `rm -rf ${x}`, ps1: (n, x) => `Remove-Item (${x})` };
+const everywhere = (text) => ({ js: text, sh: text, ps1: text });
+/** One cause, written whole and split (`'a' + 'b'` in JavaScript and PowerShell, touching pieces in `.sh`), in a statement of each language. `broad`: a classifier reading calls the line broad. */
+const ATOMS = [
+  { name: "a legacy name", cls: ["legacy-name"], stmt: val, whole: everywhere(`'${Q}-x'`), split: { js: "'tests' + 'To' + 'Delete-x'", sh: "'tests''To''Delete-x'", ps1: "'tests' + 'To' + 'Delete-x'" } },
+  { name: "a pattern tail with no owner", cls: ["owner-blind"], stmt: val, whole: everywhere(`'${Q}[-_]'`), split: { js: "'tests' + 'To' + 'Delete[-_]'", sh: "'tests''To''Delete[-_]'", ps1: "'tests' + 'To' + 'Delete[-_]'" } },
+  { name: "an owner letter and a star", cls: ["legacy-name"], stmt: val, whole: everywhere(`'${Q}-u*'`), split: { js: "'tests' + 'To' + 'Delete-u*'", sh: "'tests''To''Delete-u*'", ps1: "'tests' + 'To' + 'Delete-u*'" } },
+  { name: "half of the word", cls: ["legacy-name"], stmt: val, whole: everywhere("'testsTo'"), split: { js: "'tests' + 'To'", sh: "'tests''To'", ps1: "'tests' + 'To'" } },
+  { name: "the bare word", cls: ["legacy-name"], stmt: val, whole: everywhere(`'${Q}'`), split: { js: "'tests' + 'To' + 'Delete'", sh: "'tests''To''Delete'", ps1: "'tests' + 'To' + 'Delete'" } },
+  { name: "an owner-form name", cls: [], stmt: val, whole: everywhere(`'${Q}-u1000-coai-x'`), split: { js: "'tests' + 'To' + 'Delete-u1000-coai-x'", sh: "'tests''To''Delete-u1000-coai-x'", ps1: "'tests' + 'To' + 'Delete-u1000-coai-x'" } },
+  { name: "a glob in a removal", cls: ["owner-blind"], broad: true, stmt: removal, whole: everywhere(`'${Q}-*'`), split: { js: "'tests' + 'To' + 'Delete-*'", sh: "'tests''To''Delete-*'", ps1: "'tests' + 'To' + 'Delete-*'" } },
+];
+const LANGS = {
+  js: { file: "scripts/zz.mjs", joiner: " ", mark: "//", far: ["// far", "const far = 1; // far"] },
+  sh: { file: "scripts/zz.sh", joiner: "; ", mark: "#", far: ["# far", "echo far # far"] },
+  ps1: { file: "scripts/zz.ps1", joiner: "; ", mark: "#", far: ["# far", "$far = 1 # far"] },
+};
+const EXEMPT_LEGACY = `${Q}-exempt: legacy-name — a probe the test removes`;
+const scanLines = (file, lines, allowances = []) => scanText(file, fixtureOf(file, lines), [], undefined, undefined, { foldingAllowances: allowances });
+const answerOf = (file, lines, allowances) => listOf(scanLines(file, lines, allowances));
+const shifted = (list) => list.map((entry) => `${Number(entry.split(":")[0]) + 1}:${entry.split(":")[1]}`);
+const withoutLegacy = (list) => list.filter((entry) => !entry.endsWith(":legacy-name"));
+const FORMS = ["whole", "split"];
+
+test("F30 interactions (W): the whole and the split spelling of one cause answer the same list, the one the table states", () => {
+  const wrong = [];
+  for (const [lang, { file }] of Object.entries(LANGS)) {
+    for (const atom of ATOMS) {
+      const expected = atom.cls.map((cls) => `1:${cls}`);
+      for (const form of FORMS) {
+        const got = answerOf(file, [atom.stmt[lang](1, atom[form][lang])]);
+        if (JSON.stringify(got) !== JSON.stringify(expected)) wrong.push(`${lang} ${atom.name} ${form}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(got)}`);
+      }
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test("F30 interactions (F): a line elsewhere that holds an unrelated comment shifts the list and changes nothing else, for every cause and every spelling row; a raw binding from a comment is the one exception", () => {
+  const wrong = [];
+  for (const [lang, { file, far }] of Object.entries(LANGS)) {
+    for (const atom of ATOMS) {
+      for (const form of FORMS) {
+        const lines = [atom.stmt[lang](1, atom[form][lang])];
+        const alone = answerOf(file, lines);
+        for (const comment of far) {
+          const got = answerOf(file, [comment, ...lines]);
+          if (JSON.stringify(got) !== JSON.stringify(shifted(alone))) wrong.push(`${lang} ${atom.name} ${form} after ${JSON.stringify(comment)}: expected ${JSON.stringify(shifted(alone))}, got ${JSON.stringify(got)}`);
+        }
+      }
+    }
+  }
+  const BINDS_FROM_A_COMMENT = new Set(["a raw binding from a comment stays, as at the release"]);
+  for (const [kind, file, lines, expected] of SPELLINGS) {
+    const lang = file.endsWith(".ps1") ? "ps1" : file.endsWith(".sh") ? "sh" : file.endsWith(".mjs") || file.endsWith(".cjs") || file.endsWith(".ts") || file.endsWith(".js") || file.endsWith(".tsx") ? "js" : undefined;
+    if (lang === undefined || BINDS_FROM_A_COMMENT.has(kind)) continue;
+    const far = LANGS[lang].far;
+    for (const comment of far) {
+      const got = answerOf(file, [comment, ...lines]);
+      if (JSON.stringify(got) !== JSON.stringify(shifted(expected))) wrong.push(`row "${kind}" after ${JSON.stringify(comment)}: expected ${JSON.stringify(shifted(expected))}, got ${JSON.stringify(got)}`);
+    }
+  }
+  assert.deepEqual(wrong, []);
+  assert.deepEqual(answerOf("scripts/zz.mjs", [`// const P = '${Q}-';`, "rmSync(P + x);"]), ["2:owner-blind"], "the exception: the raw binding reading binds from a comment, as at the release");
+  assert.deepEqual(answerOf("scripts/zz.mjs", [`// const P = '${Q}-';`, "rmSync(P + x);"], ["scripts/zz.mjs"]), ["2:owner-blind"], "and the reader being off does not change it");
+});
+
+test("F30 interactions (P): two occurrences on one line give the union of each alone, in both orders; a line the classifier calls broad stays owner-blind with the release's own raw hits", () => {
+  const wrong = [];
+  for (const [lang, { file, joiner }] of Object.entries(LANGS)) {
+    for (const a of ATOMS) {
+      for (const b of ATOMS) {
+        for (const [formA, formB] of [["whole", "whole"], ["split", "split"], ["whole", "split"], ["split", "whole"]]) {
+          const line = `${a.stmt[lang](1, a[formA][lang])}${joiner}${b.stmt[lang](2, b[formB][lang])}`;
+          const got = answerOf(file, [line]);
+          const alone = [answerOf(file, [a.stmt[lang](1, a[formA][lang])]), answerOf(file, [b.stmt[lang](2, b[formB][lang])])];
+          const union = [...new Set([...alone[0], ...alone[1]])].sort();
+          // on a broad line the bare word and the piece read nothing (D4); a name legacyNameHits reads stays, split or whole: it is the release's own raw hit of the whole spelling
+          const wholeLine = `${a.stmt[lang](1, a.whole[lang])}${joiner}${b.stmt[lang](2, b.whole[lang])}`;
+          const raw = answerOf(file, [wholeLine], [file]);
+          const expected = a.broad || b.broad ? [...new Set(["1:owner-blind", ...raw.filter((entry) => entry.endsWith(":legacy-name"))])].sort() : union;
+          if (JSON.stringify(got) !== JSON.stringify(expected)) wrong.push(`${lang} ${a.name} ${formA} + ${b.name} ${formB}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(got)}`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test("F30 interactions (E): a legacy-name exemption on the line gives the list without legacy-name, for one cause and for two, and owner-blind stays", () => {
+  const wrong = [];
+  for (const [lang, { file, joiner, mark }] of Object.entries(LANGS)) {
+    for (const a of ATOMS) {
+      for (const b of ATOMS) {
+        for (const form of FORMS) {
+          const line = `${a.stmt[lang](1, a[form][lang])}${joiner}${b.stmt[lang](2, b[form][lang])}`;
+          const plain = answerOf(file, [line]);
+          const exempted = answerOf(file, [`${line} ${mark} ${EXEMPT_LEGACY}`]);
+          if (JSON.stringify(exempted) !== JSON.stringify(withoutLegacy(plain))) wrong.push(`${lang} ${a.name} + ${b.name} ${form}: expected ${JSON.stringify(withoutLegacy(plain))}, got ${JSON.stringify(exempted)}`);
+        }
+      }
+    }
+  }
+  for (const [kind, file, lines, expected] of SPELLINGS) {
+    if (!/\.(?:mjs|cjs|js|ts|tsx)$/.test(file) || lines.length !== 1 || lines[0].includes("//") || lines[0].includes("/*")) continue;
+    const got = answerOf(file, [`${lines[0]} // ${EXEMPT_LEGACY}`]);
+    if (JSON.stringify(got) !== JSON.stringify(withoutLegacy(expected))) wrong.push(`row "${kind}": expected ${JSON.stringify(withoutLegacy(expected))}, got ${JSON.stringify(got)}`);
+  }
+  assert.deepEqual(wrong, []);
+});
+
+// D6: the allowances are this repository's own, and only when the scan is of this repository ---------------------------------------
+
+test("F30 D6: the folding allowances are exactly the listed files; each exists and still needs its place", () => {
+  assert.ok(Object.isFrozen(FOLDING_ALLOWANCES));
+  assert.deepEqual([...FOLDING_ALLOWANCES], [...FOLDING_ALLOWANCES].sort(), "sorted, so a new entry shows in a diff");
+  assert.equal(new Set(FOLDING_ALLOWANCES).size, FOLDING_ALLOWANCES.length);
+  for (const file of FOLDING_ALLOWANCES) {
+    assert.ok(fs.existsSync(path.join(root, file)), `${file} exists`);
+    assert.ok(isScanned(file), `${file} is a file the guard scans`);
+    const text = fs.readFileSync(path.join(root, file), "utf8");
+    const allowed = scanText(file, text, [], undefined, undefined, { foldingAllowances: FOLDING_ALLOWANCES });
+    const folded = scanText(file, text, [], undefined, undefined, { foldingAllowances: [] });
+    assert.ok(folded.length > allowed.length, `${file} still draws a finding from the folding reader without its allowance: remove a stale entry`);
+  }
+});
+
+test("F30 D6: scanText has no allowance by default; an allowance silences the folded readings and nothing else", () => {
+  const file = FOLDING_ALLOWANCES[0];
+  const split = 'const n = "testsTo" + "Delete-agent-";\n';
+  assert.deepEqual(scanText(file, split).map((entry) => entry.cls), ["legacy-name"], "no option, no allowance: a listed name draws the finding");
+  assert.deepEqual(scanText(file, split, [], undefined, undefined, { foldingAllowances: FOLDING_ALLOWANCES }).map((entry) => entry.cls), []);
+  assert.deepEqual(scanText(file, `const n = "${Q}-agent-1";\n`, [], undefined, undefined, { foldingAllowances: FOLDING_ALLOWANCES }).map((entry) => entry.cls), ["legacy-name"], "a whole name in a listed file is still a finding");
+});
+
+test("F30 D6: a consumer inherits no allowance by a matching path: tools/janitor.sh of another repository is read", (t) => {
+  const repo = tree(t, { "tools/janitor.sh": "mkdir /tmp/tests\"To\"'Delete-agent-1'\n" });
+  const found = scanRepository({ repo, rule: RULE }).findings.filter((entry) => entry.file === "tools/janitor.sh");
+  assert.deepEqual(found.map((entry) => `${entry.line}:${entry.cls}`), ["1:legacy-name"]);
+  const own = scanText("tools/janitor.sh", "mkdir /tmp/tests\"To\"'Delete-agent-1'\n", [], undefined, undefined, { foldingAllowances: FOLDING_ALLOWANCES });
+  assert.deepEqual(own, [], "the same line in this repository's own janitor, through the allowance list");
+});
+
+test("F30 D6: this repository's own scan applies the allowances (the guard is green over its own root)", () => {
+  const real = scanRepository({ repo: root });
+  assert.deepEqual(real.findings.map((entry) => `${entry.file}:${entry.line}:${entry.cls}`), []);
+});
+
+test("F30 D6: the janitor's allowlisted inventory line draws no owner-blind through the folded readings either", () => {
+  const text = fs.readFileSync(path.join(root, JANITOR), "utf8").replace(/\r\n/g, "\n");
+  const entries = JSON.parse(fs.readFileSync(ALLOWLIST, "utf8")).entries;
+  const found = scanText(JANITOR, text, entries, undefined, undefined, { foldingAllowances: [] });
+  const line = entries[0].line;
+  assert.deepEqual(found.filter((entry) => entry.line === line).map((entry) => entry.cls), [], "the line the allowlist passes draws nothing from any reading");
+  const lines = text.split("\n");
+  assert.deepEqual(found.filter((entry) => entry.cls === "owner-blind" && /\$\{?(?:RX|GLOB)\b/.test(lines[entry.line - 1])).map((entry) => entry.line), [], "the variables the passed line assigns bind nothing in the folded reading either: their uses stay clean");
+  const without = scanText(JANITOR, text, [], undefined, undefined, { foldingAllowances: [] });
+  assert.ok(without.some((entry) => entry.line === line && entry.cls === "owner-blind"), "without the allowlist the same line is owner-blind");
+});
+
+// the reader itself ----------------------------------------------------------------------------------------------------------------
+
+const readerOf = (extension, ...lines) => fold.foldFile(lines, extension).lines.map((entry) => ({ text: entry.text, literals: entry.literals.map((literal) => literal.value) }));
+
+test("F30 reader: foldFile joins, decodes, removes comments and keeps the quotes; a hole that holds anything but a literal stays", () => {
+  const rows = [
+    // [extension, line, the folded text, the joined literals]
+    [".mjs", 'const n = "testsTo".concat("Delete-agent-", id);', 'const n = "testsToDelete-agent-".concat(id);', ["testsToDelete-agent-"]],
+    [".mjs", 'const n = "a".concat("b").concat("c", x);', 'const n = "abc".concat(x);', ["abc"]],
+    [".mjs", "const n = `testsTo${'Delete'}-${x}`;", "const n = `testsToDelete-${x}`;", ["testsToDelete-${x}"]],
+    [".mjs", "const n = `${LEGACY_WORD}x`;", "const n = `${LEGACY_WORD}x`;", ["${LEGACY_WORD}x"]],
+    [".mjs", "const n = ['a', 'b'].join('-') + 'c';", "const n = 'a-bc';", ["a-bc"]],
+    [".ts", "const n = 'tests\\x54o' + \"Del\\u0065te\";", "const n = 'testsToDelete';", ["testsToDelete"]],
+    [".mjs", 'const n = "a" + id + "b";', 'const n = "a" + id + "b";', ["a", "b"]],
+    [".mjs", 'const n = ("a") + ("b");', "const n = ('ab');".replace(/'/g, '"'), ["ab"]],
+    [".mjs", "const n = 'a'; // 'b' + 'c'", "const n = 'a'; ", ["a"]],
+    [".mjs", "const n = 'a'; /* 'b' */ const m = 'c';", "const n = 'a';  const m = 'c';", ["a", "c"]],
+    [".mjs", "const r = /'/g; const n = 'a' + 'b';", "const r = /'/g; const n = 'ab';", ["ab"]],
+    [".mjs", "const r = a / b; const n = 'a' + 'b'; const t = 'c' / 2;", "const r = a / b; const n = 'ab'; const t = 'c' / 2;", ["ab", "c"]],
+    [".sh", "rm -rf $'tests\\x54oDelete-*' \"a\"'b'", `rm -rf '${Q}-*' "ab"`, [`${Q}-*`, "ab"]],
+    [".sh", "mkdir /tmp/tests\"To\"'Delete-x' # c", `mkdir "/tmp/testsToDelete-x" `, ["/tmp/testsToDelete-x"]],
+    [".yml", "      - run: echo 'a''b'", "      - run: echo 'ab'", ["ab"]],
+    [".ps1", '$n = ("testsTo", "Delete-agent-1") -join ""', '$n = ("testsToDelete-agent-1")', ["testsToDelete-agent-1"]],
+    [".ps1", "$n = 'a' + \"b\" + 'c'", "$n = 'abc'", ["abc"]],
+    [".ps1", "$n = 'a''b' + 'c'", "$n = 'a''bc'", ["a''bc"]], // a doubled quote is inside the literal
+    [".mjs", "const n = 'tests'.concat('To','Delete-x',);", "const n = 'testsToDelete-x';", ["testsToDelete-x"]], // a trailing comma closes the .concat
+    [".sh", 'echo "a\\"b $x \\$y"', 'echo "a"b $x $y"', ['a"b $x $y']], // \" and \$ inside double quotes are undone
+    [".mjs", "const n = 'CORP\\alice';", "const n = 'CORPalice';", ["CORPalice"]], // \a is a BEL in a shell $'…' and not in JavaScript
+    [".sh", "echo $'a\\ab'", "echo 'a\u0007b'", ["a\u0007b"]],
+    [".mjs", "no quote on this line", "no quote on this line", []],
+    // D2: a call is not a parenthesis; the pieces after a call join each other and nothing the call holds
+    [".mjs", "const a = f('tests') + 'To' + 'Delete-x';", "const a = f('tests') + 'ToDelete-x';", ["tests", "ToDelete-x"]],
+    [".mjs", "const a = f(('tests')) + ('To');", "const a = f(('tests')) + ('To');", ["tests", "To"]],
+    [".mjs", "  return ('tests') + 'To';", "  return ('testsTo');", ["testsTo"]],
+    [".mjs", "const a = (('tests') + 'To') + 'Delete-x';", "const a = (('testsToDelete-x'));", ["testsToDelete-x"]],
+    [".ps1", "$a = (f 'tests') + 'To' + 'Delete-x'", "$a = (f 'tests') + 'ToDelete-x'", ["tests", "ToDelete-x"]],
+    [".ps1", "$n = ('tests'),('To') -join ''", "$n = ('testsTo')", ["testsTo"]],
+    [".ps1", "$n = ('tests','To')-join''", "$n = ('testsTo')", ["testsTo"]],
+    [".ps1", "$n = ('tests',('To')) -join ('')", "$n = ('testsTo')", ["testsTo"]],
+    [".ps1", "$n = (f 'tests', 'To') -join ''", "$n = (f 'tests', 'To') -join ''", ["tests", "To", ""]],
+  ];
+  for (const [extension, line, text, literals] of rows) {
+    const [folded] = readerOf(extension, line);
+    assert.equal(folded.text, text, line);
+    assert.deepEqual(folded.literals, literals, line);
+  }
+  assert.deepEqual([".mjs", ".cjs", ".js", ".ts", ".mts", ".cts", ".tsx", ".jsx"].map(fold.foldKind), Array(8).fill("js"));
+  assert.deepEqual([".sh", ".yml", ".yaml", ".ps1", ".md", ".py", ".bash", ".cmd", ""].map(fold.foldKind), ["sh", "sh", "sh", "ps1", undefined, undefined, undefined, undefined, undefined]);
+  assert.equal(fold.foldFile(['a "testsTo" + "Delete" in a document'], ".md"), null, "a kind that is not listed is not read");
+});
+
+test("F30 D1: the fold file and the shell file use each other only at call time, so either may be imported first (and nothing is read from the other at load)", () => {
+  const url = (name) => pathToFileURL(path.join(root, "tools", "lib", name)).href;
+  for (const [first, second] of [["leftovers-fold.mjs", "leftovers-fold-shell.mjs"], ["leftovers-fold-shell.mjs", "leftovers-fold.mjs"]]) {
+    const code = `await import(${JSON.stringify(url(first))}); await import(${JSON.stringify(url(second))}); const m = await import(${JSON.stringify(url("leftovers-fold.mjs"))});
+      console.log(JSON.stringify([".sh", ".ps1", ".mjs"].map((e) => m.foldFile([e === ".mjs" ? "x = 'a' + 'b';" : "x 'a''b' + 'c'"], e).lines[0].text)));`;
+    const child = spawnSync(process.execPath, ["--input-type=module", "-e", code], { encoding: "utf8", timeout: 30_000 });
+    assert.equal(child.status, 0, `${first} first: ${child.stderr.slice(0, 300)}`);
+    assert.equal(JSON.parse(child.stdout).length, 3);
+  }
+});
+
+test("F30 reader: no marker character is put in the text, so a control byte in a line turns nothing off; a decoded newline never splits a line", () => {
+  const [row] = readerOf(".mjs", `const c = "\u0001\u0002"; const n = 'tests' + 'To' + 'Delete-x';`);
+  assert.equal(row.text, `const c = "\u0001\u0002"; const n = 'testsToDelete-x';`);
+  const [escaped] = readerOf(".mjs", 'const n = "a\\nb" + "\\r";');
+  assert.doesNotMatch(escaped.text, /[\r\n]/, "the folded text is one line");
+  assert.deepEqual(escaped.literals, ["a\nb\r"], "the literal itself is decoded");
+});
+
+test("F30 reader: state crosses lines for a block comment and a template, and for nothing else", () => {
+  const rows = readerOf(".mjs", "const a = 1; /* open", "'testsTo' in the comment", "closed */ const b = 'x' + 'y';", "const t = `x ${ f(", "  'q') } /* still template", "end`; const c = 'p' + 'r';");
+  assert.deepEqual(rows[0], { text: "const a = 1; ", literals: [] });
+  assert.deepEqual(rows[1], { text: "", literals: [] });
+  assert.deepEqual(rows[2], { text: " const b = 'xy';", literals: ["xy"] });
+  assert.equal(rows[3].literals.join("|"), "x ", "the template's body before its hole is a literal portion");
+  assert.equal(rows[3].text, "const t = `x ${ f(", "the hole is code and is kept as written");
+  assert.deepEqual(rows[4], { text: "  'q') } /* still template", literals: [" /* still template"] }, "the hole's tail is code, the template goes on after it");
+  assert.deepEqual(rows[5], { text: "`; const c = 'pr';".replace("`;", "end`;"), literals: ["end", "pr"] });
+});
+
+test("F30 reader: a file that ends inside a block comment or a template, at any depth, is one unreadable finding on the line where the outermost open state opened", () => {
+  const found = scanText("scripts/zz.mjs", "const a = 1;\n/* never closed\nconst b = 2;\n");
+  assert.deepEqual(found.map((entry) => `${entry.line}:${entry.cls}`), ["2:unreadable"]);
+  assert.match(found[0].text, /block comment that opens on line 2/);
+  assert.deepEqual(scanText("scripts/zz.ps1", "<# never closed\n$a = 1\n").map((entry) => `${entry.line}:${entry.cls}`), ["1:unreadable"]);
+  const template = scanText("scripts/zz.mjs", "const a = `never closed\nconst b = 2;\n");
+  assert.deepEqual(template.map((entry) => `${entry.line}:${entry.cls}`), ["1:unreadable"], "a template that never closes is a finding, not a silent clean file");
+  assert.match(template[0].text, /template that opens on line 1/);
+  const rows = [
+    ["a template after clean lines", "const ok = 1;\nconst b = `abc\nmore\nand more\n", "2:unreadable", /template/],
+    ["a hole at the end", "const b = `abc${ f(\nx\n", "1:unreadable", /template/],
+    ["a template nested in a hole", "const ok = 1;\nconst a = `x ${ `y ${ z\n", "2:unreadable", /template/],
+    ["a block comment in a hole: the template is the outermost state", "const ok = 1;\nconst a = `${ /* never closes\nstill inside\n", "2:unreadable", /template that opens on line 2/],
+    ["a template that closes on a line that opens another one: the second is the outermost", "const a = `x\ny` + `z\nw\n", "2:unreadable", /template that opens on line 2/],
+    ["a block comment, then a template that never closes", "/* c */ const t = `a\n", "1:unreadable", /template/],
+    ["a template after a closed template and a closed comment", "const t = `a\nb`; /* c\nd */ const u = `e\n", "3:unreadable", /template that opens on line 3/],
+  ];
+  const wrong = rows.flatMap(([kind, text, expected, pattern]) => {
+    const got = scanText("scripts/zz.mjs", text).filter((entry) => entry.cls === "unreadable");
+    return got.length === 1 && `${got[0].line}:${got[0].cls}` === expected && pattern.test(got[0].text) ? [] : [`${kind}: expected ${expected}, got ${JSON.stringify(got.map((entry) => `${entry.line}:${entry.text}`))}`];
+  });
+  assert.deepEqual(wrong, []);
+  assert.deepEqual(scanText("scripts/zz.mjs", "const a = `${ /* closes */ 1 }`;\n").map((entry) => entry.cls), [], "a block comment in a hole that closes is no finding");
+  assert.deepEqual(scanText("scripts/zz.mjs", "const a = `closed`;\nconst b = `two\nlines`;\n").map((entry) => entry.cls), [], "templates that close are no finding");
+});
+
+test("F30 reader: the bare word and the piece rule read literals, and never an operand", () => {
+  const literal = (value, plus = false) => ({ value, plus });
+  const bare = (...values) => fold.bareWordHits(values.map((value) => literal(value)));
+  assert.deepEqual(bare(`${Q}-u1000-coai-`, `${Q}[-_]w42[-_]`, `${Q}-exempt: x`, `.x.${P}-quarantine-1`, `${P.toUpperCase()}_RUN`, `${Q}.owner=u1`, `${Q}-agent-x`, `${Q}-\${owner}-`), { blind: [], legacy: [] },
+    "an owner form, the marker words, an environment name, the label key, a name (legacyNameHits') and a placed owner are no bare word");
+  assert.equal(bare(Q, `${Q}-`, `${P}_`, `x ${Q}-`).legacy.length, 4);
+  assert.deepEqual(bare(`${Q}-*`, `${Q}[-_]`, `${Q}-(x)`, `${Q}-?`, `${Q}\\d`).legacy, [], "a tail that holds [, (, ?, * or \\ is a pattern");
+  assert.equal(bare(`${Q}-*`, `${Q}[-_]`, `${Q}-(x)`, `${Q}-?`, `${Q}\\d`).blind.length, 5);
+  assert.deepEqual(bare(`${Q}-[uw]\\d{1,10}-x`, `${Q}-[uw][0-9]`, `${Q}-[uw][0-9]{1,10}-`, `${Q}-[uw]\\d`), { blind: [], legacy: [] }, "[uw] with a digit form after it is an owner");
+  assert.equal(bare(`${Q}-[uw]`).blind.length, 1, "[uw] with no digit form after it reaches every owner");
+  assert.equal(bare(`${Q}-[uw]x`).blind.length, 1);
+  assert.deepEqual(bare(`a ${Q} entry`, `see ${Q}, then`, `the ${Q}.`, `a ${Q}) rule`), { blind: [], legacy: [] }, "prose: a space before the word, and after it a space or , . : ) then a space or the end");
+  assert.equal(bare(`${Q} entry`).legacy.length, 1, "no space before the word: not prose");
+  assert.deepEqual([bare(`${Q} (x)`).legacy.length, bare(`${Q} (x)`).blind.length], [1, 0], "a ( a space away is not a pattern tail");
+  assert.equal(bare(`a ${Q}-x ${Q}`).legacy.length, 1, "the second occurrence ends the literal");
+  assert.deepEqual(bare(`${Q}d`, `${Q}Count`, `x${Q}`, `${Q}2`), { blind: [], legacy: [] }, "a letter or digit at either side makes it another word");
+  assert.deepEqual(fold.bareWordHits([literal(`${Q}-u`, true)]), { blind: [], legacy: [] }, "the owner letter at the end of a literal that a + continues");
+  assert.equal(fold.bareWordHits([literal(`${Q}-u`, false)]).legacy.length, 1, "the owner letter and nothing after it is a bare `u`: it reaches every owner");
+  assert.equal(fold.bareWordHits([literal(`${Q}-uu`, true)]).legacy.length, 0, "-uu is a narrow second segment, which legacyNameHits judges");
+  assert.equal(bare(`${P.toUpperCase()}_U`, `${P.toUpperCase()}_W`).legacy.length, 2, "the extra for the _U and _W environment names is gone");
+  assert.deepEqual(fold.pieceHits(["restore", "history", "todo/x", "hostStopped", "chatModelEdits", `${Q}-x`].map(literal)), [], "no piece of 6 in a product word; the whole word is judged by bareWordHits");
+  assert.equal(fold.pieceHits(["testsTo"].map(literal)).length, 1);
+  assert.equal(fold.pieceHits(["TESTSTO", "teststo", "TODELETE"].map(literal)).length, 3, "the three forms of the word: camel, lower, upper");
+  assert.equal(fold.pieceHits(["Teststo", "tESTSTO"].map(literal)).length, 0, "any other mix of cases is no form");
+  assert.equal(fold.pieceHits(["xTODELETEx"].map(literal)).length, 0, "a letter at a side");
+  assert.equal(fold.pieceHits(["1TODELETE2", "-testsTo-"].map(literal)).length, 2, "a digit or a dash at a side is not a letter");
+  assert.equal(fold.pieceHits(["sToDel"].map(literal)).length, 1, "6 characters that cross the join");
+  assert.equal(fold.pieceHits(["sToDe"].map(literal)).length, 0, "5 is below the minimum");
+  assert.equal(fold.pieceHits(["Delete", "tests", "testS"].map(literal)).length, 0, "a half that sits wholly inside one word is no crossing piece");
+});
+
+test("F30 reader: decodeCode reads a one-character class and the \\x, \\u escapes of a regex literal", () => {
+  assert.equal(fold.decodeCode("/^tests[T]oDelete[-_]/"), `/^${Q}[-_]/`);
+  assert.equal(fold.decodeCode("/^tests\\x54o\\u0044elete\\u{65}/"), `/^${Q}e/`);
+  assert.equal(fold.decodeCode("/[a-z][0-9][-_][^x]/"), "/[a-z][0-9][-_][^x]/", "a class of more than one character stays");
+  assert.equal(fold.decodeCode("nothing to decode"), "nothing to decode");
+});
+
+// D5 item 4: time and size ---------------------------------------------------------------------------------------------------------
+
+const MiB = 1024 * 1024;
+const repeatTo = (unit, size) => unit.repeat(Math.ceil(size / unit.length)).slice(0, size);
+const stepsOf = (extension, line) => {
+  const meter = { steps: 0 };
+  const result = fold.foldFile([line], extension, { meter });
+  assert.ok(result !== null);
+  return meter.steps;
+};
+
+const HOSTILE = [
+  [".mjs", "an escaped single quote", (size) => repeatTo("\\'", size)],
+  [".mjs", "an escaped double quote", (size) => repeatTo('\\"', size)],
+  [".mjs", "a literal and a comma", (size) => repeatTo("'a',", size)],
+  [".mjs", "spaces after a literal", (size) => `x = 'a'${" ".repeat(size)}`],
+  [".mjs", "a literal, spaces, a literal", (size) => repeatTo(`'a'${" ".repeat(61)}`, size)],
+  [".mjs", "a literal and a plus that continues nothing", (size) => repeatTo("'a' + ", size)],
+  [".mjs", "a backtick and a quote", (size) => repeatTo("`\"", size)],
+  [".mjs", "an open regex class", (size) => repeatTo("= /[ ", size)],
+  [".mjs", "the word, repeated", (size) => repeatTo(`${Q} `, size)],
+  [".mjs", "a plus and parentheses that never close", (size) => repeatTo("'a' + ((", size)],
+  [".mjs", "arrays of parenthesised literals that never close", (size) => repeatTo("[('a'), (", size)],
+  [".mjs", "spaces around .concat and its argument", (size) => repeatTo("'a' . concat ( ('a') ", size)],
+  [".mjs", "a long run of opening parentheses after a bracket", (size) => `x = [${"(".repeat(size)}`],
+  [".mjs", "an array that never closes", (size) => `x = [${repeatTo("'a', ", size)}`],
+  [".mjs", "a concat that never closes", (size) => `x = 'a'.concat(${repeatTo("'a', ", size)}`],
+  [".mjs", "holes that never close", (size) => repeatTo("`${'", size)],
+  [".mjs", "a literal, a plus and a template hole with a regex that never closes, repeated (the lookahead of a join reads the template, and the line's flag must outlive it)", (size) => repeatTo("'a'+`${/[}", size)],
+  [".mjs", "a template of holes that each hold a regex with no closer (the quadratic shape of the review of 16943a7: a flag per hole tried every one)", (size) => `\`${repeatTo("${/[}", size)}`],
+  [".mjs", "holes that each hold a regex with no closer, each in a template of its own", (size) => repeatTo("`${/[}`", size)],
+  [".mjs", "a regex with no closer in code, then holes that hold one each", (size) => `x = /[ ${repeatTo("`${/[}`", size)}`],
+  [".mjs", "a block comment that never closes", (size) => repeatTo("/* ' ", size)],
+  [".sh", "an escaped quote", (size) => repeatTo("\\'", size)],
+  [".sh", "touching pieces", (size) => repeatTo('"a"', size)],
+  [".sh", "spaces after a literal", (size) => `x 'a'${" ".repeat(size)}`],
+  [".sh", "a quote that never closes", (size) => repeatTo("echo '", size)],
+  [".ps1", "a doubled quote", (size) => repeatTo("''", size)],
+  [".ps1", "a list that never closes", (size) => repeatTo("'a',", size)],
+  [".ps1", "a plus chain", (size) => repeatTo("'a' + ", size)],
+  [".ps1", "items in parentheses that never join", (size) => repeatTo("('a'),", size)],
+  [".ps1", "a long run of opens before a literal", (size) => `${"(".repeat(size)}'a'`],
+  [".ps1", "a literal and a long run of closers", (size) => `('a'${")".repeat(size)}-join`],
+  [".mjs", "calls with two opens before a literal, repeated", (size) => repeatTo("f(('a') + ", size)],
+  [".mjs", "a literal and a long run of closers before a plus", (size) => `f('a'${")".repeat(size)} + 'b'`],
+  [".mjs", "a long identifier, a call, a plus", (size) => `${"a".repeat(size)}('a') + 'b'`],
+  [".mjs", "spaced opens and closers around a literal", (size) => `${"( ".repeat(size / 2)}'a'${" )".repeat(size / 2)} + 'b'`],
+];
+
+test("F30 time: the reader's step counter grows linearly at 1, 2, 4 and 8 MB, for every hostile line", () => {
+  assert.equal(typeof fold.foldFile, "function");
+  const wrong = [];
+  for (const [extension, kind, build] of HOSTILE) {
+    // a quadratic line is caught at 128 KiB (a few seconds), not at 8 MB (hours): the small sizes go first and a shape that fails there is not run larger
+    const small = [32, 128].map((kib) => stepsOf(extension, build(kib * 1024)));
+    if (small[1] > 24 * 128 * 1024 || small[1] > 4.5 * small[0]) {
+      wrong.push(`${extension} ${kind}: ${small[0]} steps at 32 KiB, ${small[1]} at 128 KiB`);
+      continue;
+    }
+    const sizes = extension === ".mjs" ? [1, 2, 4, 8] : [1, 2, 4];
+    const steps = sizes.map((mib) => stepsOf(extension, build(mib * MiB)));
+    steps.forEach((count, index) => {
+      if (count > 24 * sizes[index] * MiB) wrong.push(`${extension} ${kind}: ${count} steps at ${sizes[index]} MB`);
+      if (index > 0 && count > 2.3 * steps[index - 1]) wrong.push(`${extension} ${kind}: ${steps[index - 1]} -> ${count} steps, more than double`);
+    });
+  }
+  assert.deepEqual(wrong, []);
+});
+
+// The loops of the other helpers (spaces, closers, the backward scan of groupParens, plusFollows) pass characters the main loop passes again, so a row cannot tell a counted helper from an uncounted one;
+// what a row can see is a failed word, whose scan no later loop repeats. The reader's bound is the table of hostile lines above.
+test("F30 time: the step counter counts a failed word, whose scan no later loop repeats (a counter that sees 7 steps in a 64 KiB line proves nothing)", () => {
+  const shapes = [
+    [".sh", "a single quote that never closes", (size) => `echo '${"a".repeat(size)}`],
+    [".sh", "a double quote that never closes", (size) => `echo "${"a".repeat(size)}`],
+    [".sh", "a $' that never closes", (size) => `echo $'${"a".repeat(size)}`],
+    [".mjs", "spaces after a bracket", (size) => `x = [${" ".repeat(size)}`],
+    [".mjs", "spaces and closers after a literal", (size) => `x = ('a'${" )".repeat(size / 2)}`],
+    [".mjs", "spaces after a dot", (size) => `x = 'a'.${" ".repeat(size)}`],
+    [".ps1", "spaces after a list", (size) => `$x = ('a', 'b'${" ".repeat(size)}`],
+    [".ps1", "spaces after the literal of a plus", (size) => `$x = 'a' +${" ".repeat(size)}`],
+  ];
+  const size = 64 * 1024;
+  const blind = shapes.filter(([extension, , build]) => stepsOf(extension, build(size)) < size / 2).map(([extension, kind]) => `${extension} ${kind}`);
+  assert.deepEqual(blind, [], "shapes whose work is not in the counter");
+});
+
+test("F30 time: one run of 32 MB, of the reader alone", () => {
+  const size = 32 * MiB;
+  const count = stepsOf(".mjs", repeatTo("'a', = /[ \\' ", size));
+  assert.ok(count <= 24 * size, `${count} steps at 32 MB`);
+});
+
+test("F30 time: many lines cost the same per byte as one", () => {
+  const lines = Array.from({ length: 20000 }, (_, index) => `const n${index} = 'a' + 'b'; // 'x'`);
+  const meter = { steps: 0 };
+  const result = fold.foldFile(lines, ".mjs", { meter });
+  assert.equal(result.lines.length, 20000);
+  assert.ok(meter.steps <= 24 * lines.join("\n").length);
+});
+
+const bigLine = (size) => `const a = "${"a".repeat(size - 13)}";`;
+
+test("F30 limit: a folded line over 256 KiB is not read by the folded readings and is ONE unreadable finding with its text", () => {
+  assert.equal(fold.FOLD_LIMIT, 256 * 1024);
+  const text = `${bigLine(300 * 1024)}\n`;
+  const found = scanText("scripts/zz.mjs", `const clean = 1;\n${text}const clean2 = 2;\n`);
+  assert.deepEqual(found.map((entry) => `${entry.line}:${entry.cls}`), ["2:unreadable"]);
+  assert.equal(found[0].text, "line 2 is 300 KiB: the folded reading stops at 256 KiB");
+  assert.equal(found[0].file, "scripts/zz.mjs");
+  const exactly = scanText("scripts/zz.mjs", `${bigLine(256 * 1024)}\n`);
+  assert.deepEqual(exactly, [], "256 KiB exactly is read");
+  const over = scanText("scripts/zz.mjs", `${bigLine(256 * 1024 + 1)}\n`);
+  assert.deepEqual(over.map((entry) => entry.text), ["line 1 is 257 KiB: the folded reading stops at 256 KiB"]);
+});
+
+test("F30 limit: the raw readings stay as they are on a line over the limit; the other lines are still read", () => {
+  const long = `const a = "${"a".repeat(300 * 1024)}"; const n = "${Q}-coai-x-abc123";`;
+  const found = scanText("scripts/zz.mjs", `${long}\nconst m = "tests" + "To" + "Delete-x";\n`);
+  assert.deepEqual(listOf(found, 0), ["1:legacy-name", "1:unreadable", "2:legacy-name"]);
+});
+
+test("F30 limit: a line that is long before folding and short after it (a comment) is read", () => {
+  const found = scanText("scripts/zz.mjs", `const n = "tests" + "To" + "Delete-x"; // ${"c".repeat(400 * 1024)}\n`);
+  assert.deepEqual(found.map((entry) => entry.cls), ["legacy-name"]);
+});
+
+test("F30 limit: any throw in the reader is ONE unreadable finding that names the file, never a crash and never a clean result", () => {
+  const boom = () => {
+    throw new RangeError("boom");
+  };
+  const found = scanText("scripts/zz.mjs", `const n = "${Q}-coai-x-abc123";\nconst m = 1;\n`, [], undefined, undefined, { reader: boom });
+  assert.deepEqual(found.map((entry) => `${entry.file}:${entry.line}:${entry.cls}`).sort(), ["scripts/zz.mjs:1:legacy-name", "scripts/zz.mjs:1:unreadable"], "the raw readings still run; ONE unreadable");
+  assert.match(found.find((entry) => entry.cls === "unreadable").text, /boom/);
+  const clean = scanText("scripts/zz.mjs", "const m = 1;\n", [], undefined, undefined, { reader: boom });
+  assert.deepEqual(clean.map((entry) => entry.cls), ["unreadable"], "a file with nothing else is not clean");
+  assert.equal(scanText("scripts/zz.mjs", "const m = 1;\n", [], undefined, undefined, { reader: () => null }).length, 0, "a reader that does not read the kind adds nothing");
+});
+
+test("F30 limit: the unreadable class names its wider use in its cure, and the guard's header says so", () => {
+  assert.match(CURES.unreadable, /folded reading|folding reader/);
+  assert.match(CURES.unreadable, /ends inside a block comment .*or inside a template.*\\x60/, "the template case and its cure: write the backtick as \\x60, or move the regex");
+  assert.match(fs.readFileSync(path.join(root, "tools", "leftovers-check.mjs"), "utf8"), /256 KiB/);
+});
+
+// F30 review fix 2 — the classifier's cost on a raw line (todo/PLAN_F30_folding_reader.md, Goal: a hostile line never hangs) -----------
+
+/** The matcher test of `looseVerdicts` as it was at the release: a regular expression run on everything before each occurrence of the word, quadratic on a repeated word. The oracle of the differential test. */
+const OLD_MATCHER = /(?:\bgrep\b|\bfindstr\b|-i?match\b|-i?like\b|\.test\(|\.includes\(|\.match\(|\.search\(|\bre\.\w+\(|startswith\(|endswith\(|-iname\b|(?<![-\w])-name\b|-regex\b)[^|;]*$/;
+/** `looseVerdicts` as it was at the release, for a line that holds no deleting word (so only the matcher arms an occurrence). */
+function oldLooseVerdicts(lower) {
+  const verdicts = [];
+  for (const match of lower.matchAll(new RegExp(P, "g"))) {
+    const before = lower.slice(0, match.index);
+    const rest = lower.slice(match.index + match[0].length);
+    if (/[a-z0-9_.]$/.test(before) || rest.startsWith(".owner")) continue;
+    if (OLD_MATCHER.test(before)) verdicts.push(sweeper.verdictAfter(rest));
+  }
+  return verdicts;
+}
+
+const PIECES_OF_LINE = [P, `x${P}`, `${P}.owner`, `${P}x`, `${P}-`, `${P}-u1-`, ".", "grep ", "-name ", "-iname ", "-regex ", ".test(", ".includes(", ".match(", ".search(", "startswith(", "endswith(", "re.f(", "re.x" + P + "(", "findstr ", "-match ", "-imatch ", "-like ", "-ilike ", "-NAME ", "x-name ", "xgrep ", "grep", "|", ";", "(", ")", " ", "'", "a", "_", "*"];
+
+// D5 item 6: a speed fix to a raw reading stays only with a durable differential test against the old code as its oracle, and the reason why the two agree. The reason: no matcher token holds a `|` or a `;`,
+// so for the occurrence at p the old expression (a token, then `[^|;]*` to p) is true exactly when some token ends at or before p with no cut between its end and p. A later token's gap to p lies inside
+// an earlier token's gap, so the last token that ends before p decides, and the last cut before p is the only cut that can matter: the forward pass keeps exactly these two. The test runs the oracle over every
+// line of up to four pieces of twelve and 30000 random lines of up to fourteen pieces, 52621 in all.
+test("F30 classifier: looseVerdicts answers what the regular expression of the release answered, over every line of up to four pieces and 30000 random ones", () => {
+  assert.equal(typeof sweeper.looseVerdicts, "function");
+  const small = [P, `x${P}`, `${P}.owner`, `${P}-`, "grep ", "-name ", ".test(", "re.x" + P + "(", "|", ";", " ", "a"];
+  const lines = [""];
+  let frontier = [""];
+  for (let length = 1; length <= 4; length += 1) {
+    frontier = frontier.flatMap((head) => small.map((piece) => head + piece));
+    lines.push(...frontier);
+  }
+  let seed = 12345;
+  const next = (limit) => (seed = (seed * 1103515245 + 12345) % 2147483648) % limit;
+  for (let count = 0; count < 30000; count += 1) lines.push(Array.from({ length: 1 + next(14) }, () => PIECES_OF_LINE[next(PIECES_OF_LINE.length)]).join(""));
+  const wrong = lines.filter((line) => JSON.stringify(sweeper.looseVerdicts(line.toLowerCase())) !== JSON.stringify(oldLooseVerdicts(line.toLowerCase())));
+  assert.deepEqual(wrong.slice(0, 5), [], `${wrong.length} of ${lines.length} lines answer differently`);
+  assert.equal(lines.length, 52621, "the lines the oracle is compared over: 1 + 12 + 144 + 1728 + 20736 of four pieces, and 30000 random ones");
+});
+
+test("F30 classifier: a token that holds the word arms a later occurrence and not an earlier one; a pipe or a semicolon disarms (the differential rows by hand)", () => {
+  assert.deepEqual(sweeper.looseVerdicts(`re.x${P}( ${P}-`), ["broad"], "the token re.x…( holds the first occurrence, a longer word: it arms the second");
+  assert.deepEqual(sweeper.looseVerdicts(`grep ${P} | ${P}-`), ["broad"], "armed for the first; the pipe disarms the second");
+  assert.deepEqual(sweeper.looseVerdicts(`grep ${P}-a ; ${P}-`), [null], "the semicolon disarms the second");
+  assert.deepEqual(sweeper.looseVerdicts(`${P}-a grep ${P}-b`), [null], "only the second is armed");
+});
+
+test("F30 crash: a file with 300000 findings is read to the end (no call spreads the list of findings, which overflows the stack)", (t) => {
+  const repo = tree(t, { "scripts/many.sh": "t=$(mktemp)\n".repeat(300000) });
+  const found = scanRepository({ repo, rule: RULE }).findings.filter((entry) => entry.file === "scripts/many.sh");
+  assert.equal(found.length, 300000);
+});
+
+test("F30 review: reader details that no mutant-killing row saw (a cut at the next occurrence, the + flag, += and ++, a lone class with a dash, an oversize line, a thrown text)", () => {
+  const tail = fold.bareWordHits([{ value: `${Q}-${Q}*`, plus: false }]);
+  assert.deepEqual([tail.blind.length, tail.legacy.length], [1, 1], "the tail of the first occurrence ends at the second: one is legacy-name, the other a pattern");
+  const plusOf = (line) => fold.foldFile([line], ".mjs").lines[0].literals.map((literal) => literal.plus);
+  assert.deepEqual(plusOf(`const m = ('${Q}-u') + uid;`), [true], "a ) between the literal and the + is skipped");
+  assert.deepEqual(plusOf(`const m = '${Q}-u' ++ uid;`), [false], "++ is no +");
+  assert.deepEqual(plusOf(`const m = '${Q}-u' += uid;`), [false], "+= is no +");
+  assert.deepEqual(fold.foldFile(["let n = 'a' += 'b';"], ".mjs").lines[0].literals.map((literal) => literal.value), ["a", "b"], "+= joins nothing");
+  assert.deepEqual(fold.foldFile(["let n = 'a' ++ 'b';"], ".mjs").lines[0].literals.map((literal) => literal.value), ["a", "b"], "++ joins nothing");
+  assert.deepEqual(fold.foldFile(["x = 'a[-]b' + 'c[^]d';"], ".mjs").lines[0].literals.map((literal) => literal.value), ["a[-]bc[^]d"], "a class with a dash or a caret is no one-character class");
+  const big = fold.foldFile([`const s = 'first'; const a = "${"a".repeat(fold.FOLD_LIMIT)}";`, "const b = 'x';"], ".mjs").lines;
+  assert.deepEqual([big[0].oversize, big[0].text, big[0].code, big[0].literals], [true, "", "", []], "an oversize line keeps nothing");
+  assert.deepEqual([big[1].oversize, big[1].literals.length], [false, 1], "the next line is read");
+  const thrown = scanText("scripts/zz.mjs", "const m = 1;\n", [], undefined, undefined, { reader: () => { throw new Error("bad\u001b[2J\u202etext"); } });
+  assert.doesNotMatch(thrown[0].text, /[\u0000-\u001f\u007f-\u009f]/, "no control character reaches the finding text");
+});
+
+test("F30 review: a package.json script is read by the folded readings too (--profile node; a manifest takes no exemption)", (t) => {
+  const repo = tree(t, { "package.json": JSON.stringify({ scripts: { clean: "rm -rf 'tests''To''Delete-*'", name: "mkdir 'tests''To''Delete-x'" } }, null, 2) });
+  const found = scanRepository({ repo, profile: "node", rule: RULE }).findings.filter((entry) => entry.file === "package.json");
+  assert.deepEqual(found.map((entry) => entry.cls).sort(), ["legacy-name", "owner-blind"]);
 });

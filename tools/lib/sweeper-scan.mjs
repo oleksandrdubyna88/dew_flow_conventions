@@ -56,24 +56,39 @@ const STARTS_WITH_RE = /startswith\(\s*["'`]teststodelete(?=[-_])/g;
 // An UNANCHORED use of the prefix is a sweep too when the line deletes something or the prefix is what a matcher is given:
 // `ls | grep <prefix> | xargs rm -rf`, `n.includes("<prefix>-")`, `re.match(r"<prefix>-", n)`, `$_.Name -match '<prefix>'`.
 const DELETION_RE = /(?:^|[^a-z0-9_-])(?:rm|rmdir|unlink|del|erase)(?=\s|$)|remove-item|docker\s+(?:(?:container|volume|network|image)\s+)?(?:rm|rmi|prune)\b|rmsync|rmtree|xargs|-delete\b|os\.remove|\.unlink\(|\.rmdir\(/;
-const MATCHER_RE = /(?:\bgrep\b|\bfindstr\b|-i?match\b|-i?like\b|\.test\(|\.includes\(|\.match\(|\.search\(|\bre\.\w+\(|startswith\(|endswith\(|-iname\b|(?<![-\w])-name\b|-regex\b)[^|;]*$/;
+// The matcher tokens, found ONCE per line with a global regular expression (F30, review): the test used to run on everything before each occurrence of the prefix, which is quadratic on a repeated word.
+const MATCHER_TOKENS = /\bgrep\b|\bfindstr\b|-i?match\b|-i?like\b|\.test\(|\.includes\(|\.match\(|\.search\(|\bre\.\w+\(|startswith\(|endswith\(|-iname\b|(?<![-\w])-name\b|-regex\b/g;
 const PREFIX_WORD_RE = new RegExp(PREFIX_WORD, "g");
 
-/** The verdicts of the unanchored occurrences of the prefix, when the line deletes or the prefix is a matcher's argument. */
-function looseVerdicts(lower) {
+/**
+ * The verdicts of the unanchored occurrences of the prefix, when the line deletes or the prefix is a matcher's argument. An occurrence is armed by a matcher token that ends before it with no `|` or `;`
+ * between the token and the occurrence. One forward pass: the last token that ends before the occurrence is the only one that can matter (no token holds a `|` or a `;`, so a cut cannot fall inside one),
+ * and the last cut is kept as the pass goes. Same answers as the regular expression it replaces (`[^|;]*$` after the token, run on everything before the occurrence), which a differential test keeps as its oracle.
+ */
+export function looseVerdicts(lower) {
   const verdicts = [];
   const deletes = DELETION_RE.test(lower.replace(/\s#.*$/, "")); // a trailing shell comment deletes nothing
+  const ends = deletes ? [] : Array.from(lower.matchAll(MATCHER_TOKENS), (token) => token.index + token[0].length);
+  let next = 0; // the first token that ends after the current occurrence
+  let scanned = 0; // the text before this position has been searched for cuts
+  let lastCut = -1;
   for (const match of lower.matchAll(PREFIX_WORD_RE)) {
-    const before = lower.slice(0, match.index);
-    const rest = lower.slice(match.index + match[0].length);
-    if (/[a-z0-9_.]$/.test(before) || rest.startsWith(".owner")) continue; // a longer word, or the label key
-    if (deletes || MATCHER_RE.test(before)) verdicts.push(SEPARATOR_RE.test(rest) ? verdictAfter(rest) : "broad");
+    const at = match.index;
+    for (; scanned < at; scanned += 1) {
+      const c = lower.charCodeAt(scanned);
+      if (c === 124 || c === 59) lastCut = scanned;
+    }
+    while (next < ends.length && ends[next] <= at) next += 1;
+    const armed = next > 0 && ends[next - 1] > lastCut;
+    const rest = lower.slice(at + match[0].length);
+    if (/[a-z0-9_.]/.test(lower.charAt(at - 1)) || rest.startsWith(".owner")) continue; // a longer word, or the label key
+    if (deletes || armed) verdicts.push(SEPARATOR_RE.test(rest) ? verdictAfter(rest) : "broad");
   }
   return verdicts;
 }
 
-/** What the text after the prefix says: an owner segment, a narrow literal name, or (anything else) every owner. */
-function verdictAfter(rest) {
+/** What the text after the prefix says (`rest` lower-cased): an owner segment (`'owner-aware'`), a narrow literal name (`null`), or (anything else) every owner (`'broad'`). */
+export function verdictAfter(rest) {
   const separator = SEPARATOR_RE.exec(rest);
   if (separator === null) return "broad";
   const after = rest.slice(separator[0].length);
@@ -98,7 +113,7 @@ function occurrenceVerdicts(lower) {
   for (const match of lower.matchAll(STARTS_WITH_RE)) {
     verdicts.push(verdictAfter(lower.slice(match.index + match[0].length)));
   }
-  verdicts.push(...looseVerdicts(lower));
+  for (const verdict of looseVerdicts(lower)) verdicts.push(verdict); // a spread of a long list overflows the stack
   return verdicts;
 }
 
