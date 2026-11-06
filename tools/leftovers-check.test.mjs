@@ -1169,6 +1169,8 @@ const SPELLINGS = [
   ["a method named of", "scripts/zz.mjs", ["const a = Array.of('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
   ["a method named catch", "scripts/zz.mjs", ["const a = p.catch('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
   ["a method named return", "scripts/zz.mjs", ["const a = it.return('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a method name after spaces and a dot", "scripts/zz.mjs", ["const a = map . delete ('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a spread before a keyword is no member: a group joins", "scripts/zz.mjs", ["const a = [...await ('testsTo') + 'Delete-*'];"], ["1:owner-blind"], []],
   ["an optional call", "scripts/zz.mjs", ["const a = f?.('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
   ["an optional call of a member", "scripts/zz.mjs", ["const a = x.f?.('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
   ["export default is no call: a group joins", "scripts/zz.mjs", ["export default ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
