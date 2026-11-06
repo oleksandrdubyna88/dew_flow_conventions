@@ -1382,16 +1382,30 @@ test("F30 reader: state crosses lines for a block comment and a template, and fo
   assert.deepEqual(rows[5], { text: "`; const c = 'pr';".replace("`;", "end`;"), literals: ["end", "pr"] });
 });
 
-test("F30 reader: a file that ends inside a block comment is one unreadable finding on the line it opens; a template is no such finding", () => {
+test("F30 reader: a file that ends inside a block comment or a template, at any depth, is one unreadable finding on the line where the outermost open state opened", () => {
   const found = scanText("scripts/zz.mjs", "const a = 1;\n/* never closed\nconst b = 2;\n");
   assert.deepEqual(found.map((entry) => `${entry.line}:${entry.cls}`), ["2:unreadable"]);
-  assert.match(found[0].text, /block comment/);
+  assert.match(found[0].text, /block comment that opens on line 2/);
   assert.deepEqual(scanText("scripts/zz.ps1", "<# never closed\n$a = 1\n").map((entry) => `${entry.line}:${entry.cls}`), ["1:unreadable"]);
-  assert.deepEqual(scanText("scripts/zz.mjs", "const a = `never closed\nconst b = 2;\n").map((entry) => entry.cls), [], "D1 names the block comment only: a file that ends inside a template is a stated limit, not a finding");
-  const inHole = scanText("scripts/zz.mjs", "const ok = 1;\nconst a = `${ /* never closes\nstill inside\n");
-  assert.deepEqual(inHole.map((entry) => `${entry.line}:${entry.cls}`), ["2:unreadable"], "a block comment anywhere on the stack: inside a hole too");
-  assert.match(inHole[0].text, /block comment that opens on line 2/);
+  const template = scanText("scripts/zz.mjs", "const a = `never closed\nconst b = 2;\n");
+  assert.deepEqual(template.map((entry) => `${entry.line}:${entry.cls}`), ["1:unreadable"], "a template that never closes is a finding, not a silent clean file");
+  assert.match(template[0].text, /template that opens on line 1/);
+  const rows = [
+    ["a template after clean lines", "const ok = 1;\nconst b = `abc\nmore\nand more\n", "2:unreadable", /template/],
+    ["a hole at the end", "const b = `abc${ f(\nx\n", "1:unreadable", /template/],
+    ["a template nested in a hole", "const ok = 1;\nconst a = `x ${ `y ${ z\n", "2:unreadable", /template/],
+    ["a block comment in a hole: the template is the outermost state", "const ok = 1;\nconst a = `${ /* never closes\nstill inside\n", "2:unreadable", /template that opens on line 2/],
+    ["a template that closes on a line that opens another one: the second is the outermost", "const a = `x\ny` + `z\nw\n", "2:unreadable", /template that opens on line 2/],
+    ["a block comment, then a template that never closes", "/* c */ const t = `a\n", "1:unreadable", /template/],
+    ["a template after a closed template and a closed comment", "const t = `a\nb`; /* c\nd */ const u = `e\n", "3:unreadable", /template that opens on line 3/],
+  ];
+  const wrong = rows.flatMap(([kind, text, expected, pattern]) => {
+    const got = scanText("scripts/zz.mjs", text).filter((entry) => entry.cls === "unreadable");
+    return got.length === 1 && `${got[0].line}:${got[0].cls}` === expected && pattern.test(got[0].text) ? [] : [`${kind}: expected ${expected}, got ${JSON.stringify(got.map((entry) => `${entry.line}:${entry.text}`))}`];
+  });
+  assert.deepEqual(wrong, []);
   assert.deepEqual(scanText("scripts/zz.mjs", "const a = `${ /* closes */ 1 }`;\n").map((entry) => entry.cls), [], "a block comment in a hole that closes is no finding");
+  assert.deepEqual(scanText("scripts/zz.mjs", "const a = `closed`;\nconst b = `two\nlines`;\n").map((entry) => entry.cls), [], "templates that close are no finding");
 });
 
 test("F30 reader: the bare word and the piece rule read literals, and never an operand", () => {
@@ -1460,6 +1474,9 @@ const HOSTILE = [
   [".mjs", "an array that never closes", (size) => `x = [${repeatTo("'a', ", size)}`],
   [".mjs", "a concat that never closes", (size) => `x = 'a'.concat(${repeatTo("'a', ", size)}`],
   [".mjs", "holes that never close", (size) => repeatTo("`${'", size)],
+  [".mjs", "a template of holes that each hold a regex with no closer (the quadratic shape of the review of 16943a7: a flag per hole tried every one)", (size) => `\`${repeatTo("${/[}", size)}`],
+  [".mjs", "holes that each hold a regex with no closer, each in a template of its own", (size) => repeatTo("`${/[}`", size)],
+  [".mjs", "a regex with no closer in code, then holes that hold one each", (size) => `x = /[ ${repeatTo("`${/[}`", size)}`],
   [".mjs", "a block comment that never closes", (size) => repeatTo("/* ' ", size)],
   [".sh", "an escaped quote", (size) => repeatTo("\\'", size)],
   [".sh", "touching pieces", (size) => repeatTo('"a"', size)],
@@ -1482,6 +1499,22 @@ test("F30 time: the reader's step counter grows linearly at 1, 2, 4 and 8 MB, fo
     });
   }
   assert.deepEqual(wrong, []);
+});
+
+test("F30 time: the step counter counts a failed word and the scans of every helper (a counter that sees 7 steps in a 64 KiB line proves nothing)", () => {
+  const shapes = [
+    [".sh", "a single quote that never closes", (size) => `echo '${"a".repeat(size)}`],
+    [".sh", "a double quote that never closes", (size) => `echo "${"a".repeat(size)}`],
+    [".sh", "a $' that never closes", (size) => `echo $'${"a".repeat(size)}`],
+    [".mjs", "spaces after a bracket", (size) => `x = [${" ".repeat(size)}`],
+    [".mjs", "spaces and closers after a literal", (size) => `x = ('a'${" )".repeat(size / 2)}`],
+    [".mjs", "spaces after a dot", (size) => `x = 'a'.${" ".repeat(size)}`],
+    [".ps1", "spaces after a list", (size) => `$x = ('a', 'b'${" ".repeat(size)}`],
+    [".ps1", "spaces after the literal of a plus", (size) => `$x = 'a' +${" ".repeat(size)}`],
+  ];
+  const size = 64 * 1024;
+  const blind = shapes.filter(([extension, , build]) => stepsOf(extension, build(size)) < size / 2).map(([extension, kind]) => `${extension} ${kind}`);
+  assert.deepEqual(blind, [], "shapes whose work is not in the counter");
 });
 
 test("F30 time: one run of 32 MB, of the reader alone", () => {
@@ -1538,6 +1571,7 @@ test("F30 limit: any throw in the reader is ONE unreadable finding that names th
 
 test("F30 limit: the unreadable class names its wider use in its cure, and the guard's header says so", () => {
   assert.match(CURES.unreadable, /folded reading|folding reader/);
+  assert.match(CURES.unreadable, /ends inside a block comment .*or inside a template.*\\x60/, "the template case and its cure: write the backtick as \\x60, or move the regex");
   assert.match(fs.readFileSync(path.join(root, "tools", "leftovers-check.mjs"), "utf8"), /256 KiB/);
 });
 

@@ -166,9 +166,11 @@ const VALUE = 1; // the previous token ends a value: a `/` is a division
 const OPENER = 2; // the previous token starts an expression: a `/` opens a regex
 const EVENT = { EOL: 0, QUOTE: 1, TICK: 2, BRACKET: 3, LINE_COMMENT: 4, BLOCK_COMMENT: 5, LBRACE: 6, RBRACE: 7 };
 
-export const skipSpaces = (line, from) => {
+/** The index of the first non-space at or after `from`. Counts the characters it passes (every helper does, so a test sees all the work of a line). */
+export const skipSpaces = (line, from, ctx) => {
   let j = from;
   while (j < line.length && isSpace(line.charCodeAt(j))) j += 1;
+  ctx.steps += j - from;
   return j;
 };
 
@@ -213,9 +215,9 @@ function regexEnd(line, from, ctx) {
 }
 
 /** Whether a literal (a quote or a backtick), maybe in parentheses, starts at `from` after spaces. */
-function operandFollows(line, from) {
-  let j = skipSpaces(line, from);
-  while (line.charCodeAt(j) === 40) j = skipSpaces(line, j + 1);
+function operandFollows(line, from, ctx) {
+  let j = skipSpaces(line, from, ctx);
+  while (line.charCodeAt(j) === 40) j = skipSpaces(line, j + 1, ctx);
   return isQuote(line.charCodeAt(j)) || line.charCodeAt(j) === 96;
 }
 
@@ -241,7 +243,7 @@ function nextEvent(line, from, ctx, state) {
       ctx.steps += i - start - 1;
       const length = i - start;
       prev = (length === 4 || length === 6) && KEYWORDS_BEFORE_REGEX.has(line.slice(start, i)) ? OPENER : VALUE;
-    } else if (isQuote(c) || c === 96 || (c === 91 && state.arrays && operandFollows(line, i + 1))) {
+    } else if (isQuote(c) || c === 96 || (c === 91 && state.arrays && operandFollows(line, i + 1, ctx))) {
       state.at = i;
       state.prev = prev;
       return c === 96 ? EVENT.TICK : c === 91 ? EVENT.BRACKET : EVENT.QUOTE;
@@ -252,10 +254,10 @@ function nextEvent(line, from, ctx, state) {
         state.prev = prev;
         return d === SLASH ? EVENT.LINE_COMMENT : EVENT.BLOCK_COMMENT;
       }
-      if (!state.noRegex && (state.start || prev === OPENER)) {
+      if (!ctx.noRegex && (state.start || prev === OPENER)) {
         const end = regexEnd(line, i + 1, ctx);
         if (end < 0) {
-          state.noRegex = true; // no closer on the line: a division, and the line gets no second try
+          ctx.noRegex = true; // no closer on the line: a division, and the line gets no second try, in code or in any hole of it
           prev = OPENER;
           i += 1;
         } else {
@@ -286,7 +288,7 @@ function nextEvent(line, from, ctx, state) {
 
 // a template under construction: its decoded value, where its source starts on this line, and where its outermost `${` opened (-1 when it opened on an earlier line)
 const newTemplate = (rawStart, opened) => ({ value: "", rawStart, opened, holeStart: -1 });
-const newHoleState = () => ({ prev: OPENER, noRegex: false, hole: true, arrays: false, start: true, at: 0 });
+const newHoleState = () => ({ prev: OPENER, hole: true, arrays: false, start: true, at: 0 });
 
 /** A literal that opens at `at` and closes on this line: `{ end, value }`, or null. Used for the operands of a join. */
 function readLiteral(line, at, ctx) {
@@ -296,7 +298,7 @@ function readLiteral(line, at, ctx) {
     return end < 0 ? null : { end, value: decodeJs(line.slice(at + 1, end - 1)), quote: line[at] };
   }
   if (c === 96) {
-    const inner = { stack: [T], ts: newTemplate(at, true), commentLine: 0 };
+    const inner = { stack: [T], ts: newTemplate(at, true) };
     const end = lexTemplate(line, at + 1, inner, new Out(true), ctx);
     return inner.stack.length === 0 ? { end, value: inner.ts.value, quote: "`" } : null;
   }
@@ -305,26 +307,27 @@ function readLiteral(line, at, ctx) {
 
 
 /** After a literal that ends at `end`: whether a `+` follows (a `)` and spaces may come first). */
-export function plusFollows(line, end) {
+export function plusFollows(line, end, ctx) {
   let j = end;
   while (j < line.length && (isSpace(line.charCodeAt(j)) || line.charCodeAt(j) === 41)) j += 1;
+  ctx.steps += j - end;
   return line.charCodeAt(j) === 43 && line.charCodeAt(j + 1) !== 43 && line.charCodeAt(j + 1) !== 61;
 }
 
 /** A literal with any number of parentheses around it, spaces allowed: `{ end, value, quote }`, or null. `read` is the language's `readLiteral`. */
 export function readOperand(line, at, ctx, read = readLiteral) {
-  let j = skipSpaces(line, at);
+  let j = skipSpaces(line, at, ctx);
   let open = 0;
   while (line.charCodeAt(j) === 40) {
     open += 1;
-    j = skipSpaces(line, j + 1);
+    j = skipSpaces(line, j + 1, ctx);
   }
   ctx.steps += j - at;
   const literal = read(line, j, ctx);
   if (literal === null) return null;
   let end = literal.end;
   for (let t = 0; t < open; t += 1) {
-    const m = skipSpaces(line, end);
+    const m = skipSpaces(line, end, ctx);
     if (line.charCodeAt(m) !== 41) return null;
     end = m + 1;
   }
@@ -332,11 +335,11 @@ export function readOperand(line, at, ctx, read = readLiteral) {
 }
 
 /** The position of the `(` of `. name (` that starts at `at` (the dot), or -1: spaces are allowed around the dot and before the parenthesis. */
-function methodOpen(line, at, name) {
+function methodOpen(line, at, name, ctx) {
   if (line.charCodeAt(at) !== 46) return -1;
-  const k = skipSpaces(line, at + 1);
+  const k = skipSpaces(line, at + 1, ctx);
   if (!line.startsWith(name, k)) return -1;
-  const open = skipSpaces(line, k + name.length);
+  const open = skipSpaces(line, k + name.length, ctx);
   return line.charCodeAt(open) === 40 ? open : -1;
 }
 
@@ -344,7 +347,7 @@ const isPlus = (line, j) => line.charCodeAt(j) === 43 && line.charCodeAt(j + 1) 
 
 /** The literal arguments of a `.concat(` whose `(` is just before `from`: `{ value, end, closed, count }`; `end` is after the `)` when closed, else at the first argument that is no literal. */
 function concatArguments(line, from, ctx) {
-  let j = skipSpaces(line, from);
+  let j = skipSpaces(line, from, ctx);
   let value = "";
   let count = 0;
   for (;;) {
@@ -352,9 +355,9 @@ function concatArguments(line, from, ctx) {
     if (lit === null) return { value, end: j, closed: false, count };
     count += 1;
     value += lit.value;
-    j = skipSpaces(line, lit.end);
+    j = skipSpaces(line, lit.end, ctx);
     if (line.charCodeAt(j) === 44) {
-      j = skipSpaces(line, j + 1);
+      j = skipSpaces(line, j + 1, ctx);
       if (line.charCodeAt(j) === 41) return { value, end: j + 1, closed: true, count };
     } else return line.charCodeAt(j) === 41 ? { value, end: j + 1, closed: true, count } : { value, end: lit.end, closed: false, count };
   }
@@ -372,11 +375,11 @@ export function chain(line, end, value, ctx, js, read = readLiteral) {
   let closers = 0;
   let carry = "";
   for (;;) {
-    let j = skipSpaces(line, e);
+    let j = skipSpaces(line, e, ctx);
     let c = 0;
     while (j < n && line.charCodeAt(j) === 41) {
       c += 1;
-      j = skipSpaces(line, j + 1);
+      j = skipSpaces(line, j + 1, ctx);
     }
     ctx.steps += j - e + 1;
     if (isPlus(line, j)) {
@@ -385,8 +388,8 @@ export function chain(line, end, value, ctx, js, read = readLiteral) {
       joined += operand.value;
       closers += c;
       e = operand.end;
-    } else if (js && methodOpen(line, j, "concat") >= 0) {
-      const args = concatArguments(line, methodOpen(line, j, "concat") + 1, ctx);
+    } else if (js && methodOpen(line, j, "concat", ctx) >= 0) {
+      const args = concatArguments(line, methodOpen(line, j, "concat", ctx) + 1, ctx);
       if (args.count === 0) break;
       joined += args.value;
       closers += c;
@@ -402,7 +405,7 @@ export function chain(line, end, value, ctx, js, read = readLiteral) {
 
 /** `['a', 'b'].join('-')` that opens at `at` (spaces around its operators, a literal in parentheses anywhere a literal stands): `{ end, value, quote }`, or null. */
 function tryJoinArray(line, at, ctx) {
-  let j = skipSpaces(line, at + 1);
+  let j = skipSpaces(line, at + 1, ctx);
   const items = [];
   let quote;
   for (;;) {
@@ -410,18 +413,18 @@ function tryJoinArray(line, at, ctx) {
     if (lit === null) return null;
     quote ??= lit.quote;
     items.push(lit.value);
-    j = skipSpaces(line, lit.end);
+    j = skipSpaces(line, lit.end, ctx);
     if (line.charCodeAt(j) === 44) {
-      j = skipSpaces(line, j + 1);
+      j = skipSpaces(line, j + 1, ctx);
       if (line.charCodeAt(j) === 93) break;
     } else if (line.charCodeAt(j) === 93) break;
     else return null;
   }
-  const open = methodOpen(line, skipSpaces(line, j + 1), "join");
+  const open = methodOpen(line, skipSpaces(line, j + 1, ctx), "join", ctx);
   if (open < 0) return null;
   const separator = readOperand(line, open + 1, ctx);
   if (separator === null) return null;
-  j = skipSpaces(line, separator.end);
+  j = skipSpaces(line, separator.end, ctx);
   if (line.charCodeAt(j) !== 41) return null;
   ctx.steps += j - at;
   return { end: j + 1, value: items.join(separator.value), quote };
@@ -516,7 +519,6 @@ function lexTemplate(line, from, st, out, ctx) {
         ctx.steps += (close < 0 ? n : close + 2) - at;
         if (close < 0) {
           stack.push(C);
-          st.commentLine = st.line;
           i = n;
         } else i = close + 2;
       }
@@ -537,10 +539,10 @@ function lexTemplate(line, from, st, out, ctx) {
 }
 
 function scanJsLine(line, number, st, out, ctx) {
-  st.line = number;
+  ctx.noRegex = false; // one flag for the line, shared by its code and every hole of it (D1): a regex that fails to close is tried once
   const n = line.length;
   const stack = st.stack;
-  const state = { prev: 0, noRegex: false, hole: false, arrays: true, start: true, at: 0 };
+  const state = { prev: 0, hole: false, arrays: true, start: true, at: 0 };
   let i = 0;
   let runStart = 0;
   if (stack.length > 0) {
@@ -576,7 +578,7 @@ function scanJsLine(line, number, st, out, ctx) {
       ctx.steps += (close < 0 ? n : close + 2) - at;
       if (close < 0) {
         stack.push(C);
-        st.commentLine = number;
+        st.openLine = number; // the outermost open state: the stack was empty here
         return;
       }
       i = runStart = close + 2;
@@ -604,6 +606,7 @@ function scanJsLine(line, number, st, out, ctx) {
       out.code(line.slice(runStart, at));
       runStart = at;
       st.ts = newTemplate(at, true);
+      st.openLine = number; // the outermost open state: the stack was empty here
       stack.push(T);
       const end = lexTemplate(line, at + 1, st, out, ctx);
       if (stack.length > 0) return; // it goes on to the next line, and has said what it holds on this one
@@ -611,7 +614,7 @@ function scanJsLine(line, number, st, out, ctx) {
     }
     const joined = chain(line, literal.end, literal.value, ctx, true);
     out.code(line.slice(runStart, at));
-    out.lit(quote, joined.value, line.slice(at, joined.end), plusFollows(line, joined.end));
+    out.lit(quote, joined.value, line.slice(at, joined.end), plusFollows(line, joined.end, ctx));
     out.textOnly(")".repeat(joined.closers));
     out.textOnly(joined.carry);
     i = runStart = joined.end;
@@ -620,16 +623,21 @@ function scanJsLine(line, number, st, out, ctx) {
   }
 }
 
-export const openComment = (line) => [{ line, text: `the file ends inside a block comment that opens on line ${line}: the folded reading cannot tell what is code after it` }];
+/** The one `unreadable` finding of a file that ends inside `what` ("a block comment", "a template"), on the line where the outermost open state opened (D1). */
+export const openState = (what, line) => [{ line, text: `the file ends inside ${what} that opens on line ${line}: the folded reading cannot tell what is code after it` }];
+
+/** The state a line starts in: `code`, inside a `template` (at any depth) or inside a `comment` (a block comment). The guard's comment gate reads it (D4). */
+const startState = (stack) => (stack.length === 0 ? "code" : stack[0] === C ? "comment" : "template");
 
 function foldJs(lines, ctx) {
-  const st = { stack: [], ts: null, commentLine: 0 };
+  const st = { stack: [], ts: null, openLine: 0 };
   const result = lines.map((line, index) => {
     const out = new Out(true);
+    const start = startState(st.stack);
     scanJsLine(line, index + 1, st, out, ctx);
-    return out.finish();
+    return { ...out.finish(), start };
   });
-  return { lines: result, unreadable: st.stack.includes(C) ? openComment(st.commentLine) : [] };
+  return { lines: result, unreadable: st.stack.length === 0 ? [] : openState(st.stack[0] === C ? "a block comment" : "a template", st.openLine) };
 }
 
 

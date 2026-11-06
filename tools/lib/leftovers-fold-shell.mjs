@@ -3,7 +3,7 @@
 // The fold file imports `foldSh` and `foldPs`; this file imports the shared operand and output helpers from the fold file. Each side uses the other only at call time, so the import cycle is safe
 // (the two scanners are function declarations, which exist before either module runs).
 
-import { BACKSLASH, C, Out, chain, decodeAnsi, isQuote, isSpace, openComment, plusFollows, skipSpaces } from "./leftovers-fold.mjs";
+import { BACKSLASH, C, Out, chain, decodeAnsi, isQuote, isSpace, openState, plusFollows, skipSpaces } from "./leftovers-fold.mjs";
 
 /** A PowerShell literal that opens at `at` and closes on this line: `{ end, value }` (the body as written: no decoding), or null. */
 function readPsLiteral(line, at, ctx) {
@@ -56,7 +56,10 @@ function readShWord(line, at, ctx) {
     } else if (c === 39) {
       flush(j);
       const close = line.indexOf("'", j + 1);
-      if (close < 0) return undefined;
+      if (close < 0) {
+        ctx.steps += n - at; // a failed word has cost the scan to the line's end
+        return undefined;
+      }
       ctx.steps += close - j;
       if (quote === "") quote = "'";
       value += line.slice(j + 1, close);
@@ -74,8 +77,11 @@ function readShWord(line, at, ctx) {
           from = k;
         } else k += line.charCodeAt(k) === BACKSLASH ? 2 : 1;
       }
-      ctx.steps += Math.min(k, n) - j;
-      if (k >= n) return undefined;
+      if (k >= n) {
+        ctx.steps += n - at;
+        return undefined;
+      }
+      ctx.steps += k - j;
       if (quote === "") quote = '"';
       value += piece + line.slice(from, k);
       j = k + 1;
@@ -84,8 +90,11 @@ function readShWord(line, at, ctx) {
       flush(j);
       let k = j + 2;
       while (k < n && line.charCodeAt(k) !== 39) k += line.charCodeAt(k) === BACKSLASH ? 2 : 1;
-      ctx.steps += Math.min(k, n) - j;
-      if (k >= n) return undefined;
+      if (k >= n) {
+        ctx.steps += n - at;
+        return undefined;
+      }
+      ctx.steps += k - j;
       if (quote === "") quote = "'";
       value += decodeAnsi(line.slice(j + 2, k));
       j = k + 1;
@@ -140,7 +149,7 @@ export function foldSh(lines, ctx) {
   const result = lines.map((line) => {
     const out = new Out(false);
     scanShLine(line, out, ctx);
-    return out.finish();
+    return { ...out.finish(), start: "code" };
   });
   return { lines: result, unreadable: [] };
 }
@@ -150,22 +159,22 @@ export function foldSh(lines, ctx) {
 /** `"a", "b" -join ""` that starts with the literal `first` (the list may sit in parentheses): `{ end, value, close }`, or `{ fail }` with the index its reading reached. */
 function tryPsJoin(line, first, ctx) {
   const items = [first.value];
-  let j = skipSpaces(line, first.end);
+  let j = skipSpaces(line, first.end, ctx);
   while (line.charCodeAt(j) === 44) {
-    j = skipSpaces(line, j + 1);
+    j = skipSpaces(line, j + 1, ctx);
     const lit = readPsLiteral(line, j, ctx);
     if (lit === null) return { fail: j };
     items.push(lit.value);
-    j = skipSpaces(line, lit.end);
+    j = skipSpaces(line, lit.end, ctx);
   }
   const listEnd = j;
   let close = false;
   if (line.charCodeAt(j) === 41) {
     close = true;
-    j = skipSpaces(line, j + 1);
+    j = skipSpaces(line, j + 1, ctx);
   }
   if (line.slice(j, j + 5).toLowerCase() !== "-join" || !isSpace(line.charCodeAt(j + 5))) return { fail: listEnd };
-  const separator = readPsLiteral(line, skipSpaces(line, j + 5), ctx);
+  const separator = readPsLiteral(line, skipSpaces(line, j + 5, ctx), ctx);
   if (separator === null) return { fail: listEnd };
   return { end: separator.end, value: items.join(separator.value), close };
 }
@@ -220,7 +229,7 @@ function scanPsLine(line, number, st, out, ctx) {
       }
       const next = chain(line, end, value, ctx, false, readPsLiteral);
       out.code(line.slice(runStart, i));
-      out.lit(line[i], next.value, line.slice(i, next.end), plusFollows(line, next.end));
+      out.lit(line[i], next.value, line.slice(i, next.end), plusFollows(line, next.end, ctx));
       out.textOnly(tail + ")".repeat(next.closers));
       i = runStart = next.end;
       boundary = false;
@@ -236,8 +245,9 @@ export function foldPs(lines, ctx) {
   const st = { stack: [], commentLine: 0 };
   const result = lines.map((line, index) => {
     const out = new Out(false);
+    const start = st.stack.length > 0 ? "comment" : "code";
     scanPsLine(line, index + 1, st, out, ctx);
-    return out.finish();
+    return { ...out.finish(), start };
   });
-  return { lines: result, unreadable: st.stack.length > 0 ? openComment(st.commentLine) : [] };
+  return { lines: result, unreadable: st.stack.length > 0 ? openState("a block comment", st.commentLine) : [] };
 }
