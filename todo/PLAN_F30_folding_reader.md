@@ -164,12 +164,12 @@ This measure reads literals by a rough regular expression. It is evidence for th
 
 ## Definition of Done
 
-- [ ] D5's checks RED on the old guard and GREEN on the new one, with the mutants recorded, including items 5 and 6.
+- [x] D5's checks RED on the old guard and GREEN on the new one, with the mutants recorded, including items 5 and 6.
 - [ ] Every test of this repository green; `plan-lifecycle` clean.
 - [ ] The real-tree record on the PR: nine consumers, default branches, each new finding listed and read, each lost finding explained, CI activation stated.
-- [ ] The guard's header and `research/` say what the guard reads and what it does not, and name D2's table; `common/test-leftovers-detail.md` points at the header.
+- [x] The guard's header and `research/` say what the guard reads and what it does not, and name D2's table; `common/test-leftovers-detail.md` points at the header.
 - [ ] No file over 800 lines; no text or test title says a raw reading is linear.
-- [ ] F30's entry says what shipped, with the piece rule and the class, for the template's owner; D8's row is in the follow-ups plan.
+- [x] F30's entry says what shipped, with the piece rule and the class, for the template's owner; D8's row is in the follow-ups plan.
 - [ ] The real-tree comparison re-run immediately before the release, with its commits recorded.
 - [ ] One release; the consumers' fixes merged first; the pin bumps, each alone; each consumer that declared "zero whole literals, F30 open" runs the guard again at the new pin and records the result.
 

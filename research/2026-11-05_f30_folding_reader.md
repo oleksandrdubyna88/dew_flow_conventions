@@ -511,3 +511,85 @@ Section 8.3 reported `composeEnvHits` as super-linear and left it. The plan's Go
 - After: the shape with `$(` at 256 KiB, 512 KiB, 1 MiB and 2 MiB took 112, 255, 459 and 945 ms (at 256 KiB it took 2861 ms before `closersOf`). `docker run --name x`, `docker run $(`, `docker compose -p x`, `-p $(` and `docker run -v ${`, each at 1 MiB: 208 to 264 ms.
 
 **The 65th assignment on a line is a difference from the release**: such a line gets a new hit or loses a later value's hit, on the line's existing class. No real tree holds it; the record of the real trees is the proof, and it is re-run before the release.
+
+## 9. Epoch 3 — the build of the re-review's table (2026-11-06, `feat/f30-folding-reader`)
+
+Append-only. Sections 1 to 8 stand as written; this section says what the build of the epoch 3 table did and what it changes in how they read. The coder was Sonnet 5.5. Epoch 3 used 0 of its accepted changes: no fix below made a sentence of the plan false. One reading is chosen where the plan has two (9.3, relation P).
+
+### 9.1 What the build did, by row of the table
+
+| Row | Commit | What |
+|---|---|---|
+| D1 split | `d5c440c` | moves only: `foldSh` and `foldPs` with their helpers to `tools/lib/leftovers-fold-shell.mjs`; `chain` takes its literal reader as an argument; tests green before and after (106 of 106). The cycle is safe: the two scanners are function declarations and nothing is read at load. |
+| `leftovers-shell.mjs` back | `8ab8dd6` | checked out from `284203b`; `git diff bd795847 -- tools/lib/leftovers-shell.mjs` is empty. The compose time test, the compose cap test, the `closersOf` differential, `COMPOSE_UNITS`, `P_OWNER_FORM` and the import only they used are gone. Section 8.8 stays. |
+| the reader | `c0c9cd1` | one no-regex flag per line (`ctx.noRegex`, reset at each line, shared by the code and every hole); every helper counts (`skipSpaces` takes the context) and a failed `.sh` word counts the line; a file that ends inside a template or a block comment, at any depth, is one `unreadable` finding on the line where the outermost state opened; `CURES.unreadable` names the template case and `\x60`. |
+| a call is not a parenthesis | `08d5084` | `groupParens` counts the `(` right before the literal and takes the outermost off when a `)`, `]` or a non-keyword identifier stands before it (a keyword: `return`, `typeof`, `case`, `await`, and others); `chain` lets a closer between operands cross only these. |
+| `.ps1` joins | `08d5084` | the list reads each item and the separator through `readOperand`, closes only its own groups, and takes `-join` with no space at either side. |
+| comment gate, occurrence rule | `f6a42c1` | the reader answers `start` (`code`, `template`, `comment`) per line; the guard reads the folded lines always; a comment-like line is empty in the folded input unless it is a JavaScript `#` line in code state or a `.ps1` line after `#>` with code; the `changed` shortcut, the `entry.text !== lines[index]` gate and `legacyRead` are gone; `bareWordHits` takes `legacyAt` and drops a pattern tail only where `legacyNameHits` reads that occurrence. |
+| tests the table names | `f6a42c1`, `167ecd7`, `a868c9d`, `2766c04` | the 2 MiB wall-clock test on a raw line removed; the 300000-findings test renamed (`F30 crash:`); `looseVerdicts`, its oracle and its count kept, the count now exact (52,621); D5 item 5's interaction table; item 6's reason as a comment; rows for the mutants that stayed green. |
+| texts | `71fd7b8`, `a3b057a` | see 9.7. |
+
+### 9.2 RED and GREEN, for each fix
+
+RED is the new test against the code before the fix, in a scratch copy of the previous commit; GREEN is the worktree. Every number below was read from a run.
+
+| Fix | RED (before) | GREEN (after) |
+|---|---|---|
+| one flag per line | the shape backtick + `${/[}` repeated: 8 KiB 6,716,621 steps, 16 KiB 26,855,015, 32 KiB 107,397,120, 64 KiB 429,542,607 (four times per doubling; 1 MiB would take about 1e11) | 8 KiB 14,743; 1 MiB 1,887,436; 8 MiB 15,099,492 (about 1.8 per byte) |
+| a failed word counts | `echo '` + 64 KiB of `a` and the same at 128 KiB: 7 steps | 65,544 and 131,080 steps |
+| a template at a file's end | `const b = `never closed` is clean (`[]`) | `["2:unreadable"]` on the line where the template opened; nested, in a hole, after a closed template on the same line: seven rows, each one finding on the outermost line |
+| a call is not a parenthesis | 13 rows of the spellings table wrong: `f('testsTo') + 'Delete-*'`, `x.f(`, `x[0](`, `f(1, `, `f((`, `.concat` answered `owner-blind` (joined) where the answer is `legacy-name`; the `.ps1` forms `('tests','To','Delete-x') -join ('')`, `('tests',('To'),'Delete-x') -join ''`, `…)-join''`, `('tests'),('To'),('Delete-x') -join ''` (two rows) answered `[]` | all rows as the table states; the reader rows (`f('tests') + 'ToDelete-x'`, with the call's `tests` apart) |
+| the comment gate | 19 rows wrong, among them: template text lines `# rm -rf W-*`, `// rm -rf W-*`, `-- drop W-*` drew `owner-blind`; `-- drop W-*` in `.sh` and in a workflow run block drew `owner-blind`; a `-- P=…` line bound a prefix; `  #p = 'W-agent-1'` and `#r = /^W[-_]/` in a class drew nothing without a comment elsewhere (and the finding came back with `const z = 1; // far`) | all as stated; the answer no longer depends on a far line |
+| the occurrence rule | `const a = 'testsTo'; const b = 'W[-_]';` and `'W-old W[-_]'`, both orders, answered one class; with a `legacy-name` exemption they answered `[]` | both classes; the exemption clears the first and leaves `owner-blind`; `'W-u*'` is `legacy-name` alone and its exemption clears it; `rmSync('W-u*')` draws both, as at the release |
+| the interaction table | 135 answers differed in its relations F, P and E (at `08d5084`); W held | all four relations hold over 7 causes in 3 languages and over the spelling rows |
+
+### 9.3 The interaction table (D5 item 5) and the one reading chosen
+
+The table is `F30 interactions (W)`, `(F)`, `(P)`, `(E)` in `tools/leftovers-check.test.mjs`: seven causes (a name, a pattern tail, an owner letter and a star, half of the word, the bare word, an owner-form name, a glob in a removal), each whole and split, in JavaScript, `.sh` and `.ps1`. Relation F also runs over every spelling row of the file (a comment line and a trailing comment elsewhere, the list shifted by one), with one exception named in the test: the raw binding from a comment. Relation E runs over every one-line JavaScript row. All four hold.
+
+**One reading is chosen, and it is stated here and in the test.** D5 item 5 says two occurrences give "the union of each alone, except a line the classifier calls broad, which stays `owner-blind`, and the release's own raw hits". Read to the letter, a *split* name next to a glob in a removal (`'tests' + 'To' + 'Delete-x'; fs.rmSync('tests' + 'To' + 'Delete-*')`) should draw `owner-blind` only, but its whole spelling draws `legacy-name` from the release's raw reading, and the plan also says "split equals whole on a code line" and D4 gives `legacyNameHits` on the folded text no broad exception. The two cannot both hold for that row. The code keeps the second pair of sentences (W true): on a broad line the bare word and the piece read nothing, and a name that `legacyNameHits` reads stays, split or whole. The test's expected answer for a broad pair is `owner-blind` plus the `legacy-name` that the release's raw reading gives the whole spelling. If the plan means the first reading, the row is a ledger question for the plan's owner, and the change is one line (`legacy` dropped in `foldedReadings` where the raw verdict is `broad`).
+
+### 9.4 The mutants
+
+51 hand mutants of the epoch 3 code, each in its own copy of a commit, the whole `tools/leftovers-check.test.mjs` run with `timeout` and a private empty `TMPDIR` (the list is in `mutants.mjs` of the coder's scratch folder; its names are below). First run on `a868c9d`: 41 red, 10 green. Rows were added for three of the green ones (C05, C10, C12) and the three were run again on `2766c04`: red.
+
+- Red by a test: R01 and R03 (flag per hole, flag never set) by timeout of the hostile-line test (240 s), R02 (flag not reset per line), R04 to R07, R09; C01 to C04, C06 to C09, C11 (= **P18**, a closer not required in `readOperand`), C14 to C20; C05, C10 and C12 only after their rows; G01, G02, G04, G05, G07 to G13 (G08 = **P31**, ungated verdicts passed to `foldedReadings`; G13 = **N71**, an allowlisted line read as folded text; G15 = **N78**, manifests folded off); O01, O02, O05, O06, O07.
+- Green, and why no row can see them (7): **R08** `skipSpaces` not counting (the main loop counts the same characters); **C13** `.ps1` `groupParens` called as JavaScript (it would differ only for `cmd ('a') + 'b'`, where PowerShell command mode passes three arguments and the code joins, as the release did; no row pins a doubtful reading); **G03** a `.ps1` comment-like line read in any state (the scanner removes a `#` comment in code state, so its text is empty); **G06** an unread comment-like line keeps its folded text in the input (`classifyLines` binds from no `-- ` or template text line whose folded text differs from the raw one); **G14** = **N70**, the oversize line's raw text goes to the bindings (cost only: the line is not read either way); **O03** and **O04** the owner grammar and the marker words ignored in `legacyReadsOccurrence` (the cases return earlier in `bareWordHits`: `'W-exempt*'`, `'W-quarantine*'`, `'W-u1*'` draw nothing).
+- **P13 and P14** (the compose default not cut, the compose value not restored) target the compose cap, which D8 removed with `leftovers-shell.mjs`. No code, no row.
+
+### 9.5 Step counts (D5 item 4)
+
+Through `foldFile` with a meter; one reader, no clock. Steps at 1, 2, 4 and 8 MB (`.sh` and `.ps1` at 1, 2 and 4); the largest steps per byte is the last column. The doubling never exceeds 2.0 times and the cap is 24 per byte.
+
+| Line | 1 MB | 2 MB | 4 MB | 8 MB | max per byte |
+|---|---|---|---|---|---|
+| a template of `${/[}` holes (the review's shape) | 1,887,436 | 3,774,871 | 7,549,745 | 15,099,492 | 1.80 |
+| holes of `${/[}`, each in a template of its own | 2,246,943 | 4,493,893 | 8,987,791 | 17,975,583 | 2.14 |
+| a regex with no closer in code, then such holes | 2,246,964 | 4,493,914 | 8,987,812 | 17,975,604 | 2.14 |
+| spaces after a literal | 4,194,314 | 8,388,618 | 16,777,226 | 33,554,442 | 4.00 |
+| a literal, spaces, a literal | 5,078,979 | 10,158,019 | 20,316,099 | 40,632,259 | 4.84 |
+| a plus and parentheses that never close | 3,014,650 | 6,029,306 | 12,058,618 | 24,117,242 | 2.87 |
+| spaced opens and closers around a literal | 3,670,028 | 7,340,044 | 14,680,076 | 29,360,140 | 3.50 |
+| a literal and a long run of closers before a plus | 3,145,749 | 6,291,477 | 12,582,933 | 25,165,845 | 3.00 |
+| `.ps1` items in parentheses that never join | 2,446,675 | 4,893,352 | 9,786,707 | | 2.33 |
+| `.sh` a quote that never closes | 1,660,244 | 3,320,488 | 6,640,980 | | 1.58 |
+
+All 34 lines of the test's list are in the run (`stepsall.out` of the coder's scratch folder); the table shows the largest and the new ones. The one 32 MB run (`'a', = /[ \' ` repeated, the reader alone): 72,271,079 steps, 2.15 per byte.
+
+### 9.6 The classifier differential, and the real trees
+
+- **A differential of the whole `classifyLine`, the release `bd795847` against this head, run by the coder:** the judge's script with the same 51 pieces and the same seed, 6,900,453 lines of up to four pieces and 2,500,000 random lines of 5 to 20 pieces: **9,400,453 lines, 0 differ.** The judge's own run, recorded in the plan, found the same count and no difference. Together with the durable oracle over 52,621 lines this is why D8 keeps `looseVerdicts`' forward pass.
+- **Real trees**, the guard at `2766c04` against the release `bd795847`, by class, file and line, each consumer's `--token` and `--identity` the repository column of its row in `common/test-leftovers-detail.md` (vscode_kit and wsl_care hold no row and are run as `conventions`, "the shared-rules repository"; no `token` finding appears): coai `main` 96282699c7 324 and 324, coai E5 `b3bdd472a3` 229 and 229, creds `main` 7d5e1800be 64 and 64, **creds `7e0a048068` 16 and 17**, benchmark `e597c03e2c` 202 and 202, rag_qln `9852c1f091` 13 and 13, sidecar_rust `8efee6f74f` 0 and 0, vscode_kit `f0ec3641e9` 23 and 23, mcp `5ccfcfdeaa` 0 and 0, amd_r9700 `63a1be9a2d` 0 and 0, wsl_care `6e0cbcca44` 24 and 24. **New: exactly one, `legacy-name` at creds `src_vs_code/src/test/leftoversSites.test.ts:91`. Lost: none.** No file of any tree ends inside a template or a comment (no `unreadable` finding). The run of all eleven rows takes 44 s; coai `main` alone takes 1.37 s at the release and 2.01 s here (the folded lines are always read now).
+
+### 9.7 What section 8 now reads differently, and the texts
+
+- **8.8 (the compose reading).** Its code is gone: `composeEnvHits` and `maskExpansions` are the release's, the 65th assignment on a line is no longer a difference, and `closersOf` does not exist. The reason is D8: a fix to a raw reading stays only if it changes no answer, and the compose cap did (a 65th assignment, a cut value). The two time paths it measured (256 KiB 42 s and `docker run $(` 256 KiB 22 s) are F32's rows. What stays of section 8.3 is `looseVerdicts`' forward pass and the removed spreads, which the differential of 9.6 and the durable test of 52,621 lines hold to the release's answers. The sentence of 8.3's brief that "the classifier is linear" is true of that pass only; no text says a raw reading is linear.
+- **8.4 and 8.5.** The step counts of 8.4 are for the reader and stand; the whole-file shape of 8.5 is a limit of the raw reading (D8), not a promise.
+- **Entry 2.1 of the ledger is too wide, as the ledger's own note says.** It says a `RegExp` over a bound name is not followed. The measured reading follows it on a line that assigns nothing and with a template hole, as at the release; D4's corrected paragraph is what holds. Nothing in the code changed for this.
+- **Texts.** The guard's header (D2's table with the call rule, `-join` spacing, the one flag, the comment gate, the occurrence rule, what is not joined, not read and not told from code, a template at a file's end as `unreadable`), the fold header, `README.md`, `research/README.md`, `todo/README.md`, F30's entry (its "Left for after the release" is removed: the split and the template finding are done) and a new row F32 in `todo/PLAN_test_leftovers_merged_core_followups.md` with D8's list and numbers. The rule detail's paragraph is replaced inside the 800 B headroom test of `tools/test-leftovers-rule.test.mjs` (the body is 31,965 of 31,968 allowed): **the brief said 691 B were free; that is the file cap, and the test is stricter, so the replacement may grow by 9 B only.**
+
+### 9.8 Counts, differences from the brief, and what was not run
+
+Lines: `tools/lib/leftovers-fold.mjs` 784, `tools/lib/leftovers-fold-shell.mjs` 265, `tools/leftovers-check.mjs` 789 (all under 800); `tools/leftovers-check.test.mjs` 1,852 (it was over 800 before this branch and is not named by D7).
+
+Differences from the brief: (1) the detail's room is 9 B, not 691 B (9.7). (2) The relation P reading in 9.3. (3) P13 and P14 have no row (9.4). (4) The interaction table is in the existing test file, not a new one, because the guard's own scan excludes only two test files by name. (5) `skipSpaces` and `plusFollows` take the context to count; a signature change of the exported helpers. Not run: the independent review, the coai gate, the PR, a release, and the real-tree comparison "immediately before the release" (the plan asks for it then).
