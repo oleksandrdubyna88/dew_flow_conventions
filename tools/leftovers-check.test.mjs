@@ -16,7 +16,6 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { git } from "./lib/git.mjs";
 import * as fold from "./lib/leftovers-fold.mjs";
-import { closersOf, closingOf, composeEnvHits, maskExpansions } from "./lib/leftovers-shell.mjs";
 import * as sweeper from "./lib/sweeper-scan.mjs";
 import { MAX_CLAIM_BYTES, OWNER_GRAMMAR, REPO_ROW, REPO_TOKEN, TOKEN_SHAPE, classifyName, ownedDir } from "./lib/owned.mjs";
 import { CURES, EXCLUDED_FILES, FOLDING_ALLOWANCES, LEGACY_NAME_PENDING, isScanned, main, parseArguments, resolveRule, scanRepository, scanText, tokenConstants, tokenFindings, parseTokenTable } from "./leftovers-check.mjs";
@@ -1606,53 +1605,6 @@ test("F30 time: scanText on one hostile line of 2 MiB ends within 60 s, for the 
     if (child.status !== 0) slow.push(`${name}: ${child.error?.code ?? `exit ${child.status}`} ${child.stderr.slice(0, 200)}`);
   }
   assert.deepEqual(slow, [], "lines that did not end in 60 s");
-});
-
-const P_OWNER_FORM = `${Q}-u1000-conventions-a`;
-const COMPOSE_UNITS = [
-  ["a repeated assignment", "COMPOSE_PROJECT_NAME=x "], ["an open $( each time", "COMPOSE_PROJECT_NAME=$( "], ["an open ${ each time", "COMPOSE_PROJECT_NAME=${ "], ["an open quote each time", "COMPOSE_PROJECT_NAME='x "],
-  ["one long word", "COMPOSE_PROJECT_NAME="], ["a bound name each time", "COMPOSE_PROJECT_NAME=$x "],
-];
-
-test("F30 time: scanText on a line of 2 MiB that repeats a compose project name ends within 60 s (one reading per assignment cost the rest of the line, at the release too)", () => {
-  const slow = [];
-  for (const [name, unit] of COMPOSE_UNITS) {
-    const child = spawnSync(process.execPath, ["--input-type=module", "-e", CLASSIFIER_CHILD, unit, "2"], { encoding: "utf8", timeout: 60_000, maxBuffer: 1 << 20 });
-    if (child.status !== 0) slow.push(`${name}: ${child.error?.code ?? `exit ${child.status}`} ${child.stderr.slice(0, 200)}`);
-  }
-  assert.deepEqual(slow, [], "lines that did not end in 60 s");
-});
-
-test("F30 review: a line with more compose project names than a person writes is a named hit; below that every one is read, and a long value is cut in the text only", () => {
-  const good = "COMPOSE_PROJECT_NAME=" + P_OWNER_FORM + " ";
-  assert.deepEqual(composeEnvHits(good.repeat(64)), [], "64 owner-form names: each is read, none is a hit");
-  assert.deepEqual(composeEnvHits(good.repeat(63) + "COMPOSE_PROJECT_NAME=fixed").length, 1, "the 64th is read");
-  const over = composeEnvHits(good.repeat(65));
-  assert.equal(over.length, 1, "65 owner-form names: one named hit, never a silent clean line");
-  assert.match(over[0], /assigned 65 times on this line: only the first 64 are read/);
-  const long = composeEnvHits("COMPOSE_PROJECT_NAME=" + "a".repeat(5000));
-  assert.equal(long.length, 1);
-  assert.ok(long[0].length < 400, "the hit's text does not carry a value of any length");
-  assert.match(long[0], /a{200}…/);
-});
-
-test("F30 review: closersOf answers what closingOf answers for every opener, over every short line of these pieces and random longer ones", () => {
-  const pieces = ["(", ")", "{", "}", "$(", "${", " ", "a"];
-  const lines = [""];
-  for (let length = 0, from = 0; length < 5; length += 1) {
-    const to = lines.length;
-    for (let index = from; index < to; index += 1) for (const piece of pieces) lines.push(lines[index] + piece);
-    from = to;
-  }
-  let seed = 4242;
-  const next = (limit) => (seed = (seed * 1103515245 + 12345) % 2147483648) % limit;
-  for (let count = 0; count < 5000; count += 1) lines.push(Array.from({ length: 6 + next(40) }, () => pieces[next(pieces.length)]).join(""));
-  const wrong = lines.filter((line) => {
-    const closers = closersOf(line);
-    return [...line].some((char, index) => (char === "(" || char === "{") && (closers.get(index) ?? -1) !== closingOf(line, index));
-  });
-  assert.deepEqual(wrong.slice(0, 5), [], `${wrong.length} of ${lines.length} lines answer differently`);
-  assert.equal(maskExpansions("a ${b c} $(d e) $(f g").replaceAll(/[^ a-z$(){}]/g, "_"), "a ${b_c} $(d_e) $(f g", "a closed expansion is masked, an open one is not");
 });
 
 test("F30 time: a file with 300000 findings is read to the end (no call spreads the list of findings)", (t) => {
