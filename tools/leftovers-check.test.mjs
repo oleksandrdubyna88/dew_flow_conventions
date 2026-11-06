@@ -1331,6 +1331,126 @@ test("F30 limits: JSX text is not told from code: an apostrophe stops that line'
   assert.deepEqual(listOf(scanText("scripts/zz.mjs", fixtureOf("x.mjs", ["const n = `${`}`}`; const m = 'tests' + 'To' + 'Delete-x';"]))), ["1:legacy-name"], "a nested template that holds a brace keeps the state");
 });
 
+// D5 item 5: the interactions, as an executable table, because each review round found its defects there ------------------------------
+//
+// One rule for every kept row. The answer is compared across (W) the whole against the split spelling, (F) the row alone against the row with a line elsewhere that holds an unrelated
+// comment, (P) one occurrence against two on the line, in both orders, and (E) exempted against not. The expected answers: (W) the same list; (F) the same list shifted, except a raw binding
+// from a comment; (P) the union of each alone, except a line the classifier calls broad, where the bare word and the piece read nothing, so it stays owner-blind with the legacy-name that
+// the release's raw reading gives the whole spelling (a name that legacyNameHits reads stays, split or whole); (E) the list without legacy-name.
+// If a relation does not hold over a row, that row is a report to the plan's owner (a ledger question), never an exception written here.
+
+const val = { js: (n, x) => `const v${n} = ${x};`, sh: (n, x) => `echo ${x}`, ps1: (n, x) => `$v${n} = ${x}` };
+const removal = { js: (n, x) => `fs.rmSync(${x});`, sh: (n, x) => `rm -rf ${x}`, ps1: (n, x) => `Remove-Item (${x})` };
+const everywhere = (text) => ({ js: text, sh: text, ps1: text });
+/** One cause, written whole and split (`'a' + 'b'` in JavaScript and PowerShell, touching pieces in `.sh`), in a statement of each language. `broad`: a classifier reading calls the line broad. */
+const ATOMS = [
+  { name: "a legacy name", cls: ["legacy-name"], stmt: val, whole: everywhere(`'${Q}-x'`), split: { js: "'tests' + 'To' + 'Delete-x'", sh: "'tests''To''Delete-x'", ps1: "'tests' + 'To' + 'Delete-x'" } },
+  { name: "a pattern tail with no owner", cls: ["owner-blind"], stmt: val, whole: everywhere(`'${Q}[-_]'`), split: { js: "'tests' + 'To' + 'Delete[-_]'", sh: "'tests''To''Delete[-_]'", ps1: "'tests' + 'To' + 'Delete[-_]'" } },
+  { name: "an owner letter and a star", cls: ["legacy-name"], stmt: val, whole: everywhere(`'${Q}-u*'`), split: { js: "'tests' + 'To' + 'Delete-u*'", sh: "'tests''To''Delete-u*'", ps1: "'tests' + 'To' + 'Delete-u*'" } },
+  { name: "half of the word", cls: ["legacy-name"], stmt: val, whole: everywhere("'testsTo'"), split: { js: "'tests' + 'To'", sh: "'tests''To'", ps1: "'tests' + 'To'" } },
+  { name: "the bare word", cls: ["legacy-name"], stmt: val, whole: everywhere(`'${Q}'`), split: { js: "'tests' + 'To' + 'Delete'", sh: "'tests''To''Delete'", ps1: "'tests' + 'To' + 'Delete'" } },
+  { name: "an owner-form name", cls: [], stmt: val, whole: everywhere(`'${Q}-u1000-coai-x'`), split: { js: "'tests' + 'To' + 'Delete-u1000-coai-x'", sh: "'tests''To''Delete-u1000-coai-x'", ps1: "'tests' + 'To' + 'Delete-u1000-coai-x'" } },
+  { name: "a glob in a removal", cls: ["owner-blind"], broad: true, stmt: removal, whole: everywhere(`'${Q}-*'`), split: { js: "'tests' + 'To' + 'Delete-*'", sh: "'tests''To''Delete-*'", ps1: "'tests' + 'To' + 'Delete-*'" } },
+];
+const LANGS = {
+  js: { file: "scripts/zz.mjs", joiner: " ", mark: "//", far: ["// far", "const far = 1; // far"] },
+  sh: { file: "scripts/zz.sh", joiner: "; ", mark: "#", far: ["# far", "echo far # far"] },
+  ps1: { file: "scripts/zz.ps1", joiner: "; ", mark: "#", far: ["# far", "$far = 1 # far"] },
+};
+const EXEMPT_LEGACY = `${Q}-exempt: legacy-name — a probe the test removes`;
+const scanLines = (file, lines, allowances = []) => scanText(file, fixtureOf(file, lines), [], undefined, undefined, { foldingAllowances: allowances });
+const answerOf = (file, lines, allowances) => listOf(scanLines(file, lines, allowances));
+const shifted = (list) => list.map((entry) => `${Number(entry.split(":")[0]) + 1}:${entry.split(":")[1]}`);
+const withoutLegacy = (list) => list.filter((entry) => !entry.endsWith(":legacy-name"));
+const FORMS = ["whole", "split"];
+
+test("F30 interactions (W): the whole and the split spelling of one cause answer the same list, the one the table states", () => {
+  const wrong = [];
+  for (const [lang, { file }] of Object.entries(LANGS)) {
+    for (const atom of ATOMS) {
+      const expected = atom.cls.map((cls) => `1:${cls}`);
+      for (const form of FORMS) {
+        const got = answerOf(file, [atom.stmt[lang](1, atom[form][lang])]);
+        if (JSON.stringify(got) !== JSON.stringify(expected)) wrong.push(`${lang} ${atom.name} ${form}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(got)}`);
+      }
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test("F30 interactions (F): a line elsewhere that holds an unrelated comment shifts the list and changes nothing else, for every cause and every spelling row; a raw binding from a comment is the one exception", () => {
+  const wrong = [];
+  for (const [lang, { file, far }] of Object.entries(LANGS)) {
+    for (const atom of ATOMS) {
+      for (const form of FORMS) {
+        const lines = [atom.stmt[lang](1, atom[form][lang])];
+        const alone = answerOf(file, lines);
+        for (const comment of far) {
+          const got = answerOf(file, [comment, ...lines]);
+          if (JSON.stringify(got) !== JSON.stringify(shifted(alone))) wrong.push(`${lang} ${atom.name} ${form} after ${JSON.stringify(comment)}: expected ${JSON.stringify(shifted(alone))}, got ${JSON.stringify(got)}`);
+        }
+      }
+    }
+  }
+  const BINDS_FROM_A_COMMENT = new Set(["a raw binding from a comment stays, as at the release"]);
+  for (const [kind, file, lines, expected] of SPELLINGS) {
+    const lang = file.endsWith(".ps1") ? "ps1" : file.endsWith(".sh") ? "sh" : file.endsWith(".mjs") || file.endsWith(".cjs") || file.endsWith(".ts") || file.endsWith(".js") || file.endsWith(".tsx") ? "js" : undefined;
+    if (lang === undefined || BINDS_FROM_A_COMMENT.has(kind)) continue;
+    const far = LANGS[lang].far;
+    for (const comment of far) {
+      const got = answerOf(file, [comment, ...lines]);
+      if (JSON.stringify(got) !== JSON.stringify(shifted(expected))) wrong.push(`row "${kind}" after ${JSON.stringify(comment)}: expected ${JSON.stringify(shifted(expected))}, got ${JSON.stringify(got)}`);
+    }
+  }
+  assert.deepEqual(wrong, []);
+  assert.deepEqual(answerOf("scripts/zz.mjs", [`// const P = '${Q}-';`, "rmSync(P + x);"]), ["2:owner-blind"], "the exception: the raw binding reading binds from a comment, as at the release");
+  assert.deepEqual(answerOf("scripts/zz.mjs", [`// const P = '${Q}-';`, "rmSync(P + x);"], ["scripts/zz.mjs"]), ["2:owner-blind"], "and the reader being off does not change it");
+});
+
+test("F30 interactions (P): two occurrences on one line give the union of each alone, in both orders; a line the classifier calls broad stays owner-blind with the release's own raw hits", () => {
+  const wrong = [];
+  for (const [lang, { file, joiner }] of Object.entries(LANGS)) {
+    for (const a of ATOMS) {
+      for (const b of ATOMS) {
+        for (const [formA, formB] of [["whole", "whole"], ["split", "split"], ["whole", "split"], ["split", "whole"]]) {
+          const line = `${a.stmt[lang](1, a[formA][lang])}${joiner}${b.stmt[lang](2, b[formB][lang])}`;
+          const got = answerOf(file, [line]);
+          const alone = [answerOf(file, [a.stmt[lang](1, a[formA][lang])]), answerOf(file, [b.stmt[lang](2, b[formB][lang])])];
+          const union = [...new Set([...alone[0], ...alone[1]])].sort();
+          // on a broad line the bare word and the piece read nothing (D4); a name legacyNameHits reads stays, split or whole: it is the release's own raw hit of the whole spelling
+          const wholeLine = `${a.stmt[lang](1, a.whole[lang])}${joiner}${b.stmt[lang](2, b.whole[lang])}`;
+          const raw = answerOf(file, [wholeLine], [file]);
+          const expected = a.broad || b.broad ? [...new Set(["1:owner-blind", ...raw.filter((entry) => entry.endsWith(":legacy-name"))])].sort() : union;
+          if (JSON.stringify(got) !== JSON.stringify(expected)) wrong.push(`${lang} ${a.name} ${formA} + ${b.name} ${formB}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(got)}`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test("F30 interactions (E): a legacy-name exemption on the line gives the list without legacy-name, for one cause and for two, and owner-blind stays", () => {
+  const wrong = [];
+  for (const [lang, { file, joiner, mark }] of Object.entries(LANGS)) {
+    for (const a of ATOMS) {
+      for (const b of ATOMS) {
+        for (const form of FORMS) {
+          const line = `${a.stmt[lang](1, a[form][lang])}${joiner}${b.stmt[lang](2, b[form][lang])}`;
+          const plain = answerOf(file, [line]);
+          const exempted = answerOf(file, [`${line} ${mark} ${EXEMPT_LEGACY}`]);
+          if (JSON.stringify(exempted) !== JSON.stringify(withoutLegacy(plain))) wrong.push(`${lang} ${a.name} + ${b.name} ${form}: expected ${JSON.stringify(withoutLegacy(plain))}, got ${JSON.stringify(exempted)}`);
+        }
+      }
+    }
+  }
+  for (const [kind, file, lines, expected] of SPELLINGS) {
+    if (!/\.(?:mjs|cjs|js|ts|tsx)$/.test(file) || lines.length !== 1 || lines[0].includes("//") || lines[0].includes("/*")) continue;
+    const got = answerOf(file, [`${lines[0]} // ${EXEMPT_LEGACY}`]);
+    if (JSON.stringify(got) !== JSON.stringify(withoutLegacy(expected))) wrong.push(`row "${kind}": expected ${JSON.stringify(withoutLegacy(expected))}, got ${JSON.stringify(got)}`);
+  }
+  assert.deepEqual(wrong, []);
+});
+
 // D6: the allowances are this repository's own, and only when the scan is of this repository ---------------------------------------
 
 test("F30 D6: the folding allowances are exactly the listed files; each exists and still needs its place", () => {
@@ -1668,6 +1788,10 @@ function oldLooseVerdicts(lower) {
 
 const PIECES_OF_LINE = [P, `x${P}`, `${P}.owner`, `${P}x`, `${P}-`, `${P}-u1-`, ".", "grep ", "-name ", "-iname ", "-regex ", ".test(", ".includes(", ".match(", ".search(", "startswith(", "endswith(", "re.f(", "re.x" + P + "(", "findstr ", "-match ", "-imatch ", "-like ", "-ilike ", "-NAME ", "x-name ", "xgrep ", "grep", "|", ";", "(", ")", " ", "'", "a", "_", "*"];
 
+// D5 item 6: a speed fix to a raw reading stays only with a durable differential test against the old code as its oracle, and the reason why the two agree. The reason: no matcher token holds a `|` or a `;`,
+// so for the occurrence at p the old expression (a token, then `[^|;]*` to p) is true exactly when some token ends at or before p with no cut between its end and p. A later token's gap to p lies inside
+// an earlier token's gap, so the last token that ends before p decides, and the last cut before p is the only cut that can matter: the forward pass keeps exactly these two. The test runs the oracle over every
+// line of up to four pieces of twelve and 30000 random lines of up to fourteen pieces, 52621 in all.
 test("F30 classifier: looseVerdicts answers what the regular expression of the release answered, over every line of up to four pieces and 30000 random ones", () => {
   assert.equal(typeof sweeper.looseVerdicts, "function");
   const small = [P, `x${P}`, `${P}.owner`, `${P}-`, "grep ", "-name ", ".test(", "re.x" + P + "(", "|", ";", " ", "a"];
