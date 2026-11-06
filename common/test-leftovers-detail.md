@@ -272,8 +272,7 @@ least ten characters and three words and not a placeholder (*needed*, *see above
 `shared-store` it carries `lock:`. A reason-less, class-less or unknown-class exemption is a finding of class
 `exemption`.
 
-**The Node guard reads the spellings of one line (F30).** Its header lists what it reads, does not join and cannot tell from code. `legacy-name` and `owner-blind` see a line's literals joined and decoded;
-the bare word and the half word are `legacy-name`, a pattern after the bare word `owner-blind`. A file that ends inside a template or comment is `unreadable`. A zero is zero for those spellings only.
+**The Node guard reads one line's spellings (F30).** Its header lists its limits. `legacy-name` and `owner-blind` see a line's literals joined and decoded; the bare word and half word are `legacy-name`, but a pattern after the bare word is `owner-blind` unless `legacyNameHits` reads that occurrence. A template or comment open at a file's end is `unreadable`. A zero is zero for those spellings only.
 
 **The `raw-temp` baseline — a second pass, for that one class only:** one ratcheting file may carry the `raw-temp`
 sites of a runner that makes an owned, claimed run folder (§2). Its full definition is the companion

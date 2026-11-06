@@ -92,6 +92,9 @@
  * `<p>src/*.ts</p>` opens a block comment that hides every line up to the next `*\/`. **A limit, stated plainly: a template that a later backtick closes cannot be told from a real one**, so the joins up to that closer are silently not read (and
  * that text reads as a template's text, so a whole name or a piece there is a finding). A backtick or block comment that never closes by the file's end is one `unreadable` finding, on the line where the outermost one opened; a quote that never
  * closes ends that line's reading and is no finding. Joins are read within one line; only a comment and a template cross lines.
+ * Further stated limits (D9): `f<T>(` and `f!(` read as groups; a division at a position the list names (TypeScript `x!`, a line's start, a property named like a keyword) reads as a regex, so text after it can open a template and end
+ * `unreadable`; so can a string continued onto the next line that holds a backtick; `f /* c *\/ (`, a tagged template call and `function () {}(` read as groups; `.ps1` command mode `Write-Host ('tests') + 'To'…` joins; `(['a','b']).join('')` is not read;
+ * `'TestsTo'` with a capital is no form; `'word-word-u*'` is `legacy-name` alone, because `legacyNameHits` takes the second word as the segment.
  * The reader looks at every character a bounded number of times: a join that fails is lexed again as ordinary code, and a regex that does not close is tried once per line, in code and in every template hole of it. A test counts the steps
  * (a counter, not a clock). **That promise is the reader's alone: the raw readings' time (the classifier, `exemptionProblem` and the docker pass) is not promised** (`todo/PLAN_test_leftovers_merged_core_followups.md`, F32).
  * The readings: the raw lines (comments included) as today; the folded text through `legacyNameHits` (`legacy-name`); the FILE's folded lines through `classifyLines`, so a prefix built in pieces binds as a whole one
@@ -409,7 +412,7 @@ const THROWN_MARKER = /[\u0000-\u001f\u007f-\u009f]/g;
 
 /**
  * The folding reader's answer for one file (`tools/lib/leftovers-fold.mjs`): `{ lines, findings }`, where `lines` is the reader's per-line answer (or undefined when the kind is not read or the file
- * is one of this repository's allowances) and `findings` are the reader's own `unreadable` findings: a line over 256 KiB, a file that ends inside a block comment, and any throw (ONE finding, never a
+ * is one of this repository's allowances) and `findings` are the reader's own `unreadable` findings: a line over 256 KiB, a file that ends inside a block comment or a template, and any throw (ONE finding, never a
  * crash and never a clean result).
  */
 function foldReading(file, lines, allowances, reader) {

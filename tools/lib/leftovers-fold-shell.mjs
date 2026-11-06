@@ -1,5 +1,5 @@
 // The shell, workflow and PowerShell scanners of the folding reader (`tools/lib/leftovers-fold.mjs`, D1 of `todo/PLAN_F30_folding_reader.md`): the same forward-only walk as the JavaScript scanner, for
-// `.sh` (and yaml, which reads as `.sh`) and `.ps1`. Split out of the fold file so each stays under the style maximum of 800 lines; the code is moved whole.
+// `.sh` (and yaml, which reads as `.sh`) and `.ps1`. Split out of the fold file so each stays under the style maximum of 800 lines (the first commit of epoch 3 moved the code; later commits changed it with the rest of the reader).
 // The fold file imports `foldSh` and `foldPs`; this file imports the shared operand and output helpers from the fold file. Each side uses the other only at call time, so the import cycle is safe
 // (the two scanners are function declarations, which exist before either module runs).
 
