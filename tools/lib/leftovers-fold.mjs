@@ -15,6 +15,7 @@
 //
 // The module holds the pure reading: `foldFile`, `decodeCode`, and the two literal-level readings the folded literals feed, `bareWordHits` and `pieceHits`. The classes stay in the guard.
 
+import { foldPs, foldSh } from "./leftovers-fold-shell.mjs";
 import { verdictAfter } from "./sweeper-scan.mjs";
 
 /** A folded line over this many characters does not go to the folded readings (a bound on their work; the plan's D5 keeps it): the guard says so in one `unreadable` finding. */
@@ -34,8 +35,8 @@ export const foldKind = (extension) => KIND_BY_EXTENSION[extension];
 
 const SIMPLE_ESCAPES = Object.freeze({ n: "\n", r: "\r", t: "\t", 0: "\0", b: "\b", f: "\f", v: "\v" }); // JavaScript: `\a` is `a`
 const ANSI_ESCAPES = Object.freeze({ ...SIMPLE_ESCAPES, a: "\u0007" }); // a shell $'…' has the bell too
-const fromCode = (code) => (Number.isInteger(code) && code >= 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : "�");
-const simple = (letter, table = SIMPLE_ESCAPES) => table[letter] ?? letter;
+export const fromCode = (code) => (Number.isInteger(code) && code >= 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : "�");
+export const simple = (letter, table = SIMPLE_ESCAPES) => table[letter] ?? letter;
 
 // one escape of a JavaScript literal, or a one-character class
 const JS_DECODE = /\\(?:u\{([0-9a-fA-F]+)\}|u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2})|([\s\S]))|\[([^\]\\^-])\]/g;
@@ -67,7 +68,7 @@ export function decodeCode(code) {
 }
 
 const ANSI_ESCAPE = /\\u([0-9a-fA-F]{1,4})|\\U([0-9a-fA-F]{1,8})|\\x([0-9a-fA-F]{1,2})|\\([0-7]{1,3})|\\([\s\S])/g;
-const decodeAnsi = (body) => body.replace(ANSI_ESCAPE, (_all, u4, u8, hex, octal, plain) => {
+export const decodeAnsi = (body) => body.replace(ANSI_ESCAPE, (_all, u4, u8, hex, octal, plain) => {
   if (u4 !== undefined) return fromCode(Number.parseInt(u4, 16));
   if (u8 !== undefined) return fromCode(Number.parseInt(u8, 16));
   if (hex !== undefined) return fromCode(Number.parseInt(hex, 16));
@@ -104,7 +105,7 @@ class Chunks {
  * The answer for one line. Text and code stop being kept once either passes FOLD_LIMIT (`oversize`): the reader goes on counting, so a 32 MB line costs no memory, and the guard answers one
  * finding for it instead of running the quadratic classifier.
  */
-class Out {
+export class Out {
   constructor(isJs) {
     this.isJs = isJs;
     this.text = new Chunks();
@@ -151,21 +152,21 @@ class Out {
 
 // --- JavaScript -------------------------------------------------------------------------------------------------------------
 
-const BACKSLASH = 92;
+export const BACKSLASH = 92;
 const SLASH = 47;
 const STAR = 42;
 const T = -1; // a template body on the stack
-const C = -2; // a block comment on the stack; a number >= 0 is a `${` hole and holds its brace depth
-const isSpace = (c) => c === 32 || c === 9 || c === 13 || c === 10 || c === 11 || c === 12 || c === 0xa0 || c === 0xfeff;
+export const C = -2; // a block comment on the stack; a number >= 0 is a `${` hole and holds its brace depth
+export const isSpace = (c) => c === 32 || c === 9 || c === 13 || c === 10 || c === 11 || c === 12 || c === 0xa0 || c === 0xfeff;
 const isIdent = (c) => (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95 || c === 36 || c > 127;
-const isQuote = (c) => c === 39 || c === 34;
+export const isQuote = (c) => c === 39 || c === 34;
 const REGEX_AFTER = new Set([40, 44, 61, 58, 91, 33, 38, 124, 63, 123, 59]); // ( , = : [ ! & | ? { ;
 const KEYWORDS_BEFORE_REGEX = new Set(["return", "typeof", "case"]);
 const VALUE = 1; // the previous token ends a value: a `/` is a division
 const OPENER = 2; // the previous token starts an expression: a `/` opens a regex
 const EVENT = { EOL: 0, QUOTE: 1, TICK: 2, BRACKET: 3, LINE_COMMENT: 4, BLOCK_COMMENT: 5, LBRACE: 6, RBRACE: 7 };
 
-const skipSpaces = (line, from) => {
+export const skipSpaces = (line, from) => {
   let j = from;
   while (j < line.length && isSpace(line.charCodeAt(j))) j += 1;
   return j;
@@ -302,36 +303,16 @@ function readLiteral(line, at, ctx) {
   return null;
 }
 
-/** A PowerShell literal that opens at `at` and closes on this line: `{ end, value }` (the body as written: no decoding), or null. */
-function readPsLiteral(line, at, ctx) {
-  const n = line.length;
-  const quote = line.charCodeAt(at);
-  if (!isQuote(quote)) return null;
-  let j = at + 1;
-  while (j < n) {
-    const c = line.charCodeAt(j);
-    if (quote === 34 && c === 96) j += 2;
-    else if (c === quote) {
-      if (line.charCodeAt(j + 1) === quote) j += 2;
-      else {
-        ctx.steps += j - at;
-        return { end: j + 1, value: line.slice(at + 1, j), quote: line[at] };
-      }
-    } else j += 1;
-  }
-  ctx.steps += n - at;
-  return null;
-}
 
 /** After a literal that ends at `end`: whether a `+` follows (a `)` and spaces may come first). */
-function plusFollows(line, end) {
+export function plusFollows(line, end) {
   let j = end;
   while (j < line.length && (isSpace(line.charCodeAt(j)) || line.charCodeAt(j) === 41)) j += 1;
   return line.charCodeAt(j) === 43 && line.charCodeAt(j + 1) !== 43 && line.charCodeAt(j + 1) !== 61;
 }
 
 /** A literal with any number of parentheses around it, spaces allowed: `{ end, value, quote }`, or null. `read` is the language's `readLiteral`. */
-function readOperand(line, at, ctx, read = readLiteral) {
+export function readOperand(line, at, ctx, read = readLiteral) {
   let j = skipSpaces(line, at);
   let open = 0;
   while (line.charCodeAt(j) === 40) {
@@ -384,7 +365,7 @@ function concatArguments(line, from, ctx) {
  * joins and nothing is tried twice. Returns `{ value, end, closers, carry }`: the closers are the `)` that came right after the left operand (kept, after the joined
  * literal), and `carry` is `.concat(` when a non-literal argument follows the joined ones.
  */
-function chain(line, end, value, ctx, js) {
+export function chain(line, end, value, ctx, js, read = readLiteral) {
   const n = line.length;
   let e = end;
   let joined = value;
@@ -399,7 +380,7 @@ function chain(line, end, value, ctx, js) {
     }
     ctx.steps += j - e + 1;
     if (isPlus(line, j)) {
-      const operand = readOperand(line, j + 1, ctx, js ? readLiteral : readPsLiteral);
+      const operand = readOperand(line, j + 1, ctx, read);
       if (operand === null) break;
       joined += operand.value;
       closers += c;
@@ -639,7 +620,7 @@ function scanJsLine(line, number, st, out, ctx) {
   }
 }
 
-const openComment = (line) => [{ line, text: `the file ends inside a block comment that opens on line ${line}: the folded reading cannot tell what is code after it` }];
+export const openComment = (line) => [{ line, text: `the file ends inside a block comment that opens on line ${line}: the folded reading cannot tell what is code after it` }];
 
 function foldJs(lines, ctx) {
   const st = { stack: [], ts: null, commentLine: 0 };
@@ -651,221 +632,6 @@ function foldJs(lines, ctx) {
   return { lines: result, unreadable: st.stack.includes(C) ? openComment(st.commentLine) : [] };
 }
 
-// --- shell and workflow lines -----------------------------------------------------------------------------------------------
-
-const SH_DELIMITER = new Set([32, 9, 59, 38, 124, 60, 62, 40, 41]); // space, tab, ; & | < > ( )
-
-/**
- * The shell word that starts at `at` (its first character is no delimiter): `{ end, value, quote, prefix }`, where `quote` is "" for a word with no quoted piece, or
- * `undefined` when a quote never closes. The touching pieces, quoted or not, are one value; `prefix` is where the literal starts: an `=` before the first quote ends the code
- * before it (`P='a''b'` keeps `P=` as code).
- */
-function readShWord(line, at, ctx) {
-  const n = line.length;
-  let j = at;
-  let value = "";
-  let quote = "";
-  let prefix = at;
-  let run = at;
-  const flush = (to) => {
-    if (to > run) value += line.slice(run, to);
-  };
-  while (j < n) {
-    const c = line.charCodeAt(j);
-    if (SH_DELIMITER.has(c)) break;
-    if (c === BACKSLASH) {
-      flush(j);
-      value += j + 1 < n ? line[j + 1] : "\\";
-      j += 2;
-      run = j;
-    } else if (c === 39) {
-      flush(j);
-      const close = line.indexOf("'", j + 1);
-      if (close < 0) return undefined;
-      ctx.steps += close - j;
-      if (quote === "") quote = "'";
-      value += line.slice(j + 1, close);
-      j = close + 1;
-      run = j;
-    } else if (c === 34) {
-      flush(j);
-      let k = j + 1;
-      let from = k;
-      let piece = "";
-      while (k < n && line.charCodeAt(k) !== 34) {
-        if (line.charCodeAt(k) === BACKSLASH && k + 1 < n && "$`\"\\".includes(line[k + 1])) {
-          piece += line.slice(from, k) + line[k + 1];
-          k += 2;
-          from = k;
-        } else k += line.charCodeAt(k) === BACKSLASH ? 2 : 1;
-      }
-      ctx.steps += Math.min(k, n) - j;
-      if (k >= n) return undefined;
-      if (quote === "") quote = '"';
-      value += piece + line.slice(from, k);
-      j = k + 1;
-      run = j;
-    } else if (c === 36 && line.charCodeAt(j + 1) === 39) {
-      flush(j);
-      let k = j + 2;
-      while (k < n && line.charCodeAt(k) !== 39) k += line.charCodeAt(k) === BACKSLASH ? 2 : 1;
-      ctx.steps += Math.min(k, n) - j;
-      if (k >= n) return undefined;
-      if (quote === "") quote = "'";
-      value += decodeAnsi(line.slice(j + 2, k));
-      j = k + 1;
-      run = j;
-    } else {
-      if (c === 61 && quote === "") { // an `=` before the first quote ends the code prefix
-        prefix = j + 1;
-        value = "";
-        run = j + 1;
-      }
-      j += 1;
-    }
-  }
-  flush(Math.min(j, n));
-  ctx.steps += Math.min(j, n) - at;
-  return { end: Math.min(j, n), value, quote, prefix };
-}
-
-function scanShLine(line, out, ctx) {
-  const n = line.length;
-  let i = 0;
-  let runStart = 0;
-  let wordStart = true;
-  while (i < n) {
-    const c = line.charCodeAt(i);
-    ctx.steps += 1;
-    if (SH_DELIMITER.has(c)) {
-      i += 1;
-      wordStart = true;
-    } else if (c === 35 && wordStart) { // a comment: the rest of the line
-      out.code(line.slice(runStart, i));
-      return;
-    } else {
-      const word = readShWord(line, i, ctx);
-      if (word === undefined) { // a quote with no closer: the rest of the line is not read
-        out.code(line.slice(runStart));
-        return;
-      }
-      if (word.quote !== "") {
-        out.code(line.slice(runStart, word.prefix));
-        out.lit(word.quote, word.value, line.slice(word.prefix, word.end), false);
-        runStart = word.end;
-      }
-      i = word.end;
-      wordStart = false;
-    }
-  }
-  out.code(line.slice(runStart));
-}
-
-function foldSh(lines, ctx) {
-  const result = lines.map((line) => {
-    const out = new Out(false);
-    scanShLine(line, out, ctx);
-    return out.finish();
-  });
-  return { lines: result, unreadable: [] };
-}
-
-// --- PowerShell -------------------------------------------------------------------------------------------------------------
-
-/** `"a", "b" -join ""` that starts with the literal `first` (the list may sit in parentheses): `{ end, value, close }`, or `{ fail }` with the index its reading reached. */
-function tryPsJoin(line, first, ctx) {
-  const items = [first.value];
-  let j = skipSpaces(line, first.end);
-  while (line.charCodeAt(j) === 44) {
-    j = skipSpaces(line, j + 1);
-    const lit = readPsLiteral(line, j, ctx);
-    if (lit === null) return { fail: j };
-    items.push(lit.value);
-    j = skipSpaces(line, lit.end);
-  }
-  const listEnd = j;
-  let close = false;
-  if (line.charCodeAt(j) === 41) {
-    close = true;
-    j = skipSpaces(line, j + 1);
-  }
-  if (line.slice(j, j + 5).toLowerCase() !== "-join" || !isSpace(line.charCodeAt(j + 5))) return { fail: listEnd };
-  const separator = readPsLiteral(line, skipSpaces(line, j + 5), ctx);
-  if (separator === null) return { fail: listEnd };
-  return { end: separator.end, value: items.join(separator.value), close };
-}
-
-function scanPsLine(line, number, st, out, ctx) {
-  const n = line.length;
-  let i = 0;
-  let runStart = 0;
-  let failedUntil = -1; // a list that failed at its first literal fails from every later literal of it too: no second try
-  if (st.stack.length > 0) {
-    const close = line.indexOf("#>");
-    ctx.steps += close < 0 ? n : close + 2;
-    if (close < 0) return;
-    st.stack.pop();
-    i = runStart = close + 2;
-  }
-  let boundary = true; // `#` starts a comment only at the start of a token
-  while (i < n) {
-    const c = line.charCodeAt(i);
-    ctx.steps += 1;
-    if (c === 60 && line.charCodeAt(i + 1) === 35) { // <#
-      out.code(line.slice(runStart, i));
-      const close = line.indexOf("#>", i + 2);
-      ctx.steps += (close < 0 ? n : close + 2) - i;
-      if (close < 0) {
-        st.stack.push(C);
-        st.commentLine = number;
-        return;
-      }
-      i = runStart = close + 2;
-      boundary = true;
-    } else if (c === 35 && boundary) {
-      out.code(line.slice(runStart, i));
-      return;
-    } else if (isQuote(c)) {
-      const first = readPsLiteral(line, i, ctx);
-      if (first === null) { // a quote with no closer: the rest of the line is not read
-        out.code(line.slice(runStart));
-        return;
-      }
-      let end = first.end;
-      let value = first.value;
-      let tail = "";
-      if (i >= failedUntil) {
-        const list = tryPsJoin(line, first, ctx);
-        if (list.fail !== undefined) failedUntil = list.fail;
-        else {
-          end = list.end;
-          value = list.value;
-          tail = list.close ? ")" : "";
-        }
-      }
-      const next = chain(line, end, value, ctx, false);
-      out.code(line.slice(runStart, i));
-      out.lit(line[i], next.value, line.slice(i, next.end), plusFollows(line, next.end));
-      out.textOnly(tail + ")".repeat(next.closers));
-      i = runStart = next.end;
-      boundary = false;
-    } else {
-      boundary = isSpace(c) || c === 40 || c === 123 || c === 59 || c === 124 || c === 44;
-      i += 1;
-    }
-  }
-  out.code(line.slice(runStart));
-}
-
-function foldPs(lines, ctx) {
-  const st = { stack: [], commentLine: 0 };
-  const result = lines.map((line, index) => {
-    const out = new Out(false);
-    scanPsLine(line, index + 1, st, out, ctx);
-    return out.finish();
-  });
-  return { lines: result, unreadable: st.stack.length > 0 ? openComment(st.commentLine) : [] };
-}
 
 // --- the file ---------------------------------------------------------------------------------------------------------------
 
