@@ -1,6 +1,6 @@
 # PLAN — F30: the shipped Node guard reads a prefix in the spellings it lists
 
-> Status: **epoch 2 open, 2026-11-05: the owner approved the narrowed plan; the rebuild is done on `feat/f30-folding-reader` (RED first, the mutants, the step counts and the real-tree record in `research/2026-11-05_f30_folding_reader.md` § 7), the code gate and the independent Opus review have read it (§ 8 of the record); their fixes are in progress, then the PR and one release.** The item is F30 of `todo/PLAN_test_leftovers_merged_core_followups.md`. Owner: this repository. Deadline 2026-11-19, or before creds' E2.5 merges if that is earlier. Not a prerequisite of coai's E5 producer PR.
+> Status: **epoch 2 stopped for re-review, 2026-11-06: entries 2.2 and 2.3 are the epoch's second and third changes. No new code on this plan until the whole plan is reviewed again and the next epoch opens.** The rebuild and its review fixes are on `feat/f30-folding-reader` at `16943a7`, unmerged. The item is F30 of `todo/PLAN_test_leftovers_merged_core_followups.md`. Owner: this repository. Deadline 2026-11-19, or before creds' E2.5 merges if that is earlier. Not a prerequisite of coai's E5 producer PR.
 
 ## Plan changes
 
@@ -20,10 +20,14 @@ Narrowed: yes — epoch 1 promised that a zero means zero on any one-line spelli
 | three false-finding cures, 2adbe82 | pushed, unmerged | fits | keep the verdictAfter export and the rows; move the three rules into the scanner, tightened to D4 |
 | documents and real-tree record, f5b3b16 | pushed, unmerged | cut | fix forward: correct every text that says owner-blind or any case; keep the research record and add a dated section |
 
-> Epoch 2 · approved 2026-11-05 · by owner · state: open
+> Epoch 2 · approved 2026-11-05 · by owner · state: stopped
 
 - 2.1 · 2026-11-05 · reviewer · contract — D4's statements about what the release's raw and binding readings do were not measured; a RegExp over a bound name and a use on an assigning line are not followed, and the owner letter before a + only shortens a finding's text
   (Found by the coder's measure and the independent Opus review of f9c427a. The plan's text now says what the reading does; the reading is not extended, as "What this does not do" says. This epoch has no change left: the next accepted one is a full stop.)
+- 2.2 · 2026-11-06 · reviewer · dod, contract — the Goal's never a hang and D5's raw readings stay as at the release cannot both hold: ten more raw paths are super-linear, one cubic, and the classifier and compose fixes already changed raw code, the compose cap a raw answer
+  (The independent Opus review of 16943a7. The agent had called the classifier and compose fixes no change; the compose cap's 65th assignment is a different answer, so that was wrong. This second change stopped the plan.)
+- 2.3 · 2026-11-06 · reviewer · contract — D4's row says a bare word's pattern tail stays owner-blind; no finding lost and one class for one cause make 'testsToDelete-u*' legacy-name alone, so the row and three documents do not hold
+  (Same review. An independent cause, so its own entry. The same review found entry 2.1's text too wide: a RegExp over a bound name is followed on a line that assigns nothing and with a template hole, as at the release. D4's corrected paragraph holds as measured.)
 
 ## Goal
 
