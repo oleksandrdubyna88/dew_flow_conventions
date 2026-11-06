@@ -2128,6 +2128,9 @@ runner of a release (`windows-11-arm`) is not measured.
   draft of E6 stories, #103; E6 reads it before it writes its own (item 8.3).
 - **The conventions tree.** F27 merged as #133 (`e45ad11`), by the peer session, outside this plan's epics.
 - **The owner's open item is unchanged:** merge condition (c), the WSL administrator scan.
+  *[2026-11-06: DONE. The owner ran it: none found, 266 files read, nothing unreadable. Recorded in
+  [research/security/machines.md](../research/security/machines.md). Condition (c) is met for the WSL machine, and row (c) of
+  § *Epoch 6* item 3 is read as met. This is the condition coming true as written, not a plan change; epoch 7's count stays 0.]*
 
 **Goal.** The goal of § *Epoch 6* stands word for word, with **one more bounded exception** (the owner approves it with
 item 7): a run on Windows in an ELEVATED process makes folders and claims owned by `Administrators`. What such a run
@@ -2145,6 +2148,7 @@ above. Nothing else of the list changes.
 As § *Epoch 6* item 2, with these states: item 2's release and pin steps are DONE, and the second F24 check's Node half
 is DONE (issuecomment-6656216417), its C# half to be posted from S6's record. (c) stays OPEN. F30 stays not a
 prerequisite, deadline 2026-11-19.
+*[2026-11-06: (c) is DONE, item 1's note and [research/security/machines.md](../research/security/machines.md). The sentence above is the state at approval.]*
 
 ### 3. Merge conditions
 

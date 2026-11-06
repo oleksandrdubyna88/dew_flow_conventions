@@ -1,8 +1,8 @@
 # Barrier records — one section per machine that builds or tests this repository
 
 > Status: **three machines recorded. The Ubuntu dev VM's barrier is OPEN (2026-10-27). The operator's WSL machine's barrier is
-> OPEN for every place a developer account can read (2026-11-04); two root-only places are not read, so its merge condition (c)
-> waits for one administrator scan. The owner's Windows machine was not tested, so its barrier is closed; since 2026-11-04 it does
+> OPEN (2026-11-06): the administrator scan read its two root-only places and found nothing, so its merge condition (c) is met.
+> The owner's Windows machine was not tested, so its barrier is closed; since 2026-11-04 it does
 > not build or test E2's and E5's repositories, which meets condition (c) for it (P1 closed).** The checklist
 > each section answers is the merged-core plan's *Barrier checklist* ([PLAN_test_leftovers_merged_core.md](../PLAN_test_leftovers_merged_core.md)).
 > A machine with no section here is a machine whose barrier is closed. Names of other repositories are not written here.
@@ -117,3 +117,20 @@ places, which were not read. With the 2026-10-31 record, **the barrier is open f
 read.** The checklist says the barrier is never declared open on unread evidence, so **merge condition (c) for this machine is
 not complete**: the open item is the administrator's `sudo node tools/sweeper-scan.mjs --system`. When it exits 0, or each line
 it prints is resolved here, this section records it and condition (c) is met for this machine.
+
+**System scan as root** (2026-11-06, the owner as administrator, from this repository's main checkout at `abac5a8`, on the
+owner's word in the session; the output is quoted as the owner pasted it):
+`sweeper-scan: none found (266 file(s) read) — the barrier is open for this scope`. The tool prints that line only on its
+path to exit 0; the paste does not show the exit code itself. It printed no `unreadable:` line, so the two root-only places
+above were read: `/root/.config/systemd/user` and `/var/spool/cron/crontabs`. Neither holds an owner-blind line.
+
+**What this scan covers, and what it does not.** With no `--root`, the root is the folder it starts in, so it read this
+checkout, root's crontab, and the system scope (`/etc/crontab`, `/etc/cron*`, `/var/spool/cron`, `/etc/systemd/system`, every
+home's systemd user folder). It did not read the other checkouts; the table above and its attestation cover them, for
+2026-11-04. A checkout's lines are not scheduled sweeps; the scheduled places are what this scan closes. The same command as
+the developer account, from the same checkout, on the same day: exit 2, no owner-blind line, and only those two places
+unreadable (EACCES), so the root scan's answer is not a change of scope hiding a finding. The scanner at `abac5a8` is the one
+before F30's forward-only pass, which F30 states gives the same answers.
+
+**Attested** on 2026-11-06 by the operator's session, on the owner's scan above. **The barrier on this machine is open, and
+merge condition (c) is met for it.** The other merge conditions of each PR still apply.
