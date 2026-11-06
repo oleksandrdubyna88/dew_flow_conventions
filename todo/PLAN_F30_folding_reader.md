@@ -54,6 +54,9 @@ Narrowed: yes — epoch 2 promised that any hostile line ends in linear time or 
 
 > Epoch 3 · approved 2026-11-06 · by owner · state: open
 
+- 3.1 · 2026-11-06 · agent · dod — the box no file over 800 lines is wider than D7, which names the three source files; the guard's test file was over before this branch, so the box reads as D7 does
+  (Found by the coder. This epoch has no change left: the next accepted one is a full stop.)
+
 ## Goal
 
 `tools/leftovers-check.mjs` finds a legacy name or an owner-blind pattern when a file builds the prefix on one line by a spelling in the table of D2. **It is a spelling check over text a person wrote in their own repository. It does not defend against a hostile author.** A repository's zero then means zero for the supported spellings, within the limits D2 names, and each document that says so names them. The exemption grammar does not change. The classes keep their names; `legacy-name` now also covers the bare word and the half word (D4).
@@ -168,7 +171,7 @@ This measure reads literals by a rough regular expression. It is evidence for th
 - [ ] Every test of this repository green; `plan-lifecycle` clean.
 - [ ] The real-tree record on the PR: nine consumers, default branches, each new finding listed and read, each lost finding explained, CI activation stated.
 - [x] The guard's header and `research/` say what the guard reads and what it does not, and name D2's table; `common/test-leftovers-detail.md` points at the header.
-- [ ] No file over 800 lines; no text or test title says a raw reading is linear.
+- [x] No file D7 names is over 800 lines; no text or test title says a raw reading is linear.
 - [x] F30's entry says what shipped, with the piece rule and the class, for the template's owner; D8's row is in the follow-ups plan.
 - [ ] The real-tree comparison re-run immediately before the release, with its commits recorded.
 - [ ] One release; the consumers' fixes merged first; the pin bumps, each alone; each consumer that declared "zero whole literals, F30 open" runs the guard again at the new pin and records the result.
