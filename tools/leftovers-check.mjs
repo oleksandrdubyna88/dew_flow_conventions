@@ -18,11 +18,11 @@
  *                 variable the same file assigns a value holding the prefix (a name from another file, the environment or an
  *                 argument is not traced) — the shape of a sweeper that cannot tell one user's leftovers from another's. It takes NO inline exemption: the one pass is
  *                 `tools/fixtures/owner-blind-allowlist.json`, keyed by file, line and the sha256 of the line
- * `legacy-name` and `owner-blind` also read each line through a FOLDING READER (F30, `tools/lib/leftovers-fold.mjs`): the comments removed, the string literals decoded and joined. A SPELLING check, not data flow and not a defence
+ * `legacy-name` and `owner-blind` also read each line through a FOLDING READER (F30, `tools/lib/leftovers-fold.mjs` and `tools/lib/leftovers-fold-shell.mjs`): the comments removed, the string literals decoded and joined. A SPELLING check, not data flow and not a defence
  * against a hostile author; what it reads and does not is the section "The folding reader" below.
  * plus three that are about the guard's own grammar and inputs:
  *   unreadable    under `--profile node`, a `package.json` that is not valid JSON, is not an object, or whose `scripts` is not an object of strings (never skipped in silence); and, for any file, a folded line
- *                 over 256 KiB (`line <n> is <size>: the folded reading stops at 256 KiB`), a file that ends inside a block comment, or a throw of the folding reader
+ *                 over 256 KiB (`line <n> is <size>: the folded reading stops at 256 KiB`), a file that ends inside a block comment or a template at any depth (on the line where the outermost one opened), or a throw of the folding reader
  *   exemption     a `testsToDelete-exempt:` comment that is not well-formed
  *   token         this repository's token is not a row of the rule's `## Tokens` table (§1), or is of the owner grammar, or a copied `owned.mjs` has
  *                 no `owned-token.mjs` beside it (the shipped helper holds no token: each repository writes its OWN `tools/lib/owned-token.mjs` — `REPO_TOKEN`, `REPO_ROW` — and never copies another's)
@@ -80,21 +80,30 @@
  * defence against a hostile author: a name built from a variable, across lines, from the environment or at run time is not seen, and a zero for these two classes is zero for the listed
  * spellings only. What it reads, by file kind (the promise; any document that states the guard's reach names it):
  *   .mjs .cjs .js .ts .tsx .jsx .mts .cts   comments `//` and `/* *\/` (across lines); literals '…', "…", `…` (a `${'a'}` hole that holds only a quoted literal; a regex literal is recognised after `( , = : [ ! & | ? { ;`, after `=>`, `return`, `typeof`
- *                                           or `case` and at a line's start, so its quotes shift nothing; after any other token (`)`, `else`, `+`, `throw`, `await`, `...`) a `/` is a division); joins `+`, `.concat('a', 'b')`, `['a', 'b'].join(<literal>)`, each with spaces around its operators and a literal in parentheses;
+ *                                           or `case` and at a line's start, so its quotes shift nothing; after any other token (`)`, `else`, `+`, `throw`, `await`, `...`) a `/` is a division; with no closer on the line it is a division too, and the line gets no second try, in code or in any hole of it); joins `+`, `.concat('a', 'b')`, `['a', 'b'].join(<literal>)`, each with spaces around its operators and a literal in parentheses;
  *                                           decoded `\uXXXX`, `\u{…}`, `\xXX` and a one-character class `[T]`
  *   .sh .yml .yaml                          comments `#` at the start of a word; literals '…', "…", $'…'; a word's touching pieces, quoted or not (`testsTo"Delete-"`, `'a''b'`); in $'…' `\xXX`, `\uXXXX`, octal
- *   .ps1                                    comments `#` and `<# #>` (across lines); literals '…', "…"; joins `+` and a binary `-join` over a literal array; a literal in parentheses; no decoding
- * Not read: a template nested in a hole (`${`x`}`), a literal in an expression hole of a template (`${f('a')}`), unary `-join`, a comment between operands, `.ps1` here-strings, `.sh` heredocs and a
- * nested `"$(…)"`, an extensionless script, every other kind (.py, .bash, .cmd). JSX text is not told from code: `<p>don't</p>` stops that line's reading, and `<p>src/*.ts</p>` opens a block comment that hides EVERY
- * line up to the next `*\/`. **A limit, stated plainly: a backtick in JSX text, or in a regex at a position the list above does not name, leaves the reader inside a template; the supported spellings later in that file
- * are then silently not read, and that is no finding** (a file that ends inside a block comment is one; a file that ends inside a template is not). Joins are read within one line; only a comment and a template cross lines.
- * Nothing is read twice but the operand of a join that fails (an array or a `+` operand is lexed once to see whether it joins, and again as ordinary code): the bound is linear, and a test counts the steps.
+ *   .ps1                                    comments `#` and `<# #>` (across lines); literals '…', "…"; joins `+` and a binary `-join` over a literal array, with or without spaces at the operator, its items and its separator each in parentheses or not; a literal in parentheses; no decoding
+ * A call is not a parenthesis: `f('a') + 'b'` joins nothing, because the value of `f(…)` is not the literal (a keyword before `(`, such as `return` or `typeof`, is not a call).
+ * Not joined: a template nested in a hole (`${`x`}`), a literal in an expression hole (`${f('a')}`), unary `-join`, a comment between operands. A literal in these forms that holds a whole name or a piece is still a finding, so only a split
+ * into three or more pieces gives no finding. Not read: an unquoted `.sh` or yaml word with no quote in it (`echo testsToDelete`, `name: testsTo`), extensionless scripts, and every other kind (.py, .bash, .cmd).
+ * Not told from code: a line of a `.ps1` here-string or a `.sh` heredoc reads as an ordinary line of its kind (a text line there can draw a finding, and an apostrophe stops that line); in a nested `"$(…)"` the inner quotes close the outer
+ * ones; a regex at a position the list above does not name is not recognised (after `)`, `else`, `+`, `%`, `throw`, `await` or `...` its quote or backtick is read as an opener); JSX text is not told from code: `<p>don't</p>` stops that line's reading and
+ * `<p>src/*.ts</p>` opens a block comment that hides every line up to the next `*\/`. **A limit, stated plainly: a template that a later backtick closes cannot be told from a real one**, so the joins up to that closer are silently not read (and
+ * that text reads as a template's text, so a whole name or a piece there is a finding). A backtick or block comment that never closes by the file's end is one `unreadable` finding, on the line where the outermost one opened; a quote that never
+ * closes ends that line's reading and is no finding. Joins are read within one line; only a comment and a template cross lines.
+ * The reader looks at every character a bounded number of times: a join that fails is lexed again as ordinary code, and a regex that does not close is tried once per line, in code and in every template hole of it. A test counts the steps
+ * (a counter, not a clock). **That promise is the reader's alone: the raw readings' time (the classifier, `exemptionProblem` and the docker pass) is not promised** (`todo/PLAN_test_leftovers_merged_core_followups.md`, F32).
  * The readings: the raw lines (comments included) as today; the folded text through `legacyNameHits` (`legacy-name`); the FILE's folded lines through `classifyLines`, so a prefix built in pieces binds as a whole one
- * does (`owner-blind`, no exemption); the code with escapes and classes decoded, for a regex literal (`owner-blind`); and on the joined literals the BARE WORD (a literal that holds the whole word with a boundary each
- * side and no owner after it) and a PIECE of the word (a crossing piece of 6 or more in the word's own form, no letter at its sides): both are class `legacy-name`, so an inline `legacy-name` exemption clears them, except a bare
- * word whose tail (the run of characters that touch it, up to a space) holds `[`, `(`, `?`, `*` or `\` (a pattern), which stays `owner-blind`. They read only a line that no `owner-blind` reading called broad: a line draws one class for one cause. `FOLDING_ALLOWANCES` lists this repository's own
- * files that spell the word in pieces on purpose and applies ONLY when the scan is of this repository's own root; a consumer has none. A folded line over 256 KiB is not
- * read by the folded readings (a bound on their work; the classifier of a raw line is linear since the review of F30) and is ONE `unreadable` finding; a file that ends inside a block comment, and any throw of the reader, are `unreadable` findings too. The raw readings are never skipped.
+ * does (`owner-blind`); the code with escapes and classes decoded, for a regex literal (`owner-blind`); and on the joined literals the BARE WORD (a literal that holds the whole word with a boundary each
+ * side and no owner after it) and a PIECE of the word (a crossing piece of 6 or more in the word's own form, no letter at its sides): both are class `legacy-name`, so an inline `legacy-name` exemption clears them. A bare word whose tail (the run of
+ * characters that touch it, up to a space) holds `[`, `(`, `?`, `*` or `\` (a pattern) is `owner-blind` unless `legacyNameHits` reads that same occurrence of the word (`'testsToDelete-u*'` is `legacy-name` alone). Each occurrence of the word is its own
+ * cause, so a line can draw both classes; the bare word and the piece read nothing on a line that a classifier reading (raw, folded or decoded) called broad.
+ * The comment gate: the raw readings skip a line that starts like a comment (`isComment`), as at the release. A comment-like line gets folded readings in two cases only: a JavaScript line that starts with `#` where the line starts in code state
+ * (a private field), and a `.ps1` line where `#>` closes a block comment and code follows. Every other comment-like line (`-- ` in `.sh` and yaml, a template's text line that starts with `#`, `//` or `--`) is empty in the folded input: it binds nothing and reads
+ * nothing, and the release reports nothing on it either. The raw binding reading is unchanged: it binds from a comment. `FOLDING_ALLOWANCES` lists this repository's own files that spell the word in pieces on purpose and applies ONLY when the scan is of this
+ * repository's own root; a consumer has none. A folded line over 256 KiB is not read by the folded readings (a bound on their work) and is ONE `unreadable` finding; a file that ends inside a block comment or a template, and any throw of the reader, are
+ * `unreadable` findings too. The raw readings are never skipped.
  *
  * Exit 0 clean, 1 with every finding printed (`file:line — <class> — <text>`), 2 when it scanned nothing or its
  * arguments are bad — an empty scan is a broken discovery, never a clean repository.

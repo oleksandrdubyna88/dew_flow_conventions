@@ -1,19 +1,22 @@
 // The folding reader of the structural guard (`tools/leftovers-check.mjs`, F30; `todo/PLAN_F30_folding_reader.md` D1 to D4): a SPELLING reader of text a person wrote in their own
 // repository. It is not a defence against a hostile author and not data flow: a name built from a variable, across lines, from the environment or at run time is not seen.
 //
-// ONE forward-only scanner per file kind (D1). It walks the file once and answers, for each line, `{ text, code, literals, size }`: `text` is the line with the comments removed and every string
+// ONE forward-only scanner per file kind (D1). It walks the file once and answers, for each line, `{ text, code, literals, size, start }`: `text` is the line with the comments removed and every string
 // literal decoded and joined, each written back in its own quotes; `code` the line with the comments removed and nothing else changed (`decodeCode` reads it); `literals` `[{ value, plus }]`, the
 // joined literals in order (`plus`: a `+` follows, so an owner letter at the literal's end is continued). Nothing is re-tried but a join that fails: an unterminated quote ends that line's reading, a regex literal with no
-// closer on its line is a division and the line gets no second try, and a lookahead (an array, a `+` or `.concat` operand) scans only what it can join, once, and then the text is lexed as ordinary code (twice in all; a test counts the steps). No marker character is put in the text, so a control byte turns nothing off.
-// Only a block comment and a template (with its `${}` depth) cross lines; a join is read within one line.
+// closer on its line is a division and the line gets no second try (one flag per line, in code and in every `${}` hole of it), and a lookahead (an array, a `+` or `.concat` operand) scans only what it can join, once, and then the text is lexed as ordinary code (twice in all; a test counts the steps). No marker character is put in the text, so a control byte turns nothing off.
+// Only a block comment and a template (with its `${}` depth) cross lines; a join is read within one line. `start` is the state a line starts in (`code`, `template`, `comment`): the guard's comment gate (D4) reads it.
+// The step counter counts every helper and a failed word, so a test proves the reader linear without a clock; the raw readings' time is not promised (F32).
 //
 // What it reads, by kind, is D2's table (the promise); the header of the guard states it, with what is not read and the limits. In short: .mjs .cjs .js .ts .tsx .jsx .mts .cts: comments `//` `/* */`, literals '…' "…" `…` (a `${'a'}` hole
 // that holds only a quoted literal), a regex literal (after `( , = : [ ! & | ? { ;`, `=>`, `return`, `typeof`, `case` and at a line's start; after any other token a `/` is a division), joins `+` `.concat(…)` `['a', 'b'].join(<literal>)`, decoded `\uXXXX` `\u{…}` `\xXX` and a class `[T]`; .sh .yml .yaml: comments `#` at the start of a
 // word, '…' "…" $'…', a word's touching pieces; .ps1: comments `#` `<# #>`, '…' "…", `+`, binary `-join`. Not read: a template nested in a hole, a literal in an expression hole, unary `-join`, a comment between operands,
 // `.ps1` here-strings, `.sh` heredocs, a nested `"$(…)"`, an extensionless script, every other kind. JSX text is not told from code: `<p>don't</p>` stops that line's reading, `<p>src/*.ts</p>` hides every line to the next `*/`, and a backtick in
-// JSX text or in a regex at an unlisted position leaves the reader inside a template: the later spellings of that file are silently not read, and that is no finding.
+// JSX text or in a regex at an unlisted position opens a template the reader cannot tell from a real one: a file that ends inside it is one `unreadable` finding (on the line where the outermost state opened); one that a later backtick closes is not
+// told, and the joins up to that closer are silently not read.
 //
-// The module holds the pure reading: `foldFile`, `decodeCode`, and the two literal-level readings the folded literals feed, `bareWordHits` and `pieceHits`. The classes stay in the guard.
+// The module holds the file reader, the JavaScript scanner and the shared helpers, `decodeCode`, and the two literal-level readings the folded literals feed, `bareWordHits` and `pieceHits`; the `.sh`, yaml and `.ps1` scanners are in
+// `leftovers-fold-shell.mjs` (D1: each file stays under the style maximum of 800 lines). The classes stay in the guard.
 
 import { foldPs, foldSh } from "./leftovers-fold-shell.mjs";
 import { verdictAfter } from "./sweeper-scan.mjs";
@@ -103,7 +106,7 @@ class Chunks {
 
 /**
  * The answer for one line. Text and code stop being kept once either passes FOLD_LIMIT (`oversize`): the reader goes on counting, so a 32 MB line costs no memory, and the guard answers one
- * finding for it instead of running the quadratic classifier.
+ * finding for it instead of running the classifier on it.
  */
 export class Out {
   constructor(isJs) {
@@ -690,7 +693,7 @@ const FOLDERS = { js: foldJs, sh: foldSh, ps1: foldPs };
 /**
  * Reads a whole file, once. `lines` are its lines (split on `\r?\n`); `extension` has its dot. Returns `null` for a kind that is not read, else
  * `{ lines: [{ text, code, literals, size, oversize }], unreadable: [{ line, text }] }` with one entry per line. `meter`, when given, is `{ steps }` and counts the characters the
- * reader looked at, so a test can prove it linear without a clock.
+ * reader looked at (every helper and a failed word included), so a test can prove it linear without a clock.
  */
 export function foldFile(lines, extension, { meter } = {}) {
   const kind = foldKind(extension);
