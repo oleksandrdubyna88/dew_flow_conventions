@@ -10,8 +10,8 @@
 //
 // What it reads, by kind, is D2's table (the promise); the header of the guard states it, with what is not read and the limits. In short: .mjs .cjs .js .ts .tsx .jsx .mts .cts: comments `//` `/* */`, literals '…' "…" `…` (a `${'a'}` hole
 // that holds only a quoted literal), a regex literal (after `( , = : [ ! & | ? { ;`, `=>`, `return`, `typeof`, `case` and at a line's start; after any other token a `/` is a division), joins `+` `.concat(…)` `['a', 'b'].join(<literal>)`, decoded `\uXXXX` `\u{…}` `\xXX` and a class `[T]`; .sh .yml .yaml: comments `#` at the start of a
-// word, '…' "…" $'…', a word's touching pieces; .ps1: comments `#` `<# #>`, '…' "…", `+`, binary `-join`. Not read: a template nested in a hole, a literal in an expression hole, unary `-join`, a comment between operands,
-// `.ps1` here-strings, `.sh` heredocs, a nested `"$(…)"`, an extensionless script, every other kind. JSX text is not told from code: `<p>don't</p>` stops that line's reading, `<p>src/*.ts</p>` hides every line to the next `*/`, and a backtick in
+// word, '…' "…" $'…', a word's touching pieces; .ps1: comments `#` `<# #>`, '…' "…", `+`, binary `-join`. Not read: a template nested in a hole, a literal in an expression hole, unary `-join`, a comment between operands, an extensionless script, every other kind. Not told from code (D2): a `.ps1` here-string, a `.sh` heredoc, a nested `"$(…)"`,
+// and JSX text: `<p>don't</p>` stops that line's reading, `<p>src/*.ts</p>` hides every line to the next `*/`, and a backtick in
 // JSX text or in a regex at an unlisted position opens a template the reader cannot tell from a real one: a file that ends inside it is one `unreadable` finding (on the line where the outermost state opened); one that a later backtick closes is not
 // told, and the joins up to that closer are silently not read.
 //
@@ -367,7 +367,7 @@ function concatArguments(line, from, ctx) {
 }
 
 // A keyword before `(` makes it a group and not a call: `return ('a') + 'b'` joins, `f('a') + 'b'` does not (D2: a call is not a parenthesis).
-const KEYWORDS_BEFORE_GROUP = new Set(["return", "typeof", "case", "await", "yield", "throw", "delete", "void", "in", "of", "instanceof", "else", "do", "if", "while", "for", "switch", "with", "catch"]);
+const KEYWORDS_BEFORE_GROUP = new Set(["return", "typeof", "case", "await", "yield", "throw", "delete", "void", "in", "of", "instanceof", "else", "do", "if", "while", "for", "switch", "with", "catch", "default", "new"]);
 
 /**
  * How many of the parentheses that stand right before the literal at `at` (spaces allowed) are groups and not calls (D2). The run of `(` before the literal is counted; the outermost
@@ -392,11 +392,15 @@ export function groupParens(line, at, ctx, js) {
     if (js) while (k >= 0 && isSpace(line.charCodeAt(k))) k -= 1;
     const c = k < 0 ? 0 : line.charCodeAt(k);
     if (c === 41 || c === 93) call = true;
+    else if (c === 46 && line.charCodeAt(k - 1) === 63) call = true; // `f?.(`
     else if (isIdent(c)) {
       let w = k;
       while (w >= 0 && isIdent(line.charCodeAt(w))) w -= 1;
-      call = !KEYWORDS_BEFORE_GROUP.has(line.slice(w + 1, k + 1));
-      stop = Math.min(stop, w);
+      let m = w; // a member name is a call whatever it is called: `it.return(`, `map.delete(`
+      if (js) while (m >= 0 && isSpace(line.charCodeAt(m))) m -= 1;
+      const member = m >= 0 && line.charCodeAt(m) === 46 && line.charCodeAt(m - 1) !== 46;
+      call = member || !KEYWORDS_BEFORE_GROUP.has(line.slice(w + 1, k + 1));
+      stop = Math.min(stop, m);
     }
   }
   ctx.steps += at - stop;
@@ -515,6 +519,11 @@ function lexTemplate(line, from, st, out, ctx) {
         stack.pop();
         i = j + 1;
         if (stack.length === 0) return i;
+        if (stack[stack.length - 1] >= 0) { // a template nested in a hole closed: the hole goes on after a value
+          hole ??= newHoleState();
+          hole.prev = VALUE;
+          hole.start = false;
+        }
       } else {
         if (stack.length === 1) {
           ts.value += decodeJs(line.slice(segment, j));
@@ -688,7 +697,7 @@ function foldJs(lines, ctx) {
 
 // --- the file ---------------------------------------------------------------------------------------------------------------
 
-const FOLDERS = { js: foldJs, sh: foldSh, ps1: foldPs };
+const FOLDERS = { js: () => foldJs, sh: () => foldSh, ps1: () => foldPs }; // read at call time: the shell file imports this one, and each side uses the other only when called
 
 /**
  * Reads a whole file, once. `lines` are its lines (split on `\r?\n`); `extension` has its dot. Returns `null` for a kind that is not read, else
@@ -699,7 +708,7 @@ export function foldFile(lines, extension, { meter } = {}) {
   const kind = foldKind(extension);
   if (kind === undefined) return null;
   const ctx = { steps: 0 };
-  const result = FOLDERS[kind](lines, ctx);
+  const result = FOLDERS[kind]()(lines, ctx);
   if (meter !== undefined) meter.steps += ctx.steps;
   return result;
 }

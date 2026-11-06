@@ -11,7 +11,8 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
 
 import { git } from "./lib/git.mjs";
 import * as fold from "./lib/leftovers-fold.mjs";
@@ -1162,6 +1163,27 @@ const SPELLINGS = [
   ["a call, then two pieces: they join each other and nothing the call holds", "scripts/zz.mjs", ["const a = f('tests') + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
   ["a call that holds a group: the group's closer joins, the call's closer does not", "scripts/zz.mjs", ["const a = f(('tests') + 'To') + 'Delete-*';"], ["1:legacy-name"], []],
   ["a regex with no closer on the line above does not stop the regexes of this line (one flag per line, not per file)", "scripts/zz.mjs", ["const bad = /[ b;", "const a = /'/; const n = 'tests' + 'To' + 'Delete-x';"], ["2:legacy-name"], []],
+  // a member name is a call whatever it is called (a keyword too), and `?.(` is a call; `default` and `new` are no call
+  ["a method named delete", "scripts/zz.mjs", ["const a = map.delete('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a method named for", "scripts/zz.mjs", ["const a = Symbol.for('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a method named of", "scripts/zz.mjs", ["const a = Array.of('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a method named catch", "scripts/zz.mjs", ["const a = p.catch('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a method named return", "scripts/zz.mjs", ["const a = it.return('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["an optional call", "scripts/zz.mjs", ["const a = f?.('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["an optional call of a member", "scripts/zz.mjs", ["const a = x.f?.('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["export default is no call: a group joins", "scripts/zz.mjs", ["export default ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["new is no call: a group joins", "scripts/zz.mjs", ["const a = new ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["throw is no call: a group joins", "scripts/zz.mjs", ["throw ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["if is no call: a group joins", "scripts/zz.mjs", ["if ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["a .ps1 command word and a group: the group joins (a stated limit: command mode would pass three arguments)", "scripts/zz.ps1", ["$x = foo ('testsTo') + 'Delete-*'"], ["1:owner-blind"], []],
+  // a template nested in a hole closes: the hole goes on after a value, so the next / is a division
+  ["a division after a nested template in a hole (the regex flag of the line is not spent)", "scripts/zz.mjs", ["const t = `${`a` / 2 + `/`}`;", "const n = 'tests' + 'To' + 'Delete-x';"], ["2:legacy-name"], []],
+  ["a division after a nested template, then a string, in a hole", "scripts/zz.mjs", ["const t = `${`a` / 2 + \"/\" + `b`}`;", "const n = 'tests' + 'To' + 'Delete-x';"], ["2:legacy-name"], []],
+  // the comment gate, the rows of the review: a block comment's start is not code, a template text line binds nothing, a .ps1 comment-like line in code state is a comment, a bare word's marker
+  ["an upper-case environment name with a star is a pattern", "scripts/zz.mjs", [`const a = '${Q.toUpperCase()}_U*';`], ["1:owner-blind"], []],
+  ["a -- line in .ps1 is a comment", "scripts/zz.ps1", ["-- 'tests' + 'To' + 'Delete-x'"], [], []],
+  ["a # line in a template that would bind a prefix in its folded form binds nothing", "scripts/zz.mjs", ["const t = `", "# const P = 'tests\\x54oDelete-';", "`;", "fs.rmSync(P + x);"], [], []],
+  ["a # line where a block comment started is not code", "scripts/zz.mjs", ["/* a", "# b */ const n = 'tests' + 'To' + 'Delete-x';"], [], []],
   ["return is no call: a group joins", "scripts/zz.mjs", ["  return ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
   ["typeof is no call: a group joins", "scripts/zz.mjs", ["const t = typeof ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
   ["case is no call: a group joins", "scripts/zz.mjs", ["switch (x) { case ('testsTo') + 'Delete-*': break; }"], ["1:owner-blind"], []],
@@ -1557,6 +1579,17 @@ test("F30 reader: foldFile joins, decodes, removes comments and keeps the quotes
   assert.equal(fold.foldFile(['a "testsTo" + "Delete" in a document'], ".md"), null, "a kind that is not listed is not read");
 });
 
+test("F30 D1: the fold file and the shell file use each other only at call time, so either may be imported first (and nothing is read from the other at load)", () => {
+  const url = (name) => pathToFileURL(path.join(root, "tools", "lib", name)).href;
+  for (const [first, second] of [["leftovers-fold.mjs", "leftovers-fold-shell.mjs"], ["leftovers-fold-shell.mjs", "leftovers-fold.mjs"]]) {
+    const code = `await import(${JSON.stringify(url(first))}); await import(${JSON.stringify(url(second))}); const m = await import(${JSON.stringify(url("leftovers-fold.mjs"))});
+      console.log(JSON.stringify([".sh", ".ps1", ".mjs"].map((e) => m.foldFile([e === ".mjs" ? "x = 'a' + 'b';" : "x 'a''b' + 'c'"], e).lines[0].text)));`;
+    const child = spawnSync(process.execPath, ["--input-type=module", "-e", code], { encoding: "utf8", timeout: 30_000 });
+    assert.equal(child.status, 0, `${first} first: ${child.stderr.slice(0, 300)}`);
+    assert.equal(JSON.parse(child.stdout).length, 3);
+  }
+});
+
 test("F30 reader: no marker character is put in the text, so a control byte in a line turns nothing off; a decoded newline never splits a line", () => {
   const [row] = readerOf(".mjs", `const c = "\u0001\u0002"; const n = 'tests' + 'To' + 'Delete-x';`);
   assert.equal(row.text, `const c = "\u0001\u0002"; const n = 'testsToDelete-x';`);
@@ -1668,6 +1701,7 @@ const HOSTILE = [
   [".mjs", "an array that never closes", (size) => `x = [${repeatTo("'a', ", size)}`],
   [".mjs", "a concat that never closes", (size) => `x = 'a'.concat(${repeatTo("'a', ", size)}`],
   [".mjs", "holes that never close", (size) => repeatTo("`${'", size)],
+  [".mjs", "a literal, a plus and a template hole with a regex that never closes, repeated (the lookahead of a join reads the template, and the line's flag must outlive it)", (size) => repeatTo("'a'+`${/[}", size)],
   [".mjs", "a template of holes that each hold a regex with no closer (the quadratic shape of the review of 16943a7: a flag per hole tried every one)", (size) => `\`${repeatTo("${/[}", size)}`],
   [".mjs", "holes that each hold a regex with no closer, each in a template of its own", (size) => repeatTo("`${/[}`", size)],
   [".mjs", "a regex with no closer in code, then holes that hold one each", (size) => `x = /[ ${repeatTo("`${/[}`", size)}`],
@@ -1692,6 +1726,12 @@ test("F30 time: the reader's step counter grows linearly at 1, 2, 4 and 8 MB, fo
   assert.equal(typeof fold.foldFile, "function");
   const wrong = [];
   for (const [extension, kind, build] of HOSTILE) {
+    // a quadratic line is caught at 128 KiB (a few seconds), not at 8 MB (hours): the small sizes go first and a shape that fails there is not run larger
+    const small = [32, 128].map((kib) => stepsOf(extension, build(kib * 1024)));
+    if (small[1] > 24 * 128 * 1024 || small[1] > 4.5 * small[0]) {
+      wrong.push(`${extension} ${kind}: ${small[0]} steps at 32 KiB, ${small[1]} at 128 KiB`);
+      continue;
+    }
     const sizes = extension === ".mjs" ? [1, 2, 4, 8] : [1, 2, 4];
     const steps = sizes.map((mib) => stepsOf(extension, build(mib * MiB)));
     steps.forEach((count, index) => {
@@ -1702,7 +1742,9 @@ test("F30 time: the reader's step counter grows linearly at 1, 2, 4 and 8 MB, fo
   assert.deepEqual(wrong, []);
 });
 
-test("F30 time: the step counter counts a failed word and the scans of every helper (a counter that sees 7 steps in a 64 KiB line proves nothing)", () => {
+// The loops of the other helpers (spaces, closers, the backward scan of groupParens, plusFollows) pass characters the main loop passes again, so a row cannot tell a counted helper from an uncounted one;
+// what a row can see is a failed word, whose scan no later loop repeats. The reader's bound is the table of hostile lines above.
+test("F30 time: the step counter counts a failed word, whose scan no later loop repeats (a counter that sees 7 steps in a 64 KiB line proves nothing)", () => {
   const shapes = [
     [".sh", "a single quote that never closes", (size) => `echo '${"a".repeat(size)}`],
     [".sh", "a double quote that never closes", (size) => `echo "${"a".repeat(size)}`],
