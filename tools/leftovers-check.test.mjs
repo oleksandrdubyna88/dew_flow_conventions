@@ -1165,6 +1165,7 @@ const SPELLINGS = [
   ["a regex with no closer on the line above does not stop the regexes of this line (one flag per line, not per file)", "scripts/zz.mjs", ["const bad = /[ b;", "const a = /'/; const n = 'tests' + 'To' + 'Delete-x';"], ["2:legacy-name"], []],
   // a member name is a call whatever it is called (a keyword too), and `?.(` is a call; `default` and `new` are no call
   ["a method named delete", "scripts/zz.mjs", ["const a = map.delete('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a private method named delete", "scripts/zz.mjs", ["const a = this.#delete('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
   ["a method named for", "scripts/zz.mjs", ["const a = Symbol.for('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
   ["a method named of", "scripts/zz.mjs", ["const a = Array.of('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
   ["a method named catch", "scripts/zz.mjs", ["const a = p.catch('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],

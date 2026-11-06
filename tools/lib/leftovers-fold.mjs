@@ -10,7 +10,7 @@
 //
 // What it reads, by kind, is D2's table (the promise); the header of the guard states it, with what is not read and the limits. In short: .mjs .cjs .js .ts .tsx .jsx .mts .cts: comments `//` `/* */`, literals '…' "…" `…` (a `${'a'}` hole
 // that holds only a quoted literal), a regex literal (after `( , = : [ ! & | ? { ;`, `=>`, `return`, `typeof`, `case` and at a line's start; after any other token a `/` is a division), joins `+` `.concat(…)` `['a', 'b'].join(<literal>)`, decoded `\uXXXX` `\u{…}` `\xXX` and a class `[T]`; .sh .yml .yaml: comments `#` at the start of a
-// word, '…' "…" $'…', a word's touching pieces; .ps1: comments `#` `<# #>`, '…' "…", `+`, binary `-join`. Not read: a template nested in a hole, a literal in an expression hole, unary `-join`, a comment between operands, an extensionless script, every other kind. Not told from code (D2): a `.ps1` here-string, a `.sh` heredoc, a nested `"$(…)"`,
+// word, '…' "…" $'…', a word's touching pieces; .ps1: comments `#` `<# #>`, '…' "…", `+`, binary `-join`. Not joined: a template nested in a hole, a literal in an expression hole, unary `-join`, a comment between operands (each literal is still read alone). Not read: an extensionless script, every other kind. Not told from code (D2): a `.ps1` here-string, a `.sh` heredoc, a nested `"$(…)"`,
 // and JSX text: `<p>don't</p>` stops that line's reading, `<p>src/*.ts</p>` hides every line to the next `*/`, and a backtick in
 // JSX text or in a regex at an unlisted position opens a template the reader cannot tell from a real one: a file that ends inside it is one `unreadable` finding (on the line where the outermost state opened); one that a later backtick closes is not
 // told, and the joins up to that closer are silently not read.
@@ -371,7 +371,7 @@ const KEYWORDS_BEFORE_GROUP = new Set(["return", "typeof", "case", "await", "yie
 
 /**
  * How many of the parentheses that stand right before the literal at `at` (spaces allowed) are groups and not calls (D2). The run of `(` before the literal is counted; the outermost
- * of them is a call, and does not count, when a `)` or `]` stands right before it, or an identifier that is no keyword (`js`: spaces may come between; PowerShell: none may, because
+ * of them is a call, and does not count, when a `)`, `]` or `?.` stands right before it, a member name of any spelling, or an identifier that is no keyword (`js`: spaces may come between; PowerShell: none may, because
  * `Remove-Item ("a" + "b")` is a command and its argument group). A closer after the literal may cross only these. Counts the characters it passes.
  */
 export function groupParens(line, at, ctx, js) {
@@ -396,9 +396,9 @@ export function groupParens(line, at, ctx, js) {
     else if (isIdent(c)) {
       let w = k;
       while (w >= 0 && isIdent(line.charCodeAt(w))) w -= 1;
-      let m = w; // a member name is a call whatever it is called: `it.return(`, `map.delete(`
+      let m = w; // a member name is a call whatever it is called: `it.return(`, `map.delete(`, `this.#delete(`
       if (js) while (m >= 0 && isSpace(line.charCodeAt(m))) m -= 1;
-      const member = m >= 0 && line.charCodeAt(m) === 46 && line.charCodeAt(m - 1) !== 46;
+      const member = line.charCodeAt(w) === 35 || (m >= 0 && line.charCodeAt(m) === 46 && line.charCodeAt(m - 1) !== 46);
       call = member || !KEYWORDS_BEFORE_GROUP.has(line.slice(w + 1, k + 1));
       stop = Math.min(stop, m);
     }
