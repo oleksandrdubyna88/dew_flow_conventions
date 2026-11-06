@@ -3,7 +3,7 @@
 // The fold file imports `foldSh` and `foldPs`; this file imports the shared operand and output helpers from the fold file. Each side uses the other only at call time, so the import cycle is safe
 // (the two scanners are function declarations, which exist before either module runs).
 
-import { BACKSLASH, C, Out, chain, decodeAnsi, isQuote, isSpace, openState, plusFollows, skipSpaces } from "./leftovers-fold.mjs";
+import { BACKSLASH, C, Out, chain, decodeAnsi, groupParens, isQuote, isSpace, openState, plusFollows, readOperand, skipSpaces } from "./leftovers-fold.mjs";
 
 /** A PowerShell literal that opens at `at` and closes on this line: `{ end, value }` (the body as written: no decoding), or null. */
 function readPsLiteral(line, at, ctx) {
@@ -156,27 +156,36 @@ export function foldSh(lines, ctx) {
 
 // --- PowerShell -------------------------------------------------------------------------------------------------------------
 
-/** `"a", "b" -join ""` that starts with the literal `first` (the list may sit in parentheses): `{ end, value, close }`, or `{ fail }` with the index its reading reached. */
-function tryPsJoin(line, first, ctx) {
+/**
+ * `"a", "b" -join ""` that starts with the literal `first`: the items may each sit in parentheses, the whole list may, the operator may have no space at its sides, and its separator may
+ * sit in parentheses. `own` is the number of groups right before `first` (`groupParens`): the closers of the list may close those and no others, because a call is not a parenthesis.
+ * Returns `{ end, value, left }` (`left`: the groups not closed), or `{ fail }` with the index its reading reached.
+ */
+function tryPsJoin(line, first, ctx, own) {
   const items = [first.value];
-  let j = skipSpaces(line, first.end, ctx);
-  while (line.charCodeAt(j) === 44) {
-    j = skipSpaces(line, j + 1, ctx);
-    const lit = readPsLiteral(line, j, ctx);
-    if (lit === null) return { fail: j };
-    items.push(lit.value);
-    j = skipSpaces(line, lit.end, ctx);
+  let left = own;
+  let j = first.end;
+  for (;;) {
+    let k = skipSpaces(line, j, ctx);
+    let closers = 0;
+    while (line.charCodeAt(k) === 41) {
+      closers += 1;
+      k = skipSpaces(line, k + 1, ctx);
+    }
+    if (closers > left) return { fail: k };
+    left -= closers;
+    if (line.charCodeAt(k) === 44) {
+      const lit = readOperand(line, k + 1, ctx, readPsLiteral);
+      if (lit === null) return { fail: k };
+      items.push(lit.value);
+      j = lit.end;
+      continue;
+    }
+    if (line.slice(k, k + 5).toLowerCase() !== "-join" || !(isSpace(line.charCodeAt(k + 5)) || isQuote(line.charCodeAt(k + 5)) || line.charCodeAt(k + 5) === 40)) return { fail: k };
+    const separator = readOperand(line, k + 5, ctx, readPsLiteral);
+    if (separator === null) return { fail: k };
+    return { end: separator.end, value: items.join(separator.value), left };
   }
-  const listEnd = j;
-  let close = false;
-  if (line.charCodeAt(j) === 41) {
-    close = true;
-    j = skipSpaces(line, j + 1, ctx);
-  }
-  if (line.slice(j, j + 5).toLowerCase() !== "-join" || !isSpace(line.charCodeAt(j + 5))) return { fail: listEnd };
-  const separator = readPsLiteral(line, skipSpaces(line, j + 5, ctx), ctx);
-  if (separator === null) return { fail: listEnd };
-  return { end: separator.end, value: items.join(separator.value), close };
 }
 
 function scanPsLine(line, number, st, out, ctx) {
@@ -218,16 +227,19 @@ function scanPsLine(line, number, st, out, ctx) {
       let end = first.end;
       let value = first.value;
       let tail = "";
+      const own = groupParens(line, i, ctx, false);
+      let left = own;
       if (i >= failedUntil) {
-        const list = tryPsJoin(line, first, ctx);
+        const list = tryPsJoin(line, first, ctx, own);
         if (list.fail !== undefined) failedUntil = list.fail;
         else {
           end = list.end;
           value = list.value;
-          tail = list.close ? ")" : "";
+          left = list.left;
+          tail = ")".repeat(own - list.left);
         }
       }
-      const next = chain(line, end, value, ctx, false, readPsLiteral);
+      const next = chain(line, end, value, ctx, false, readPsLiteral, left);
       out.code(line.slice(runStart, i));
       out.lit(line[i], next.value, line.slice(i, next.end), plusFollows(line, next.end, ctx));
       out.textOnly(tail + ")".repeat(next.closers));

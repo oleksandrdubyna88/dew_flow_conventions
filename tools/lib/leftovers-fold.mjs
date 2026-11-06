@@ -363,16 +363,55 @@ function concatArguments(line, from, ctx) {
   }
 }
 
+// A keyword before `(` makes it a group and not a call: `return ('a') + 'b'` joins, `f('a') + 'b'` does not (D2: a call is not a parenthesis).
+const KEYWORDS_BEFORE_GROUP = new Set(["return", "typeof", "case", "await", "yield", "throw", "delete", "void", "in", "of", "instanceof", "else", "do", "if", "while", "for", "switch", "with", "catch"]);
+
+/**
+ * How many of the parentheses that stand right before the literal at `at` (spaces allowed) are groups and not calls (D2). The run of `(` before the literal is counted; the outermost
+ * of them is a call, and does not count, when a `)` or `]` stands right before it, or an identifier that is no keyword (`js`: spaces may come between; PowerShell: none may, because
+ * `Remove-Item ("a" + "b")` is a command and its argument group). A closer after the literal may cross only these. Counts the characters it passes.
+ */
+export function groupParens(line, at, ctx, js) {
+  let j = at - 1;
+  let opens = 0;
+  let outer = -1;
+  for (;;) {
+    while (j >= 0 && isSpace(line.charCodeAt(j))) j -= 1;
+    if (j < 0 || line.charCodeAt(j) !== 40) break;
+    opens += 1;
+    outer = j;
+    j -= 1;
+  }
+  let call = false;
+  let stop = j;
+  if (opens > 0) {
+    let k = outer - 1;
+    if (js) while (k >= 0 && isSpace(line.charCodeAt(k))) k -= 1;
+    const c = k < 0 ? 0 : line.charCodeAt(k);
+    if (c === 41 || c === 93) call = true;
+    else if (isIdent(c)) {
+      let w = k;
+      while (w >= 0 && isIdent(line.charCodeAt(w))) w -= 1;
+      call = !KEYWORDS_BEFORE_GROUP.has(line.slice(w + 1, k + 1));
+      stop = Math.min(stop, w);
+    }
+  }
+  ctx.steps += at - stop;
+  return call ? opens - 1 : opens;
+}
+
 /**
  * The joins after a literal, as far as they go: `+` (an operand may sit in parentheses) and, for JavaScript, `.concat(<literals>)`. Each is read on the characters it
- * joins and nothing is tried twice. Returns `{ value, end, closers, carry }`: the closers are the `)` that came right after the left operand (kept, after the joined
- * literal), and `carry` is `.concat(` when a non-literal argument follows the joined ones.
+ * joins and nothing is tried twice. `own` is the number of parentheses right before the literal that are groups (`groupParens`): the closers between the operands may close
+ * those and no others, because the value of `f('a')` is not `'a'`. Returns `{ value, end, closers, carry }`: the closers are the `)` that came right after the left operand
+ * (kept, after the joined literal), and `carry` is `.concat(` when a non-literal argument follows the joined ones.
  */
-export function chain(line, end, value, ctx, js, read = readLiteral) {
+export function chain(line, end, value, ctx, js, read, own) {
   const n = line.length;
   let e = end;
   let joined = value;
   let closers = 0;
+  let open = own;
   let carry = "";
   for (;;) {
     let j = skipSpaces(line, e, ctx);
@@ -382,17 +421,20 @@ export function chain(line, end, value, ctx, js, read = readLiteral) {
       j = skipSpaces(line, j + 1, ctx);
     }
     ctx.steps += j - e + 1;
+    if (c > open) break; // a closer of a call, or of a group that does not hold this literal
     if (isPlus(line, j)) {
       const operand = readOperand(line, j + 1, ctx, read);
       if (operand === null) break;
       joined += operand.value;
       closers += c;
+      open -= c;
       e = operand.end;
     } else if (js && methodOpen(line, j, "concat", ctx) >= 0) {
       const args = concatArguments(line, methodOpen(line, j, "concat", ctx) + 1, ctx);
       if (args.count === 0) break;
       joined += args.value;
       closers += c;
+      open -= c;
       e = args.end;
       if (!args.closed) {
         carry = ".concat(";
@@ -612,7 +654,7 @@ function scanJsLine(line, number, st, out, ctx) {
       if (stack.length > 0) return; // it goes on to the next line, and has said what it holds on this one
       literal = { end, value: st.ts.value };
     }
-    const joined = chain(line, literal.end, literal.value, ctx, true);
+    const joined = chain(line, literal.end, literal.value, ctx, true, readLiteral, groupParens(line, at, ctx, true));
     out.code(line.slice(runStart, at));
     out.lit(quote, joined.value, line.slice(at, joined.end), plusFollows(line, joined.end, ctx));
     out.textOnly(")".repeat(joined.closers));

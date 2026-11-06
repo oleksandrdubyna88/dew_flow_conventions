@@ -1119,6 +1119,21 @@ const SPELLINGS = [
   ["a whole prefix in a constant, startsWith on it (the binding reading of today: line 2 is owner-blind at the release too)", "scripts/zz.mjs", [`const P = '${Q}-';`, "names.filter((n) => n.startsWith(P));"], ["1:legacy-name", "2:owner-blind"], ["2:owner-blind"]],
   ["a whole prefix passed to a call: legacy-name, and a person reads it", "scripts/zz.mjs", [`sweep('${Q}-');`], ["1:legacy-name"], []],
   ["a prefix in two constants and a sum: the first piece only", "scripts/zz.mjs", ["const A = 'testsTo';", "const B = 'Delete-';", "rmSync(A + B + x);"], ["1:legacy-name"], []],
+  // D2: a call is not a parenthesis. A closer after a literal crosses only the parentheses that stand right before that literal; the outer one is a call when an identifier, `)` or `]` stands before it
+  ["a call before the +: its argument joins nothing (a piece, not the glob)", "scripts/zz.mjs", ["const a = f('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a method call before the +", "scripts/zz.mjs", ["const a = x.f('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a call after an index before the +", "scripts/zz.mjs", ["const a = x[0]('testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a call with the literal after another argument", "scripts/zz.mjs", ["const a = f(1, 'testsTo') + 'Delete-*';"], ["1:legacy-name"], []],
+  ["two opens, the outer one a call", "scripts/zz.mjs", ["const a = f(('testsTo')) + 'Delete-*';"], ["1:legacy-name"], []],
+  ["a call before .concat", "scripts/zz.mjs", ["const a = f('testsTo').concat('Delete-*');"], ["1:legacy-name"], []],
+  ["a call, then two pieces: they join each other and nothing the call holds", "scripts/zz.mjs", ["const a = f('tests') + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
+  ["return is no call: a group joins", "scripts/zz.mjs", ["  return ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["typeof is no call: a group joins", "scripts/zz.mjs", ["const t = typeof ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["case is no call: a group joins", "scripts/zz.mjs", ["switch (x) { case ('testsTo') + 'Delete-*': break; }"], ["1:owner-blind"], []],
+  ["await is no call: a group joins", "scripts/zz.mjs", ["const a = await ('testsTo') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["a group of two opens joins", "scripts/zz.mjs", ["const a = (('testsTo')) + 'Delete-*';"], ["1:owner-blind"], []],
+  ["a group that closes in the middle of the chain joins", "scripts/zz.mjs", ["const a = ('tests' + 'To') + 'Delete-*';"], ["1:owner-blind"], []],
+  ["a group after a call's argument list joins inside its own parentheses", "scripts/zz.mjs", ["const a = f(('tests') + 'To' + 'Delete-*');"], ["1:owner-blind"], []],
   // .sh and workflow lines: touching pieces, quoted or not
   ["a .sh adjacency, legacy", "scripts/zz.sh", ["mkdir \"$TMPDIR\"/'testsTo''Delete-agent-1'"], ["1:legacy-name"], []],
   ["a .sh adjacency of three pieces", "scripts/zz.sh", ["mkdir \"$TMPDIR\"/'tests''To''Delete-agent-1'"], ["1:legacy-name"], []],
@@ -1145,6 +1160,15 @@ const SPELLINGS = [
   ["a .ps1 three pieces, one in parentheses", "scripts/zz.ps1", ['$n = ("tests") + ("To") + "Delete-agent-1"'], ["1:legacy-name"], []],
   ["a .ps1 -join", "scripts/zz.ps1", ['$n = ("testsTo", "Delete-agent-1") -join ""'], ["1:legacy-name"], []],
   ["a .ps1 -join of three pieces", "scripts/zz.ps1", ['$n = ("tests", "To", "Delete-agent-1") -join ""'], ["1:legacy-name"], []],
+  // D2: a .ps1 list joins with the operator at any spacing, with its items or separator in parentheses; a call is not a parenthesis here either
+  ["a .ps1 -join over a separator in parentheses", "scripts/zz.ps1", ["$n = ('tests','To','Delete-x') -join ('')"], ["1:legacy-name"], []],
+  ["a .ps1 -join over a list item in parentheses", "scripts/zz.ps1", ["$n = ('tests',('To'),'Delete-x') -join ''"], ["1:legacy-name"], []],
+  ["a .ps1 -join with no space at the operator", "scripts/zz.ps1", ["$n = ('tests','To','Delete-x')-join''"], ["1:legacy-name"], []],
+  ["a .ps1 list of items each in parentheses", "scripts/zz.ps1", ["$n = ('tests'),('To'),('Delete-x') -join ''"], ["1:legacy-name"], []],
+  ["a .ps1 list of items each in parentheses, at the line's start", "scripts/zz.ps1", ["('tests'),('To'),('Delete-x') -join ''"], ["1:legacy-name"], []],
+  ["a .ps1 list whose closer belongs to a call joins nothing", "scripts/zz.ps1", ["$n = (f 'testsTo', 'Delete-*') -join ''"], ["1:legacy-name"], []],
+  ["a .ps1 call before the +: its argument joins nothing", "scripts/zz.ps1", ["$n = (f 'testsTo') + 'Delete-*'"], ["1:legacy-name"], []],
+  ["a .ps1 call, then two pieces: they join each other and nothing the call holds", "scripts/zz.ps1", ["$a = (f 'tests') + 'To' + 'Delete-x'"], ["1:legacy-name"], []],
   ["a .ps1 split after a block comment on the line", "scripts/zz.ps1", ["<# a 'quote #> $n = 'tests' + 'To' + 'Delete-x'"], ["1:legacy-name"], []],
   ["a .ps1 split after a multi-line block comment", "scripts/zz.ps1", ["<# a comment", "with 'a quote #> $n = 'tests' + 'To' + 'Delete-x'"], ["2:legacy-name"], []],
   ["a .ps1 prefix in pieces, a sweep over the name on the next line", "scripts/zz.ps1", ['$P = "tests" + "To" + "Delete-"', 'Remove-Item "$P*"'], ["1:legacy-name", "2:owner-blind"], []],
@@ -1248,6 +1272,11 @@ const CLEAN = [
   // a literal that is no code
   [["const css = `", "a { background: url(x/*.png) }", "`;"], "scripts/zz.mjs", "a multi-line template that holds /* opens no block comment"],
   [["const r = /'/; const s = 'a' + 'b';"], "scripts/zz.mjs", "a regex that holds a quote"],
+  // D2: an operand is a literal and its own closers; a comma list is not one (P18: with the closer not required, 'To' would join 'tests' and be a piece)
+  [["const n = 'tests' + ('To', 'Delete-x');"], "scripts/zz.mjs", "a comma expression is no operand of the +: its value is the last item"],
+  [["const n = 'tests'.concat(('To', 'Delete-x'));"], "scripts/zz.mjs", "a comma expression is no argument of .concat"],
+  [["$n = -join ('tests','To','Delete-x')"], "scripts/zz.ps1", "unary -join is not read (a stated limit of D2)"],
+  [["$n = ('tests','To','Delete-x') -joinx ''"], "scripts/zz.ps1", "-joinx is no operator"],
 ];
 
 test("F30 table 2: product words, pieces that touch a letter, comments, prose and owner forms are no finding", () => {
@@ -1352,6 +1381,16 @@ test("F30 reader: foldFile joins, decodes, removes comments and keeps the quotes
     [".mjs", "const n = 'CORP\\alice';", "const n = 'CORPalice';", ["CORPalice"]], // \a is a BEL in a shell $'…' and not in JavaScript
     [".sh", "echo $'a\\ab'", "echo 'a\u0007b'", ["a\u0007b"]],
     [".mjs", "no quote on this line", "no quote on this line", []],
+    // D2: a call is not a parenthesis; the pieces after a call join each other and nothing the call holds
+    [".mjs", "const a = f('tests') + 'To' + 'Delete-x';", "const a = f('tests') + 'ToDelete-x';", ["tests", "ToDelete-x"]],
+    [".mjs", "const a = f(('tests')) + ('To');", "const a = f(('tests')) + ('To');", ["tests", "To"]],
+    [".mjs", "  return ('tests') + 'To';", "  return ('testsTo');", ["testsTo"]],
+    [".mjs", "const a = (('tests') + 'To') + 'Delete-x';", "const a = (('testsToDelete-x'));", ["testsToDelete-x"]],
+    [".ps1", "$a = (f 'tests') + 'To' + 'Delete-x'", "$a = (f 'tests') + 'ToDelete-x'", ["tests", "ToDelete-x"]],
+    [".ps1", "$n = ('tests'),('To') -join ''", "$n = ('testsTo')", ["testsTo"]],
+    [".ps1", "$n = ('tests','To')-join''", "$n = ('testsTo')", ["testsTo"]],
+    [".ps1", "$n = ('tests',('To')) -join ('')", "$n = ('testsTo')", ["testsTo"]],
+    [".ps1", "$n = (f 'tests', 'To') -join ''", "$n = (f 'tests', 'To') -join ''", ["tests", "To", ""]],
   ];
   for (const [extension, line, text, literals] of rows) {
     const [folded] = readerOf(extension, line);
@@ -1485,6 +1524,13 @@ const HOSTILE = [
   [".ps1", "a doubled quote", (size) => repeatTo("''", size)],
   [".ps1", "a list that never closes", (size) => repeatTo("'a',", size)],
   [".ps1", "a plus chain", (size) => repeatTo("'a' + ", size)],
+  [".ps1", "items in parentheses that never join", (size) => repeatTo("('a'),", size)],
+  [".ps1", "a long run of opens before a literal", (size) => `${"(".repeat(size)}'a'`],
+  [".ps1", "a literal and a long run of closers", (size) => `('a'${")".repeat(size)}-join`],
+  [".mjs", "calls with two opens before a literal, repeated", (size) => repeatTo("f(('a') + ", size)],
+  [".mjs", "a literal and a long run of closers before a plus", (size) => `f('a'${")".repeat(size)} + 'b'`],
+  [".mjs", "a long identifier, a call, a plus", (size) => `${"a".repeat(size)}('a') + 'b'`],
+  [".mjs", "spaced opens and closers around a literal", (size) => `${"( ".repeat(size / 2)}'a'${" )".repeat(size / 2)} + 'b'`],
 ];
 
 test("F30 time: the reader's step counter grows linearly at 1, 2, 4 and 8 MB, for every hostile line", () => {
