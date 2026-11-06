@@ -420,27 +420,46 @@ function foldReading(file, lines, allowances, reader) {
 }
 
 /**
- * What the folded readings add for each line of a file whose reader answered `folded` (D4): `{ legacy, blind }` per line. `legacy` are `legacyNameHits` of the folded text, then the bare word and the piece
- * (only on a line that no `owner-blind` reading called broad); `blind` is the reason, or undefined: the FILE's folded lines through `classifyLines`, the decoded code of a JS line through `classifyLine`, or a
- * bare word whose tail is a pattern. A line the allowlist passes, and a line over the limit, are not read.
+ * The comment gate (D4). The raw readings skip a line `isComment` calls a comment; the folded readings read such a line in two cases only, which the reader states: a JavaScript line that
+ * starts with `#` where the line starts in code state (a private field), and a `.ps1` line where `#>` closes a block comment and code follows. Every other comment-like line (`-- ` in `.sh`
+ * and yaml, a template's text line that starts with `#`, `//` or `--`, a line where a template or a block comment closes) is empty in the folded input: it binds nothing and reads nothing.
  */
-function foldedReadings(file, lines, folded, verdicts, allowlist, isJs) {
-  const usable = folded.map((entry, index) => !entry.oversize && !passes(allowlist, file, index + 1, lines[index]));
-  const texts = folded.map((entry, index) => (entry.oversize ? "" : usable[index] ? entry.text : lines[index])); // a line the allowlist passes keeps its raw text, so classifyLines passes it by its hash
-  const changed = texts.some((text, index) => text !== lines[index]);
-  const foldedVerdicts = changed ? classifyLines(texts.join("\n"), { allowlist, file }) : verdicts;
+function readable(entry, line, kind) {
+  if (!isComment(line)) return true;
+  if (kind === "js") return entry.start === "code" && /^\s*#/.test(line);
+  return kind === "ps1" && entry.start === "comment" && entry.text.trim() !== "";
+}
+
+/** Whether `legacyNameHits` reads the occurrence of the word that starts `text`: `[-_]`, then a second segment that is no owner and no marker word. The occurrence rule of D4 asks it of a pattern in a bare word's tail. */
+const LEGACY_AT = new RegExp(`^${WORD}[-_]([a-z0-9]+)`, "i");
+function legacyReadsOccurrence(text) {
+  const match = LEGACY_AT.exec(text);
+  return match !== null && !notAName(match) && !OWNER_GRAMMAR.test(match[1].toLowerCase());
+}
+
+/**
+ * What the folded readings add for each line of a file whose reader answered `folded` (D4): `{ legacy, blind }` per line. `legacy` are `legacyNameHits` of the folded text, then the bare word and the piece
+ * (only on a line that no classifier reading called broad); `blind` is the reason, or undefined: the FILE's folded lines through `classifyLines` (always: a comment-like line the gate does not open is
+ * empty there, so no answer depends on a line elsewhere), the decoded code of a JS line through `classifyLine`, or a bare word whose pattern tail `legacyNameHits` does not read at that occurrence.
+ * A line the allowlist passes, and a line over the limit, are not read. `verdicts` are the RAW readings' answers, a comment-like line `null` (the raw readings skip it).
+ */
+function foldedReadings(file, lines, folded, verdicts, allowlist, kind) {
+  const passed = folded.map((entry, index) => passes(allowlist, file, index + 1, lines[index]));
+  const usable = folded.map((entry, index) => !entry.oversize && !passed[index] && readable(entry, lines[index], kind));
+  const texts = folded.map((entry, index) => (passed[index] ? lines[index] : usable[index] ? entry.text : "")); // a line the allowlist passes keeps its raw text, so classifyLines passes it by its hash
+  const foldedVerdicts = classifyLines(texts.join("\n"), { allowlist, file });
   return folded.map((entry, index) => {
     if (!usable[index]) return { legacy: [], blind: undefined };
-    const legacy = entry.text !== lines[index] ? legacyNameHits(entry.text) : [];
+    const legacy = legacyNameHits(entry.text);
     let blind;
     if (verdicts[index] === "broad") return { legacy, blind };
     if (foldedVerdicts[index] === "broad") blind = "matches the prefix with no owner segment after it, read after folding the line's string literals";
-    else if (isJs) {
+    else if (kind === "js") {
       const decoded = decodeCode(entry.code);
       if (decoded !== entry.code && classifyLine(decoded) === "broad") blind = "matches the prefix with no owner segment after it, read after decoding the escapes and one-character classes of the line's code";
     }
     if (blind !== undefined) return { legacy, blind };
-    const bare = bareWordHits(entry.literals);
+    const bare = bareWordHits(entry.literals, legacyReadsOccurrence);
     const bareBlind = bare.blind.length > 0 ? `the bare prefix ${bare.blind.map((hit) => `\`${hit}\``).join(", ")} in a string literal, with a pattern after it and no owner segment` : undefined; // kept apart: see lineFindings
     return { legacy: [...legacy, ...bare.legacy, ...pieceHits(entry.literals)], blind, bareBlind };
   });
@@ -456,7 +475,7 @@ function lineFindings(file, lines, exemptions, allowlist, baseline, allowances, 
   const fold = foldReading(file, lines, allowances, reader);
   for (const entry of fold.findings) found.push(entry);
   const raw = verdicts.map((verdict, index) => (isComment(lines[index]) ? null : verdict)); // the raw readings skip a line that starts like a comment ...
-  const readings = fold.lines === undefined ? [] : foldedReadings(file, lines, fold.lines, raw, allowlist, foldKind(path.extname(file)) === "js");
+  const readings = fold.lines === undefined ? [] : foldedReadings(file, lines, fold.lines, raw, allowlist, foldKind(path.extname(file)));
   lines.forEach((line, index) => {
     const folded = readings[index] ?? { legacy: [], blind: undefined };
     const comment = isComment(line); // ... but the reader has already removed the comments, so what it keeps of such a line is code (`#p = …` in JavaScript, the code after `#>`, a template's text)
@@ -475,11 +494,11 @@ function lineFindings(file, lines, exemptions, allowlist, baseline, allowances, 
       add(index, cls, [...new Set(hits)].map((hit) => `\`${hit}\``).join(", "));
     }
     // owner-blind: no exemption of any kind — the allowlist (file, line, hash) is the one pass. One finding per line, whichever reading found it.
-    // A pattern in the tail of a bare word counts only when the line has no legacy-name reading, raw or folded, exempted or not (one class for one cause, D4).
-    const legacyRead = checks[checks.length - 1][1].length > 0;
+    // A pattern in the tail of a bare word is owner-blind unless legacyNameHits reads that same occurrence (D4's occurrence rule: each occurrence of the word is its own cause, so another
+    // occurrence's legacy-name reading, exempted or not, hides nothing here).
     if (raw[index] === "broad") found.push(finding(file, index + 1, "owner-blind", "matches the prefix with no owner segment after it"));
     else if (folded.blind !== undefined) found.push(finding(file, index + 1, "owner-blind", folded.blind));
-    else if (folded.bareBlind !== undefined && !legacyRead) found.push(finding(file, index + 1, "owner-blind", folded.bareBlind));
+    else if (folded.bareBlind !== undefined) found.push(finding(file, index + 1, "owner-blind", folded.bareBlind));
   });
   return found;
 }

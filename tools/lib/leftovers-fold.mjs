@@ -727,11 +727,11 @@ function ownerAfter(rest) {
  * The bare word (D4): a literal that holds the whole word, with a boundary each side (no letter or digit touches it), followed by none of: the owner form or a narrow
  * second segment as the classifier reads it (`verdictAfter`; this covers the exempt, quarantine and proof marker words and `TESTSTODELETE_RUN`), `[uw]` with a digit form
  * after it, the label key `.owner`, the owner letter at the end of a literal that a `+` continues, prose (a space before the word, and after it a space, or `,` `.` `:` `)`
- * and then a space or the literal's end). What is left is `{ blind, legacy }`: a tail that holds `[`, `(`, `?`, `*` or `\` is a pattern and stays `owner-blind` (the tail is the run of characters
- * that touch the word, up to the next space); the rest is `legacy-name`.
- * `literals` are `[{ value, plus }]`.
+ * and then a space or the literal's end). What is left is `{ blind, legacy }`: a tail that holds `[`, `(`, `?`, `*` or `\` is a pattern and is `owner-blind` (the tail is the run of characters
+ * that touch the word, up to the next space), unless `legacyAt(text)` says that `legacyNameHits` reads that same occurrence (`text` is the literal from the occurrence on: then it is `legacy-name`
+ * alone, as `'testsToDelete-u*'` is at the release); the rest is `legacy-name`. `literals` are `[{ value, plus }]`.
  */
-export function bareWordHits(literals) {
+export function bareWordHits(literals, legacyAt = () => false) {
   const blind = [];
   const legacy = [];
   for (const { value, plus } of literals) {
@@ -746,7 +746,9 @@ export function bareWordHits(literals) {
       const prose = start > 0 && /\s/.test(value[start - 1]) && next !== undefined && (/\s/.test(next) || (",.:)".includes(next) && (stop + 1 === value.length || /\s/.test(value[stop + 1]))));
       const letter = plus && value.length - stop === 2 && OWNER_LETTER.test(value.slice(stop));
       if (ownerAfter(rest) || LABEL_KEY.test(rest) || prose || letter) return;
-      (PATTERN_TAIL.test(TAIL_TOKEN.exec(rest)[0]) ? blind : legacy).push(`${value.slice(start, stop)}${rest.slice(0, 3)}`);
+      const pattern = PATTERN_TAIL.test(TAIL_TOKEN.exec(rest)[0]);
+      if (pattern && legacyAt(value.slice(start))) return; // one cause, one class: legacyNameHits reads this occurrence
+      (pattern ? blind : legacy).push(`${value.slice(start, stop)}${rest.slice(0, 3)}`);
     });
   }
   return { blind, legacy };

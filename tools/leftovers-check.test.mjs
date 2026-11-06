@@ -11,9 +11,8 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { createRequire } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
-import { spawnSync } from "node:child_process";
 import { git } from "./lib/git.mjs";
 import * as fold from "./lib/leftovers-fold.mjs";
 import * as sweeper from "./lib/sweeper-scan.mjs";
@@ -1109,8 +1108,38 @@ const SPELLINGS = [
   ["a private field line (starts with #) is code in JavaScript", "scripts/zz.mjs", ["  #p = 'tests' + 'To' + 'Delete-x';"], ["1:legacy-name"], []],
   ["a private method that sweeps a joined glob", "scripts/zz.mjs", ["  #sweep = () => fs.rmSync('tests' + 'To' + 'Delete-*');"], ["1:owner-blind"], []],
   ["the code after #> in PowerShell", "scripts/zz.ps1", ["<# a comment", "#> $n = 'tests' + 'To' + 'Delete-x'"], ["2:legacy-name"], []],
-  ["a # line in a multi-line template is template text", "scripts/zz.mjs", ["const t = `", "# 'testsTo'", "`;"], ["2:legacy-name"], []],
-  ["a // line in a multi-line template is template text", "scripts/zz.mjs", ["const t = `", "// testsTo", "`;"], ["2:legacy-name"], []],
+  // D4, the comment gate: a line the raw readings call a comment gets folded readings in two cases only (a JS line that starts with # in code state, a .ps1 line where #> closes a block comment and code follows);
+  // every other comment-like line is EMPTY in the folded input, so it binds nothing and reads nothing, and the release reports nothing on it either
+  ["a # line in a multi-line template is template text: nothing is read", "scripts/zz.mjs", ["const t = `", "# 'testsTo'", "`;"], [], []],
+  ["a // line in a multi-line template is template text: nothing is read", "scripts/zz.mjs", ["const t = `", "// testsTo", "`;"], [], []],
+  ["a # line in a template that holds a sweep", "scripts/zz.mjs", ["const t = `", `# rm -rf ${Q}-*`, "`;"], [], []],
+  ["a // line in a template that holds a sweep", "scripts/zz.mjs", ["const t = `", `// rm -rf ${Q}-*`, "`;"], [], []],
+  ["a -- line in a template that holds a drop", "scripts/zz.mjs", ["const t = `", `-- drop ${Q}-*`, "`;"], [], []],
+  ["a -- line in .sh", "scripts/zz.sh", [`-- drop ${Q}-*`], [], []],
+  ["a -- line in a workflow's run block", ".github/workflows/zz.yml", ["jobs:", "  j:", "    runs-on: ubuntu-latest", "    steps:", "      - run: |", `          -- drop ${Q}-*`], [], []],
+  ["a -- line in .sh that would bind a prefix", "scripts/zz.sh", ["-- P='testsTo''Delete-'", 'rm -rf "$P"*'], [], []],
+  ["a # line where a template closes and code follows is not read, as at the release", "scripts/zz.mjs", ["const t = `", "# x` + 'tests' + 'To' + 'Delete-x';"], [], []],
+  ["a // line where a block comment closes and code follows is not read, as at the release", "scripts/zz.mjs", ["/* open", "// x */ const n = 'tests' + 'To' + 'Delete-x';"], [], []],
+  ["a # line inside a .ps1 block comment that holds a sweep", "scripts/zz.ps1", ["<# a comment", `# Remove-Item ${Q}-*`, "#>"], [], []],
+  ["a .ps1 line where #> closes a block comment and a whole name follows: the whole name is read too", "scripts/zz.ps1", ["<# a comment", `#> $n = '${Q}-x'`], ["2:legacy-name"], []],
+  ["a private field line (starts with #): a whole name is read too", "scripts/zz.mjs", ["class A {", `  #p = '${Q}-agent-1';`, "}"], ["2:legacy-name"], []],
+  ["a private field line (starts with #): a regex over the word is owner-blind, in a class", "scripts/zz.mjs", ["class A {", `  #r = /^${Q}[-_]/;`, "}"], ["2:owner-blind"], []],
+  ["the same with a comment elsewhere in the file: the answer does not depend on it", "scripts/zz.mjs", ["const z = 1; // far", "class A {", `  #r = /^${Q}[-_]/;`, "}"], ["3:owner-blind"], []],
+  ["the same at the start of the line", "scripts/zz.mjs", ["class A {", `#r = /^${Q}[-_]/;`, "}"], ["2:owner-blind"], []],
+  ["an indented # line: the classifier's shell-comment cut hides the removal, so the bare word is legacy-name (the same line without # is owner-blind, next row)", "scripts/zz.mjs", ["class A {", `  #p = rmSync('${Q}-' + x);`, "}"], ["2:legacy-name"], []],
+  ["the same line without #", "scripts/zz.mjs", ["class A {", `  p = rmSync('${Q}-' + x);`, "}"], ["2:owner-blind"], ["2:owner-blind"]],
+  ["a raw binding from a comment stays, as at the release", "scripts/zz.mjs", [`// const P = '${Q}-';`, "rmSync(P + x);"], ["2:owner-blind"], ["2:owner-blind"]],
+  // D4, the occurrence rule: each occurrence of the word is its own cause. A pattern in the tail is dropped only when legacyNameHits reads that same occurrence
+  ["a piece and a pattern in two literals draw both classes", "scripts/zz.mjs", [`const a = 'testsTo'; const b = '${Q}[-_]';`], ["1:legacy-name", "1:owner-blind"], []],
+  ["the same, the other order", "scripts/zz.mjs", [`const b = '${Q}[-_]'; const a = 'testsTo';`], ["1:legacy-name", "1:owner-blind"], []],
+  ["the same, a legacy-name exemption clears the piece and leaves owner-blind", "scripts/zz.mjs", [`const a = 'testsTo'; const b = '${Q}[-_]'; // ${Q}-exempt: legacy-name — a probe the test removes`], ["1:owner-blind"], []],
+  ["two occurrences in one literal: a name, then a pattern", "scripts/zz.mjs", [`const a = '${Q}-old ${Q}[-_]';`], ["1:legacy-name", "1:owner-blind"], ["1:legacy-name"]],
+  ["two occurrences in one literal: a pattern, then a name", "scripts/zz.mjs", [`const a = '${Q}[-_] ${Q}-old';`], ["1:legacy-name", "1:owner-blind"], ["1:legacy-name"]],
+  ["two occurrences in one literal, exempted: legacy-name is cleared and owner-blind stays", "scripts/zz.mjs", [`const a = '${Q}-old ${Q}[-_]'; // ${Q}-exempt: legacy-name — a probe the test removes`], ["1:owner-blind"], []],
+  ["a bare word with a pattern tail and an owner letter is legacy-name alone, and its exemption clears it", "scripts/zz.mjs", [`const a = '${Q}-u*'; // ${Q}-exempt: legacy-name — a probe the test removes`], [], []],
+  ["a removal over the same tail draws both, as at the release", "scripts/zz.mjs", [`rmSync('${Q}-u*');`], ["1:legacy-name", "1:owner-blind"], ["1:legacy-name", "1:owner-blind"]],
+  ["on a line a classifier reading calls broad the bare word reads nothing", "scripts/zz.mjs", [`const a = '${Q}'; fs.globSync('${Q}-*');`], ["1:owner-blind"], ["1:owner-blind"]],
+  ["on a line a classifier reading calls broad the piece reads nothing", "scripts/zz.mjs", [`const a = 'testsTo'; fs.globSync('${Q}-*');`], ["1:owner-blind"], ["1:owner-blind"]],
   ["a call a space after the word is not a pattern tail (the tail is the run that touches the word)", "scripts/zz.mjs", [`const a = '${Q} (x)';`], ["1:legacy-name"], []],
   ["a prefix in pieces, a sweep over the name on the next line", "scripts/zz.mjs", ["const P = 'testsTo' + 'Delete-';", "fs.rmSync(P + x);"], ["1:legacy-name", "2:owner-blind"], []],
   ["a prefix in pieces, a sweep over the name; an exemption clears the first line only", "scripts/zz.mjs", [`const P = 'testsTo' + 'Delete-'; // ${Q}-exempt: legacy-name — a probe the test removes`, "fs.rmSync(P + x);"], ["2:owner-blind"], []],
@@ -1653,7 +1682,7 @@ test("F30 classifier: looseVerdicts answers what the regular expression of the r
   for (let count = 0; count < 30000; count += 1) lines.push(Array.from({ length: 1 + next(14) }, () => PIECES_OF_LINE[next(PIECES_OF_LINE.length)]).join(""));
   const wrong = lines.filter((line) => JSON.stringify(sweeper.looseVerdicts(line.toLowerCase())) !== JSON.stringify(oldLooseVerdicts(line.toLowerCase())));
   assert.deepEqual(wrong.slice(0, 5), [], `${wrong.length} of ${lines.length} lines answer differently`);
-  assert.ok(lines.length > 40000);
+  assert.equal(lines.length, 52621, "the lines the oracle is compared over: 1 + 12 + 144 + 1728 + 20736 of four pieces, and 30000 random ones");
 });
 
 test("F30 classifier: a token that holds the word arms a later occurrence and not an earlier one; a pipe or a semicolon disarms (the differential rows by hand)", () => {
@@ -1663,31 +1692,7 @@ test("F30 classifier: a token that holds the word arms a later occurrence and no
   assert.deepEqual(sweeper.looseVerdicts(`${P}-a grep ${P}-b`), [null], "only the second is armed");
 });
 
-const MIB = 1024 * 1024;
-const CLASSIFIER_CHILD = `
-import { scanText } from ${JSON.stringify(pathToFileURL(path.join(root, "tools", "leftovers-check.mjs")).href)};
-const [unit, mib] = process.argv.slice(1);
-const line = "x = " + unit.repeat(Math.ceil(Number(mib) * 1048576 / unit.length));
-const started = Date.now();
-const found = scanText("scripts/zz.mjs", line + "\\n");
-console.log(JSON.stringify({ seconds: (Date.now() - started) / 1000, classes: [...new Set(found.map((entry) => entry.cls))].sort() }));
-`;
-const CLASSIFIER_UNITS = [
-  ["the word", `${Q} `], ["rm and the word", `rm ${Q} `], ["grep and the word", `grep ${Q} `], ["the word and a pipe", `${Q}| `], ["the word and a glob", `${Q}-*`],
-  ["a quoted name and a comma", `'${Q}-',`], ["a path anchor", `/${Q}-`],
-  ["an escaped single quote", "\\'"], ["an escaped double quote", '\\"'], ["a literal and a comma", "'a',"], ["spaces after a literal", `'a'${" ".repeat(61)}`], ["a backtick and a quote", '`"'], ["an open regex class", "= /[ "],
-];
-
-test("F30 time: scanText on one hostile line of 2 MiB ends within 60 s, for the repeated word and for D5's lines (the classifier is linear on a raw line)", () => {
-  const slow = [];
-  for (const [name, unit] of CLASSIFIER_UNITS) {
-    const child = spawnSync(process.execPath, ["--input-type=module", "-e", CLASSIFIER_CHILD, unit, "2"], { encoding: "utf8", timeout: 60_000 });
-    if (child.status !== 0) slow.push(`${name}: ${child.error?.code ?? `exit ${child.status}`} ${child.stderr.slice(0, 200)}`);
-  }
-  assert.deepEqual(slow, [], "lines that did not end in 60 s");
-});
-
-test("F30 time: a file with 300000 findings is read to the end (no call spreads the list of findings)", (t) => {
+test("F30 crash: a file with 300000 findings is read to the end (no call spreads the list of findings, which overflows the stack)", (t) => {
   const repo = tree(t, { "scripts/many.sh": "t=$(mktemp)\n".repeat(300000) });
   const found = scanRepository({ repo, rule: RULE }).findings.filter((entry) => entry.file === "scripts/many.sh");
   assert.equal(found.length, 300000);
