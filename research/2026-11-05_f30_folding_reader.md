@@ -593,3 +593,47 @@ All 34 lines of the test's list are in the run (`stepsall.out` of the coder's sc
 Lines: `tools/lib/leftovers-fold.mjs` 784, `tools/lib/leftovers-fold-shell.mjs` 265, `tools/leftovers-check.mjs` 789 (all under 800); `tools/leftovers-check.test.mjs` 1,852 (it was over 800 before this branch and is not named by D7).
 
 Differences from the brief: (1) the detail's room is 9 B, not 691 B (9.7). (2) The relation P reading in 9.3. (3) P13 and P14 have no row (9.4). (4) The interaction table is in the existing test file, not a new one, because the guard's own scan excludes only two test files by name. (5) `skipSpaces` and `plusFollows` take the context to count; a signature change of the exported helpers. Not run: the independent review, the coai gate, the PR, a release, and the real-tree comparison "immediately before the release" (the plan asks for it then).
+
+## 10. Epoch 3, the review's fixes (2026-11-06, `feat/f30-folding-reader`)
+
+Append-only. Section 9 is not edited; its corrections are in 10.5. The coder was Sonnet 5.5. The gate's and the Opus review's findings reached the coder as a brief; this section records each finding as that brief stated it and what it became. Entry 3.1 of the ledger (the size box reads as D7 does) is the one accepted change of epoch 3; no fix below made a sentence of the plan false.
+
+### 10.1 The code fixes, RED and GREEN
+
+RED is the new rows against `dcf4070`, in a scratch copy; GREEN is the worktree at `2dc7c81`.
+
+| Finding | RED | GREEN |
+|---|---|---|
+| D2, a call is not a parenthesis: a name after `.` or `?.` is a call whatever it is called, `?.(` is a call, `default` and `new` are keywords | 11 rows wrong: `map.delete(`, `Symbol.for(`, `Array.of(`, `p.catch(`, `it.return(`, `f?.(`, `x.f?.(` answered `owner-blind` (joined) for `legacy-name`; `export default (` and `new (` answered `legacy-name` for `owner-blind` | all eleven right; `groupParens` takes the member test before the keyword test |
+| D2, regex positions: a template nested in a hole closes with `prev` and `start` unchanged | ``const t = `${`a` / 2 + `/`}`;`` and ``const t = `${`a` / 2 + "/" + `b`}`;`` each answered `1:unreadable` where line 2 is `2:legacy-name` | both `2:legacy-name`; the hole sets `prev = VALUE`, `start = false` when the nested template closes |
+| D1, "uses the other only at call time": `FOLDERS` read `foldSh` and `foldPs` at load | no behavioural RED: both are function declarations, hoisted, so either import order worked | `FOLDERS` holds functions that return them; a test imports either file first in a child process |
+
+### 10.2 Rows for the review's mutants
+
+All run at `286a5a3` (the table of 10.4). The fixtures are the review's: O04 (`notAName` off) `const a = 'TESTSTODELETE_U*';` is `1:owner-blind`; G03 (`.ps1` comment-like line read in any state) ``-- 'tests' + 'To' + 'Delete-x'`` is `[]`; G06 (an unread line keeps its folded text) a ``# const P = 'tests\x54oDelete-';`` line inside a template, then `fs.rmSync(P + x);`, is `[]`; Q30 (a block comment's start read as code) `/* a` then ``# b */ const n = 'tests' + 'To' + 'Delete-x';`` is `[]`; Q13 and Q14 (`if` and `throw` out of the keywords) `throw ('testsTo') + 'Delete-*';` and `if (…)` are `1:owner-blind`; Q16 (spaces counted before a `.ps1` call) `$x = foo ('testsTo') + 'Delete-*'` is `1:owner-blind`. The `.ps1` row states its reading as a limit: PowerShell command mode would pass three arguments and the code joins.
+
+**Q29, the lookahead flag.** The mutant that resets the no-regex flag when a join reads a template ahead (``'a'+`${/[}` `` repeated) took 3,058,970, 48,834,747 and 781,052,094 steps at 8, 32 and 128 KiB, and the four time tests stayed green because their sizes began at 1 MB, which a quadratic line never finishes. The hostile-line test now measures every shape at 32 and 128 KiB first (at most 24 steps per byte, and at most 4.5 times from 32 to 128 KiB) and does not run a failing shape larger; the shape is in the table. The mutant is red in that test within seconds. The step counts of the shape at the head, which are linear: 8 KiB 16,385; 32 KiB 65,531; 128 KiB 262,145; 1 MiB 2,097,144; 2 MiB 4,194,305; 4 MiB 8,388,602; 8 MiB 16,777,211 (2.00 per byte throughout).
+
+**Q34 and Q35** (`groupParens` and `plusFollows` not counted) cannot be seen by a row: their characters are passed again by the main loop, so any line that makes them cost also makes the main loop count it. The test's title is corrected to what it proves: that the step counter counts a failed word, whose scan no later loop repeats.
+
+### 10.3 Texts
+
+The rule detail states the `legacy-name` case of a pattern tail (a pattern after the bare word is `owner-blind` unless `legacyNameHits` reads that occurrence), in 3 bytes of room, by shortening its other sentences (body 31,962 of 31,968 allowed); the hash is updated. The fold header says `.ps1` here-strings, `.sh` heredocs and a nested `"$(…)"` are not told from code, as D2 and the guard's header do. The comment of `foldReading` names the template; the shell file's header no longer says its code is moved whole; the README row of the plan says what is true now. The guard's header has the limit lines of D9: `f<T>(` and `f!(` read as groups; a division at a position the list names reads as a regex, so text after it can open a template and end `unreadable`, as can a string continued onto the next line that holds a backtick; `f /* c */ (`, a tagged template call and `function () {}(` read as groups; `.ps1` command mode joins; `(['a','b']).join('')` is not read; `'TestsTo'` is no form; `'word-word-u*'` is `legacy-name` alone.
+
+### 10.4 The mutants of the round
+
+15 hand mutants of the review's list and of the new code, each in a copy of `286a5a3`, the whole guard test file run with `timeout`. **Red:** O04 (as `O04b`), G03 (`G03b`), G06 (`G06b`), Q30, Q13, Q14, Q16, Q29, and N1 (a member name is no call), N2 (`?.(` is no call), N3 (`default` is a call), N4 (`new` is a call), N5 (a closed nested template keeps the old `prev`). **Green, then red after one row each:** N6 (the spaces between a dot and a name not skipped; row `map . delete (…)`), N7 (a spread counted as a member; row `[...await (…)`), both run again at `dfc0083`: red.
+
+### 10.5 Corrections to section 9, without editing it
+
+- Section 9's first paragraph says epoch 3 used 0 of its accepted changes. Entry 3.1 is now in the ledger, so epoch 3 used one, and the next accepted change is a full stop.
+- Section 9.4 says seven green mutants cannot be seen by a row. O04, G03 and G06 can, and now are (10.2). R08, C13, G14 (= N70), O03 stay green: R08 and C13 and G14 for the reasons given, O03 because its cases return earlier in `bareWordHits`.
+- Section 9.3 says the reading of the broad line would be a one-line change. That is false: the review applied the edit, and the split line still answers both classes, because its raw verdict is `null` (the raw readings skip a split spelling) and the broad verdict is the folded one, so an edit that drops `legacy` where the raw verdict is `broad` does not reach it. The reading stays as the coordinator ruled it, and D5 item 5's text says so.
+
+### 10.6 The review's sound results
+
+The brief records, as sound results of the review: 88,871 fuzz cases on the gate; 44,263 units on the reader's steps; 1,425,765 literals on O03; and the reader against the TypeScript parser over 3,800 files. These are the reviewer's numbers, taken from the brief and not rerun here.
+
+### 10.7 The real trees again
+
+The guard at `dfc0083` against the release `bd795847`, by the same script (tokens and identities as in 9.6): coai `main` ff2016cc44 324 and 324, coai E5 `b3bdd472a3` 229 and 229, creds `main` 7d5e1800be 64 and 64, **creds `7e0a048068` 16 and 17**, benchmark `e597c03e2c` 202 and 202, rag_qln `9852c1f091` 13 and 13, sidecar_rust 0 and 0, vscode_kit `f0ec3641e9` 23 and 23, mcp 0 and 0, amd_r9700 0 and 0, wsl_care `6e0cbcca44` 24 and 24. New: exactly one, `legacy-name` at creds `src_vs_code/src/test/leftoversSites.test.ts:91`. Lost: none. No `unreadable` finding. The machine was under heavy load from other work during this round (load average 25 to 40), which lengthened every run; no result depends on a clock.
