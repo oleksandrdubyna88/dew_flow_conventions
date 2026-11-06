@@ -2148,6 +2148,7 @@ above. Nothing else of the list changes.
 As § *Epoch 6* item 2, with these states: item 2's release and pin steps are DONE, and the second F24 check's Node half
 is DONE (issuecomment-6656216417), its C# half to be posted from S6's record. (c) stays OPEN. F30 stays not a
 prerequisite, deadline 2026-11-19.
+*[2026-11-06: (c) is DONE, item 1's note and [research/security/machines.md](../research/security/machines.md). The sentence above is the state at approval.]*
 
 ### 3. Merge conditions
 
