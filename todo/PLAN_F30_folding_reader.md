@@ -1,6 +1,6 @@
 # PLAN — F30: the shipped Node guard reads a prefix in the spellings it lists
 
-> Status: **epoch 2 stopped for re-review, 2026-11-06: entries 2.2 and 2.3 are the epoch's second and third changes. No new code on this plan until the whole plan is reviewed again and the next epoch opens.** The rebuild and its review fixes are on `feat/f30-folding-reader` at `16943a7`, unmerged. The item is F30 of `todo/PLAN_test_leftovers_merged_core_followups.md`. Owner: this repository. Deadline 2026-11-19, or before creds' E2.5 merges if that is earlier. Not a prerequisite of coai's E5 producer PR.
+> Status: **epoch 3 open, 2026-11-06: the owner approved the narrowed plan after the second full stop; the build is in progress on `feat/f30-folding-reader`, keeping what the re-review's table marks `fits`.** The item is F30 of `todo/PLAN_test_leftovers_merged_core_followups.md`. Owner: this repository. Deadline 2026-11-19, or before creds' E2.5 merges if that is earlier. Not a prerequisite of coai's E5 producer PR.
 
 ## Plan changes
 
@@ -20,7 +20,7 @@ Narrowed: yes — epoch 1 promised that a zero means zero on any one-line spelli
 | three false-finding cures, 2adbe82 | pushed, unmerged | fits | keep the verdictAfter export and the rows; move the three rules into the scanner, tightened to D4 |
 | documents and real-tree record, f5b3b16 | pushed, unmerged | cut | fix forward: correct every text that says owner-blind or any case; keep the research record and add a dated section |
 
-> Epoch 2 · approved 2026-11-05 · by owner · state: stopped
+> Epoch 2 · approved 2026-11-05 · by owner · state: closed
 
 - 2.1 · 2026-11-05 · reviewer · contract — D4's statements about what the release's raw and binding readings do were not measured; a RegExp over a bound name and a use on an assigning line are not followed, and the owner letter before a + only shortens a finding's text
   (Found by the coder's measure and the independent Opus review of f9c427a. The plan's text now says what the reading does; the reading is not extended, as "What this does not do" says. This epoch has no change left: the next accepted one is a full stop.)
@@ -51,6 +51,8 @@ Narrowed: yes — epoch 2 promised that any hostile line ends in linear time or 
 | 284203b: research section 8 | pushed, unmerged | fits | keep unchanged; add a dated section 9 for what section 8 now reads differently |
 | 16943a7: leftovers-shell.mjs including closersOf; its three tests and the imports only they use | pushed, unmerged | cut | fix forward: restore the file from 284203b, byte-equal to the release; remove the tests; no plain revert, because that deletes section 8.8 |
 | 16943a7: research section 8.8 | pushed, unmerged | fits | keep; section 9 says the code left and why |
+
+> Epoch 3 · approved 2026-11-06 · by owner · state: open
 
 ## Goal
 
@@ -176,3 +178,5 @@ This measure reads literals by a rough regular expression. It is evidence for th
 Round 1, session `73a0a295`, `proceed`, 1 of 2 reviewers (Antigravity out of quota). Finding 0 accepted: the real-tree comparison names its commits and runs again before the release. Finding 1 rejected, because its example reads an operand and the rule reads the joined literal.
 
 The code gate on `f5b3b16` (4 of 8 reviewers): findings 0 and 2 accepted, one point: the eight-round cap. D1's scanner removes it. Findings 1, 3 and 4 rejected: finding 1 on the template's reading, findings 3 and 4 measured as found.
+
+The code gate on `f9c427a` (4 of 8 reviewers): one finding accepted, the classifier's cost; on `16943a7` (4 of 8): no findings. The independent Opus reviews of both found what epoch 2's ledger records. The re-review for epoch 3: consult `997bd291`, solved; the Opus judge's table and corrections; the document gate at `7fc4ab1`, `proceed` with no findings, 2 of 4 reviewers (Antigravity out of quota).
