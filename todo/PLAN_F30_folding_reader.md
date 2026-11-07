@@ -1,6 +1,8 @@
 # PLAN — F30: the shipped Node guard reads a prefix in the spellings it lists
 
-> Status: **epoch 3 open, 2026-11-06: the owner approved the narrowed plan after the second full stop; the build is on `feat/f30-folding-reader`; the fixes from its code gate and Opus review are in progress, then the PR, the consumer fix and one release.** The item is F30 of `todo/PLAN_test_leftovers_merged_core_followups.md`. Owner: this repository. Deadline 2026-11-19, or before creds' E2.5 merges if that is earlier. Not a prerequisite of coai's E5 producer PR.
+> Status: **epoch 3 open, released 2026-11-06: #135 merged at `acb693c`, the consumer fix merged first (creds #294, `834c91b`), and `release` promoted to `37b9aa5`. Eight of nine consumers pin it; coai's pin bump (#956) waits for coai's own release, and with it coai's re-run of the guard. The plan closes after that record.**
+>
+> Was: **epoch 3 open, 2026-11-06: the owner approved the narrowed plan after the second full stop; the build is on `feat/f30-folding-reader`; the fixes from its code gate and Opus review are in progress, then the PR, the consumer fix and one release.** The item is F30 of `todo/PLAN_test_leftovers_merged_core_followups.md`. Owner: this repository. Deadline 2026-11-19, or before creds' E2.5 merges if that is earlier. Not a prerequisite of coai's E5 producer PR.
 
 ## Plan changes
 
@@ -168,13 +170,13 @@ This measure reads literals by a rough regular expression. It is evidence for th
 ## Definition of Done
 
 - [x] D5's checks RED on the old guard and GREEN on the new one, with the mutants recorded, including items 5 and 6.
-- [ ] Every test of this repository green; `plan-lifecycle` clean.
-- [ ] The real-tree record on the PR: nine consumers, default branches, each new finding listed and read, each lost finding explained, CI activation stated.
+- [x] Every test of this repository green; `plan-lifecycle` clean. *(At `37b9aa5`, the released commit: 1600 tests, 1592 pass, 0 fail, 8 skipped.)*
+- [x] The real-tree record on the PR: nine consumers, default branches, each new finding listed and read, each lost finding explained, CI activation stated. *(#135, from `dfc0083`.)*
 - [x] The guard's header and `research/` say what the guard reads and what it does not, and name D2's table; `common/test-leftovers-detail.md` points at the header.
 - [x] No file D7 names is over 800 lines; no text or test title says a raw reading is linear.
 - [x] F30's entry says what shipped, with the piece rule and the class, for the template's owner; D8's row is in the follow-ups plan.
-- [ ] The real-tree comparison re-run immediately before the release, with its commits recorded.
-- [ ] One release; the consumers' fixes merged first; the pin bumps, each alone; each consumer that declared "zero whole literals, F30 open" runs the guard again at the new pin and records the result.
+- [x] The real-tree comparison re-run immediately before the release, with its commits recorded. *(2026-11-06, the guard at `37b9aa5` against `bd795847`, each tree's default branch unless named: coai `ddf12da517` 327; coai E5 `b3bdd472a3` 229; creds `834c91b01d` 16; benchmark `e597c03e2c` 202; rag_qln `9852c1f091` 13; sidecar_rust `8efee6f74f` 0; vscode_kit `f0ec3641e9` 23; mcp `5ccfcfdeaa` 0; amd_r9700 `63a1be9a2d` 0; wsl_care `6e0cbcca44` 24. Every tree: 0 new, 0 lost. Creds' `leftoversSites.test.ts:91`, new on the E2.1 branch before its exemption, is not found on creds main.)*
+- [ ] One release; the consumers' fixes merged first; the pin bumps, each alone; each consumer that declared "zero whole literals, F30 open" runs the guard again at the new pin and records the result. *(2026-11-07: the release and the fix are done. Pin bumps merged: creds #306, benchmark #174, sidecar_rust #71, vscode_kit #24, mcp #65, amd_r9700 #17, wsl_care #187, and rag_qln #89 last, with its two externals current. Open: coai #956 alone. Coai #956 is the coai release session's: its rules-budget tests failed on the larger tier, mostly F27's `common/testing.md`, and the owner raised that budget. Creds recorded 0 `legacy-name` at the new pin (creds #309). Coai's re-run waits for #956.)*
 
 ## Plan gate
 
