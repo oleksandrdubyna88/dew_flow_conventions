@@ -928,6 +928,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - **Shape to weigh.** The helper re-owns what it makes to the caller's own SID on Windows (WRITE_OWNER, no privilege; `WindowsOwnership.OwnedByCaller` is the test-side form). It changes the template, every adapted copy and the Node reference. Never widen the key so that `Administrators` counts as the caller: that key is what keeps a folder of another account safe.
 - **The pin to read when this is fixed.** Coai's `AnUntouchedClaim_StaysUnseen_OnAnElevatedWindowsRun`: its assertion on a folder made by the helper goes red.
 - **Owner and date.** This repository, for the template and the rule. Reviewed, and either fixed or accepted again by the owner, at the first of: E2.3 starts (the next copy of the helper), a suite is to run on a Windows machine that persists, or 2026-12-05. Not a prerequisite of any PR of the rollout (epoch 7, the owner's answer, 2026-11-05).
+  *[2026-11-07, at E2.3's start: **accepted again by the owner** (after consult `ee34d365`: one consultant for accepting, one for fixing first unless that costs a plan change, which it does: E2.3 depends on the template at `197cc76`). E2.3 copies the helper as it is. The next review is at the first of: a suite to run on a Windows machine that persists, or 2026-12-05.]*
 
 ## F32 — The raw readings of the guard and the sweeper are super-linear on a hostile line, and their time is not promised (found 2026-11-06, the independent review of F30's `16943a7`; the plan's D8)
 
