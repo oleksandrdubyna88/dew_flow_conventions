@@ -893,6 +893,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   creds' E2.5 merges if that is earlier — the owner confirms or moves the date (the rollout's § *Epoch 6*, item 7, question 3).
   Until it ships, every consumer's Node compliance declaration says in its PR that `legacy-name` and `owner-blind` are
   "zero whole literals, F30 open", and runs the interim scan with its output recorded.
+  *[2026-11-06: shipped in release `37b9aa5` (#135). After a pin bump a consumer's sentence reads "zero for the guard's listed spellings"; `todo/PLAN_F30_folding_reader.md` tracks the pin bumps and the re-runs.]*
 - **Re-measured by the epoch-6 judge (2026-11-05, `scanText` at `bd795847`; the brief's exact lines are not recorded).** The brief's table holds 16 spellings, not 15
   (2 found, 14 not). The count depends on the line: `/testsToDelete[-_]/i` and `new RegExp('^testsToDelete[-_]')` answer `owner-blind` (the classifier's anchors), and the
   bare word, the bare prefix or a `?` glob on a line with `rmSync` answer `owner-blind` too (its deletion reading); with no removal on the line the `?` glob and
