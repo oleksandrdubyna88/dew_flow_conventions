@@ -1,6 +1,6 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **stopped for re-review (2026-11-07): entry 7.2 (E2.4: D5's names cannot pass the released guard), the second accepted change of epoch 7, the seventh full stop.** No new code on any epic of this plan and no merge of a pull request carrying its work until the full re-review is complete; when its record says `Narrowed: yes`, the owner approves the revised plan; then epoch 8 opens. At the stop: E2.1, E2.2, E2.3 merged (creds #294, #310, #311); coai E5's producer merged (#945); E2.4 drafted, nothing built.
+> Status: **stopped for re-review (2026-11-07): entry 7.2 (E2.4: D5's names cannot pass the released guard), the second accepted change of epoch 7, the seventh full stop.** No new code on any epic of this plan and no merge of a pull request carrying its work until the full re-review is complete; when its record says `Narrowed: yes`, the owner approves the revised plan; then epoch 8 opens. At the stop: E2.1, E2.2, E2.3 merged (creds #294, #310, #311); coai E5's producer merged (#945); E2.4 drafted, nothing built. The whole plan is revised for epoch 8 (2026-11-07, step 4 of the full stop): § *Epoch 8 — the plan as revised at the re-review*. Entry 7.2 is settled by option (B), and its record says `Narrowed: no`; the record's verdicts are the Opus judge's (step 5), and epoch 8 opens only after the re-review approves.
 >
 > Was: **epoch 7 open (2026-11-05), approved by the owner after the re-review; entry 7.1 recorded 2026-11-07 (E2.2's harness exit pattern), so the next accepted change is the seventh full stop.** Epoch 6 stopped at entries 6.1 and 6.2; the whole plan was revised (§ *Epoch 7*), the Opus judge sorted epoch 6's work (15 fit; 1 cut, unmerged and fixed forward; 3 outside; nothing merged contradicts), the plan gate on an operative extract, because the plan is over the gate's 256 KiB limit (the first read, session `05d66915`, no findings; the final text, session `a196b43c`, 3 findings rejected with reasons; each time 1 of 2 reviewers answered, the other out of quota) and the interim document gate on the E5 stories document (2 accepted) passed, a final Opus read's fixes were applied, and because the record says `Narrowed: yes` the owner approved it (2026-11-05). F31 is reviewed at the first of: E2.3 starts, a suite is to run on a Windows machine that persists, or 2026-12-05.
 >
@@ -477,6 +477,29 @@ Narrowed: yes — E5's merge condition (o) and the goal: on an elevated Windows 
   (creds `todo/PLAN_test_leftovers_E2.2_brief.md` § 3.1 and § 6, Q2 and Q3; named a change by the independent Opus review of the brief, its point 6. Not counted as changes, with the reason in the brief: Q8, because the Done-when's count stays and the record shows the measured count beside it; Q1, because the plan's "the same group / job" holds and only the runner's own header about streamed output changes on Windows. One change used in epoch 7: the next accepted change is the seventh full stop.)
 - 7.2 · 2026-11-07 · agent · approach, dod — E2.4's brief measured that D5's container and volume names (`testsToDelete-${OWNER}-creds-…`) cannot pass the released guard (`37b9aa5`): its `docker-name` class needs a literal owner segment, and it matches the remover and `-v` names only unquoted (6 findings over D5's steps; clean only with a literal `u1001` owner and unquoted names). § S4's sentence that the guard accepts `${OWNER}` is false. Every way through changes the plan: a literal owner checked against `id -u` replaces D5's computed owner and fails on any other uid (approach); a guard that reads `${OWNER}` is a conventions release E2.4 would depend on; merging with the findings breaks E2.4's Done-when ("the guard evidence run shows only `commandParse.test.ts:40` and the product scripts"). The stories' own rule for this case is to stop and report (D8, § Order)
   (creds `todo/PLAN_test_leftovers_E2.4_brief.md` § 6 Q1 and integration findings I2, I3, on `feat/test-leftovers-e2.4` at `dee6220`; the question consultants, consult `78b3ed74`, both counted it a change. Not counted, with the reason: the bash helper writing `:<start>:<ns>` on Linux, because the stories say the released contract wins where they differ (§ Order) and both readers need it. **The second accepted change of epoch 7: the seventh full stop.** No new code on any epic of this plan until the re-review is complete; the E2.4 drafts (the S1 spec by Fable, the S2–S4 brief) are the starting material.)
+
+### Re-review for epoch 8
+
+Narrowed: no — entry 7.2 is settled by option (B), which keeps D5's names in the owner form, its owner label, its record and its complete cleanup and E2.4's Done-when; nothing of the goal, the Definition of Done, the merge conditions or the release got smaller. The Node reading of the Definition of Done got stricter (F30 released), and the merge conditions got wider (§ *Epoch 8* item 3: the remover's `|| true` test, the uid check before any resource, S7's two checks and its last commit, E6's worktree collector and three container proofs, E7's serialization and four ownership states). Acme's state after a kill stays "gone" on either branch of § *Epoch 8* item 4.3.2.
+  (Written 2026-11-07 with the revision of § *Epoch 8*, over the two entries of epoch 7: 7.1, E2.2's harness exit
+  module (built, merged as creds #310); 7.2, E2.4's names against the released guard (drafts only). Re-review consult
+  `ba518e5d`; the question consultants before it: `78b3ed74`. The Verdict and Action cells are `—` until an Opus judge
+  fills them (step 5 of the full stop); the judge adds what this list missed. The epoch 8 line is written only after the
+  re-review approves; with `Narrowed: no` the plan gate approves, not the owner.)
+
+| Work | Where | Verdict | Action |
+|---|---|---|---|
+| the epoch-7 record, F31 and the owner's answer, conventions #134 `df8eb54` | main | — | — |
+| creds #294 `834c91b`, E2.1 — the Node unit-test lifecycle | main of creds | — | — |
+| F30, conventions `acb693c`, and the release `37b9aa5` (with #136, the WSL administrator scan); the nine pin bumps to it (among them mcp #65 `45a8db2`, rag_qln #89 `93ffdb9`) | main; `release` = `37b9aa5`; main of each consumer | — | — |
+| the records #137 `e444c1b`, #138 `a3a02fa` (entry 7.1), #139 `7d8ad89`, #140 `eb8c141` | main | — | — |
+| creds #310 `bf59e4f`, E2.2 — the harnesses and the shared exit module of entry 7.1 | main of creds | — | — |
+| creds #311 `0ae0211`, E2.3 — the C# helper as an adapted copy in five executables | main of creds | — | — |
+| coai #945 `825504e`, E5's producer — S3, S2-B, S4, S5, S6 | main of coai | — | — |
+| creds `dee6220` on `feat/test-leftovers-e2.4` — the E2.4 S1 spec (Fable) and the S2–S4 brief (Opus), docs only | pushed, unmerged (no PR) | — | — |
+| benchmark `a94775a6` on `docs/e6-boundary-mirror` — the E6 boundary row on the benchmark side | pushed, unmerged (no PR) | — | — |
+| the stop record, entry 7.2, conventions #141 `a887924` | main | — | — |
+| this revision, § *Epoch 8* and this record (branch `docs/rollout-epoch-8`) | local, uncommitted | — | — |
 
 ## Symptom
 
@@ -2242,6 +2265,253 @@ this limit, and any test in it that says "collected" on Windows re-owns first.
 **8.3 What the other documents' own revisions must say**, in addition to § *Epoch 6* item 8.3: E2.3, E6 and E7 state this
 goal exception where they copy the C# helper, and each brief's table carries the new sentence. E6 reads benchmark's draft
 #103 before it writes its stories; that draft predates the owner form.
+
+## Epoch 8 — the plan as revised at the re-review (2026-11-07)
+
+The whole plan read again against what is known now, as step 4 of the full stop asks (`common/plan-change-control.md`),
+over the two entries of epoch 7: 7.1, E2.2's harness exit pattern (built and merged); 7.2, E2.4's container and volume
+names against the released guard. The re-review consult is `ba518e5d` (codex); the question consultants before it:
+`78b3ed74`. It is advice, and each point was checked against the files or by a run (item 6). This section is the
+baseline epoch 8 is approved on. § *Epoch 7* and § *Epoch 6* stay as the plan for everything this section does not name.
+Superseded by this section, read from here: § *Epoch 6* item 3's E2, E6 and E7 tables (item 3 below replaces them; the
+rows (o), (p), (k) of § *Epoch 7* item 3 are met and stay as the record); the example spelling of creds' D5
+(`testsToDelete-${OWNER}-creds-…`) and § S4's sentence that the shipped guard accepts it (item 4.2); "F30 open" in every
+Node compliance reading (item 1).
+
+**How to read the evidence.** **[M]** marks a statement measured for this revision, read-only, with the command in item 3.2.
+**[D]** marks a statement taken from a document, with the document named. A statement with neither mark is a decision of
+this revision.
+
+### 1. What this plan is now
+
+**The root cause, the consultant's, checked.** Seven stops share one shape: the plan approved a mechanism, and a later
+brief found that the mechanism does not fit the tool, the tree or the CI at the pin. Epoch 6 added the table (each
+condition mapped to a file, its invocations and a check). Epoch 7 added a column (what the check prepares and does not
+prove). Entry 7.2 shows the gap that is still open: the table held a claim about the released guard that nobody had run.
+E2.4's brief ran it and found 6 findings. So from epoch 8, **a row is approved only with an OBSERVED result at the
+consumer's actual pin, and with at least one counterexample that must be red** (item 8.1). Item 3 carries that for every
+remaining row that can be observed read-only. The rows that need a hosted run say so, and they are observed before their
+story's plan gate, not after it.
+
+**State at the stop (read 2026-11-07).**
+
+| Epic | State | Commits |
+|---|---|---|
+| E1, E3, E4 | DONE (wave 1) | conventions #77 `2c96f83`; mcp #58 `4feb245`, #59 `197cc76`; sidecar_rust #64 `5478109` |
+| E2 (creds) | E2.1, E2.2, E2.3 MERGED. E2.4 DRAFTED only: the S1 spec by Fable (`todo/PLAN_test_leftovers_E2.4_S1_spec.md`) and the S2–S4 brief by Opus (`todo/PLAN_test_leftovers_E2.4_brief.md`), on `feat/test-leftovers-e2.4` at `dee6220` (pushed, no PR), no code. E2.5 not started | #294 `834c91b`, #310 `bf59e4f` (entry 7.1), #311 `0ae0211` |
+| E5 (coai) | the producer PR MERGED (S3, S2-B, S4, S5, S6). S7 (the drain) not started. The baseline holds 778 entries in six scopes **[M]**; the inline `raw-temp` markers number 78 **[M]** | #945 `825504e`; `main` at `f07a9601` |
+| E6 (benchmark) | stage A DONE. The stories are an old draft (`docs/test-leftovers-e6-stories`, `08a87430`, 2026-10-17, before the owner form) **[D]**. The boundary row is written on the benchmark side on `docs/e6-boundary-mirror` (`a94775a6`, pushed, unmerged) **[D]** | #125 `6a963a4` |
+| E7 (rag_qln) | stage A DONE and promoted. No stories document. `research/module_tests.md` is still absent **[M]** | #86 `47998e7`, #87 `88577ff`; pin #89 `93ffdb9` |
+| F30 | DONE: released in `37b9aa5` **[D]**; every consumer pinned there (the coordinator's record; read for mcp, creds, benchmark, coai and rag_qln **[M]**; the local sidecar_rust ref was not fetched) | `acb693c`, release `37b9aa5` |
+| F31 | ACCEPTED AGAIN by the owner on 2026-11-07, at E2.3's start, with the `windows-latest` ownership measurement (#139, #140) **[D]**. Next review: a Windows machine that persists, or 2026-12-05 | — |
+| Merge condition (c) | DONE for the WSL machine (#136) **[D]** | `37b9aa5` |
+| The coai feature review | not started (item 3, row F; item 5) | — |
+
+**Goal.** The goal of § *Epoch 6*, with § *Epoch 7*'s exception for an elevated Windows run, stands word for word. No
+exception is added.
+
+**Definition of Done, read for epoch 8** (the list is not edited). F30 is released, so § *Epoch 6*'s reading "a Node
+consumer's zero for `legacy-name` and `owner-blind` is a zero of WHOLE literals, F30 open" ends: from `37b9aa5` the zero is
+the folding reader's zero, for the spellings its table lists. **[M]** at `37b9aa5`: `"testsTo" + "Delete-"` in a `.cjs` and in
+a `.sh`, `"testsTo""Delete-"` in a `.sh`, an array `.join("")` and a template in a `.mjs` are each `legacy-name`. What it
+still does not read **[M]**: a prefix joined through a shell variable (`p=testsTo; q=${p}Delete-agent-x`), and in a `.sh`
+any temp path that is not `mktemp` (`${TMPDIR:-/tmp}`, `/tmp/x` with `mkdir`). A PR that declared "F30 open" re-runs the
+guard at `37b9aa5` and records the result (F30's own Definition of Done). This reading is stricter, not smaller.
+
+### 2. Prerequisites
+
+1. Merge condition (c), the release `37b9aa5` and its pins, F30: DONE.
+2. F31: accepted, with its triggers above. Not a prerequisite of any PR here. E6 and E7 state its limit where they copy the
+   C# helper (§ *Epoch 7* item 8.3).
+3. The N6 follow-up (a `raw-temp` reading for `${TMPDIR…}` and `$TMPDIR` in `.sh`): still open, still not a prerequisite.
+   Each epic migrates its own sites and its PR names the lines the guard cannot see.
+4. **No conventions release is a prerequisite of E2.4** (item 4.2 rejects option A).
+5. Not prerequisites: F25–F29, F32; the private sibling's mirror (F26, the owner's).
+
+### 3. Merge conditions — ONE table
+
+Each remaining condition, its implementation, its invocations, its check, what the check prepares and does not prove, and
+what was OBSERVED for this revision. A row whose last cell says "to observe" names the run that must exist before that
+story's plan gate.
+
+| # | Condition | Implementation (file) | Invocations | Executable check | Prepares / does not prove | Observed for this revision |
+|---|---|---|---|---|---|---|
+| E2.4-a | `docker.yml`'s names are owner-form and the carve-out is complete, in the guard's reading | creds `docker.yml`: a first step *Name the smoke's resources*, the names `testsToDelete-u1001-creds-{cv,refused,refused-data,refused-logs}-${SMOKE_ID}`, one remover step (item 4.2) | the guard under `--profile node`; `docker.yml` runs only on `ubuntu-latest` (creds' D4) | the shipped guard on the head: 0 findings for `docker.yml` (S3.0) | A text scan. It proves the spelling and the step order, not that a command ran | **[M]** whole workflow, main `0ae0211` with option B: 0 findings. Seven counterexamples, each red: D5 as written 6 (4 `docker-name`, 2 `docker-run`); B with the remover's names quoted 2; B without `if: always()` 2; B without `continue-on-error` 2; a `docker logs` reader step after the remover 1; the remover before *Smoke-test a refused start* 1; one volume left out of the remover 1. Correction to the brief's I3: `-v` sources in quotes are read (0 findings); only the remover's names must be unquoted |
+| E2.4-b | every remover command runs on every path | the remover: each of the four removals ends in `\|\| true`; the step is `if: always()` and `continue-on-error: true` | the same | a creds test over `docker.yml` (in S3, beside the guard fixtures of `leftoversGuardFixtures.test.ts`): each removal line of that step ends in `\|\| true`. RED: one line without it | The guard does NOT check it. `continue-on-error` keeps only the job's verdict; the step's shell is `bash -e` (GitHub's default, **[D]** its documentation), so the first failed command ends the step and the later removals do not run | **[M]** B with no `\|\| true` in the remover: 0 findings, so the guard accepts it. **[M]** `bash --noprofile --norc -eo pipefail -c 'f(){ return 1; }; f; echo ran'` prints nothing, exit 1 |
+| E2.4-c | the owner segment is the runner's uid, checked before any resource exists | the naming step, before *Build*: `[ "$(id -u)" = 1001 ] \|\| exit 1`, then `SMOKE_ID` and `SMOKE_OWNER` (`$PPID` of the step's shell, D5) | `ubuntu-latest` | the step fails at once on any other uid; the first dispatch prints the uid and the worker | Proves the name matches the runner. A move to another runner fails loudly before Docker starts, never with a wrong name | **to observe** in S3.1's premise run: uid `1001` is **[D]** (the brief: "to be measured by the first dispatch") |
+| E2.4-d | sc. 1 and sc. 2: a failed smoke stays failed, the remover ran, `Publish` skipped; the happy path is green | as E2.4-a and b | two hosted dispatches on a throwaway branch, one on the PR branch | the brief's S3.1 (P, R, G1, G2) and S3.2, run URLs on the PR | The throwaway rewrites `Publish`'s `if:`, so it proves `success()`, not the real `if:` | **to observe** before E2.4's code gate (hosted only; no `docker` binary here **[D]** the brief's I14) |
+| E2.4-e | a bash record is judged on Linux | `owned.sh`'s `owned_owner` writes `:<start>:<ns>` on Linux (the start from `/proc/$$/stat` and ONE `getconf CLK_TCK`, the namespace from ONE `readlink /proc/self/ns/pid`); macOS writes neither | every Linux caller of `owned.sh` | the S1 spec's T13, T15, T16 on Linux: the janitor and the Node sweep collect a dead record | Without `<ns>` both readers answer `unknown` and collect nothing | **[D]** the brief's I4, read from `janitor.sh:649` and `owned.mjs:564`. Not counted: the stories say the released contract wins (§ *Order*). The S1 spec is revised before its gate |
+| E2.4-f | sc. 6: acme killed mid-issuance leaves nothing after the next run | `run.sh`'s janitor call (D6); the state | the hosted `ubuntu-latest` throwaway job (the brief's Q2) | S4.2: `kill -9`, wait 11 minutes, run again; the project, its network AND the state are gone | The janitor runs as the job's user; the containers write root- and uid-10001-owned files into a bind mount | **to observe before E2.4's plan gate** (a throwaway, never merged): does the janitor remove the state folder? Decided now (item 4.3): if not, the state moves to named, labelled volumes. "A person removes it" is not an outcome of this plan |
+| E2.4-g | sc. 3 on Windows | S1's T14 | `windows-latest` | the `unverified:` line and the runner's `[ -O ]` outcome quoted | The Node sweep only lists on Windows (F16); F31 on the elevated runner | **[D]** the S1 spec § 10 point 4 |
+| E2.5-a | the Node guard over creds at `37b9aa5`: only the inventory's exemptions are left | the shipped guard, `--profile node --token creds` | the files the `node` profile reads | exactly the list in the PR (the E2.4 brief's row 20 expects 5 after E2.4), every other line a finding | A spelling check | **[M]** the plant spellings of item 1 are `legacy-name` at `37b9aa5`. So S5 sc. 2's `.cjs` and `.sh` plants are findings again: the PR pins each as a positive test, RED by hand once against a copy of the guard with the plant's line removed. Creds' revision row 2 ("cannot be findings") is read with this |
+| E2.5-b | the `.sh` temp paths the guard cannot see | migration by E2.4 (`mcp-listen-smoke.sh:35`, `version-smoke.sh:30`) | — | `git grep` for the old leaf names → 0 | No detector (N6) | **[M]** in a `.sh`: `x=${TMPDIR:-/tmp}`, `work="${TMPDIR:-/tmp}/creds-smoke-$$"; mkdir -p "$work"` and `d=/tmp/creds-x; mkdir -p "$d"` give no finding; `work=$(mktemp -d)` is `raw-temp` |
+| E2.5-c | the C# guard over `.cs` | creds' adapted copy (E2.3) | the five xUnit executables | the copied folded reading: a planted split literal in a `.cs` is a finding | The Node guard does not fold `.cs` | **[M]** the Node guard on `var p = "testsTo" + "Delete-agent-x";` in a `.cs`: no finding. So `.cs` rests on the C# guard alone |
+| S7-a | the creation bypass goes | coai `ci.yml`, step *The raw-temp baseline only shrinks*, its `number != 945` clause | every later PR | S7's first PR removes the clause | — | **[M]** the clause is on `main` `f07a9601` (`ci.yml:211`) |
+| S7-b | an entry is removed only with its allocation | `raw-temp-baseline.json`; the Node wrapper (`testLeftovers.test.mjs:63`, `--baseline`) and the C# wrapper | each drain PR | BOTH `--baseline` (reconciliation) and `--baseline-shrinks --base <base>` green | The shrink check alone passes a deleted entry whose site stays | **[M]** one Node entry deleted, its site kept: `--baseline` exit 1 (`raw-temp` at the site); `--baseline-shrinks --base HEAD` exit 0 ("only shrinks"). The C# half was not run here |
+| S7-c | history only where it is needed | the standing step fetches the base at depth 1 | every PR | a non-creation shrink needs no history; a creation is refused in a shallow clone (exit 2) | — | **[D]** read in `tools/lib/raw-temp-baseline.mjs` at `37b9aa5` (`creationVerdict`): the full-clone need of § *Epoch 6* row (q) was the creation's only |
+| S7-d | the last drain PR deletes the file AND drops `--baseline` from every invocation, in one commit | the file; both wrappers | the last PR | the guard without `--baseline` green on the head | — | **[M]** with the file deleted: `--baseline` exit 2 ("cannot read the baseline"); `--baseline-shrinks` exit 0 ("absent now — drained"). So a deleted file with `--baseline` kept is a red wrapper |
+| S7-e | "baseline zero" is not "no inline exemptions" | the expected-exemption inventory (`shared/leftovers-exemptions.json`, `LeftoversInventoryTests.cs`) | — | S7 ends at 0 entries with the inventory unchanged | The inline rows are contained lines with a proved reason (§ *Epoch 6* item 4.2) and stay | **[M]** 78 markers `testsToDelete-exempt: raw-temp` outside the mount (`git grep -c`); the inventory's count binds, not this grep |
+| E6-a | the boundary on both sides | benchmark's `todo/PLAN_bench_test_leftovers_followups.md`, the row of `a94775a6` | — | the row is on benchmark's `main` | — | **[D]** written, unmerged |
+| E6-b | a worktree a test makes is owned, and the guard's boundary is stated | the old draft's D4: the product's `ScratchWorktree.AddAsync(…, scratchRoot)` gets a ROOT inside an owned folder; product code is the `Source` kind, which the C# guard does not read for `raw-worktree`. A `worktree add` in a TEST file takes one inline `raw-worktree` exemption with the reason "inside the owned folder `<x>`" | `Bench.Tests` | the C# guard on the head; one planted test-file `worktree add` without the marker is red | The guard reads the spelling, never the lock or the folder | **[M]** a compliant `git worktree add --detach --lock --reason "$RECORD" testsToDelete-u1001-bench-x HEAD` is `raw-worktree` in a `.sh`, a `.cs` and a `.mjs` under the released Node guard, and only the inline marker clears it. The C# template matches any `worktree add` the same way (mcp `45a8db2`, `LeftoversGuard.cs:91`, `:197-203`) **[M]** |
+| E6-c | a killed child's worktree is collected by a NAMED implementation | the copied C# sweep's folder pass, on the owned folder that holds the clone and its worktree (the old draft's sweep case 15) | the next run's start | sweep case 15, rewritten in the owner form: a dead-claimed owned folder with `repo/` and a linked `scratch/<id>/` is removed whole | The C# template has NO worktree pass (mcp `LeftoversSweep.cs:3`) and keeps a linked worktree it does not list as `other clone` (`:173`) **[M]**; so a worktree at the temp root is never this sweep's, only the janitor's | **to observe** in E6's brief, at benchmark's pin `37b9aa5`: that `:173` does not keep the owned folder (the draft says the `.git` file is at depth two) |
+| E6-d | the fixture's container: three separate proofs | `PostgresFixture.cs` | `Bench.Tests` | (1) Ryuk on: a killed child's container is gone; (2) the owner label `testsToDelete.owner` on the builder, read by the sweep's container pass; (3) no `.WithReuse(` (the draft's guard class `testcontainers`) | Ryuk collects by its session, not by owner; one test cannot stand for the other two | **[D]** the old draft's S3 and its decision table; each is a separate row of E6's brief |
+| E6-e | the copy and its limits | the adapted copy with a manifest (§ *Epoch 4*), F29 read, F31 stated | — | the diff check | — | **[D]** |
+| E7-a | `research/module_tests.md` exists | rag_qln | — | the file with the harness, the command, the flow catalogue | — | **[M]** absent on `origin/main` `93ffdb9` (`git ls-tree`) |
+| E7-b | a capped store never evicts a test collection, or tests never share a capped store | `EvictionPolicy.Choose` (orders by `LastServedUtc`, skips `Protected`), `ResidentSet.MakeRoomAsync` | a store with a budget that tests use | a test either way, BEFORE any rename test | — | **[M]** read at `93ffdb9`: the order is unchanged since § *Epoch 6* |
+| E7-c | the live tests' reset is serialized before any rename test runs against the store | `FastLaneLiveTests` (fixed project ids) | the live tests | two live runs at once on one store: the second waits or refuses, by test | — | **[M]** no `lock`, `Semaphore`, `Mutex` or `serializ` in `FastLaneLiveTests.cs` at `93ffdb9` (`git grep -n -i`) |
+| E7-d | the ownership states are proved separately | the store sweep (rule §3's store row) | the sampler tick, the sweep | one test each: LIVE kept; UNKNOWN (store unreachable or record unreadable) kept, nothing dropped; UNMARKED listed, never dropped; ABANDONED (record gone, lock free) dropped | One mixed test can pass while one state is wrong | **[D]** rule §3, §4 |
+| E7-e | the failing live test | `SearchLiveTests.AQuestionInWords_FindsTheMemberThatAnswersIt` | the live tests | fixed or recorded as known before the live tests are E7's proof | — | **[D]** still recorded in `research/module_search.md:153` there |
+| F | the feature reviews | `mcp__coai__review_feature` | — | ONE call per plan of three or more epics (item 5) | The reviewers get ONE checkout: the outline and hunks of every file changed between `baseRef` and that checkout's HEAD, the plan, the epics (1 to 20) and the lessons. Work in another repository reaches them as text only | **[M]** the tool's own contract, read in this session. Ranges in item 5 |
+
+#### 3.2 The measurements, and how to repeat them
+
+All read-only, 2026-11-07, in a scratch folder. The guard is `37b9aa5`'s, from `git archive 37b9aa5 tools`.
+
+1. **`docker.yml`.** The whole workflow of creds `main` (`0ae0211`), and variants built from it by a script (the naming
+   step, the names, the remover of item 4.2, then one change each), each scanned whole with
+   `scanText('.github/workflows/docker.yml', text)` of `tools/leftovers-check.mjs`. Results: rows E2.4-a and E2.4-b.
+2. **Single lines.** `scanText(<path>, <line>)` for each line quoted in item 1 and in rows E2.5 and E6-b. For example
+   `scanText('tools/probe.sh', 'x=${TMPDIR:-/tmp}')` → `[]`.
+3. **coai.** A local clone of coai at `f07a9601` with the mount at `37b9aa5`:
+   `node .agents/conventions/tools/leftovers-check.mjs --repo . --baseline --profile node --token coai --identity "the multi-model review extension and server"`
+   → `clean (645 files)`, exit 0. Then the two edits of rows S7-b and S7-d, each run with `--baseline` and with
+   `--baseline-shrinks --base HEAD`, and restored.
+4. **Reads.** `git show`, `git grep` and `git ls-tree` on each repository's `origin/main`; the C# template at mcp `45a8db2`;
+   `git rev-list --count` and `git diff --shortstat` for item 5's ranges.
+
+Not measured here, and why: anything with Docker (no `docker` binary on this machine), the C# wrappers (no .NET run),
+Windows, macOS.
+
+### 4. The dispositions of entries 7.1 and 7.2
+
+**4.1 Entry 7.1 — kept as built.** The shared harness exit module is merged in E2.2 (#310). Nothing of it is narrowed.
+
+**4.2 Entry 7.2 — option (B), decided.** The names spell a literal owner segment, `u1001`, and the first step after
+checkout fails when `id -u` is not `1001`, before any image, container or volume exists. The remover's names are written
+unquoted. The owner label, the record and the complete cleanup of D5 stay as they are. Reasons:
+
+1. It carries out D5's own decision: an owner segment from the runner's uid, in a text the guard reads. Only the example
+   spelling and its claim were wrong. Measured clean on the whole workflow, with seven counterexamples red (row E2.4-a).
+2. `docker.yml` runs only on the hosted `ubuntu-latest` (creds' D4). A move to another runner already needs a `docker.yml`
+   change. Under (B) it fails at the first step, with one line, and makes nothing.
+3. It narrows nothing: the names, the labels, the carve-out and E2.4's Done-when stay. It adds a check (E2.4-c) and a
+   test (E2.4-b) that the plan did not have.
+4. **(A) rejected.** A guard that takes `${OWNER}` as an owner because the same file assigns `OWNER=u$(id -u)` reads data
+   flow. The released guard says of itself that it is "a SPELLING check, not data flow" (`tools/leftovers-check.mjs:21`
+   at `37b9aa5`). It would also make a conventions release a prerequisite of E2.4. If the guard ever reads an assignment,
+   that is a follow-up of its own, not this plan's.
+5. **(C) rejected.** Merging with six findings makes E2.4's Done-when smaller: `Narrowed: yes`, the owner's, and E2.5 would
+   inherit findings it cannot exempt with a reason that holds.
+
+The consultant recommended (B) and said (B) is not a narrowing (item 6). Corrections to the brief that come with it: the
+`-v` sources need no change of quoting (row E2.4-a); the host is normalised with `sed -E 's/[@:[:space:]]+/-/g'` (the
+brief's I19); each removal carries `|| true`, and a test pins that (E2.4-b).
+
+**4.3 What 7.2 also found, settled here so that E2.4's gate meets no open design question.**
+
+1. **The Linux record (I4).** `owned_owner` writes `:<start>:<ns>` on Linux (row E2.4-e). The released contract wins
+   (the stories' § *Order*). Not a change.
+2. **Acme's state after a kill (I6, the brief's Q4).** Measure first, on the hosted throwaway, BEFORE E2.4's plan gate
+   (row E2.4-f). If the janitor removes it: D6 as written. If not: the containers' state goes to named volumes that carry
+   the owner label and the owner-form name, which the janitor removes by label; `run.sh` reads the files it needs through a
+   one-shot container. The outcome of sc. 6 stays "gone" either way. This is the baseline, decided now, so the
+   measurement chooses a branch and cannot stop the plan again.
+3. **The other open questions of the drafts:** `owned_trap` (brief Q5, spec Q1), `OWNED_TEST_IDS` (spec Q2), the run
+   record not read (spec Q3), the kill cases on the three CI legs (spec Q6), `$RANDOM` ids (spec Q7), acme on the hosted
+   job (brief Q2), the self-tests' RED by hand (brief Q6), the owned `TMPDIR` for the itest's child (brief Q7), the kept
+   server log's limit (brief Q8), the premise run (brief Q9), one PR (brief Q10). Each as recommended in the drafts;
+   none is a change.
+4. **If bash 3.2 does not show the parent's trap inside `$( )` (spec Q4):** the coder stops and reports. Recommended shape:
+   the trap text written to a file beside the claim and read back. The callers' one-line contract does not change.
+
+### 5. Build order
+
+```
+DONE   epoch 7 approved (#134) → E2.1 (#294) → F30 and the release 37b9aa5, the nine pins → (c) recorded (#136)
+       → E2.2 (#310, entry 7.1) → E2.3 (#311) → F31 accepted again → E5's producer (#945) → the E2.4 drafts (dee6220)
+       → the stop (entry 7.2, #141) → this revision.
+NEXT   the Opus judge sorts epoch 7's work (step 5) → the plan gate on an operative extract (the file is over the gate's
+       limit) → epoch 8 opens `by reviewers` (Narrowed: no).
+THEN, two repositories at once (entry 1.1):
+  creds  E2.4: the S1 spec and the brief revised by item 4 (Fable for S1, Opus for the brief) → the hosted throwaway
+         observations of rows E2.4-c and E2.4-f → the plan gate → S1 → S2 → S3 → S4, one PR, each RED then GREEN → the
+         code gate and an Opus review per story → merge.
+         E2.5: its brief opens with rows E2.5-a to c observed at the pin → the two guards on, the inventory, the F30
+         re-run recorded → merge.
+  coai   E5.S7: one PR per suite; the first removes the creation bypass (S7-a); each keeps both checks (S7-b); the last
+         deletes the file and drops `--baseline` in the same commit (S7-d); the inline rows stay (S7-e).
+THEN   wave 3: E6 ∥ E7. Benchmark's boundary row merges first. Each stories document is written new against `37b9aa5`
+       (E6 reads the old draft as material, not as approved text) and opens with item 3's rows, observed at its pin.
+LAST   the feature reviews (below); the promotion of this plan and its stories documents; R6 ticked in the remainder plan.
+```
+
+**The feature reviews.** The tool reviews ONE checkout (item 3, row F). So:
+
+1. **This plan**, from a pulled conventions `main`: `planPath` `todo/PLAN_test_leftovers_rollout.md`, `baseRef` `d52bcaf`
+   (the parent of E1's `2c96f83`), seven epics, each with its repository and PRs in its summary. **[M]** at `a887924` that
+   range holds 65 commits and 128 files (+41,176 −320), and much of it is other plans' work; one `baseRef` cannot leave
+   it out, so the lessons name it. The consumer epics reach the reviewers as text only, and the lessons say so.
+2. **E2's stories document** (five sub-epics), from creds after E2.5: `baseRef` `a52fde1` (the parent of `834c91b`).
+   **[M]** at `0ae0211`: 6 commits, 193 files.
+3. **E5**, from coai after S7: `planPath` `todo/PLAN_test_leftovers_E5.md`, `baseRef` `ee7a7b70` (the parent of stage A,
+   `d02ed40e`). **[M]** at `f07a9601`: 31 commits, 1,102 files, with coai's own releases in between. If the server
+   answers `skipped` (the document holds stages and stories, not three epics), that is said, and it does not block.
+4. E3, E4, E6 and E7 are one epic each in their repositories; their code gates cover them. Their `baseRef`s, for the
+   lessons of item 1: mcp `6457540`, sidecar_rust `17b18b3`, benchmark `a504cfec`, rag_qln `75b7673`.
+
+### 6. What the re-review consultant raised, and what was done with it
+
+| Point (consult `ba518e5d`) | Checked | Done |
+|---|---|---|
+| Recommend (B); Narrowed: no for B; no for A if A keeps detection; yes for C | (B) measured clean on the whole workflow; (C) leaves 6 findings against the Done-when; (A) reads data flow, against the guard's own header | Item 4.2: (B). Narrowed: no |
+| The root cause: epoch 8 needs OBSERVED results before approval, at each consumer's pin, counterexamples included | True: 7.2 was a table cell nobody had run | Item 1, item 3's last column, item 8.1 |
+| (a) the complete `docker.yml` against the pinned guard; cleanup after the last reader; `continue-on-error` alone does not run later commands | True, both. The guard checks the order (a reader after the remover is red) but not `\|\| true` (0 findings without it) | Rows E2.4-a, E2.4-b; a creds test pins `\|\| true` |
+| (b) E2.5: class-specific expectations instead of "F30 open"; `scanText('tools/probe.sh', 'x=${TMPDIR:-/tmp}')` has no findings | True, `[]`. And the F30 reader now finds the `.cjs` and `.sh` plants | Rows E2.5-a to c; item 1's reading of the DoD |
+| (c) S7: the first PR removes the bypass; reconciliation and the shrink check with full history; an entry deleted with its allocation left fails; "baseline zero" is not "no inline exemptions" | True, each measured, except "full history": only a creation needs it (S7-c). One more found: a deleted file with `--baseline` kept is exit 2 | Rows S7-a to e |
+| (d) E6: a compliant locked worktree still triggers `raw-worktree`; the helper/exemption boundary; the named collector of a killed child's worktree; Ryuk, owner labels and no reuse separately | True in both guards. The C# template has no worktree pass | Rows E6-b to d |
+| (e) E7: capped-store eviction and reset serialization before rename tests; live / unknown / unmarked / abandoned separately | True: no serialization today; the eviction order is unchanged | Rows E7-b to d |
+| (f) the feature review: exact cross-repository ranges and the tool's input limits | True: one checkout per call | Item 5, row F |
+
+Nothing the consultant raised was rejected. Added by this revision beyond it: S7-d (the file's deletion and `--baseline`),
+the `-v` quoting correction, E2.4-c's uid check before any resource, item 4.3's decision rule for acme.
+
+### 7. Questions for the owner
+
+None. The record says `Narrowed: no`, so the plan gate approves epoch 8 (§ *The full stop*, step 8). What the owner may
+want to know, with no decision asked: under (B), a change of `docker.yml`'s runner fails the image job at its first step
+until the names are changed; F31's next review is at a persistent Windows machine or on 2026-12-05.
+
+### 8. The way of working — so an eighth stop is less likely
+
+**8.1 What changes.** One rule, added to § *Epoch 7* item 8.1:
+
+- **A row is approved only with an observed result at the consumer's pin, and a counterexample that must be red.** Where
+  a guard decides, the result is the guard run on the whole file the story will change, not on a fragment, and the
+  counterexample is the same file with one line wrong. Where only a hosted run can observe it, the run is a throwaway
+  BEFORE the story's plan gate, and the row says "to observe" until then.
+- **A guard's acceptance is never the mechanism's proof.** Row E2.4-b is the example: the guard accepts a remover that
+  stops at its first failure. Each row names what the guard does not read.
+- **An example spelling in a stories document is run through the released guard when it is written.** D5's was not.
+- **A decision that waits for a measurement is written with both branches now** (item 4.3.2), so the measurement chooses
+  and does not stop the plan.
+
+No new document and no new gate. The column is one cell per row of a table the briefs already write.
+
+**8.2 The surprises still likely.**
+
+| Story | What it is likely to meet | Why |
+|---|---|---|
+| E2.4 S4 (acme) | the janitor cannot remove the containers' state | root- and uid-10001-owned files in a bind mount; decided in 4.3.2 |
+| E2.4 S1 | bash 3.2's `trap -p` inside `$( )`; MSYS's exclusive create | unmeasured premises; the spec's T7a and T5 run first |
+| E2.5 | new `legacy-name` findings from the F30 reader on creds' tree | F30's real-tree re-run is recorded for creds (#137 **[D]**); E2.4 adds files after it |
+| E5.S7 | the last PR's order (S7-d); a site that moves and changes its hash | measured: the file's absence is exit 2 under `--baseline` |
+| E6 | the old draft predates the owner form, the merged core, F29 and F31; the `other clone` rule | the stories are written new |
+| E7 | eviction and serialization; Qdrant's naming for the prefix; the failing live test | none is settled in code yet |
+
+**8.3 What the other documents' own revisions must say** (each its own gate work): creds' E2 document — D5's spelling as
+item 4.2, the `|| true` test, the uid check, its revision row 2 read with E2.5-a; the S1 spec — the Linux record and
+`owned_trap`; the E2.4 brief — item 4; coai's E5 document — S7-a to e in S7's DoD; benchmark — merge the boundary row,
+then write E6 new; rag_qln — E7's stories with E7-a to e as their first table.
 
 ## Epics
 
