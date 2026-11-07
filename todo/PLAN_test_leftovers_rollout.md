@@ -2130,6 +2130,7 @@ runner of a release (`windows-11-arm`) is not measured.
 - **E2.** Creds #294 (draft) unchanged at `9a6e9faf`. **E6, E7.** Not started past their stage A. Benchmark holds an old
   draft of E6 stories, #103; E6 reads it before it writes its own (item 8.3).
   *[2026-11-06: E2.1 merged as creds #294 at `834c91b`, after condition (c) and CodeRabbit's second review ([E2.1 review 8-10]: a zombie survivor has ended; six tests no longer depend on the real scan on macOS). E2.2 is next. F30 released in `37b9aa5`.]*
+  *[2026-11-07: E2.2 merged as creds #310 at `bf59e4f` (entry 7.1's shared harness exit module; four code rounds, two Opus reviews, a hosted macOS run). E2.3 started on `feat/test-leftovers-e2.3`: F31 raised with the owner and accepted again; F29 read (the template's mutex fix did not happen; creds' copy records the limit). Coai E5 (#945) merged main after the coai release; main's new sites were migrated in E5.]*
 - **The conventions tree.** F27 merged as #133 (`e45ad11`), by the peer session, outside this plan's epics.
 - **The owner's open item is unchanged:** merge condition (c), the WSL administrator scan.
   *[2026-11-06: DONE. The owner ran it: none found, 266 files read, nothing unreadable. Recorded in
