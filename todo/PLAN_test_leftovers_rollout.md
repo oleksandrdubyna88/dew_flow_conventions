@@ -489,17 +489,29 @@ Narrowed: no — entry 7.2 is settled by option (B), which keeps D5's names in t
 
 | Work | Where | Verdict | Action |
 |---|---|---|---|
-| the epoch-7 record, F31 and the owner's answer, conventions #134 `df8eb54` | main | — | — |
-| creds #294 `834c91b`, E2.1 — the Node unit-test lifecycle | main of creds | — | — |
-| F30, conventions `acb693c`, and the release `37b9aa5` (with #136, the WSL administrator scan); the nine pin bumps to it (among them mcp #65 `45a8db2`, rag_qln #89 `93ffdb9`) | main; `release` = `37b9aa5`; main of each consumer | — | — |
-| the records #137 `e444c1b`, #138 `a3a02fa` (entry 7.1), #139 `7d8ad89`, #140 `eb8c141` | main | — | — |
-| creds #310 `bf59e4f`, E2.2 — the harnesses and the shared exit module of entry 7.1 | main of creds | — | — |
-| creds #311 `0ae0211`, E2.3 — the C# helper as an adapted copy in five executables | main of creds | — | — |
-| coai #945 `825504e`, E5's producer — S3, S2-B, S4, S5, S6 | main of coai | — | — |
-| creds `dee6220` on `feat/test-leftovers-e2.4` — the E2.4 S1 spec (Fable) and the S2–S4 brief (Opus), docs only | pushed, unmerged (no PR) | — | — |
-| benchmark `a94775a6` on `docs/e6-boundary-mirror` — the E6 boundary row on the benchmark side | pushed, unmerged (no PR) | — | — |
-| the stop record, entry 7.2, conventions #141 `a887924` | main | — | — |
-| this revision, § *Epoch 8* and this record (branch `docs/rollout-epoch-8`) | local, uncommitted | — | — |
+| the epoch-7 record, F31 and the owner's answer, conventions #134 `df8eb54` | main | fits | kept — a record; § *Epoch 8* names what it supersedes, and § *Epoch 7* stands for the rest |
+| creds #294 `834c91b`, E2.1 — the Node unit-test lifecycle | main of creds | fits | kept — Node records with start and namespace, no `docker.yml`, no bash helper, no `${OWNER}` name (its diff read for them); its § *Revision* rows are what row E2.5-a reads |
+| F30, conventions `acb693c` (#135), and the release `37b9aa5` (= #136's merge, the WSL administrator scan); the nine pin bumps to it: creds #306, coai #956, benchmark #174, rag_qln #89 `93ffdb9`, mcp #65 `45a8db2`, sidecar_rust #71, vscode_kit #24, amd_r9700 #17, wsl_care #187 | main; `release` = `37b9aa5`; main of each consumer | fits | kept — every gitlink reads `37b9aa5` through the GitHub API, sidecar_rust included. Item 1's stricter reading rests on it. coai #956 also re-pins coai's rule budget and snippet (F27 and #83 ride the release): coai's own, outside the epics, needed by the pin |
+| the records #137 `e444c1b`, #138 `a3a02fa` (entry 7.1), #139 `7d8ad89`, #140 `eb8c141` | main | fits | kept — plan and follow-ups text only (file lists read) |
+| creds #309 `ccf2e9f3`, E2's note that F30 shipped and is pinned, condition (c) met (not in this table when it was written) | main of creds | fits | kept — four lines in `PLAN_test_leftovers_E2.md`; "zero for the guard's listed spellings" is item 1's reading |
+| creds #310 `bf59e4f`, E2.2 — the harnesses and the shared exit module of entry 7.1 | main of creds | fits | kept — item 4.1. No `.sh`, no Docker, no `${OWNER}` in its diff; its records are Node's |
+| creds #311 `0ae0211`, E2.3 — the C# helper as an adapted copy in five executables | main of creds | fits | kept — its only `${OWNER}` is the template's copied `rm -rf` owner-blind case (`LeftoversGuardTests.cs:190`, the same line at mcp), not a Docker name; its `docker.yml` exclusion is the C# guard's, and E2.4-a is the Node guard's |
+| coai #945 `825504e`, E5's producer — S3, S2-B, S4, S5, S6 | main of coai | fits | kept — S7-a's clause (`ci.yml:211`) is the one creation bypass S7's first PR removes, and the standing step already fetches the base at depth 1 (S7-c) |
+| creds `dee6220` on `feat/test-leftovers-e2.4` — the E2.4 S1 spec (Fable) and the S2–S4 brief (Opus), docs only | pushed, unmerged (no PR) | fits | kept as the starting material (§ *Epoch 8* item 5); the brief's § 3.2 is already (B) with the uid check and `"$PROJECT"` for acme (0 findings **[M]**). The parts item 4 replaces are the next row |
+| the same drafts' parts § *Epoch 8* replaces (not in this table when it was written): the brief's § 3.2 item 2 and Q1 (B), "the `-v` sources unquoted" (I3); the brief's Q4 recommendation (A), a person's command for acme's state; the S1 spec § 3 (`:86`), "No start, no namespace" | pushed, unmerged (no PR) | cut | fixed forward on the branch by new commits (Fable for S1, Opus for the brief, item 5), never a rewrite — rows E2.4-a, E2.4-e and item 4.3.2 |
+| creds `todo/PLAN_test_leftovers_E2.md` on main, the lines § *Epoch 8* supersedes: D5's `${OWNER}` names (`:470-473`), § S4's quoted remover (`:1003-1006`) and its sentence (`:1014-1015`), S5 sc. 2's two "`${OWNER}` ⇒ 0" (`:1132` acme's `-p`, `:1136` the remover), D3's "bash never" (`:393`) (merged by creds #253 on 2026-11-02; not in this table when it was written) | main of creds | cut | corrected in a NEW creds PR, E2's document revision of item 8.3, before E2.4's plan gate; #253 is not reverted. Acme's `-p teststodelete-${OWNER}-creds-acme-$id` is a `docker-name` finding at `37b9aa5` **[M]** |
+| creds `tmp/e22-macos` `7088d960`, a throwaway: one workflow file, a macOS run of E2.2's harnesses (not in this table when it was written) | pushed, no PR, not for merge | fits | nothing to do — it never reaches `main`; the branch goes |
+| benchmark `a94775a6` on `docs/e6-boundary-mirror` — the E6 boundary row on the benchmark side | main of benchmark: merged as #177 `562cb4bd` (2026-11-07) | fits | kept — one row and one sentence in `PLAN_bench_test_leftovers_followups.md`; row E6-a is met |
+| the stop record, entry 7.2, conventions #141 `a887924` | main | fits | kept — the stop |
+| this revision, § *Epoch 8* and this record (branch `docs/rollout-epoch-8`) | pushed, unmerged (no PR), at `5710328`; this table on top, uncommitted | fits | kept — the baseline epoch 8 is approved on, never an entry; the judge's corrections below go in with it |
+| conventions #83 `6d67ca4d`, a held gate released only by the person's Proceed (not in this table when it was written) | main, in `release` `37b9aa5`; outside this plan | — | outside this plan, no verdict. Rule text and smoke fixtures; it rides the release and coai #956 adapts to it |
+| the other merges of the epoch: coai #950, #952–#955, #957, #960, #961 and the dependency bumps; creds #298–#305, #308; benchmark #172, #173, #175, #176, #178; amd_r9700 #15, #16; ai_language_comparison #3 (not in this table when it was written) | main of each repository, outside this plan | — | outside this plan, no verdict. Titles and file lists read: no test-leftovers site work; coai's releases after #945 ship it unchanged |
+  (Judged 2026-11-07 by an Opus judge against § *Epoch 8*, § *Epoch 7*, § *Epoch 6*, creds' E2 document at `0ae0211` and the E2.4 drafts at `dee6220`: 13 rows fit; 2 are cut, both by a fix forward (the drafts' replaced parts, unmerged; the E2 document's superseded lines, merged earlier by #253); 2 rows are outside this plan. Nothing merged in epoch 7 contradicts the revised plan.
+  Read: `gh pr list --state merged --search "merged:>=2026-11-05"` in twelve repositories, each plan PR's file list, the diffs of #294, #310, #311 and #309 searched for `${OWNER}`, `docker.yml`, `owned.sh` and the record's start and namespace; the E2.4 brief § 3.2, § 3.3, Q1–Q4 and I2–I4; the S1 spec § 3; coai `ci.yml:205-215` at `f07a9601`; benchmark #177's diff; each pin's gitlink through the GitHub API; the remote branches of the five plan repositories.
+  Run, read-only, with `scanText` of the guard at `37b9aa5`: `docker compose -p teststodelete-${OWNER}-creds-acme-$id …` in `deploy/acme-test/run.sh` is one `docker-name`; `-p teststodelete-u1001-…` and the brief's `-p "$PROJECT"` are clean.
+  The questions. Nothing merged under E2.2 or E2.3 assumes D5's `${OWNER}` names or a bash record without start and namespace: neither PR has a shell helper or a Docker step, and their records are Node's and C#'s. What does assume them is older text: creds' E2 document (the cut row), and the S1 spec's § 3 on the branch. The brief's I3 was partly wrong: the remover's names must be unquoted, the `-v` sources need not be (row E2.4-a); its Q4 (A) left acme's state to a person, which item 4.3.2 rules out. The brief already carries (B), the uid check and the host's `sed`.
+  Corrections made to § *Epoch 8*, plain facts: K1, item 1's E6 row, row E6-a, item 5 and item 8.3: the boundary row is merged (benchmark #177 `562cb4bd`), not "pushed, unmerged". K2, item 1's E7 row: an old E7 stories draft exists on rag_qln `docs/test-leftovers-e7-stories` (`bff8478a`, 2026-10-17), as E6's does; item 5 now says both are read as material. K3, item 1's F30 row: sidecar_rust is pinned at `37b9aa5` (#71). K4, item 5's DONE line in merge order: F30 and the release came before E2.1, and #945 before E2.3. K5, item 8.3's creds line names the E2 document's lines of the cut row, acme's `-p` among them. K6, this record's last plan row: the revision is pushed.
+  Could not check: anything with Docker (the acme line is a text scan); the E2.4 drafts' other open questions, which item 4.3.3 settles as recommended.)
 
 ## Symptom
 
@@ -2300,9 +2312,9 @@ story's plan gate, not after it.
 | E1, E3, E4 | DONE (wave 1) | conventions #77 `2c96f83`; mcp #58 `4feb245`, #59 `197cc76`; sidecar_rust #64 `5478109` |
 | E2 (creds) | E2.1, E2.2, E2.3 MERGED. E2.4 DRAFTED only: the S1 spec by Fable (`todo/PLAN_test_leftovers_E2.4_S1_spec.md`) and the S2–S4 brief by Opus (`todo/PLAN_test_leftovers_E2.4_brief.md`), on `feat/test-leftovers-e2.4` at `dee6220` (pushed, no PR), no code. E2.5 not started | #294 `834c91b`, #310 `bf59e4f` (entry 7.1), #311 `0ae0211` |
 | E5 (coai) | the producer PR MERGED (S3, S2-B, S4, S5, S6). S7 (the drain) not started. The baseline holds 778 entries in six scopes **[M]**; the inline `raw-temp` markers number 78 **[M]** | #945 `825504e`; `main` at `f07a9601` |
-| E6 (benchmark) | stage A DONE. The stories are an old draft (`docs/test-leftovers-e6-stories`, `08a87430`, 2026-10-17, before the owner form) **[D]**. The boundary row is written on the benchmark side on `docs/e6-boundary-mirror` (`a94775a6`, pushed, unmerged) **[D]** | #125 `6a963a4` |
-| E7 (rag_qln) | stage A DONE and promoted. No stories document. `research/module_tests.md` is still absent **[M]** | #86 `47998e7`, #87 `88577ff`; pin #89 `93ffdb9` |
-| F30 | DONE: released in `37b9aa5` **[D]**; every consumer pinned there (the coordinator's record; read for mcp, creds, benchmark, coai and rag_qln **[M]**; the local sidecar_rust ref was not fetched) | `acb693c`, release `37b9aa5` |
+| E6 (benchmark) | stage A DONE. The stories are an old draft (`docs/test-leftovers-e6-stories`, `08a87430`, 2026-10-17, before the owner form) **[D]**. The boundary row is written on the benchmark side and MERGED: benchmark #177 `562cb4bd` (2026-11-07, from `docs/e6-boundary-mirror` at `a94775a6`) **[M]** (corrected by the judge) | #125 `6a963a4` |
+| E7 (rag_qln) | stage A DONE and promoted. No stories document on `main`; an old draft on `docs/test-leftovers-e7-stories` (`bff8478a`, 2026-10-17, before the owner form) **[M]** (added by the judge). `research/module_tests.md` is still absent **[M]** | #86 `47998e7`, #87 `88577ff`; pin #89 `93ffdb9` |
+| F30 | DONE: released in `37b9aa5` **[D]**; every consumer pinned there (the coordinator's record; read for mcp, creds, benchmark, coai and rag_qln **[M]**; sidecar_rust #71, vscode_kit #24, amd_r9700 #17 and wsl_care #187 read through the GitHub API by the judge **[M]**) | `acb693c`, release `37b9aa5` |
 | F31 | ACCEPTED AGAIN by the owner on 2026-11-07, at E2.3's start, with the `windows-latest` ownership measurement (#139, #140) **[D]**. Next review: a Windows machine that persists, or 2026-12-05 | — |
 | Merge condition (c) | DONE for the WSL machine (#136) **[D]** | `37b9aa5` |
 | The coai feature review | not started (item 3, row F; item 5) | — |
@@ -2351,7 +2363,7 @@ story's plan gate.
 | S7-c | history only where it is needed | the standing step fetches the base at depth 1 | every PR | a non-creation shrink needs no history; a creation is refused in a shallow clone (exit 2) | — | **[D]** read in `tools/lib/raw-temp-baseline.mjs` at `37b9aa5` (`creationVerdict`): the full-clone need of § *Epoch 6* row (q) was the creation's only |
 | S7-d | the last drain PR deletes the file AND drops `--baseline` from every invocation, in one commit | the file; both wrappers | the last PR | the guard without `--baseline` green on the head | — | **[M]** with the file deleted: `--baseline` exit 2 ("cannot read the baseline"); `--baseline-shrinks` exit 0 ("absent now — drained"). So a deleted file with `--baseline` kept is a red wrapper |
 | S7-e | "baseline zero" is not "no inline exemptions" | the expected-exemption inventory (`shared/leftovers-exemptions.json`, `LeftoversInventoryTests.cs`) | — | S7 ends at 0 entries with the inventory unchanged | The inline rows are contained lines with a proved reason (§ *Epoch 6* item 4.2) and stay | **[M]** 78 markers `testsToDelete-exempt: raw-temp` outside the mount (`git grep -c`); the inventory's count binds, not this grep |
-| E6-a | the boundary on both sides | benchmark's `todo/PLAN_bench_test_leftovers_followups.md`, the row of `a94775a6` | — | the row is on benchmark's `main` | — | **[D]** written, unmerged |
+| E6-a | the boundary on both sides | benchmark's `todo/PLAN_bench_test_leftovers_followups.md`, the row of `a94775a6` | — | the row is on benchmark's `main` | — | **[M]** merged: benchmark #177 `562cb4bd` (corrected by the judge). Met |
 | E6-b | a worktree a test makes is owned, and the guard's boundary is stated | the old draft's D4: the product's `ScratchWorktree.AddAsync(…, scratchRoot)` gets a ROOT inside an owned folder; product code is the `Source` kind, which the C# guard does not read for `raw-worktree`. A `worktree add` in a TEST file takes one inline `raw-worktree` exemption with the reason "inside the owned folder `<x>`" | `Bench.Tests` | the C# guard on the head; one planted test-file `worktree add` without the marker is red | The guard reads the spelling, never the lock or the folder | **[M]** a compliant `git worktree add --detach --lock --reason "$RECORD" testsToDelete-u1001-bench-x HEAD` is `raw-worktree` in a `.sh`, a `.cs` and a `.mjs` under the released Node guard, and only the inline marker clears it. The C# template matches any `worktree add` the same way (mcp `45a8db2`, `LeftoversGuard.cs:91`, `:197-203`) **[M]** |
 | E6-c | a killed child's worktree is collected by a NAMED implementation | the copied C# sweep's folder pass, on the owned folder that holds the clone and its worktree (the old draft's sweep case 15) | the next run's start | sweep case 15, rewritten in the owner form: a dead-claimed owned folder with `repo/` and a linked `scratch/<id>/` is removed whole | The C# template has NO worktree pass (mcp `LeftoversSweep.cs:3`) and keeps a linked worktree it does not list as `other clone` (`:173`) **[M]**; so a worktree at the temp root is never this sweep's, only the janitor's | **to observe** in E6's brief, at benchmark's pin `37b9aa5`: that `:173` does not keep the owned folder (the draft says the `.git` file is at depth two) |
 | E6-d | the fixture's container: three separate proofs | `PostgresFixture.cs` | `Bench.Tests` | (1) Ryuk on: a killed child's container is gone; (2) the owner label `testsToDelete.owner` on the builder, read by the sweep's container pass; (3) no `.WithReuse(` (the draft's guard class `testcontainers`) | Ryuk collects by its session, not by owner; one test cannot stand for the other two | **[D]** the old draft's S3 and its decision table; each is a separate row of E6's brief |
@@ -2427,9 +2439,10 @@ brief's I19); each removal carries `|| true`, and a test pins that (E2.4-b).
 ### 5. Build order
 
 ```
-DONE   epoch 7 approved (#134) → E2.1 (#294) → F30 and the release 37b9aa5, the nine pins → (c) recorded (#136)
-       → E2.2 (#310, entry 7.1) → E2.3 (#311) → F31 accepted again → E5's producer (#945) → the E2.4 drafts (dee6220)
-       → the stop (entry 7.2, #141) → this revision.
+DONE   epoch 7 approved (#134) → F30 (#135) → (c) recorded (#136), whose merge is the release 37b9aa5 → E2.1 (#294)
+       → the nine pins → benchmark's boundary row (#177) → E2.2 (#310, entry 7.1) → E5's producer (#945) → F31 accepted
+       again (#139, at E2.3's start) → E2.3 (#311) → the E2.4 drafts (dee6220) → the stop (entry 7.2, #141) → this
+       revision. (Merge order, corrected by the judge.)
 NEXT   the Opus judge sorts epoch 7's work (step 5) → the plan gate on an operative extract (the file is over the gate's
        limit) → epoch 8 opens `by reviewers` (Narrowed: no).
 THEN, two repositories at once (entry 1.1):
@@ -2440,8 +2453,8 @@ THEN, two repositories at once (entry 1.1):
          re-run recorded → merge.
   coai   E5.S7: one PR per suite; the first removes the creation bypass (S7-a); each keeps both checks (S7-b); the last
          deletes the file and drops `--baseline` in the same commit (S7-d); the inline rows stay (S7-e).
-THEN   wave 3: E6 ∥ E7. Benchmark's boundary row merges first. Each stories document is written new against `37b9aa5`
-       (E6 reads the old draft as material, not as approved text) and opens with item 3's rows, observed at its pin.
+THEN   wave 3: E6 ∥ E7. Benchmark's boundary row is merged (#177). Each stories document is written new against `37b9aa5`
+       (E6 and E7 read their old drafts as material, not as approved text) and opens with item 3's rows, observed at its pin.
 LAST   the feature reviews (below); the promotion of this plan and its stories documents; R6 ticked in the remainder plan.
 ```
 
@@ -2509,9 +2522,11 @@ No new document and no new gate. The column is one cell per row of a table the b
 | E7 | eviction and serialization; Qdrant's naming for the prefix; the failing live test | none is settled in code yet |
 
 **8.3 What the other documents' own revisions must say** (each its own gate work): creds' E2 document — D5's spelling as
-item 4.2, the `|| true` test, the uid check, its revision row 2 read with E2.5-a; the S1 spec — the Linux record and
-`owned_trap`; the E2.4 brief — item 4; coai's E5 document — S7-a to e in S7's DoD; benchmark — merge the boundary row,
-then write E6 new; rag_qln — E7's stories with E7-a to e as their first table.
+item 4.2, the `|| true` test, the uid check, its revision row 2 read with E2.5-a, and the lines of the judge's cut row
+(D5 `:470-473`, § S4 `:1003-1006` and `:1014-1015`, S5 sc. 2 `:1132` and `:1136`, D3 `:393`; acme's `-p` with `${OWNER}`
+is a `docker-name` finding **[M]**); the S1 spec — the Linux record and
+`owned_trap`; the E2.4 brief — item 4; coai's E5 document — S7-a to e in S7's DoD; benchmark — the boundary row is
+merged (#177), write E6 new; rag_qln — E7's stories with E7-a to e as their first table.
 
 ## Epics
 
