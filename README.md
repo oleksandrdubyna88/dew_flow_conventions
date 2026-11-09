@@ -74,8 +74,9 @@ of skipping it is a commit that breaks a rule written precisely because breaking
   working* and needs its build run. A rules-pin bump never needs that; a code-pin bump always does.
   Do not treat them as the same chore because the same tool reports both. This orders pin BUMPS only: a
   consumer's migration to the neutral mount is not ordered by who pins whom — `dew_flow_rag_qln` migrated with
-  both code pins unmigrated and built green (2026-11-04) — so after the canary the owner selects any consumer
-  whose migration prerequisites are met ([ROLLOUT.md](ROLLOUT.md) § Recovery and later updates).
+  both code pins unmigrated and built green (2026-11-04) — so after the canary gate (its migration and adapter
+  PRs merged with green CI and `adapter-check` passing) the owner selects any consumer whose migration
+  prerequisites are met ([ROLLOUT.md](ROLLOUT.md) § Recovery and later updates).
 - The habit is now also a check: [`tools/pin-check.mjs`](tools/pin-check.mjs) runs in every
   consumer's CI and fails while **any** submodule pin is not at the tip of **the ref it tracks** —
   `submodule.<name>.branch` in that consumer's `.gitmodules`. The 2026-08-19 audit found three
