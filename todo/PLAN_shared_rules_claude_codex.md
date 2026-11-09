@@ -3,16 +3,22 @@ paths: ["__conventions_planning_documentation_only__/**"]
 ---
 # PLAN — единый источник правил для Claude Code и Codex
 
-> Status: **stopped for re-review, 2026-11-09** (IN PROGRESS since 2026-09-10). Scope: общий контракт инструкций, подключение Claude Code/Codex и миграция шести потребителей conventions. Resolver и self-host bootstrap написаны; rollout ещё не выполнен.
+> Status: **stopped for re-review, 2026-11-09** (IN PROGRESS since 2026-09-10). Scope: общий контракт инструкций, подключение Claude Code/Codex и миграция потребителей conventions (the six of 2026-09-09 and every repository that joined since — nine rows in `README.md` § Consumers on 2026-11-09). Resolver, self-host bootstrap, migration tool and smoke harness are shipped (S1 #16, S2 #17); the consumer rollout is part done.
 >
-> Progress, 2026-11-04 (read from each repository's default branch, `AGENTS.md` present or not): migrated —
-> `dew_flow_connect_other_ais`, `dew_flow_benchmark` (#113), `dew_flow_vscode_kit`, `wsl_care`, and `dew_flow_rag_qln`
-> (its PR #83, on the owner's request, entry 1.1); not migrated — `dew_flow_mcp`, `dew_flow_sidecar_rust`,
-> `dew_flow_creds_for_devs`.
+> Progress, 2026-11-09 (read from each repository's default branch: `.gitmodules` path and `AGENTS.md` present or
+> not): on the neutral layout — `dew_flow_connect_other_ais` (canary, #192), `dew_flow_benchmark` (#113),
+> `dew_flow_rag_qln` (#83 and the Claude adapter #85, entry 1.1), and three repositories that joined the family on
+> that layout and never had the legacy mount: `wsl_care` (2026-10-02), `dew_flow_vscode_kit` (2026-10-02),
+> `dew_flow_amd_r9700_tuning_ai` (2026-11-01, hooks and adapter present, CI runs `leftovers-check`, `plan-lifecycle`
+> and `post-deploy-check`; it never needed a migration PR); still on `.claude/rules/shared` with no `AGENTS.md` —
+> `dew_flow_mcp`, `dew_flow_sidecar_rust`, `dew_flow_creds_for_devs`.
 >
 > **The stop, 2026-11-09:** entry 1.2 (the owner moves `dew_flow_creds_for_devs` ahead of
 > `dew_flow_sidecar_rust`) is this plan's second change since approval. No consumer migration and no new code on any
-> stage of this plan until the whole plan is reviewed again and epoch 2 is open.
+> stage of this plan until the whole plan is reviewed again and epoch 2 is open. The re-review (rule step 4) revised
+> this whole plan on 2026-11-09; its record is under `## Plan changes`. The plan stays in `todo/` through the
+> re-review: `plan-lifecycle.mjs` reads ledgers only there, and epoch 2's line must be written into this ledger. The
+> promotion of the shipped design, with any remainder extracted, is Stage 4's closing step, not a step of the stop.
 
 ## Plan changes
 
@@ -29,6 +35,32 @@ paths: ["__conventions_planning_documentation_only__/**"]
   hand. Asked with three options after consult 806739e5 split (sidecar_rust then creds; only creds and stop this
   plan; wait), the owner chose only creds. No technical dependency was found between the two consumers; the creds
   migration is still to be built. This second change stopped the plan.)
+
+### Re-review for epoch 2
+
+Narrowed: no — the scope grows from the six consumers of 2026-09-09 to every row of `README.md` § Consumers (nine on 2026-11-09; the three that joined on the neutral layout need the acceptance check of § 7, not a migration), the Definition of Done keeps every item of epoch 1 and adds the `git grep` zero-result condition and the product-adapter review per migrated consumer, the merge conditions of a migration PR are written out in § 6 Stage 3 and are the same or stricter than epoch 1's bullets, nothing moves to another plan and nothing is deferred; the two build-order entries become one selection rule in place of the fixed consumer order (§ 6 Stage 3), which orders the same work and cuts none of it
+
+  (Both changes of epoch 1 were build-order entries by the owner for one cause each: a consumer whose loader refused
+  the legacy mount was pulled forward. Consult f54922a3 advised the selection rule, the complete creds checklist and
+  the promote-plus-remainder shape; the first two are applied below, the third is Stage 4's closing step because
+  the stop rule keeps the ledger in `todo/` until epoch 2 is open. Every row below is a merged pull request, a
+  merged direct commit or a pushed commit of this plan; the Opus judge fills Verdict and Action.)
+
+| Work | Where | Verdict | Action |
+|---|---|---|---|
+| S1 — metadata, resolver, bootstrap, tests, migration inventory: conventions #16, `026b20e` | conventions `main`, released | fits | kept |
+| S2 — migration tool, gate-copy check on the neutral mount, bounded native smoke: conventions #17, `895b24c` (promoted as `research/PLAN_shared_rules_rollout_tooling.md`) | conventions `main`, released | fits | kept |
+| Ledger opened, entry 1.1 (rag_qln before the three siblings): conventions #127, `87274b6` | conventions `main` | fits | kept |
+| Entry 1.2 and the stop: `a27f89d` | pushed, unmerged (`origin/docs/shared-rules-entry-1.2`; the base of this re-review branch) | fits | kept; lands with the re-review (open PR #144) |
+| Canary — `dew_flow_connect_other_ais` #192, `8d42647`: AGENTS/CLAUDE adapters, PROJECT.md, mount moved to `.agents/conventions` | coai `main` (section name `.claude/rules/shared` kept, path `.agents/conventions`, `branch = release`) | fits | kept; § 7 acceptance owed (closing matrix) |
+| `dew_flow_benchmark` #113, `89b4909`: adopt the shared entry | benchmark `main` | fits | kept; § 7 acceptance owed (closing matrix): no Claude adapter on `main` (no `.claude/hooks`), owed by story 3.B |
+| `dew_flow_rag_qln` #83, `d83315b`: adopt the shared entry (entry 1.1) | rag_qln `main` | fits | kept; § 7 acceptance owed (closing matrix) |
+| `dew_flow_rag_qln` #85, `75b7673`: the Claude adapter hook, `adapter-check` in CI | rag_qln `main` | fits | kept; its unannounced `external/dew_flow_benchmark` move (`469a510` → `2407ac8`, one docs commit) is already superseded by pin PRs #88 and #89, nothing to correct; § 7 acceptance owed |
+| `wsl_care` `a8082f0` (2026-10-02): joined on the neutral layout, no legacy mount ever | wsl_care `main`, direct commit | fits | kept; § 7 acceptance owed (closing matrix) |
+| `dew_flow_vscode_kit` `34338f4` (2026-10-02): joined on the neutral layout, no legacy mount ever | vscode_kit `main`, direct commit | fits | kept; § 7 acceptance owed (closing matrix) |
+| `dew_flow_amd_r9700_tuning_ai` `2578d4e` (2026-11-01): joined on the neutral layout with hooks and adapter, no legacy mount ever | r9700 `main`, direct commit | fits | kept; § 7 acceptance owed (closing matrix) |
+| The Claude adapter: `settings/hooks/load-instructions.mjs`, `settings/settings.json`, `tools/adapter-check.mjs`, conventions `524a994` … `d7cfbca` (2026-09-10..11) | conventions `main`, direct commits, released | fits | kept; story 3.C and story 3.B install it, the closing matrix checks it |
+| coai's Claude adapter: `f6c1b0d`, `b415232` (2026-09-10, `.claude/hooks/load-instructions.mjs`, `adapter-check` test in CI) | coai `main`, via PR #195 (merge `d5ee8bf`) | fits | kept; § 7 acceptance owed (closing matrix, with #192) |
 
 ## Execution journal — 2026-09-10
 
@@ -139,6 +171,11 @@ consumer/
 
 Это **целевая структура**, перечисленные новые файлы и новые команды пока не созданы. Пути `common/`, `csharp/`, `rust/`, `typescript/`, `tools/` внутри conventions сохраняются, чтобы не совмещать перенос mount с массовым переименованием всех правил.
 
+Re-review note, 2026-11-09: the structure above is built and shipped. `ENTRY.md`, `tools/rules.mjs`,
+`tools/migrate-rules.mjs`, `tools/smoke-rules.mjs`, `tools/adapter-check.mjs` and the reference adapter in
+`settings/` exist in this repository (S1 #16, S2 #17 and later releases); six repositories run on it (status
+block). The paragraph above is kept as the approved design text, not as a statement of what exists.
+
 Предлагаемый `AGENTS.md` содержит только подключение, без пересказа правил:
 
 ```markdown
@@ -188,6 +225,28 @@ Fallback `project_doc_fallback_filenames = ["CLAUDE.md"]` не является 
 | dew_flow_connect_other_ais | есть | нет | `.claude/rules/shared` |
 
 Проверялось наличие файлов на диске, не фактическая загрузка инструкций во всех работающих IDE. Глобальные правила или инструкции, добавленные хостом, этой таблицей не исключаются. В этих шести checkout также не обнаружен `.codex/config.toml`.
+
+### 3.1. State on 2026-11-09 (re-review baseline)
+
+Read from each repository's default branch with `gh api` (`.gitmodules`, `AGENTS.md`, `.claude/`), not from local
+checkouts. "Legacy references" is `git grep -n -F '.claude/rules/shared'` over the committed tree; for creds it is
+the exact count on `origin/main` `16975d0`, for mcp and sidecar_rust the GitHub code-search file count (approximate).
+
+| Repository | Mount path | `AGENTS.md` | How it got there | Legacy references |
+|---|---|---|---|---|
+| dew_flow_connect_other_ais | `.agents/conventions` (section still named `.claude/rules/shared`) | yes | migration PR #192, 2026-09-10 (canary) | not re-counted here |
+| dew_flow_benchmark | `.agents/conventions` (section `.claude/rules/shared`) | yes | migration PR #113, 2026-10-29 | not re-counted here |
+| dew_flow_rag_qln | `.agents/conventions` (section `.claude/rules/shared`); code pins `external/dew_flow_mcp`, `external/dew_flow_benchmark` | yes | migration PR #83 and adapter PR #85, 2026-11-04 (entry 1.1) | not re-counted here |
+| wsl_care | `.agents/conventions` | yes | joined on the neutral layout, `a8082f0`, 2026-10-02 | none by construction |
+| dew_flow_vscode_kit | `.agents/conventions` | yes | joined on the neutral layout, `34338f4`, 2026-10-02 | none by construction |
+| dew_flow_amd_r9700_tuning_ai | `.agents/conventions` | yes | joined on the neutral layout, `2578d4e`, 2026-11-01; `.claude/hooks` and `settings.json` present; CI: `leftovers-check`, `plan-lifecycle`, `post-deploy-check` | none by construction |
+| dew_flow_mcp | `.claude/rules/shared` | no | not migrated | about 18 files |
+| dew_flow_sidecar_rust | `.claude/rules/shared` | no | not migrated | about 21 files |
+| dew_flow_creds_for_devs | `.claude/rules/shared` (pin `37b9aa5`); `.claude/settings.json` present, no `.claude/hooks` | no | not migrated; the resolver refuses the legacy mount (entry 1.2) | 249 lines in 90 files (detail in § 6 Stage 3, story 3.C) |
+
+The three repositories that joined on the neutral layout are in scope for the acceptance check of § 7 (fresh clone,
+both agents, adapter present), not for a migration: there is no legacy mount to move and no rollback to a legacy
+state. The "not re-counted" cells are work of Stage 3's closing matrix, not a claim of zero.
 
 В старом `ClaudeRag · AGENTS.md:8` уже есть индекс с `@CLAUDE.md` и ссылками на Claude rules. Он показывает намерение иметь один источник, но не служит проверкой автоматического import Codex. `ClaudeRag` заморожен по `README.md:116`; в rollout шести активных потребителей его не включать без отдельной задачи.
 
@@ -294,19 +353,130 @@ Claude/Codex-специфичные детали, если понадобятс�
 
 ### Этап 3 — остальные потребители
 
-- [ ] Проверить Rust-потребитель `dew_flow_sidecar_rust`, затем `dew_flow_creds_for_devs`.
-- [ ] Мигрировать `dew_flow_mcp`, `dew_flow_benchmark`; `dew_flow_rag_qln`, который сам закрепляет часть этих репозиториев, проверять последним.
-- [ ] Для каждого — отдельный migration PR с old/new SHA, обновлением путей, проверками обоих агентов и rollback.
+Revised whole on 2026-11-09 (the re-review for epoch 2). Epoch 1 named a fixed consumer order — sidecar_rust, then
+creds, then mcp and benchmark, rag_qln last because it pins siblings. Both changes of epoch 1 overrode that order for
+the same cause: a consumer whose loader refused the legacy mount was pulled forward, and the fixed order had no
+technical ground (rag_qln's migration built and tested green with its two code pins unmigrated; no dependency was
+found between sidecar_rust and creds). The order is replaced by a selection rule; the same text replaces the order
+in `ROLLOUT.md` § Recovery and later updates and in `README.md` § Editing discipline.
+
+**Selection rule (replaces the fixed order).** After the canary's acceptance, the owner may select any consumer
+whose documented migration prerequisites are met:
+
+1. the migration tool's preflight passes in dry-run on the consumer's committed base (`validateInputs`: a clean
+   legacy mount, the selected `release` SHA, no host settings and no untracked policy pointing at the old mount,
+   no reference-style Markdown definitions);
+2. the product references the tool cannot rewrite are listed, each with its owner change (story 3.C shows the shape);
+3. a code-pin change is never part of a migration PR: it needs its own justification, its own build and its own
+   pull request (the pinned-by rule in `README.md` governs pin BUMPS, not migration order);
+4. a loader refusal in a consumer (the resolver refuses its legacy mount, as in creds on 2026-11-09) triggers
+   triage — which rule set the sessions there read by hand, since when, and what it cost — and then the owner's
+   selection; it never migrates a consumer by itself and it is never a reason to skip a prerequisite.
+
+Done, with evidence:
+
+- [x] Canary `dew_flow_connect_other_ais` — PR #192, `8d42647`, 2026-09-10 (Stage 2).
+- [x] `dew_flow_benchmark` — PR #113, `89b4909`, 2026-10-29.
+- [x] `dew_flow_rag_qln` — PR #83, `d83315b`, and the Claude adapter PR #85, `75b7673`, 2026-11-04 (entry 1.1).
+- [x] `wsl_care`, `dew_flow_vscode_kit`, `dew_flow_amd_r9700_tuning_ai` joined on the neutral layout (§ 3.1); each
+      still owes the § 7 acceptance check in the closing matrix.
+
+Open stories:
+
+- [ ] **Story 3.C — `dew_flow_creds_for_devs`** (the owner's selection of 2026-11-09, entry 1.2). One migration PR,
+      with this acceptance checklist complete before merge:
+  - [ ] **Reconcile with the open work in creds first.** PR #323 (`feat/remote-bridge-e15` → `main`, another
+        session's, 36 files, `CONFLICTING` against `main` on 2026-11-09) touches no `.claude/rules/shared` reference,
+        no `CLAUDE.md`, no `.gitmodules` and no workflow (checked with `gh pr diff` on 2026-11-09); it does touch
+        `todo/README.md` and two plan files. The migration PR names its base commit and its merge order relative to
+        #323 and the other open PRs (#320–#322, #326, #327 on 2026-11-09), and its owner re-checks that list on the
+        day it opens; the migration never carries another session's files.
+  - [ ] **Dry-run, then apply** `tools/migrate-rules.mjs` with the `release` SHA, into a worktree outside both
+        checkouts. The report's remaining-legacy list is read whole before `--apply`.
+  - [ ] **Project and local policy move:** `CLAUDE.md` (11 legacy references, including the local CPU-budget
+        preload line `LP=.claude/rules/shared/tools/low-priority.mjs`) becomes `.agents/PROJECT.md` with its links
+        rebased; the root `CLAUDE.md` is only `@AGENTS.md`; `AGENTS.md` is the family bootstrap; `.claude/rules`
+        ends up empty. creds has no `.claude/rules` policy besides the mount, so no `.agents/rules` files are
+        expected — the preflight confirms it.
+  - [ ] **Install the Claude adapter:** `.claude/hooks/load-instructions.mjs` and the `settings/settings.json`
+        reference merged into creds' existing `.claude/settings.json` without weakening a permission; verified by
+        `node .agents/conventions/tools/adapter-check.mjs` in CI, as rag_qln #85 did.
+  - [ ] **Product scripts the tool cannot rewrite** (`validateInputs` accepts `--rewrite` only for tracked files
+        under root `tools/`, `scripts/` or `deploy/` with the extensions `mjs|js|sh|ps1|cmd|bat|yaml|yml`; a `.cjs`
+        and anything under `src_vs_code/` are refused). Each is a hand edit in the migration PR, with its test run:
+        `src_vs_code/scripts/lower-priority.mjs:14` (`MOUNT`), `src_vs_code/scripts/lib/leftovers.cjs:5,31`
+        (the mount path and the remount hint), `src_vs_code/scripts/lib/leftovers.d.cts`,
+        `src_vs_code/scripts/lib/processTree.mjs:46-47` (two imports from the mount),
+        `src_vs_code/scripts/run-tests.mjs`, `src_vs_code/scripts/run-itests.mjs`; the tests that assert the
+        legacy path or the remount sentence: `src_vs_code/src/test/itestRunner.test.ts:387,448,701`,
+        `workflowMount.test.ts:102,140,147-148`, `leftoversWrapper.test.ts`, `leftoversRunner.test.ts`,
+        `localCpuBudget.test.ts`, `backupWatch.test.ts`; the .NET side:
+        `src_service_defaults/tests/Leftovers/LeftoversJanitorTests.cs:17,32` (`Janitor` constant),
+        `LeftoversGuardTests.cs:264,579`, `LeftoversAuditTests.cs`, `Support/Leftovers/*.cs` (three files),
+        `Directory.Build.props`, `Directory.Packages.props` (comments), `src_minimalapi_server/src/Program.cs`,
+        `Logging.cs`, `src_service_defaults/src/CredsLogging.cs` and its `.csproj` (comments),
+        `src_vs_code/src/{logFormat,keyFingerprint,agentAuditFile}.ts` (comments); `.gitignore`;
+        `deploy/restore-archive-itest.sh` (eligible for `--rewrite deploy/restore-archive-itest.sh`).
+  - [ ] **The leftovers sweep and guard** keep running against the new mount: the Node wrapper
+        (`leftovers.cjs`), the C# tests that locate `tools/janitor.sh` and `tools/leftovers-check.mjs`, and the
+        CI step, each green on the migrated tree.
+  - [ ] **Workflows** (`ci-server.yml` 8, `docs.yml` 6, `release.yml` 5, `rsd-server-deploy.yml` 2,
+        `ci-extension.yml` 2, `ci-clients.yml` 1, `sonarcloud.yml` 1 references): rewritten by the tool's default
+        allowlist; the `pin-check` step and the `plan-lifecycle` caller point at the new mount; `submodules: true`
+        or the explicit `git submodule update --init .agents/conventions` stays.
+  - [ ] **Documentation:** root `README.md`, `POST_DEPLOY.md`, `http/README.md` and the product READMEs
+        (`src_cli`, `src_mcp`, `src_minimalapi_server`) name the new mount; `research/` and `todo/` plan texts are
+        historical citations and are NOT rewritten (the tool's rule), except the two `research/README.md` and
+        `research/architecture.md` lines that are live pointers.
+  - [ ] **Check the committed result:** `git grep -n -F '.claude/rules/shared'` on the PR head returns only
+        historical plan and research citations and the preserved `.gitmodules` section name — zero executable paths,
+        zero hints that tell a reader to init the old mount. The list is pasted into the PR.
+  - [ ] **Fresh clone** with `submodules: true`, `npm ci --ignore-scripts --prefix .agents/conventions`, then
+        `rules.mjs check`, `explain --task inspect`, `gate-snippet-check`, `adapter-check`, `pin-check`,
+        `plan-lifecycle`; the extension's `npm test` and the .NET test run, both green.
+  - [ ] **Both agents** read the selected sources in a bounded smoke (`tools/smoke-rules.mjs`, Claude and Codex)
+        from the migrated worktree; a quota or an absent CLI is recorded as incomplete, never as a pass.
+  - [ ] **Product behaviour unchanged:** the broker, CLI, MCP server and extension builds and their test suites
+        green on the migrated tree; no permission in `.claude/settings.json` weakened.
+  - [ ] **Rollback** named in the PR: one revert restores the gitlink, adapters and paths together
+        (`ROLLOUT.md` § Recovery); tried once in a disposable clone.
+  - [ ] **Merge conditions of this PR** — below, the same for every migration PR.
+- [ ] **Story 3.R — `dew_flow_sidecar_rust`** (Rust: `csharp/` never matches, `rust/doctrine.md` is its doctrine).
+      Selected by the owner under the rule above when its prerequisites are met; its checklist is story 3.C's shape
+      with its own product references (about 21 files on 2026-11-09) listed in the PR.
+- [ ] **Story 3.M — `dew_flow_mcp`** (.NET, public; pinned by rag_qln as `external/dew_flow_mcp`). Selected by the
+      owner under the rule above; its migration PR moves no code pin, and rag_qln's later bump of that pin is a
+      separate code-pin PR with a build.
+- [ ] **Story 3.B — the Claude adapter in `dew_flow_benchmark`** (found by the re-review's judge, 2026-11-09:
+      benchmark migrated in #113, but its `main` has only `.claude/settings.json`, no `.claude/hooks`, so a Claude
+      session there starts without its rules). Its own PR, selected by the owner under the rule above, in the shape
+      of rag_qln #85: the reference hook `.claude/hooks/load-instructions.mjs` and the `settings/settings.json`
+      reference merged into its `.claude/settings.json` without weakening a permission, and
+      `node .agents/conventions/tools/adapter-check.mjs` in CI. It moves no code pin.
+- [ ] **Closing matrix:** one table of every consumer in `README.md` § Consumers — mount path, pin, adapter check,
+      fresh clone, both agents, legacy-reference count — written into this plan before Stage 4.
 - [ ] Не двигать code dependency pins только для того, чтобы погасить старый pin-check; принять явное решение о совместимых версиях и проверить сборку при их изменении.
 - [ ] Обновить README/ROLLOUT/POST_DEPLOY и checklist каждого потребителя. Ссылки на инструменты старого mount не должны остаться исполняемыми путями.
 
-**Выход:** матрица шести потребителей с подтверждёнными версиями. Старый `ClaudeRag` остаётся вне миграции.
+**Merge conditions of a migration PR** (written out in the re-review; epoch 1 had them as bullets): old and new
+conventions SHA named; the tool's dry-run report attached; both agents' smoke results attached or marked incomplete
+with the reason; the `git grep` result pasted; the consumer's own CI green on the head SHA, checks present (never
+"no failure found"); rollback named; no code pin moved; the reviewer gate and the automated reviewer's threads
+answered; the owner's go for the consumer recorded (the selection rule).
+
+**Выход:** матрица всех потребителей (nine rows on 2026-11-09) с подтверждёнными версиями. Старый `ClaudeRag` остаётся вне миграции.
 
 ### Этап 4 — закрытие и эксплуатация
 
 - [ ] В CI: `rules check`, проверка templates, manifest и ссылок; запрет новых ручных policy-копий.
 - [ ] Регулярный compatibility smoke после обновления Claude/Codex; staged rollout новой версии правил.
 - [ ] Зафиксировать изменения поведения и отклонения; закрыть соответствующие пункты общего backlog.
+- [ ] Close this plan (re-review of 2026-11-09): once the closing matrix of Stage 3 is complete, promote this file
+      to `research/` with `IMPLEMENTED <date>` and its deviations (the fixed order that was dropped, the three
+      repositories that joined without a migration, the section name kept in `.gitmodules`, Codex native
+      acceptance as measured); extract whatever is still open (for example Codex acceptance or a consumer the owner
+      has not selected) into a fresh `todo/` plan with the boundary table named on both sides. Not before: the
+      ledger lives here and `plan-lifecycle.mjs` reads it only in `todo/`.
 
 ## 7. Проверки приёмки
 
@@ -324,6 +494,8 @@ Claude/Codex-специфичные детали, если понадобятс�
 | Windows, WSL, пробелы, Unicode, fresh clone | Подключение не требует вручную созданных symlinks и абсолютных путей машины автора |
 | Ошибка проверки / неполный coai review | Нет выдуманного pass или полного состава reviewers |
 | Откат canary | Старый mount, инструкции и команды снова работают на прежнем SHA |
+| Loader refuses a consumer's legacy mount (added 2026-11-09) | Recorded as a triage finding with what sessions there read by hand and since when; it is not itself a migration and it skips no prerequisite of § 6 Stage 3 |
+| Consumer that joined on the neutral layout (added 2026-11-09) | The fresh-clone, adapter and both-agents rows above hold; no legacy mount, so no rollback row |
 
 Детерминированные tests проверяют resolver, пути, manifest и templates. Для model smoke хранить список ожидаемых rule id/hash, фактические чтения и результат поведения. Ответ модели «я всё прочитала» сам по себе не является достаточной проверкой. Проверки с моделями — отдельные разрешённые запуски с лимитом, не скрытая часть обычного `rules check`.
 
@@ -341,6 +513,10 @@ Claude/Codex-специфичные детали, если понадобятс�
 
 - [ ] Каждое действующее правило и локальное обязательство имеет один canonical body и запись в migration map.
 - [ ] В каждом из шести потребителей один submodule conventions и одна версия policy для обоих агентов.
+- [ ] (Re-review 2026-11-09, widens the line above) The same holds for every row of `README.md` § Consumers at the
+      time of promotion — nine on 2026-11-09 — and for each migrated consumer `git grep -n -F '.claude/rules/shared'`
+      on `main` returns no executable path and no remount hint; the product references the tool could not rewrite
+      were reviewed as a separate list in the migration PR.
 - [ ] CLAUDE импортирует AGENTS; отсутствуют циклы `AGENTS → CLAUDE → AGENTS` и ручные копии правил.
 - [ ] Состав прочитанных rule id/hash соответствует задаче и совпадает у Claude/Codex, кроме явно названных runtime adapters.
 - [ ] Todo, fixtures и справочные документы не входят в обычный instruction payload.

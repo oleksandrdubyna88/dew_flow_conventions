@@ -137,5 +137,11 @@ remote HEAD as a missing-instruction fallback.
 One trap on an existing clone: `git submodule update --remote` reads `submodule.<name>.branch` from
 **`.git/config` first**, and `git submodule sync` copies the url but NOT the branch. A clone made
 before this rollout therefore keeps following the default branch while CI names `release`. Fix it
-once per clone with `git config submodule.<name>.branch release`, or re-init the submodule. Migrate the canary first; update pinned repositories before their consumers,
-and build whenever a code pin changes.
+once per clone with `git config submodule.<name>.branch release`, or re-init the submodule.
+
+Migrate the canary first. After its acceptance there is no fixed consumer order: the owner may select any consumer
+whose documented migration prerequisites are met (the tool's dry-run preflight passes on its committed base, and
+the product references the tool cannot rewrite are listed with their owner changes). A code-pin change is never part
+of a migration — it needs its own justification, its own build and its own pull request. A loader refusing a
+consumer's legacy mount triggers triage, not an automatic migration. The pinned-by rule in the README governs pin
+bumps, not migration order (the shared-rules plan, re-review of 2026-11-09).
