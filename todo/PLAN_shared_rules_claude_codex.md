@@ -3,22 +3,32 @@ paths: ["__conventions_planning_documentation_only__/**"]
 ---
 # PLAN — единый источник правил для Claude Code и Codex
 
-> Status: **IN PROGRESS, 2026-09-10.** Scope: общий контракт инструкций, подключение Claude Code/Codex и миграция шести потребителей conventions. Resolver и self-host bootstrap написаны; rollout ещё не выполнен.
+> Status: **stopped for re-review, 2026-11-09** (IN PROGRESS since 2026-09-10). Scope: общий контракт инструкций, подключение Claude Code/Codex и миграция шести потребителей conventions. Resolver и self-host bootstrap написаны; rollout ещё не выполнен.
 >
 > Progress, 2026-11-04 (read from each repository's default branch, `AGENTS.md` present or not): migrated —
 > `dew_flow_connect_other_ais`, `dew_flow_benchmark` (#113), `dew_flow_vscode_kit`, `wsl_care`, and `dew_flow_rag_qln`
 > (its PR #83, on the owner's request, entry 1.1); not migrated — `dew_flow_mcp`, `dew_flow_sidecar_rust`,
 > `dew_flow_creds_for_devs`.
+>
+> **The stop, 2026-11-09:** entry 1.2 (the owner moves `dew_flow_creds_for_devs` ahead of
+> `dew_flow_sidecar_rust`) is this plan's second change since approval. No consumer migration and no new code on any
+> stage of this plan until the whole plan is reviewed again and epoch 2 is open.
 
 ## Plan changes
 
-> Epoch 1 · approved 2026-09-10 · by reviewers · state: open
+> Epoch 1 · approved 2026-09-10 · by reviewers · state: stopped
 
 - 1.1 · 2026-11-04 · owner · build-order — dew_flow_rag_qln migrates before dew_flow_mcp, dew_flow_sidecar_rust and dew_flow_creds_for_devs, not last
   (Stage 3 said rag_qln is checked last, because it pins some of the others as submodules. The owner asked for its
   entry on 2026-11-04: the loader refused the repository and every session there read rules by hand. Its pins do
   not depend on the siblings' layout; its migration PR built and tested green with them unmigrated. This plan was
   approved before the change-control rule reached this repository, so this entry opens its ledger.)
+- 1.2 · 2026-11-09 · owner · build-order — dew_flow_creds_for_devs migrates now, before dew_flow_sidecar_rust; sidecar_rust and dew_flow_mcp stay unmigrated
+  (Stage 3 says the Rust consumer sidecar_rust is checked first, then creds. The owner asked on 2026-11-09 to fix rule
+  loading in creds: the resolver refuses its legacy `.claude/rules/shared` mount and sessions there read rules by
+  hand. Asked with three options after consult 806739e5 split (sidecar_rust then creds; only creds and stop this
+  plan; wait), the owner chose only creds. No technical dependency was found between the two consumers; the creds
+  migration is still to be built. This second change stopped the plan.)
 
 ## Execution journal — 2026-09-10
 
