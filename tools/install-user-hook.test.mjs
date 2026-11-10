@@ -499,3 +499,23 @@ test('repairRegistration resolves the same relative link from the real folder', 
   assert.equal(fs.existsSync(path.join(base, 'real', 'settings.json')), true);
   assert.equal(fs.existsSync(path.join(base, 'settings.json')), false);
 });
+
+// CodeRabbit on coai #970 (2026-11-10), red first: the link is pointed at ANOTHER file with the same bytes between the
+// resolve and the write. The byte re-read passed and the write went to the old file; the target is now re-resolved.
+test('a settings link re-pointed during the write is refused, even when both files hold the same bytes', t => {
+  const s = sandbox(t);
+  const dotfiles = path.join(path.dirname(s.home), 'dotfiles');
+  fs.mkdirSync(dotfiles);
+  const a = path.join(dotfiles, 'a.json');
+  const b = path.join(dotfiles, 'b.json');
+  fs.writeFileSync(a, '{"model":"opus"}\n');
+  fs.writeFileSync(b, '{"model":"opus"}\n');
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  try { fs.symlinkSync(a, s.paths.settings); } catch (error) { return t.skip(`no symlink here (${error.code})`); }
+  const repoint = () => { fs.rmSync(s.paths.settings); fs.symlinkSync(b, s.paths.settings); };
+  const r = install({ home: s.home, source: s.source, beforeWrite: repoint });
+  assert.equal(r.code, 1, r.lines.join('\n'));
+  assert.match(r.lines.at(-1), /changed while installing/);
+  assert.equal(fs.readFileSync(a, 'utf8'), '{"model":"opus"}\n', 'the old target was written');
+  assert.equal(fs.existsSync(s.paths.hook), false);
+});

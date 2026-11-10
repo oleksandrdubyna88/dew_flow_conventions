@@ -183,7 +183,9 @@ ending in a missing file keeps every link and creates the last target (a one-lev
 link loop is refused before the backup, manifest, hook or settings are written. A 41-link acyclic chain is refused the same way. CodeRabbit on
 #149: `uninstall` resolves the target only when it writes settings.json, so a loop does not stop it removing the hook
 and manifest and writing the opt-out marker (red first). CodeRabbit on creds #340: a relative link target is read from the link's
-real folder, so `..` after a symlinked parent names the right place (red first).
+real folder, so `..` after a symlinked parent names the right place (red first). CodeRabbit on coai #970: a link
+pointed at another file with the same bytes between the read and the write is refused (the re-read checks which file,
+not only its bytes; red first).
 
 `tools/load-instructions-hook.test.mjs` (4 cases, 2026-11-10) drives `sessionInstructions` of
 `settings/hooks/load-instructions.mjs` against fake self-hosted layouts: the bound is at most 30 s, a resolver that
