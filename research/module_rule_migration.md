@@ -48,7 +48,11 @@ marker distinct from a target's own exit 125; the bounded smoke report keeps tha
 CLI completion, complete bodies, and unchanged checkout state
 are separate evidence; the final answer still needs behavioral review. The latest result
 per agent is stored atomically in Git metadata, with two fixed 32 KiB slots. Full model traces
-are captured only in memory, limited to 256 KiB. A lock prevents concurrent ownership of a slot.
+are captured only in memory, limited to 8 MiB (`INSPECT_TRACE_MAX_BYTES`, the behaviour fixtures' cap; 256 KiB
+until 2026-11-10 cut every Claude run in dew_flow_creds_for_devs). The prompt (`inspectPrompt`) asks for `explain`
+once, then one `read --only <id>` per selected rule, because Claude Code shows the model only a 2 KB preview of a Bash
+output over about 30 KB. The resolver starts git with stdin `ignore`: Codex's Linux sandbox refuses a child with a
+stdin pipe (EPERM after its output), which stopped every Codex run there until 2026-11-10. A lock prevents concurrent ownership of a slot.
 A quota failure is recorded without a retry or changing accounts.
 
 The installed mounted resolver takes precedence over an unrelated root ENTRY. Self-host

@@ -40,6 +40,15 @@ mode and retained advisory/host-policy caveats. The external 180-second timeout 
 The HTTP-only selection regression failed before the dependency was declared and passed
 afterward. The complete suite now contains 55 cases (one Windows symlink privilege skip).
 
+The creds migration's smoke (dew_flow_creds_for_devs #328, 2026-11-10) was incomplete for both agents, and four cases
+pin the three causes, each red on the old code. `tools/smoke-rules.test.mjs`: an inspect smoke with a fake Claude whose
+trace is over 256 KiB still decodes and counts every rule (red: cut at 262,144 B), and the prompt asks for one
+`read --only <id>` per selected rule (red: one whole read, which Claude Code shows the model only as a 2 KB preview).
+`tools/rules.test.mjs`: the resolver's `check` runs inside `codex sandbox` (red: `spawnSync git EPERM`; skipped where
+no Codex CLI is installed), and the same check under a preload that refuses any `execFileSync` with a stdin pipe, as
+the sandbox does, so CI holds the fix too. Measured with the fix in a disposable creds worktree: Codex 924,490 B and
+Claude 375,834 B traces, 5 of 5 rules read in full for each.
+
 The S2 suite adds `tools/migrate-rules.test.mjs`, `tools/proc.test.mjs` and
 `tools/smoke-rules.test.mjs`; all run through `npm test` and the coverage job. Scenarios use
 real Git repositories/submodules, with spaces and Unicode: dry-run/no source edits, apply,
@@ -153,7 +162,17 @@ that open no pool are ignored, the stdin/stdout protocol is exercised end to end
 `hookEventName`, `permissionDecision` and a reason naming `-m:4`, and an allowed command produces
 no output at all — and a malformed payload allows the command rather than blocking the session.
 The protocol case exists because the pure predicate can be right while the wiring emits the wrong
-shape, which denies nothing and says nothing.
+shape, which denies nothing and says nothing. Since 2026-11-10 (17 cases) the suggested command carries `-m:4`
+directly after the build verb — `dotnet build -m:4 App.slnx # note`, `msbuild -m:4 …`, a quoted `dotnet.exe` path,
+a leading assignment — where the old append put it inside a trailing comment (red on the old text). CodeRabbit on
+#147 added one case (red first): a verb inside an assignment's value (`BUILDER=msbuild dotnet build`) is skipped,
+and `dotnet.cmd` / `dotnet.bat` are matched as `executableName` reads them. `--check` also names an install cut short
+after its manifest (the hook still holds the manifest's `previous`) as unfinished, not as an edit (one case, red first).
+
+`tools/load-instructions-hook.test.mjs` (4 cases, 2026-11-10) drives `sessionInstructions` of
+`settings/hooks/load-instructions.mjs` against fake self-hosted layouts: the bound is at most 30 s, a resolver that
+sleeps past a 0.5 s bound gives the INCOMPLETE notice naming it, an answering resolver is passed through under the
+header, and no resolver gives the restore commands. Red on the old file: it exported nothing and waited 120 s.
 
 `tools/adapter-check.test.mjs` grows one case for the second hook, and two existing cases change
 count because a bare repository is now missing two hooks rather than one. The new case observes a
@@ -182,7 +201,15 @@ unparsable `settings.json` is refused byte-identical, a project hook with uncomm
 is refused, every install writes the provenance manifest (source, sha256, version, UTC time, `self-install`), and
 spawned runs of the entry point print exactly one `systemMessage` line the first time and nothing the second, and
 survive garbage stdin (the payload `cwd` stands in for `CLAUDE_PROJECT_DIR`). The permanent break-it makes the
-version comparison always install: the "equal writes nothing" and the second-run-silent cases go red.
+version comparison always install: the "equal writes nothing" and the second-run-silent cases go red. Four cases
+added 2026-11-10 (coai code gate on dew_flow_creds_for_devs #328), the first three red on the old files: git not on
+PATH refuses the install (it read as "no uncommitted changes"); a hooks path that cannot be written leaves
+`settings.json` without a registration (it used to register a missing file first); an installed guard edited since
+its install is refused, unchanged, with `--force` named; and an install cut short after the new hook, before its
+manifest, is completed rather than taken for an edit. The code round of the same day added four more: a stop after
+the hook and a stop after the manifest (the old bytes are its `previous`) are both completed even when the source has
+moved on, every install records `previous`, and a relative source path is checked for uncommitted changes (it named
+a pathspec under the `-C` folder that did not exist); the last three red on the first fix.
 `tools/effort-converge.test.mjs` (10 cases, 2026-10-14) covers the effort convergence (`effortProblems`,
 `convergeEffort`, `applyEffort`, `ensureEffort`) with temporary homes: all keys set, input never mutated, other keys and
 their order kept, other `modelSettings` keys (`claude-opus-5`) pinned, idempotent (no write, backup or output),

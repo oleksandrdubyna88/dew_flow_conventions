@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { ensureUserGuard, guardVersion } from '../settings/hooks/ensure-user-guard.mjs';
-import { OPTOUT_FILE, findEntries, install, targets } from '../settings/hooks/lib/user-guard-install.mjs';
+import { OPTOUT_FILE, check, findEntries, install, targets } from '../settings/hooks/lib/user-guard-install.mjs';
 import { ownedDir } from './lib/owned.mjs';
 
 const ENTRY = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'settings', 'hooks', 'ensure-user-guard.mjs');
@@ -299,4 +299,97 @@ test('a consumer (conventions mounted under .agents/, no tools/rules.mjs at the 
   fs.writeFileSync(path.join(mount, 'tools', 'rules.mjs'), '// mount\n');
   fs.writeFileSync(path.join(mount, 'settings', 'hooks', 'subagent-model.mjs'), hookText(2));
   assert.equal(s.ensure().action, 'installed');
+});
+
+// ---- the coai code gate on dew_flow_creds_for_devs #328 (2026-11-10): three findings on the self-install ----
+const sha = bytes => createHash('sha256').update(bytes).digest('hex');
+
+test('git that cannot run (not on PATH) refuses the install instead of reading as "no uncommitted changes"', t => {
+  const s = sandbox(t);
+  const noGit = ownedDir(t, 'no-git-on-path');
+  const r = s.run({ PATH: noGit });
+  assert.equal(r.status, 0);
+  assert.match(JSON.parse(r.stdout).systemMessage, /subagent-model guard NOT installed into ~\/\.claude: git could not tell whether the project copy has uncommitted changes/);
+  assert.equal(fs.existsSync(s.paths.hook), false);
+});
+
+test('a hook file that cannot be written leaves settings.json without a registration of it', t => {
+  const s = sandbox(t);
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  fs.writeFileSync(path.dirname(s.paths.hook), 'a file where the hooks folder should be\n');
+  assert.throws(() => install({ home: s.home, source: s.source }));
+  assert.equal(fs.existsSync(s.paths.settings), false, 'settings.json registers a hook that was never written');
+});
+
+test('an installed guard changed since its install is not replaced by an upgrade, and the line names --force', t => {
+  const s = sandbox(t, 2);
+  s.seedInstalled(1);
+  fs.writeFileSync(s.paths.manifest, JSON.stringify({ sha256: sha(Buffer.from(hookText(1))), version: 1 }));
+  fs.appendFileSync(s.paths.hook, '// a local edit\n');
+  registerValidly(s);
+  const before = fs.readFileSync(s.paths.hook);
+  const r = s.ensure();
+  assert.equal(r.action, 'refused');
+  assert.match(r.line, /changed since it was installed/);
+  assert.match(r.line, /--force/);
+  assert.deepEqual(fs.readFileSync(s.paths.hook), before);
+});
+
+test('a copy cut short after the new hook, before its manifest, is completed — not taken for a local edit', t => {
+  const s = sandbox(t, 2);
+  s.seedInstalled(2);
+  fs.writeFileSync(s.paths.manifest, JSON.stringify({ sha256: sha(Buffer.from(hookText(1))), version: 1 }));
+  registerValidly(s);
+  assert.equal(s.ensure().action, 'installed');
+  assertCurrent(s);
+});
+
+// ---- the code round's findings on this branch (coai session 0d92a7d2, 2026-11-10) ----
+test('an upgrade cut short after the new hook is completed even when the source moved on again', t => {
+  const s = sandbox(t, 3);
+  s.seedInstalled(2);
+  fs.writeFileSync(s.paths.manifest, JSON.stringify({ sha256: sha(Buffer.from(hookText(2))), previous: sha(Buffer.from(hookText(1))), version: 2 }));
+  registerValidly(s);
+  assert.equal(s.ensure().action, 'upgraded');
+  assertCurrent(s);
+});
+
+test('an upgrade cut short after the manifest, before the hook, is completed — the old bytes are the manifest\'s previous', t => {
+  const s = sandbox(t, 3);
+  s.seedInstalled(1);
+  fs.writeFileSync(s.paths.manifest, JSON.stringify({ sha256: sha(Buffer.from(hookText(2))), previous: sha(Buffer.from(hookText(1))), version: 2 }));
+  registerValidly(s);
+  assert.equal(s.ensure().action, 'upgraded');
+  assertCurrent(s);
+});
+
+test('every install records the hash of the bytes it replaces as the manifest\'s previous', t => {
+  const s = sandbox(t, 2);
+  s.seedInstalled(1);
+  assert.equal(s.ensure().action, 'upgraded');
+  const manifest = JSON.parse(fs.readFileSync(s.paths.manifest, 'utf8'));
+  assert.equal(manifest.previous, sha(Buffer.from(hookText(1))));
+  assert.equal(manifest.sha256, sha(fs.readFileSync(s.source)));
+});
+
+test('a relative source path is checked for uncommitted changes like an absolute one', t => {
+  const s = sandbox(t);
+  const git = spawnSync('git', ['init', '-q'], { cwd: s.project });
+  if (git.status !== 0) return t.skip('git unavailable');
+  const r = ensureUserGuard({ home: s.home, source: path.relative(process.cwd(), s.source), env: {} });
+  assert.equal(r.action, 'refused');
+  assert.match(r.line, /: the project copy of the hook has uncommitted changes;/);
+  assert.equal(fs.existsSync(s.paths.hook), false);
+});
+
+// ---- CodeRabbit on #147 (2026-11-10) ----
+test('--check names an install cut short after its manifest as unfinished, not as an edit', t => {
+  const s = sandbox(t, 2);
+  s.seedInstalled(1);
+  fs.writeFileSync(s.paths.manifest, JSON.stringify({ sha256: sha(fs.readFileSync(s.source)), previous: sha(Buffer.from(hookText(1))), version: 2 }));
+  registerValidly(s);
+  const r = check({ home: s.home, source: s.source });
+  assert.equal(r.code, 1);
+  assert.doesNotMatch(r.lines.join('\n'), /edited after install/);
+  assert.match(r.lines.join('\n'), /cut short after its manifest/);
 });

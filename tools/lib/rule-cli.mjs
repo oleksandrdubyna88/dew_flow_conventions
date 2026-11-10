@@ -11,8 +11,10 @@ export function bootstrap(entry=".agents/conventions/ENTRY.md") {
   return `# Project instructions\n\nBefore working in this repository, read and apply \`${entry}\` and\n\`.agents/PROJECT.md\`. Follow the shared entry's rule-selection procedure for\nthe task and the files you will inspect or change.\nResolve these paths from this repository's root (git rev-parse --show-toplevel),\nincluding when started in a subdirectory or working on another repository.\nIf any required source or resolver is unavailable, report instruction loading as\nincomplete and do not change affected files until it is restored.\n`;
 }
 
+// stdin is `ignore`, as in lib/git.mjs: in Codex's Linux sandbox a child with a stdin pipe returns its output and still
+// fails with EPERM, which made every Codex session there report instruction loading as incomplete (2026-11-10).
 function git(repo,...args) {
-  return execFileSync("git",["-C",repo,...args],{encoding:"utf8",timeout:10000,maxBuffer:1024*1024,windowsHide:true}).trim();
+  return execFileSync("git",["-C",repo,...args],{encoding:"utf8",timeout:10000,maxBuffer:1024*1024,windowsHide:true,stdio:["ignore","pipe","pipe"]}).trim();
 }
 
 function parseArgs(argv) {

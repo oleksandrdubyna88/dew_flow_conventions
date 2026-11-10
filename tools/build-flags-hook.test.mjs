@@ -33,7 +33,18 @@ test('a build that does not bound its pool is refused, and told what to type', (
   ]) assert.equal(refused(command), true, command);
   const reason = buildFlagsRefusal('dotnet build src/App.slnx -c Release');
   assert.match(reason, /-m:4/);
-  assert.match(reason, /dotnet build src\/App\.slnx -c Release -m:4/);
+  assert.match(reason, /dotnet build -m:4 src\/App\.slnx -c Release/);
+});
+
+// coai code gate on dew_flow_creds_for_devs #328 (2026-11-10): the suggestion appended -m:4 to the whole segment, so a
+// trailing comment swallowed it. The flag now goes directly after the build verb, where it is valid whatever follows.
+test('the suggested command puts -m:4 right after the build verb', () => {
+  const suggested = command => /\n {4}(.*)\n/.exec(buildFlagsRefusal(command))?.[1];
+  assert.equal(suggested('dotnet build App.slnx # the second try'), 'dotnet build -m:4 App.slnx # the second try');
+  assert.equal(suggested('dotnet msbuild App.slnx -t:Restore'), 'dotnet msbuild -m:4 App.slnx -t:Restore');
+  assert.equal(suggested('msbuild App.slnx'), 'msbuild -m:4 App.slnx');
+  assert.equal(suggested('"C:/Program Files/dotnet/dotnet.exe" Build App.slnx'), '"C:/Program Files/dotnet/dotnet.exe" Build -m:4 App.slnx');
+  assert.equal(suggested('CI=1 dotnet publish -c Release'), 'CI=1 dotnet publish -m:4 -c Release');
 });
 
 test("another command's -m does not satisfy the check", () => {
@@ -182,4 +193,13 @@ test('an environment assignment in front of the command does not hide it', () =>
     'CI=1 dotnet build App.slnx -m:4',
     'CI=1 npm test',
   ]) assert.equal(refused(command), false, command);
+});
+
+// CodeRabbit on #147 (2026-11-10): a build verb inside an assignment's value is not the command, and dotnet.cmd / .bat
+// are dotnet as executableName reads them.
+test('the suggestion skips a verb inside an assignment and knows dotnet.cmd and dotnet.bat', () => {
+  const suggested = command => /\n {4}(.*)\n/.exec(buildFlagsRefusal(command))?.[1];
+  assert.equal(suggested('BUILDER=msbuild dotnet build App.slnx'), 'BUILDER=msbuild dotnet build -m:4 App.slnx');
+  assert.equal(suggested('dotnet.cmd build App.slnx # note'), 'dotnet.cmd build -m:4 App.slnx # note');
+  assert.equal(suggested('dotnet.bat publish -c Release'), 'dotnet.bat publish -m:4 -c Release');
 });
