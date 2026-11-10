@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { loadCatalog, selectRules, sha256, TASKS } from "./lib/rule-catalog.mjs";
 import { provenanceFindings, caseFindings } from "./lib/gates.mjs";
@@ -647,6 +647,25 @@ const codexInstalled=process.platform==="linux"&&spawnSync("codex",["--version"]
 test("the resolver's check runs inside the Codex read-only sandbox",{skip:codexInstalled?false:"no Codex CLI on this machine"},()=>{
   const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
   const result=spawnSync("codex",["sandbox","--",process.execPath,path.join(root,"tools/rules.mjs"),"check","--repo",root],{encoding:"utf8",timeout:60000,stdio:["ignore","pipe","pipe"]});
+  assert.doesNotMatch(result.stdout+result.stderr,/EPERM/);
+  assert.equal(result.status,0,result.stdout+result.stderr);
+});
+
+// The same failure where no Codex CLI is installed (the CI runners): a preload makes every execFileSync whose stdin is a
+// pipe throw EPERM, as the Codex sandbox does, before the resolver's modules are evaluated.
+test("the resolver starts git with no stdin pipe, so a sandbox that refuses one cannot stop it",t=>{
+  const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
+  const preload=path.join(ownedDir(t,"stdin-pipe-refused"),"refuse-stdin-pipe.mjs");
+  fs.writeFileSync(preload,`import childProcess from "node:child_process";import {syncBuiltinESMExports} from "node:module";
+const real=childProcess.execFileSync;
+childProcess.execFileSync=function(file,args,options){
+  const stdio=options?.stdio,stdin=Array.isArray(stdio)?stdio[0]:stdio;
+  if(stdin===undefined||stdin==="pipe")throw Object.assign(new Error("spawnSync "+file+" EPERM"),{code:"EPERM"});
+  return real.apply(this,arguments);
+};
+syncBuiltinESMExports();
+`);
+  const result=spawnSync(process.execPath,["--import",pathToFileURL(preload).href,path.join(root,"tools/rules.mjs"),"check","--repo",root],{encoding:"utf8",timeout:60000});
   assert.doesNotMatch(result.stdout+result.stderr,/EPERM/);
   assert.equal(result.status,0,result.stdout+result.stderr);
 });
