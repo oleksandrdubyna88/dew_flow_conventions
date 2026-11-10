@@ -300,3 +300,46 @@ test('a consumer (conventions mounted under .agents/, no tools/rules.mjs at the 
   fs.writeFileSync(path.join(mount, 'settings', 'hooks', 'subagent-model.mjs'), hookText(2));
   assert.equal(s.ensure().action, 'installed');
 });
+
+// ---- the coai code gate on dew_flow_creds_for_devs #328 (2026-11-10): three findings on the self-install ----
+const sha = bytes => createHash('sha256').update(bytes).digest('hex');
+
+test('git that cannot run (not on PATH) refuses the install instead of reading as "no uncommitted changes"', t => {
+  const s = sandbox(t);
+  const noGit = ownedDir(t, 'no-git-on-path');
+  const r = s.run({ PATH: noGit });
+  assert.equal(r.status, 0);
+  assert.match(JSON.parse(r.stdout).systemMessage, /subagent-model guard NOT installed into ~\/\.claude: git could not tell whether the project copy has uncommitted changes/);
+  assert.equal(fs.existsSync(s.paths.hook), false);
+});
+
+test('a hook file that cannot be written leaves settings.json without a registration of it', t => {
+  const s = sandbox(t);
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  fs.writeFileSync(path.dirname(s.paths.hook), 'a file where the hooks folder should be\n');
+  assert.throws(() => install({ home: s.home, source: s.source }));
+  assert.equal(fs.existsSync(s.paths.settings), false, 'settings.json registers a hook that was never written');
+});
+
+test('an installed guard changed since its install is not replaced by an upgrade, and the line names --force', t => {
+  const s = sandbox(t, 2);
+  s.seedInstalled(1);
+  fs.writeFileSync(s.paths.manifest, JSON.stringify({ sha256: sha(Buffer.from(hookText(1))), version: 1 }));
+  fs.appendFileSync(s.paths.hook, '// a local edit\n');
+  registerValidly(s);
+  const before = fs.readFileSync(s.paths.hook);
+  const r = s.ensure();
+  assert.equal(r.action, 'refused');
+  assert.match(r.line, /changed since it was installed/);
+  assert.match(r.line, /--force/);
+  assert.deepEqual(fs.readFileSync(s.paths.hook), before);
+});
+
+test('a copy cut short after the new hook, before its manifest, is completed — not taken for a local edit', t => {
+  const s = sandbox(t, 2);
+  s.seedInstalled(2);
+  fs.writeFileSync(s.paths.manifest, JSON.stringify({ sha256: sha(Buffer.from(hookText(1))), version: 1 }));
+  registerValidly(s);
+  assert.equal(s.ensure().action, 'installed');
+  assertCurrent(s);
+});

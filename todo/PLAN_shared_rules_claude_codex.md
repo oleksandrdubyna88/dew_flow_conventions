@@ -457,6 +457,12 @@ Open stories:
         from the migrated worktree, and both pass the § 7 pass conditions; a quota or an absent CLI is recorded as
         incomplete, which is a fail of this item — the PR waits for a completed run of both agents, as epoch 1
         required.
+        Progress 2026-11-10: both runs on creds #328 (pin `37b9aa5`) were incomplete — Codex `spawnSync git EPERM`
+        (the resolver's git had a stdin pipe, which the Codex Linux sandbox refuses), Claude a cut 256 KiB trace and
+        one whole read that the host showed the model only as a preview. The corrective PR under this story (stdin
+        `ignore`, one `read --only <id>` per rule, an 8 MiB trace cap, and the code gate's hook findings) satisfies
+        this item as written; it is not a plan change. With the fix in a disposable creds worktree each agent read
+        5 of 5 rules in full; the evidence is the run on #328's committed pin, before the release is promoted.
   - [ ] **Product behaviour unchanged:** the broker, CLI, MCP server and extension builds and their test suites
         green on the migrated tree; no permission in `.claude/settings.json` weakened.
   - [ ] **Rollback** named in the PR: the migration is ONE whole commit (squash-merged), so the rollback is the

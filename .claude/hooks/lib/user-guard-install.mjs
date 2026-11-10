@@ -251,6 +251,21 @@ function downgradeRefusal(t, sourceBytes, force) {
   return from > to ? `installed guard is version ${from}, newer than the source's ${to}; nothing changed — pass --force to replace it` : '';
 }
 
+/**
+ * Refuses to replace an installed copy changed since its install, unless forced; '' when the install may go ahead.
+ * Changed means: a manifest exists, and the installed bytes match neither its hash nor the source. The second half
+ * keeps an install cut short after the new hook (before its manifest) from reading as a local edit. Reading only the
+ * version replaced a user's edited guard without a word (coai code gate, 2026-11-10). No manifest (an install from
+ * before manifests existed) cannot be judged and goes ahead as before.
+ */
+function changedRefusal(t, sourceBytes, force) {
+  const installed = readOrNull(t.hook);
+  const manifest = readManifest(t);
+  if (force || installed === null || manifest === null || installed.equals(sourceBytes)) return '';
+  return manifest.sha256 === sha256(installed) ? ''
+    : `installed guard ${t.hook} was changed since it was installed (its sha256 differs from ${t.manifest}); nothing changed — pass --force to replace it`;
+}
+
 export function install({ home, source, beforeWrite = () => {}, clearOptout = false, force = false, by = 'cli' }) {
   const t = targets(home);
   if (!fs.existsSync(source)) return result(1, [`source hook not found: ${source} — pass --source <file>`]);
@@ -259,7 +274,7 @@ export function install({ home, source, beforeWrite = () => {}, clearOptout = fa
   if (parsed.error) return unparsable(t.settings, parsed.error);
   const merged = mergeEntry(parsed.settings, t.hook);
   const sourceBytes = fs.readFileSync(source);
-  const refusal = downgradeRefusal(t, sourceBytes, force);
+  const refusal = downgradeRefusal(t, sourceBytes, force) || changedRefusal(t, sourceBytes, force);
   if (refusal) return result(1, [refusal]);
   const upToDate = original !== null && original.equals(Buffer.from(serialise(merged))) && sameBytes(readOrNull(t.hook), sourceBytes) && isRegistered(t);
   if (upToDate) return result(0, [...dropOptout(t, clearOptout), 'already installed']);
@@ -267,10 +282,12 @@ export function install({ home, source, beforeWrite = () => {}, clearOptout = fa
   if (original !== null) lines.push(`backup ${writeBackup(t.settings, original)}`);
   beforeWrite();
   if (!sameBytes(readOrNull(t.settings), original)) return result(1, [...lines, CHANGED]);
-  writeAtomic(t.settings, serialise(merged));
-  // The copy comes AFTER the registration: a refusal above leaves no unregistered hook file behind.
+  // Every refusal is above, so a refused install still writes nothing. The hook and its manifest come BEFORE the
+  // registration: a failure between them leaves an unregistered file the host never runs, which the next session start
+  // registers. The old order could leave a registration of a missing script, run on every Agent call (2026-11-10).
   writeAtomic(t.hook, sourceBytes);
   writeManifest(t, source, sourceBytes, by);
+  writeAtomic(t.settings, serialise(merged));
   return result(0, [`wrote ${t.hook}`, ...lines, `wrote ${t.settings} (hooks.PreToolUse: ${MATCHER})`]);
 }
 

@@ -72,7 +72,13 @@ copy), this repository hosts it on itself in `.claude/`, and `tools/install-user
 unparsable or concurrently changed settings, a backup, an atomic write, one handler upgraded in place. A second
 `SessionStart` hook, `settings/hooks/ensure-user-guard.mjs` (5 s timeout), runs that core at session start when the
 user copy is missing, older by `GUARD_VERSION`, or badly registered; it never downgrades, never runs from this
-repository's own layout, refuses a project copy with uncommitted changes, and writes a provenance manifest. The same hook, at EVERY start, converges an existing `~/.claude/settings.json` so `effortLevel` and every
+repository's own layout, refuses a project copy with uncommitted changes or one git cannot judge (no git on PATH,
+a timeout — only "not a git repository" means nothing to compare), refuses to replace an installed copy changed since
+its install (its bytes match neither the manifest's sha256 nor the source; `--force` replaces it), writes the hook and
+the provenance manifest before the registration, so a failed copy never leaves `settings.json` naming a missing file
+(all three from the coai code gate on dew_flow_creds_for_devs #328, 2026-11-10). `load-instructions.mjs` bounds its
+resolver call at 30 s (`RESOLVER_TIMEOUT_MS`; the host's own default for a command hook is 600 s) and then gives the
+INCOMPLETE notice naming the bound. `build-flags.mjs` suggests the command with `-m:4` directly after the build verb. The same hook, at EVERY start, converges an existing `~/.claude/settings.json` so `effortLevel` and every
 `modelSettings.*.effortLevel` (`sonnet`, `opus`, `fable` and any other key) are `high` — backup and atomic write, silent
 when already converged, skipped under `SUBAGENT_MODEL_GUARD=off` and in this repository (the `subagent-model.optout` marker does NOT skip it: high everywhere), never creating the file, following a symlink and keeping the file mode, refusing (one warning line, nothing written) a read-only file, an unwritable target, or a non-object `modelSettings` / per-model value
 (`applyEffort`; `install-user-hook.mjs --check` reports it without gating the exit code). Design

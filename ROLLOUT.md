@@ -62,7 +62,10 @@ not Linux paths. Create a separate Linux checkout/worktree for WSL; do not rewri
 
 Windows containment requires PowerShell 7 with local scripts permitted by existing policy;
 the tool never changes execution policy. Linux uses a process group. Each cell has a
-180-second deadline and a 256 KiB output cap. The Windows supervisor owns a kill-on-close
+180-second deadline and an 8 MiB in-memory output cap (`INSPECT_TRACE_MAX_BYTES`; 256 KiB cut
+every Claude run in dew_flow_creds_for_devs on 2026-11-10, one file's trace was 448,976 B; only the trace's hash and
+size are kept). The prompt asks for `explain` once and then one `read --only <id>` per rule: Claude Code keeps only
+a 2 KB preview of a Bash output over about 30 KB, so one whole read put no rule body into the trace. The Windows supervisor owns a kill-on-close
 Job Object, so an exited direct child cannot strand its descendants.
 
 The harness checks full canonical bodies in successful tool outputs, CLI completion and

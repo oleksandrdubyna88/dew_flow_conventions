@@ -33,7 +33,18 @@ test('a build that does not bound its pool is refused, and told what to type', (
   ]) assert.equal(refused(command), true, command);
   const reason = buildFlagsRefusal('dotnet build src/App.slnx -c Release');
   assert.match(reason, /-m:4/);
-  assert.match(reason, /dotnet build src\/App\.slnx -c Release -m:4/);
+  assert.match(reason, /dotnet build -m:4 src\/App\.slnx -c Release/);
+});
+
+// coai code gate on dew_flow_creds_for_devs #328 (2026-11-10): the suggestion appended -m:4 to the whole segment, so a
+// trailing comment swallowed it. The flag now goes directly after the build verb, where it is valid whatever follows.
+test('the suggested command puts -m:4 right after the build verb', () => {
+  const suggested = command => /\n {4}(.*)\n/.exec(buildFlagsRefusal(command))?.[1];
+  assert.equal(suggested('dotnet build App.slnx # the second try'), 'dotnet build -m:4 App.slnx # the second try');
+  assert.equal(suggested('dotnet msbuild App.slnx -t:Restore'), 'dotnet msbuild -m:4 App.slnx -t:Restore');
+  assert.equal(suggested('msbuild App.slnx'), 'msbuild -m:4 App.slnx');
+  assert.equal(suggested('"C:/Program Files/dotnet/dotnet.exe" Build App.slnx'), '"C:/Program Files/dotnet/dotnet.exe" Build -m:4 App.slnx');
+  assert.equal(suggested('CI=1 dotnet publish -c Release'), 'CI=1 dotnet publish -m:4 -c Release');
 });
 
 test("another command's -m does not satisfy the check", () => {
