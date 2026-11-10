@@ -234,13 +234,14 @@ export function repairRegistration({ home, beforeWrite = () => {} }) {
   const original = readOrNull(t.settings);
   const parsed = parseSettings(original);
   if (parsed.error) return unparsable(t.settings, parsed.error);
-  const file = settingsFileOf(t.settings);
+  const target = settingsFileOf(t.settings);
+  if (target.refusal) return result(1, [target.refusal]);
   const merged = serialise(mergeEntry(parsed.settings, t.hook));
   if (original !== null && original.equals(Buffer.from(merged))) return result(0, ['already registered']);
   const lines = original === null ? [] : [`backup ${writeBackup(t.settings, original, modeOf(t.settings))}`];
   beforeWrite();
   if (!sameBytes(readOrNull(t.settings), original)) return result(1, [...lines, CHANGED]);
-  writeSettings(file, merged);
+  writeSettings(target.file, merged);
   return result(0, [...lines, `wrote ${t.settings} (hooks.PreToolUse: ${MATCHER})`]);
 }
 
@@ -283,7 +284,8 @@ export function install({ home, source, beforeWrite = () => {}, clearOptout = fa
   const original = readOrNull(t.settings);
   const parsed = parseSettings(original);
   if (parsed.error) return unparsable(t.settings, parsed.error);
-  const file = settingsFileOf(t.settings);
+  const target = settingsFileOf(t.settings);
+  if (target.refusal) return result(1, [target.refusal]);
   const merged = mergeEntry(parsed.settings, t.hook);
   const sourceBytes = fs.readFileSync(source);
   const refusal = downgradeRefusal(t, sourceBytes, force) || changedRefusal(t, sourceBytes, force);
@@ -301,7 +303,7 @@ export function install({ home, source, beforeWrite = () => {}, clearOptout = fa
   // leave a registration of a missing script, run on every Agent call (2026-11-10).
   writeManifest(t, source, sourceBytes, by, readOrNull(t.hook));
   writeAtomic(t.hook, sourceBytes);
-  writeSettings(file, serialise(merged));
+  writeSettings(target.file, serialise(merged));
   return result(0, [`wrote ${t.hook}`, ...lines, `wrote ${t.settings} (hooks.PreToolUse: ${MATCHER})`]);
 }
 
@@ -311,7 +313,8 @@ export function uninstall({ home, beforeWrite = () => {} }) {
   const original = readOrNull(t.settings);
   const parsed = parseSettings(original);
   if (parsed.error) return unparsable(t.settings, parsed.error);
-  const file = settingsFileOf(t.settings);
+  const target = settingsFileOf(t.settings);
+  if (target.refusal) return result(1, [target.refusal]);
   const present = findEntries(parsed.settings, t.hook).length > 0;
   const hookThere = fs.existsSync(t.hook);
   const markOptout = () => { writeAtomic(t.optout, OPTOUT_TEXT); return `wrote the opt-out marker ${t.optout}`; };
@@ -321,7 +324,7 @@ export function uninstall({ home, beforeWrite = () => {} }) {
     lines.push(`backup ${writeBackup(t.settings, original, modeOf(t.settings))}`);
     beforeWrite();
     if (!sameBytes(readOrNull(t.settings), original)) return result(1, [CHANGED]);
-    writeSettings(file, serialise(removeEntry(parsed.settings, t.hook)));
+    writeSettings(target.file, serialise(removeEntry(parsed.settings, t.hook)));
     lines.push(`removed the hook entry from ${t.settings}`);
   }
   if (hookThere) {
@@ -416,13 +419,26 @@ const MAX_LINKS = 40;
  * The file a settings write goes to, found BEFORE anything is written: the real file when one exists; otherwise the
  * last target of a chain of links that ends in a missing file (one link or several — CodeRabbit on #148 and coai
  * #969, 2026-11-10: a single-level read replaced the middle link of a chain with a plain file); otherwise the path
- * itself. A loop throws, so the operation stops before its backup, manifest, hook or settings are touched.
+ * itself. More than 40 links is a `refusal` (a result, like the installer's other refusals — the code round), so
+ * the operation stops before its backup, manifest, hook or settings are touched.
  */
 function settingsFileOf(settingsPath) {
-  return effortTarget(settingsPath) ?? lastLinkTarget(settingsPath) ?? settingsPath;
+  const existing = effortTarget(settingsPath);
+  if (existing !== null) return { file: existing };
+  const last = lastLinkTarget(settingsPath);
+  if (last === TOO_MANY_LINKS) {
+    return { refusal: `${settingsPath} has more than ${MAX_LINKS} links (a loop, or a chain too long to open); nothing changed — point it at one file` };
+  }
+  return { file: last ?? settingsPath };
 }
 
-/** The missing file a chain of links ends in, each hop read from its own folder; null when the path is no link. */
+/** What `lastLinkTarget` answers when the chain does not end within `MAX_LINKS`. */
+const TOO_MANY_LINKS = Symbol('too many links');
+
+/**
+ * The missing file a chain of links ends in, each hop read from its own folder; null when the path is no link;
+ * `TOO_MANY_LINKS` past the limit. At most `MAX_LINKS` links are followed, as the kernel follows them.
+ */
 function lastLinkTarget(settingsPath) {
   let current = settingsPath;
   for (let hop = 0; hop <= MAX_LINKS; hop += 1) {
@@ -430,7 +446,7 @@ function lastLinkTarget(settingsPath) {
     if (stat === null || !stat.isSymbolicLink()) return hop === 0 ? null : current;
     current = path.resolve(path.dirname(current), fs.readlinkSync(current));
   }
-  throw new Error(`${settingsPath} is a symlink loop (more than ${MAX_LINKS} links); nothing written`);
+  return TOO_MANY_LINKS;
 }
 
 const lstatOrNull = file => {
