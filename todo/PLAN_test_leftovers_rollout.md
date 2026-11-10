@@ -1,6 +1,6 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 8 open (2026-11-07), approved by the reviewers after the re-review (`Narrowed: no`).** Epoch 7 stopped at entries 7.1 and 7.2; the whole plan was revised (§ *Epoch 8*): D5 by option B, observed acceptance results for every remaining epic, the Windows exception restated by its true condition (a process whose new files are owned by Administrators); the Opus judge sorted epoch 7's work (fits, two cuts fixed forward, outside rows; coai #962 merged during the stop and is reported to the owner); the plan gate on an operative extract (sessions `39432dd3`, `6f58dbce`) and an independent Opus review passed. Epoch 8 starts at 0 changes.
+> Status: **epoch 8 open (2026-11-07), approved by the reviewers after the re-review (`Narrowed: no`); entry 8.1 recorded 2026-11-10 (E2.4.S3: D5's check and naming step and a failed command substitution), so the next accepted change is the eighth full stop.** Epoch 7 stopped at entries 7.1 and 7.2; the whole plan was revised (§ *Epoch 8*): D5 by option B, observed acceptance results for every remaining epic, the Windows exception restated by its true condition (a process whose new files are owned by Administrators); the Opus judge sorted epoch 7's work (fits, two cuts fixed forward, outside rows; coai #962 merged during the stop and is reported to the owner); the plan gate on an operative extract (sessions `39432dd3`, `6f58dbce`) and an independent Opus review passed. Epoch 8 starts at 0 changes.
 >
 > Was: Status: **stopped for re-review (2026-11-07): entry 7.2 (E2.4: D5's names cannot pass the released guard), the second accepted change of epoch 7, the seventh full stop.** No new code on any epic of this plan and no merge of a pull request carrying its work until the full re-review is complete; when its record says `Narrowed: yes`, the owner approves the revised plan; then epoch 8 opens. At the stop: E2.1, E2.2, E2.3 merged (creds #294, #310, #311); coai E5's producer merged (#945); E2.4 drafted, nothing built. The whole plan is revised for epoch 8 (2026-11-07, step 4 of the full stop): § *Epoch 8 — the plan as revised at the re-review*. Entry 7.2 is settled by option (B), and its record says `Narrowed: no`; the record's verdicts are the Opus judge's (step 5), and epoch 8 opens only after the re-review approves.
 >
@@ -531,6 +531,16 @@ Narrowed: no — entry 7.2 is settled by option (B), which keeps D5's names in t
   four makes a condition smaller, so the Narrowed line stands.)
 
 > Epoch 8 · approved 2026-11-07 · by reviewers · state: open
+
+- 8.1 · 2026-11-10 · reviewer · contract — E2.4.S3: `bash -e` does not stop on a failed command substitution inside another command, so D5's check passes when `docker` fails and its naming step can write an empty `SMOKE_ID`; both are corrected
+  (Found by the Opus review of E2.4.S3, findings 2 and 4, measured with a stub `docker` that exits 1 and a failed
+  `openssl`. One cause, one entry. The fix: each check line assigns the listing first (`out=$(docker …)`, which fails
+  the step under `-e`) and then tests it; the naming step checks the id against `^[0-9a-f]{8}$` before it writes it.
+  Every D5 decision stands: the literal owner `u1001`, the uid check first, the unquoted remover names with `|| true`,
+  and a check with `docker ps` and `docker volume ls`, never `inspect`. Not counted, with reasons in creds' E2.4 build
+  record: the anchors observed by a throwaway run where the check goes red (the brief says G2 observes them), the
+  helper made to keep the S1 spec's "a function that calls owned_cleanup itself is fine", and the E2.5 items
+  (`module_tests.md`, the mount install in CI) taken back out of E2.4.)
 
 ## Symptom
 
