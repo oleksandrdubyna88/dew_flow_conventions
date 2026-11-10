@@ -539,8 +539,9 @@ Narrowed: no — entry 7.2 is settled by option (B), which keeps D5's names in t
   Every D5 decision stands: the literal owner `u1001`, the uid check first, the unquoted remover names with `|| true`,
   and a check with `docker ps` and `docker volume ls`, never `inspect`. Not counted, with reasons in creds' E2.4 build
   record: the anchors observed by a throwaway run where the check goes red (the brief says G2 observes them), the
-  helper made to keep the S1 spec's "a function that calls owned_cleanup itself is fine", and the E2.5 items
-  (`module_tests.md`, the mount install in CI) taken back out of E2.4.)
+  helper made to keep the S1 spec's "a function that calls owned_cleanup itself is fine", and the mount install
+  in CI taken back out of E2.4 (an E2.5 item). Each story's own `module_tests.md` paragraphs stay in E2.4, as in
+  E2.1–E2.3: E2.5 adds only the section *Test leftovers*.)
 
 ## Symptom
 
