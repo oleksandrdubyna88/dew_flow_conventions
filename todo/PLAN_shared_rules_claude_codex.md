@@ -13,6 +13,11 @@ paths: ["__conventions_planning_documentation_only__/**"]
 > and `post-deploy-check`; it never needed a migration PR); still on `.claude/rules/shared` with no `AGENTS.md` —
 > `dew_flow_mcp`, `dew_flow_sidecar_rust`, `dew_flow_creds_for_devs`.
 >
+> Progress, 2026-11-10: `dew_flow_creds_for_devs` is on the neutral layout (story 3.C, #328, `75c1f1f`); both agents'
+> smoke passed on its committed pin, the first consumer of this plan to pass it. Still on `.claude/rules/shared`:
+> `dew_flow_mcp` and `dew_flow_sidecar_rust` (stories 3.M and 3.R, not selected). Release `9b1d668` is pinned by every
+> consumer (conventions #147 and #148; the hook fixes the creds code gate found).
+>
 > **The stop, 2026-11-09:** entry 1.2 (the owner moves `dew_flow_creds_for_devs` ahead of
 > `dew_flow_sidecar_rust`) is this plan's second change since approval. No consumer migration and no new code on any
 > stage of this plan until the whole plan is reviewed again and epoch 2 is open. The re-review (rule step 4) revised
@@ -246,7 +251,7 @@ sidecar_rust the GitHub code-search file count (approximate).
 | dew_flow_amd_r9700_tuning_ai | `.agents/conventions` | yes | joined on the neutral layout, `2578d4e`, 2026-11-01; `.claude/hooks` and `settings.json` present; CI: `leftovers-check`, `plan-lifecycle`, `post-deploy-check` | none by construction |
 | dew_flow_mcp | `.claude/rules/shared` | no | not migrated | about 18 files |
 | dew_flow_sidecar_rust | `.claude/rules/shared` | no | not migrated | about 21 files |
-| dew_flow_creds_for_devs | `.claude/rules/shared` (pin `37b9aa5`); `.claude/settings.json` present, no `.claude/hooks` | no | not migrated; the resolver refuses the legacy mount (entry 1.2) | 249 lines in 97 files (detail in § 6 Stage 3, story 3.C) |
+| dew_flow_creds_for_devs | `.claude/rules/shared` (pin `37b9aa5`); `.claude/settings.json` present, no `.claude/hooks` | no | not migrated; the resolver refuses the legacy mount (entry 1.2). **Migrated 2026-11-10** (story 3.C, #328, `75c1f1f`) | 249 lines in 97 files (detail in § 6 Stage 3, story 3.C) |
 
 The three repositories that joined on the neutral layout are in scope for the acceptance check of § 7 (fresh clone,
 both agents, adapter present), not for a migration: there is no legacy mount to move and no rollback to a legacy
@@ -391,23 +396,34 @@ Done, with evidence:
 
 Open stories:
 
-- [ ] **Story 3.C — `dew_flow_creds_for_devs`** (the owner's selection of 2026-11-09, entry 1.2). One migration PR,
+- [x] **Story 3.C — `dew_flow_creds_for_devs`** (the owner's selection of 2026-11-09, entry 1.2). One migration PR,
       with this acceptance checklist complete before merge:
-  - [ ] **Reconcile with the open work in creds first.** PR #323 (`feat/remote-bridge-e15` → `main`, another
+      **Done 2026-11-10: creds #328, squash-merged as `75c1f1f`** (conventions pin `37b9aa5` → `5e73780`, the mount on
+      `.agents/conventions`, the five hooks recopied, Sonar excluding `.claude/hooks/**`). Evidence, all in the PR: the
+      tool's dry-run and apply; `git grep` with zero executable old-mount paths (re-checked after each of three `main`
+      merges, which brought 12 live files of #329 back to the old path and were moved by hand); a fresh clone with every
+      check green and the rollback tried in a disposable clone, both on the PR's first commit `8f31013` (before those
+      merges; the final head was checked by CI and `git grep`); the extension and .NET suites green; **both agents' smoke
+      passed on the committed pin `5e73780`** before the promotion (Codex and Claude, 7 of 7 rules each, hashes matched,
+      HEAD/index/status unchanged), after the harness fixes of conventions #147 (the resolver's git had a stdin pipe the
+      Codex sandbox refused; the Claude trace was cut at 256 KiB, and one whole read reached the model only as a preview);
+      CI 19/19 on the head; the CodeRabbit threads answered, the old-clone steps added to the README after its finding.
+      The creds pin then moved with the release to `9b1d668` inside creds #336.
+  - [x] **Reconcile with the open work in creds first.** PR #323 (`feat/remote-bridge-e15` → `main`, another
         session's, 36 files, `CONFLICTING` against `main` on 2026-11-09) touches no `.claude/rules/shared` reference,
         no `CLAUDE.md`, no `.gitmodules` and no workflow (checked with `gh pr diff` on 2026-11-09); it does touch
         `todo/README.md` and two plan files. The migration PR names its base commit and its merge order relative to
         #323 and the other open PRs (#320–#322 and #326 on 2026-11-09 evening; #325 and #327 merged, creds `main` is
         `9916836`), and its owner re-checks that list on the day it opens; the migration never carries another
         session's files.
-  - [ ] **Dry-run, then apply** `tools/migrate-rules.mjs` with the `release` SHA, into a worktree outside both
+  - [x] **Dry-run, then apply** `tools/migrate-rules.mjs` with the `release` SHA, into a worktree outside both
         checkouts. The report's remaining-legacy list is read whole before `--apply`.
-  - [ ] **Project and local policy move:** `CLAUDE.md` (11 legacy references, including the local CPU-budget
+  - [x] **Project and local policy move:** `CLAUDE.md` (11 legacy references, including the local CPU-budget
         preload line `LP=.claude/rules/shared/tools/low-priority.mjs`) becomes `.agents/PROJECT.md` with its links
         rebased; the root `CLAUDE.md` is only `@AGENTS.md`; `AGENTS.md` is the family bootstrap; `.claude/rules`
         ends up empty. creds has no `.claude/rules` policy besides the mount, so no `.agents/rules` files are
         expected — the preflight confirms it.
-  - [ ] **Install the WHOLE Claude adapter**, every file `tools/adapter-check.mjs` compares (it reads every
+  - [x] **Install the WHOLE Claude adapter**, every file `tools/adapter-check.mjs` compares (it reads every
         non-test `.mjs` under `settings/hooks/`, recursively): `.claude/hooks/load-instructions.mjs`,
         `ensure-user-guard.mjs`, `lib/user-guard-install.mjs`, `build-flags.mjs`, `subagent-model.mjs`, copied
         verbatim, plus the four hook registrations of `settings/settings.json` merged into creds' existing
@@ -416,7 +432,7 @@ Open stories:
         `build-flags.mjs` then refuses a `dotnet build` that does not limit the MSBuild worker pool, so every build
         line in creds' `CLAUDE.md` (the future `PROJECT.md`), its scripts and its documentation carries the limit
         (`csharp/dotnet-build.md`), checked in the same PR.
-  - [ ] **Product scripts the tool cannot rewrite** (`validateInputs` accepts `--rewrite` only for tracked files
+  - [x] **Product scripts the tool cannot rewrite** (`validateInputs` accepts `--rewrite` only for tracked files
         under root `tools/`, `scripts/` or `deploy/` with the extensions `mjs|js|sh|ps1|cmd|bat|yaml|yml`; a `.cjs`
         and anything under `src_vs_code/` are refused). Each is a hand edit in the migration PR, with its test run:
         `src_vs_code/scripts/lower-priority.mjs:14` (`MOUNT`), `src_vs_code/scripts/lib/leftovers.cjs:5,31`
@@ -432,14 +448,14 @@ Open stories:
         `Logging.cs`, `src_service_defaults/src/CredsLogging.cs` and its `.csproj` (comments),
         `src_vs_code/src/{logFormat,keyFingerprint,agentAuditFile}.ts` (comments); `.gitignore`;
         `deploy/restore-archive-itest.sh` (eligible for `--rewrite deploy/restore-archive-itest.sh`).
-  - [ ] **The leftovers sweep and guard** keep running against the new mount: the Node wrapper
+  - [x] **The leftovers sweep and guard** keep running against the new mount: the Node wrapper
         (`leftovers.cjs`), the C# tests that locate `tools/janitor.sh` and `tools/leftovers-check.mjs`, and the
         CI step, each green on the migrated tree.
-  - [ ] **Workflows** (`ci-server.yml` 8, `docs.yml` 6, `release.yml` 5, `rsd-server-deploy.yml` 2,
+  - [x] **Workflows** (`ci-server.yml` 8, `docs.yml` 6, `release.yml` 5, `rsd-server-deploy.yml` 2,
         `ci-extension.yml` 2, `ci-clients.yml` 1, `sonarcloud.yml` 1 references): rewritten by the tool's default
         allowlist; the `pin-check` step and the `plan-lifecycle` caller point at the new mount; `submodules: true`
         or the explicit `git submodule update --init .agents/conventions` stays.
-  - [ ] **Documentation:** root `README.md`, `POST_DEPLOY.md`, `http/README.md` and the product READMEs
+  - [x] **Documentation:** root `README.md`, `POST_DEPLOY.md`, `http/README.md` and the product READMEs
         (`src_cli`, `src_mcp`, `src_minimalapi_server`) name the new mount; the live module documents with
         runnable old-mount lines are hand-edited, not exempted as citations: `research/module_tests.md` (14
         references, among them lines 135 and 242 — the remount sentence — 1159, 2143, 2148, 2178 and 2199 — the
@@ -447,13 +463,13 @@ Open stories:
         `research/module_service_defaults.md:10`, plus the two live pointers in `research/README.md` and
         `research/architecture.md`; `research/PLAN_*.md` and `todo/` plan texts are historical citations and are
         NOT rewritten (the tool's rule).
-  - [ ] **Check the committed result:** `git grep -n -F '.claude/rules/shared'` on the PR head returns only
+  - [x] **Check the committed result:** `git grep -n -F '.claude/rules/shared'` on the PR head returns only
         historical plan and research citations and the preserved `.gitmodules` section name — zero executable paths,
         zero hints that tell a reader to init the old mount. The list is pasted into the PR.
-  - [ ] **Fresh clone** with `submodules: true`, `npm ci --ignore-scripts --prefix .agents/conventions`, then
+  - [x] **Fresh clone** with `submodules: true`, `npm ci --ignore-scripts --prefix .agents/conventions`, then
         `rules.mjs check`, `explain --task inspect`, `gate-snippet-check`, `adapter-check`, `pin-check`,
         `plan-lifecycle`; the extension's `npm test` and the .NET test run, both green.
-  - [ ] **Both agents** read the selected sources in a bounded smoke (`tools/smoke-rules.mjs`, Claude and Codex)
+  - [x] **Both agents** read the selected sources in a bounded smoke (`tools/smoke-rules.mjs`, Claude and Codex)
         from the migrated worktree, and both pass the § 7 pass conditions; a quota or an absent CLI is recorded as
         incomplete, which is a fail of this item — the PR waits for a completed run of both agents, as epoch 1
         required.
@@ -463,13 +479,13 @@ Open stories:
         `ignore`, one `read --only <id>` per rule, an 8 MiB trace cap, and the code gate's hook findings) satisfies
         this item as written; it is not a plan change. With the fix in a disposable creds worktree each agent read
         5 of 5 rules in full; the evidence is the run on #328's committed pin, before the release is promoted.
-  - [ ] **Product behaviour unchanged:** the broker, CLI, MCP server and extension builds and their test suites
+  - [x] **Product behaviour unchanged:** the broker, CLI, MCP server and extension builds and their test suites
         green on the migrated tree; no permission in `.claude/settings.json` weakened.
-  - [ ] **Rollback** named in the PR: the migration is ONE whole commit (squash-merged), so the rollback is the
+  - [x] **Rollback** named in the PR: the migration is ONE whole commit (squash-merged), so the rollback is the
         revert of that one commit, restoring the gitlink, the adapters and every hand-edited product file together
         (`ROLLOUT.md` § Recovery); the revert is tried once in a disposable clone and the old mount, instructions and
         commands work again on the previous SHA.
-  - [ ] **Merge conditions of this PR** — below, the same for every migration PR.
+  - [x] **Merge conditions of this PR** — below, the same for every migration PR.
 - [ ] **Story 3.R — `dew_flow_sidecar_rust`** (Rust: `csharp/` never matches, `rust/doctrine.md` is its doctrine).
       Selected by the owner under the rule above when its prerequisites are met; its checklist is story 3.C's shape
       with its own product references (about 21 files on 2026-11-09) listed in the PR.
