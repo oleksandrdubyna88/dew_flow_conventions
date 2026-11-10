@@ -14,7 +14,8 @@ paths: ["__conventions_planning_documentation_only__/**"]
 > `dew_flow_mcp`, `dew_flow_sidecar_rust`, `dew_flow_creds_for_devs`.
 >
 > Progress, 2026-11-10: `dew_flow_creds_for_devs` is on the neutral layout (story 3.C, #328, `75c1f1f`); both agents'
-> smoke passed on its committed pin, the first consumer of this plan to pass it. Still on `.claude/rules/shared`:
+> smoke read every expected rule on its committed pin (part 1 of the § 7 pass condition; part 2, the observable, is
+> owed — corrected the same day, see the closing matrix). Still on `.claude/rules/shared`:
 > `dew_flow_mcp` and `dew_flow_sidecar_rust` (stories 3.M and 3.R, not selected). Release `9b1d668` is pinned by every
 > consumer (conventions #147 and #148; the hook fixes the creds code gate found).
 >
@@ -408,8 +409,8 @@ Open stories:
       old-clone cleanup steps; `pin-check` was green at the merge and reads stale now only because `release` moved on);
       the **rollback tried on `75c1f1f`** in that clone (the revert gives exactly its parent's tree; with the PR's steps
       the old mount at `37b9aa5` is back, its tools and the low-priority wrapper run, the tree is clean); the same
-      checks had also passed on the PR's first commit `8f31013`; **both agents' smoke passed on the committed pin
-      `5e73780`** before the promotion (two files, `Program.cs` and `extension.ts`: Codex and Claude, 7 of 7 rules each, hashes matched,
+      checks had also passed on the PR's first commit `8f31013`; **both agents' smoke read every expected rule on the committed
+      pin `5e73780`** (part 1 of § 7 only — part 2 is owed, see the item below) before the promotion (two files, `Program.cs` and `extension.ts`: Codex and Claude, 7 of 7 rules each, hashes matched,
       HEAD/index/status unchanged), after the harness fixes of conventions #147 (the resolver's git had a stdin pipe the
       Codex sandbox refused; the Claude trace was cut at 256 KiB, and one whole read reached the model only as a preview);
       CI 19/19 on the head; the CodeRabbit threads answered, the old-clone steps added to the README after its finding.
@@ -474,7 +475,7 @@ Open stories:
   - [x] **Fresh clone** with `submodules: true`, `npm ci --ignore-scripts --prefix .agents/conventions`, then
         `rules.mjs check`, `explain --task inspect`, `gate-snippet-check`, `adapter-check`, `pin-check`,
         `plan-lifecycle`; the extension's `npm test` and the .NET test run, both green.
-  - [x] **Both agents** read the selected sources in a bounded smoke (`tools/smoke-rules.mjs`, Claude and Codex)
+  - [ ] **Both agents** read the selected sources in a bounded smoke (`tools/smoke-rules.mjs`, Claude and Codex)
         from the migrated worktree, and both pass the § 7 pass conditions; a quota or an absent CLI is recorded as
         incomplete, which is a fail of this item — the PR waits for a completed run of both agents, as epoch 1
         required.
@@ -485,6 +486,10 @@ Open stories:
         this item as written; it is not a plan change. With the fix in a disposable creds worktree each agent read
         5 of 5 rules in full (a measuring run on one file, `extension.ts`, which selects 5); the evidence is the run on
         #328's committed pin `5e73780` (two files, 7 rules), recorded in the story's Done paragraph above.
+        **Corrected 2026-11-10 (CodeRabbit on #152):** that run proves part 1 of the § 7 pass condition only (every
+        expected rule read in full, hash matched). Part 2, the observable in the recorded answer or checkout, was not
+        checked: the Codex answer does not name ENTRY or PROJECT, and a second-path load is not recorded. This item
+        stays open until the harness records both and the run is repeated; #328 merged on part 1 alone.
   - [x] **Product behaviour unchanged:** the broker, CLI, MCP server and extension builds and their test suites
         green on the migrated tree; no permission in `.claude/settings.json` weakened.
   - [x] **Rollback** named in the PR: the migration is ONE whole commit (squash-merged), so the rollback is the
@@ -516,22 +521,29 @@ Open stories:
       consumer's story (3.C, 3.R, 3.M, 3.B, or a new story for a consumer that joined on the neutral layout), never
       a new plan or a plan change; only a failure that changes the design is a change.
 
-      **The matrix, 2026-11-10** (read from each `main` and from disposable worktrees of it, after the pin bumps of
-      release `1341995` merged in all nine; the smoke and rollback evidence, run by run with rule ids, hashes, trace sizes and dates, is
-      [research/2026-11-10_shared_rules_acceptance.md](../research/2026-11-10_shared_rules_acceptance.md)). This item
-      stays open: two rows have no decision yet, and only the owner selects or defers a consumer.
+  **The matrix, 2026-11-10** (read from each `main` and from disposable worktrees of it, after the pin bumps of
+  release `1341995` merged in all nine; the smoke and rollback evidence, run by run with rule ids, hashes, trace
+  sizes and dates, is [research/2026-11-10_shared_rules_acceptance.md](../research/2026-11-10_shared_rules_acceptance.md)).
+  This item stays open. **§ 7 is not passed yet for any consumer:** its pass condition has two parts, (1) the trace
+  shows every expected rule read in full with its hash, and (2) the row's observable is seen in the recorded answer
+  or the checkout state. For "Claude / Codex from root" that observable is: ENTRY and PROJECT read, the expected
+  sources read, no body loaded by a second path. Every run passed part 1. Part 2 is owed: the harness reports
+  `behavior requires review`; the Codex answers do not name ENTRY or PROJECT, one Claude answer (wsl_care) names
+  only PROJECT, and whether a body came by a second path is not recorded at all. The harness is being taught to
+  record both, and the runs follow (corrected 2026-11-10 after CodeRabbit on #152). The same evening `release` moved
+  to `153e6b5` (#151), with pin bumps open in every consumer.
 
-      | Consumer | Mount | Pin | Adapter check | Fresh clone / worktree | Both agents (§ 7) | Old-mount lines outside `todo/`, `research/`, `.gitmodules` | Rollback | Decision |
-      |---|---|---|---|---|---|---|---|---|
-      | dew_flow_connect_other_ais | `.agents/conventions` | `1341995` | OK | worktree of `ee8ad53`: `rules check` resolved | PASS both, 8 of 8 rules | 66, none executable for its own mount: the product's gate snippet and rule discovery support user repositories still on the old layout (and their tests), plus about 10 code comments and the `.coderabbit.yaml` header citing rules by the old path (a stale pointer, fixed by a corrective PR) | tried on `8d42647`: the revert gives its parent's tree, the old mount `895b24c` and its tools are back | migrated (#192) |
-      | dew_flow_benchmark | `.agents/conventions` | `1341995` | none: no `.claude/hooks` (story 3.B) | worktree of `3958ecc`: resolved | PASS both, 6 of 6 | 23: the gate's tests and the spikes measure other repositories and old transcripts on the old layout; 2 comments cite rules by the old path (corrective PR) | tried on `89b4909`: parent's tree, old mount `e29883f`, low-priority wrapper runs | migrated (#113); the adapter is story 3.B, not selected |
-      | dew_flow_rag_qln | `.agents/conventions` | `1341995` | OK | worktree of `f7f4fc4`: resolved | PASS both, 6 of 6 | 0 | tried on `d83315b`: parent's tree, old mount `cc24f9e`, low-priority wrapper runs | migrated (#83, #85) |
-      | wsl_care | `.agents/conventions` | `1341995` | OK | worktree of `cb8046b`: resolved | PASS both, 6 of 6 | 0 | none by construction | joined on the neutral layout |
-      | dew_flow_vscode_kit | `.agents/conventions` | `1341995` | OK | worktree of `a9ab150`: resolved | PASS both, 6 of 6 | 0 | none by construction | joined on the neutral layout |
-      | dew_flow_amd_r9700_tuning_ai | `.agents/conventions` | `1341995` | OK (`build-flags.mjs` added in #28) | worktree of `2ecb356`: resolved | PASS both, 6 of 6 | 0 | none by construction | joined on the neutral layout |
-      | dew_flow_creds_for_devs | `.agents/conventions` | `1341995` (`37b9aa5` → `5e73780` in #328 → `9b1d668` in #336 → `1341995` in #340) | OK | fresh clone of `75c1f1f` (story 3.C) | PASS both, 7 of 7 (on `5e73780`, story 3.C) | 2: the README's old-clone cleanup steps | tried on `75c1f1f` (story 3.C) | migrated (#328, story 3.C) |
-      | dew_flow_mcp | `.claude/rules/shared` | `1341995` (mcp #70) | — | — | — (the resolver refuses the old mount) | about 18 files (2026-11-09) | — | no decision yet: neither `selected <date>` nor `deferred by the owner until <date>` (story 3.M) |
-      | dew_flow_sidecar_rust | `.claude/rules/shared` | `1341995` (sidecar_rust #75) | — | — | — | about 21 files (2026-11-09) | — | no decision yet: neither `selected <date>` nor `deferred by the owner until <date>` (story 3.R) |
+  | Consumer | Mount | Pin | Adapter check | Fresh clone / worktree | Both agents (§ 7) | Old-mount lines outside `todo/`, `research/`, `.gitmodules` | Rollback | Decision |
+  |---|---|---|---|---|---|---|---|---|
+  | dew_flow_connect_other_ais | `.agents/conventions` | `1341995` | OK | worktree of `ee8ad53`: `rules check` resolved | reads verified for both (part 1), 8 of 8 rules; the observable (part 2) owed | 66, none executable for its own mount: the product's gate snippet and rule discovery support user repositories still on the old layout (and their tests), plus 14 comment and doc lines citing rules by the old path (corrective PR #972) | tried on `8d42647`: the revert gives its parent's tree, the old mount `895b24c` and its tools are back | migrated (#192) |
+  | dew_flow_benchmark | `.agents/conventions` | `1341995` | none: no `.claude/hooks` (story 3.B) | worktree of `3958ecc`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed | 23: the gate's tests and the spikes measure other repositories and old transcripts on the old layout; 2 comments cite rules by the old path (corrective PR #194) | tried on `89b4909`: parent's tree, old mount `e29883f`, low-priority wrapper runs | migrated (#113); the adapter is story 3.B, not selected |
+  | dew_flow_rag_qln | `.agents/conventions` | `1341995` | OK | worktree of `f7f4fc4`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed | 0 | tried on `d83315b`: parent's tree, old mount `cc24f9e`, low-priority wrapper runs | migrated (#83, #85) |
+  | wsl_care | `.agents/conventions` | `1341995` | OK | worktree of `cb8046b`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed | 0 | none by construction | joined on the neutral layout |
+  | dew_flow_vscode_kit | `.agents/conventions` | `1341995` | OK | worktree of `a9ab150`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed | 0 | none by construction | joined on the neutral layout |
+  | dew_flow_amd_r9700_tuning_ai | `.agents/conventions` | `1341995` | OK (`build-flags.mjs` added in #28) | worktree of `2ecb356`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed | 0 | none by construction | joined on the neutral layout |
+  | dew_flow_creds_for_devs | `.agents/conventions` | `1341995` (`37b9aa5` → `5e73780` in #328 → `9b1d668` in #336 → `1341995` in #340) | OK | fresh clone of `75c1f1f` (story 3.C) | reads verified for both (part 1), 7 of 7 (on `5e73780`, story 3.C) rules; the observable (part 2) owed | 2: the README's old-clone cleanup steps | tried on `75c1f1f` (story 3.C) | migrated (#328, story 3.C) |
+  | dew_flow_mcp | `.claude/rules/shared` on `main`; `.agents/conventions` in #71 | `1341995` (mcp #70); `153e6b5` in #71 | in #71: OK | in #71: fresh clone of `a0809f5`, all checks, build and 622 tests green | in #71: reads verified for both (part 1), 6 rules; the observable (part 2) owed | about 18 files (2026-11-09); in #71: 1, a fixture pinning that the old mount is never entered | in #71: tried, the revert gives `main`'s tree and the old mount is back | **selected 2026-11-10 by the owner** (story 3.M); migration PR #71, draft until § 7 passes |
+  | dew_flow_sidecar_rust | `.claude/rules/shared` on `main`; `.agents/conventions` in #76 | `1341995` (sidecar_rust #75); `153e6b5` in #76 | in #76: OK | in #76: CI | in #76: owed | about 21 files (2026-11-09) | in #76: owed | **selected 2026-11-10 by the owner** (story 3.R); migration PR #76, draft |
 - [ ] Не двигать code dependency pins только для того, чтобы погасить старый pin-check; принять явное решение о совместимых версиях и проверить сборку при их изменении.
 - [ ] Обновить README/ROLLOUT/POST_DEPLOY и checklist каждого потребителя. Ссылки на инструменты старого mount не должны остаться исполняемыми путями.
 
