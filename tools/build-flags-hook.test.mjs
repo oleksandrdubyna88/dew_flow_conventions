@@ -222,9 +222,12 @@ test('a wrapper\'s inner command line is split into its chain, like the outer on
 // The code round on dew_flow_conventions (2026-11-10), each red first.
 test('the assignment prefix pattern is linear: an unclosed quote after a long value does not backtrack', () => {
   // The first pattern repeated `[^\s"']+` inside `*`: 24 characters took 647 ms and each two more took four times as long.
-  const started = Date.now();
+  // CPU time, not the clock: a runner that parks this process for a while must not fail it (CodeRabbit on #148).
+  const started = process.cpuUsage();
   ASSIGNMENTS_AT_START.exec(`A=${'a'.repeat(24)}"`);
-  assert.ok(Date.now() - started < 100, `took ${Date.now() - started} ms`);
+  const { user, system } = process.cpuUsage(started);
+  const ms = (user + system) / 1000;
+  assert.ok(ms < 100, `took ${ms} ms of CPU`);
 });
 
 test('for a POSIX shell, only the one argument after -c is the command: what follows is $0 and the arguments', () => {

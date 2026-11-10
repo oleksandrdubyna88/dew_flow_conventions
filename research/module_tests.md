@@ -175,7 +175,10 @@ wrapper's inner command line is split into its chain (`bash -c "cd src && dotnet
 `settings.json` without replacing the link, and keep its mode (0600) for the file and its backup. The code round of
 the same day added two, red first: the assignment-prefix pattern is linear (its first form backtracked exponentially
 on an unclosed quote, 647 ms at 24 characters), and a POSIX shell's `-c` takes one argument as its command, so
-`bash -c 'dotnet build' -m:4` is refused (`-m:4` there is `$0`).
+`bash -c 'dotnet build' -m:4` is refused (`-m:4` there is `$0`). CodeRabbit on #148 added two installer cases, red first: a
+0644 `settings.json` stays 0644 under umask 0077 (the temp file's mode is set with chmod, not left to the umask), and a
+symlink whose target does not exist yet stays a link while its target is created. The linear-pattern case measures CPU
+time, not the clock, so a parked runner cannot fail it.
 
 `tools/load-instructions-hook.test.mjs` (4 cases, 2026-11-10) drives `sessionInstructions` of
 `settings/hooks/load-instructions.mjs` against fake self-hosted layouts: the bound is at most 30 s, a resolver that

@@ -134,12 +134,17 @@ export function drift(settings, hookPath, installedBytes, sourceBytes) {
   return [...out, ...registrationProblems(settings, hookPath)];
 }
 
-/** Temp file + rename; the temp file never outlives a failed write, and `mode` (when given) is kept. */
+/**
+ * Temp file + rename; the temp file never outlives a failed write, and `mode` (when given) is kept. The mode is SET
+ * with chmod before the rename: a create mode is cut by the umask, so 0644 under umask 0077 became 0600 and other
+ * users lost their read of settings.json (CodeRabbit on #148, 2026-11-10).
+ */
 function writeAtomic(dest, data, mode) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   const tmp = `${dest}.tmp-${process.pid}`;
   try {
     fs.writeFileSync(tmp, data, mode === undefined ? undefined : { mode });
+    if (mode !== undefined) fs.chmodSync(tmp, mode);
     fs.renameSync(tmp, dest);
   } finally {
     fs.rmSync(tmp, { force: true });
@@ -398,8 +403,23 @@ const modeOf = file => (fs.existsSync(file) ? fs.statSync(file).mode & 0o777 : u
  * repairRegistration and uninstall did neither until 2026-11-10 (CodeRabbit on creds #328).
  */
 function writeSettings(settingsPath, data) {
-  const file = effortTarget(settingsPath) ?? settingsPath;
+  const file = effortTarget(settingsPath) ?? danglingLinkTarget(settingsPath) ?? settingsPath;
   writeAtomic(file, data, modeOf(file));
+}
+
+/**
+ * The path a symlink points at when that path does not exist yet; null for anything else. Without it, a link into a
+ * dotfiles folder whose file is not created yet read as "no settings", and the rename replaced the LINK with a plain
+ * file (CodeRabbit on #148, 2026-11-10). One level: the link's own target, resolved from the link's folder.
+ */
+function danglingLinkTarget(settingsPath) {
+  try {
+    return fs.lstatSync(settingsPath).isSymbolicLink()
+      ? path.resolve(path.dirname(settingsPath), fs.readlinkSync(settingsPath))
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Where to read and write: the symlink's target when settings.json is a link; null when there is no file. */
