@@ -467,7 +467,12 @@ export function check({ home, source }) {
   const manifest = readManifest(t);
   if (manifest === null) return result(1, [...lines, 'provenance manifest missing or unreadable: ' + t.manifest, effort]);
   const shown = `provenance: ${JSON.stringify(manifest)}`;
-  if (installed !== null && manifest.sha256 !== sha256(installed)) lines.push('installed hook no longer matches the sha256 in its provenance manifest (edited after install)');
+  if (installed !== null && manifest.sha256 !== sha256(installed)) {
+    // The bytes the manifest says it replaced: an install stopped after its manifest, before the hook — not an edit.
+    lines.push(manifest.previous === sha256(installed)
+      ? 'the last install was cut short after its manifest (the hook still holds the bytes it replaced) — run --install to finish it'
+      : 'installed hook no longer matches the sha256 in its provenance manifest (edited after install)');
+  }
   return lines.length ? result(1, [shown, ...lines, effort]) : result(0, ['installed and current', shown, effort]);
 }
 

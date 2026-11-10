@@ -144,8 +144,12 @@ function unboundedBuild(segment, depth = 0) {
   return isBuild && !bounded(parts) ? segment.trim() : '';
 }
 
-/** The build verb as the segment spells it: `dotnet <verb>` (also a quoted path to dotnet.exe) or `msbuild`. */
-const VERB_IN_TEXT = /(dotnet(?:\.exe)?["']?\s+(?:build|msbuild|publish|pack|restore)|msbuild(?:\.exe|\.cmd|\.bat)?["']?)(?=\s|$)/i;
+/**
+ * The build verb as the segment spells it: `dotnet <verb>` (also a quoted path, and the .exe/.cmd/.bat names
+ * `executableName` reads as dotnet) or `msbuild`. It must start a word or a path part — never after `=`, where it is an
+ * assignment's value (`BUILDER=msbuild dotnet build`; CodeRabbit on #147).
+ */
+const VERB_IN_TEXT = /(?<=^|[\s"'\/\\&])(dotnet(?:\.exe|\.cmd|\.bat)?["']?\s+(?:build|msbuild|publish|pack|restore)|msbuild(?:\.exe|\.cmd|\.bat)?["']?)(?=\s|$)/i;
 
 /**
  * The command to type instead: -m:4 directly after the build verb, where it is valid whatever follows. Appending it to

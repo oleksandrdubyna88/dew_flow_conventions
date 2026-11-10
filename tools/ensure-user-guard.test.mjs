@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { ensureUserGuard, guardVersion } from '../settings/hooks/ensure-user-guard.mjs';
-import { OPTOUT_FILE, findEntries, install, targets } from '../settings/hooks/lib/user-guard-install.mjs';
+import { OPTOUT_FILE, check, findEntries, install, targets } from '../settings/hooks/lib/user-guard-install.mjs';
 import { ownedDir } from './lib/owned.mjs';
 
 const ENTRY = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'settings', 'hooks', 'ensure-user-guard.mjs');
@@ -380,4 +380,16 @@ test('a relative source path is checked for uncommitted changes like an absolute
   assert.equal(r.action, 'refused');
   assert.match(r.line, /: the project copy of the hook has uncommitted changes;/);
   assert.equal(fs.existsSync(s.paths.hook), false);
+});
+
+// ---- CodeRabbit on #147 (2026-11-10) ----
+test('--check names an install cut short after its manifest as unfinished, not as an edit', t => {
+  const s = sandbox(t, 2);
+  s.seedInstalled(1);
+  fs.writeFileSync(s.paths.manifest, JSON.stringify({ sha256: sha(fs.readFileSync(s.source)), previous: sha(Buffer.from(hookText(1))), version: 2 }));
+  registerValidly(s);
+  const r = check({ home: s.home, source: s.source });
+  assert.equal(r.code, 1);
+  assert.doesNotMatch(r.lines.join('\n'), /edited after install/);
+  assert.match(r.lines.join('\n'), /cut short after its manifest/);
 });

@@ -164,7 +164,10 @@ no output at all — and a malformed payload allows the command rather than bloc
 The protocol case exists because the pure predicate can be right while the wiring emits the wrong
 shape, which denies nothing and says nothing. Since 2026-11-10 (17 cases) the suggested command carries `-m:4`
 directly after the build verb — `dotnet build -m:4 App.slnx # note`, `msbuild -m:4 …`, a quoted `dotnet.exe` path,
-a leading assignment — where the old append put it inside a trailing comment (red on the old text).
+a leading assignment — where the old append put it inside a trailing comment (red on the old text). CodeRabbit on
+#147 added one case (red first): a verb inside an assignment's value (`BUILDER=msbuild dotnet build`) is skipped,
+and `dotnet.cmd` / `dotnet.bat` are matched as `executableName` reads them. `--check` also names an install cut short
+after its manifest (the hook still holds the manifest's `previous`) as unfinished, not as an edit (one case, red first).
 
 `tools/load-instructions-hook.test.mjs` (4 cases, 2026-11-10) drives `sessionInstructions` of
 `settings/hooks/load-instructions.mjs` against fake self-hosted layouts: the bound is at most 30 s, a resolver that

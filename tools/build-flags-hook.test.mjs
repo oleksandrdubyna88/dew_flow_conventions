@@ -194,3 +194,12 @@ test('an environment assignment in front of the command does not hide it', () =>
     'CI=1 npm test',
   ]) assert.equal(refused(command), false, command);
 });
+
+// CodeRabbit on #147 (2026-11-10): a build verb inside an assignment's value is not the command, and dotnet.cmd / .bat
+// are dotnet as executableName reads them.
+test('the suggestion skips a verb inside an assignment and knows dotnet.cmd and dotnet.bat', () => {
+  const suggested = command => /\n {4}(.*)\n/.exec(buildFlagsRefusal(command))?.[1];
+  assert.equal(suggested('BUILDER=msbuild dotnet build App.slnx'), 'BUILDER=msbuild dotnet build -m:4 App.slnx');
+  assert.equal(suggested('dotnet.cmd build App.slnx # note'), 'dotnet.cmd build -m:4 App.slnx # note');
+  assert.equal(suggested('dotnet.bat publish -c Release'), 'dotnet.bat publish -m:4 -c Release');
+});
