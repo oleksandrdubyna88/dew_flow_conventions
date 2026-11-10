@@ -402,3 +402,64 @@ test('a settings.json symlink whose target does not exist yet stays a link, and 
   assert.equal(fs.lstatSync(s.paths.settings).isSymbolicLink(), true, 'the dangling link was replaced by a plain file');
   assert.deepEqual(findEntries(JSON.parse(fs.readFileSync(real, 'utf8')), s.paths.hook).length, 1);
 });
+
+// ---- CodeRabbit on coai #969 (2026-11-10), red first: a CHAIN of links ending in a missing file ----
+test('a chain of settings links whose last target is missing keeps every link, and the last target is created', t => {
+  const s = sandbox(t);
+  const dotfiles = path.join(path.dirname(s.home), 'dotfiles');
+  const mid = path.join(dotfiles, 'mid.json');
+  const real = path.join(dotfiles, 'settings.json');
+  fs.mkdirSync(dotfiles);
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  try { fs.symlinkSync(real, mid); fs.symlinkSync(mid, s.paths.settings); } catch (error) { return t.skip(`no symlink here (${error.code})`); }
+  assert.equal(install({ home: s.home, source: s.source }).code, 0);
+  assert.equal(fs.lstatSync(s.paths.settings).isSymbolicLink(), true, 'the first link was replaced');
+  assert.equal(fs.lstatSync(mid).isSymbolicLink(), true, 'the middle link was replaced by a plain file');
+  assert.equal(findEntries(JSON.parse(fs.readFileSync(real, 'utf8')), s.paths.hook).length, 1);
+});
+
+test('a settings link loop is refused and no link is touched', t => {
+  const s = sandbox(t);
+  const other = path.join(s.paths.dir, 'loop.json');
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  try { fs.symlinkSync(other, s.paths.settings); fs.symlinkSync(s.paths.settings, other); } catch (error) { return t.skip(`no symlink here (${error.code})`); }
+  const r = install({ home: s.home, source: s.source });
+  assert.equal(r.code, 1, 'a refusal is a result, like every other refusal of the installer');
+  assert.match(r.lines.at(-1), /more than 40 links \(a loop, or a chain too long to open\); nothing changed/);
+  assert.equal(fs.lstatSync(s.paths.settings).isSymbolicLink(), true);
+  assert.equal(fs.existsSync(s.paths.hook), false, 'the refusal came after the hook was written');
+  assert.equal(fs.lstatSync(other).isSymbolicLink(), true);
+});
+
+test('an acyclic chain longer than 40 links is refused like a loop, before anything is written', t => {
+  const s = sandbox(t);
+  const dotfiles = path.join(path.dirname(s.home), 'links');
+  fs.mkdirSync(dotfiles);
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  const hops = Array.from({ length: 41 }, (_, i) => path.join(dotfiles, `l${i}`));
+  try {
+    hops.forEach((hop, i) => fs.symlinkSync(i + 1 < hops.length ? hops[i + 1] : path.join(dotfiles, 'missing.json'), hop));
+    fs.symlinkSync(hops[0], s.paths.settings);
+  } catch (error) { return t.skip(`no symlink here (${error.code})`); }
+  const r = install({ home: s.home, source: s.source });
+  assert.equal(r.code, 1);
+  assert.match(r.lines.at(-1), /more than 40 links/);
+  assert.equal(fs.existsSync(s.paths.hook), false);
+  assert.equal(fs.existsSync(path.join(dotfiles, 'missing.json')), false);
+});
+
+// CodeRabbit on #149 (2026-11-10), red first: uninstall writes settings.json only when it holds our entry, which a loop
+// never does (it reads as no file) — so a loop must not stop it removing the hook, the manifest and writing the marker.
+test('uninstall still removes the hook and writes the opt-out marker when settings.json is a link loop', t => {
+  const s = sandbox(t);
+  fs.mkdirSync(path.dirname(s.paths.hook), { recursive: true });
+  fs.copyFileSync(s.source, s.paths.hook);
+  fs.writeFileSync(s.paths.manifest, '{}');
+  const other = path.join(s.paths.dir, 'loop.json');
+  try { fs.symlinkSync(other, s.paths.settings); fs.symlinkSync(s.paths.settings, other); } catch (error) { return t.skip(`no symlink here (${error.code})`); }
+  const r = uninstall({ home: s.home });
+  assert.equal(r.code, 0, r.lines.join('\n'));
+  assert.equal(fs.existsSync(s.paths.hook), false);
+  assert.equal(fs.existsSync(s.paths.optout), true);
+  assert.equal(fs.lstatSync(s.paths.settings).isSymbolicLink(), true);
+});
