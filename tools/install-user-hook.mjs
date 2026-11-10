@@ -7,8 +7,9 @@
  *
  * <p>The logic lives in `settings/hooks/lib/user-guard-install.mjs`; this file is only the CLI. `--uninstall`
  * also writes `~/.claude/hooks/subagent-model.optout` so the session self-install does not undo it;
- * an explicit `--install` deletes that marker. `--force` installs over a NEWER installed guard (without
- * it that is refused); every install writes `subagent-model.installed.json` (provenance), which `--check`
+ * an explicit `--install` deletes that marker. `--force` installs over a NEWER installed guard, or over one changed
+ * since its install (its bytes match neither the manifest's `sha256` and `previous` nor the source); without it both
+ * are refused; every install writes `subagent-model.installed.json` (provenance), which `--check`
  * prints and verifies and `--uninstall` removes.</p>
  *
  * <p>`--check` also prints one `effort:` line — `high for every model`, or the settings that are not

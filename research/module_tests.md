@@ -203,7 +203,10 @@ added 2026-11-10 (coai code gate on dew_flow_creds_for_devs #328), the first thr
 PATH refuses the install (it read as "no uncommitted changes"); a hooks path that cannot be written leaves
 `settings.json` without a registration (it used to register a missing file first); an installed guard edited since
 its install is refused, unchanged, with `--force` named; and an install cut short after the new hook, before its
-manifest, is completed rather than taken for an edit.
+manifest, is completed rather than taken for an edit. The code round of the same day added four more: a stop after
+the hook and a stop after the manifest (the old bytes are its `previous`) are both completed even when the source has
+moved on, every install records `previous`, and a relative source path is checked for uncommitted changes (it named
+a pathspec under the `-C` folder that did not exist); the last three red on the first fix.
 `tools/effort-converge.test.mjs` (10 cases, 2026-10-14) covers the effort convergence (`effortProblems`,
 `convergeEffort`, `applyEffort`, `ensureEffort`) with temporary homes: all keys set, input never mutated, other keys and
 their order kept, other `modelSettings` keys (`claude-opus-5`) pinned, idempotent (no write, backup or output),

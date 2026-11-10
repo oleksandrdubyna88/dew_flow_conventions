@@ -195,9 +195,14 @@ const OPTOUT_TEXT = 'subagent-model guard was removed on purpose (install-user-h
  * Install the hook. `beforeWrite` is a test seam (runs after the merge is computed and the backup is
  * taken, before the final re-read) and is deliberately not reachable from the CLI.
  */
-/** Provenance of the installed copy: where it came from, which bytes, which version, who put it there. */
-function writeManifest(t, source, sourceBytes, by) {
-  const manifest = { source: path.resolve(source), sha256: sha256(sourceBytes), version: guardVersion(sourceBytes.toString('utf8')), installedAt: new Date().toISOString(), by };
+/**
+ * Provenance of the installed copy: where it came from, which bytes, which version, who put it there — and `previous`,
+ * the hash of the bytes it replaces (null on a first install), so an install cut short after this write and before the
+ * hook copy is not taken for a local edit.
+ */
+function writeManifest(t, source, sourceBytes, by, replaced) {
+  const manifest = { source: path.resolve(source), sha256: sha256(sourceBytes), previous: replaced === null ? null : sha256(replaced),
+    version: guardVersion(sourceBytes.toString('utf8')), installedAt: new Date().toISOString(), by };
   writeAtomic(t.manifest, serialise(manifest));
 }
 
@@ -262,7 +267,7 @@ function changedRefusal(t, sourceBytes, force) {
   const installed = readOrNull(t.hook);
   const manifest = readManifest(t);
   if (force || installed === null || manifest === null || installed.equals(sourceBytes)) return '';
-  return manifest.sha256 === sha256(installed) ? ''
+  return [manifest.sha256, manifest.previous].includes(sha256(installed)) ? ''
     : `installed guard ${t.hook} was changed since it was installed (its sha256 differs from ${t.manifest}); nothing changed — pass --force to replace it`;
 }
 
@@ -282,11 +287,13 @@ export function install({ home, source, beforeWrite = () => {}, clearOptout = fa
   if (original !== null) lines.push(`backup ${writeBackup(t.settings, original)}`);
   beforeWrite();
   if (!sameBytes(readOrNull(t.settings), original)) return result(1, [...lines, CHANGED]);
-  // Every refusal is above, so a refused install still writes nothing. The hook and its manifest come BEFORE the
-  // registration: a failure between them leaves an unregistered file the host never runs, which the next session start
-  // registers. The old order could leave a registration of a missing script, run on every Agent call (2026-11-10).
+  // Every refusal is above, so a refused install never writes the hook, the manifest or settings.json (the backup and
+  // the opt-out removal above are older behaviour). Order: the manifest (naming the bytes it replaces), the hook, then
+  // the registration. A stop after the manifest leaves the old bytes, which its `previous` vouches for; a stop after the
+  // hook leaves an unregistered file the host never runs, which the next session start registers. The old order could
+  // leave a registration of a missing script, run on every Agent call (2026-11-10).
+  writeManifest(t, source, sourceBytes, by, readOrNull(t.hook));
   writeAtomic(t.hook, sourceBytes);
-  writeManifest(t, source, sourceBytes, by);
   writeAtomic(t.settings, serialise(merged));
   return result(0, [`wrote ${t.hook}`, ...lines, `wrote ${t.settings} (hooks.PreToolUse: ${MATCHER})`]);
 }

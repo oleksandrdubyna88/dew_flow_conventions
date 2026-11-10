@@ -524,7 +524,7 @@ const scope=["--repo",repo,"--task","inspect","--file",${JSON.stringify(file)}];
 const ids=JSON.parse(resolve(["explain",...scope])).rules.map(rule=>rule.id);
 const events=ids.flatMap((id,index)=>[
   {type:"assistant",message:{model:"claude-fake",content:[{type:"tool_use",id:"toolu_"+index,name:"Bash",
-    input:{command:'node "'+resolver+'" read --repo "'+repo+'" --task inspect --file ${file} --only '+id}}]}},
+    input:{command:'node "'+resolver+'" read --repo "'+repo+'" --task inspect --file '+${JSON.stringify(JSON.stringify(file))}+' --only '+id}}]}},
   {type:"user",message:{content:[{type:"tool_result",tool_use_id:"toolu_"+index,content:resolve(["read",...scope,"--only",id])}]}}]);
 events.push({type:"assistant",message:{model:"claude-fake",content:[{type:"text",text:"x".repeat(400000)}]}});
 events.push({type:"result",subtype:"success",is_error:false,result:"done"});

@@ -343,3 +343,41 @@ test('a copy cut short after the new hook, before its manifest, is completed —
   assert.equal(s.ensure().action, 'installed');
   assertCurrent(s);
 });
+
+// ---- the code round's findings on this branch (coai session 0d92a7d2, 2026-11-10) ----
+test('an upgrade cut short after the new hook is completed even when the source moved on again', t => {
+  const s = sandbox(t, 3);
+  s.seedInstalled(2);
+  fs.writeFileSync(s.paths.manifest, JSON.stringify({ sha256: sha(Buffer.from(hookText(2))), previous: sha(Buffer.from(hookText(1))), version: 2 }));
+  registerValidly(s);
+  assert.equal(s.ensure().action, 'upgraded');
+  assertCurrent(s);
+});
+
+test('an upgrade cut short after the manifest, before the hook, is completed — the old bytes are the manifest\'s previous', t => {
+  const s = sandbox(t, 3);
+  s.seedInstalled(1);
+  fs.writeFileSync(s.paths.manifest, JSON.stringify({ sha256: sha(Buffer.from(hookText(2))), previous: sha(Buffer.from(hookText(1))), version: 2 }));
+  registerValidly(s);
+  assert.equal(s.ensure().action, 'upgraded');
+  assertCurrent(s);
+});
+
+test('every install records the hash of the bytes it replaces as the manifest\'s previous', t => {
+  const s = sandbox(t, 2);
+  s.seedInstalled(1);
+  assert.equal(s.ensure().action, 'upgraded');
+  const manifest = JSON.parse(fs.readFileSync(s.paths.manifest, 'utf8'));
+  assert.equal(manifest.previous, sha(Buffer.from(hookText(1))));
+  assert.equal(manifest.sha256, sha(fs.readFileSync(s.source)));
+});
+
+test('a relative source path is checked for uncommitted changes like an absolute one', t => {
+  const s = sandbox(t);
+  const git = spawnSync('git', ['init', '-q'], { cwd: s.project });
+  if (git.status !== 0) return t.skip('git unavailable');
+  const r = ensureUserGuard({ home: s.home, source: path.relative(process.cwd(), s.source), env: {} });
+  assert.equal(r.action, 'refused');
+  assert.match(r.line, /: the project copy of the hook has uncommitted changes;/);
+  assert.equal(fs.existsSync(s.paths.hook), false);
+});

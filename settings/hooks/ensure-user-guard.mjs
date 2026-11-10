@@ -82,8 +82,10 @@ const repairedLine = (installed, source) =>
  * in English, so the one accepted failure is recognised whatever the user's locale.
  */
 function uncommittedRefusal(file) {
+  // Absolute: a relative pathspec is read from the `-C` folder, so it named a file that is not there (code round).
+  const absolute = path.resolve(file);
   try {
-    const out = execFileSync('git', ['-C', path.dirname(file), 'status', '--porcelain', '--', file], {
+    const out = execFileSync('git', ['-C', path.dirname(absolute), 'status', '--porcelain', '--', absolute], {
       encoding: 'utf8', timeout: 2000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, LC_ALL: 'C' },
     });

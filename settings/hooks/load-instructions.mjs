@@ -108,6 +108,7 @@ if (process.argv[1]?.endsWith('load-instructions.mjs')) {
   try {
     process.stdout.write(sessionInstructions({ root: repoRoot() }));
   } catch (error) {
-    process.stdout.write(incompleteText(failureReason(error, RESOLVER_TIMEOUT_MS)));
+    // Only `repoRoot()` throws here (sessionInstructions never does), so the words are git's, not the resolver's.
+    process.stdout.write(incompleteText(`git could not find the repository root: ${String(error?.stderr || error?.message || error).trim()}`));
   }
 }
