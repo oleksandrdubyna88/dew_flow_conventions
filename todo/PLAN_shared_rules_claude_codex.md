@@ -20,7 +20,8 @@ paths: ["__conventions_planning_documentation_only__/**"]
 > consumer (conventions #147 and #148; the hook fixes the creds code gate found).
 > Later the same day: the owner selected 3.M and 3.R (migration PRs mcp #71 and sidecar_rust #76). The smoke harness
 > now records part 2 (conventions #154), and the rerun passes both parts of § 7 for both agents in all nine
-> repositories (mcp and sidecar_rust on their migration branches; see the closing matrix).
+> repositories (mcp and sidecar_rust on their migration branches; see the closing matrix). That night both migrations
+> merged (mcp `9bf9f5b`, sidecar_rust `97e174c`): all nine consumers are on the neutral layout.
 >
 > **The stop, 2026-11-09:** entry 1.2 (the owner moves `dew_flow_creds_for_devs` ahead of
 > `dew_flow_sidecar_rust`) is this plan's second change since approval. No consumer migration and no new code on any
@@ -504,12 +505,31 @@ Open stories:
         (`ROLLOUT.md` § Recovery); the revert is tried once in a disposable clone and the old mount, instructions and
         commands work again on the previous SHA.
   - [x] **Merge conditions of this PR** — below, the same for every migration PR.
-- [ ] **Story 3.R — `dew_flow_sidecar_rust`** (Rust: `csharp/` never matches, `rust/doctrine.md` is its doctrine).
+- [x] **Story 3.R — `dew_flow_sidecar_rust`** (Rust: `csharp/` never matches, `rust/doctrine.md` is its doctrine).
       Selected by the owner under the rule above when its prerequisites are met; its checklist is story 3.C's shape
       with its own product references (about 21 files on 2026-11-09) listed in the PR.
-- [ ] **Story 3.M — `dew_flow_mcp`** (.NET, public; pinned by rag_qln as `external/dew_flow_mcp`). Selected by the
+      **Done 2026-11-10:** selected by the owner that day. Migration PR #76 was squash-merged as `97e174c` (pin
+      `153e6b5`). Evidence in the PR:
+      - the tool's dry run (no dirty inputs; 15 "requires review" files edited by hand);
+      - `git grep` (no executable old-mount path);
+      - CI green on both legs (the Rust build cannot run on this machine);
+      - two tests that read moved files: each red in CI first, then green;
+      - both agents' § 7 smoke, both parts, 8 of 8 rules;
+      - the rollback in a fresh clone;
+      - the coai plan and code rounds.
+- [x] **Story 3.M — `dew_flow_mcp`** (.NET, public; pinned by rag_qln as `external/dew_flow_mcp`). Selected by the
       owner under the rule above; its migration PR moves no code pin, and rag_qln's later bump of that pin is a
       separate code-pin PR with a build.
+      **Done 2026-11-10:** selected by the owner that day. Migration PR #71 was squash-merged as `9bf9f5b` (pin
+      `153e6b5`). Evidence in the PR:
+      - the tool's dry run;
+      - `git grep`;
+      - a fresh clone: all checks, the build, 622 tests, 0 failed;
+      - both agents' § 7 smoke, both parts, 6 of 6 rules;
+      - the rollback in a disposable clone;
+      - the coai rounds.
+
+      rag_qln's code-pin PR for `external/dew_flow_mcp` follows, with a build.
 - [ ] **Story 3.B — the Claude adapter in `dew_flow_benchmark`** (found by the re-review's judge, 2026-11-09:
       benchmark migrated in #113, but its `main` has only `.claude/settings.json`, no `.claude/hooks`, so a Claude
       session there starts without its rules). Its own PR, selected by the owner under the rule above, in the shape
@@ -543,7 +563,9 @@ Open stories:
   worktrees passes **both parts for both agents in every row**: ENTRY and PROJECT read by a call that did not fail, no
   rule body by a second path, no call it cannot classify. mcp and sidecar_rust ran on their migration branches, on the
   committed pin `153e6b5`. The runs are in the record's rerun section. This item stays open until mcp #71 and
-  sidecar_rust #76 merge, and while benchmark has no Claude adapter (story 3.B, not selected).
+  sidecar_rust #76 merge, and while benchmark has no Claude adapter (story 3.B, not selected). Both merged later that
+  night (mcp `9bf9f5b`, sidecar_rust `97e174c`), so all nine repositories are on the neutral layout; the item stays
+  open for story 3.B only.
 
   | Consumer | Mount | Pin | Adapter check | Fresh clone / worktree | Both agents (§ 7) | Old-mount lines outside `todo/`, `research/`, `.gitmodules` | Rollback | Decision |
   |---|---|---|---|---|---|---|---|---|
@@ -554,8 +576,8 @@ Open stories:
   | dew_flow_vscode_kit | `.agents/conventions` | `1341995` | OK | worktree of `a9ab150`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both** in the rerun of 2026-11-10 evening, harness conventions #154 | 0 | none by construction | joined on the neutral layout |
   | dew_flow_amd_r9700_tuning_ai | `.agents/conventions` | `1341995` | OK (`build-flags.mjs` added in #28) | worktree of `2ecb356`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both** in the rerun of 2026-11-10 evening, harness conventions #154 | 0 | none by construction | joined on the neutral layout |
   | dew_flow_creds_for_devs | `.agents/conventions` | `1341995` (`37b9aa5` → `5e73780` in #328 → `9b1d668` in #336 → `1341995` in #340) | OK | fresh clone of `75c1f1f` (story 3.C) | reads verified for both (part 1), 7 of 7 (on `5e73780`, story 3.C) rules; the observable (part 2) owed; **both parts verified for both** in the rerun of 2026-11-10 evening, harness conventions #154 (worktree `daa7e05`) | 2: the README's old-clone cleanup steps | tried on `75c1f1f` (story 3.C) | migrated (#328, story 3.C) |
-  | dew_flow_mcp | `.claude/rules/shared` on `main`; `.agents/conventions` in #71 | `1341995` (mcp #70); `153e6b5` in #71 | in #71: OK | in #71: fresh clone of `a0809f5`, all checks, build and 622 tests green | in #71: reads verified for both (part 1), 6 rules; the observable (part 2) owed; **both parts verified for both** on `64f42d0` in the rerun of 2026-11-10 evening, harness conventions #154 | about 18 files (2026-11-09); in #71: 1, a fixture pinning that the old mount is never entered | in #71: tried, the revert gives `main`'s tree and the old mount is back | **selected 2026-11-10 by the owner** (story 3.M); migration PR #71, draft until § 7 passes (it passes since the rerun) |
-  | dew_flow_sidecar_rust | `.claude/rules/shared` on `main`; `.agents/conventions` in #76 | `1341995` (sidecar_rust #75); `153e6b5` in #76 | in #76: OK | in #76: CI | in #76: owed; then **both parts verified for both**, 8 of 8 rules, on `a691935` in the rerun of 2026-11-10 evening, harness conventions #154 | about 21 files (2026-11-09) | in #76: owed; then tried on `c446c69` and again on `a691935`: one revert gives the tree of `main`, the old mount `1341995` is back | **selected 2026-11-10 by the owner** (story 3.R); migration PR #76, draft |
+  | dew_flow_mcp | `.claude/rules/shared` on `main`; `.agents/conventions` in #71 | `1341995` (mcp #70); `153e6b5` in #71 | in #71: OK | in #71: fresh clone of `a0809f5`, all checks, build and 622 tests green | in #71: reads verified for both (part 1), 6 rules; the observable (part 2) owed; **both parts verified for both** on `64f42d0` in the rerun of 2026-11-10 evening, harness conventions #154 | about 18 files (2026-11-09); in #71: 1, a fixture pinning that the old mount is never entered | in #71: tried, the revert gives `main`'s tree and the old mount is back | **selected 2026-11-10 by the owner** (story 3.M); migration PR #71, draft until § 7 passes (it passes since the rerun); **merged 2026-11-10 as `9bf9f5b`** |
+  | dew_flow_sidecar_rust | `.claude/rules/shared` on `main`; `.agents/conventions` in #76 | `1341995` (sidecar_rust #75); `153e6b5` in #76 | in #76: OK | in #76: CI | in #76: owed; then **both parts verified for both**, 8 of 8 rules, on `a691935` in the rerun of 2026-11-10 evening, harness conventions #154 | about 21 files (2026-11-09) | in #76: owed; then tried on `c446c69` and again on `a691935`: one revert gives the tree of `main`, the old mount `1341995` is back | **selected 2026-11-10 by the owner** (story 3.R); migration PR #76, draft; **merged 2026-11-10 as `97e174c`** |
 - [ ] Не двигать code dependency pins только для того, чтобы погасить старый pin-check; принять явное решение о совместимых версиях и проверить сборку при их изменении.
 - [ ] Обновить README/ROLLOUT/POST_DEPLOY и checklist каждого потребителя. Ссылки на инструменты старого mount не должны остаться исполняемыми путями.
 
