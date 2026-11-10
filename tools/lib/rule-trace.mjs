@@ -110,33 +110,57 @@ function toolCalls(agent,events) {
       else if(block.name==="Bash")calls.push({via:"shell",command:String(block.input?.command??"")});
     }
   }
-  return calls.filter(call=>!(call.command??"").includes("rules.mjs"));
+  return calls.filter(call=>!isSingleResolverCall(call.command));
+}
+
+/**
+ * True only for ONE resolver invocation (after unwrapping one `bash -lc '…'` layer): no chaining, substitution or
+ * redirection. A command that also does something else is scanned like any other (the plan round on this change).
+ */
+function isSingleResolverCall(command) {
+  if(command===undefined)return false;
+  const inner=/^\s*(?:\/bin\/)?(?:ba)?sh\s+-l?c\s+(['"])([\s\S]*)\1\s*$/.exec(command)?.[2]??command;
+  return inner.includes("rules.mjs")&&!/[;&|`$<>\r\n]/.test(inner);
 }
 
 const MOUNT_PREFIX=".agents/conventions/";
+
+/** Each word of a shell command, quotes removed: the candidates for a path the command names. */
+const commandWords=command=>command.split(/[\s'"]+/).filter(Boolean);
+
+/** True when the call's path, or one word of its command, resolves to one of `files` inside the checkout. */
+function namesFile(call,files,repo) {
+  const candidates=call.path!==undefined?[call.path]:commandWords(call.command);
+  return candidates.some(word=>files.has(comparable(path.resolve(repo,word))));
+}
 
 /**
  * § 7 part 2 for "Claude / Codex from root": ENTRY and PROJECT read, and no rule body loaded by a second path — a
  * Read or Grep of a selected rule's source file, or a shell command naming it (CodeRabbit on #152, 2026-11-10).
  * Part 1 (allSourcesRead) proves the resolver delivered every body; this proves that delivery was the only one.
+ * Paths count only when they resolve to THIS checkout's files. A shell command that reaches a selected rule's folder
+ * without naming one file (a glob, a variable) cannot be classified: it is listed in `unclassified` and the
+ * observable is not verified.
  */
 function observableEvidence(calls,expected,origin) {
-  const touches=(call,re)=>re.test(call.path??"")||re.test(call.command??"");
-  const entryRead=calls.some(call=>touches(call,/(^|[\s'"\\/])ENTRY\.md(\b|$)/));
-  const projectRead=calls.some(call=>touches(call,/(^|[\s'"\\/])\.agents[\\/]PROJECT\.md(\b|$)/));
   const repo=origin?.repo??process.cwd();
+  const at=(...parts)=>comparable(path.resolve(repo,...parts));
+  const entryRead=calls.some(call=>namesFile(call,new Set([at(MOUNT_PREFIX,"ENTRY.md"),at("ENTRY.md")]),repo));
+  const projectRead=calls.some(call=>namesFile(call,new Set([at(".agents","PROJECT.md")]),repo));
   const secondPathReads=[];
   for(const rule of expected) {
     const source=String(rule.source??"");
     if(!source)continue;
-    const full=comparable(path.resolve(repo,source));
-    const inMount=source.startsWith(MOUNT_PREFIX)?source.slice(MOUNT_PREFIX.length):source;
-    const hit=calls.find(call=>call.path!==undefined
-      ?comparable(path.resolve(repo,call.path))===full
-      :(call.command.includes(source)||call.command.includes(inMount)));
+    const hit=calls.find(call=>namesFile(call,new Set([at(source)]),repo));
     if(hit)secondPathReads.push({id:rule.id,via:hit.via});
   }
-  return {entryRead,projectRead,secondPathReads,verified:entryRead&&projectRead&&secondPathReads.length===0};
+  const ruleFolders=[...new Set(expected.map(rule=>path.posix.dirname(String(rule.source??""))).filter(folder=>folder&&folder!=="."))];
+  const named=new Set(expected.map(rule=>at(String(rule.source??""))));
+  const unclassified=calls.filter(call=>call.command!==undefined
+    &&ruleFolders.some(folder=>call.command.includes(folder))
+    &&!commandWords(call.command).some(word=>named.has(comparable(path.resolve(repo,word))))).map(call=>call.command);
+  return {entryRead,projectRead,secondPathReads,unclassified,
+    verified:entryRead&&projectRead&&secondPathReads.length===0&&unclassified.length===0};
 }
 
 function decodedEvidence(agent,trace,expected,origin) {
@@ -159,7 +183,7 @@ export function traceEvidence(agent,trace,expected,origin) {
     return {parseFailed:true,parseError:`${error.name}: native event stream could not be decoded`,
       completed:false,allSourcesRead:false,final:"",finalTruncated:false,sourceCalls:[],models:[],
       reads:expected.map(({id,hash})=>({id,hash,complete:false})),
-      observable:{entryRead:false,projectRead:false,secondPathReads:[],verified:false}};
+      observable:{entryRead:false,projectRead:false,secondPathReads:[],unclassified:[],verified:false}};
   }
 }
 

@@ -686,7 +686,7 @@ test("the observable is verified when ENTRY and PROJECT were read and every body
   for(const [agent,trace] of [["claude",claudeTrace([])],["codex",codexTrace([])]]){
     const e=traceEvidence(agent,trace,[obsRule],obsOrigin);
     assert.equal(e.allSourcesRead,true,agent);
-    assert.deepEqual(e.observable,{entryRead:true,projectRead:true,secondPathReads:[],verified:true},agent);
+    assert.deepEqual(e.observable,{entryRead:true,projectRead:true,secondPathReads:[],unclassified:[],verified:true},agent);
   }
 });
 
@@ -704,4 +704,31 @@ test("an agent that never read ENTRY or PROJECT does not have the observable",()
   const e=traceEvidence("claude",trace,[obsRule],obsOrigin);
   assert.equal(e.allSourcesRead,true,"part 1 alone can pass");
   assert.deepEqual([e.observable.entryRead,e.observable.projectRead,e.observable.verified],[false,false,false]);
+});
+
+// ---- the plan round on this change (2026-11-10), each red first ----
+test("only a single resolver call is the first path: a chained command that also opens a rule body is a second path",()=>{
+  const chained=traceEvidence("codex",codexTrace([codexCmd(`/bin/bash -lc '${obsRead} && cat .agents/conventions/common/sample.md'`,obsPayload)]),[obsRule],obsOrigin);
+  assert.deepEqual(chained.observable.secondPathReads,[{id:"common.sample",via:"shell"}]);
+  assert.equal(chained.observable.verified,false);
+});
+
+test("ENTRY and PROJECT count only when the path is this checkout's own file",()=>{
+  const elsewhere=[claudeTool("r1","Read",{file_path:"/somewhere/else/ENTRY.md"}),claudeResult("r1","x"),
+    claudeTool("r2","Read",{file_path:"/somewhere/else/.agents/PROJECT.md"}),claudeResult("r2","x"),
+    claudeTool("r3","Bash",{command:obsRead}),claudeResult("r3",obsPayload),{type:"result",subtype:"success",is_error:false,result:"done"}];
+  const e=traceEvidence("claude",elsewhere.map(x=>JSON.stringify(x)).join("\n"),[obsRule],obsOrigin);
+  assert.deepEqual([e.observable.entryRead,e.observable.projectRead],[false,false],"a look-alike outside the checkout");
+  const relative=[claudeTool("r1","Read",{file_path:".agents/conventions/ENTRY.md"}),claudeResult("r1","x"),
+    claudeTool("r2","Read",{file_path:"./.agents/PROJECT.md"}),claudeResult("r2","x"),
+    claudeTool("r3","Bash",{command:obsRead}),claudeResult("r3",obsPayload),{type:"result",subtype:"success",is_error:false,result:"done"}];
+  const r=traceEvidence("claude",relative.map(x=>JSON.stringify(x)).join("\n"),[obsRule],obsOrigin);
+  assert.deepEqual([r.observable.entryRead,r.observable.projectRead,r.observable.verified],[true,true,true],"relative paths into the checkout");
+});
+
+test("a shell command that reaches a rule folder without naming one file is unclassified, and the observable is not verified",()=>{
+  const e=traceEvidence("codex",codexTrace([codexCmd("/bin/bash -lc 'cat .agents/conventions/common/*.md'","…")]),[obsRule],obsOrigin);
+  assert.deepEqual(e.observable.secondPathReads,[]);
+  assert.deepEqual(e.observable.unclassified,["/bin/bash -lc 'cat .agents/conventions/common/*.md'"]);
+  assert.equal(e.observable.verified,false);
 });
