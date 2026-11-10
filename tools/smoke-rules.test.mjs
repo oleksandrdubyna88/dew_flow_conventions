@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {traceEvidence,smokeResolver,installedCli,snapshot,behaviourCliArgs,behaviourSmoke,recordedLaunches,judgeBehaviour,loadingPrompt,changedPaths,parseArgs} from "./lib/rule-smoke.mjs";
+import {smoke,traceEvidence,smokeResolver,installedCli,snapshot,behaviourCliArgs,behaviourSmoke,recordedLaunches,judgeBehaviour,loadingPrompt,changedPaths,parseArgs} from "./lib/rule-smoke.mjs";
 import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
 import {delegationEvidence} from "./lib/rule-trace.mjs";
@@ -506,6 +506,48 @@ test("the classification fixture loads only the rule under test, with the measur
   const full=loadNamed("behaviour");
   assert.equal(full.loadOnly,undefined);
   assert.deepEqual([full.caps.maxOutputBytes,full.caps.maxBudgetUsd,full.caps.timeoutMs,full.caps.maxReportBytes,full.caps.measured],[8388608,10,1800000,262144,true]);
+});
+
+// ---- the inspect smoke end to end with a fake claude (the creds migration's runs, 2026-11-10) ----
+// A real Claude run of one file in dew_flow_creds_for_devs wrote a 448,976-byte trace (the SessionStart hook output,
+// the instruction reads and the rule reads); the old 262,144-byte cap cut every one of three runs, and the cut stream
+// could not be decoded. The same run showed the second cause: Claude Code keeps only a 2 KB preview of a Bash output
+// over about 30 KB, and the one whole `read` was 31,963 bytes — so no rule body reached the trace. The fake below
+// writes what a good run writes: one `read --only <id>` per selected rule, then 400 KB of answer text.
+function fakeInspectClaude(home,file) {
+  const fake=path.join(home,"fake-inspect-claude.mjs"),promptFile=path.join(home,"prompt.txt");
+  fs.writeFileSync(fake,`import fs from "node:fs";import {execFileSync} from "node:child_process";
+const prompt=process.argv.at(-1);fs.writeFileSync(${JSON.stringify(promptFile)},prompt);
+const resolver=/node "([^"]+)"/.exec(prompt)[1],repo=/--repo "([^"]+)"/.exec(prompt)[1];
+const resolve=args=>execFileSync(process.execPath,[resolver,...args],{encoding:"utf8"});
+const scope=["--repo",repo,"--task","inspect","--file",${JSON.stringify(file)}];
+const ids=JSON.parse(resolve(["explain",...scope])).rules.map(rule=>rule.id);
+const events=ids.flatMap((id,index)=>[
+  {type:"assistant",message:{model:"claude-fake",content:[{type:"tool_use",id:"toolu_"+index,name:"Bash",
+    input:{command:'node "'+resolver+'" read --repo "'+repo+'" --task inspect --file ${file} --only '+id}}]}},
+  {type:"user",message:{content:[{type:"tool_result",tool_use_id:"toolu_"+index,content:resolve(["read",...scope,"--only",id])}]}}]);
+events.push({type:"assistant",message:{model:"claude-fake",content:[{type:"text",text:"x".repeat(400000)}]}});
+events.push({type:"result",subtype:"success",is_error:false,result:"done"});
+process.stdout.write(events.map(event=>JSON.stringify(event)).join("\\n")+"\\n");`);
+  return {fake,promptFile};
+}
+
+test("an inspect smoke whose trace is larger than 256 KiB still decodes, and every rule read counts",async t=>{
+  const {home,worktree}=disposableWorktree(t,"smoke-inspect-large");
+  const {fake}=fakeInspectClaude(home,"src/sample.ts");
+  const outcome=await smoke({repo:worktree,agent:"claude",files:["src/sample.ts"],cli:fake});
+  assert.ok(outcome.traceBytes>262144,`the fake trace is ${outcome.traceBytes} bytes, more than the old cap`);
+  assert.deepEqual([outcome.overflow,outcome.parseFailed,outcome.allSourcesRead],[false,false,true]);
+  assert.equal(outcome.status,"source reads verified; behavior requires review");
+});
+
+test("the inspect smoke asks for one `read --only <id>` per selected rule, never one whole read",async t=>{
+  const {home,worktree}=disposableWorktree(t,"smoke-inspect-prompt");
+  const {fake,promptFile}=fakeInspectClaude(home,"src/sample.ts");
+  await smoke({repo:worktree,agent:"claude",files:["src/sample.ts"],cli:fake});
+  const prompt=fs.readFileSync(promptFile,"utf8");
+  assert.match(prompt,/ read --repo "[^"]+" --task inspect --file "src\/sample\.ts" --only <id>` for each selected rule id/);
+  assert.match(prompt,/too large for one read/);
 });
 
 // ---- the real code path: behaviourSmoke end to end with a fake claude, no paid run ----

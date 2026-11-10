@@ -638,3 +638,15 @@ test("the allowances section of research/module_rules.md states every cap the te
   for(const cap of CAPS)assert.ok(section.includes(`${cap.max.toLocaleString("en-US")} B`),`the allowances section does not state ${cap.what} at ${cap.max.toLocaleString("en-US")} B`);
   for(const epic of ["E2","E3","E4","E5","E6"])assert.ok(section.includes(epic),`${epic} has no allowance row`);
 });
+
+// The Codex smoke of dew_flow_creds_for_devs (2026-11-10) stopped at `rules check: INCOMPLETE — spawnSync git EPERM`:
+// in Codex's Linux sandbox a child started with a stdin PIPE gets its output and still reports EPERM. The resolver's own
+// git helper took Node's default stdio (stdin a pipe), so no Codex session on Linux or WSL could load rules at all.
+// Runs only where the Codex CLI is installed (not on the CI runners), with nothing but `codex sandbox` around the resolver.
+const codexInstalled=process.platform==="linux"&&spawnSync("codex",["--version"],{encoding:"utf8",timeout:20000}).status===0;
+test("the resolver's check runs inside the Codex read-only sandbox",{skip:codexInstalled?false:"no Codex CLI on this machine"},()=>{
+  const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
+  const result=spawnSync("codex",["sandbox","--",process.execPath,path.join(root,"tools/rules.mjs"),"check","--repo",root],{encoding:"utf8",timeout:60000,stdio:["ignore","pipe","pipe"]});
+  assert.doesNotMatch(result.stdout+result.stderr,/EPERM/);
+  assert.equal(result.status,0,result.stdout+result.stderr);
+});

@@ -122,6 +122,24 @@ export function disposableRoot(repo) {
   return root;
 }
 
+/**
+ * The in-memory cap of one inspect run's native trace. Only its hash and size are kept, never the trace (§ 8's
+ * artifact budget is the 32 KiB report). 262144 B cut every Claude run in dew_flow_creds_for_devs on 2026-11-10:
+ * one file's trace measured 448,976 B. 8 MiB is the behaviour fixtures' cap, measured there for the same reason.
+ */
+export const INSPECT_TRACE_MAX_BYTES=8388608;
+
+/**
+ * The inspect run's prompt. Rules are read ONE per call (`read --only <id>`): Claude Code keeps only a 2 KB preview
+ * of a Bash output over about 30 KB, and one whole read of a consumer's rules measured 31,963 B on 2026-11-10, so a
+ * single read put no rule body into the trace. Behaviour mode's `loadingPrompt` asks for the same.
+ */
+export function inspectPrompt(scope,{resolver,root}) {
+  const node=`node "${forwardSlashes(resolver)}"`,repo=`--repo "${forwardSlashes(root)}"`;
+  const files=scope.map(file=>`--file ${JSON.stringify(file)}`).join(" ");
+  return `Read the repository instructions and explain the rules governing hypothetical new files ${scope.map(file=>JSON.stringify(file)).join(", ")}. This is read-only inspection, not implementation. Follow the repository loading procedure. Invoke ${node} as a single command per tool call, with ${repo}; do not prefix cd or combine shell commands. Load the rules this way: run \`${node} explain ${repo} --task inspect ${files}\` once, then run \`${node} read ${repo} --task inspect ${files} --only <id>\` for each selected rule id (the whole payload is too large for one read: the host keeps only a preview of a long output). Keep the final answer concise: selected rule ids/hashes and a concrete constraint from each applicable language. Do not delegate, call reviewers, edit files, inspect credentials, or read outside this repository.`;
+}
+
 export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
   if(!["claude","codex"].includes(agent))throw new Error("Agent must be claude or codex");
   const root=path.resolve(git(repo,"rev-parse","--show-toplevel"));
@@ -133,7 +151,7 @@ export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
   const resolver=smokeResolver(root);
   const manifest=JSON.parse(execFileSync(process.execPath,[resolver,"explain","--repo",root,"--task","inspect",...scope.flatMap(file=>["--file",file])],{encoding:"utf8",timeout:10000,maxBuffer:262144}));
   const expected=manifest.rules.map(rule=>({...rule,text:normalizedText(within(root,rule.source))}));
-  const prompt=`Read the repository instructions and explain the rules governing hypothetical new files ${scope.map(file=>JSON.stringify(file)).join(", ")}. This is read-only inspection, not implementation. Follow the repository loading procedure. Invoke node "${resolver.replaceAll("\\","/")}" as a single command per tool call, with --repo "${root.replaceAll("\\","/")}"; do not prefix cd or combine shell commands. Keep the final answer concise: selected rule ids/hashes and a concrete constraint from each applicable language. Do not delegate, call reviewers, edit files, inspect credentials, or read outside this repository.`;
+  const prompt=inspectPrompt(scope,{resolver,root});
   const cli=nativeCli(agent,working,prompt,resolver,explicitCli);
   const snapshotPaths=[...manifest.instructions.map(item=>item.path),...manifest.rules.map(item=>item.source),...scope];
   const {report,lock,save}=smokeReports(root,agent);
@@ -147,7 +165,7 @@ export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
   try {
     const before=snapshot(root,snapshotPaths);
     save(initial);
-    const result=await run(cli.command,cli.args,{cwd:working,timeoutMs:180000,maxOutputBytes:262144,containTree:true,signal:controller.signal});
+    const result=await run(cli.command,cli.args,{cwd:working,timeoutMs:180000,maxOutputBytes:INSPECT_TRACE_MAX_BYTES,containTree:true,signal:controller.signal});
     const unchanged=before===snapshot(root,snapshotPaths);
     const evidence=traceEvidence(agent,result.out,expected,{resolver,cwd:working,repo:root});
     const complete=result.code===0&&!evidence.parseFailed&&unchanged&&evidence.completed&&evidence.allSourcesRead;
