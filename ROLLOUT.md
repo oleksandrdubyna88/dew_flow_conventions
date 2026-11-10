@@ -68,7 +68,8 @@ size are kept). The prompt asks for `explain` once and then one `read --only <id
 a 2 KB preview of a Bash output over about 30 KB, so one whole read put no rule body into the trace. The Windows supervisor owns a kill-on-close
 Job Object, so an exited direct child cannot strand its descendants.
 
-The harness checks full canonical bodies in successful tool outputs, CLI completion and
+The harness checks full canonical bodies in successful tool outputs (§ 7 part 1), records whether
+ENTRY and PROJECT were read and whether any rule body came by a second path (`observable`, part 2), CLI completion and
 unchanged Git HEAD/index/status plus instruction, selected rule, requested file and known host
 setting content. Other file bodies are not hashed. Snapshots refuse more than 512 files,
 1 MiB per source or 8 MiB total. A final model claim alone is insufficient. Successful source reads
