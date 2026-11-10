@@ -516,22 +516,22 @@ Open stories:
       consumer's story (3.C, 3.R, 3.M, 3.B, or a new story for a consumer that joined on the neutral layout), never
       a new plan or a plan change; only a failure that changes the design is a change.
 
-      **The matrix, 2026-11-10** (read from each `main` and from disposable worktrees of it; every pin is release
-      `1341995`; the smoke and rollback evidence, run by run with rule ids, hashes, trace sizes and dates, is
+      **The matrix, 2026-11-10** (read from each `main` and from disposable worktrees of it, after the pin bumps of
+      release `1341995` merged in all nine; the smoke and rollback evidence, run by run with rule ids, hashes, trace sizes and dates, is
       [research/2026-11-10_shared_rules_acceptance.md](../research/2026-11-10_shared_rules_acceptance.md)). This item
       stays open: two rows have no decision yet, and only the owner selects or defers a consumer.
 
-      | Consumer | Mount | Adapter check | Fresh clone / worktree | Both agents (§ 7) | Old-mount lines outside `todo/`, `research/`, `.gitmodules` | Rollback | Decision |
-      |---|---|---|---|---|---|---|---|
-      | dew_flow_connect_other_ais | `.agents/conventions` | OK | worktree of `ee8ad53`: `rules check` resolved | PASS both, 8 of 8 rules | 66, none executable for its own mount: the product's gate snippet and rule discovery support user repositories still on the old layout (and their tests), plus about 10 code comments and the `.coderabbit.yaml` header citing rules by the old path (a stale pointer, fixed by a corrective PR) | tried on `8d42647`: the revert gives its parent's tree, the old mount `895b24c` and its tools are back | migrated (#192) |
-      | dew_flow_benchmark | `.agents/conventions` | none: no `.claude/hooks` (story 3.B) | worktree of `3958ecc`: resolved | PASS both, 6 of 6 | 23: the gate's tests and the spikes measure other repositories and old transcripts on the old layout; 2 comments cite rules by the old path (corrective PR) | tried on `89b4909`: parent's tree, old mount `e29883f`, low-priority wrapper runs | migrated (#113); the adapter is story 3.B, not selected |
-      | dew_flow_rag_qln | `.agents/conventions` | OK | worktree of `f7f4fc4`: resolved | PASS both, 6 of 6 | 0 | tried on `d83315b`: parent's tree, old mount `cc24f9e`, low-priority wrapper runs | migrated (#83, #85) |
-      | wsl_care | `.agents/conventions` | OK | worktree of `cb8046b`: resolved | PASS both, 6 of 6 | 0 | none by construction | joined on the neutral layout |
-      | dew_flow_vscode_kit | `.agents/conventions` | OK | worktree of `a9ab150`: resolved | PASS both, 6 of 6 | 0 | none by construction | joined on the neutral layout |
-      | dew_flow_amd_r9700_tuning_ai | `.agents/conventions` | OK (`build-flags.mjs` added in #28) | worktree of `2ecb356`: resolved | PASS both, 6 of 6 | 0 | none by construction | joined on the neutral layout |
-      | dew_flow_creds_for_devs | `.agents/conventions` | OK | fresh clone of `75c1f1f` (story 3.C) | PASS both, 7 of 7 (on `5e73780`, story 3.C) | 2: the README's old-clone cleanup steps | tried on `75c1f1f` (story 3.C) | migrated (#328, story 3.C) |
-      | dew_flow_mcp | `.claude/rules/shared` | — | — | — (the resolver refuses the old mount) | about 18 files (2026-11-09) | — | not selected (story 3.M): owner |
-      | dew_flow_sidecar_rust | `.claude/rules/shared` | — | — | — | about 21 files (2026-11-09) | — | not selected (story 3.R): owner |
+      | Consumer | Mount | Pin | Adapter check | Fresh clone / worktree | Both agents (§ 7) | Old-mount lines outside `todo/`, `research/`, `.gitmodules` | Rollback | Decision |
+      |---|---|---|---|---|---|---|---|---|
+      | dew_flow_connect_other_ais | `.agents/conventions` | `1341995` | OK | worktree of `ee8ad53`: `rules check` resolved | PASS both, 8 of 8 rules | 66, none executable for its own mount: the product's gate snippet and rule discovery support user repositories still on the old layout (and their tests), plus about 10 code comments and the `.coderabbit.yaml` header citing rules by the old path (a stale pointer, fixed by a corrective PR) | tried on `8d42647`: the revert gives its parent's tree, the old mount `895b24c` and its tools are back | migrated (#192) |
+      | dew_flow_benchmark | `.agents/conventions` | `1341995` | none: no `.claude/hooks` (story 3.B) | worktree of `3958ecc`: resolved | PASS both, 6 of 6 | 23: the gate's tests and the spikes measure other repositories and old transcripts on the old layout; 2 comments cite rules by the old path (corrective PR) | tried on `89b4909`: parent's tree, old mount `e29883f`, low-priority wrapper runs | migrated (#113); the adapter is story 3.B, not selected |
+      | dew_flow_rag_qln | `.agents/conventions` | `1341995` | OK | worktree of `f7f4fc4`: resolved | PASS both, 6 of 6 | 0 | tried on `d83315b`: parent's tree, old mount `cc24f9e`, low-priority wrapper runs | migrated (#83, #85) |
+      | wsl_care | `.agents/conventions` | `1341995` | OK | worktree of `cb8046b`: resolved | PASS both, 6 of 6 | 0 | none by construction | joined on the neutral layout |
+      | dew_flow_vscode_kit | `.agents/conventions` | `1341995` | OK | worktree of `a9ab150`: resolved | PASS both, 6 of 6 | 0 | none by construction | joined on the neutral layout |
+      | dew_flow_amd_r9700_tuning_ai | `.agents/conventions` | `1341995` | OK (`build-flags.mjs` added in #28) | worktree of `2ecb356`: resolved | PASS both, 6 of 6 | 0 | none by construction | joined on the neutral layout |
+      | dew_flow_creds_for_devs | `.agents/conventions` | `1341995` (`37b9aa5` → `5e73780` in #328 → `9b1d668` in #336 → `1341995` in #340) | OK | fresh clone of `75c1f1f` (story 3.C) | PASS both, 7 of 7 (on `5e73780`, story 3.C) | 2: the README's old-clone cleanup steps | tried on `75c1f1f` (story 3.C) | migrated (#328, story 3.C) |
+      | dew_flow_mcp | `.claude/rules/shared` | `1341995` (mcp #70) | — | — | — (the resolver refuses the old mount) | about 18 files (2026-11-09) | — | no decision yet: neither `selected <date>` nor `deferred by the owner until <date>` (story 3.M) |
+      | dew_flow_sidecar_rust | `.claude/rules/shared` | `1341995` (sidecar_rust #75) | — | — | — | about 21 files (2026-11-09) | — | no decision yet: neither `selected <date>` nor `deferred by the owner until <date>` (story 3.R) |
 - [ ] Не двигать code dependency pins только для того, чтобы погасить старый pin-check; принять явное решение о совместимых версиях и проверить сборку при их изменении.
 - [ ] Обновить README/ROLLOUT/POST_DEPLOY и checklist каждого потребителя. Ссылки на инструменты старого mount не должны остаться исполняемыми путями.
 
