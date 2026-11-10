@@ -91,27 +91,38 @@ function claudeEvents(events,capture) {
 }
 
 /**
- * Every file-touching call of the trace: Claude's Read, Grep and Bash tool uses, Codex's shell commands. The
- * resolver's own invocations are left out, since they ARE the first path.
+ * Every file-touching call of the trace, in order, each with its index and whether it failed: Claude's Read, Grep
+ * and Bash tool uses (failed = its tool_result says is_error), Codex's shell commands (failed = a non-zero exit).
+ * The resolver's own invocations are left out, since they ARE the first path.
  */
 function toolCalls(agent,events) {
-  const calls=[];
+  const calls=[],failedIds=new Set();
   for(const event of events) {
     if(agent==="codex") {
       const item=event.item;
-      if(event.type==="item.completed"&&item?.type==="command_execution")calls.push({via:"shell",command:String(item.command??"")});
+      if(event.type==="item.completed"&&item?.type==="command_execution")calls.push({via:"shell",command:String(item.command??""),error:item.exit_code!==0});
+      continue;
+    }
+    if(event.type==="user") {
+      for(const block of event.message?.content??[])if(block?.type==="tool_result"&&block.is_error)failedIds.add(block.tool_use_id);
       continue;
     }
     if(event.type!=="assistant")continue;
     for(const block of event.message?.content??[]) {
       if(block?.type!=="tool_use")continue;
-      if(block.name==="Read")calls.push({via:"Read",path:String(block.input?.file_path??"")});
-      else if(block.name==="Grep")calls.push({via:"Grep",path:String(block.input?.path??"")});
-      else if(block.name==="Bash")calls.push({via:"shell",command:String(block.input?.command??"")});
+      if(block.name==="Read")calls.push({via:"Read",id:block.id,path:String(block.input?.file_path??"")});
+      else if(block.name==="Grep")calls.push({via:"Grep",id:block.id,path:String(block.input?.path??"")});
+      else if(block.name==="Bash")calls.push({via:"shell",id:block.id,command:String(block.input?.command??"")});
     }
   }
-  return calls.filter(call=>!isSingleResolverCall(call.command));
+  return calls.map((call,index)=>({...call,index,error:call.error??failedIds.has(call.id)}))
+    .filter(call=>!isSingleResolverCall(call.command));
 }
+
+const SHELL_WRAPPER=/^\s*(?:\/(?:usr\/)?bin\/)?(?:ba)?sh\s+-l?c\s+(['"])([\s\S]*)\1\s*$/;
+
+/** The command inside one `bash -lc '…'` layer, or the command itself. */
+const innerCommand=command=>SHELL_WRAPPER.exec(command)?.[2]??command;
 
 /**
  * True only for ONE resolver invocation (after unwrapping one `bash -lc '…'` layer): no chaining, substitution or
@@ -119,46 +130,56 @@ function toolCalls(agent,events) {
  */
 function isSingleResolverCall(command) {
   if(command===undefined)return false;
-  const inner=/^\s*(?:\/bin\/)?(?:ba)?sh\s+-l?c\s+(['"])([\s\S]*)\1\s*$/.exec(command)?.[2]??command;
+  const inner=innerCommand(command);
   return inner.includes("rules.mjs")&&!/[;&|`$<>\r\n]/.test(inner);
 }
 
-const MOUNT_PREFIX=".agents/conventions/";
+const MOUNT=".agents/conventions";
 
-/** Each word of a shell command, quotes removed: the candidates for a path the command names. */
-const commandWords=command=>command.split(/[\s'"]+/).filter(Boolean);
+/** Each word of a shell command, a quoted run kept whole with its quotes removed: the candidates for a path. */
+const commandWords=command=>[...innerCommand(command).matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)].map(match=>match[1]??match[2]??match[3]);
 
-/** True when the call's path, or one word of its command, resolves to one of `files` inside the checkout. */
-function namesFile(call,files,repo) {
-  const candidates=call.path!==undefined?[call.path]:commandWords(call.command);
-  return candidates.some(word=>files.has(comparable(path.resolve(repo,word))));
+/** A shell command whose words a reader cannot resolve to fixed files: a variable, a glob or a substitution. */
+const DYNAMIC=/[$*?[`]/;
+
+/** The checkout file a word names, or undefined for a word no path can be made of (a NUL byte, say). */
+function resolvedIn(repo,word) {
+  try {return comparable(path.resolve(repo,word));}
+  catch {return undefined;}
 }
+
+/** Every checkout path the call names: its path, or each word of its command. Resolved once per call. */
+const targetsOf=(call,repo)=>(call.path!==undefined?[call.path]:commandWords(call.command)).map(word=>resolvedIn(repo,word)).filter(Boolean);
 
 /**
  * § 7 part 2 for "Claude / Codex from root": ENTRY and PROJECT read, and no rule body loaded by a second path — a
  * Read or Grep of a selected rule's source file, or a shell command naming it (CodeRabbit on #152, 2026-11-10).
  * Part 1 (allSourcesRead) proves the resolver delivered every body; this proves that delivery was the only one.
- * Paths count only when they resolve to THIS checkout's files. A shell command that reaches a selected rule's folder
- * without naming one file (a glob, a variable) cannot be classified: it is listed in `unclassified` and the
- * observable is not verified.
+ * Paths count only when they resolve to THIS checkout's files, and a read counts only when it did not fail. A body
+ * reached by a second path counts even from a failed call: a chained command can print it and still exit non-zero.
+ * A call that reaches a selected rule's folder, or a dynamic shell command that mentions the mount, without naming
+ * one rule file cannot be classified: it is listed in `unclassified` with its index, and the observable is not
+ * verified (the code round on this change).
  */
 function observableEvidence(calls,expected,origin) {
   const repo=origin?.repo??process.cwd();
-  const at=(...parts)=>comparable(path.resolve(repo,...parts));
-  const entryRead=calls.some(call=>namesFile(call,new Set([at(MOUNT_PREFIX,"ENTRY.md"),at("ENTRY.md")]),repo));
-  const projectRead=calls.some(call=>namesFile(call,new Set([at(".agents","PROJECT.md")]),repo));
+  const at=(...parts)=>resolvedIn(repo,path.join(...parts));
+  const targeted=calls.map(call=>({call,targets:targetsOf(call,repo)}));
+  const readOk=files=>targeted.some(({call,targets})=>!call.error&&targets.some(target=>files.has(target)));
+  const entryRead=readOk(new Set([at(MOUNT,"ENTRY.md"),at("ENTRY.md")]));
+  const projectRead=readOk(new Set([at(".agents","PROJECT.md")]));
+  const sources=expected.map(rule=>({id:rule.id,source:String(rule.source??"")})).filter(rule=>rule.source);
   const secondPathReads=[];
-  for(const rule of expected) {
-    const source=String(rule.source??"");
-    if(!source)continue;
-    const hit=calls.find(call=>namesFile(call,new Set([at(source)]),repo));
-    if(hit)secondPathReads.push({id:rule.id,via:hit.via});
+  for(const rule of sources) {
+    const file=at(rule.source);
+    const hit=targeted.find(({targets})=>targets.includes(file));
+    if(hit)secondPathReads.push({id:rule.id,via:hit.call.via});
   }
-  const ruleFolders=[...new Set(expected.map(rule=>path.posix.dirname(String(rule.source??""))).filter(folder=>folder&&folder!=="."))];
-  const named=new Set(expected.map(rule=>at(String(rule.source??""))));
-  const unclassified=calls.filter(call=>call.command!==undefined
-    &&ruleFolders.some(folder=>call.command.includes(folder))
-    &&!commandWords(call.command).some(word=>named.has(comparable(path.resolve(repo,word))))).map(call=>call.command);
+  const ruleFiles=new Set(sources.map(rule=>at(rule.source)));
+  const ruleFolders=new Set(sources.map(rule=>path.posix.dirname(rule.source)).filter(folder=>folder!==".").map(folder=>at(folder)));
+  const unclassified=targeted.filter(({call,targets})=>!targets.some(target=>ruleFiles.has(target))
+    &&(targets.some(target=>ruleFolders.has(target))||(call.command!==undefined&&DYNAMIC.test(innerCommand(call.command))&&call.command.includes(MOUNT))))
+    .map(({call})=>({index:call.index,command:call.command??call.path}));
   return {entryRead,projectRead,secondPathReads,unclassified,
     verified:entryRead&&projectRead&&secondPathReads.length===0&&unclassified.length===0};
 }

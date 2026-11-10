@@ -729,6 +729,35 @@ test("ENTRY and PROJECT count only when the path is this checkout's own file",()
 test("a shell command that reaches a rule folder without naming one file is unclassified, and the observable is not verified",()=>{
   const e=traceEvidence("codex",codexTrace([codexCmd("/bin/bash -lc 'cat .agents/conventions/common/*.md'","…")]),[obsRule],obsOrigin);
   assert.deepEqual(e.observable.secondPathReads,[]);
-  assert.deepEqual(e.observable.unclassified,["/bin/bash -lc 'cat .agents/conventions/common/*.md'"]);
+  assert.deepEqual(e.observable.unclassified.map(u=>u.command),["/bin/bash -lc 'cat .agents/conventions/common/*.md'"]);
+  assert.equal(e.observable.verified,false);
+});
+
+// ---- the code round on this change (2026-11-10), red first ----
+test("a Read that failed is not a read: ENTRY and PROJECT count only when the tool result is not an error",()=>{
+  const failed=[claudeTool("r1","Read",{file_path:path.resolve(".agents/conventions/ENTRY.md")}),{type:"user",message:{content:[{type:"tool_result",tool_use_id:"r1",is_error:true,content:"ENOENT"}]}},
+    claudeTool("r2","Read",{file_path:path.resolve(".agents/PROJECT.md")}),claudeResult("r2","project"),
+    claudeTool("r3","Bash",{command:obsRead}),claudeResult("r3",obsPayload),{type:"result",subtype:"success",is_error:false,result:"done"}];
+  const e=traceEvidence("claude",failed.map(x=>JSON.stringify(x)).join("\n"),[obsRule],obsOrigin);
+  assert.deepEqual([e.observable.entryRead,e.observable.projectRead,e.observable.verified],[false,true,false]);
+});
+
+test("a variable or a glob over the mount cannot be classified, and the observable is not verified",()=>{
+  const e=traceEvidence("codex",codexTrace([codexCmd("/bin/bash -lc 'cat \"$RULES/sample.md\" .agents/conventions/x'","…")]),[obsRule],obsOrigin);
+  assert.equal(e.observable.unclassified.length,1);
+  assert.equal(e.observable.unclassified[0].index>=0,true,"the call is located by its index");
+  assert.equal(e.observable.verified,false);
+});
+
+test("a quoted path with spaces is one word, and a strange word never throws",()=>{
+  const repo=path.join(path.sep,"srv","my repo");
+  const origin={resolver:path.join(repo,".agents/conventions/tools/rules.mjs"),cwd:repo,repo};
+  const spaced=traceEvidence("codex",[codexCmd(`/bin/bash -lc 'cat "${path.join(repo,".agents/conventions/common/sample.md")}" "a\u0000b"'`,text),{type:"turn.completed"}].map(e=>JSON.stringify(e)).join("\n"),[obsRule],origin);
+  assert.deepEqual(spaced.observable.secondPathReads,[{id:"common.sample",via:"shell"}]);
+});
+
+test("a Grep over a selected rule's folder names no file and is unclassified",()=>{
+  const e=traceEvidence("claude",claudeTrace([claudeTool("r5","Grep",{pattern:"x",path:path.resolve(path.dirname(obsRule.source))}),claudeResult("r5","…")]),[obsRule],obsOrigin);
+  assert.deepEqual(e.observable.unclassified.map(u=>u.command),[path.resolve(path.dirname(obsRule.source))]);
   assert.equal(e.observable.verified,false);
 });
