@@ -482,3 +482,20 @@ test('a relative link reached through a symlinked folder resolves from that fold
   assert.equal(fs.existsSync(path.join(base, 'real', 'settings.json')), true, 'the real target was not written');
   assert.equal(fs.existsSync(path.join(base, 'settings.json')), false, 'a file was written next to the alias');
 });
+
+test('repairRegistration resolves the same relative link from the real folder', t => {
+  const s = sandbox(t);
+  const base = path.dirname(s.home);
+  const realDir = path.join(base, 'real', 'dir');
+  fs.mkdirSync(realDir, { recursive: true });
+  const alias = path.join(base, 'alias');
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  try {
+    fs.symlinkSync(realDir, alias);
+    fs.symlinkSync('../settings.json', path.join(realDir, 'mid'));
+    fs.symlinkSync(path.join(alias, 'mid'), s.paths.settings);
+  } catch (error) { return t.skip(`no symlink here (${error.code})`); }
+  assert.equal(repairRegistration({ home: s.home }).code, 0);
+  assert.equal(fs.existsSync(path.join(base, 'real', 'settings.json')), true);
+  assert.equal(fs.existsSync(path.join(base, 'settings.json')), false);
+});
