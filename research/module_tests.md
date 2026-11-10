@@ -180,7 +180,9 @@ on an unclosed quote, 647 ms at 24 characters), and a POSIX shell's `-c` takes o
 symlink whose target does not exist yet stays a link while its target is created. The linear-pattern case measures CPU
 time, not the clock, so a parked runner cannot fail it. CodeRabbit on coai #969 added two more, red first: a CHAIN of links
 ending in a missing file keeps every link and creates the last target (a one-level read replaced the middle link), and a
-link loop is refused before the backup, manifest, hook or settings are written.
+link loop is refused before the backup, manifest, hook or settings are written. A 41-link acyclic chain is refused the same way. CodeRabbit on
+#149: `uninstall` resolves the target only when it writes settings.json, so a loop does not stop it removing the hook
+and manifest and writing the opt-out marker (red first).
 
 `tools/load-instructions-hook.test.mjs` (4 cases, 2026-11-10) drives `sessionInstructions` of
 `settings/hooks/load-instructions.mjs` against fake self-hosted layouts: the bound is at most 30 s, a resolver that

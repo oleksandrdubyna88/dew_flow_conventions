@@ -447,3 +447,19 @@ test('an acyclic chain longer than 40 links is refused like a loop, before anyth
   assert.equal(fs.existsSync(s.paths.hook), false);
   assert.equal(fs.existsSync(path.join(dotfiles, 'missing.json')), false);
 });
+
+// CodeRabbit on #149 (2026-11-10), red first: uninstall writes settings.json only when it holds our entry, which a loop
+// never does (it reads as no file) — so a loop must not stop it removing the hook, the manifest and writing the marker.
+test('uninstall still removes the hook and writes the opt-out marker when settings.json is a link loop', t => {
+  const s = sandbox(t);
+  fs.mkdirSync(path.dirname(s.paths.hook), { recursive: true });
+  fs.copyFileSync(s.source, s.paths.hook);
+  fs.writeFileSync(s.paths.manifest, '{}');
+  const other = path.join(s.paths.dir, 'loop.json');
+  try { fs.symlinkSync(other, s.paths.settings); fs.symlinkSync(s.paths.settings, other); } catch (error) { return t.skip(`no symlink here (${error.code})`); }
+  const r = uninstall({ home: s.home });
+  assert.equal(r.code, 0, r.lines.join('\n'));
+  assert.equal(fs.existsSync(s.paths.hook), false);
+  assert.equal(fs.existsSync(s.paths.optout), true);
+  assert.equal(fs.lstatSync(s.paths.settings).isSymbolicLink(), true);
+});

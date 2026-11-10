@@ -313,14 +313,16 @@ export function uninstall({ home, beforeWrite = () => {} }) {
   const original = readOrNull(t.settings);
   const parsed = parseSettings(original);
   if (parsed.error) return unparsable(t.settings, parsed.error);
-  const target = settingsFileOf(t.settings);
-  if (target.refusal) return result(1, [target.refusal]);
   const present = findEntries(parsed.settings, t.hook).length > 0;
   const hookThere = fs.existsSync(t.hook);
   const markOptout = () => { writeAtomic(t.optout, OPTOUT_TEXT); return `wrote the opt-out marker ${t.optout}`; };
   if (!present && !hookThere && !fs.existsSync(t.manifest)) return result(0, ['not installed', markOptout()]);
   const lines = [];
   if (present) {
+    // The target only matters when settings.json is written, which needs our entry in it. A loop reads as no file,
+    // so it never gets here, and it does not stop the hook, manifest and marker steps below (CodeRabbit on #149).
+    const target = settingsFileOf(t.settings);
+    if (target.refusal) return result(1, [target.refusal]);
     lines.push(`backup ${writeBackup(t.settings, original, modeOf(t.settings))}`);
     beforeWrite();
     if (!sameBytes(readOrNull(t.settings), original)) return result(1, [CHANGED]);
