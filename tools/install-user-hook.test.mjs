@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { ensureUserGuard } from '../settings/hooks/ensure-user-guard.mjs';
-import { drift, findEntries, install, mergeEntry, removeEntry, targets } from '../settings/hooks/lib/user-guard-install.mjs';
+import { drift, findEntries, install, mergeEntry, removeEntry, repairRegistration, targets, uninstall } from '../settings/hooks/lib/user-guard-install.mjs';
 import { ownedDir } from './lib/owned.mjs';
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'install-user-hook.mjs');
@@ -348,4 +348,57 @@ test('--check says a malformed modelSettings needs a manual repair, not that the
   const out = `${r.stdout}${r.stderr}`;
   assert.match(out, /effort: needs a manual repair — modelSettings\.sonnet is not an object; set it to \{"effortLevel": "high"\}/);
   assert.doesNotMatch(out, /self-install converges/);
+});
+
+// ---- CodeRabbit on creds #328 (2026-11-10): install, repairRegistration and uninstall replaced a symlinked
+// settings.json with a plain file and wrote it (and its backup) with the default mode. applyEffort already followed
+// the link and kept the mode; now all four writes share that. Each case was red first. ----
+const OPERATIONS = {
+  install: s => install({ home: s.home, source: s.source }),
+  repairRegistration: s => repairRegistration({ home: s.home }),
+  uninstall: s => { install({ home: s.home, source: s.source }); return uninstall({ home: s.home }); },
+};
+
+for (const [name, operation] of Object.entries(OPERATIONS)) {
+  test(`${name} writes through a symlinked settings.json and keeps the link`, t => {
+    const s = sandbox(t);
+    const dotfiles = path.join(path.dirname(s.home), 'dotfiles');
+    fs.mkdirSync(dotfiles);
+    const real = path.join(dotfiles, 'settings.json');
+    fs.writeFileSync(real, '{"model":"opus"}\n');
+    fs.mkdirSync(s.paths.dir, { recursive: true });
+    try { fs.symlinkSync(real, s.paths.settings); } catch (error) { return t.skip(`no symlink here (${error.code})`); }
+    assert.equal(operation(s).code, 0);
+    assert.equal(fs.lstatSync(s.paths.settings).isSymbolicLink(), true, 'the link was replaced by a plain file');
+    assert.equal(JSON.parse(fs.readFileSync(real, 'utf8')).model, 'opus', 'the dotfiles copy is the one that was written');
+  });
+
+  test(`${name} keeps settings.json's mode, and its backup has the same mode`, { skip: process.platform === 'win32' ? 'no POSIX modes' : false }, t => {
+    const s = sandbox(t);
+    s.writeSettings({ model: 'opus' });
+    fs.chmodSync(s.paths.settings, 0o600);
+    assert.equal(operation(s).code, 0);
+    assert.equal(fs.statSync(s.paths.settings).mode & 0o777, 0o600);
+    for (const backup of s.backups()) assert.equal(fs.statSync(path.join(s.paths.dir, backup)).mode & 0o777, 0o600, backup);
+  });
+}
+
+// ---- CodeRabbit on #148 (2026-11-10), each red first ----
+test('a 0644 settings.json stays 0644 under a strict umask: the mode is set, not left to the umask', { skip: process.platform === 'win32' ? 'no POSIX modes' : false }, t => {
+  const s = sandbox(t);
+  s.writeSettings({ model: 'opus' });
+  fs.chmodSync(s.paths.settings, 0o644);
+  const before = process.umask(0o077);
+  try { assert.equal(install({ home: s.home, source: s.source }).code, 0); } finally { process.umask(before); }
+  assert.equal(fs.statSync(s.paths.settings).mode & 0o777, 0o644);
+});
+
+test('a settings.json symlink whose target does not exist yet stays a link, and its target is created', t => {
+  const s = sandbox(t);
+  const real = path.join(path.dirname(s.home), 'dotfiles', 'settings.json');
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  try { fs.symlinkSync(real, s.paths.settings); } catch (error) { return t.skip(`no symlink here (${error.code})`); }
+  assert.equal(install({ home: s.home, source: s.source }).code, 0);
+  assert.equal(fs.lstatSync(s.paths.settings).isSymbolicLink(), true, 'the dangling link was replaced by a plain file');
+  assert.deepEqual(findEntries(JSON.parse(fs.readFileSync(real, 'utf8')), s.paths.hook).length, 1);
 });

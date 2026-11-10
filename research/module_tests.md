@@ -168,6 +168,17 @@ a leading assignment — where the old append put it inside a trailing comment (
 #147 added one case (red first): a verb inside an assignment's value (`BUILDER=msbuild dotnet build`) is skipped,
 and `dotnet.cmd` / `dotnet.bat` are matched as `executableName` reads them. `--check` also names an install cut short
 after its manifest (the hook still holds the manifest's `previous`) as unfinished, not as an edit (one case, red first).
+CodeRabbit on creds #328 and coai #968 (2026-11-10) added two more build-flags cases and six installer cases, all red
+first: a quoted assignment value (`BUILDER="msbuild" dotnet build`) is skipped when the suggestion is placed; a
+wrapper's inner command line is split into its chain (`bash -c "cd src && dotnet build"` is refused, a neighbour's
+`-m:4` vouches for nothing); and `install`, `repairRegistration` and `uninstall` each write through a symlinked
+`settings.json` without replacing the link, and keep its mode (0600) for the file and its backup. The code round of
+the same day added two, red first: the assignment-prefix pattern is linear (its first form backtracked exponentially
+on an unclosed quote, 647 ms at 24 characters), and a POSIX shell's `-c` takes one argument as its command, so
+`bash -c 'dotnet build' -m:4` is refused (`-m:4` there is `$0`). CodeRabbit on #148 added two installer cases, red first: a
+0644 `settings.json` stays 0644 under umask 0077 (the temp file's mode is set with chmod, not left to the umask), and a
+symlink whose target does not exist yet stays a link while its target is created. The linear-pattern case measures CPU
+time, not the clock, so a parked runner cannot fail it.
 
 `tools/load-instructions-hook.test.mjs` (4 cases, 2026-11-10) drives `sessionInstructions` of
 `settings/hooks/load-instructions.mjs` against fake self-hosted layouts: the bound is at most 30 s, a resolver that
