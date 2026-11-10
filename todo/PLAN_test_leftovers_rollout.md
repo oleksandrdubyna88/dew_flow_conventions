@@ -1,6 +1,8 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 8 open (2026-11-07), approved by the reviewers after the re-review (`Narrowed: no`); entry 8.1 recorded 2026-11-10 (E2.4.S3: D5's check and naming step and a failed command substitution), so the next accepted change is the eighth full stop.** Epoch 7 stopped at entries 7.1 and 7.2; the whole plan was revised (§ *Epoch 8*): D5 by option B, observed acceptance results for every remaining epic, the Windows exception restated by its true condition (a process whose new files are owned by Administrators); the Opus judge sorted epoch 7's work (fits, two cuts fixed forward, outside rows; coai #962 merged during the stop and is reported to the owner); the plan gate on an operative extract (sessions `39432dd3`, `6f58dbce`) and an independent Opus review passed. Epoch 8 starts at 0 changes.
+> Status: **epoch 8 open (2026-11-07), approved by the reviewers after the re-review (`Narrowed: no`); one change recorded, entry 8.1 (2026-11-10), so the next accepted change is the eighth full stop. E2 (creds) is COMPLETE, 2026-11-10.** Its five producer PRs are merged on creds `main`: E2.1 #294 (`834c91b`), E2.2 #310 (`bf59e4f`), E2.3 #311 (`0ae0211`), E2.4 #329 (`6e08071`, 2026-11-10) and E2.5 #330 (`b6cc6b3`, 2026-11-10 19:48 UTC). E2.5 switched on both repository guards: the shipped Node guard in creds' `docs.yml` is clean over 640 files, and the copied C# guard is green on all OS legs. Exemption markers are only on the inventoried lines. Creds' mount moved to `.agents/conventions` (#328) and is pinned at release `1341995` (#340). Epoch 8 used one change only, entry 8.1. E2's progress is not a change, so it has no ledger entry; creds' build records give the reasons why nothing else was counted. E2's rows and Definition of Done parts: § *Epoch 8* item 3.3. Still open in this plan: E5.S7, E6, E7, the feature reviews (E2's stories document's review is now due, § *Epoch 8* item 5, point 2) and the promotion. Creds' notes N20–N25 and its side findings (`release.yml`'s publish from any branch; two product scripts' temp leaks) are carried to the follow-ups as F33–F40.
+>
+> Was: Status: **epoch 8 open (2026-11-07), approved by the reviewers after the re-review (`Narrowed: no`); entry 8.1 recorded 2026-11-10 (E2.4.S3: D5's check and naming step and a failed command substitution), so the next accepted change is the eighth full stop.** Epoch 7 stopped at entries 7.1 and 7.2; the whole plan was revised (§ *Epoch 8*): D5 by option B, observed acceptance results for every remaining epic, the Windows exception restated by its true condition (a process whose new files are owned by Administrators); the Opus judge sorted epoch 7's work (fits, two cuts fixed forward, outside rows; coai #962 merged during the stop and is reported to the owner); the plan gate on an operative extract (sessions `39432dd3`, `6f58dbce`) and an independent Opus review passed. Epoch 8 starts at 0 changes.
 >
 > Was: Status: **stopped for re-review (2026-11-07): entry 7.2 (E2.4: D5's names cannot pass the released guard), the second accepted change of epoch 7, the seventh full stop.** No new code on any epic of this plan and no merge of a pull request carrying its work until the full re-review is complete; when its record says `Narrowed: yes`, the owner approves the revised plan; then epoch 8 opens. At the stop: E2.1, E2.2, E2.3 merged (creds #294, #310, #311); coai E5's producer merged (#945); E2.4 drafted, nothing built. The whole plan is revised for epoch 8 (2026-11-07, step 4 of the full stop): § *Epoch 8 — the plan as revised at the re-review*. Entry 7.2 is settled by option (B), and its record says `Narrowed: no`; the record's verdicts are the Opus judge's (step 5), and epoch 8 opens only after the re-review approves.
 >
@@ -680,6 +682,15 @@ find nothing of the caller's scope with a `gone` record.
       checkout that holds it, before this plan is promoted.
 - [ ] This plan is promoted to `research/` with its deviations, together with the stories documents of E2–E7 in their
       repositories, and the remainder plan's R6 is ticked.
+
+*2026-11-10, E2's part (no box above is E2's alone, so none is ticked).* Creds holds the first three boxes: its tests,
+scripts and CI make only owner-form resources or carry an inventoried exemption, and both guards run in its CI with no
+finding (E2.5 #330: the Node guard clean over 640 files, the C# guard green on all OS legs). Its producer stage merged as
+five gated PRs (entry 1.6), and each pin bump merged as a PR of its own (#287, #289, #292, #293, #297, #306, #340). The hand
+clean-up of E2's old names is recorded per machine for each of the five PRs (creds' E2.5 build record, the D8 table,
+column (d)). E2.2 to E2.5 each recorded the invocation inventory in their brief (E2.2, E2.3 and E2.4 § 2; E2.5 § 3). F3
+was pinned in creds (#297, release `bd79584`) before E2.5's declaration; the box also names E5's producer PR, which is
+not read again here. The details: § *Epoch 8* item 3.3.
 
 ## The merged core revises E1 first (2026-10-21)
 
@@ -2452,6 +2463,34 @@ All read-only, 2026-11-07, in a scratch folder. The guard is `37b9aa5`'s, from `
 Not measured here, and why: anything with Docker (no `docker` binary on this machine), the C# wrappers (no .NET run),
 Windows, macOS.
 
+#### 3.3 E2's rows at E2's end (2026-11-10; a progress record, not a change)
+
+E2 is complete: E2.4 #329 (`6e08071`) and E2.5 #330 (`b6cc6b3`) merged on 2026-11-10, after E2.1 #294, E2.2 #310 and
+E2.3 #311. The table above stays as it was observed for this revision. This table records each E2 row's result, read
+from creds' `todo/PLAN_test_leftovers_E2.md` (its build records) and `todo/PLAN_test_leftovers_E2.4_brief.md`, both on
+creds `main` at `b6cc6b3` **[D]**. "Part" means a part of creds' E2.4 build record.
+
+| Row | Result | Evidence (creds) |
+|---|---|---|
+| E2.4-a | done | part 3, S3.0: the shipped guard gives 0 findings in `docker.yml` (6 before). Merged in #329 |
+| E2.4-b | done | part 3, item 3 (b): `dockerSmokeLeftovers.test.ts` runs the remover's body under `bash -eo pipefail` with a stub `docker`; RED with the first `\|\| true` taken out (1 removal call, exit 1) |
+| E2.4-k | done | part 3, item 3 (k): the check fails and names what is left; RED with the check's last line made `true`, and with one volume left out of the remover. Hosted: G3, run 42738357610: the check failed with `left after removal: refused refused-data refused-logs`, and `Publish` was skipped |
+| E2.4-c | done | the E2.4 brief, § *Observations before the plan gate* (2026-11-08, runs 42415388093 and 42416565709): `uid=1001(runner)`. Part 3, item 3 (c): RED with the uid check deleted. Part 2d: the real `docker.yml` dispatch on PR #329's head, run 42744213082, printed `runner uid: 1001` |
+| E2.4-d | done | part 3, *Hosted evidence of S3*: R 42735252947 (the old shape: failure, `cv` left); G1 42735352830 and G2 42735473885 (the smoke failed, the remover and the check `success`, `Publish` skipped); S3.2 42735590128 (the PR branch green, the check `success`). The record says "Row E2.4-d is met" |
+| E2.4-e | done | part 1: T2, T13, T15 and T16 on Linux (bash 5.3.9); the shipped janitor and the mounted Node sweep collect the dead record. RED by hand with `owned_owner` without `:<start>:<ns>` (the janitor: "liveness unknown … the record names no pid namespace") |
+| E2.4-f | done | the E2.4 brief, § *Observations before the plan gate* (2026-11-08): the kill on the named-volume shape; the next run's janitor removed each resource; the three listings filtered by the compose project were empty. Again on the built code, part 2c, run 42738732851: `project volumes: 4 (expected 4), a wrong label: 0`, `KILLED run 1; wait status 137`, run 2's janitor `removed volume …`, `ALL ISSUANCE CHECKS PASSED` |
+| E2.4-g | done (quoted 2026-11-10 by the coordinator) | From the Windows leg of `ci-clients.yml` on #329's final head `fe27bea` (run 42776745568, job 129696911480), step *Self-test the shell helper*: `ok   T13/T14 the Node sweep lists unverified: (F16)`, `ok   T13/T14 the Node sweep removed nothing`, and the janitor's dry run `would run: rm -f -- /tmp/testsToDelete-w1833818394-creds-selftest-66e02999/t13/testsToDelete-w1833818394-creds-x-4ff4417e.owner` with `ok   T13/T14 the janitor says it is a dry run`. The janitor names a removal only for an entry its `[ -O ]` test says is the caller's, so this line IS the runner's `[ -O ]` outcome: true (the runner's new files are its own, not `Administrators`', so F31's case did not arise there). Was: not marked done (the quotes were missing from creds' record). |
+| E2.4-h | done | part 4: the `acmeRunLeftovers` rules of E2.4-h; RED with `PROJECT=acme` (`E2.4-h: PROJECT is assigned once, from the owned folder's name…`) |
+| E2.4-i | done | part 1: `owned.sh` and `owned.test.sh`, cases T1 to T21; the kill-between cases RED by hand (T4, T13), and the squatter (T8) |
+| E2.4-j | done | part 2: S2.1 to S2.7, RED then GREEN (a stubbed failing `chmod`; INT, TERM and HUP give 130, 143 and 129 with the root empty; the nine worlds `after: 9` then `after: 0`). The guard went from 16 to 11 findings; the five shell `raw-temp` lines are gone |
+| E2-d | done | the E2.5 build record, *The merge conditions (a)–(d) of D8, collected from the five pull requests*, column (d): one record for each of the five PRs (the WSL machine; the owner's Windows machine does not test creds) |
+| E2.5-a | done | the E2.5 build record, RED list item 7: `leftovers-check: 5 finding(s)`, then `clean (622 files)` with five markers on the five inventoried lines; on the merged head `clean (640 files)`. Item 11 and `leftoversGuardFixtures.test.ts`: the F30 plants are positive tests, each RED by hand against a copy of the guard |
+| E2.5-b | done | the E2.5 build record, RED list item 12 (S2.8): `git grep -n -E 'creds-mcp-listen-smoke-\|creds-version-smoke-' -- . ':!todo' ':!research'` gives no output, because E2.5 renamed the two given-root leaves (Q5 (C)). The check holds as written |
+| E2.5-c | done | the E2.5 build record, RED list item 5 and review fix 2: the split `.cs` case is red when the folded reading is taken out. *The hosted evidence*, E2.5-R1 (run 42790950851): the tests with `LeftoversRepositoryGuardTests`, 626 total and 0 failed, on all six `cli-binaries` legs |
+
+Two E2 items stay open in this plan: ~~row E2.4-g's quote (above)~~ (quoted 2026-11-10), and E2's feature review (item 5, point 2), which is
+due now.
+
 ### 4. The dispositions of entries 7.1 and 7.2
 
 **4.1 Entry 7.1 — kept as built.** The shared harness exit module is merged in E2.2 (#310). Nothing of it is narrowed.
@@ -2522,6 +2561,9 @@ THEN   wave 3: E6 ∥ E7. Benchmark's boundary row is merged (#177). Each storie
        (E6 and E7 read their old drafts as material, not as approved text) and opens with item 3's rows, observed at its pin.
 LAST   the feature reviews (below); the promotion of this plan and its stories documents; R6 ticked in the remainder plan.
 ```
+
+*Progress, 2026-11-10 (not a change):* the creds line of THEN is done. E2.4 merged as #329 (`6e08071`) and E2.5 as #330
+(`b6cc6b3`); E2's rows are in item 3.3. Next for E2: its feature review (point 2 below).
 
 **The feature reviews.** The tool reviews ONE checkout (item 3, row F). So:
 
@@ -2740,6 +2782,12 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
   document has the same two gaps as E5's (its D9 row 2 assumes the shipped Node guard folds — it does not, F30; its DoD
   still says "a byte copy"), and its S4 bash scripts have the trap-order class of § Epoch 6 condition (p). What its
   revision must say is § Epoch 6, item 8.3; each E2.2–E2.5 brief opens with the table of § Epoch 6, item 3.
+  *Epoch 8 (2026-11-10): COMPLETE.* The five producer PRs are merged: E2.1 #294 (`834c91b`), E2.2 #310 (`bf59e4f`), E2.3
+  #311 (`0ae0211`), E2.4 #329 (`6e08071`) and E2.5 #330 (`b6cc6b3`). Both guards run in creds' CI; creds' mount is
+  `.agents/conventions` (#328), pinned at release `1341995` (#340). The rows: § *Epoch 8* item 3.3 (E2.4-g's quote added
+  2026-11-10, run 42776745568). Still to do: E2's feature review (§ *Epoch 8* item 5) and the promotion with this plan. Creds' notes for the
+  parent N20–N25 are carried to the follow-ups as F33–F38, and its side findings as F39 (`release.yml`) and F40 (two
+  product scripts).
 - **Repository:** `dew_flow_creds_for_devs`. **Stories:** `dew_flow_creds_for_devs · todo/PLAN_test_leftovers_E2.md`. Depends on E1.
 - **Goal.** Every temp site goes through the helper; the acme state and the stub files are removed by the run that
   made them; and the CI smoke follows the E1 carve-out. On the GitHub-hosted runner the workflow uses
