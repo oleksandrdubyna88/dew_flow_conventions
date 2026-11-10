@@ -50,9 +50,13 @@ are separate evidence; the final answer still needs behavioral review. Since 202
 `observable`, part 2 of the plan's § 7 pass condition for "Claude / Codex from root": `entryRead` and `projectRead`
 (a Read, Grep or shell command of `ENTRY.md` and `.agents/PROJECT.md`), `secondPathReads` (any selected rule's source
 opened directly rather than through the resolver, with the tool that did it), and `verified` when both files were
-read and nothing came by a second path. Paths count only when they resolve to this checkout's own files; only a
-single resolver invocation is the first path (a chained command is scanned); a shell command that reaches a selected
-rule's folder without naming one file goes to `unclassified`, which also blocks `verified`. The `status` string is
+read and nothing came by a second path. Paths count only when they resolve to this checkout's own files, and a read
+counts only when it did not fail (a Claude tool_result with `is_error`, a Codex non-zero exit, or a Codex command that
+started and never completed); a second-path body counts even from a failed call. Only one run of this run's resolver
+by node is the first path (a chained command, or one that merely mentions `rules.mjs`, is scanned). A call that
+reaches a selected rule's folder, or a dynamic shell command (variable, glob, substitution) that mentions the mount,
+a rule's file name or a rule folder, without naming one rule file goes to `unclassified` as `{index, via, target}`,
+which also blocks `verified`: a false "verified" is worse than a false "not verified". The `status` string is
 unchanged; part 1 is `allSourcesRead`. The latest result
 per agent is stored atomically in Git metadata, with two fixed 32 KiB slots. Full model traces
 are captured only in memory, limited to 8 MiB (`INSPECT_TRACE_MAX_BYTES`, the behaviour fixtures' cap; 256 KiB

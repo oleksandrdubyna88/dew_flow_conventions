@@ -92,15 +92,23 @@ function claudeEvents(events,capture) {
 
 /**
  * Every file-touching call of the trace, in order, each with its index and whether it failed: Claude's Read, Grep
- * and Bash tool uses (failed = its tool_result says is_error), Codex's shell commands (failed = a non-zero exit).
- * The resolver's own invocations are left out, since they ARE the first path.
+ * and Bash tool uses (failed = its tool_result says is_error), Codex's shell commands (failed = a non-zero exit, or
+ * started and never completed). The resolver's own single invocations are left out, since they ARE the first path.
  */
-function toolCalls(agent,events) {
-  const calls=[],failedIds=new Set();
+function toolCalls(agent,events,origin) {
+  const calls=[],failedIds=new Set(),codexById=new Map();
   for(const event of events) {
     if(agent==="codex") {
       const item=event.item;
-      if(event.type==="item.completed"&&item?.type==="command_execution")calls.push({via:"shell",command:String(item.command??""),error:item.exit_code!==0});
+      if(item?.type!=="command_execution"||!["item.started","item.completed"].includes(event.type))continue;
+      const completed=event.type==="item.completed";
+      const call={via:"shell",command:String(item.command??""),error:!completed||item.exit_code!==0};
+      const known=item.id!==undefined?codexById.get(item.id):undefined;
+      if(known!==undefined)calls[known]=call;
+      else {
+        if(item.id!==undefined)codexById.set(item.id,calls.length);
+        calls.push(call);
+      }
       continue;
     }
     if(event.type==="user") {
@@ -116,7 +124,7 @@ function toolCalls(agent,events) {
     }
   }
   return calls.map((call,index)=>({...call,index,error:call.error??failedIds.has(call.id)}))
-    .filter(call=>!isSingleResolverCall(call.command));
+    .filter(call=>!isSingleResolverCall(call.command,origin));
 }
 
 const SHELL_WRAPPER=/^\s*(?:\/(?:usr\/)?bin\/)?(?:ba)?sh\s+-l?c\s+(['"])([\s\S]*)\1\s*$/;
@@ -125,13 +133,17 @@ const SHELL_WRAPPER=/^\s*(?:\/(?:usr\/)?bin\/)?(?:ba)?sh\s+-l?c\s+(['"])([\s\S]*
 const innerCommand=command=>SHELL_WRAPPER.exec(command)?.[2]??command;
 
 /**
- * True only for ONE resolver invocation (after unwrapping one `bash -lc '…'` layer): no chaining, substitution or
- * redirection. A command that also does something else is scanned like any other (the plan round on this change).
+ * True only for ONE run of THIS run's resolver by node (after unwrapping one `bash -lc '…'` layer): no chaining,
+ * substitution or redirection. Anything else, a command that only mentions rules.mjs included, is scanned like any
+ * other (the plan round and the second code round on this change). Without an origin nothing is left out.
  */
-function isSingleResolverCall(command) {
-  if(command===undefined)return false;
+function isSingleResolverCall(command,origin) {
+  if(command===undefined||!origin?.resolver)return false;
   const inner=innerCommand(command);
-  return inner.includes("rules.mjs")&&!/[;&|`$<>\r\n]/.test(inner);
+  if(/[;&|`$<>()\r\n]/.test(inner))return false;
+  const args=words(inner.trim());
+  if(args.length<2||!["node","node.exe"].includes(path.basename(args[0].replaceAll("\\","/")).toLowerCase()))return false;
+  return resolvedIn(origin.cwd??origin.repo??process.cwd(),args[1])===comparable(path.resolve(origin.resolver));
 }
 
 const MOUNT=".agents/conventions";
@@ -140,16 +152,36 @@ const MOUNT=".agents/conventions";
 const commandWords=command=>[...innerCommand(command).matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)].map(match=>match[1]??match[2]??match[3]);
 
 /** A shell command whose words a reader cannot resolve to fixed files: a variable, a glob or a substitution. */
-const DYNAMIC=/[$*?[`]/;
+const DYNAMIC=/[$%*?[`]/;
 
-/** The checkout file a word names, or undefined for a word no path can be made of (a NUL byte, say). */
+/** The checkout file a word names, or undefined for a word no path can be made of. */
 function resolvedIn(repo,word) {
-  try {return comparable(path.resolve(repo,word));}
-  catch {return undefined;}
+  if(typeof word!=="string"||word.includes("\0"))return undefined;
+  return comparable(path.resolve(repo,word));
 }
 
-/** Every checkout path the call names: its path, or each word of its command. Resolved once per call. */
-const targetsOf=(call,repo)=>(call.path!==undefined?[call.path]:commandWords(call.command)).map(word=>resolvedIn(repo,word)).filter(Boolean);
+/** Every checkout path the call names: its path, or each word of its command. Resolved once per call, as a set. */
+const targetsOf=(call,repo)=>new Set((call.path!==undefined?[call.path]:commandWords(call.command)).map(word=>resolvedIn(repo,word)).filter(Boolean));
+
+const escaped=text=>text.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+
+/**
+ * True when a dynamic command could reach a selected rule: with `/` for every separator, it mentions the mount, a
+ * rule's file name, or a rule folder's last segment next to a slash. Fails closed for the source repository too,
+ * which has no mount (the second code round on this change).
+ */
+function mentionsRules(command,sources) {
+  const flat=innerCommand(command).replaceAll("\\","/");
+  if(flat.includes(MOUNT))return true;
+  const edge="(?:^|$|[^\\w.-])";
+  return sources.some(({source})=>{
+    const name=escaped(path.posix.basename(source));
+    const folder=path.posix.dirname(source);
+    const segment=folder!=="."&&escaped(path.posix.basename(folder));
+    return new RegExp(`(?:^|[^\\w.-])${name}(?:$|[^\\w.-])`).test(flat)
+      ||(!!segment&&new RegExp(`${edge}${segment}/|/${segment}${edge}`).test(flat));
+  });
+}
 
 /**
  * § 7 part 2 for "Claude / Codex from root": ENTRY and PROJECT read, and no rule body loaded by a second path — a
@@ -157,29 +189,29 @@ const targetsOf=(call,repo)=>(call.path!==undefined?[call.path]:commandWords(cal
  * Part 1 (allSourcesRead) proves the resolver delivered every body; this proves that delivery was the only one.
  * Paths count only when they resolve to THIS checkout's files, and a read counts only when it did not fail. A body
  * reached by a second path counts even from a failed call: a chained command can print it and still exit non-zero.
- * A call that reaches a selected rule's folder, or a dynamic shell command that mentions the mount, without naming
- * one rule file cannot be classified: it is listed in `unclassified` with its index, and the observable is not
- * verified (the code round on this change).
+ * A call that reaches a selected rule's folder, or a dynamic shell command that could reach a selected rule (see
+ * mentionsRules), without naming one rule file cannot be classified: it is listed in `unclassified` with its index,
+ * tool and target, and the observable is not verified (the two code rounds on this change).
  */
 function observableEvidence(calls,expected,origin) {
   const repo=origin?.repo??process.cwd();
   const at=(...parts)=>resolvedIn(repo,path.join(...parts));
   const targeted=calls.map(call=>({call,targets:targetsOf(call,repo)}));
-  const readOk=files=>targeted.some(({call,targets})=>!call.error&&targets.some(target=>files.has(target)));
-  const entryRead=readOk(new Set([at(MOUNT,"ENTRY.md"),at("ENTRY.md")]));
-  const projectRead=readOk(new Set([at(".agents","PROJECT.md")]));
-  const sources=expected.map(rule=>({id:rule.id,source:String(rule.source??"")})).filter(rule=>rule.source);
+  const readOk=files=>targeted.some(({call,targets})=>!call.error&&files.some(file=>targets.has(file)));
+  const entryRead=readOk([at(MOUNT,"ENTRY.md"),at("ENTRY.md")]);
+  const projectRead=readOk([at(".agents","PROJECT.md")]);
+  const sources=expected.map(rule=>({id:rule.id,source:String(rule.source??"").replaceAll("\\","/")})).filter(rule=>rule.source);
   const secondPathReads=[];
   for(const rule of sources) {
     const file=at(rule.source);
-    const hit=targeted.find(({targets})=>targets.includes(file));
+    const hit=targeted.find(({targets})=>targets.has(file));
     if(hit)secondPathReads.push({id:rule.id,via:hit.call.via});
   }
-  const ruleFiles=new Set(sources.map(rule=>at(rule.source)));
-  const ruleFolders=new Set(sources.map(rule=>path.posix.dirname(rule.source)).filter(folder=>folder!==".").map(folder=>at(folder)));
-  const unclassified=targeted.filter(({call,targets})=>!targets.some(target=>ruleFiles.has(target))
-    &&(targets.some(target=>ruleFolders.has(target))||(call.command!==undefined&&DYNAMIC.test(innerCommand(call.command))&&call.command.includes(MOUNT))))
-    .map(({call})=>({index:call.index,command:call.command??call.path}));
+  const ruleFiles=sources.map(rule=>at(rule.source));
+  const ruleFolders=sources.map(rule=>path.posix.dirname(rule.source)).filter(folder=>folder!==".").map(folder=>at(folder));
+  const unclassified=targeted.filter(({call,targets})=>!ruleFiles.some(file=>targets.has(file))
+    &&(ruleFolders.some(folder=>targets.has(folder))||(call.command!==undefined&&DYNAMIC.test(innerCommand(call.command))&&mentionsRules(call.command,sources))))
+    .map(({call})=>({index:call.index,via:call.via,target:call.command??call.path}));
   return {entryRead,projectRead,secondPathReads,unclassified,
     verified:entryRead&&projectRead&&secondPathReads.length===0&&unclassified.length===0};
 }
@@ -194,7 +226,7 @@ function decodedEvidence(agent,trace,expected,origin) {
   });
   return {completed,reads,sourceCalls,models,final:final.slice(0,12000),finalTruncated:final.length>12000,
     allSourcesRead:reads.length>0&&reads.every(rule=>rule.complete),
-    observable:observableEvidence(toolCalls(agent,events),expected,origin)};
+    observable:observableEvidence(toolCalls(agent,events,origin),expected,origin)};
 }
 
 export function traceEvidence(agent,trace,expected,origin) {

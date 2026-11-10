@@ -729,7 +729,7 @@ test("ENTRY and PROJECT count only when the path is this checkout's own file",()
 test("a shell command that reaches a rule folder without naming one file is unclassified, and the observable is not verified",()=>{
   const e=traceEvidence("codex",codexTrace([codexCmd("/bin/bash -lc 'cat .agents/conventions/common/*.md'","…")]),[obsRule],obsOrigin);
   assert.deepEqual(e.observable.secondPathReads,[]);
-  assert.deepEqual(e.observable.unclassified.map(u=>u.command),["/bin/bash -lc 'cat .agents/conventions/common/*.md'"]);
+  assert.deepEqual(e.observable.unclassified.map(u=>u.target),["/bin/bash -lc 'cat .agents/conventions/common/*.md'"]);
   assert.equal(e.observable.verified,false);
 });
 
@@ -758,6 +758,41 @@ test("a quoted path with spaces is one word, and a strange word never throws",()
 
 test("a Grep over a selected rule's folder names no file and is unclassified",()=>{
   const e=traceEvidence("claude",claudeTrace([claudeTool("r5","Grep",{pattern:"x",path:path.resolve(path.dirname(obsRule.source))}),claudeResult("r5","…")]),[obsRule],obsOrigin);
-  assert.deepEqual(e.observable.unclassified.map(u=>u.command),[path.resolve(path.dirname(obsRule.source))]);
+  assert.deepEqual(e.observable.unclassified.map(u=>u.target),[path.resolve(path.dirname(obsRule.source))]);
   assert.equal(e.observable.verified,false);
+});
+
+// ---- the second code round on this change (2026-11-10), red first ----
+test("only the configured resolver run by node is the first path: a command that merely mentions rules.mjs is scanned",()=>{
+  const e=traceEvidence("codex",codexTrace([codexCmd("/bin/bash -lc 'cat .agents/conventions/common/sample.md rules.mjs'",text)]),[obsRule],obsOrigin);
+  assert.deepEqual(e.observable.secondPathReads,[{id:"common.sample",via:"shell"}]);
+  assert.equal(e.observable.verified,false);
+});
+
+test("a dynamic command is unclassified when it names a rule's file name or folder, with or without the mount, and with backslashes",()=>{
+  for(const command of ["/bin/bash -lc 'cat \"$DIR/sample.md\"'","/bin/bash -lc 'ls \"$D\"/conventions/common'","cmd /c type %R%\\.agents\\conventions\\common\\*"]) {
+    const e=traceEvidence("codex",codexTrace([codexCmd(command,"…")]),[obsRule],obsOrigin);
+    assert.equal(e.observable.unclassified.length,1,command);
+    assert.equal(e.observable.verified,false,command);
+  }
+  const source={...obsRule,source:"common/sample.md"};
+  const own=traceEvidence("codex",codexTrace([codexCmd("/bin/bash -lc 'cat $ROOT/common/*.md'","…")]),[source],obsOrigin);
+  assert.equal(own.observable.unclassified.length,1,"the source repository has no mount");
+  const unrelated=traceEvidence("codex",codexTrace([codexCmd("/bin/bash -lc 'echo $HOME && ls src/*.mjs'","…")]),[obsRule],obsOrigin);
+  assert.deepEqual(unrelated.observable.unclassified,[],"a dynamic command about other files stays classified");
+});
+
+test("a Codex command that started and never completed is still scanned, as a failed call",()=>{
+  const started={type:"item.started",item:{id:"c9",type:"command_execution",command:"/bin/bash -lc 'cat .agents/conventions/common/sample.md'",status:"in_progress"}};
+  const e=traceEvidence("codex",codexTrace([started]),[obsRule],obsOrigin);
+  assert.deepEqual(e.observable.secondPathReads,[{id:"common.sample",via:"shell"}]);
+  const entryOnly=[{type:"item.started",item:{id:"c1",type:"command_execution",command:"cat .agents/conventions/ENTRY.md"}},
+    codexCmd("cat .agents/PROJECT.md"),codexCmd(`/bin/bash -lc '${obsRead}'`,obsPayload),{type:"turn.completed"}];
+  assert.equal(traceEvidence("codex",entryOnly.map(x=>JSON.stringify(x)).join("\n"),[obsRule],obsOrigin).observable.entryRead,false,"a read that never finished is not a read");
+});
+
+test("an unclassified entry says which tool and which target",()=>{
+  const e=traceEvidence("codex",codexTrace([codexCmd("/bin/bash -lc 'cat .agents/conventions/common/*.md'","…")]),[obsRule],obsOrigin);
+  assert.deepEqual(Object.keys(e.observable.unclassified[0]).sort(),["index","target","via"]);
+  assert.equal(e.observable.unclassified[0].via,"shell");
 });
