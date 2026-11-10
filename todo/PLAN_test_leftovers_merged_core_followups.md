@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (F27 fixed 2026-11-05, not released: a process cap and shim rule for the next planned release; F28 open: release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner). F30 added 2026-11-05 (open, with an owner and a proposed deadline: the shipped Node guard has no folding reader). F32 added 2026-11-06 (open: the raw readings of the guard and the sweeper are super-linear on a hostile line, and their time is not promised).** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (F27 fixed 2026-11-05, not released: a process cap and shim rule for the next planned release; F28 open: release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner). F30 added 2026-11-05 (open, with an owner and a proposed deadline: the shipped Node guard has no folding reader). F32 added 2026-11-06 (open: the raw readings of the guard and the sweeper are super-linear on a hostile line, and their time is not promised). F33–F40 added 2026-11-10 from creds' E2 (its notes for the parent N20–N25 and its side findings): F33 and F36 open, conventions' tools; F34 open, creds first; F35 a documented limit for now; F37 open, the C# template's; F38–F40 pointers to creds' todos.** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -942,6 +942,117 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - **Shape to weigh.** Fix each path to a forward pass with a durable differential test against the old code as its oracle and a stated reason why the two agree (F30's D5 item 6, as `looseVerdicts` has), which changes time and no answer; or record that the raw readings' time stays a documented limit. F30 kept `looseVerdicts`' forward pass and the removed spreads (a differential of the whole `classifyLine` over 9,400,453 lines found no difference), and removed the compose cap, which changed an answer.
 - **Owner and date.** This repository. No deadline; not a prerequisite of F30 or of any PR of the rollout.
 
+## F33 — The shipped janitor does not parse under bash 3.2, macOS's `/bin/bash` (found 2026-11-10, creds E2.4; creds' note N20)
+
+- **What.** `tools/janitor.sh:132` puts a `case … in Linux) …;; esac` inside `$( … )` inside `${JANITOR_OS:-…}`. Bash 3.2
+  gives `command substitution: line 132: syntax error`. Measured by the first macOS run of creds PR #329 (its helper
+  self-test, cases T13, T15 and T16, which ran the janitor with `"$BASH"`, that is `/bin/bash` 3.2). The line is the same at
+  `37b9aa5`, `1341995` and `153e6b5` (read here with `git show <sha>:tools/janitor.sh`). The shebang is
+  `#!/usr/bin/env bash`, so a caller that runs it with `bash` from `PATH` works where that bash is 4 or newer (the hosted
+  macOS runner's Homebrew bash). A stock Mac does not.
+- **Who is hit.** A consumer that runs the janitor on a Mac that has only the system bash. Creds works around it: its
+  self-test runs the janitor with `bash` from `PATH` and skips T13, T15 and T16 visibly when that bash is older than 4
+  (creds `1e4181d`), and creds' project instructions say bash 4 or newer on macOS.
+- **Fix (to decide when it is built).** Either the janitor parses and runs under bash 3.2 (for example, `OS` is set by a
+  plain `case` or `if` before the assignment, and the rest of the file is checked for other forms that need bash 4), with a
+  test that runs the janitor's dry run under `/bin/bash` 3.2 on a macOS CI leg, RED first on the current line; or the
+  janitor's contract (`common/test-leftovers-janitor.md`) names bash 4 as required, and the janitor refuses an older bash
+  with one clear line.
+- **Source.** `dew_flow_creds_for_devs · todo/PLAN_test_leftovers_E2.md` on creds `main` `b6cc6b3`: § *Notes for the
+  parent*, N20; E2.4 build record part 2d, failure A.
+- **Owner and date.** This repository (conventions): the janitor and its contract. No deadline; not a prerequisite of any
+  PR of the rollout.
+
+## F34 — A Windows dry run of the janitor in creds' helper self-test printed nothing once; the cause is not known (found 2026-11-10, creds E2.4; creds' note N21)
+
+- **What.** On creds PR #329's head `5c74ffc` (run 42749082598, first attempt) the shipped janitor's dry run printed
+  NOTHING in T13/T14 and T15 (`FAIL T13/T14 would run:`, `FAIL T15 would run:`). The same job, run again on the same head,
+  printed its `would run:` lines and passed (26 of 26), as did the head before (`15e4218`). The self-test keeps only the
+  janitor's stdout, so the reason for the first attempt is not known.
+- **Why it matters here.** On Windows the janitor runs as a dry run until F9 arms it, and its `would run:` lines are the
+  only evidence of what it would remove. A dry run that sometimes prints nothing makes a test flaky, and it could hide a
+  fault of the janitor on Windows.
+- **Next step.** Creds keeps the janitor's stderr and exit code in the self-test's failure text and reads them the next time
+  it happens. This repository acts only if that text shows a fault of the janitor: then a RED test here first, and a fix.
+- **Source.** Creds' E2 plan (as F33), N21. That attempt is not counted as a pass of those cases.
+- **Owner and date.** Creds first (the self-test's failure text); this repository (conventions) if the evidence points
+  to the janitor. No deadline.
+
+## F35 — Neither guard reads a split legacy spelling in a consumer's nested `scripts/*.cjs` folders (found 2026-11-10, creds E2.5; creds' note N22)
+
+- **What.** A split legacy spelling (`'a' + 'b'`) in creds' `src_vs_code/scripts/*.cjs` or
+  `src_minimalapi_server/scripts/*.cjs` is read by NEITHER guard. The `node` profile does not discover those folders (it
+  reads `*.test.*` and `*.spec.*` files anywhere, and every text file under the ROOT folders `scripts/`, `test/` and
+  `tests/`; creds' old note N14 said the same). The C# copy folds `.cs` only. Measured by creds at `6e08071`: the C# guard
+  reads a WHOLE legacy literal there, and the Node guard reads the split in a path it discovers
+  (creds' `leftoversGuardFixtures.test.ts` pins this).
+- **State.** Creds records it as a documented limit (its Q9 (A); creds `research/module_tests.md` § *Test leftovers*,
+  part 6).
+- **Shape to weigh.** A way for a consumer to add folders to the `node` profile's discovery (N14's "`--scan <glob>`"
+  idea), RED first with a planted split spelling in such a folder; or this stays a documented limit of the `node`
+  profile.
+- **Source.** Creds' E2 plan (as F33), N22 and N14.
+- **Owner and date.** This repository (conventions) for the `node` profile's discovery; creds for its C# copy's
+  discovery, and creds has recorded the limit. No fix is asked now; no deadline.
+
+## F36 — The shipped Node guard reads `mktemp` in `.sh` files only, not in a workflow's `run:` block (found 2026-11-10, creds E2.5; creds' note N23)
+
+- **What.** `tools/leftovers-check.mjs:376`, `RAW_TEMP_BY_EXTENSION = { ".sh": [/\bmktemp\b/], ".ps1": [...] }`: a
+  `mktemp` in a `run:` block of `.github/workflows/*.yml` is no `raw-temp` finding. The line is the same at `37b9aa5`,
+  `1341995` and `153e6b5` (read here). Creds' C# copy of the guard does read it: `ci-server.yml:375` was a C# finding (creds'
+  E2.5 build record, RED list item 6), and creds fixed it with `$RUNNER_TEMP` (its Q4 (A)).
+- **Near it.** The N6 follow-up of the rollout (§ *Epoch 8* item 2, point 3: a `raw-temp` reading for `${TMPDIR…}` and
+  `$TMPDIR` in `.sh`), another temp spelling the Node guard does not read.
+- **Fix (to decide when it is built).** The guard reads the shell lines of a workflow's `run:` blocks with the `.sh`
+  `raw-temp` patterns (the `node` profile already reads workflows for the Docker classes). RED first: a planted
+  `run: d=$(mktemp -d)` in a workflow fixture is a finding. Then the consumers' trees are scanned at the new pin, and each
+  records what it must migrate or mark. Or the owner records that it stays a documented limit.
+- **Source.** Creds' E2 plan (as F33), N23.
+- **Owner and date.** This repository (conventions). No deadline; not a prerequisite of any PR of the rollout.
+
+## F37 — The C# template guard does not read a `/tmp` inside a raw string literal that also holds a quote (found 2026-11-07, creds E2.3; creds' note N24)
+
+- **What.** In creds, `src_broker_client/tests/CallerIdentityTests.cs:196` holds `/tmp` inside a C# raw string literal
+  (`"""…"""`) that also holds a `"`, as `"""{"a":"/tmp/p"}"""` does. The copied guard reads a one-line raw string, but it
+  misses a `/tmp` inside a raw string that holds a quote (creds' E2.3 build record, part 3 difference 1 as corrected in part
+  3b). So that line is no finding.
+- **Who copies it.** Every adapted copy of the C# template guard (creds E2.3; E6 and E7 later).
+- **Fix (to decide when it is built).** The template's literal reading handles a raw string with quotes inside it, RED
+  first with that exact plant; or the limit is written beside the template's guard and in each copy's manifest.
+- **Source.** Creds' E2 plan (as F33), N24 ("for E3 and the template … recorded; not an op here").
+- **Owner and date.** The C# template's owner. The template lives in `dew_flow_mcp` (E3); this register tracks it, as it
+  tracks F29 and F31. It is not creds': creds wants no op on its copy for it. No deadline.
+
+## F38 — Pointer: two creds `consent` folders on the WSL machine have no claim (found 2026-11-10, creds E2.4; creds' note N25)
+
+- **What, in short.** `/tmp/testsToDelete-u1000-creds-consent-DPZ0Sd` and `-NtKkk6` (2026-11-09 21:30:57, each with a
+  `keys/` folder) stand with no claim beside them. They are made by `ownedDir(scope, 'consent')` in creds'
+  `src_vs_code/src/test/consentContractVpn.test.ts:56`. A folder whose claim is gone while the folder stays is what the helper's order should
+  never leave. The cause is not known. Until it is found, the janitor and the sweeps list them as unmarked and remove
+  nothing.
+- **Where it is tracked.** Creds' E2 plan (as F33), N25, and its D8 table, row E2.4, column (d). Creds' next step:
+  reproduce with that test file alone, read the audit's output, and fix test first in E2.1's helper if the order is wrong.
+- **Owner.** Creds. A pointer only: nothing is built here unless creds finds a fault of the shared reference.
+
+## F39 — Pointer: creds' `release.yml` with `target=extension` publishes to the Marketplace from any branch (found 2026-11-10, creds E2.5)
+
+- **What, in short.** A manual dispatch of creds' `release.yml` with `target=extension` from a branch runs the extension
+  job (its `if:` accepts `inputs.target == 'extension'`), and its publish step has no tag guard. Run 42792112748 (head
+  `d56f3378`) ran "Publish to the Marketplace"; only the Marketplace's refusal of an existing version (1.18.0) stopped it.
+- **Where it is tracked.** Creds' E2 plan (as F33), E2.5 build record, *The hosted evidence*: "Side finding, a todo, not
+  built". Never dispatch `target=extension` for evidence.
+- **Owner.** Creds. A pointer only.
+
+## F40 — Pointer: two creds product scripts keep a temp path when a step fails (found 2026-11-10, creds E2.5)
+
+- **What, in short.** Creds' `install.sh:63` keeps its temp file when `fetch` fails, and `deploy/restore.sh:102` keeps its
+  staging folder when a step fails (line numbers at `6e08071`; on `b6cc6b3` the `mktemp` lines are `install.sh:64` and
+  `deploy/restore.sh:103`, under their markers). Both are product scripts, not tests; E2.5 marked their `mktemp` lines with an
+  exemption whose reason claims no cleanup.
+- **Where it is tracked.** Creds' E2 plan (as F33), E2.5 build record, *What is not done, and why* (its Q11: todos, not
+  built).
+- **Owner.** Creds. A pointer only.
+
 ## Definition of Done
 
 - [ ] Each of F1 to F22, F24 and F25 (F23 is reserved by F3's note for other manifests) is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
@@ -952,6 +1063,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
       measurement above is of `Directory.Move`, not of `MoveFileExW`). And F16's Fix either keeps the Node sweep list-only on Windows or meets F29's Node requirement.
 - [ ] F31 is closed when the helper makes what an elevated Windows run can read back, with a Windows test on a natural claim and a natural folder, or when the owner records under F31 that it stays a documented limit.
 - [ ] F32 is closed when each path it lists is linear with a durable differential test against its old code (and a stated reason why the two agree), or when the owner records under F32 that the raw readings' time stays a documented limit.
+- [ ] F33, F35, F36 and F37 are each fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit. F34 is closed when creds' self-test keeps the janitor's stderr and either the next empty dry run is explained (with a fix here, RED first, if the janitor is at fault) or the owner records that it stays an open observation. F38, F39 and F40 are pointers: each is closed when creds' own record says its todo is done.
 - [ ] F30 is closed when the shipped Node guard's folding reader is released with its fixture of the table's spellings, by exact line, RED first and GREEN after,
       the consumers' real trees at their recorded counts, and the consumers that declared "zero whole literals, F30 open" have re-run the
       guard at the new pin and recorded the result; or when the owner records, under F30, that the reader stays a documented limit.
