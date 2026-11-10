@@ -401,10 +401,15 @@ Open stories:
       **Done 2026-11-10: creds #328, squash-merged as `75c1f1f`** (conventions pin `37b9aa5` → `5e73780`, the mount on
       `.agents/conventions`, the five hooks recopied, Sonar excluding `.claude/hooks/**`). Evidence, all in the PR: the
       tool's dry-run and apply; `git grep` with zero executable old-mount paths (re-checked after each of three `main`
-      merges, which brought 12 live files of #329 back to the old path and were moved by hand); a fresh clone with every
-      check green and the rollback tried in a disposable clone, both on the PR's first commit `8f31013` (before those
-      merges; the final head was checked by CI and `git grep`); the extension and .NET suites green; **both agents' smoke
-      passed on the committed pin `5e73780`** before the promotion (Codex and Claude, 7 of 7 rules each, hashes matched,
+      merges, which brought 12 live files of #329 back to the old path and were moved by hand); the extension and .NET
+      suites green in CI on the head and on `main` at `75c1f1f`; a **fresh clone of the merged commit `75c1f1f`**
+      (2026-11-10 17:42 UTC: `rules check` and `explain --task inspect` resolved, `gate-snippet-check`, `adapter-check`,
+      `plan-lifecycle` and `build-flags-check` OK, no executable old-mount path — the two README lines left are the
+      old-clone cleanup steps; `pin-check` was green at the merge and reads stale now only because `release` moved on);
+      the **rollback tried on `75c1f1f`** in that clone (the revert gives exactly its parent's tree; with the PR's steps
+      the old mount at `37b9aa5` is back, its tools and the low-priority wrapper run, the tree is clean); the same
+      checks had also passed on the PR's first commit `8f31013`; **both agents' smoke passed on the committed pin
+      `5e73780`** before the promotion (two files, `Program.cs` and `extension.ts`: Codex and Claude, 7 of 7 rules each, hashes matched,
       HEAD/index/status unchanged), after the harness fixes of conventions #147 (the resolver's git had a stdin pipe the
       Codex sandbox refused; the Claude trace was cut at 256 KiB, and one whole read reached the model only as a preview);
       CI 19/19 on the head; the CodeRabbit threads answered, the old-clone steps added to the README after its finding.
@@ -478,7 +483,8 @@ Open stories:
         one whole read that the host showed the model only as a preview. The corrective PR under this story (stdin
         `ignore`, one `read --only <id>` per rule, an 8 MiB trace cap, and the code gate's hook findings) satisfies
         this item as written; it is not a plan change. With the fix in a disposable creds worktree each agent read
-        5 of 5 rules in full; the evidence is the run on #328's committed pin, before the release is promoted.
+        5 of 5 rules in full (a measuring run on one file, `extension.ts`, which selects 5); the evidence is the run on
+        #328's committed pin `5e73780` (two files, 7 rules), recorded in the story's Done paragraph above.
   - [x] **Product behaviour unchanged:** the broker, CLI, MCP server and extension builds and their test suites
         green on the migrated tree; no permission in `.claude/settings.json` weakened.
   - [x] **Rollback** named in the PR: the migration is ONE whole commit (squash-merged), so the rollback is the
