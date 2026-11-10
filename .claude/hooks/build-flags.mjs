@@ -141,9 +141,12 @@ function unboundedBuild(segment, depth = 0) {
     if (start < 0) return '';
 
     // A POSIX shell's `-c` takes ONE argument as its command; what follows is `$0` and the positional arguments, so
-    // `bash -c 'dotnet build' -m:4` is an unbounded build (the code round, 2026-11-10). Every other wrapper (cmd /c,
-    // pwsh -Command, eval, time, nice, command) takes the rest of the line.
-    const shellC = POSIX_SHELLS.has(exe) && rest.slice(0, start).some(flag => /^-[a-z]*c[a-z]*$/i.test(flag));
+    // `bash -c 'dotnet build' -m:4` is an unbounded build (the code round, 2026-11-10). That holds for a quoted,
+    // several-word argument; a one-word one (`sh -lc dotnet build x`) is judged with what follows, as before, because
+    // the guard leans to refusing when it cannot tell what was meant. Every other wrapper (cmd /c, pwsh -Command,
+    // eval, time, nice, command) takes the rest of the line.
+    const shellC = POSIX_SHELLS.has(exe) && /\s/.test(rest[start])
+      && rest.slice(0, start).some(flag => /^-[a-z]*c[a-z]*$/i.test(flag));
     const inner = shellC ? rest[start] : rest.slice(start).join(' ');
     // The inner line is a command line of its own, so it is split into its chain exactly like the outer one:
     // `bash -c "cd src && dotnet build"` judged as ONE segment started with `cd` and passed, and the `-m:4` of a
