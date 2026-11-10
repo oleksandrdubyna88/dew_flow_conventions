@@ -18,6 +18,9 @@ paths: ["__conventions_planning_documentation_only__/**"]
 > owed — corrected the same day, see the closing matrix). Still on `.claude/rules/shared`:
 > `dew_flow_mcp` and `dew_flow_sidecar_rust` (stories 3.M and 3.R, not selected). Release `9b1d668` is pinned by every
 > consumer (conventions #147 and #148; the hook fixes the creds code gate found).
+> Later the same day: the owner selected 3.M and 3.R (migration PRs mcp #71 and sidecar_rust #76). The smoke harness
+> now records part 2 (conventions #154), and the rerun passes both parts of § 7 for both agents in all nine
+> repositories (mcp and sidecar_rust on their migration branches; see the closing matrix).
 >
 > **The stop, 2026-11-09:** entry 1.2 (the owner moves `dew_flow_creds_for_devs` ahead of
 > `dew_flow_sidecar_rust`) is this plan's second change since approval. No consumer migration and no new code on any
@@ -475,7 +478,7 @@ Open stories:
   - [x] **Fresh clone** with `submodules: true`, `npm ci --ignore-scripts --prefix .agents/conventions`, then
         `rules.mjs check`, `explain --task inspect`, `gate-snippet-check`, `adapter-check`, `pin-check`,
         `plan-lifecycle`; the extension's `npm test` and the .NET test run, both green.
-  - [ ] **Both agents** read the selected sources in a bounded smoke (`tools/smoke-rules.mjs`, Claude and Codex)
+  - [x] **Both agents** read the selected sources in a bounded smoke (`tools/smoke-rules.mjs`, Claude and Codex)
         from the migrated worktree, and both pass the § 7 pass conditions; a quota or an absent CLI is recorded as
         incomplete, which is a fail of this item — the PR waits for a completed run of both agents, as epoch 1
         required.
@@ -490,6 +493,10 @@ Open stories:
         expected rule read in full, hash matched). Part 2, the observable in the recorded answer or checkout, was not
         checked: the Codex answer does not name ENTRY or PROJECT, and a second-path load is not recorded. This item
         stays open until the harness records both and the run is repeated; #328 merged on part 1 alone.
+        **Ticked again 2026-11-10 evening:** the harness records part 2 (conventions #154), and the rerun in the
+        creds worktree (`daa7e05`, pin `5e73780`, two files, 7 rules) passes both parts for both agents: every rule
+        read in full with its hash, ENTRY and PROJECT read, no body by a second path, no unclassified call
+        ([the record](../research/2026-11-10_shared_rules_acceptance.md), the rerun section).
   - [x] **Product behaviour unchanged:** the broker, CLI, MCP server and extension builds and their test suites
         green on the migrated tree; no permission in `.claude/settings.json` weakened.
   - [x] **Rollback** named in the PR: the migration is ONE whole commit (squash-merged), so the rollback is the
@@ -532,18 +539,23 @@ Open stories:
   only PROJECT, and whether a body came by a second path is not recorded at all. The harness is being taught to
   record both, and the runs follow (corrected 2026-11-10 after CodeRabbit on #152). The same evening `release` moved
   to `153e6b5` (#151), with pin bumps open in every consumer.
+  **Update, the same evening:** the harness records part 2 now (conventions #154, `afbe426`), and the rerun in the same
+  worktrees passes **both parts for both agents in every row**: ENTRY and PROJECT read by a call that did not fail, no
+  rule body by a second path, no call it cannot classify. mcp and sidecar_rust ran on their migration branches, on the
+  committed pin `153e6b5`. The runs are in the record's rerun section. This item stays open until mcp #71 and
+  sidecar_rust #76 merge, and while benchmark has no Claude adapter (story 3.B, not selected).
 
   | Consumer | Mount | Pin | Adapter check | Fresh clone / worktree | Both agents (§ 7) | Old-mount lines outside `todo/`, `research/`, `.gitmodules` | Rollback | Decision |
   |---|---|---|---|---|---|---|---|---|
-  | dew_flow_connect_other_ais | `.agents/conventions` | `1341995` | OK | worktree of `ee8ad53`: `rules check` resolved | reads verified for both (part 1), 8 of 8 rules; the observable (part 2) owed | 66, none executable for its own mount: the product's gate snippet and rule discovery support user repositories still on the old layout (and their tests), plus 14 comment and doc lines citing rules by the old path (corrective PR #972) | tried on `8d42647`: the revert gives its parent's tree, the old mount `895b24c` and its tools are back | migrated (#192) |
-  | dew_flow_benchmark | `.agents/conventions` | `1341995` | none: no `.claude/hooks` (story 3.B) | worktree of `3958ecc`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed | 23: the gate's tests and the spikes measure other repositories and old transcripts on the old layout; 2 comments cite rules by the old path (corrective PR #194) | tried on `89b4909`: parent's tree, old mount `e29883f`, low-priority wrapper runs | migrated (#113); the adapter is story 3.B, not selected |
-  | dew_flow_rag_qln | `.agents/conventions` | `1341995` | OK | worktree of `f7f4fc4`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed | 0 | tried on `d83315b`: parent's tree, old mount `cc24f9e`, low-priority wrapper runs | migrated (#83, #85) |
-  | wsl_care | `.agents/conventions` | `1341995` | OK | worktree of `cb8046b`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed | 0 | none by construction | joined on the neutral layout |
-  | dew_flow_vscode_kit | `.agents/conventions` | `1341995` | OK | worktree of `a9ab150`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed | 0 | none by construction | joined on the neutral layout |
-  | dew_flow_amd_r9700_tuning_ai | `.agents/conventions` | `1341995` | OK (`build-flags.mjs` added in #28) | worktree of `2ecb356`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed | 0 | none by construction | joined on the neutral layout |
-  | dew_flow_creds_for_devs | `.agents/conventions` | `1341995` (`37b9aa5` → `5e73780` in #328 → `9b1d668` in #336 → `1341995` in #340) | OK | fresh clone of `75c1f1f` (story 3.C) | reads verified for both (part 1), 7 of 7 (on `5e73780`, story 3.C) rules; the observable (part 2) owed | 2: the README's old-clone cleanup steps | tried on `75c1f1f` (story 3.C) | migrated (#328, story 3.C) |
-  | dew_flow_mcp | `.claude/rules/shared` on `main`; `.agents/conventions` in #71 | `1341995` (mcp #70); `153e6b5` in #71 | in #71: OK | in #71: fresh clone of `a0809f5`, all checks, build and 622 tests green | in #71: reads verified for both (part 1), 6 rules; the observable (part 2) owed | about 18 files (2026-11-09); in #71: 1, a fixture pinning that the old mount is never entered | in #71: tried, the revert gives `main`'s tree and the old mount is back | **selected 2026-11-10 by the owner** (story 3.M); migration PR #71, draft until § 7 passes |
-  | dew_flow_sidecar_rust | `.claude/rules/shared` on `main`; `.agents/conventions` in #76 | `1341995` (sidecar_rust #75); `153e6b5` in #76 | in #76: OK | in #76: CI | in #76: owed | about 21 files (2026-11-09) | in #76: owed | **selected 2026-11-10 by the owner** (story 3.R); migration PR #76, draft |
+  | dew_flow_connect_other_ais | `.agents/conventions` | `1341995` | OK | worktree of `ee8ad53`: `rules check` resolved | reads verified for both (part 1), 8 of 8 rules; the observable (part 2) owed; **both parts verified for both** in the rerun of 2026-11-10 evening, harness conventions #154 | 66, none executable for its own mount: the product's gate snippet and rule discovery support user repositories still on the old layout (and their tests), plus 14 comment and doc lines citing rules by the old path (corrective PR #972) | tried on `8d42647`: the revert gives its parent's tree, the old mount `895b24c` and its tools are back | migrated (#192) |
+  | dew_flow_benchmark | `.agents/conventions` | `1341995` | none: no `.claude/hooks` (story 3.B) | worktree of `3958ecc`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both** in the rerun of 2026-11-10 evening, harness conventions #154 | 23: the gate's tests and the spikes measure other repositories and old transcripts on the old layout; 2 comments cite rules by the old path (corrective PR #194) | tried on `89b4909`: parent's tree, old mount `e29883f`, low-priority wrapper runs | migrated (#113); the adapter is story 3.B, not selected |
+  | dew_flow_rag_qln | `.agents/conventions` | `1341995` | OK | worktree of `f7f4fc4`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both** in the rerun of 2026-11-10 evening, harness conventions #154 | 0 | tried on `d83315b`: parent's tree, old mount `cc24f9e`, low-priority wrapper runs | migrated (#83, #85) |
+  | wsl_care | `.agents/conventions` | `1341995` | OK | worktree of `cb8046b`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both** in the rerun of 2026-11-10 evening, harness conventions #154 | 0 | none by construction | joined on the neutral layout |
+  | dew_flow_vscode_kit | `.agents/conventions` | `1341995` | OK | worktree of `a9ab150`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both** in the rerun of 2026-11-10 evening, harness conventions #154 | 0 | none by construction | joined on the neutral layout |
+  | dew_flow_amd_r9700_tuning_ai | `.agents/conventions` | `1341995` | OK (`build-flags.mjs` added in #28) | worktree of `2ecb356`: resolved | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both** in the rerun of 2026-11-10 evening, harness conventions #154 | 0 | none by construction | joined on the neutral layout |
+  | dew_flow_creds_for_devs | `.agents/conventions` | `1341995` (`37b9aa5` → `5e73780` in #328 → `9b1d668` in #336 → `1341995` in #340) | OK | fresh clone of `75c1f1f` (story 3.C) | reads verified for both (part 1), 7 of 7 (on `5e73780`, story 3.C) rules; the observable (part 2) owed; **both parts verified for both** in the rerun of 2026-11-10 evening, harness conventions #154 (worktree `daa7e05`) | 2: the README's old-clone cleanup steps | tried on `75c1f1f` (story 3.C) | migrated (#328, story 3.C) |
+  | dew_flow_mcp | `.claude/rules/shared` on `main`; `.agents/conventions` in #71 | `1341995` (mcp #70); `153e6b5` in #71 | in #71: OK | in #71: fresh clone of `a0809f5`, all checks, build and 622 tests green | in #71: reads verified for both (part 1), 6 rules; the observable (part 2) owed; **both parts verified for both** on `64f42d0` in the rerun of 2026-11-10 evening, harness conventions #154 | about 18 files (2026-11-09); in #71: 1, a fixture pinning that the old mount is never entered | in #71: tried, the revert gives `main`'s tree and the old mount is back | **selected 2026-11-10 by the owner** (story 3.M); migration PR #71, draft until § 7 passes (it passes since the rerun) |
+  | dew_flow_sidecar_rust | `.claude/rules/shared` on `main`; `.agents/conventions` in #76 | `1341995` (sidecar_rust #75); `153e6b5` in #76 | in #76: OK | in #76: CI | in #76: owed; then **both parts verified for both**, 8 of 8 rules, on `a691935` in the rerun of 2026-11-10 evening, harness conventions #154 | about 21 files (2026-11-09) | in #76: owed; then tried on `c446c69`: one revert gives the tree of `main`, the old mount `1341995` is back | **selected 2026-11-10 by the owner** (story 3.R); migration PR #76, draft |
 - [ ] Не двигать code dependency pins только для того, чтобы погасить старый pin-check; принять явное решение о совместимых версиях и проверить сборку при их изменении.
 - [ ] Обновить README/ROLLOUT/POST_DEPLOY и checklist каждого потребителя. Ссылки на инструменты старого mount не должны остаться исполняемыми путями.
 
