@@ -46,7 +46,11 @@ Malformed native streams return explicit incomplete evidence and the parser erro
 persisting raw trace excerpts in the error. Windows supervisor failures carry a per-launch
 marker distinct from a target's own exit 125; the bounded smoke report keeps that spawn error.
 CLI completion, complete bodies, and unchanged checkout state
-are separate evidence; the final answer still needs behavioral review. The latest result
+are separate evidence; the final answer still needs behavioral review. Since 2026-11-10 the report also carries
+`observable`, part 2 of the plan's § 7 pass condition for "Claude / Codex from root": `entryRead` and `projectRead`
+(a Read, Grep or shell command of `ENTRY.md` and `.agents/PROJECT.md`), `secondPathReads` (any selected rule's source
+opened directly rather than through the resolver, with the tool that did it), and `verified` when both files were
+read and nothing came by a second path. The `status` string is unchanged; part 1 is `allSourcesRead`. The latest result
 per agent is stored atomically in Git metadata, with two fixed 32 KiB slots. Full model traces
 are captured only in memory, limited to 8 MiB (`INSPECT_TRACE_MAX_BYTES`, the behaviour fixtures' cap; 256 KiB
 until 2026-11-10 cut every Claude run in dew_flow_creds_for_devs). The prompt (`inspectPrompt`) asks for `explain`

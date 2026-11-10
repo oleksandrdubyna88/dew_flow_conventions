@@ -665,3 +665,43 @@ test("parseArgs: --cli needs a value, unknown arguments are refused",()=>{
   assert.equal(parseArgs(["--cli","some/path"]).cli,"some/path");
   assert.equal(parseArgs([]).cli,undefined);
 });
+
+// ---- § 7 part 2 (CodeRabbit on #152, 2026-11-10): the observable of "Claude / Codex from root" — ENTRY and PROJECT
+// read, no rule body by a second path — is recorded from the trace, for both agents. Red first: the evidence had none.
+const obsRule={id:"common.sample",text,hash:sha256(text),source:".agents/conventions/common/sample.md"};
+const obsOrigin={resolver:path.resolve(".agents/conventions/tools/rules.mjs"),cwd:process.cwd(),repo:process.cwd()};
+const obsRead=`node "${obsOrigin.resolver.replaceAll("\\","/")}" read --task inspect --repo "${obsOrigin.repo.replaceAll("\\","/")}" --only common.sample`;
+const obsPayload=`BEGIN RULE ${obsRule.id} sha256:${obsRule.hash}\n${text}\nEND RULE ${obsRule.id}`;
+const claudeTool=(id,name,input)=>({type:"assistant",message:{content:[{type:"tool_use",id,name,input}]}});
+const claudeResult=(id,content)=>({type:"user",message:{content:[{type:"tool_result",tool_use_id:id,content}]}});
+const claudeTrace=extra=>[claudeTool("r1","Read",{file_path:path.resolve(".agents/conventions/ENTRY.md")}),claudeResult("r1","entry"),
+  claudeTool("r2","Read",{file_path:path.resolve(".agents/PROJECT.md")}),claudeResult("r2","project"),
+  claudeTool("r3","Bash",{command:obsRead}),claudeResult("r3",obsPayload),...extra,
+  {type:"result",subtype:"success",is_error:false,result:"done"}].map(e=>JSON.stringify(e)).join("\n");
+const codexCmd=(command,out="")=>({type:"item.completed",item:{type:"command_execution",command,exit_code:0,aggregated_output:out}});
+const codexTrace=extra=>[codexCmd("/bin/bash -lc 'sed -n 1,200p .agents/conventions/ENTRY.md'"),codexCmd("/bin/bash -lc 'cat .agents/PROJECT.md'"),
+  codexCmd(`/bin/bash -lc '${obsRead}'`,obsPayload),...extra,{type:"turn.completed"}].map(e=>JSON.stringify(e)).join("\n");
+
+test("the observable is verified when ENTRY and PROJECT were read and every body came through the resolver (both agents)",()=>{
+  for(const [agent,trace] of [["claude",claudeTrace([])],["codex",codexTrace([])]]){
+    const e=traceEvidence(agent,trace,[obsRule],obsOrigin);
+    assert.equal(e.allSourcesRead,true,agent);
+    assert.deepEqual(e.observable,{entryRead:true,projectRead:true,secondPathReads:[],verified:true},agent);
+  }
+});
+
+test("a rule body opened directly is a second-path load, and the observable is not verified",()=>{
+  const claude=traceEvidence("claude",claudeTrace([claudeTool("r4","Read",{file_path:path.resolve(obsRule.source)}),claudeResult("r4",text)]),[obsRule],obsOrigin);
+  assert.deepEqual(claude.observable.secondPathReads,[{id:"common.sample",via:"Read"}]);
+  assert.equal(claude.observable.verified,false);
+  const codex=traceEvidence("codex",codexTrace([codexCmd("/bin/bash -lc 'cat .agents/conventions/common/sample.md'",text)]),[obsRule],obsOrigin);
+  assert.deepEqual(codex.observable.secondPathReads,[{id:"common.sample",via:"shell"}]);
+  assert.equal(codex.observable.verified,false);
+});
+
+test("an agent that never read ENTRY or PROJECT does not have the observable",()=>{
+  const trace=[claudeTool("r3","Bash",{command:obsRead}),claudeResult("r3",obsPayload),{type:"result",subtype:"success",is_error:false,result:"done"}].map(e=>JSON.stringify(e)).join("\n");
+  const e=traceEvidence("claude",trace,[obsRule],obsOrigin);
+  assert.equal(e.allSourcesRead,true,"part 1 alone can pass");
+  assert.deepEqual([e.observable.entryRead,e.observable.projectRead,e.observable.verified],[false,false,false]);
+});

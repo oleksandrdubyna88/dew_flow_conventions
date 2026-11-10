@@ -90,6 +90,55 @@ function claudeEvents(events,capture) {
   return {completed,final,models:[...models]};
 }
 
+/**
+ * Every file-touching call of the trace: Claude's Read, Grep and Bash tool uses, Codex's shell commands. The
+ * resolver's own invocations are left out, since they ARE the first path.
+ */
+function toolCalls(agent,events) {
+  const calls=[];
+  for(const event of events) {
+    if(agent==="codex") {
+      const item=event.item;
+      if(event.type==="item.completed"&&item?.type==="command_execution")calls.push({via:"shell",command:String(item.command??"")});
+      continue;
+    }
+    if(event.type!=="assistant")continue;
+    for(const block of event.message?.content??[]) {
+      if(block?.type!=="tool_use")continue;
+      if(block.name==="Read")calls.push({via:"Read",path:String(block.input?.file_path??"")});
+      else if(block.name==="Grep")calls.push({via:"Grep",path:String(block.input?.path??"")});
+      else if(block.name==="Bash")calls.push({via:"shell",command:String(block.input?.command??"")});
+    }
+  }
+  return calls.filter(call=>!(call.command??"").includes("rules.mjs"));
+}
+
+const MOUNT_PREFIX=".agents/conventions/";
+
+/**
+ * § 7 part 2 for "Claude / Codex from root": ENTRY and PROJECT read, and no rule body loaded by a second path — a
+ * Read or Grep of a selected rule's source file, or a shell command naming it (CodeRabbit on #152, 2026-11-10).
+ * Part 1 (allSourcesRead) proves the resolver delivered every body; this proves that delivery was the only one.
+ */
+function observableEvidence(calls,expected,origin) {
+  const touches=(call,re)=>re.test(call.path??"")||re.test(call.command??"");
+  const entryRead=calls.some(call=>touches(call,/(^|[\s'"\\/])ENTRY\.md(\b|$)/));
+  const projectRead=calls.some(call=>touches(call,/(^|[\s'"\\/])\.agents[\\/]PROJECT\.md(\b|$)/));
+  const repo=origin?.repo??process.cwd();
+  const secondPathReads=[];
+  for(const rule of expected) {
+    const source=String(rule.source??"");
+    if(!source)continue;
+    const full=comparable(path.resolve(repo,source));
+    const inMount=source.startsWith(MOUNT_PREFIX)?source.slice(MOUNT_PREFIX.length):source;
+    const hit=calls.find(call=>call.path!==undefined
+      ?comparable(path.resolve(repo,call.path))===full
+      :(call.command.includes(source)||call.command.includes(inMount)));
+    if(hit)secondPathReads.push({id:rule.id,via:hit.via});
+  }
+  return {entryRead,projectRead,secondPathReads,verified:entryRead&&projectRead&&secondPathReads.length===0};
+}
+
 function decodedEvidence(agent,trace,expected,origin) {
   const events=trace.split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line));
   const {outputs,sourceCalls,capture}=sourceCollector(origin);
@@ -99,7 +148,8 @@ function decodedEvidence(agent,trace,expected,origin) {
     return {id:rule.id,hash:rule.hash,complete:!!evidence,...(evidence?{sourceCommandHash:evidence.commandHash}:{})};
   });
   return {completed,reads,sourceCalls,models,final:final.slice(0,12000),finalTruncated:final.length>12000,
-    allSourcesRead:reads.length>0&&reads.every(rule=>rule.complete)};
+    allSourcesRead:reads.length>0&&reads.every(rule=>rule.complete),
+    observable:observableEvidence(toolCalls(agent,events),expected,origin)};
 }
 
 export function traceEvidence(agent,trace,expected,origin) {
@@ -108,7 +158,8 @@ export function traceEvidence(agent,trace,expected,origin) {
     // Parser messages can embed raw trace content. Retain the error kind without persisting it.
     return {parseFailed:true,parseError:`${error.name}: native event stream could not be decoded`,
       completed:false,allSourcesRead:false,final:"",finalTruncated:false,sourceCalls:[],models:[],
-      reads:expected.map(({id,hash})=>({id,hash,complete:false}))};
+      reads:expected.map(({id,hash})=>({id,hash,complete:false})),
+      observable:{entryRead:false,projectRead:false,secondPathReads:[],verified:false}};
   }
 }
 
