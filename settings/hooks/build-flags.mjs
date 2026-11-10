@@ -135,8 +135,12 @@ function unboundedBuild(segment, depth = 0) {
     // not a build), and dropping every dashed token instead would throw away the inner `-m:4`.
     const rest = parts.slice(1);
     const start = rest.findIndex(part => !part.startsWith('-') && !/^\/[a-z]+$/i.test(part));
+    if (start < 0) return '';
 
-    return start < 0 ? '' : unboundedBuild(rest.slice(start).join(' '), depth + 1);
+    // The inner line is a command line of its own, so it is split into its chain exactly like the outer one:
+    // `bash -c "cd src && dotnet build"` judged as ONE segment started with `cd` and passed, and the `-m:4` of a
+    // neighbouring inner command vouched for the build (CodeRabbit on creds #328, 2026-11-10).
+    return segments(rest.slice(start).join(' ')).map(part => unboundedBuild(part, depth + 1)).find(Boolean) ?? '';
   }
   const isBuild = exe === 'msbuild'
     || (exe === 'dotnet' && BUILD_VERBS.has((parts[1] ?? '').toLowerCase()));
@@ -157,8 +161,17 @@ const VERB_IN_TEXT = /(?<=^|[\s"'\/\\&])(dotnet(?:\.exe|\.cmd|\.bat)?["']?\s+(?:
  * the old append, so the text is never worse than before.
  */
 function boundedSuggestion(offending) {
-  return VERB_IN_TEXT.test(offending) ? offending.replace(VERB_IN_TEXT, verb => `${verb} -m:4`) : `${offending} -m:4`;
+  // The search starts after the leading `NAME=value` words, quoted values included: `BUILDER="msbuild" dotnet build`
+  // matched the msbuild inside the quotes (CodeRabbit on coai #968, 2026-11-10).
+  const start = ASSIGNMENTS_AT_START.exec(offending)?.[0].length ?? 0;
+  const command = offending.slice(start);
+  return VERB_IN_TEXT.test(command)
+    ? offending.slice(0, start) + command.replace(VERB_IN_TEXT, verb => `${verb} -m:4`)
+    : `${offending} -m:4`;
 }
+
+/** The leading environment assignments of a command, each value plain or quoted (`A=1 B="x y" C='z' `). */
+const ASSIGNMENTS_AT_START = /^\s*(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s"']+)*\s+)*/;
 
 /** The reason to refuse, or an empty string when there is nothing to say. */
 export function buildFlagsRefusal(command) {

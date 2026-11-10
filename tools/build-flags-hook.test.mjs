@@ -203,3 +203,18 @@ test('the suggestion skips a verb inside an assignment and knows dotnet.cmd and 
   assert.equal(suggested('dotnet.cmd build App.slnx # note'), 'dotnet.cmd build -m:4 App.slnx # note');
   assert.equal(suggested('dotnet.bat publish -c Release'), 'dotnet.bat publish -m:4 -c Release');
 });
+
+// CodeRabbit on creds #328 and coai #968 (2026-11-10), each red first.
+test('a quoted assignment value is skipped too: -m:4 goes after the real build verb', () => {
+  const suggested = command => /\n {4}(.*)\n/.exec(buildFlagsRefusal(command))?.[1];
+  assert.equal(suggested('BUILDER="msbuild" dotnet build App.slnx'), 'BUILDER="msbuild" dotnet build -m:4 App.slnx');
+  assert.equal(suggested("BUILDER='msbuild x' dotnet build App.slnx"), "BUILDER='msbuild x' dotnet build -m:4 App.slnx");
+  assert.equal(suggested('A=1 B="msbuild" msbuild App.slnx'), 'A=1 B="msbuild" msbuild -m:4 App.slnx');
+});
+
+test('a wrapper\'s inner command line is split into its chain, like the outer one', () => {
+  assert.equal(refused('bash -c "cd src && dotnet build"'), true, 'a build after a cd inside the wrapper');
+  assert.equal(refused('bash -c "dotnet build && echo -m:4"'), true, "a neighbour's -m:4 does not bound the build");
+  assert.equal(refused('bash -c "cd src && dotnet build -m:4"'), false, 'a bounded inner build passes');
+  assert.equal(refused('sh -c "dotnet build -m:4; echo done"'), false);
+});

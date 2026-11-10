@@ -231,10 +231,10 @@ export function repairRegistration({ home, beforeWrite = () => {} }) {
   if (parsed.error) return unparsable(t.settings, parsed.error);
   const merged = serialise(mergeEntry(parsed.settings, t.hook));
   if (original !== null && original.equals(Buffer.from(merged))) return result(0, ['already registered']);
-  const lines = original === null ? [] : [`backup ${writeBackup(t.settings, original)}`];
+  const lines = original === null ? [] : [`backup ${writeBackup(t.settings, original, modeOf(t.settings))}`];
   beforeWrite();
   if (!sameBytes(readOrNull(t.settings), original)) return result(1, [...lines, CHANGED]);
-  writeAtomic(t.settings, merged);
+  writeSettings(t.settings, merged);
   return result(0, [...lines, `wrote ${t.settings} (hooks.PreToolUse: ${MATCHER})`]);
 }
 
@@ -284,7 +284,7 @@ export function install({ home, source, beforeWrite = () => {}, clearOptout = fa
   const upToDate = original !== null && original.equals(Buffer.from(serialise(merged))) && sameBytes(readOrNull(t.hook), sourceBytes) && isRegistered(t);
   if (upToDate) return result(0, [...dropOptout(t, clearOptout), 'already installed']);
   const lines = [...dropOptout(t, clearOptout)];
-  if (original !== null) lines.push(`backup ${writeBackup(t.settings, original)}`);
+  if (original !== null) lines.push(`backup ${writeBackup(t.settings, original, modeOf(t.settings))}`);
   beforeWrite();
   if (!sameBytes(readOrNull(t.settings), original)) return result(1, [...lines, CHANGED]);
   // Every refusal is above, so a refused install never writes the hook, the manifest or settings.json (the backup and
@@ -294,7 +294,7 @@ export function install({ home, source, beforeWrite = () => {}, clearOptout = fa
   // leave a registration of a missing script, run on every Agent call (2026-11-10).
   writeManifest(t, source, sourceBytes, by, readOrNull(t.hook));
   writeAtomic(t.hook, sourceBytes);
-  writeAtomic(t.settings, serialise(merged));
+  writeSettings(t.settings, serialise(merged));
   return result(0, [`wrote ${t.hook}`, ...lines, `wrote ${t.settings} (hooks.PreToolUse: ${MATCHER})`]);
 }
 
@@ -310,10 +310,10 @@ export function uninstall({ home, beforeWrite = () => {} }) {
   if (!present && !hookThere && !fs.existsSync(t.manifest)) return result(0, ['not installed', markOptout()]);
   const lines = [];
   if (present) {
-    lines.push(`backup ${writeBackup(t.settings, original)}`);
+    lines.push(`backup ${writeBackup(t.settings, original, modeOf(t.settings))}`);
     beforeWrite();
     if (!sameBytes(readOrNull(t.settings), original)) return result(1, [CHANGED]);
-    writeAtomic(t.settings, serialise(removeEntry(parsed.settings, t.hook)));
+    writeSettings(t.settings, serialise(removeEntry(parsed.settings, t.hook)));
     lines.push(`removed the hook entry from ${t.settings}`);
   }
   if (hookThere) {
@@ -387,6 +387,19 @@ function writableReason(file) {
   } catch (e) {
     return `is not writable (${e.code})`;
   }
+}
+
+/** The permission bits of an existing file (a symlink is followed); undefined when there is none. */
+const modeOf = file => (fs.existsSync(file) ? fs.statSync(file).mode & 0o777 : undefined);
+
+/**
+ * settings.json written where it really lives — a symlink (stow, chezmoi) is followed, never replaced by a plain
+ * file — and with its own mode (a 0600 file may hold tokens in `env`). `applyEffort` did both; install,
+ * repairRegistration and uninstall did neither until 2026-11-10 (CodeRabbit on creds #328).
+ */
+function writeSettings(settingsPath, data) {
+  const file = effortTarget(settingsPath) ?? settingsPath;
+  writeAtomic(file, data, modeOf(file));
 }
 
 /** Where to read and write: the symlink's target when settings.json is a link; null when there is no file. */
