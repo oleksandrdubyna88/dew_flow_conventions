@@ -463,3 +463,22 @@ test('uninstall still removes the hook and writes the opt-out marker when settin
   assert.equal(fs.existsSync(s.paths.optout), true);
   assert.equal(fs.lstatSync(s.paths.settings).isSymbolicLink(), true);
 });
+
+// CodeRabbit on creds #340 (2026-11-10), red first: a relative link target is read from the link's REAL folder. A
+// textual `..` after a symlinked parent named the wrong folder, and the write went to a file next to the alias.
+test('a relative link reached through a symlinked folder resolves from that folder\'s real place', t => {
+  const s = sandbox(t);
+  const base = path.dirname(s.home);
+  const realDir = path.join(base, 'real', 'dir');
+  fs.mkdirSync(realDir, { recursive: true });
+  const alias = path.join(base, 'alias');
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  try {
+    fs.symlinkSync(realDir, alias);
+    fs.symlinkSync('../settings.json', path.join(realDir, 'mid'));
+    fs.symlinkSync(path.join(alias, 'mid'), s.paths.settings);
+  } catch (error) { return t.skip(`no symlink here (${error.code})`); }
+  assert.equal(install({ home: s.home, source: s.source }).code, 0);
+  assert.equal(fs.existsSync(path.join(base, 'real', 'settings.json')), true, 'the real target was not written');
+  assert.equal(fs.existsSync(path.join(base, 'settings.json')), false, 'a file was written next to the alias');
+});

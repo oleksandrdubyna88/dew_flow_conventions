@@ -446,7 +446,9 @@ function lastLinkTarget(settingsPath) {
   for (let hop = 0; hop <= MAX_LINKS; hop += 1) {
     const stat = lstatOrNull(current);
     if (stat === null || !stat.isSymbolicLink()) return hop === 0 ? null : current;
-    current = path.resolve(path.dirname(current), fs.readlinkSync(current));
+    // From the link's REAL folder: a textual `..` after a symlinked parent names the wrong folder (CodeRabbit on creds
+    // #340, 2026-11-10). The link exists, so its folder does too.
+    current = path.resolve(fs.realpathSync(path.dirname(current)), fs.readlinkSync(current));
   }
   return TOO_MANY_LINKS;
 }
