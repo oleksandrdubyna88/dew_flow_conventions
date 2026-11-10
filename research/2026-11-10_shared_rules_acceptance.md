@@ -11,6 +11,8 @@ Each block is generated from the run's report (`.git/worktrees/<wt>/rules-smoke/
 
 ## dew_flow_creds_for_devs
 
+Consumer commit (worktree HEAD) for both runs below: `dc6fa09` (the head of PR #328, worktree `creds-smoke-328`).
+
 **codex** — PASS · started 2026-11-10T12:42:58.108Z · linux · pin `5e73780` (pinned submodule) · files `src_minimalapi_server/src/Program.cs`, `src_vs_code/src/extension.ts`
 
 - status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
@@ -24,6 +26,8 @@ Each block is generated from the run's report (`.git/worktrees/<wt>/rules-smoke/
 - rules read in full (7 of 7): `common.coding-style` `0ba570017a04`, `common.knowledge-base` `44712b79711c`, `common.logging-serilog` `e7c43d5c52ec`, `common.security` `47bbde205659`, `common.task-lifecycle` `2769609f1163`, `csharp.doctrine` `b8ecae510e0f`, `typescript.doctrine` `90a8939f3004`
 
 ## dew_flow_connect_other_ais
+
+Consumer commit (worktree HEAD) for both runs below: `ee8ad53`.
 
 **codex** — PASS · started 2026-11-10T19:31:10.602Z · linux · pin `1341995` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
 
@@ -39,6 +43,8 @@ Each block is generated from the run's report (`.git/worktrees/<wt>/rules-smoke/
 
 ## dew_flow_benchmark
 
+Consumer commit (worktree HEAD) for both runs below: `3958ecc`.
+
 **codex** — PASS · started 2026-11-10T19:33:10.981Z · linux · pin `1341995` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
 
 - status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
@@ -52,6 +58,8 @@ Each block is generated from the run's report (`.git/worktrees/<wt>/rules-smoke/
 - rules read in full (6 of 6): `common.coding-style` `0ba570017a04`, `common.knowledge-base` `44712b79711c`, `common.security` `47bbde205659`, `common.task-lifecycle` `2769609f1163`, `csharp.doctrine` `b8ecae510e0f`, `typescript.doctrine` `90a8939f3004`
 
 ## dew_flow_rag_qln
+
+Consumer commit (worktree HEAD) for both runs below: `f7f4fc4`.
 
 **codex** — PASS · started 2026-11-10T19:35:30.467Z · linux · pin `1341995` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
 
@@ -67,6 +75,8 @@ Each block is generated from the run's report (`.git/worktrees/<wt>/rules-smoke/
 
 ## wsl_care
 
+Consumer commit (worktree HEAD) for both runs below: `cb8046b`.
+
 **codex** — PASS · started 2026-11-10T19:37:01.169Z · linux · pin `1341995` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
 
 - status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
@@ -81,6 +91,8 @@ Each block is generated from the run's report (`.git/worktrees/<wt>/rules-smoke/
 
 ## dew_flow_vscode_kit
 
+Consumer commit (worktree HEAD) for both runs below: `a9ab150`.
+
 **codex** — PASS · started 2026-11-10T19:38:39.731Z · linux · pin `1341995` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
 
 - status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
@@ -94,6 +106,8 @@ Each block is generated from the run's report (`.git/worktrees/<wt>/rules-smoke/
 - rules read in full (6 of 6): `common.coding-style` `0ba570017a04`, `common.knowledge-base` `44712b79711c`, `common.security` `47bbde205659`, `common.task-lifecycle` `2769609f1163`, `csharp.doctrine` `b8ecae510e0f`, `typescript.doctrine` `90a8939f3004`
 
 ## dew_flow_amd_r9700_tuning_ai
+
+Consumer commit (worktree HEAD) for both runs below: `2ecb356`.
 
 **codex** — PASS · started 2026-11-10T19:40:36.501Z · linux · pin `1341995` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
 
@@ -111,8 +125,8 @@ Each block is generated from the run's report (`.git/worktrees/<wt>/rules-smoke/
 
 Each migration commit reverted in a disposable clone, then `.agents/conventions` removed, `git submodule sync`, `git submodule update --init .claude/rules/shared`:
 
-- dew_flow_connect_other_ais: migration 8d42647 revert=0 tree-equals-parent=yes old-pin=895b24c old-tools=missing (this check also asked for `low-priority.mjs`, which that pin predates; see the next line) status=0 2026-11-10T19:31:50Z
+- dew_flow_connect_other_ais: migration `8d42647` reverted (exit 0), the tree equals its parent's, the old mount is back at `895b24c` (2026-09-10) with that era's tools — `rules.mjs`, `pin-check.mjs`, `smoke-rules.mjs` are there and `pin-check` runs (stale, as an old pin is); `low-priority.mjs` did not exist yet at that pin, so the first scripted check's "old-tools=missing" was only that file; status clean, 2026-11-10T19:31:50Z.
 - dew_flow_benchmark: migration 89b4909 revert=0 tree-equals-parent=yes old-pin=e29883f old-tools=present low-priority=ok status=0 2026-11-10T19:32:01Z
 - dew_flow_rag_qln: migration d83315b revert=0 tree-equals-parent=yes old-pin=cc24f9e old-tools=present low-priority=ok status=0 2026-11-10T19:32:05Z
-- dew_flow_connect_other_ais: its old pin `895b24c` (2026-09-10) predates `low-priority.mjs`; `rules.mjs`, `pin-check.mjs`, `smoke-rules.mjs` are there and `pin-check` runs (stale, as an old pin is).
+- wsl_care, dew_flow_vscode_kit, dew_flow_amd_r9700_tuning_ai: **none by construction** — each joined the family on the neutral layout (2026-10-02, 2026-10-02, 2026-11-01) and never had the legacy mount, so there is no migration commit to revert (the plan's § 6 matrix rule).
 - dew_flow_creds_for_devs: `75c1f1f` reverted — the tree is its parent's, the old mount at `37b9aa5` is back, its tools and the low-priority wrapper run, the tree is clean (recorded in story 3.C).
