@@ -81,7 +81,9 @@ leaves `settings.json` naming a missing file and a stop between the writes is co
 resolver call at 30 s (`RESOLVER_TIMEOUT_MS`; the host's own default for a command hook is 600 s) and then gives the
 INCOMPLETE notice naming the bound. `build-flags.mjs` suggests the command with `-m:4` directly after the build verb (after any leading assignments,
 quoted or not), and splits a wrapper's inner command line into its chain like the outer one. Every write of
-`settings.json` (install, repair, uninstall, effort) follows a symlink and keeps the file's mode, its backup too. `ensure-user-guard.mjs`, at EVERY start, converges an existing `~/.claude/settings.json` so `effortLevel` and every
+`settings.json` (install, repair, uninstall, effort) follows a symlink and keeps the file's mode, its backup too. The
+write target is found before anything is written: the real file, or the last target of a chain of links that ends in a
+missing file (up to 40 links); a link loop is refused. `ensure-user-guard.mjs`, at EVERY start, converges an existing `~/.claude/settings.json` so `effortLevel` and every
 `modelSettings.*.effortLevel` (`sonnet`, `opus`, `fable` and any other key) are `high` — backup and atomic write, silent
 when already converged, skipped under `SUBAGENT_MODEL_GUARD=off` and in this repository (the `subagent-model.optout` marker does NOT skip it: high everywhere), never creating the file, following a symlink and keeping the file mode, refusing (one warning line, nothing written) a read-only file, an unwritable target, or a non-object `modelSettings` / per-model value
 (`applyEffort`; `install-user-hook.mjs --check` reports it without gating the exit code). Design

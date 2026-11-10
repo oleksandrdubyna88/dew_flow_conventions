@@ -234,12 +234,13 @@ export function repairRegistration({ home, beforeWrite = () => {} }) {
   const original = readOrNull(t.settings);
   const parsed = parseSettings(original);
   if (parsed.error) return unparsable(t.settings, parsed.error);
+  const file = settingsFileOf(t.settings);
   const merged = serialise(mergeEntry(parsed.settings, t.hook));
   if (original !== null && original.equals(Buffer.from(merged))) return result(0, ['already registered']);
   const lines = original === null ? [] : [`backup ${writeBackup(t.settings, original, modeOf(t.settings))}`];
   beforeWrite();
   if (!sameBytes(readOrNull(t.settings), original)) return result(1, [...lines, CHANGED]);
-  writeSettings(t.settings, merged);
+  writeSettings(file, merged);
   return result(0, [...lines, `wrote ${t.settings} (hooks.PreToolUse: ${MATCHER})`]);
 }
 
@@ -282,6 +283,7 @@ export function install({ home, source, beforeWrite = () => {}, clearOptout = fa
   const original = readOrNull(t.settings);
   const parsed = parseSettings(original);
   if (parsed.error) return unparsable(t.settings, parsed.error);
+  const file = settingsFileOf(t.settings);
   const merged = mergeEntry(parsed.settings, t.hook);
   const sourceBytes = fs.readFileSync(source);
   const refusal = downgradeRefusal(t, sourceBytes, force) || changedRefusal(t, sourceBytes, force);
@@ -299,7 +301,7 @@ export function install({ home, source, beforeWrite = () => {}, clearOptout = fa
   // leave a registration of a missing script, run on every Agent call (2026-11-10).
   writeManifest(t, source, sourceBytes, by, readOrNull(t.hook));
   writeAtomic(t.hook, sourceBytes);
-  writeSettings(t.settings, serialise(merged));
+  writeSettings(file, serialise(merged));
   return result(0, [`wrote ${t.hook}`, ...lines, `wrote ${t.settings} (hooks.PreToolUse: ${MATCHER})`]);
 }
 
@@ -309,6 +311,7 @@ export function uninstall({ home, beforeWrite = () => {} }) {
   const original = readOrNull(t.settings);
   const parsed = parseSettings(original);
   if (parsed.error) return unparsable(t.settings, parsed.error);
+  const file = settingsFileOf(t.settings);
   const present = findEntries(parsed.settings, t.hook).length > 0;
   const hookThere = fs.existsSync(t.hook);
   const markOptout = () => { writeAtomic(t.optout, OPTOUT_TEXT); return `wrote the opt-out marker ${t.optout}`; };
@@ -318,7 +321,7 @@ export function uninstall({ home, beforeWrite = () => {} }) {
     lines.push(`backup ${writeBackup(t.settings, original, modeOf(t.settings))}`);
     beforeWrite();
     if (!sameBytes(readOrNull(t.settings), original)) return result(1, [CHANGED]);
-    writeSettings(t.settings, serialise(removeEntry(parsed.settings, t.hook)));
+    writeSettings(file, serialise(removeEntry(parsed.settings, t.hook)));
     lines.push(`removed the hook entry from ${t.settings}`);
   }
   if (hookThere) {
@@ -402,25 +405,42 @@ const modeOf = file => (fs.existsSync(file) ? fs.statSync(file).mode & 0o777 : u
  * file — and with its own mode (a 0600 file may hold tokens in `env`). `applyEffort` did both; install,
  * repairRegistration and uninstall did neither until 2026-11-10 (CodeRabbit on creds #328).
  */
-function writeSettings(settingsPath, data) {
-  const file = effortTarget(settingsPath) ?? danglingLinkTarget(settingsPath) ?? settingsPath;
+function writeSettings(file, data) {
   writeAtomic(file, data, modeOf(file));
 }
 
+/** How many links a settings path may pass through before it is called a loop (the kernel's own ELOOP limit). */
+const MAX_LINKS = 40;
+
 /**
- * The path a symlink points at when that path does not exist yet; null for anything else. Without it, a link into a
- * dotfiles folder whose file is not created yet read as "no settings", and the rename replaced the LINK with a plain
- * file (CodeRabbit on #148, 2026-11-10). One level: the link's own target, resolved from the link's folder.
+ * The file a settings write goes to, found BEFORE anything is written: the real file when one exists; otherwise the
+ * last target of a chain of links that ends in a missing file (one link or several — CodeRabbit on #148 and coai
+ * #969, 2026-11-10: a single-level read replaced the middle link of a chain with a plain file); otherwise the path
+ * itself. A loop throws, so the operation stops before its backup, manifest, hook or settings are touched.
  */
-function danglingLinkTarget(settingsPath) {
-  try {
-    return fs.lstatSync(settingsPath).isSymbolicLink()
-      ? path.resolve(path.dirname(settingsPath), fs.readlinkSync(settingsPath))
-      : null;
-  } catch {
-    return null;
-  }
+function settingsFileOf(settingsPath) {
+  return effortTarget(settingsPath) ?? lastLinkTarget(settingsPath) ?? settingsPath;
 }
+
+/** The missing file a chain of links ends in, each hop read from its own folder; null when the path is no link. */
+function lastLinkTarget(settingsPath) {
+  let current = settingsPath;
+  for (let hop = 0; hop <= MAX_LINKS; hop += 1) {
+    const stat = lstatOrNull(current);
+    if (stat === null || !stat.isSymbolicLink()) return hop === 0 ? null : current;
+    current = path.resolve(path.dirname(current), fs.readlinkSync(current));
+  }
+  throw new Error(`${settingsPath} is a symlink loop (more than ${MAX_LINKS} links); nothing written`);
+}
+
+const lstatOrNull = file => {
+  try {
+    return fs.lstatSync(file);
+  } catch (e) {
+    if (e.code === 'ENOENT') return null;
+    throw e;
+  }
+};
 
 /** Where to read and write: the symlink's target when settings.json is a link; null when there is no file. */
 function effortTarget(settingsPath) {

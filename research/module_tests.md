@@ -178,7 +178,9 @@ on an unclosed quote, 647 ms at 24 characters), and a POSIX shell's `-c` takes o
 `bash -c 'dotnet build' -m:4` is refused (`-m:4` there is `$0`). CodeRabbit on #148 added two installer cases, red first: a
 0644 `settings.json` stays 0644 under umask 0077 (the temp file's mode is set with chmod, not left to the umask), and a
 symlink whose target does not exist yet stays a link while its target is created. The linear-pattern case measures CPU
-time, not the clock, so a parked runner cannot fail it.
+time, not the clock, so a parked runner cannot fail it. CodeRabbit on coai #969 added two more, red first: a CHAIN of links
+ending in a missing file keeps every link and creates the last target (a one-level read replaced the middle link), and a
+link loop is refused before the backup, manifest, hook or settings are written.
 
 `tools/load-instructions-hook.test.mjs` (4 cases, 2026-11-10) drives `sessionInstructions` of
 `settings/hooks/load-instructions.mjs` against fake self-hosted layouts: the bound is at most 30 s, a resolver that

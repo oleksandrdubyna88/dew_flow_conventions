@@ -402,3 +402,29 @@ test('a settings.json symlink whose target does not exist yet stays a link, and 
   assert.equal(fs.lstatSync(s.paths.settings).isSymbolicLink(), true, 'the dangling link was replaced by a plain file');
   assert.deepEqual(findEntries(JSON.parse(fs.readFileSync(real, 'utf8')), s.paths.hook).length, 1);
 });
+
+// ---- CodeRabbit on coai #969 (2026-11-10), red first: a CHAIN of links ending in a missing file ----
+test('a chain of settings links whose last target is missing keeps every link, and the last target is created', t => {
+  const s = sandbox(t);
+  const dotfiles = path.join(path.dirname(s.home), 'dotfiles');
+  const mid = path.join(dotfiles, 'mid.json');
+  const real = path.join(dotfiles, 'settings.json');
+  fs.mkdirSync(dotfiles);
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  try { fs.symlinkSync(real, mid); fs.symlinkSync(mid, s.paths.settings); } catch (error) { return t.skip(`no symlink here (${error.code})`); }
+  assert.equal(install({ home: s.home, source: s.source }).code, 0);
+  assert.equal(fs.lstatSync(s.paths.settings).isSymbolicLink(), true, 'the first link was replaced');
+  assert.equal(fs.lstatSync(mid).isSymbolicLink(), true, 'the middle link was replaced by a plain file');
+  assert.equal(findEntries(JSON.parse(fs.readFileSync(real, 'utf8')), s.paths.hook).length, 1);
+});
+
+test('a settings link loop is refused and no link is touched', t => {
+  const s = sandbox(t);
+  const other = path.join(s.paths.dir, 'loop.json');
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  try { fs.symlinkSync(other, s.paths.settings); fs.symlinkSync(s.paths.settings, other); } catch (error) { return t.skip(`no symlink here (${error.code})`); }
+  assert.throws(() => install({ home: s.home, source: s.source }), /loop/);
+  assert.equal(fs.lstatSync(s.paths.settings).isSymbolicLink(), true);
+  assert.equal(fs.existsSync(s.paths.hook), false, 'the refusal came after the hook was written');
+  assert.equal(fs.lstatSync(other).isSymbolicLink(), true);
+});
