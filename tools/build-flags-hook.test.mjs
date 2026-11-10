@@ -4,7 +4,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { buildFlagsRefusal } from '../settings/hooks/build-flags.mjs';
+import { ASSIGNMENTS_AT_START, buildFlagsRefusal } from '../settings/hooks/build-flags.mjs';
 
 const HOOK = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'settings', 'hooks', 'build-flags.mjs');
 
@@ -217,4 +217,19 @@ test('a wrapper\'s inner command line is split into its chain, like the outer on
   assert.equal(refused('bash -c "dotnet build && echo -m:4"'), true, "a neighbour's -m:4 does not bound the build");
   assert.equal(refused('bash -c "cd src && dotnet build -m:4"'), false, 'a bounded inner build passes');
   assert.equal(refused('sh -c "dotnet build -m:4; echo done"'), false);
+});
+
+// The code round on dew_flow_conventions (2026-11-10), each red first.
+test('the assignment prefix pattern is linear: an unclosed quote after a long value does not backtrack', () => {
+  // The first pattern repeated `[^\s"']+` inside `*`: 24 characters took 647 ms and each two more took four times as long.
+  const started = Date.now();
+  ASSIGNMENTS_AT_START.exec(`A=${'a'.repeat(24)}"`);
+  assert.ok(Date.now() - started < 100, `took ${Date.now() - started} ms`);
+});
+
+test('for a POSIX shell, only the one argument after -c is the command: what follows is $0 and the arguments', () => {
+  assert.equal(refused("bash -c 'dotnet build' -m:4"), true, "bash's $0 is not a build flag");
+  assert.equal(refused('bash -lc "dotnet build"'), true);
+  assert.equal(refused("bash -c 'dotnet build -m:4' worker"), false);
+  assert.equal(refused('cmd /c dotnet build App.slnx -m:4'), false, 'cmd /c still takes the rest of the line');
 });

@@ -172,7 +172,10 @@ CodeRabbit on creds #328 and coai #968 (2026-11-10) added two more build-flags c
 first: a quoted assignment value (`BUILDER="msbuild" dotnet build`) is skipped when the suggestion is placed; a
 wrapper's inner command line is split into its chain (`bash -c "cd src && dotnet build"` is refused, a neighbour's
 `-m:4` vouches for nothing); and `install`, `repairRegistration` and `uninstall` each write through a symlinked
-`settings.json` without replacing the link, and keep its mode (0600) for the file and its backup.
+`settings.json` without replacing the link, and keep its mode (0600) for the file and its backup. The code round of
+the same day added two, red first: the assignment-prefix pattern is linear (its first form backtracked exponentially
+on an unclosed quote, 647 ms at 24 characters), and a POSIX shell's `-c` takes one argument as its command, so
+`bash -c 'dotnet build' -m:4` is refused (`-m:4` there is `$0`).
 
 `tools/load-instructions-hook.test.mjs` (4 cases, 2026-11-10) drives `sessionInstructions` of
 `settings/hooks/load-instructions.mjs` against fake self-hosted layouts: the bound is at most 30 s, a resolver that
