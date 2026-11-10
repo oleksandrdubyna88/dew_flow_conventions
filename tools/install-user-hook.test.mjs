@@ -428,3 +428,18 @@ test('a settings link loop is refused and no link is touched', t => {
   assert.equal(fs.existsSync(s.paths.hook), false, 'the refusal came after the hook was written');
   assert.equal(fs.lstatSync(other).isSymbolicLink(), true);
 });
+
+test('an acyclic chain longer than 40 links is refused like a loop, before anything is written', t => {
+  const s = sandbox(t);
+  const dotfiles = path.join(path.dirname(s.home), 'links');
+  fs.mkdirSync(dotfiles);
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  const hops = Array.from({ length: 41 }, (_, i) => path.join(dotfiles, `l${i}`));
+  try {
+    hops.forEach((hop, i) => fs.symlinkSync(i + 1 < hops.length ? hops[i + 1] : path.join(dotfiles, 'missing.json'), hop));
+    fs.symlinkSync(hops[0], s.paths.settings);
+  } catch (error) { return t.skip(`no symlink here (${error.code})`); }
+  assert.throws(() => install({ home: s.home, source: s.source }), /symlink loop \(more than 40 links\)/);
+  assert.equal(fs.existsSync(s.paths.hook), false);
+  assert.equal(fs.existsSync(path.join(dotfiles, 'missing.json')), false);
+});
