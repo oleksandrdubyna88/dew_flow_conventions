@@ -95,7 +95,10 @@ A third step, `ensureAgentModelsMod`, in `ensure-user-guard.mjs`, after the guar
   differs; nothing is copied. Raw bytes are safe because of the `eol=lf` rule above; a checkout made before it is
   refused, said once.
 - **Copy and register** (the ported core): install when missing, upgrade an older version by a rename swap keeping at
-  most one `agent-models.replaced-<stamp>` folder, never downgrade, keep a copy whose bytes its record does not vouch
+  most one `agent-models.replaced-<stamp>` folder, never downgrade — also when two sessions start at once: the source's
+  swap moves the target aside without looking again (`agent-models-swap.mjs:262-268`, the cadence consultation of
+  2026-11-11), so a newer copy another start placed meanwhile would be replaced; here the swap reads the version it
+  moved aside and, when it is newer than its own, puts it back and drops its staging — keep a copy whose bytes its record does not vouch
   for, write the record, then register.
 - **Registration**: `env.CLAUDE_CODE_PLUGIN_DIRS` is a string of paths joined by `path.delimiter` (`:` on Linux and
   macOS). The target is appended once; an entry equal to it after `normalise` and `~/` expansion means nothing to do;
@@ -105,9 +108,10 @@ A third step, `ensureAgentModelsMod`, in `ensure-user-guard.mjs`, after the guar
   write; the write is refused when the file or the path it resolves to changed (the `changedUnderUs` rule `:458`),
   and a dangling chain of links is a retry, not a "fix by hand".
 - **No `settings.json`**: on a normal machine the guard step creates it earlier in the same start. Where it is still
-  missing (`SUBAGENT_MODEL_GUARD=off`, the guard's marker), the mod step creates it holding only
-  `{ "env": { "CLAUDE_CODE_PLUGIN_DIRS": "<target>" } }` through the same atomic writer — the owner's goal is every
-  session, and an absent file would leave the mod copied and never loaded.
+  missing (`SUBAGENT_MODEL_GUARD=off`, the guard's marker), the mod step creates it holding only `env` with
+  `CLAUDE_CODE_PLUGIN_DIRS`, decided exactly as for an existing file with an empty value — the session's own entries
+  first, then the target — through the same atomic writer. The owner's goal is every session, and an absent file would
+  leave the mod copied and never loaded.
 - **Lines**: `SPEAKING` gains `edited` and `registered`. Every refusal and every registration line is said once per
   state (`agent-models.reported.json`, overwritten), so a stale submodule working tree after a `git checkout` without
   `git submodule update` gives one line naming `git submodule update`, not one at every start.
@@ -250,8 +254,10 @@ with a re-check of bytes and target as one road; the code has two roads (E2's co
   in-flight releases, ask the owner, and promote `release`. Then one pin-bump commit per consumer of README
   § *Consumers*: the submodule pin and the six hook files of Design C together, with `adapter-check` green.
 - **Depends on.** E2 merged to `main`, and the owner's answer at step 7.
-- **Done when.** Every consumer's pin-bump is merged with its checks present and green. A NEW WSL session in one
-  consumer installs the mod and shows the band, recorded with its date. The plan is promoted with its deviations.
+- **Done when.** Every consumer's pin-bump is merged with its checks present and green. In one consumer on WSL, with
+  a fresh temporary HOME (the owner's own home already holds Part A, so it cannot show an install): the first session
+  start installs and registers, the second loads the band, a third leaves `settings.json` unchanged — each recorded
+  with its date. The owner's own sessions show the band. The plan is promoted with its deviations.
 - **Cornerstone areas.** None.
 
 Cornerstones: 1 of 2 — E1.S3 the released-copy check (E1), the settings-file write (E2)
