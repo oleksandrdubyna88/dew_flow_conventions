@@ -395,6 +395,12 @@ reported file keeps `{ key, at }` and no reminder (the cadence consultation, 202
 unwritable settings.json is then shown once; the consumers' CI `pin-check` and `adapter-check` still catch the first.
 A reminder interval changes the parent's "said once per state" contract, so it needs its own plan.
 
+**Follow-ups for the swap (not built here; CodeRabbit on PR #160, 2026-11-11).** (1) After a put-back that itself
+fails, a later start can install this repository's older copy and later remove the newer aside as a leftover; a
+persisted "restore pending" marker that blocks the install would close it (`putBack` states the limit). (2) `keep` is
+decided on the first read of the target, so an edit made in the milliseconds between `readTarget` and the rename is
+removed with the aside; re-hashing the moved folder before `rmQuiet` would narrow that window.
+
 **Follow-ups for the guard (not built here).** Each is a change of the guard's behaviour, so each needs its own plan.
 The line numbers are of `settings/hooks/lib/user-guard-install.mjs` at HEAD; "measured" means run on 2026-11-11.
 

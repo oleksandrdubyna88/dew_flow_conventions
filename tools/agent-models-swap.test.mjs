@@ -15,7 +15,7 @@ import { test } from 'node:test';
 import * as mod from '../settings/hooks/lib/agent-models-install.mjs';
 import { leftoverStamp } from '../settings/hooks/lib/agent-models-decide.mjs';
 import {
-  IS_ROOT, installedLine, notInstalled, escaped, writeTree, snapshot, treeFiles, sandbox, symlinkOrSkip, renameSeam,
+  IS_ROOT, installedLine, notInstalled, escaped, writeTree, snapshot, treeFiles, direntFolder, sandbox, symlinkOrSkip, renameSeam,
   failing, NOTHING_RAN, FILES, NOW, replacedName, upgradedLine, fixtureBytes, goodManifest,
 } from './lib/agent-models-fixtures.mjs';
 
@@ -545,6 +545,26 @@ test('5b: a COMPLETE mod appearing at the target during the swap is another sess
   assert.deepEqual(s.listMods(), ['agent-models', replacedName()], 'the old copy had no manifest: it stays as replaced-<stamp>');
 });
 
+test('5b2: a complete copy at the target whose plugin.json cannot be READ at that moment is a win we cannot judge, not engine junk: lost, the folder is never moved', t => {
+  if (IS_ROOT || process.platform === 'win32') return t.skip('permissions do not bind root / Windows');
+  const s = sandbox(t);
+  s.writeSettings(s.registered());
+  s.seedTarget({ version: '1.0.0' });
+  const pluginJson = path.join(s.t_.target, '.claude-plugin', 'plugin.json');
+  const { calls, seam } = renameSeam((n) => {
+    if (n !== 2) return;
+    writeTree(s.t_.target, '1.5.0');
+    fs.chmodSync(pluginJson, 0o000); // present, regular, and its read fails (EACCES, the stand-in for EIO / EMFILE)
+  });
+  const r = s.ensure({ rename: seam });
+  assert.deepEqual([r.action, r.line, r.copy], ['none', '', 'lost']);
+  assert.equal(calls.length, 2, 'no aside for the target and no retry: only the target going aside and our rename in');
+  for (const rel of FILES.filter(f => f !== '.claude-plugin/plugin.json')) assert.deepEqual(s.installedBytes(rel), fixtureBytes(rel, '1.5.0'), `${rel}: the competing copy, not ours`);
+  assert.equal(fs.statSync(pluginJson).mode & 0o777, 0o000, 'untouched');
+  assert.deepEqual(s.listMods(), ['agent-models', 'agent-models.installed.json'], 'no staging and no aside: ours is dropped, the old copy had a manifest and is deleted as for any lost race');
+  assert.equal(s.manifest().version, '1.0.0', 'no manifest from us');
+});
+
 // ---------------------------------------------------------------------------------------------------------------------
 // 4.12 a NEWER copy that appears while the swap runs is put back, never replaced (the cadence consultation)
 // ---------------------------------------------------------------------------------------------------------------------
@@ -658,4 +678,10 @@ test('W3: the rename back fails (EPERM) — refused with the aside named and the
   assert.deepEqual(s.listMods().filter(n => n.includes('staging')), []);
   assert.deepEqual(treeFiles(aside), [...FILES].sort());
   assert.deepEqual(fs.readFileSync(path.join(aside, '.claude-plugin', 'plugin.json')), fixtureBytes('.claude-plugin/plugin.json', '2.0.0'));
+});
+
+test('the fixtures name the folder of a directory entry by parentPath (Node 20.12+) or by path (Node 20.11), the repository accepting Node 20+', () => {
+  assert.equal(direntFolder({ parentPath: '/a' }), '/a');
+  assert.equal(direntFolder({ path: '/b' }), '/b');
+  assert.equal(direntFolder({ parentPath: '/a', path: '/b' }), '/a', 'the newer name wins where both exist');
 });

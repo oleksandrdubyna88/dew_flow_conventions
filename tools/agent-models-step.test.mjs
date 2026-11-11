@@ -108,6 +108,7 @@ test('3.3: a project with the conventions repository\'s own layout at its root n
 });
 
 test('3.4: a consumer whose .agents/conventions holds the full layout is NOT taken for the reference repository: the mod installs', async t => {
+  if (!onlyWhereTheStepRuns(t)) return;
   const s = sandbox(t);
   const mount = path.join(s.project, '.agents', 'conventions');
   fs.mkdirSync(path.join(mount, 'tools'), { recursive: true });
@@ -229,6 +230,7 @@ test('3.13: the hook passes its own CLAUDE_CODE_PLUGIN_DIRS to the installer: th
 });
 
 test('3.14: a copy another installer left (a record that names another source) with its registration gives none: no line, the home byte-identical', async t => {
+  if (!onlyWhereTheStepRuns(t)) return;
   const s = sandbox(t);
   s.seedSettings({ env: { CLAUDE_CODE_PLUGIN_DIRS: s.installed } });
   seedInstalledCopy(s);

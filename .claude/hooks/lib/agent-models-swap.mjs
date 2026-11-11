@@ -38,17 +38,28 @@ const isOtherUsers = (stat, uid) => {
   return me !== undefined && stat.uid !== me;
 };
 
-/** The MAJOR.MINOR.PATCH version in the regular `.claude-plugin/plugin.json` of `dir`, or null: not a mod (engine junk, no file, no version). */
-export function modVersionIn(dir) {
+/**
+ * What `dir` holds, in three kinds: `{ absent: true }` (no regular `.claude-plugin/plugin.json`: engine junk or nothing),
+ * `{ unreadable: true }` (the file is there and reading it failed: EIO, EMFILE, EACCES; whether it is a mod is not known),
+ * or `{ version }` (the MAJOR.MINOR.PATCH in it, or null when the content is not a version). The one reader of that file.
+ */
+export function readModPresence(dir) {
+  const file = path.join(dir, PLUGIN_JSON);
   try {
-    const file = path.join(dir, PLUGIN_JSON);
-    if (!lstatOrNull(file)?.isFile()) return null;
+    if (!lstatOrNull(file)?.isFile()) return { absent: true };
+  } catch (e) {
+    return e.code === 'ENOTDIR' ? { absent: true } : { unreadable: true };
+  }
+  try {
     const value = parseJsonObject(fs.readFileSync(file));
-    return value === null ? null : parseVersion(value.version);
+    return { version: value === null ? null : parseVersion(value.version) };
   } catch {
-    return null;
+    return { unreadable: true };
   }
 }
+
+/** The MAJOR.MINOR.PATCH version in the regular `.claude-plugin/plugin.json` of `dir`, or null: not a mod (engine junk, no file, no version) or not readable now. */
+export const modVersionIn = dir => readModPresence(dir).version ?? null;
 
 /** True when `dir` holds a mod (see `modVersionIn`), not engine junk. */
 export const hasModVersion = dir => modVersionIn(dir) !== null;
@@ -238,14 +249,18 @@ function putBack({ t, staging, aside, held, src, rename }) {
 
 /**
  * The rename into place failed. A complete mod is there (somebody else won, F3a), or something that is not a mod is (the
- * engine writes `.claude-plugin/types/` into a plugin path it has loaded): that goes to a fresh aside and the rename is
- * retried ONCE. Or nothing is, and the old one must go back (F3b). The old aside or replaced folder is never deleted while
- * the target is not a complete mod. Returns `{ retried: true }` when the retry put our copy in place.
+ * engine writes `.claude-plugin/types/` into a plugin path it has loaded: no plugin.json at all): that goes to a fresh aside
+ * and the rename is retried ONCE. A plugin.json that cannot be read at that moment counts as a complete mod that won. Or
+ * nothing is, and the old one must go back (F3b). The old aside or replaced folder is never deleted while the target is not
+ * a complete mod. Returns `{ retried: true }` when the retry put our copy in place.
  */
 function renameInFailed(ctx) {
   const { t, staging, aside, keep, rename, now, error } = ctx;
   if (lstatOrNull(t.target) === null) return rollBack(ctx, error);
-  if (hasModVersion(t.target)) {
+  // Only a target with NO plugin.json is engine junk. A plugin.json that is there and cannot be read now may be the whole copy
+  // that won: it is judged like one, and the folder is never moved.
+  const held = readModPresence(t.target);
+  if (held.unreadable || (held.version ?? null) !== null) {
     rmQuiet(staging);
     if (!keep) rmQuiet(aside); // the user's kept copy is not ours to delete
     return { copy: 'lost' };

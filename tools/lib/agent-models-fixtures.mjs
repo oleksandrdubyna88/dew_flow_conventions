@@ -61,13 +61,16 @@ export function writeTree(dir, version, overrides = {}) {
   }
 }
 
+/** The folder a `readdirSync` entry sits in: `parentPath` from Node 20.12, `path` before it (the repository accepts Node 20+). */
+export const direntFolder = entry => entry.parentPath ?? entry.path;
+
 /** Every file under `dir` → { bytes (hex), mtimeMs }; the record a "nothing was touched" test compares. */
 export function snapshot(dir) {
   const out = {};
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile()) continue;
-    const file = path.join(entry.parentPath, entry.name);
+    const file = path.join(direntFolder(entry), entry.name);
     out[path.relative(dir, file)] = { bytes: fs.readFileSync(file).toString('hex'), mtimeMs: fs.statSync(file).mtimeMs };
   }
   return out;
