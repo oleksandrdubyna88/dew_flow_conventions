@@ -84,7 +84,10 @@ test('A6: a target file that cannot be read is a refusal naming that file and th
   } finally {
     fs.chmodSync(file, 0o644);
   }
-  assert.deepEqual(snapshot(s.t_.mods), before);
+  const after = snapshot(s.t_.mods);
+  assert.notEqual(after['agent-models.reported.json'], undefined, 'the refusal is recorded, so it is said once');
+  delete after['agent-models.reported.json'];
+  assert.deepEqual(after, before);
 });
 
 test('A6: an unexpected throw is told with its name and message, not a bare code', t => {
@@ -93,6 +96,17 @@ test('A6: an unexpected throw is told with its name and message, not a bare code
   const r = s.ensure({ now: () => { throw new TypeError('boom'); } });
   assert.equal(r.action, 'refused');
   assert.equal(r.line, notInstalled('unexpected TypeError: boom'));
+});
+
+test('A6: an unexpected throw is told once: the same throw at the next start is silent', t => {
+  const s = sandbox(t);
+  s.writeSettings(s.registered());
+  s.seedTarget();
+  const boom = () => { throw new TypeError('boom'); };
+  const first = s.ensure({ uid: boom });
+  assert.deepEqual([first.action, first.line], ['refused', notInstalled('unexpected TypeError: boom')]);
+  const second = s.ensure({ uid: boom });
+  assert.deepEqual([second.action, second.line, second.repeated], ['refused', '', true]);
 });
 
 test('A6: another session installed it at the same moment AND settings cannot take it: the line says both', t => {

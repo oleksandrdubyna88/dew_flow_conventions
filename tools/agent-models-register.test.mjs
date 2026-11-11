@@ -485,8 +485,12 @@ test('2.27 a creation whose write fails is a retry: three runs leave no file and
   fs.mkdirSync(blocker);
   for (let run = 0; run < 3; run += 1) {
     const r = s.ensure();
-    assert.match(r.line, /could not be written \(\w+\)/);
-    assert.ok(r.line.endsWith(RETRY_TAIL), r.line);
+    if (run === 0) {
+      assert.match(r.line, /could not be written \(\w+\)/);
+      assert.ok(r.line.endsWith(RETRY_TAIL), r.line);
+    } else {
+      assert.deepEqual([r.action, r.line, r.repeated], ['refused', '', true], `run ${run}: a retry refusal is said once too`);
+    }
   }
   assert.equal(fs.existsSync(s.t_.settings), false);
   assert.deepEqual(s.backups(), []);

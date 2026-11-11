@@ -13,6 +13,7 @@
  * In short: nothing is locked; two sessions are serialised by an exclusive staging name, the atomicity of `rename`, the
  * "somebody else won" branch (F3a) and the re-read of settings.json. The target is judged by `lstat` BEFORE anything that
  * follows links, and a symlinked, foreign-owned or non-directory target is refused, never renamed or deleted through.
+ * Every refusal, like an edited or newer copy, is said once per line (`saidRefusal`, `saidOnce`): the reported file keeps one key.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,7 +22,7 @@ import {
   backupOnce, commitSettings, parseSettings, readOrNull, serialise, settingsFileOf, writableReason,
 } from './user-guard-install.mjs';
 import {
-  PLUGIN_DIRS_KEY, RELEASED_MOD, REPORTED_FILE, codeOf, currentUid, decideCopy, decideRegistration, modTargets, reportKey, versionText,
+  PLUGIN_DIRS_KEY, RELEASED_MOD, REPORTED_FILE, codeOf, currentUid, decideCopy, decideRegistration, modTargets, reportKey, sha256, versionText,
 } from './agent-models-decide.mjs';
 import { readSource, readTarget } from './agent-models-read.mjs';
 import {
@@ -123,6 +124,20 @@ function saidOnce(t, key, line, now) {
 
 const withRepeated = (result, said) => ({ ...result, line: said.line, ...(said.repeated ? { repeated: true } : {}) });
 
+/** A swap names its staging and aside folders with a random part; the same refusal at the next start must still be the same line. */
+const SWAP_NAME = /(agent-models\.(?:staging|aside)-)\d+-\d+-[0-9a-f]+/g;
+
+/**
+ * A refused outcome, said once: the key is `line:` and the digest of its line (the random part of a swap's leftover names
+ * left out), so a new reason, version or digest is a new line and the same one is silent. It needs the mods folder, where the
+ * reported file lives; when that folder cannot be made or is not a folder, nothing can be recorded and the line stands at
+ * every start. A refusal that is not recorded is never hidden.
+ */
+function saidRefusal(t, refused, now) {
+  if (modsProblem(t)) return refused;
+  return withRepeated(refused, saidOnce(t, `line:${sha256(refused.line.replace(SWAP_NAME, '$1*'))}`, refused.line, now));
+}
+
 function copyLine(copy, replaced, version, installed) {
   const shown = versionText(version);
   switch (copy) {
@@ -178,25 +193,36 @@ const symlinkRefusal = ({ t, src, target, decision, rec, now }) => {
 function run({ home, source, by, now, beforeWrite, rename, remove, uid, inheritedPluginDirs, released }) {
   const t = modTargets(home);
   const src = readSource(source, { released });
-  if (src.error) return notInstalled(src.error);
+  // A source that is not the released mod says so once, and the flag lets the caller add what only it knows (the layout).
+  if (src.error) return { ...saidRefusal(t, notInstalled(src.error), now), ...(src.unreleased ? { unreleased: true } : {}) };
   const problem = modsProblem(t);
   if (problem) return notInstalled(problem);
   const rec = reconcile(t, { now: now().getTime(), uid, rename, remove });
-  if (rec.refused) return notInstalled(rec.refused, rec);
+  if (rec.refused) return saidRefusal(t, notInstalled(rec.refused, rec), now);
   const target = readTarget(t, { uid });
   const decision = decideCopy(src, target);
   if (decision.action === 'refuse') {
-    return target.kind === 'symlink' ? symlinkRefusal({ t, src, target, decision, rec, now }) : notInstalled(decision.reason, rec);
+    return target.kind === 'symlink' ? symlinkRefusal({ t, src, target, decision, rec, now }) : saidRefusal(t, notInstalled(decision.reason, rec), now);
   }
   const copied = carryOutCopy({ t, src, decision, rename, remove, now, uid, manifest: manifestBytes(src, source, now, by) });
-  if (copied.refusal) return notInstalled(copied.refusal, rec);
+  if (copied.refusal) return saidRefusal(t, notInstalled(copied.refusal, rec), now);
   if (copied.copy === 'install' || copied.copy === 'upgrade') rmQuiet(reportedFile(t)); // a new copy is new information: what was said about the old one is forgotten
   const registered = register({ t, home, beforeWrite, inheritedPluginDirs });
   if (registered.registration === 'refuse') {
-    return composeRefusedRegistration({ copy: copied.copy, reason: registered.reason, retry: registered.retry, src, target, rec });
+    return saidRefusal(t, composeRefusedRegistration({ copy: copied.copy, reason: registered.reason, retry: registered.retry, src, target, rec }), now);
   }
   const say = (action, line) => saidOnce(t, reportKey(action, target, src.version), line, now);
   return composeDone({ copy: copied.copy, registration: registered.registration, carried: registered.carried ?? 0, replaced: copied.replaced, src, target, rec, say });
+}
+
+/** A throw nobody expected, told once when the mods folder can hold the record, and as it stands otherwise. Never throws. */
+function unexpected(home, now, e) {
+  const refused = notInstalled(`unexpected ${e?.code ?? e?.name}: ${e?.message}`);
+  try {
+    return saidRefusal(modTargets(home), refused, now);
+  } catch {
+    return refused;
+  }
 }
 
 /**
@@ -220,6 +246,6 @@ export function ensureAgentModels({
   try {
     return run({ home, source, by, now, beforeWrite, rename, remove, uid, inheritedPluginDirs, released });
   } catch (e) {
-    return notInstalled(`unexpected ${e?.code ?? e?.name}: ${e?.message}`);
+    return unexpected(home, now, e);
   }
 }

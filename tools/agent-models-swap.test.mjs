@@ -73,7 +73,7 @@ test('F2: the aside rename fails — refused, the old target, its manifest and s
   assert.match(r.line, new RegExp(`^${escaped(notInstalled(`could not rename ${s.t_.target} aside to `))}.*agent-models\\.aside-\\d+-\\d+-[0-9a-f]{8} \\(EPERM\\)$`));
   for (const rel of FILES) assert.deepEqual(s.installedBytes(rel), oldFiles[rel], rel);
   assert.deepEqual(s.manifest(), before.manifest);
-  assert.deepEqual(s.listMods(), ['agent-models', 'agent-models.installed.json']);
+  assert.deepEqual(s.listMods(), ['agent-models', 'agent-models.installed.json', 'agent-models.reported.json']);
   assert.equal(s.readSettings(), before.settings);
   assert.equal(calls.length, 1);
 });
@@ -88,7 +88,7 @@ test('F3b: the rename in fails and the rename back works — refused, the old ta
   assert.equal(r.action, 'refused');
   assert.match(r.line, new RegExp(`^${escaped(notInstalled('could not rename '))}.*agent-models\\.staging-\\d+-\\d+-[0-9a-f]{8} into place \\(EPERM\\); .*agent-models\\.aside-\\d+-\\d+-[0-9a-f]{8} was renamed back$`));
   for (const rel of FILES) assert.deepEqual(s.installedBytes(rel), oldFiles[rel], rel);
-  assert.deepEqual(s.listMods(), ['agent-models', 'agent-models.installed.json']);
+  assert.deepEqual(s.listMods(), ['agent-models', 'agent-models.installed.json', 'agent-models.reported.json']);
   assert.deepEqual(s.manifest(), before.manifest);
   assert.equal(s.readSettings(), before.settings);
 });
@@ -493,7 +493,7 @@ test('3e: keep, the rename in fails and the rename back works — refused, the e
   assert.equal(r.action, 'refused');
   assert.match(r.line, new RegExp(`^${escaped(notInstalled('could not rename '))}.*agent-models\\.staging-\\d+-\\d+-[0-9a-f]{8} into place \\(EPERM\\); .*${escaped(replacedName())} was renamed back$`));
   assert.deepEqual(bytesOnly(snapshot(s.t_.target)), bytesOnly(old));
-  assert.deepEqual(s.listMods(), ['agent-models', 'agent-models.installed.json']);
+  assert.deepEqual(s.listMods(), ['agent-models', 'agent-models.installed.json', 'agent-models.reported.json']);
 });
 
 test('3f: a crash after the target went aside (rename in and rename back both fail) leaves the replaced folder; the next start installs fresh and never touches it', t => {

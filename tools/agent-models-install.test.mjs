@@ -210,7 +210,7 @@ test('files the engine or the operator left in the target never make an equal co
 // ---------------------------------------------------------------------------------------------------------------------
 
 function sourceRefusal(name, arrange, expectedReason) {
-  test(`source refusal: ${name} — nothing written, settings byte-identical, no mods folder made`, t => {
+  test(`source refusal: ${name} — said once, settings byte-identical, the mods folder holds only the reported record`, t => {
     const s = sandbox(t);
     s.writeSettings({ model: 'opus' });
     if (arrange(s, t) === false) return;
@@ -221,10 +221,43 @@ function sourceRefusal(name, arrange, expectedReason) {
     assert.equal(r.registration, 'none');
     assert.match(r.line, new RegExp(`^${escaped(notInstalled(''))}${expectedReason(s)}$`));
     assert.equal(s.readSettings(), before);
-    assert.equal(fs.existsSync(s.t_.mods), false);
+    assert.deepEqual(s.listMods(), ['agent-models.reported.json']);
     assert.equal(s.backups().length, 0);
+    const again = s.ensure();
+    assert.deepEqual([again.action, again.line, again.repeated], ['refused', '', true]);
   });
 }
+test('a source refusal when the mods folder cannot be made is not recorded anywhere: the line stands at every start', t => {
+  const s = sandbox(t);
+  s.writeSettings({ model: 'opus' });
+  fs.writeFileSync(s.sourceFile('.claude-plugin/plugin.json'), '{');
+  fs.writeFileSync(s.t_.mods, 'a file where the mods folder should be');
+  for (let run = 0; run < 2; run += 1) {
+    const r = s.ensure();
+    assert.equal(r.action, 'refused', `run ${run}`);
+    assert.match(r.line, /does not parse/, `run ${run}`);
+    assert.equal(r.repeated, undefined, `run ${run}`);
+  }
+  assert.equal(fs.readFileSync(s.t_.mods, 'utf8'), 'a file where the mods folder should be');
+});
+
+test('a source refusal when the mods folder is a symlink writes nothing behind the link: the line stands at every start', t => {
+  const s = sandbox(t);
+  s.writeSettings({ model: 'opus' });
+  fs.writeFileSync(s.sourceFile('.claude-plugin/plugin.json'), '{');
+  const behind = path.join(s.root, 'behind');
+  fs.mkdirSync(behind);
+  fs.mkdirSync(s.claude, { recursive: true });
+  if (!symlinkOrSkip(t, behind, s.t_.mods)) return;
+  for (let run = 0; run < 2; run += 1) {
+    const r = s.ensure();
+    assert.equal(r.action, 'refused', `run ${run}`);
+    assert.match(r.line, /does not parse/, `run ${run}`);
+    assert.equal(r.repeated, undefined, `run ${run}`);
+  }
+  assert.deepEqual(fs.readdirSync(behind), []);
+});
+
 const pjPath = s => escaped(s.sourceFile('.claude-plugin/plugin.json'));
 sourceRefusal('a version of "1.2"', s => fs.writeFileSync(s.sourceFile('.claude-plugin/plugin.json'), '{"version":"1.2"}'),
   s => `source plugin\\.json ${pjPath(s)} has no MAJOR\\.MINOR\\.PATCH version \\(got "1\\.2"\\)`);
@@ -316,7 +349,10 @@ test('a target owned by another user is refused and never touched (the uid is in
   const r = s.ensure({ uid: () => 999999 });
   assert.equal(r.action, 'refused');
   assert.equal(r.line, notInstalled(`${s.t_.target} is owned by another user (uid ${realUid})`));
-  assert.deepEqual(snapshot(s.t_.mods), before.tree);
+  const after = snapshot(s.t_.mods);
+  assert.notEqual(after['agent-models.reported.json'], undefined, 'the refusal is recorded, so it is said once');
+  delete after['agent-models.reported.json'];
+  assert.deepEqual(after, before.tree);
   assert.equal(s.readSettings(), before.settings);
 });
 
@@ -448,7 +484,8 @@ test('a read-only settings.json is refused as not writable, three runs leave no 
     for (let run = 0; run < 3; run += 1) {
       const r = s.ensure();
       assert.equal(r.action, 'refused');
-      assert.match(r.line, /is not writable \(EACCES\)/);
+      if (run === 0) assert.match(r.line, /is not writable \(EACCES\)/);
+      else assert.deepEqual([r.line, r.repeated], ['', true], `run ${run}: said once`);
     }
     assert.equal(s.backups().length, 0);
     assert.deepEqual(fs.readdirSync(s.claude).filter(f => f.includes('.tmp-')), []);
@@ -467,7 +504,8 @@ test('a write that fails after the backup is a refusal, and repeated runs add no
   for (let run = 0; run < 3; run += 1) {
     const r = s.ensure();
     assert.equal(r.action, 'refused');
-    assert.match(r.line, /could not be written/);
+    if (run === 0) assert.match(r.line, /could not be written/);
+    else assert.deepEqual([r.line, r.repeated], ['', true], `run ${run}: said once`);
   }
   assert.equal(s.backups().length, 1);
   assert.equal(s.readSettings(), before);
@@ -497,7 +535,7 @@ test('a copy done and a registration refused is repaired later by registering on
   const first = s.ensure();
   assert.equal(first.action, 'refused');
   assert.equal(first.copy, 'install');
-  assert.deepEqual(s.listMods(), ['agent-models', 'agent-models.installed.json']);
+  assert.deepEqual(s.listMods(), ['agent-models', 'agent-models.installed.json', 'agent-models.reported.json']);
   const before = snapshot(s.t_.mods);
   s.writeSettings({ model: 'x' });
   const second = s.ensure();

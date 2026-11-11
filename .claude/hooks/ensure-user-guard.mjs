@@ -27,6 +27,12 @@
  * `~/.claude/settings.json` so `effortLevel` and `modelSettings.<model>.effortLevel` are all `high`
  * (`ensureEffort`; one line when it changed something). Only `SUBAGENT_MODEL_GUARD=off` and the conventions
  * repository itself skip it; the `subagent-model.optout` marker deliberately does not (high everywhere).</p>
+ *
+ * <p><b>Agent-models mod.</b> Third (`ensureAgentModelsMod`): the released mod at `<project>/.agents/conventions/mods/agent-models`
+ * is copied into `~/.claude/mods` and registered in `settings.json` (created when missing; `lib/agent-models-install.mjs`).
+ * Skipped, in order: `AGENT_MODELS_MOD=off`, win32, the conventions repository (decided on the project's own hook path, never on
+ * the mod's folder), the `agent-models.optout` marker, a project without the mod; `SUBAGENT_MODEL_GUARD=off` does not skip it.
+ * Every refusal is said once; a mod that is not the released one adds the advice to run `git submodule update`.</p>
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -34,6 +40,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
+import { ensureAgentModels, modTargets } from './lib/agent-models-install.mjs';
 import { RELEASED_GUARD, applyEffort, guardVersion, install, isRegistered, registrationValid, repairRegistration, targets } from './lib/user-guard-install.mjs';
 
 export { guardVersion };
@@ -157,6 +164,26 @@ export function ensureEffort({ home, source, env }) {
   return effortOutcome(applyEffort({ home }));
 }
 
+const modSwitchedOff = env => String(env.AGENT_MODELS_MOD ?? '').trim().toLowerCase() === 'off';
+
+const STALE_SUBMODULE_ADVICE = ' — the .agents/conventions submodule does not hold the pinned release; run git submodule update (said once)';
+
+/**
+ * Install or upgrade the agent-models mod in `~/.claude/mods` and register it in `settings.json` (what it copies and writes:
+ * `lib/agent-models-install.mjs`). The mod is the project's pinned submodule. The "is this the conventions repository" test is
+ * made on `source`, the project's `subagent-model.mjs` that the guard step uses, never on the mod's folder: a consumer's
+ * `.agents/conventions` holds that repository's layout, so testing it would skip the step in every consumer. Skipped, each
+ * writing nothing: `AGENT_MODELS_MOD=off`, win32, the reference repository, the `agent-models.optout` marker and a project
+ * without the mod folder (the submodule is not initialised). `SUBAGENT_MODEL_GUARD=off` does NOT skip it. `platform` is a test seam.
+ */
+export function ensureAgentModelsMod({ home, source, env, platform = process.platform }) {
+  if (modSwitchedOff(env) || platform === 'win32' || isReferenceRepository(source)) return skipped();
+  const mod = path.resolve(path.dirname(source), '..', '..', '.agents', 'conventions', 'mods', 'agent-models');
+  if (fs.existsSync(modTargets(home).optout) || !fs.existsSync(mod)) return skipped();
+  const result = ensureAgentModels({ home, source: mod, inheritedPluginDirs: env.CLAUDE_CODE_PLUGIN_DIRS });
+  return result.unreleased && result.line ? { ...result, line: result.line + STALE_SUBMODULE_ADVICE } : result;
+}
+
 /** The raw stdin text, abandoned after a deadline when the caller never closes the pipe. */
 async function readStdin() {
   let text = '';
@@ -182,7 +209,7 @@ function payloadCwd(text) {
   }
 }
 
-const SPEAKING = new Set(['installed', 'upgraded', 'refused', 'newer', 'repaired', 'converged']);
+const SPEAKING = new Set(['installed', 'upgraded', 'refused', 'newer', 'repaired', 'converged', 'edited', 'registered']);
 
 async function main() {
   try {
@@ -191,15 +218,16 @@ async function main() {
     if (!project) return;
     const source = path.join(project, '.claude', 'hooks', 'subagent-model.mjs');
     const args = { home: os.homedir(), source, env: process.env };
-    // Guard first: on a fresh machine it creates settings.json, which effort then converges in the same session.
-    const lines = [guardStep(ensureUserGuard, args), guardStep(ensureEffort, args)].filter(Boolean);
+    // Guard first: on a fresh machine it creates settings.json, which effort then converges and the mod then registers itself in,
+    // all in the same session.
+    const lines = [guardStep(ensureUserGuard, args), guardStep(ensureEffort, args), guardStep(ensureAgentModelsMod, args)].filter(Boolean);
     if (lines.length) process.stdout.write(`${JSON.stringify({ systemMessage: lines.join('\n') })}\n`);
   } catch {
     // Fail open: a self-install must never cost a session its start.
   }
 }
 
-/** The line a step wants shown, or '' for a silent step or one that threw (the other step still runs). */
+/** The line a step wants shown, or '' for a silent step or one that threw (the other steps still run). */
 function guardStep(step, args) {
   try {
     const { action, line } = step(args);
