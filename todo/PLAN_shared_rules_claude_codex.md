@@ -77,7 +77,8 @@ Narrowed: no — the scope grows from the six consumers of 2026-09-09 to every r
   `tools/smoke-rules.mjs` classify the trace (`observable`: entryRead, projectRead, secondPathReads, unclassified,
   verified); the 18 reruns pass it, while most Codex final answers name neither file. Consult b22249e8 (2 of 2)
   advised this clarification over prompting the agents to narrate their reads; one consultant advised the owner
-  decide it, since it spends the epoch's one change. Prepared by the agent for the owner's decision, 2026-11-11.)
+  decide it, since it spends the epoch's one change. Prepared by the agent for the owner's decision, 2026-11-11;
+  the owner approved it the same morning ("мерджи", on #156).)
 
 ## Execution journal — 2026-09-10
 
