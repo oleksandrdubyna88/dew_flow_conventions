@@ -23,6 +23,10 @@ paths: ["__conventions_planning_documentation_only__/**"]
 > repositories (mcp and sidecar_rust on their migration branches; see the closing matrix). That night both migrations
 > merged (mcp `9bf9f5b`, sidecar_rust `97e174c`): all nine consumers are on the neutral layout.
 >
+> Progress, 2026-11-11: the closing matrix of Stage 3 is complete (#152 `ee76be7`, #156 `411e54c`): every consumer
+> passes § 7 for both agents on the read-content rerun, and every consumer has the whole adapter (benchmark #197).
+> All nine pin release `09db328`. Stage 4 stays open.
+>
 > **The stop, 2026-11-09:** entry 1.2 (the owner moves `dew_flow_creds_for_devs` ahead of
 > `dew_flow_sidecar_rust`) is this plan's second change since approval. No consumer migration and no new code on any
 > stage of this plan until the whole plan is reviewed again and epoch 2 is open. The re-review (rule step 4) revised
@@ -560,7 +564,7 @@ Open stories:
       prints the rules; both agents' § 7 smoke on the branch passes both parts (6 of 6, read-content harness);
       4586 tests pass (the 572 PostgresFixture tests need Docker, which this machine lacks; CI has it); coai plan
       and code rounds.
-- [ ] **Closing matrix:** one table of every consumer in `README.md` § Consumers — mount path, pin, adapter check,
+- [x] **Closing matrix:** one table of every consumer in `README.md` § Consumers — mount path, pin, adapter check,
       fresh clone, both agents (§ 7 pass conditions), legacy-reference count, rollback (the revert tried, with the
       clone and date; "none by construction" only for a consumer that never had the legacy mount), and a
       **decision** column: for a consumer not yet migrated, `selected <date>` or `deferred by the owner until
@@ -609,6 +613,14 @@ Open stories:
   the output), and all 18 runs were repeated on fresh clones of each `main` (release `26589a5`): **all 18 pass both
   parts**. The record's section "The rerun with the read-content harness, 2026-11-11" has every run. #156 merges once
   its last review thread is resolved; from then on § 7 is passed for every row on this evidence.
+  **2026-11-11, the item is complete.** #156 merged (`411e54c`), so plan change 2.1 is in force, and this matrix
+  merged with #152 (`ee76be7`; its last CodeRabbit thread split each § 7 cell into its two runs). Every row is
+  migrated or on the neutral layout with the whole adapter, every row passes § 7 for both agents on the read-content
+  rerun, and no decision cell is open, so the item is ticked. The cells keep the words "#156 merging" as they were
+  written. The release moved again the same day, `26589a5` → `09db328` (#157, #158), and its pin bumps merged in all
+  nine consumers (coai #976, mcp #73, benchmark #198, wsl_care #196, vscode_kit #32, r9700 #33, sidecar_rust #78,
+  creds #350, rag_qln #100 with both code pins); the Pin column still shows the pins at the time of the runs. The
+  Stage 4 items, Codex native acceptance among them, stay open, and this plan is not closed by this tick.
 
   | Consumer | Mount | Pin | Adapter check | Fresh clone / worktree | Both agents (§ 7) | Old-mount lines outside `todo/`, `research/`, `.gitmodules` | Rollback | Decision |
   |---|---|---|---|---|---|---|---|---|
