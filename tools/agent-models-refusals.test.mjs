@@ -22,10 +22,14 @@ test('1i: a settings env that is an array is told as "fix it by hand", never as 
   assert.equal(r.line.includes('next session start'), false);
 });
 
-test('1j: a settings file that is missing, or whose write fails, keeps the tail "the next session start registers it"', t => {
-  const missing = sandbox(t);
-  missing.seedTarget();
-  assert.equal(missing.ensure().line, notRegistered('1.2.3', `${missing.t_.settings} does not exist`, RETRY_TAIL));
+test('1j: a settings file whose creation or write fails keeps the tail "the next session start registers it"', t => {
+  const created = sandbox(t);
+  created.seedTarget();
+  fs.mkdirSync(`${created.t_.settings}.tmp-${process.pid}`); // makes the temp-file write fail: there is no settings.json to create
+  const first = created.ensure();
+  assert.match(first.line, /could not be written \(\w+\)/);
+  assert.ok(first.line.endsWith(RETRY_TAIL), first.line);
+  assert.equal(fs.existsSync(created.t_.settings), false);
   const failing_ = sandbox(t);
   failing_.seedTarget();
   failing_.writeSettings({ model: 'x' });

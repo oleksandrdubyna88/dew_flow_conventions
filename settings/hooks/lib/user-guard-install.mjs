@@ -169,17 +169,36 @@ export function drift(settings, hookPath, installedBytes, sourceBytes) {
 /**
  * Temp file + rename; the temp file never outlives a failed write, and `mode` (when given) is kept. The mode is SET
  * with chmod before the rename: a create mode is cut by the umask, so 0644 under umask 0077 became 0600 and other
- * users lost their read of settings.json (CodeRabbit on #148, 2026-11-10).
+ * users lost their read of settings.json (CodeRabbit on #148, 2026-11-10). With `replace: false` the name must be free:
+ * the answer is `false`, and nothing is written, when it is taken (see `placeNew`); the default replaces it.
  */
-export function writeAtomic(dest, data, mode) {
+export function writeAtomic(dest, data, mode, { replace = true } = {}) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   const tmp = `${dest}.tmp-${process.pid}`;
   try {
     fs.writeFileSync(tmp, data, mode === undefined ? undefined : { mode });
     if (mode !== undefined) fs.chmodSync(tmp, mode);
+    if (!replace) return placeNew(tmp, dest);
     fs.renameSync(tmp, dest);
+    return true;
   } finally {
     fs.rmSync(tmp, { force: true });
+  }
+}
+
+/**
+ * A complete temp file gets a NEW name. A hard link fails with EEXIST when the name is taken (by a file, or by a link,
+ * dangling or not), where a rename would replace it. Where the filesystem cannot make a hard link, nothing is
+ * created: the error is thrown, and the caller makes it a retry refusal (no look-then-rename: its gap could replace a
+ * file another writer just created). False when the name is taken.
+ */
+function placeNew(tmp, dest) {
+  try {
+    fs.linkSync(tmp, dest);
+    return true;
+  } catch (e) {
+    if (e.code === 'EEXIST') return false;
+    throw e;
   }
 }
 
@@ -271,9 +290,8 @@ export function repairRegistration({ home, beforeWrite = () => {} }) {
   const merged = serialise(mergeEntry(parsed.settings, t.hook));
   if (original !== null && original.equals(Buffer.from(merged))) return result(0, ['already registered']);
   const lines = original === null ? [] : [`backup ${writeBackup(t.settings, original, modeOf(t.settings))}`];
-  beforeWrite();
-  if (changedUnderUs(t, original, target)) return result(1, [...lines, CHANGED]);
-  writeSettings(target.file, merged);
+  const done = commitSettings({ settingsPath: t.settings, original, target, data: merged, beforeWrite });
+  if (!done.written) return result(1, [...lines, CHANGED]);
   return result(0, [...lines, `wrote ${t.settings} (hooks.PreToolUse: ${MATCHER})`]);
 }
 
@@ -330,16 +348,14 @@ export function install({ home, source, beforeWrite = () => {}, clearOptout = fa
   if (upToDate) return result(0, [...dropOptout(t, clearOptout), 'already installed']);
   const lines = [...dropOptout(t, clearOptout)];
   if (original !== null) lines.push(`backup ${writeBackup(t.settings, original, modeOf(t.settings))}`);
-  beforeWrite();
-  if (changedUnderUs(t, original, target)) return result(1, [...lines, CHANGED]);
   // Every refusal is above, so a refused install never writes the hook, the manifest or settings.json (the backup and
   // the opt-out removal above are older behaviour). Order: the manifest (naming the bytes it replaces), the hook, then
   // the registration. A stop after the manifest leaves the old bytes, which its `previous` vouches for; a stop after the
   // hook leaves an unregistered file the host never runs, which the next session start registers. The old order could
   // leave a registration of a missing script, run on every Agent call (2026-11-10).
-  writeManifest(t, source, sourceBytes, by, readOrNull(t.hook));
-  writeAtomic(t.hook, sourceBytes);
-  writeSettings(target.file, serialise(merged));
+  const prepare = () => { writeManifest(t, source, sourceBytes, by, readOrNull(t.hook)); writeAtomic(t.hook, sourceBytes); };
+  const done = commitSettings({ settingsPath: t.settings, original, target, data: serialise(merged), beforeWrite, prepare });
+  if (!done.written) return result(1, [...lines, CHANGED]);
   return result(0, [`wrote ${t.hook}`, ...lines, `wrote ${t.settings} (hooks.PreToolUse: ${MATCHER})`]);
 }
 
@@ -360,9 +376,8 @@ export function uninstall({ home, beforeWrite = () => {} }) {
     const target = settingsFileOf(t.settings);
     if (target.refusal) return result(1, [target.refusal]);
     lines.push(`backup ${writeBackup(t.settings, original, modeOf(t.settings))}`);
-    beforeWrite();
-    if (changedUnderUs(t, original, target)) return result(1, [CHANGED]);
-    writeSettings(target.file, serialise(removeEntry(parsed.settings, t.hook)));
+    const done = commitSettings({ settingsPath: t.settings, original, target, data: serialise(removeEntry(parsed.settings, t.hook)), beforeWrite });
+    if (!done.written) return result(1, [CHANGED]);
     lines.push(`removed the hook entry from ${t.settings}`);
   }
   if (hookThere) {
@@ -446,8 +461,8 @@ const modeOf = file => (fs.existsSync(file) ? fs.statSync(file).mode & 0o777 : u
  * file — and with its own mode (a 0600 file may hold tokens in `env`). `applyEffort` did both; install,
  * repairRegistration and uninstall did neither until 2026-11-10 (CodeRabbit on creds #328).
  */
-function writeSettings(file, data) {
-  writeAtomic(file, data, modeOf(file));
+function writeSettings(file, data, options) {
+  return writeAtomic(file, data, modeOf(file), options);
 }
 
 /**
@@ -455,8 +470,28 @@ function writeSettings(file, data) {
  * another file with the same bytes passed the byte check, and the write went to the old file (CodeRabbit on coai
  * #970, 2026-11-10).
  */
-function changedUnderUs(t, original, target) {
-  return !sameBytes(readOrNull(t.settings), original) || settingsFileOf(t.settings).file !== target.file;
+function changedUnderUs(settingsPath, original, target, now) {
+  return !sameBytes(now, original) || settingsFileOf(settingsPath).file !== target.file;
+}
+
+/**
+ * The ONE road a change of settings.json takes once its new text is known. install, repairRegistration, uninstall and
+ * the agent-models registration all end here, so none of them can drop a step. `original` and `target` are what the
+ * caller read and resolved (`settingsFileOf`) BEFORE it computed `data`. In order: `beforeWrite` (a test seam); the
+ * bytes are read again through the path and the target is resolved again, and a difference in either answers
+ * `{ written: false, now }` with the bytes just read; `prepare` (what a caller does only when the write follows: the
+ * guard copies its hook, the mod takes its backup); then the write at `target.file`, with the file's own mode when
+ * there is one. `replace: false` is for a file that did not exist at the read: it is then created only while its
+ * name is still free, and a name taken meanwhile is `{ written: false, now }` too. An existing file is always
+ * replaced. The default, `true`, renames over the name in both cases.
+ */
+export function commitSettings({ settingsPath, original, target, data, beforeWrite = () => {}, prepare = () => {}, replace = true }) {
+  beforeWrite();
+  const now = readOrNull(settingsPath);
+  if (changedUnderUs(settingsPath, original, target, now)) return { written: false, now };
+  prepare();
+  if (writeSettings(target.file, data, { replace: replace || original !== null })) return { written: true };
+  return { written: false, now: readOrNull(settingsPath) };
 }
 
 /** How many links a settings path may pass through before it is called a loop (the kernel's own ELOOP limit). */
@@ -467,20 +502,19 @@ const MAX_LINKS = 40;
  * last target of a chain of links that ends in a missing file (one link or several — CodeRabbit on #148 and coai
  * #969, 2026-11-10: a single-level read replaced the middle link of a chain with a plain file); otherwise the path
  * itself. More than 40 links is a `refusal` (a result, like the installer's other refusals — the code round), so
- * the operation stops before its backup, manifest, hook or settings are touched.
+ * the operation stops before its backup, manifest, hook or settings are touched; its `reason` is the refusal without its
+ * advice. `dangling` marks a chain that ends in a missing file.
  */
-function settingsFileOf(settingsPath) {
+export function settingsFileOf(settingsPath) {
   const existing = effortTarget(settingsPath);
   if (existing !== null) return { file: existing };
   const last = lastLinkTarget(settingsPath);
-  if (last === TOO_MANY_LINKS) {
-    return { refusal: `${settingsPath} has more than ${MAX_LINKS} links (a loop, or a chain too long to open); nothing changed — point it at one file` };
-  }
-  if (last === MISSING_FOLDER) {
-    return { refusal: `${settingsPath} is a link whose target goes through a folder that does not exist and then ".."; nothing changed — point it at one file` };
-  }
-  return { file: last ?? settingsPath };
+  if (last === TOO_MANY_LINKS) return linkRefusal(`${settingsPath} has more than ${MAX_LINKS} links (a loop, or a chain too long to open)`);
+  if (last === MISSING_FOLDER) return linkRefusal(`${settingsPath} is a link whose target goes through a folder that does not exist and then ".."`);
+  return last === null ? { file: settingsPath } : { file: last, dangling: true };
 }
+
+const linkRefusal = reason => ({ reason, refusal: `${reason}; nothing changed — point it at one file` });
 
 /** What `lastLinkTarget` answers when the chain does not end within `MAX_LINKS`. */
 const TOO_MANY_LINKS = Symbol('too many links');

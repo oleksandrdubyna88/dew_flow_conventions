@@ -244,13 +244,13 @@ const append = (settings, targetPath, home, inherited) => {
 };
 
 /**
- * The registration decision over parsed settings (`{ settings }`, `{ error }` or `{ missing: true }`). `inherited` is the
+ * The registration decision over parsed settings (`{ settings }` or `{ error }`; a missing file is
+ * `parseSettings(null)`, an empty object). `inherited` is the
  * session's own CLAUDE_CODE_PLUGIN_DIRS: the settings value REPLACES the shell's one (measured 2026-11-10, claude -p
  * 2.1.322), so a first registration into an empty value carries it over.
  */
 export function decideRegistration(parsed, targetPath, home, inherited) {
   const file = modTargets(home).settings;
-  if (parsed.missing) return refuseRegistration(`${file} does not exist`, true);
   if (parsed.error) return refuseRegistration(`${file} ${parsed.error}`, false);
   const { settings } = parsed;
   if (!Object.hasOwn(settings, 'env')) return append(settings, targetPath, home, inherited);

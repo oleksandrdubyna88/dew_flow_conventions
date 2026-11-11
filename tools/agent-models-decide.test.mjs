@@ -196,13 +196,18 @@ const SETTINGS = path.join(HOME, '.claude', 'settings.json');
 const parsed = settings => ({ settings });
 
 test('decideRegistration: refusals name the settings path and the shape problem', () => {
-  assert.deepEqual(mod.decideRegistration({ missing: true }, TARGET, HOME), { action: 'refuse', reason: `${SETTINGS} does not exist`, retry: true });
   assert.deepEqual(mod.decideRegistration({ error: 'is not a JSON object' }, TARGET, HOME), { action: 'refuse', reason: `${SETTINGS} is not a JSON object`, retry: false });
   for (const env of [[], 'x', null]) {
     assert.deepEqual(mod.decideRegistration(parsed({ env }), TARGET, HOME), { action: 'refuse', reason: `${SETTINGS}: env is not an object`, retry: false }, JSON.stringify(env));
   }
   assert.deepEqual(mod.decideRegistration(parsed({ env: { CLAUDE_CODE_PLUGIN_DIRS: ['/a'] } }), TARGET, HOME),
     { action: 'refuse', reason: `${SETTINGS}: env.CLAUDE_CODE_PLUGIN_DIRS is not a string`, retry: false });
+});
+
+test('decideRegistration: a missing file is parseSettings(null), and is decided exactly as the file {} — the session entries first, then the target', () => {
+  const missing = mod.decideRegistration(guard.parseSettings(null), TARGET, HOME, `/a${D}/b`);
+  assert.deepEqual(missing, { action: 'append', next: { env: { CLAUDE_CODE_PLUGIN_DIRS: `/a${D}/b${D}${TARGET}` } }, carried: 2 });
+  assert.deepEqual(missing, mod.decideRegistration(parsed({}), TARGET, HOME, `/a${D}/b`));
 });
 
 test('decideRegistration: appends when the entry is absent, keeps the other entries verbatim, and finds ours in every spelling', () => {

@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {
-  backupOnce, effortTarget, parseSettings, readOrNull, sameBytes, serialise, writableReason, writeAtomic,
+  backupOnce, commitSettings, parseSettings, readOrNull, serialise, settingsFileOf, writableReason,
 } from './user-guard-install.mjs';
 import {
   PLUGIN_DIRS_KEY, RELEASED_MOD, REPORTED_FILE, codeOf, currentUid, decideCopy, decideRegistration, modTargets, reportKey, versionText,
@@ -53,46 +53,50 @@ const carriedText = n => `; carried over ${n} ${n === 1 ? 'entry' : 'entries'} o
 /** A refused registration. `retry` is typed: true only for a reason a later session start can clear. */
 const refusedRegistration = (reason, retry) => ({ registration: 'refuse', reason, retry });
 
-function appendRegistration({ t, file, original, decision }) {
-  try {
-    const mode = fs.statSync(file).mode & 0o777;
-    backupOnce(file, original, mode); // none is taken when the newest backup already holds these bytes: a retry adds no file
-    writeAtomic(file, serialise(decision.next), mode);
-    return { registration: 'append', carried: decision.carried };
-  } catch (e) {
-    return refusedRegistration(`${t.settings} could not be written (${codeOf(e)})`, true);
-  }
+/** The file changed under us: fine when what is there now lists the folder, a refusal otherwise. */
+function settledOrChanged(now, target, home) {
+  return decideRegistration(parseSettings(now), target, home).action === 'none' ? { registration: 'settled' } : refusedRegistration(SETTINGS_CHANGED, true);
 }
 
-/** The file changed under us: fine when whoever changed it registered the folder too, a refusal otherwise. */
-function settledOrChanged(changedBytes, target, home) {
-  const parsed = changedBytes === null ? { missing: true } : parseSettings(changedBytes);
-  return decideRegistration(parsed, target, home).action === 'none' ? { registration: 'settled' } : refusedRegistration(SETTINGS_CHANGED, true);
+/** Why the write must not start, as a refused registration; null when it may. */
+function blocked(t, original, target) {
+  if (target.refusal) return refusedRegistration(target.reason, false);
+  if (target.dangling) return refusedRegistration(`${t.settings} is a link to ${target.file}, which does not exist`, true);
+  const file = original === null ? '' : writableReason(target.file);
+  if (file) return refusedRegistration(`${t.settings} ${file}`, false);
+  const folder = path.dirname(target.file);
+  const reason = writableReason(folder);
+  return reason ? refusedRegistration(`${folder} ${reason}`, false) : null;
 }
 
-function registerIn({ t, home, beforeWrite, inheritedPluginDirs }) {
-  const file = effortTarget(t.settings);
-  if (file === null) {
-    const missing = decideRegistration({ missing: true }, t.target, home);
-    return refusedRegistration(missing.reason, missing.retry);
-  }
-  const original = fs.readFileSync(file);
+function registerIn({ t, home, beforeWrite, inheritedPluginDirs, original, target }) {
   const decision = decideRegistration(parseSettings(original), t.target, home, inheritedPluginDirs);
   if (decision.action === 'none') return { registration: 'none' };
   if (decision.action === 'refuse') return refusedRegistration(decision.reason, decision.retry);
-  const reason = writableReason(file);
-  if (reason) return refusedRegistration(`${t.settings} ${reason}`, false);
-  beforeWrite();
-  const again = readOrNull(file);
-  return sameBytes(again, original) ? appendRegistration({ t, file, original, decision }) : settledOrChanged(again, t.target, home);
+  const refusal = blocked(t, original, target);
+  if (refusal) return refusal;
+  // A backup only when a write follows, and none of a file that did not exist; a retry adds no file (backupOnce).
+  const prepare = () => { if (original !== null) backupOnce(target.file, original, fs.statSync(target.file).mode & 0o777); };
+  // replace: false — a settings.json this step creates never takes the place of one that appeared after the re-check.
+  const done = commitSettings({ settingsPath: t.settings, original, target, data: serialise(decision.next), beforeWrite, prepare, replace: false });
+  return done.written ? { registration: 'append', carried: decision.carried } : settledOrChanged(done.now, t.target, home);
 }
 
-/** Registers the target in settings.json (never creating the file). Never throws. */
+/** Registers the target in settings.json, creating a missing file. Never throws. */
 function register(args) {
+  const { settings } = args.t;
+  let original;
+  let target;
   try {
-    return registerIn(args);
+    original = readOrNull(settings);
+    target = settingsFileOf(settings);
   } catch (e) {
-    return refusedRegistration(`${args.t.settings} could not be read (${codeOf(e)})`, false);
+    return refusedRegistration(`${settings} could not be read (${codeOf(e)})`, false);
+  }
+  try {
+    return registerIn({ ...args, original, target });
+  } catch (e) {
+    return refusedRegistration(`${settings} could not be written (${codeOf(e)})`, true);
   }
 }
 
@@ -205,7 +209,7 @@ function run({ home, source, by, now, beforeWrite, rename, remove, uid, inherite
  *                        variable): a first registration into an empty settings value carries it, because that value replaces the shell's
  *   released  the identity a source must have; a test passes its fixture's own, production passes nothing
  *   beforeWrite  test seam: runs before the final re-read of settings.json
- *   rename       test seam: the function used for the swap's and the restore's renames ONLY (never writeAtomic's)
+ *   rename       test seam: the function used for the swap's and the restore's renames ONLY (never the settings write's)
  *   remove       test seam: the function that deletes a leftover folder or file (default: recursive rmSync, ENOENT is success)
  *   uid          test seam: the caller's uid
  */

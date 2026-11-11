@@ -198,6 +198,56 @@ test('the source-read scan still finds its known instances: the released read in
 });
 
 // ---------------------------------------------------------------------------------------------------------------------
+// ONE road to settings.json: `commitSettings` (E2.S2)
+// ---------------------------------------------------------------------------------------------------------------------
+
+const GUARD_TEXT = fs.readFileSync(path.join(LIB, GUARD), 'utf8');
+
+/** The body of `function <name>(` — with or without `export` — from its line to the first line that is exactly `}`; null when absent. */
+function bodyOf(text, name) {
+  const lines = text.split('\n');
+  const start = lines.findIndex(line => new RegExp(`^(?:export\\s+)?function\\s+${name}\\(`).test(line));
+  if (start === -1) return null;
+  const end = lines.findIndex((line, i) => i > start && line === '}');
+  return end === -1 ? null : lines.slice(start, end + 1).join('\n');
+}
+
+/** The calls of `writeSettings(` and `changedUnderUs(`: a declaration (`function writeSettings(`) is not a call. */
+const ROAD_PARTS = /(?<![\w$.])(?<!function\s)(?:writeSettings|changedUnderUs)\(/g;
+const roadPartCalls = text => callsOf(text, ROAD_PARTS).map(call => call.name);
+const commitCalls = text => callsOf(text, /(?<![\w$.])(?<!function\s)commitSettings\(/g);
+
+test('the registration reaches settings.json only through commitSettings: it imports commitSettings and settingsFileOf, never writeAtomic, effortTarget or sameBytes, and calls the road once with replace: false', () => {
+  const install = modules().find(m => m.name === 'agent-models-install.mjs');
+  const names = namedImports(install.text).filter(i => i.from === `./${GUARD}`).flatMap(i => i.names);
+  for (const wanted of ['commitSettings', 'settingsFileOf']) assert.ok(names.includes(wanted), `${wanted} is imported from the guard installer`);
+  for (const gone of ['writeAtomic', 'effortTarget', 'sameBytes']) assert.equal(names.includes(gone), false, `${gone} is not imported: the registration has no road of its own`);
+  const calls = commitCalls(install.text);
+  assert.equal(calls.length, 1, 'one call of the road');
+  assert.match(calls[0].args, /\breplace: false\b/, 'the mod\'s creation never replaces a file that appeared');
+});
+
+test('in the guard installer only commitSettings calls writeSettings and changedUnderUs, and install, repairRegistration and uninstall each call the road once with its defaults', () => {
+  const road = bodyOf(GUARD_TEXT, 'commitSettings');
+  const outside = GUARD_TEXT.replace(road, '');
+  assert.deepEqual(roadPartCalls(outside), [], 'no other function calls the road\'s parts');
+  for (const name of ['install', 'repairRegistration', 'uninstall']) {
+    const body = bodyOf(GUARD_TEXT, name);
+    assert.equal(commitCalls(body).length, 1, `${name} calls commitSettings once`);
+    assert.doesNotMatch(body, /\breplace\b/, `${name} never asks for the creation that does not replace: the guard does what it did`);
+  }
+});
+
+test('the road scans still find their known instances: the body of commitSettings and of install are found, the road holds both parts, and a declaration is not a call', () => {
+  const road = bodyOf(GUARD_TEXT, 'commitSettings');
+  assert.ok(road, 'the body of commitSettings is found');
+  assert.deepEqual(roadPartCalls(road).sort(), ['changedUnderUs', 'writeSettings']);
+  assert.ok(bodyOf(GUARD_TEXT, 'install'), 'the body of install is found');
+  assert.ok(bodyOf(GUARD_TEXT, 'writeAtomic')?.includes('fs.renameSync'), 'an exported function with a default parameter object is found');
+  assert.deepEqual(roadPartCalls('function writeSettings(file) {\n  return 1;\n}\nconst x = writeSettings(a);\n'), ['writeSettings']);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
 // no invisible character in a hook module
 // ---------------------------------------------------------------------------------------------------------------------
 

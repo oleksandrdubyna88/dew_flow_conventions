@@ -13,11 +13,22 @@ import path from 'node:path';
 import { test } from 'node:test';
 
 import * as mod from '../settings/hooks/lib/agent-models-install.mjs';
+import { serialise } from '../settings/hooks/lib/user-guard-install.mjs';
 import {
   T, S, NOW, IS_ROOT, EMPTY_REC, sha, installedLine, upgradedLine, registeredLine, notRegistered, notInstalled, escaped,
   replacedName, editedLine, newerLine, symlinkLine, RETRY_TAIL, HAND_TAIL, carriedText, renameSeam,
   fixtureBytes, writeTree, snapshot, treeFiles, goodManifest, sandbox, symlinkOrSkip, FILES, D, fixtureReleased,
 } from './lib/agent-models-fixtures.mjs';
+
+/** Runs `run` with the process umask set to `mask`, and restores it. */
+function withUmask(mask, run) {
+  const before = process.umask(mask);
+  try {
+    return run();
+  } finally {
+    process.umask(before);
+  }
+}
 
 // ---------------------------------------------------------------------------------------------------------------------
 // 4.2 install, upgrade, no-op, edited, newer
@@ -381,19 +392,16 @@ for (const [name, content, reason] of [
   });
 }
 
-test('a missing settings.json is never created: the copy is done, the registration refuses, then repairs once settings exist', t => {
+test('a missing settings.json is created holding only the registration, with the mode of the umask and no backup; the second run is silent', { skip: process.platform === 'win32' }, t => {
   const s = sandbox(t);
-  const r = s.ensure();
-  assert.equal(r.action, 'refused');
-  assert.equal(r.copy, 'install');
-  assert.equal(r.registration, 'refuse');
-  assert.equal(r.line, notRegistered('1.2.3', `${s.t_.settings} does not exist`));
-  assert.deepEqual(s.listMods(), ['agent-models', 'agent-models.installed.json']);
-  assert.equal(fs.existsSync(s.t_.settings), false);
-  s.writeSettings({});
+  const r = withUmask(0o022, () => s.ensure());
+  assert.deepEqual([r.action, r.line, r.copy, r.registration], ['installed', installedLine('1.2.3'), 'install', 'append']);
+  assert.equal(s.readSettings(), serialise({ env: { CLAUDE_CODE_PLUGIN_DIRS: s.t_.target } }));
+  assert.equal(fs.statSync(s.t_.settings).mode & 0o777, 0o644, 'the mode the guard gives a file it creates under the same umask');
+  assert.deepEqual(s.backups(), []);
+  assert.deepEqual(fs.readdirSync(s.claude).filter(f => f.includes('.tmp-')), []);
   const again = s.ensure();
-  assert.equal(again.action, 'registered');
-  assert.equal(again.copy, 'none');
+  assert.deepEqual([again.action, again.line, again.copy, again.registration], ['none', '', 'none', 'none']);
 });
 
 test('settings changed between the read and the write: refused, the other writer\'s bytes stay, no backup', t => {
