@@ -537,6 +537,7 @@ test('a copy done and a registration refused is repaired later by registering on
   assert.equal(first.copy, 'install');
   assert.deepEqual(s.listMods(), ['agent-models', 'agent-models.installed.json', 'agent-models.reported.json']);
   const before = snapshot(s.t_.mods);
+  delete before['agent-models.reported.json']; // the registration that now went through ended the refusal: the said-once record is forgotten
   s.writeSettings({ model: 'x' });
   const second = s.ensure();
   assert.deepEqual([second.action, second.copy, second.registration], ['registered', 'none', 'append']);

@@ -69,7 +69,7 @@ function sandbox(t, { mod = true } = {}) {
   };
   const readSettings = () => JSON.parse(fs.readFileSync(settings, 'utf8'));
   const lines = result => (result.stdout === '' ? [] : JSON.parse(result.stdout).systemMessage.split('\n'));
-  const step = (env = {}, platform) => ensureAgentModelsMod({ home, source, env, ...(platform === undefined ? {} : { platform }) });
+  const step = async (env = {}, platform) => ensureAgentModelsMod({ home, source, env, ...(platform === undefined ? {} : { platform }) });
   return { root, home, project, hooks, modDir, entry, source, claude, installed, settings, optout, reported, run, seedSettings, readSettings, lines, step };
 }
 
@@ -93,7 +93,7 @@ test('3.2: the second run prints nothing', t => {
   assert.equal(second.stdout, '');
 });
 
-test('3.3: a project with the conventions repository\'s own layout at its root never installs the mod, even with the mod folder beside it', t => {
+test('3.3: a project with the conventions repository\'s own layout at its root never installs the mod, even with the mod folder beside it', async t => {
   const s = sandbox(t);
   fs.mkdirSync(path.join(s.project, 'tools'), { recursive: true });
   fs.mkdirSync(path.join(s.project, 'settings', 'hooks'), { recursive: true });
@@ -101,13 +101,13 @@ test('3.3: a project with the conventions repository\'s own layout at its root n
   fs.writeFileSync(path.join(s.project, 'settings', 'hooks', 'subagent-model.mjs'), '// reference\n');
   s.seedSettings({});
   const before = snapshot(s.home);
-  const result = s.step();
+  const result = await s.step();
   assert.equal(result.action, 'skipped');
   assert.deepEqual(snapshot(s.home), before);
   assert.equal(fs.existsSync(s.installed), false);
 });
 
-test('3.4: a consumer whose .agents/conventions holds the full layout is NOT taken for the reference repository: the mod installs', t => {
+test('3.4: a consumer whose .agents/conventions holds the full layout is NOT taken for the reference repository: the mod installs', async t => {
   const s = sandbox(t);
   const mount = path.join(s.project, '.agents', 'conventions');
   fs.mkdirSync(path.join(mount, 'tools'), { recursive: true });
@@ -115,36 +115,36 @@ test('3.4: a consumer whose .agents/conventions holds the full layout is NOT tak
   fs.writeFileSync(path.join(mount, 'tools', 'rules.mjs'), '// mount\n');
   fs.writeFileSync(path.join(mount, 'settings', 'hooks', 'subagent-model.mjs'), '// mount\n');
   s.seedSettings({});
-  const result = s.step();
+  const result = await s.step();
   assert.equal(result.action, 'installed', result.line);
   assert.equal(result.line, MOD_LINE);
 });
 
-test('3.5: AGENT_MODELS_MOD=off leaves the home byte-identical, whatever its case or spaces', t => {
+test('3.5: AGENT_MODELS_MOD=off leaves the home byte-identical, whatever its case or spaces', async t => {
   const s = sandbox(t);
   s.seedSettings({});
   const before = snapshot(s.home);
   for (const value of ['off', 'OFF', ' off ']) {
-    assert.equal(s.step({ AGENT_MODELS_MOD: value }).action, 'skipped', `value ${JSON.stringify(value)}`);
+    assert.equal((await s.step({ AGENT_MODELS_MOD: value })).action, 'skipped', `value ${JSON.stringify(value)}`);
     assert.deepEqual(snapshot(s.home), before, `value ${JSON.stringify(value)}`);
   }
 });
 
-test('3.6: the opt-out marker leaves the home byte-identical and the spawned run says nothing about the mod', t => {
+test('3.6: the opt-out marker leaves the home byte-identical and the spawned run says nothing about the mod', async t => {
   const s = sandbox(t);
   s.seedSettings({});
   fs.mkdirSync(path.dirname(s.optout), { recursive: true });
   fs.writeFileSync(s.optout, '');
   const before = snapshot(s.home);
-  assert.equal(s.step().action, 'skipped');
+  assert.equal((await s.step()).action, 'skipped');
   assert.deepEqual(snapshot(s.home), before);
   assert.equal(s.run().stdout.includes('agent-models'), false);
   assert.equal(fs.existsSync(s.installed), false);
 });
 
-test('3.7: win32 is skipped and writes nothing, not even a folder', t => {
+test('3.7: win32 is skipped and writes nothing, not even a folder', async t => {
   const s = sandbox(t);
-  const result = s.step({}, 'win32');
+  const result = await s.step({}, 'win32');
   assert.equal(result.action, 'skipped');
   assert.deepEqual(fs.readdirSync(s.home), []);
 });
@@ -228,12 +228,12 @@ test('3.13: the hook passes its own CLAUDE_CODE_PLUGIN_DIRS to the installer: th
   assert.equal(s.readSettings().env.CLAUDE_CODE_PLUGIN_DIRS, `/a${D}${s.installed}`);
 });
 
-test('3.14: a copy another installer left (a record that names another source) with its registration gives none: no line, the home byte-identical', t => {
+test('3.14: a copy another installer left (a record that names another source) with its registration gives none: no line, the home byte-identical', async t => {
   const s = sandbox(t);
   s.seedSettings({ env: { CLAUDE_CODE_PLUGIN_DIRS: s.installed } });
   seedInstalledCopy(s);
   const before = snapshot(s.home);
-  const result = s.step();
+  const result = await s.step();
   assert.deepEqual([result.action, result.line], ['none', '']);
   assert.deepEqual(snapshot(s.home), before);
 });
@@ -273,3 +273,21 @@ test('3.16: an edited file of the project copy is named with both digests once; 
     assert.equal(s.run({ SUBAGENT_MODEL_GUARD: 'off' }).stdout, '', `the repeat after ${JSON.stringify(edit)}`);
   }
 });
+
+/** What a load failure of the mod's modules looks like in a consumer: a sibling that is gone, and one that does not parse. */
+const LOAD_FAILURES = [
+  ['a missing sibling module', lib => fs.rmSync(path.join(lib, 'agent-models-swap.mjs'))],
+  ['a sibling module with a syntax error', lib => fs.writeFileSync(path.join(lib, 'agent-models-read.mjs'), 'export const broken = ;\n')],
+];
+
+for (const [name, damage] of LOAD_FAILURES) {
+  test(`3.17: ${name} in the mod's modules is a silent skip of the mod step: the hook exits 0, prints the guard and effort lines and installs the guard`, t => {
+    const s = sandbox(t);
+    damage(path.join(s.hooks, 'lib'));
+    const result = s.run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(s.lines(result), [GUARD_LINE, EFFORT_LINE]);
+    assert.equal(fs.existsSync(path.join(s.claude, 'hooks', 'subagent-model.mjs')), true, 'the guard was installed');
+    assert.equal(fs.existsSync(path.join(s.claude, 'mods')), false, 'the mod step wrote nothing');
+  });
+}

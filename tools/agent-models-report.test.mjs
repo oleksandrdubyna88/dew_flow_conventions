@@ -11,7 +11,7 @@ import { test } from 'node:test';
 
 import {
   IS_ROOT, EMPTY_REC, HAND_TAIL, registeredLine, writeTree, snapshot, sandbox, symlinkOrSkip, editedLine, newerLine,
-  symlinkLine, fixtureReleased, notInstalled, notRegistered, renameSeam, failing, escaped,
+  symlinkLine, fixtureReleased, notInstalled, notRegistered, renameSeam, failing, escaped, replacedName, NOW,
 } from './lib/agent-models-fixtures.mjs';
 
 test('1a: an equal copy that differs from the source but matches its OWN manifest (another checkout installed it) is silent and not "edited"', t => {
@@ -186,4 +186,48 @@ test('3.18: the reported file never grows: after refusals, an edited copy and a 
   s.ensure();
   s.ensure();
   shape('after a refused source');
+});
+
+test('3.19: a refusal said, fixed and entered again is said again: the same bad settings.json after a clean start is a new state, not a repeat', t => {
+  const s = sandbox(t);
+  const refusal = notRegistered('1.2.3', `${s.t_.settings}: env is not an object`, HAND_TAIL);
+  s.writeSettings({ env: [] });
+  assert.equal(s.ensure().line, refusal, 'start 1: the refusal is said');
+  assert.deepEqual(silentRepeat(s.ensure()), ['refused', '', true], 'start 2: the unchanged refusal is silent');
+  s.writeSettings({});
+  const fixed = s.ensure();
+  assert.deepEqual([fixed.action, fixed.line], ['registered', registeredLine], 'start 3: the fix registers');
+  s.writeSettings({ env: [] });
+  assert.equal(s.ensure().line, refusal, 'start 4: the same refusal, entered again, is said again');
+});
+
+test('3.20: a start that ends without a refusal forgets the record; an edited or newer copy, said once per state, keeps it', t => {
+  const s = sandbox(t);
+  s.writeSettings({ env: [] });
+  s.ensure();
+  assert.notEqual(s.reported(), null);
+  s.writeSettings({});
+  s.ensure();
+  assert.equal(s.reported(), null, 'registered: nothing was refused, so nothing stays said');
+  s.ensure();
+  assert.equal(s.reported(), null, 'a start that changes nothing writes no record');
+  fs.appendFileSync(path.join(s.t_.target, 'types', 'index.d.ts'), '// mine\n');
+  assert.equal(s.ensure().line, editedLine('1.2.3'));
+  const key = s.reported().key;
+  assert.equal(s.ensure().line, '', 'the edited copy is still said once');
+  assert.equal(s.reported().key, key);
+});
+
+test('3.21: a refusal naming a replaced- folder is told once although its stamp is the swap\'s clock, so it differs at every start', t => {
+  const s = sandbox(t);
+  s.writeSettings(s.registered());
+  s.seedTarget({ version: '1.0.0', manifest: null }); // no record: the old copy is kept as a replaced- folder (A3)
+  const stamps = [NOW, new Date(NOW.getTime() + 1500)];
+  const refuse = at => s.ensure({ now: () => at, rename: renameSeam(n => { if (n === 1) throw failing('EPERM'); }).seam });
+  const first = refuse(stamps[0]);
+  assert.equal(first.action, 'refused');
+  assert.ok(first.line.includes(replacedName(stamps[0])), `the refusal names the replaced- folder: ${first.line}`);
+  const second = refuse(stamps[1]);
+  assert.notEqual(replacedName(stamps[0]), replacedName(stamps[1]), 'the two starts name different folders');
+  assert.deepEqual(silentRepeat(second), ['refused', '', true]);
 });

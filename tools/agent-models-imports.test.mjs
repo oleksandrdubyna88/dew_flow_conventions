@@ -248,6 +248,39 @@ test('the road scans still find their known instances: the body of commitSetting
 });
 
 // ---------------------------------------------------------------------------------------------------------------------
+// no second writer of settings.json: a `writeAtomic(` call naming settings, anywhere the road could be bypassed
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** The calls of `writeAtomic(`, a declaration (`function writeAtomic(`) and a member call (`x.writeAtomic(`) left out. */
+const WRITE_ATOMIC = /(?<![\w$.])(?<!function\s)writeAtomic\(/g;
+
+/** `name:line` of every `writeAtomic(` call whose arguments name `settings` (a path, a variable, a helper: any spelling, any case). */
+const settingsWrites = (name, text) => callsOf(text, WRITE_ATOMIC)
+  .filter(call => /settings/i.test(call.args))
+  .map(call => `${name}:${call.line} writeAtomic(${call.args.replace(/\s+/g, ' ').trim()}) names settings`);
+
+/** The four installer modules and the guard installer: every file that can write the settings file or import what writes it. */
+const settingsScope = () => [...modules(), { name: GUARD, text: GUARD_TEXT }];
+
+test('no installer module and no function of the guard installer but the effort write calls writeAtomic with settings in its arguments: settings.json has one road, commitSettings, and the one separate writer', () => {
+  const effort = bodyOf(GUARD_TEXT, 'writeConverged');
+  assert.ok(effort, 'the effort write is found');
+  const scope = settingsScope().map(m => (m.name === GUARD ? { ...m, text: m.text.replace(effort, '') } : m));
+  assert.deepEqual(scope.map(m => m.name).sort(), [...LAYERS, GUARD].sort(), 'all five files are scanned');
+  assert.deepEqual(scope.flatMap(m => settingsWrites(m.name, m.text)), []);
+});
+
+test('the settings-write scan still finds its known instances: the effort write in the guard installer, and a planted call in a mod module (one over several lines, one with another spelling)', () => {
+  const found = settingsWrites(GUARD, GUARD_TEXT);
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.ok(bodyOf(GUARD_TEXT, 'writeConverged').includes('writeAtomic('), 'the one instance sits in writeConverged');
+  const planted = 'import { writeAtomic } from "./user-guard-install.mjs";\nfunction sneak(t) {\n  writeAtomic(\n    t.settings,\n    bytes);\n}\n';
+  assert.deepEqual(settingsWrites('agent-models-swap.mjs', planted), ['agent-models-swap.mjs:3 writeAtomic(t.settings, bytes) names settings']);
+  assert.equal(settingsWrites('x.mjs', 'writeAtomic(path.join(home, ".claude", "Settings.json"), data);\n').length, 1);
+  assert.deepEqual(settingsWrites('x.mjs', 'writeAtomic(t.manifest, bytes);\nexport function writeAtomic(dest, data, settings) {}\nfs.writeAtomic(settings);\n'), []);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
 // no invisible character in a hook module
 // ---------------------------------------------------------------------------------------------------------------------
 

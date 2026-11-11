@@ -137,11 +137,14 @@ test('2.4 where no hard link can be made nothing is created and nothing is repla
   assert.deepEqual(tmpFiles(gap.dir), []);
 });
 
-test('2.4 at the registration, a filesystem without hard links is a retry refusal, in both halves, and no file is created or replaced', { skip: !POSIX }, t => {
+/** What the registration says when the filesystem cannot make the hard link the creation needs: the code, and that nothing later can clear it. */
+const noLinkReason = file => `${file} could not be created (EPERM): this filesystem cannot make the hard link the creation needs`;
+
+test('2.4 at the registration, a filesystem without hard links is a refusal to fix by hand (no later start can clear it), in both halves, and no file is created or replaced', { skip: !POSIX }, t => {
   const s = sandbox(t);
   const counter = { calls: 0 };
   const r = withLinkSync(noHardLinks(counter), () => s.ensure());
-  assert.equal(r.line, notRegistered('1.2.3', `${s.t_.settings} could not be written (EPERM)`, RETRY_TAIL));
+  assert.equal(r.line, notRegistered('1.2.3', noLinkReason(s.t_.settings), HAND_TAIL));
   assert.equal(counter.calls, 1);
   assert.equal(fs.existsSync(s.t_.settings), false);
   assert.deepEqual(tmpFiles(s.claude), []);
@@ -150,7 +153,7 @@ test('2.4 at the registration, a filesystem without hard links is a retry refusa
   g.seedTarget();
   const gapCounter = { calls: 0 };
   const written = withLinkSync(noHardLinks(gapCounter, to => fs.writeFileSync(to, OTHER)), () => g.ensure());
-  assert.equal(written.line, notRegistered('1.2.3', `${g.t_.settings} could not be written (EPERM)`, RETRY_TAIL));
+  assert.equal(written.line, notRegistered('1.2.3', noLinkReason(g.t_.settings), HAND_TAIL));
   assert.equal(g.readSettings(), OTHER);
   assert.deepEqual(tmpFiles(g.claude), []);
 });

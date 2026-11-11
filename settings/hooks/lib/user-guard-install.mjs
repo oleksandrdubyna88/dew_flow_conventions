@@ -189,8 +189,9 @@ export function writeAtomic(dest, data, mode, { replace = true } = {}) {
 /**
  * A complete temp file gets a NEW name. A hard link fails with EEXIST when the name is taken (by a file, or by a link,
  * dangling or not), where a rename would replace it. Where the filesystem cannot make a hard link, nothing is
- * created: the error is thrown, and the caller makes it a retry refusal (no look-then-rename: its gap could replace a
- * file another writer just created). False when the name is taken.
+ * created: the error is thrown (marked, see `isHardLinkFailure`; its code is kept), and the caller makes it a refusal to fix by
+ * hand, because no later start can make the link either (no look-then-rename: its gap could replace a file another writer just
+ * created). Only the agent-models registration passes `replace: false`; the guard never does. False when the name is taken.
  */
 function placeNew(tmp, dest) {
   try {
@@ -198,9 +199,12 @@ function placeNew(tmp, dest) {
     return true;
   } catch (e) {
     if (e.code === 'EEXIST') return false;
-    throw e;
+    throw Object.assign(new Error(e.message, { cause: e }), { code: e.code, hardLinkFailed: true });
   }
 }
+
+/** True for the error `placeNew` throws when the link cannot be made: a filesystem without hard links, which no later start changes. */
+export const isHardLinkFailure = e => e?.hardLinkFailed === true;
 
 export const readOrNull = file => (fs.existsSync(file) ? fs.readFileSync(file) : null);
 
@@ -475,8 +479,10 @@ function changedUnderUs(settingsPath, original, target, now) {
 }
 
 /**
- * The ONE road a change of settings.json takes once its new text is known. install, repairRegistration, uninstall and
- * the agent-models registration all end here, so none of them can drop a step. `original` and `target` are what the
+ * The one road a change of settings.json takes for the guard's three operations and the agent-models registration, once its
+ * new text is known. install, repairRegistration, uninstall and the registration all end here, so none of them can drop a
+ * step. The effort write (`writeConverged`) is NOT on this road: it writes by `writeAtomic` on its own, a recorded
+ * follow-up. `original` and `target` are what the
  * caller read and resolved (`settingsFileOf`) BEFORE it computed `data`. In order: `beforeWrite` (a test seam); the
  * bytes are read again through the path and the target is resolved again, and a difference in either answers
  * `{ written: false, now }` with the bytes just read; `prepare` (what a caller does only when the write follows: the

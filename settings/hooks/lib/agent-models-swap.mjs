@@ -195,6 +195,9 @@ function pruneReplaced(t, keepName, { uid, remove }) {
   }
 }
 
+/** What `versionOf` answers for a plugin.json that cannot be read. */
+const UNREADABLE = [0, 0, 0];
+
 const freshAside = (t, now) => path.join(t.mods, `${ASIDE_TAG}${now().getTime()}-${process.pid}-${randomBytes(4).toString('hex')}`);
 
 /** The rename into place cannot go on: put the old folder back (F3b), or just drop our staging when there was none. */
@@ -214,16 +217,20 @@ function rollBack({ t, staging, aside, upgrade, rename }, error) {
 }
 
 /**
- * The old folder went aside and holds a NEWER mod than ours: another session installed it a moment ago (the cadence
- * consultation). It goes back to the target and our staging is dropped, the same outcome as a lost race (F3a); a start
- * never replaces a newer copy. When it cannot go back, the refusal names where it is.
+ * The old folder went aside and holds a NEWER mod than ours (another session installed it a moment ago, the cadence
+ * consultation), or one whose version cannot be read (`held` is null; it may be that newer copy). It goes back to the target
+ * and our staging is dropped, the same outcome as a lost race (F3a); a start never replaces a newer copy. When it cannot go
+ * back, the refusal names where it is and tells the person to rename it back by hand. That is the limit: until they do, a
+ * later start finds no target and installs this repository's older copy, and may then delete the newer aside as a leftover;
+ * no marker guards against that (the line is the whole warning).
  */
 function putBack({ t, staging, aside, held, src, rename }) {
   try {
     rename(aside, t.target);
   } catch (e) {
     rmQuiet(staging);
-    return { refusal: `${aside} holds version ${versionText(held)}, newer than this repository's ${versionText(src.version)}, and could not be renamed back to ${t.target} (${codeOf(e)}); rename it back by hand` };
+    const what = held === null ? 'holds a version that could not be read' : `holds version ${versionText(held)}, newer than this repository's ${versionText(src.version)}`;
+    return { refusal: `${aside} ${what}, and could not be renamed back to ${t.target} (${codeOf(e)}); rename it back by hand` };
   }
   rmQuiet(staging);
   return { copy: 'lost' };
@@ -253,11 +260,11 @@ function renameInFailed(ctx) {
 }
 
 /**
- * S1 stage, S2 aside (a newer copy found there is put back, W3), S3 in, S4 drop the aside, S5 manifest. At no instant does the target hold a half-copied mod. The names
+ * `seen` is the target's version as the decision read it. S1 stage, S2 aside (a newer copy found there, or one whose version cannot be read, is put back, W3), S3 in, S4 drop the aside, S5 manifest. At no instant does the target hold a half-copied mod. The names
  * carry the clock of the swap's start (`now()`), which is what reconcile judges their age by. With `keep` the old folder goes
  * to `replaced-<stamp>` instead of an aside and S4 does not delete it.
  */
-function swap({ t, src, upgrade, keep, rename, remove, now, uid, manifest }) {
+function swap({ t, src, seen, upgrade, keep, rename, remove, now, uid, manifest }) {
   const started = now();
   const suffix = `${started.getTime()}-${process.pid}-${randomBytes(4).toString('hex')}`;
   const staging = path.join(t.mods, STAGING_TAG + suffix);
@@ -277,7 +284,11 @@ function swap({ t, src, upgrade, keep, rename, remove, now, uid, manifest }) {
       return { refusal: `could not rename ${t.target} aside to ${aside} (${codeOf(e)})` };
     }
     const held = modVersionIn(aside);
-    if (held !== null && compareVersions(held, src.version) > 0) return putBack({ t, staging, aside, held, src, rename });
+    // Go on only when the aside's version is known and not newer, or was already unreadable when the decision was made (`seen`
+    // is 0.0.0: a broken copy is what an upgrade is for). A version that WAS readable and cannot be read now (EMFILE, EIO, a file
+    // another start is still writing) may be a newer copy: it goes back, never gets deleted on a guess.
+    const changedToUnreadable = held === null && compareVersions(seen, UNREADABLE) > 0;
+    if (changedToUnreadable || (held !== null && compareVersions(held, src.version) > 0)) return putBack({ t, staging, aside, held, src, rename });
   }
   try {
     rename(staging, t.target);
@@ -291,8 +302,8 @@ function swap({ t, src, upgrade, keep, rename, remove, now, uid, manifest }) {
   return { copy: upgrade ? 'upgrade' : 'install', ...(keep ? { replaced } : {}) };
 }
 
-export function carryOutCopy({ t, src, decision, rename, remove, now, uid, manifest }) {
-  const args = { t, src, rename, remove, now, uid, manifest };
+export function carryOutCopy({ t, src, seen, decision, rename, remove, now, uid, manifest }) {
+  const args = { t, src, seen, rename, remove, now, uid, manifest };
   switch (decision.action) {
     case 'install': return swap({ ...args, upgrade: false, keep: false });
     case 'upgrade': return swap({ ...args, upgrade: true, keep: decision.keep === true });

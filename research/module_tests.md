@@ -246,24 +246,29 @@ names. `tools/agent-models-pin.test.mjs` covers the pin table: a change to a mod
 live `mods/agent-models` equals its committed row, and `RELEASED_MOD` equals the newest row.
 `tools/agent-models-extract.test.mjs` runs the mod's session-log extractor with node over fixture logs.
 `tools/agent-models-imports.test.mjs` reads the installer modules as text: what each may import, no second body of a
-helper `user-guard-install.mjs` exports, no read of the source folder outside `readSource`, and every write of
-`settings.json` through `commitSettings`; each scan has a companion that it still finds a known instance.
+helper `user-guard-install.mjs` exports, no read of the source folder outside `readSource`, every write of `settings.json`
+through `commitSettings` (the guard's three operations and the mod's registration; the effort write, `writeConverged`, is
+separate and a recorded follow-up), and no `writeAtomic(` call naming `settings` anywhere in the four agent-models modules
+or `user-guard-install.mjs` but that one; each scan has a companion that it still finds a known instance.
 
 `tools/agent-models-swap.test.mjs`, `tools/agent-models-install.test.mjs` and `tools/agent-models-refusals.test.mjs`
 cover the copy: install, upgrade, no-op, an edited copy, a newer copy (also put back when another start installed it
 during the swap), the leftovers, each failure of the swap and its roll-back, the install record, a copy that writes only
 the bytes the released check saw (the source is changed after the read), and the refusal lines with their retry or
-fix-by-hand tail. `tools/agent-models-register.test.mjs` covers the registration and the road under it: a created
+fix-by-hand tail (a filesystem without hard links is by hand, an aside whose version cannot be read is put back).
+`tools/agent-models-register.test.mjs` covers the registration and the road under it: a created
 `settings.json`, a file or link that appears in the gap, a filesystem without hard links, a re-pointed link with equal
 bytes, a chain, a dangling chain and a loop, unwritable and unreadable files, and the guard's own install doing what it
 did before the road existed. `tools/agent-models-report.test.mjs` covers the said-once lines: every refusal, an edited
-and a newer copy, the reset by an install, and that the reported file stays one file of `{ key, at }` under 1 KB.
+and a newer copy, the reset by an install and by any run that ends with no refusal (the same refusal after a fix is said
+again), a `replaced-` folder named in a refusal, and that the reported file stays one file of `{ key, at }` under 1 KB.
 `tools/agent-models-step.test.mjs` runs the step as a session start does: a consumer-shaped project whose
 `.claude/hooks/` is a copy of `settings/hooks/` (the real released guard) and whose
 `.agents/conventions/mods/agent-models` is a copy of `mods/agent-models`, with the project's own
 `ensure-user-guard.mjs` spawned. It covers one line per step and nothing on the second run, each skip in its order (a
 project with this repository's layout is skipped; a consumer whose `.agents/conventions` has that layout is not),
-`SUBAGENT_MODEL_GUARD=off` still loading the mod, a throwing installer leaving the guard and effort lines, a project
+`SUBAGENT_MODEL_GUARD=off` still loading the mod, a throwing installer and a mod module that does not load (a missing
+sibling, a syntax error) leaving the guard and effort lines, a project
 without the mod, the carried-over session value, a stale or edited project copy refused once with the advice to update
 the submodule, and a copy another installer left giving no line.
 

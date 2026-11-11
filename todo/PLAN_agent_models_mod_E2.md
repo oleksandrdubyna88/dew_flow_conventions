@@ -1,6 +1,7 @@
 # PLAN — agent-models mod, E2: the complete self-install
 
-> Status: **plan only, nothing implemented yet, 2026-11-11.** Stories of epic E2 of
+> Status: **built 2026-11-11 on `feat/agent-models-mod-e2` (760a6a9, 1cd74bd, bc3d04e), the coai code round
+> `proceed` and an Opus review; review fixes in progress; not merged yet, and it promotes with its parent.** Stories of epic E2 of
 > [PLAN_agent_models_mod.md](PLAN_agent_models_mod.md) (§ *Epics*, E2), written by Opus when the epic started. Scope:
 > the writing installer modules `agent-models-swap.mjs` and `agent-models-install.mjs`, the registration in
 > `~/.claude/settings.json`, the third session-start step `ensureAgentModelsMod` in `ensure-user-guard.mjs` with its
@@ -417,8 +418,8 @@ The line numbers are of `settings/hooks/lib/user-guard-install.mjs` at HEAD; "me
 - An EXISTING file that another program changes between the re-check and the rename is replaced. The gap is a few
   system calls. No lock is shared with the host. The guard's road has the same gap today.
 - Windows and macOS were not run: CI is `ubuntu-latest`. `fs.linkSync` runs only in the mod's creation, and the mod's
-  step skips `win32` (E2.S3, D3.2). If that call fails for a reason other than "the name is taken", the road looks
-  once and takes the rename.
+  step skips `win32` (E2.S3, D3.2). If that call fails for a reason other than "the name is taken", nothing is
+  created and the registration is refused by hand (no hard links there; the E2 Opus review, 2026-11-11).
 
 **Files.**
 

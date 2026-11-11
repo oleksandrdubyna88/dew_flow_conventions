@@ -32,7 +32,9 @@
  * is copied into `~/.claude/mods` and registered in `settings.json` (created when missing; `lib/agent-models-install.mjs`).
  * Skipped, in order: `AGENT_MODELS_MOD=off`, win32, the conventions repository (decided on the project's own hook path, never on
  * the mod's folder), the `agent-models.optout` marker, a project without the mod; `SUBAGENT_MODEL_GUARD=off` does not skip it.
- * Every refusal is said once; a mod that is not the released one adds the advice to run `git submodule update`.</p>
+ * Every refusal is said once; a mod that is not the released one adds the advice to run `git submodule update`.
+ * The step loads the mod's modules with a dynamic `import()` when it runs (the step is async), so a module that fails to load (missing,
+ * a syntax error) skips that step in silence and never costs the guard or effort step; `main` runs each step inside `guardStep`.</p>
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -40,7 +42,6 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
-import { ensureAgentModels, modTargets } from './lib/agent-models-install.mjs';
 import { RELEASED_GUARD, applyEffort, guardVersion, install, isRegistered, registrationValid, repairRegistration, targets } from './lib/user-guard-install.mjs';
 
 export { guardVersion };
@@ -166,6 +167,19 @@ export function ensureEffort({ home, source, env }) {
 
 const modSwitchedOff = env => String(env.AGENT_MODELS_MOD ?? '').trim().toLowerCase() === 'off';
 
+/**
+ * The mod's installer, loaded only when the step runs (never as a static import: a load failure of any of its four modules, a
+ * missing sibling or a syntax error, would end the whole hook before `main` and cost the guard and effort steps too). A load failure
+ * is a silent skip of the mod step: the modules that could say it, or record it in the reported file, are the ones that did not load.
+ */
+async function loadInstaller() {
+  try {
+    return await import('./lib/agent-models-install.mjs');
+  } catch {
+    return null;
+  }
+}
+
 const STALE_SUBMODULE_ADVICE = ' — the .agents/conventions submodule does not hold the pinned release; run git submodule update (said once)';
 
 /**
@@ -176,8 +190,11 @@ const STALE_SUBMODULE_ADVICE = ' — the .agents/conventions submodule does not 
  * writing nothing: `AGENT_MODELS_MOD=off`, win32, the reference repository, the `agent-models.optout` marker and a project
  * without the mod folder (the submodule is not initialised). `SUBAGENT_MODEL_GUARD=off` does NOT skip it. `platform` is a test seam.
  */
-export function ensureAgentModelsMod({ home, source, env, platform = process.platform }) {
+export async function ensureAgentModelsMod({ home, source, env, platform = process.platform }) {
   if (modSwitchedOff(env) || platform === 'win32' || isReferenceRepository(source)) return skipped();
+  const installer = await loadInstaller();
+  if (installer === null) return skipped();
+  const { ensureAgentModels, modTargets } = installer;
   const mod = path.resolve(path.dirname(source), '..', '..', '.agents', 'conventions', 'mods', 'agent-models');
   if (fs.existsSync(modTargets(home).optout) || !fs.existsSync(mod)) return skipped();
   const result = ensureAgentModels({ home, source: mod, inheritedPluginDirs: env.CLAUDE_CODE_PLUGIN_DIRS });
@@ -220,7 +237,7 @@ async function main() {
     const args = { home: os.homedir(), source, env: process.env };
     // Guard first: on a fresh machine it creates settings.json, which effort then converges and the mod then registers itself in,
     // all in the same session.
-    const lines = [guardStep(ensureUserGuard, args), guardStep(ensureEffort, args), guardStep(ensureAgentModelsMod, args)].filter(Boolean);
+    const lines = [await guardStep(ensureUserGuard, args), await guardStep(ensureEffort, args), await guardStep(ensureAgentModelsMod, args)].filter(Boolean);
     if (lines.length) process.stdout.write(`${JSON.stringify({ systemMessage: lines.join('\n') })}\n`);
   } catch {
     // Fail open: a self-install must never cost a session its start.
@@ -228,9 +245,9 @@ async function main() {
 }
 
 /** The line a step wants shown, or '' for a silent step or one that threw (the other steps still run). */
-function guardStep(step, args) {
+async function guardStep(step, args) {
   try {
-    const { action, line } = step(args);
+    const { action, line } = await step(args);
     return SPEAKING.has(action) ? line : '';
   } catch {
     return '';

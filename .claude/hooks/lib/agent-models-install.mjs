@@ -13,16 +13,16 @@
  * In short: nothing is locked; two sessions are serialised by an exclusive staging name, the atomicity of `rename`, the
  * "somebody else won" branch (F3a) and the re-read of settings.json. The target is judged by `lstat` BEFORE anything that
  * follows links, and a symlinked, foreign-owned or non-directory target is refused, never renamed or deleted through.
- * Every refusal, like an edited or newer copy, is said once per line (`saidRefusal`, `saidOnce`): the reported file keeps one key.
+ * Every refusal, like an edited or newer copy, is said once per line (`saidRefusal`, `saidOnce`): the reported file keeps one key, and a run that ends with no refusal removes it, so a bad state entered again is said again.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 
 import {
-  backupOnce, commitSettings, parseSettings, readOrNull, serialise, settingsFileOf, writableReason,
+  backupOnce, commitSettings, isHardLinkFailure, parseSettings, readOrNull, serialise, settingsFileOf, writableReason,
 } from './user-guard-install.mjs';
 import {
-  PLUGIN_DIRS_KEY, RELEASED_MOD, REPORTED_FILE, codeOf, currentUid, decideCopy, decideRegistration, modTargets, reportKey, sha256, versionText,
+  ASIDE_TAG, PLUGIN_DIRS_KEY, RELEASED_MOD, REPLACED_TAG, REPORTED_FILE, STAGING_TAG, codeOf, currentUid, decideCopy, decideRegistration, modTargets, reportKey, sha256, versionText,
 } from './agent-models-decide.mjs';
 import { readSource, readTarget } from './agent-models-read.mjs';
 import {
@@ -97,6 +97,8 @@ function register(args) {
   try {
     return registerIn({ ...args, original, target });
   } catch (e) {
+    // A filesystem that cannot make the hard link the creation needs is not cleared by a later start: by hand, not a retry.
+    if (isHardLinkFailure(e)) return refusedRegistration(`${settings} could not be created (${codeOf(e)}): this filesystem cannot make the hard link the creation needs`, false);
     return refusedRegistration(`${settings} could not be written (${codeOf(e)})`, true);
   }
 }
@@ -124,8 +126,17 @@ function saidOnce(t, key, line, now) {
 
 const withRepeated = (result, said) => ({ ...result, line: said.line, ...(said.repeated ? { repeated: true } : {}) });
 
-/** A swap names its staging and aside folders with a random part; the same refusal at the next start must still be the same line. */
-const SWAP_NAME = /(agent-models\.(?:staging|aside)-)\d+-\d+-[0-9a-f]+/g;
+const escapeRegex = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * A swap names its staging and aside folders with the swap's clock, pid and a random part, and a kept copy's `replaced-`
+ * folder with the clock's stamp (`replacedStamp`); the same refusal at the next start must still be the same line. Built from
+ * the tag constants, so a tag that is renamed cannot leave this behind.
+ */
+const SWAP_NAME = new RegExp(
+  `(${escapeRegex(STAGING_TAG)}|${escapeRegex(ASIDE_TAG)})\\d+-\\d+-[0-9a-f]+|(${escapeRegex(REPLACED_TAG)})\\d+T\\d+Z`, 'g',
+);
+const swapNameKey = (match, swapTag, replacedTag) => `${swapTag ?? replacedTag}*`;
 
 /**
  * A refused outcome, said once: the key is `line:` and the digest of its line (the random part of a swap's leftover names
@@ -135,7 +146,7 @@ const SWAP_NAME = /(agent-models\.(?:staging|aside)-)\d+-\d+-[0-9a-f]+/g;
  */
 function saidRefusal(t, refused, now) {
   if (modsProblem(t)) return refused;
-  return withRepeated(refused, saidOnce(t, `line:${sha256(refused.line.replace(SWAP_NAME, '$1*'))}`, refused.line, now));
+  return withRepeated(refused, saidOnce(t, `line:${sha256(refused.line.replace(SWAP_NAME, swapNameKey))}`, refused.line, now));
 }
 
 function copyLine(copy, replaced, version, installed) {
@@ -190,6 +201,10 @@ const symlinkRefusal = ({ t, src, target, decision, rec, now }) => {
   return withRepeated(refused, saidOnce(t, reportKey('refuse', target, src.version), refused.line, now));
 };
 
+/** The copies and registrations that are no refusal and no said-once state (`edited`, `newer`, `other-checkout` and `lost` are not): a run made of these forgets the record. */
+const CLEAN_COPIES = new Set(['none', 'install', 'upgrade', 'manifest']);
+const CLEAN_REGISTRATIONS = new Set(['none', 'append']);
+
 function run({ home, source, by, now, beforeWrite, rename, remove, uid, inheritedPluginDirs, released }) {
   const t = modTargets(home);
   const src = readSource(source, { released });
@@ -204,13 +219,15 @@ function run({ home, source, by, now, beforeWrite, rename, remove, uid, inherite
   if (decision.action === 'refuse') {
     return target.kind === 'symlink' ? symlinkRefusal({ t, src, target, decision, rec, now }) : saidRefusal(t, notInstalled(decision.reason, rec), now);
   }
-  const copied = carryOutCopy({ t, src, decision, rename, remove, now, uid, manifest: manifestBytes(src, source, now, by) });
+  const copied = carryOutCopy({ t, src, seen: target.version, decision, rename, remove, now, uid, manifest: manifestBytes(src, source, now, by) });
   if (copied.refusal) return saidRefusal(t, notInstalled(copied.refusal, rec), now);
   if (copied.copy === 'install' || copied.copy === 'upgrade') rmQuiet(reportedFile(t)); // a new copy is new information: what was said about the old one is forgotten
   const registered = register({ t, home, beforeWrite, inheritedPluginDirs });
   if (registered.registration === 'refuse') {
     return saidRefusal(t, composeRefusedRegistration({ copy: copied.copy, reason: registered.reason, retry: registered.retry, src, target, rec }), now);
   }
+  // A start that ends with no refusal leaves no bad state to repeat: "said once" is once each time a bad state is entered.
+  if (CLEAN_COPIES.has(copied.copy) && CLEAN_REGISTRATIONS.has(registered.registration)) rmQuiet(reportedFile(t));
   const say = (action, line) => saidOnce(t, reportKey(action, target, src.version), line, now);
   return composeDone({ copy: copied.copy, registration: registered.registration, carried: registered.carried ?? 0, replaced: copied.replaced, src, target, rec, say });
 }

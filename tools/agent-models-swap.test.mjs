@@ -603,6 +603,49 @@ test('W3: an arriving copy of this repository\'s own version is not put back: on
   assert.deepEqual(s.listMods(), ['agent-models', 'agent-models.installed.json']);
 });
 
+/** What another session's half-seen install can leave at the target: a plugin.json that cannot be read as a version at that moment. */
+const UNREADABLE_ARRIVALS = [
+  ['a directory named plugin.json', target => { fs.rmSync(path.join(target, '.claude-plugin', 'plugin.json')); fs.mkdirSync(path.join(target, '.claude-plugin', 'plugin.json')); }],
+  ['a plugin.json that is not JSON', target => fs.writeFileSync(path.join(target, '.claude-plugin', 'plugin.json'), '{')],
+];
+
+for (const [name, damage] of UNREADABLE_ARRIVALS) {
+  test(`W3: an aside whose version cannot be read (${name}) may be another session's newer copy: it is put back, never deleted, and the outcome is lost`, t => {
+    const s = sandbox(t);
+    s.writeSettings(s.registered());
+    s.seedTarget({ version: '1.0.0' });
+    const { calls, seam } = renameSeam((n, from) => {
+      if (n === 1 && from === s.t_.target) {
+        anotherSessionInstalls(s, '2.0.0');
+        damage(s.t_.target);
+      }
+    });
+    const r = s.ensure({ rename: seam });
+    assert.deepEqual([r.action, r.line, r.copy], ['none', '', 'lost']);
+    assert.equal(calls.length, 2, 'the target went aside and the aside came back');
+    assert.deepEqual(calls[1], [calls[0][1], s.t_.target]);
+    const left = FILES.filter(rel => rel !== '.claude-plugin/plugin.json');
+    for (const rel of left) assert.deepEqual(s.installedBytes(rel), fixtureBytes(rel, '2.0.0'), `${rel} is back at the target, not deleted`);
+    assert.deepEqual(s.listMods(), ['agent-models', 'agent-models.installed.json'], 'no staging and no aside is left');
+  });
+}
+
+test('W3: an unreadable aside that cannot be renamed back is refused with the aside named and the hand fix', t => {
+  const s = sandbox(t);
+  s.writeSettings(s.registered());
+  s.seedTarget({ version: '1.0.0' });
+  const { calls, seam } = renameSeam((n, from) => {
+    if (n === 1 && from === s.t_.target) {
+      anotherSessionInstalls(s, '2.0.0');
+      UNREADABLE_ARRIVALS[1][1](s.t_.target);
+    }
+    if (n === 2) throw failing('EPERM');
+  });
+  const r = s.ensure({ rename: seam });
+  assert.equal(r.line, notInstalled(`${calls[0][1]} holds a version that could not be read, and could not be renamed back to ${s.t_.target} (EPERM); rename it back by hand`));
+  assert.deepEqual(s.listMods().filter(n => n.includes('staging')), []);
+});
+
 test('W3: the rename back fails (EPERM) — refused with the aside named and the hand fix, no staging left, the newer copy still in the aside', t => {
   const s = sandbox(t);
   s.writeSettings(s.registered());
