@@ -569,7 +569,8 @@ Open stories:
   On 2026-11-11, by the owner's go ("Release"), `release` moved `153e6b5` → `26589a5` (conventions #153, #154,
   #155: the user-guard installer resolves a link target as the kernel walks it). Pin bumps merged in eight consumers
   (coai #974, benchmark #196, rag_qln #99 with both code pins, wsl_care #195, vscode_kit #31, r9700 #31, mcp #72,
-  sidecar_rust #77); creds moves in #343, which waits for the owner to resolve a CodeRabbit thread. The matrix's Pin
+  sidecar_rust #77); creds moves in #343, which waits for the owner to resolve a CodeRabbit thread. The owner resolved it, and
+  #343 merged the same night (`e48798a`): all nine consumers are on `26589a5`. The matrix's Pin
   column shows the pins at the time of the runs.
   **Which evidence shows part 2 (added 2026-11-11, CodeRabbit on #152).** § 7's pass sentence asks for the
   observable "in the recorded final answer or in the checkout state". These runs show it in the recorded trace, as the
