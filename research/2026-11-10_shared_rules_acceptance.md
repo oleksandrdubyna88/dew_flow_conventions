@@ -7,7 +7,7 @@ with its hash matching (here also: the CLI finished, the output not cut, Git HEA
 the row's observable is seen in the recorded answer or the checkout state; for "Claude / Codex from root" that is
 ENTRY and PROJECT read and no body loaded by a second path. Every run below passes part 1. **Part 2 is owed for
 every run:** the harness says `behavior requires review`, the Codex answers do not name ENTRY or PROJECT, and a
-second-path load is not recorded (corrected after CodeRabbit on #152; the harness is being taught to record both). **Update, the same evening:** the harness now records both. The rerun below passes part 2 for every run, and also for mcp and sidecar_rust on their migration branches (on the trace, as the harness classifies it; under § 7's literal sentence part 2 is not shown by the final answers, and the owner decides draft #156). The final answers are not kept here (a report is
+second-path load is not recorded (corrected after CodeRabbit on #152; the harness is being taught to record both). **Update, the same evening:** the harness now records both. On the trace, as the harness classifies it, the rerun below passes part 2 for every run, and also for mcp and sidecar_rust on their migration branches. Under § 7's literal sentence, part 2 is not shown by the final answers, and the owner decides draft PR #156. The final answers are not kept here (a report is
 up to 32 KiB); the trace itself is never stored, only its size and sha256. Planned files: `src/Example.cs` and
 `src/example.ts` (C# and TypeScript rules selected), except creds, whose run named two real files.
 
@@ -145,9 +145,10 @@ The same smoke again, in the same worktrees, for both agents, one after the othe
 `tools/smoke-rules.mjs` from this repository at `9ad652d` (conventions #154; squash-merged as `afbe426` with the
 same `tools/`). That harness records part 2 from the trace itself (`observable`): ENTRY and PROJECT read by a call
 that did not fail, any selected rule body loaded outside one run of the resolver, and any call it cannot classify
-(a call into a rule folder, or a dynamic command that could reach a rule, without naming a rule file). **All 18
-runs pass both parts on the trace:** 9 repositories, 2 agents each (for part 2 under § 7's literal sentence, see
-"Which evidence shows part 2" below). Every expected rule was read in full with its hash. ENTRY
+(a call into a rule folder, or a dynamic command that could reach a rule, without naming a rule file). **On the trace, as the
+harness classifies it, all 18 runs pass both parts:** 9 repositories, 2 agents each. Under § 7's literal sentence,
+part 2 is not shown by the final answers, and the owner decides draft PR #156 (see "Which evidence shows part 2"
+below). Every expected rule was read in full with its hash. ENTRY
 and PROJECT were read, no body came by a second path, and no call is unclassified. Seven consumers ran on the
 commits of the first runs above (creds on `daa7e05`, the later head of #328). `dew_flow_mcp` (#71) and
 `dew_flow_sidecar_rust` (#76) ran on their migration branches, on the committed pin `153e6b5`. The planned files
