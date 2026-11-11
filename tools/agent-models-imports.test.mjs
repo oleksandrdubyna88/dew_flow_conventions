@@ -142,6 +142,62 @@ test('the parsers read a double-quoted specifier like a single-quoted one: named
 });
 
 // ---------------------------------------------------------------------------------------------------------------------
+// the copy reads no byte of the source itself: only the Map `readSource` returned is written (E1.S3's rule, scanned)
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** The two modules that copy: they hold the Map of `readSource` and never a path under the source. */
+const COPY_MODULES = ['agent-models-swap.mjs', 'agent-models-install.mjs'];
+/** The reads that take a path: the target reader, the guard's file reader and any `fs.<name>(`. */
+const READ_CALLS = /(?<![\w$])(?:readTarget|readOrNull|fs\.[A-Za-z]+)\(/g;
+const SOURCE_WORD = /\b(?:source|src)\b/;
+
+/** Every call of a text that `pattern` opens (it ends at the `(`): `{ name, args, line }`, the argument text up to the matching `)`, across lines. */
+function callsOf(text, pattern) {
+  const calls = [];
+  for (const m of text.matchAll(pattern)) {
+    const open = m.index + m[0].length;
+    let depth = 1;
+    let end = open;
+    while (end < text.length && depth > 0) {
+      if (text[end] === '(') depth++;
+      else if (text[end] === ')') depth--;
+      end++;
+    }
+    calls.push({ name: m[0].slice(0, -1), args: text.slice(open, end - 1), line: text.slice(0, m.index).split('\n').length });
+  }
+  return calls;
+}
+
+/** The calls of `text` that read a path and name the source in their arguments. */
+const sourceReads = (name, text) => callsOf(text, READ_CALLS)
+  .filter(call => SOURCE_WORD.test(call.args))
+  .map(call => `${name}:${call.line} ${call.name}(${call.args.replace(/\s+/g, ' ').trim()}) names the source`);
+
+const copyModules = () => modules().filter(m => COPY_MODULES.includes(m.name));
+const readSourceCalls = text => callsOf(text, /(?<![\w$.])readSource\(/g);
+
+test('the swap and the installer read no file under the source: no read call takes an argument that names it, so only the bytes readSource checked are written', () => {
+  const found = copyModules();
+  assert.deepEqual(found.map(m => m.name), [...COPY_MODULES].sort(), 'both modules are scanned');
+  assert.deepEqual(found.flatMap(({ name, text }) => sourceReads(name, text)), []);
+});
+
+test('the installer calls readSource exactly once, with the source folder first, and the swap never calls it', () => {
+  const [swap, install] = COPY_MODULES.map(name => copyModules().find(m => m.name === name));
+  const calls = readSourceCalls(install.text);
+  assert.equal(calls.length, 1, 'one read of the source per run');
+  assert.equal(calls[0].args.split(',')[0].trim(), 'source');
+  assert.deepEqual(readSourceCalls(swap.text), []);
+});
+
+test('the source-read scan still finds its known instances: the released read in the installer, an allowed file read in the swap, and a planted read over several lines', () => {
+  const [swap, install] = COPY_MODULES.map(name => copyModules().find(m => m.name === name));
+  assert.deepEqual(readSourceCalls(install.text).map(c => c.args.replace(/\s+/g, ' ')), ['source, { released }']);
+  assert.ok(callsOf(swap.text, READ_CALLS).some(c => c.name === 'fs.readFileSync' && c.args === 'file'), 'the scan finds fs.readFileSync(file) in the swap, a read of the target');
+  assert.deepEqual(sourceReads('planted.mjs', 'const x = fs.readFileSync(\n  path.join(source, rel));\n'), ['planted.mjs:1 fs.readFileSync(path.join(source, rel)) names the source']);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
 // no invisible character in a hook module
 // ---------------------------------------------------------------------------------------------------------------------
 

@@ -1,7 +1,8 @@
 /**
  * Shared fixtures of the agent-models test files (`agent-models-decide.test.mjs`, `agent-models-read.test.mjs`,
- * `agent-models-pin.test.mjs`): the source and target trees, the temporary home, the rename seam and the lines the
- * installer prints, built from the same constants the tests assert with. E2 adds sandbox().ensure with the installer.
+ * `agent-models-pin.test.mjs`, `agent-models-install.test.mjs`, `agent-models-swap.test.mjs`,
+ * `agent-models-refusals.test.mjs`, `agent-models-report.test.mjs`): the source and target trees, the temporary home, the
+ * rename seam and the lines the installer prints, built from the same constants the tests assert with.
  *
  * Temporary homes are made by `ownedDir` only — never `os.homedir()`, never the real ~/.claude.
  */
@@ -9,6 +10,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import * as mod from '../../settings/hooks/lib/agent-models-install.mjs';
 import { MOD_FILES } from '../../settings/hooks/lib/agent-models-decide.mjs';
 import { ownedDir } from './owned.mjs';
 
@@ -119,6 +121,7 @@ export function sandbox(t, { version = '1.2.3' } = {}) {
       if (doc !== null) fs.writeFileSync(t_.manifest, `${JSON.stringify(doc, null, 2)}\n`);
       return files;
     },
+    ensure: (opts = {}) => mod.ensureAgentModels({ home, source, by: 'test', now: () => NOW, released: fixtureReleased(version), ...opts }),
   };
   return s;
 }
