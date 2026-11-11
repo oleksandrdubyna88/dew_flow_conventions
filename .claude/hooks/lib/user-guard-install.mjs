@@ -23,7 +23,7 @@ export function guardVersion(text) {
   return match ? Number.parseInt(match[1], 10) : 0;
 }
 
-const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
+export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const BACKUP_TAG = 'settings.json.bak-subagent-model-';
 
 /**
@@ -70,14 +70,14 @@ export function targets(home) {
   };
 }
 
-const normalise = p => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
+export const normalise = p => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
 
 /** The entry this tool owns. */
 export function entryFor(hookPath) {
   return { matcher: MATCHER, hooks: [{ type: 'command', command: 'node', args: [hookPath] }] };
 }
 
-const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+export const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 const itemIsOurs = (item, hookPath) =>
   isObject(item) && Array.isArray(item.args) && typeof item.args[0] === 'string' &&
@@ -171,7 +171,7 @@ export function drift(settings, hookPath, installedBytes, sourceBytes) {
  * with chmod before the rename: a create mode is cut by the umask, so 0644 under umask 0077 became 0600 and other
  * users lost their read of settings.json (CodeRabbit on #148, 2026-11-10).
  */
-function writeAtomic(dest, data, mode) {
+export function writeAtomic(dest, data, mode) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   const tmp = `${dest}.tmp-${process.pid}`;
   try {
@@ -183,12 +183,12 @@ function writeAtomic(dest, data, mode) {
   }
 }
 
-const readOrNull = file => (fs.existsSync(file) ? fs.readFileSync(file) : null);
+export const readOrNull = file => (fs.existsSync(file) ? fs.readFileSync(file) : null);
 
-const sameBytes = (a, b) => (a === null || b === null ? a === b : a.equals(b));
+export const sameBytes = (a, b) => (a === null || b === null ? a === b : a.equals(b));
 
 /** Parsed settings from bytes, or an `error` phrase when they are not a JSON object. */
-function parseSettings(bytes) {
+export function parseSettings(bytes) {
   if (bytes === null) return { settings: {} };
   try {
     const value = JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/, ''));
@@ -213,7 +213,7 @@ function writeBackup(settingsPath, bytes, mode) {
 }
 
 const result = (code, lines) => ({ code, lines });
-const serialise = settings => `${JSON.stringify(settings, null, 2)}\n`;
+export const serialise = settings => `${JSON.stringify(settings, null, 2)}\n`;
 const unparsable = (file, error) => result(1, [`${file} ${error}; nothing changed — fix or move the file and run again`]);
 
 /** The refusal shared by install and uninstall when settings.json moved under us. */
@@ -429,7 +429,7 @@ function effortRefusal(file, parsed) {
   return shape ? `${file}: ${shape}; nothing changed — fix it by hand` : '';
 }
 
-function writableReason(file) {
+export function writableReason(file) {
   try {
     fs.accessSync(file, fs.constants.W_OK);
     return '';
@@ -547,7 +547,7 @@ const realOrNull = file => {
   }
 };
 
-const lstatOrNull = file => {
+export const lstatOrNull = file => {
   try {
     return fs.lstatSync(file);
   } catch (e) {
@@ -557,12 +557,12 @@ const lstatOrNull = file => {
 };
 
 /** Where to read and write: the symlink's target when settings.json is a link; null when there is no file. */
-function effortTarget(settingsPath) {
+export function effortTarget(settingsPath) {
   return fs.existsSync(settingsPath) ? fs.realpathSync(settingsPath) : null;
 }
 
 /** A backup of `bytes`, unless the newest backup already holds exactly these bytes (a retry loop must not pile up files). */
-function backupOnce(file, bytes, mode) {
+export function backupOnce(file, bytes, mode) {
   const dir = path.dirname(file);
   const newest = fs.readdirSync(dir).filter(name => name.startsWith(BACKUP_TAG)).sort().at(-1);
   const newestPath = newest === undefined ? '' : path.join(dir, newest);
