@@ -32,7 +32,7 @@ const modules = () => fs.readdirSync(LIB)
 
 /** Every `import { a, b as c } from '…'` of a text, across lines: `{ names, from }` (the names as exported by the source). */
 function namedImports(text) {
-  return [...text.matchAll(/^import\s*\{([^}]*)\}\s*from\s*'([^']+)'/gm)].map(m => ({
+  return [...text.matchAll(/^import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/gm)].map(m => ({
     names: m[1].split(',').map(part => part.trim().split(/\s+as\s+/)[0]).filter(Boolean),
     from: m[2],
   }));
@@ -41,9 +41,9 @@ function namedImports(text) {
 /** Every module specifier of a text: `import … from`, `export … from`, a bare `import '…'`, and `import('…')`. */
 function specifiersOf(text) {
   const found = [
-    ...text.matchAll(/^(?:import|export)\b[^;]*?\bfrom\s+'([^']+)'/gm),
-    ...text.matchAll(/^import\s+'([^']+)'/gm),
-    ...text.matchAll(/\bimport\(\s*'([^']+)'\s*\)/g),
+    ...text.matchAll(/^(?:import|export)\b[^;]*?\bfrom\s+['"]([^'"]+)['"]/gm),
+    ...text.matchAll(/^import\s+['"]([^'"]+)['"]/gm),
+    ...text.matchAll(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g),
   ];
   return found.map(m => m[1]);
 }
@@ -127,4 +127,41 @@ test('the scans still find their known instances: the folder lists decide and re
   const decide = all.find(m => m.name === 'agent-models-decide.mjs');
   assert.ok(namedImports(decide.text).some(i => i.from === `./${GUARD}` && i.names.includes('isObject')), 'the import parser finds isObject in decide');
   assert.ok(declaredFunctions(fs.readFileSync(path.join(LIB, GUARD), 'utf8')).includes('lstatOrNull'), 'the declaration scan finds const lstatOrNull in the guard installer');
+});
+
+test('the parsers read a double-quoted specifier like a single-quoted one: named imports with their names, export-from, a bare import and a dynamic import', () => {
+  const text = [
+    'import { a, b as c } from "./x.mjs";',
+    'export { z } from "./y.mjs";',
+    'import "./side.mjs";',
+    'const late = await import("./dyn.mjs");',
+    "import { d } from './single.mjs';",
+  ].join('\n');
+  assert.deepEqual(specifiersOf(text), ['./x.mjs', './y.mjs', './single.mjs', './side.mjs', './dyn.mjs']);
+  assert.deepEqual(namedImports(text), [{ names: ['a', 'b'], from: './x.mjs' }, { names: ['d'], from: './single.mjs' }]);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// no invisible character in a hook module
+// ---------------------------------------------------------------------------------------------------------------------
+
+const HOOKS = fileURLToPath(new URL('../settings/hooks/', import.meta.url));
+/** U+FEFF, written as an escape here so this file holds none itself. */
+const BOM = '\uFEFF';
+
+/** Every `*.mjs` under a folder, recursively, as paths relative to it, sorted. */
+const mjsUnder = dir => fs.readdirSync(dir, { recursive: true }).filter(rel => rel.endsWith('.mjs')).map(rel => rel.split(path.sep).join('/')).sort();
+
+/** `file:line` of every line of a text that holds U+FEFF. */
+const bomLines = (name, text) => text.split('\n').flatMap((line, i) => (line.includes(BOM) ? [`${name}:${i + 1}`] : []));
+
+test('no file under settings/hooks holds the invisible character U+FEFF, which a reader cannot see in a regex or a string', () => {
+  const findings = mjsUnder(HOOKS).flatMap(rel => bomLines(rel, fs.readFileSync(path.join(HOOKS, rel), 'utf8')));
+  assert.deepEqual(findings, []);
+});
+
+test('the U+FEFF scan still finds its known instances: it lists the installer modules and the guard installer under lib/, and names a line that holds the character', () => {
+  const files = mjsUnder(HOOKS);
+  for (const known of ['lib/agent-models-decide.mjs', 'lib/agent-models-read.mjs', 'lib/user-guard-install.mjs', 'subagent-model.mjs']) assert.ok(files.includes(known), `${known} is scanned`);
+  assert.deepEqual(bomLines('f.mjs', `one\nvalue.replace(/^${BOM}/, '')\nthree`), ['f.mjs:2']);
 });

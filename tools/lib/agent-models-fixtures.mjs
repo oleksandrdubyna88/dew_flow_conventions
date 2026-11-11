@@ -9,9 +9,11 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { MOD_FILES } from '../../settings/hooks/lib/agent-models-decide.mjs';
 import { ownedDir } from './owned.mjs';
 
-export const FILES = ['.claude-plugin/plugin.json', 'hooks/hooks.json', 'hooks/register.tsx', 'hooks/prompts.ts', 'hooks/tasks.tsx', 'hooks/limits.tsx', 'types/index.d.ts'];
+/** The seven files of the mod, taken from the installer's own list, never typed a second time. */
+export const FILES = [...MOD_FILES];
 export const D = path.delimiter;
 export const NOW = new Date('2026-11-10T00:00:00Z');
 export const T = '~/.claude/mods/agent-models';

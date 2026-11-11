@@ -65,7 +65,8 @@ commit, as #158 did. This repository's own session start imports `.claude/hooks/
 - **F6** The source port lives only in the session scratchpad
   (`…/scratchpad/k-mods/mods/agent-models/` and `…/scratchpad/k-repo/`). A WSL restart empties it. If it is gone, the
   coder stops and asks the caller; it never fetches the source again by itself.
-- **F7** Test count of the E1 files in the source: `agent-models-decide.test.mjs` 27, `agent-models-extract.test.mjs`
+- **F7** Test count of the E1 files in the source: `agent-models-decide.test.mjs` 28 (first written as 27; both the
+  source and the port run 28), `agent-models-extract.test.mjs`
   18, `agent-models-pin.test.mjs` 8.
 
 ## Which ported tests belong to E1 (settled by their imports)
@@ -178,7 +179,7 @@ caller names.
 | 1.1 | the export-only edit; the check command of the brief, step 2 | `export-only, 12 lines`, exit 0 | — (a check of the edit, not a test) |
 | 1.2 | `npm test` before and after the export-only edit | the same pass count, 0 new failures | — (no behaviour change: the observation IS the proof) |
 | 1.3 | `node tools/adapter-check.mjs` after the edit, before the mirror copy / after it | names `.claude/hooks/lib/user-guard-install.mjs` as different / `OK` | the first half is the RED |
-| 1.4 | `tools/agent-models-decide.test.mjs` | 27 pass | fails to load: `Cannot find module '…/settings/hooks/lib/agent-models-decide.mjs'` |
+| 1.4 | `tools/agent-models-decide.test.mjs` | 28 pass | fails to load: `Cannot find module '…/settings/hooks/lib/agent-models-decide.mjs'` |
 | 1.5 | read: `readSource(sandbox.source)` of the 1.2.3 fixture tree | `version` `[1, 2, 3]`; `[...files.keys()]` equals `FILES` in order; `files.get('hooks/hooks.json')` equals the file's bytes | fails to load: `Cannot find module '…/agent-models-read.mjs'` |
 | 1.6 | read: `readSource(<root>/nowhere)` | `error` matches `/not a directory/` | as 1.5 |
 | 1.7 | read: `readTarget(t_)` with no target / after `seedTarget({ version: '1.2.3' })` | `{ kind: 'missing', path }` / `kind: 'dir'`, `version [1, 2, 3]`, the seeded bytes, `manifest.version '1.2.3'` | as 1.5 |
@@ -420,7 +421,7 @@ function that makes a source value, and it returns bytes only after the pure che
 | 3.19 | read: an identity that is not valid — `released: null` / one digest deleted / one digest of 63 hex digits | each `{ error: 'source <dir> cannot be checked: there is no valid released identity', unreleased: true }` | as 3.10 |
 | 3.20 | read: the target is never checked. `readTarget(t_)` after `seedTarget({ version: '1.2.3' })`, bytes that `RELEASED_MOD` does not name | `kind: 'dir'` with the seeded bytes, as 1.7 | — (green before; red if the check is ever put on the target) |
 | 3.21 | `cmp` of the two changed modules with their `.claude/hooks/lib/` copies; `node tools/adapter-check.mjs` | equal; `OK` | before the copy: adapter-check names `.claude/hooks/lib/agent-models-decide.mjs` as different |
-| 3.22 | `node --test tools/agent-models-decide.test.mjs tools/agent-models-imports.test.mjs`; `npm test`; `npm run check` | E1.S1's cases still pass (27 in decide); the total rises by the new cases, the failures do not rise; green | — |
+| 3.22 | `node --test tools/agent-models-decide.test.mjs tools/agent-models-imports.test.mjs`; `npm test`; `npm run check` | E1.S1's cases still pass (28 in decide); the total rises by the new cases, the failures do not rise; green | — |
 
 **Teeth (RED → GREEN → RED), one at a time, each restored by the reverse edit** (the files are not committed yet, so
 never by `git checkout`):

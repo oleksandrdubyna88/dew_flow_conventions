@@ -10,7 +10,7 @@ import { test } from 'node:test';
 
 import * as decide from '../settings/hooks/lib/agent-models-decide.mjs';
 import { readSource, readTarget } from '../settings/hooks/lib/agent-models-read.mjs';
-import { FILES, fixtureBytes, fixtureReleased, sandbox, sha, symlinkOrSkip, writeTree } from './lib/agent-models-fixtures.mjs';
+import { FILES, escaped, fixtureBytes, fixtureReleased, sandbox, sha, symlinkOrSkip, writeTree } from './lib/agent-models-fixtures.mjs';
 
 test('readSource reads the seven files once and keeps the plugin.json bytes it parsed, and a read that passed holds only a version and files', t => {
   const s = sandbox(t);
@@ -193,9 +193,34 @@ test('3.19 an identity that is missing or malformed refuses, it never passes: nu
   const without = { ...RELEASED, sha256: { ...RELEASED.sha256 } };
   delete without.sha256['hooks/hooks.json'];
   const short = { ...RELEASED, sha256: { ...RELEASED.sha256, 'hooks/hooks.json': RELEASED.sha256['hooks/hooks.json'].slice(1) } };
-  for (const released of [null, without, short]) {
+  const inherited = { version: decide.RELEASED_MOD.version, sha256: Object.create(decide.RELEASED_MOD.sha256) };
+  assert.equal(inherited.sha256['hooks/hooks.json'], decide.RELEASED_MOD.sha256['hooks/hooks.json'], 'the digests are reachable through the prototype chain, as the case needs');
+  assert.deepEqual(Object.keys(inherited.sha256), [], 'and none of them is an own key');
+  for (const released of [null, without, short, inherited]) {
     assert.deepEqual(readSource(s.source, { released }), { error: `source ${s.source} cannot be checked: there is no valid released identity`, unreleased: true });
   }
+});
+
+test('3.19b options that are not an object never throw: readSource(dir, null) answers the refusal of the real released identity, naming the version it checked against', t => {
+  const s = sandbox(t);
+  let read;
+  assert.doesNotThrow(() => { read = readSource(s.source, null); });
+  assert.equal(read.unreleased, true);
+  assert.equal(read.files, undefined);
+  assert.match(read.error, new RegExp(`^source ${escaped(s.source)} is not the released mod ${escaped(decide.RELEASED_MOD.version)}: `));
+});
+
+test('3.21 a MOD_FILES entry that cannot be read (EACCES) is answered as an error naming that file, never a throw and never files', t => {
+  const s = sandbox(t);
+  const denied = s.sourceFile('hooks/prompts.ts');
+  const original = fs.readFileSync;
+  t.mock.method(fs, 'readFileSync', (file, ...rest) => {
+    if (file === denied) throw Object.assign(new Error('permission denied'), { code: 'EACCES' });
+    return original(file, ...rest);
+  });
+  const read = readSource(s.source, { released: fixtureReleased('1.2.3') });
+  assert.deepEqual(read, { error: `source file ${denied} could not be read (EACCES)` });
+  assert.ok(fs.readFileSync.mock.calls.some(c => c.arguments[0] === denied), 'the denied file was really read through the mock');
 });
 
 test('3.20 the target is never checked against the released identity: seeded bytes that RELEASED_MOD does not name are read as they are', t => {

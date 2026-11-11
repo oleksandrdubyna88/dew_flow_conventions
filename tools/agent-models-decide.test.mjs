@@ -306,3 +306,9 @@ test('leftoverStamp reads the clock out of a staging or aside name, and answers 
 test('replacedStamp is UTC YYYYMMDDTHHmmssSSSZ', () => {
   assert.equal(mod.replacedStamp(new Date('2026-11-10T01:02:03.004Z')), '20261110T010203004Z');
 });
+
+test('parseJsonObject drops one leading byte order mark and parses the object, and answers null for a JSON value that is not an object', () => {
+  assert.deepEqual(mod.parseJsonObject(Buffer.from('\uFEFF{"a":1}')), { a: 1 });
+  assert.deepEqual(mod.parseJsonObject(Buffer.from('{"a":1}')), { a: 1 });
+  assert.equal(mod.parseJsonObject(Buffer.from('\uFEFF[1]')), null);
+});

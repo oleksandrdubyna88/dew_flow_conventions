@@ -22,7 +22,12 @@ function readRegular(file) {
     return { problem: `could not be read (${e.code})` };
   }
   if (stat === null) return { problem: 'is missing' };
-  return stat.isFile() ? { bytes: fs.readFileSync(file) } : { problem: 'is not a regular file' };
+  if (!stat.isFile()) return { problem: 'is not a regular file' };
+  try {
+    return { bytes: fs.readFileSync(file) };
+  } catch (e) {
+    return { problem: `could not be read (${e.code})` };
+  }
 }
 
 function sourceVersion(file, bytes) {
@@ -63,8 +68,9 @@ function readSourceFiles(source, released) {
  * Reads the source folder ONCE and returns its bytes only when they are the released mod. Never throws, whatever
  * `source` is. `released` is a test seam (a fixture tree's own identity); production passes nothing.
  */
-export function readSource(source, { released = RELEASED_MOD } = {}) {
+export function readSource(source, options) {
   try {
+    const released = options?.released === undefined ? RELEASED_MOD : options.released;
     if (!fs.statSync(source, { throwIfNoEntry: false })?.isDirectory()) return { error: `source ${source} is not a directory` };
     return readSourceFiles(source, released);
   } catch (e) {

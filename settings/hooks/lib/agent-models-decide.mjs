@@ -94,7 +94,7 @@ export function compareVersions(a, b) {
 }
 
 export const parseJsonObject = bytes => {
-  const value = JSON.parse(bytes.toString('utf8').replace(/^﻿/, ''));
+  const value = JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/, ''));
   return isObject(value) ? value : null;
 };
 
@@ -113,7 +113,7 @@ export const versionText = version => version.join('.');
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 const isReleasedIdentity = released => isObject(released) && parseVersion(released.version) !== null
-  && isObject(released.sha256) && MOD_FILES.every(rel => SHA256_HEX.test(released.sha256[rel]));
+  && isObject(released.sha256) && MOD_FILES.every(rel => Object.hasOwn(released.sha256, rel) && SHA256_HEX.test(released.sha256[rel]));
 
 /**
  * Why a source read (`{ version, files }`) is not the released mod; '' when it is. Pure. It names the first
@@ -122,6 +122,7 @@ const isReleasedIdentity = released => isObject(released) && parseVersion(releas
  */
 export function releasedModRefusal(src, released) {
   if (!isReleasedIdentity(released)) return 'cannot be checked: there is no valid released identity';
+  if (!Array.isArray(src?.version)) return 'has no version: the read of its plugin.json gave none';
   const not = `is not the released mod ${released.version}: `;
   const version = versionText(src.version);
   const otherVersion = `${PLUGIN_JSON} is version ${version}, released ${released.version}`;

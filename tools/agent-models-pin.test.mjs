@@ -105,7 +105,7 @@ const newestVersion = pins => Object.keys(pins).map(decide.parseVersion).sort(de
 
 test('3.2 the newest row is the highest version by compareVersions, not the last key and not the highest by text', () => {
   const row = {};
-  assert.equal(newestVersion({ '1.10.0': row, '1.9.0': row, '1.2.0': row }), '1.10.0');
+  assert.equal(newestVersion({ '1.9.0': row, '1.10.0': row, '1.2.0': row }), '1.10.0');
 });
 
 test('3.3 RELEASED_MOD is the newest row of the committed pin table: its version, its seven digests, in MOD_FILES order', () => {
@@ -148,4 +148,11 @@ test('3.6 the pure check: the fixture and its own identity pass; a missing file 
     `is not the released mod 1.2.3: hooks/tasks.tsx differs (sha256 none, released ${released.sha256['hooks/tasks.tsx'].slice(0, 12)})`,
   );
   assert.equal(decide.releasedModRefusal({ version: [1, 2, 3], files }, undefined), 'cannot be checked: there is no valid released identity');
+});
+
+test('3.6b the pure check on a read with no version (null) answers a refusal and never throws', () => {
+  let refusal;
+  assert.doesNotThrow(() => { refusal = decide.releasedModRefusal({ version: null, files: new Map() }, fixtureReleased('1.2.3')); });
+  assert.equal(typeof refusal, 'string');
+  assert.notEqual(refusal, '');
 });
