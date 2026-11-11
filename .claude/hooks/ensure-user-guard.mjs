@@ -34,7 +34,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
-import { RELEASED_GUARD, applyEffort, guardVersion, install, isRegistered, registrationValid, releaseRefusal, repairRegistration, targets } from './lib/user-guard-install.mjs';
+import { RELEASED_GUARD, applyEffort, guardVersion, install, isRegistered, registrationValid, repairRegistration, targets } from './lib/user-guard-install.mjs';
 
 export { guardVersion };
 
@@ -132,9 +132,8 @@ export function ensureUserGuard({ home, source, env, released = RELEASED_GUARD }
   if (step.action === 'repair-registration') return repairOnly(home, step.from, to);
   const dirty = uncommittedRefusal(source);
   if (dirty) return { action: 'refused', line: refusal(dirty) };
-  const unreleased = releaseRefusal(source, released);
-  if (unreleased) return { action: 'refused', line: refusal(unreleased) };
-  const { code, lines } = install({ home, source, by: 'self-install' });
+  // The release check is inside install, on the bytes it writes (one read).
+  const { code, lines } = install({ home, source, by: 'self-install', released });
   if (code !== 0) return { action: 'refused', line: refusal(lines.at(-1) ?? 'unknown reason') };
   return { action: step.action, line: successLine(step, to) };
 }

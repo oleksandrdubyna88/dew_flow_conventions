@@ -43,19 +43,19 @@ export const RELEASED_GUARD = Object.freeze({
 export const guardDigest = text => sha256(String(text).replaceAll('\r\n', '\n'));
 
 /**
- * Why `source` must not be copied into ~/.claude as the released guard; '' when it may be. A file that cannot be read
- * is a reason, never a throw (the plan round, 2026-11-11).
+ * Why a guard's TEXT must not be copied into ~/.claude as the released guard; '' when it may be. A digest difference
+ * names both digests; a version-only difference names both versions (the code round, 2026-11-11).
  */
-export function releaseRefusal(source, released = RELEASED_GUARD) {
-  let text;
-  try {
-    text = fs.readFileSync(source, 'utf8');
-  } catch (error) {
-    return `the project copy of the hook could not be read (${error?.code ?? 'error'})`;
-  }
+export function releasedTextRefusal(text, released = RELEASED_GUARD) {
   const digest = guardDigest(text);
-  if (digest === released.sha256 && guardVersion(text) === released.version) return '';
-  return `the project copy is not the released guard (sha256 ${digest.slice(0, 12)}, released ${released.sha256.slice(0, 12)})`;
+  const version = guardVersion(text);
+  if (digest !== released.sha256) {
+    return `the project copy is not the released guard (sha256 ${digest.slice(0, 12)}, released ${released.sha256.slice(0, 12)})`;
+  }
+  if (version !== released.version) {
+    return `the project copy is not the released guard (version ${version}, released version ${released.version})`;
+  }
+  return '';
 }
 
 /** Where the hook and the settings live for a home. */
@@ -310,7 +310,7 @@ function changedRefusal(t, sourceBytes, force) {
     : `installed guard ${t.hook} was changed since it was installed (its sha256 differs from ${t.manifest}); nothing changed — pass --force to replace it`;
 }
 
-export function install({ home, source, beforeWrite = () => {}, clearOptout = false, force = false, by = 'cli' }) {
+export function install({ home, source, beforeWrite = () => {}, clearOptout = false, force = false, by = 'cli', released = null }) {
   const t = targets(home);
   if (!fs.existsSync(source)) return result(1, [`source hook not found: ${source} — pass --source <file>`]);
   const original = readOrNull(t.settings);
@@ -320,6 +320,10 @@ export function install({ home, source, beforeWrite = () => {}, clearOptout = fa
   if (target.refusal) return result(1, [target.refusal]);
   const merged = mergeEntry(parsed.settings, t.hook);
   const sourceBytes = fs.readFileSync(source);
+  // The release check runs on THESE bytes, the ones written below: one read, so nothing can swap the file between a
+  // check and the copy (the code round, 2026-11-11). `released` is null only for an explicit --unreleased.
+  const unreleased = released ? releasedTextRefusal(sourceBytes.toString('utf8'), released) : '';
+  if (unreleased) return result(1, [unreleased]);
   const refusal = downgradeRefusal(t, sourceBytes, force) || changedRefusal(t, sourceBytes, force);
   if (refusal) return result(1, [refusal]);
   const upToDate = original !== null && original.equals(Buffer.from(serialise(merged))) && sameBytes(readOrNull(t.hook), sourceBytes) && isRegistered(t);

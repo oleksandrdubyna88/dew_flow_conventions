@@ -40,7 +40,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-import { check, install, releaseRefusal, uninstall } from '../settings/hooks/lib/user-guard-install.mjs';
+import { RELEASED_GUARD, check, install, uninstall } from '../settings/hooks/lib/user-guard-install.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_SOURCE = path.resolve(HERE, '..', 'settings', 'hooks', 'subagent-model.mjs');
@@ -69,9 +69,11 @@ export function parseArgs(argv) {
 
 /** Install, after the release check: a guard that is not the released one needs `--unreleased`, and nothing is written. */
 export function installChecked(a) {
-  const reason = a.unreleased ? '' : releaseRefusal(a.source);
-  if (reason) return { code: 1, lines: [`refused: ${reason}; --unreleased installs it anyway (the guard in ~/.claude runs for every repository)`] };
-  return install({ ...a, clearOptout: true });
+  const r = install({ ...a, clearOptout: true, released: a.unreleased ? null : RELEASED_GUARD });
+  if (r.code !== 0 && /is not the released guard/.test(r.lines.at(-1) ?? '')) {
+    return { ...r, lines: [...r.lines.slice(0, -1), `refused: ${r.lines.at(-1)}; --unreleased installs it anyway (the guard in ~/.claude runs for every repository)`] };
+  }
+  return r;
 }
 
 const ACTIONS = { install: installChecked, uninstall, check };

@@ -448,3 +448,20 @@ test('a project copy that cannot be read is a refusal line, never a throw', t =>
   assert.equal(r.action, 'refused');
   assert.match(r.line, /could not be read/);
 });
+
+// ---- the code round (2026-11-11), red first: the bytes checked are the bytes written (one read, no check-then-copy) ----
+test('install itself refuses bytes that are not the released pair, so nothing can swap the file after a check', t => {
+  const s = sandbox(t);
+  fs.writeFileSync(s.source, `${realText()}// swapped in after a check\n`);
+  const r = install({ home: s.home, source: s.source, released: RELEASED_GUARD });
+  assert.equal(r.code, 1);
+  assert.match(r.lines.at(-1), /is not the released guard/);
+  assert.equal(fs.existsSync(s.paths.hook), false);
+});
+
+test('a version-only difference says so, instead of two equal digests', t => {
+  const s = sandbox(t);
+  fs.writeFileSync(s.source, realText());
+  const r = ensureUserGuard({ home: s.home, source: s.source, env: {}, released: { ...RELEASED_GUARD, version: RELEASED_GUARD.version + 1 } });
+  assert.match(r.line, new RegExp(`version ${RELEASED_GUARD.version}, released version ${RELEASED_GUARD.version + 1}`));
+});
