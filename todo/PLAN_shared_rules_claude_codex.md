@@ -75,6 +75,16 @@ Narrowed: no — the scope grows from the six consumers of 2026-09-09 to every r
 
 > Epoch 2 · approved 2026-11-09 · by reviewers · state: open
 
+- 2.1 · 2026-11-11 · reviewer · dod — for a § 7 observable that is itself a read, the evidence is the recorded trace as the harness classifies it, not the final answer
+  (CodeRabbit on #152: § 7's pass sentence asks for the observable "in the recorded final answer or in the checkout
+  state", but the "from root" rows' observable is a read — ENTRY and PROJECT read, no rule body by a second path —
+  and the same paragraph says a model's claim "I read everything" is evidence of nothing. Conventions #154 made
+  `tools/smoke-rules.mjs` classify the trace (`observable`: entryRead, projectRead, secondPathReads, unclassified,
+  verified); the 18 reruns pass it, while most Codex final answers name neither file. Consult b22249e8 (2 of 2)
+  advised this clarification over prompting the agents to narrate their reads; one consultant advised the owner
+  decide it, since it spends the epoch's one change. Prepared by the agent for the owner's decision, 2026-11-11;
+  the owner approved it the same morning ("мерджи", on #156).)
+
 ## Execution journal — 2026-09-10
 
 Branch: `feat/shared-rules-claude-codex`, base `5d6984ebaa9efd3bae48e25f91f8a1bb3872b54f`.
@@ -660,7 +670,10 @@ selection rule).
 
 Pass and fail conditions (added 2026-11-09, for every row above and for each agent separately). **Pass:** the
 recorded read trace shows every expected rule id read in full with its hash matching (`tools/smoke-rules.mjs`
-evidence), AND the observable in the right column is seen in the recorded final answer or in the checkout state
+evidence), AND the observable in the right column is seen in the recorded final answer or in the checkout state —
+or, for an observable that is itself a read (the "from root" rows: ENTRY and PROJECT read, no body by a second
+path), in the recorded trace as `tools/smoke-rules.mjs` classifies it (`observable.verified`, entry 2.1), since a
+final answer naming the files is a model's claim
 (for example: the resolver's `explain` output names the second language's rules before the second language's file
 is edited; the nested start names the repository root; the rollback clone runs the old commands on the old SHA).
 **Fail:** any expected source not read or read in part, a hash mismatch, a body loaded by a second path, a quota or

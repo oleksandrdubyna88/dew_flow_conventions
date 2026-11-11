@@ -6,7 +6,8 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { ensureUserGuard } from '../settings/hooks/ensure-user-guard.mjs';
-import { drift, findEntries, install, mergeEntry, removeEntry, repairRegistration, targets, uninstall } from '../settings/hooks/lib/user-guard-install.mjs';
+import { DEFAULT_SOURCE } from './install-user-hook.mjs';
+import { drift, findEntries, guardDigest, guardVersion, install, mergeEntry, removeEntry, repairRegistration, targets, uninstall } from '../settings/hooks/lib/user-guard-install.mjs';
 import { ownedDir } from './lib/owned.mjs';
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'install-user-hook.mjs');
@@ -19,14 +20,18 @@ function sandbox(t) {
   const source = path.join(root, 'subagent-model.mjs');
   fs.writeFileSync(source, '// fixture hook\nprocess.exit(0);\n');
   const t_ = targets(home);
-  const run = (...args) => spawnSync(process.execPath, [SCRIPT, ...args, '--home', home, '--source', source], { encoding: 'utf8' });
+  // The fixture is not the released guard, so its installs pass --unreleased (the consent the CLI asks for); `strict`
+  // runs without it.
+  const strict = (...args) => spawnSync(process.execPath, [SCRIPT, ...args, '--home', home, '--source', source], { encoding: 'utf8' });
+  const installs = args => !args.includes('--uninstall') && !args.includes('--check'); // no action means --install
+  const run = (...args) => strict(...args, ...(installs(args) ? ['--unreleased'] : []));
   const writeSettings = value => {
     fs.mkdirSync(t_.dir, { recursive: true });
     fs.writeFileSync(t_.settings, typeof value === 'string' ? value : `${JSON.stringify(value, null, 2)}\n`);
   };
   const readSettings = () => fs.readFileSync(t_.settings, 'utf8');
   const backups = () => (fs.existsSync(t_.dir) ? fs.readdirSync(t_.dir).filter(f => f.includes('.bak-subagent-model-')) : []);
-  return { home, source, paths: t_, run, writeSettings, readSettings, backups };
+  return { home, source, paths: t_, run, strict, writeSettings, readSettings, backups };
 }
 
 const ours = hook => ({ matcher: 'Agent|Task', hooks: [{ type: 'command', command: 'node', args: [hook] }] });
@@ -331,7 +336,8 @@ for (const [what, tamper] of [
     tamper(doc.hooks.PreToolUse[0]);
     s.writeSettings(doc);
     assert.equal(s.run('--check').status, 1);
-    const r = ensureUserGuard({ home: s.home, source: s.source, env: {} });
+    const text = fs.readFileSync(s.source, 'utf8');
+    const r = ensureUserGuard({ home: s.home, source: s.source, env: {}, released: { version: guardVersion(text), sha256: guardDigest(text) } });
     assert.match(r.action, /^(installed|upgraded)$/);
     assert.match(r.line, /installed|upgraded/);
     const after = JSON.parse(s.readSettings());
@@ -559,4 +565,25 @@ test('a settings link re-pointed during the write is refused, even when both fil
   assert.match(r.lines.at(-1), /changed while installing/);
   assert.equal(fs.readFileSync(a, 'utf8'), '{"model":"opus"}\n', 'the old target was written');
   assert.equal(fs.existsSync(s.paths.hook), false);
+});
+
+// ---- the owner's go of 2026-11-11, red first: the manual installer asks before it installs an unreleased guard ----
+test('--install of a guard that is not the released one is refused without --unreleased, and nothing is written', t => {
+  const s = sandbox(t);
+  const r = s.strict('--install');
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, /the project copy is not the released guard .*--unreleased installs it anyway/s);
+  assert.equal(fs.existsSync(s.paths.hook), false);
+  assert.equal(fs.existsSync(s.paths.settings), false);
+  const consented = s.strict('--install', '--unreleased');
+  assert.equal(consented.status, 0, consented.stderr);
+  assert.equal(fs.existsSync(s.paths.hook), true);
+});
+
+test('--install of the released guard needs no consent', t => {
+  const s = sandbox(t);
+  fs.copyFileSync(DEFAULT_SOURCE, s.source);
+  const r = s.strict('--install');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(fs.readFileSync(s.paths.hook, 'utf8'), fs.readFileSync(DEFAULT_SOURCE, 'utf8'));
 });
