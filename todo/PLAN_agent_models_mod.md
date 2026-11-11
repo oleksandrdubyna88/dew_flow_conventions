@@ -1,6 +1,7 @@
 # PLAN — the `agent-models` mod ships with the shared rules and the session self-install turns it on
 
-> Status: **plan approved 2026-11-11 (coai plan round `proceed`, 2 of 2 reviewers), nothing implemented yet.** Scope: a
+> Status: **plan approved 2026-11-11 (coai plan round `proceed`, 2 of 2 reviewers); E1 built on `feat/agent-models-mod-e1`
+> (ends at 248065d, its code rounds `proceed`), E2 in progress on `feat/agent-models-mod-e2`, nothing merged or released.** Scope: a
 > new `mods/agent-models/` folder (a Claude Code mod, version 1.3.3, ported from the owner's own earlier work), one new
 > step in `settings/hooks/ensure-user-guard.mjs` with four installer modules under `settings/hooks/lib/`, helpers
 > exported from `settings/hooks/lib/user-guard-install.mjs`, the version pin table, their tests,
@@ -231,7 +232,8 @@ with a re-check of bytes and target as one road; the code has two roads (E2's co
 - **Scope.** The writing half of build-order step 3 (`agent-models-swap.mjs`, `agent-models-install.mjs`, their ported
   tests), then steps 4, 5 and 6. Files: those two modules; `settings/hooks/ensure-user-guard.mjs`
   (`ensureAgentModelsMod`, `SPEAKING`); the rewritten `install` and `step` tests and the new cases of the test plan,
-  run in a consumer-shaped project; `research/module_rules.md` and `research/module_tests.md`.
+  run in a consumer-shaped project; `research/module_rules.md` and `research/module_tests.md`. The stories:
+  [PLAN_agent_models_mod_E2.md](PLAN_agent_models_mod_E2.md).
 - **Depends on.** E1: the exports, `RELEASED_MOD`, `readSource`, the check, and its rule for the copy.
 - **Done when.** Every new case of the test plan was watched RED, then green. The step installs, upgrades, registers,
   skips and refuses as Design B says, and the reported file stays one file. The guard and effort steps still run when
@@ -260,4 +262,4 @@ with a re-check of bytes and target as one road; the code has two roads (E2's co
   with its date. The owner's own sessions show the band. The plan is promoted with its deviations.
 - **Cornerstone areas.** None.
 
-Cornerstones: 1 of 2 — E1.S3 the released-copy check (E1), the settings-file write (E2)
+Cornerstones: 2 of 2 — E1.S3 the released-copy check (E1), E2.S2 the settings-file write (E2)
