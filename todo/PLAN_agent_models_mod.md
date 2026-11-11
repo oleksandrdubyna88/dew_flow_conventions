@@ -40,7 +40,7 @@ repository's plan documents and git history are NOT copied; only the mod, its in
   ceiling (`hooks/prompts.ts:234-279`; not proven, the engine side was not observed), left to a separate plan for mod
   1.3.4 so this port stays byte-identical to 1.3.3.
 - **The source port** (a copy outside this repository):
-  - the mod: 7 shipped files, 10 test files, `tsconfig.json`, `.gitignore`;
+  - the mod: 7 shipped files, 11 test files (8 `*.test.tsx`, 3 fixtures), `tsconfig.json`, `.gitignore`;
   - the installer: `agent-models-decide.mjs` (218 lines), `agent-models-read.mjs` (120), `agent-models-swap.mjs`
     (334), `agent-models-install.mjs` (221);
   - the Node tests `agent-models-{decide,extract,install,pin,refusals,report,step,swap}.test.mjs`, the support files
@@ -68,7 +68,7 @@ repository's plan documents and git history are NOT copied; only the mod, its in
 
 ### A. The mod — `mods/agent-models/`
 
-The 7 shipped files byte-identical to 1.3.3, its 10 tests, `tsconfig.json` and `.gitignore`. `.gitattributes` gains
+The 7 shipped files byte-identical to 1.3.3, its 11 test files, `tsconfig.json` and `.gitignore`. `.gitattributes` gains
 `mods/agent-models/** text eol=lf`, so every checkout holds the same bytes the pin table names. No `.md` inside: the
 rule loader reads rule folders only. `claude plugin validate` and `claude plugin test mods/agent-models` need the
 `claude` CLI and are run by hand; CI does not run the mod's `.tsx` tests, and Sonar's `sources=tools` covers neither
@@ -206,8 +206,9 @@ with a re-check of bytes and target as one road; the code has two roads (E2's co
   `settings/hooks/lib/agent-models-decide.mjs` (`MOD_FILES`, `RELEASED_MOD`) and `agent-models-read.mjs`
   (`readSource`) with their pointer rewrites; the ported tests that import only these, the pin test with its new cases
   among them. No module of this epic writes to the user's home. In the source, `agent-models-read.mjs:13` imports
-  `lstatOrNull` from `agent-models-swap.mjs` (`:20`); here that read helper lives in `agent-models-read.mjs` and the
-  swap module imports it from there, so E1 imports nothing of E2.
+  `lstatOrNull` from `agent-models-swap.mjs` (`:20`); here the existing private `lstatOrNull` of
+  `user-guard-install.mjs` is exported and re-exported by `agent-models-read.mjs`, and the swap module imports it from
+  there, so E1 imports nothing of E2. The stories: [PLAN_agent_models_mod_E1.md](PLAN_agent_models_mod_E1.md).
 - **Depends on.** Nothing in this plan. Its inputs are the source port and the scan of 2026-11-11.
 - **Done when.** `RELEASED_MOD` was watched RED, then equals the newest pin row, and that row equals the files at HEAD.
   A source that differs in one file or in the version gives a refusal that names the first file. Step 1 changed no
@@ -253,4 +254,4 @@ with a re-check of bytes and target as one road; the code has two roads (E2's co
   consumer installs the mod and shows the band, recorded with its date. The plan is promoted with its deviations.
 - **Cornerstone areas.** None.
 
-Cornerstones: 0 of 2 — the released-copy check (E1), the settings-file write (E2)
+Cornerstones: 1 of 2 — E1.S3 the released-copy check (E1), the settings-file write (E2)
