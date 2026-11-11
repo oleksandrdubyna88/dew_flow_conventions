@@ -566,6 +566,11 @@ Open stories:
   sidecar_rust #76 merge, and while benchmark has no Claude adapter (story 3.B, not selected). Both merged later that
   night (mcp `9bf9f5b`, sidecar_rust `97e174c`), so all nine repositories are on the neutral layout; the item stays
   open for story 3.B only.
+  On 2026-11-11, by the owner's go ("Release"), `release` moved `153e6b5` → `26589a5` (conventions #153, #154,
+  #155: the user-guard installer resolves a link target as the kernel walks it). Pin bumps merged in eight consumers
+  (coai #974, benchmark #196, rag_qln #99 with both code pins, wsl_care #195, vscode_kit #31, r9700 #31, mcp #72,
+  sidecar_rust #77); creds moves in #343, which waits for the owner to resolve a CodeRabbit thread. The matrix's Pin
+  column shows the pins at the time of the runs.
 
   | Consumer | Mount | Pin | Adapter check | Fresh clone / worktree | Both agents (§ 7) | Old-mount lines outside `todo/`, `research/`, `.gitmodules` | Rollback | Decision |
   |---|---|---|---|---|---|---|---|---|
