@@ -52,7 +52,11 @@ are separate evidence; the final answer still needs behavioral review. Since 202
 opened directly rather than through the resolver, with the tool that did it), and `verified` when both files were
 read and nothing came by a second path. Paths count only when they resolve to this checkout's own files, and a read
 counts only when it did not fail (a Claude tool_result with `is_error`, a Codex non-zero exit, or a Codex command that
-started and never completed); a second-path body counts even from a failed call. Only one run of this run's resolver
+started and never completed), and only when its output shows the file: 3 consecutive non-blank lines of it, one of
+them 20 characters or longer, compared after CRLF folding and with Read's line numbers removed. So `test -e`, `ls`
+or a `grep` count only name the file, and a read from the middle of the file still counts (CodeRabbit on #156,
+2026-11-11; plan change 2.1 makes this classification the § 7 evidence for the from-root rows). A second-path body
+counts even from a failed call, and without its text in the output. Only one run of this run's resolver
 by node is the first path (a chained command, or one that merely mentions `rules.mjs`, is scanned). A call that
 reaches a selected rule's folder, or a dynamic shell command (variable, glob, substitution) that mentions the mount,
 a rule's file name or a rule folder, without naming one rule file goes to `unclassified` as `{index, via, target}`,
