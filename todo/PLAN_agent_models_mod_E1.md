@@ -1,7 +1,7 @@
 # PLAN — agent-models mod, E1: the release payload and its identity
 
-> Status: **implemented 2026-11-11 on `feat/agent-models-mod-e1` (ec9b570 … 248065d), two coai code rounds `proceed`
-> and an Opus review; not merged yet (E1 and E2 share one pull request).** Stories of epic E1 of
+> Status: **built 2026-11-11 on `feat/agent-models-mod-e1` (ec9b570 … 248065d), two coai code rounds `proceed` and an
+> Opus review; not merged yet (E1 and E2 share one pull request), and it promotes with its parent.** Stories of epic E1 of
 > [PLAN_agent_models_mod.md](PLAN_agent_models_mod.md) (§ *Epics*, E1), written by Opus when the epic started. Scope:
 > the helper exports of `settings/hooks/lib/user-guard-install.mjs`, the read-only installer modules
 > `agent-models-decide.mjs` and `agent-models-read.mjs`, mod 1.3.3 in `mods/agent-models/` with its `eol=lf` rule, the
