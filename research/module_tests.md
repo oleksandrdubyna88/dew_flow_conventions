@@ -222,7 +222,12 @@ unchanged), a newer installed copy is never downgraded and is reported as `newer
 unparsable `settings.json` is refused byte-identical, a project hook with uncommitted changes (a real `git init`)
 is refused, every install writes the provenance manifest (source, sha256, version, UTC time, `self-install`), and
 spawned runs of the entry point print exactly one `systemMessage` line the first time and nothing the second, and
-survive garbage stdin (the payload `cwd` stands in for `CLAUDE_PROJECT_DIR`). The permanent break-it makes the
+survive garbage stdin (the payload `cwd` stands in for `CLAUDE_PROJECT_DIR`). Since 2026-11-11 the release check:
+`RELEASED_GUARD` equals this commit's guard (digest and version); a committed but edited guard is refused and
+`~/.claude` stays untouched; the released guard installs with LF or CRLF endings; the right bytes under another
+version are refused; an unreadable project copy is a refusal line, never a throw; and the manual `--install` refuses
+an unreleased guard without `--unreleased` (red first, then green, then red again with the check removed). Unit tests
+with fake guards pass their own released pair; the spawned entry-point runs carry the real guard. The permanent break-it makes the
 version comparison always install: the "equal writes nothing" and the second-run-silent cases go red. Four cases
 added 2026-11-10 (coai code gate on dew_flow_creds_for_devs #328), the first three red on the old files: git not on
 PATH refuses the install (it read as "no uncommitted changes"); a hooks path that cannot be written leaves
