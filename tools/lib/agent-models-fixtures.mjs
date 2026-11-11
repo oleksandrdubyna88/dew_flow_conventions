@@ -73,8 +73,11 @@ export function snapshot(dir) {
   return out;
 }
 
+/** UTF-16 code-unit order, as a bare sort() gives, written out (Sonar S2871); the order of tools/leftovers-check.mjs. */
+const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
 /** The files (not folders) under `dir`, sorted, relative with `/`. */
-export const treeFiles = dir => Object.keys(snapshot(dir)).map(f => f.split(path.sep).join('/')).sort();
+export const treeFiles = dir => Object.keys(snapshot(dir)).map(f => f.split(path.sep).join('/')).sort(byCodeUnit);
 
 export const goodManifest = (version, files, source = '/somewhere') => ({
   version,
@@ -108,7 +111,7 @@ export function sandbox(t, { version = '1.2.3' } = {}) {
     root, home, source, t_, claude, writeSettings, registered,
     readSettings: () => (fs.existsSync(t_.settings) ? fs.readFileSync(t_.settings, 'utf8') : null),
     backups: (dir = claude) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.includes('.bak-subagent-model-')) : []),
-    listMods: () => (fs.existsSync(t_.mods) ? fs.readdirSync(t_.mods).sort() : null),
+    listMods: () => (fs.existsSync(t_.mods) ? fs.readdirSync(t_.mods).sort(byCodeUnit) : null),
     installedBytes: rel => fs.readFileSync(path.join(t_.target, rel)),
     reported: () => (fs.existsSync(t_.reported) ? JSON.parse(fs.readFileSync(t_.reported, 'utf8')) : null),
     manifest: () => (fs.existsSync(t_.manifest) ? JSON.parse(fs.readFileSync(t_.manifest, 'utf8')) : null),
