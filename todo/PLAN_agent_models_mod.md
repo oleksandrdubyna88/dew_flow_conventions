@@ -182,3 +182,75 @@ shows the band.
 - [ ] The research docs describe the step and the mod as built, with the CI and Sonar gaps.
 - [ ] Released, every consumer pins it with the hooks copied in the same commit, one real install observed on WSL.
 - [ ] This plan promoted with its deviations.
+
+## Epics
+
+Three epics; cornerstone quota ⌈2·3/5⌉ = 2. Split by Fable on 2026-11-11 (entry 1.1), after the question consultants
+were asked what is important: 2 of 2 answered, both said three epics and the same two cornerstone areas, and the caller
+checked their reasons against the code. Each epic's stories are `todo/PLAN_agent_models_mod_E<n>.md`, written by Opus
+when the epic starts, with its `todo/README.md` row in the same commit and no `## Plan changes` of its own. The ledger
+line at the end names the two areas; k stays 0 until a stories document marks its story.
+
+E1 and E2 are code on this branch and share the one pull request of build-order step 6, each with its own code round.
+Every commit that changes `settings/hooks/**` also updates this repository's own `.claude/hooks/**` copies, as #158
+did: the session start of this repository imports them. One correction to the consultants: they named `effortTarget`
+with a re-check of bytes and target as one road; the code has two roads (E2's cornerstone area says which to take).
+
+### E1 — The release payload and its identity
+
+- **Goal.** This repository holds mod 1.3.3 byte for byte, and can tell from bytes alone whether a mod folder is the
+  released one. Nothing runs at session start yet.
+- **Scope.** Build-order steps 1 and 2, and the half of step 3 that only reads and decides. Files: the exports in
+  `settings/hooks/lib/user-guard-install.mjs`; `mods/agent-models/**`; the `.gitattributes` rule;
+  `tools/agent-models-pins.json`, `tools/lib/agent-models-pin.mjs`, `tools/lib/agent-models-fixtures.mjs`;
+  `settings/hooks/lib/agent-models-decide.mjs` (`MOD_FILES`, `RELEASED_MOD`) and `agent-models-read.mjs`
+  (`readSource`) with their pointer rewrites; the ported tests that import only these, the pin test with its new cases
+  among them. No module of this epic writes to the user's home. In the source, `agent-models-read.mjs:13` imports
+  `lstatOrNull` from `agent-models-swap.mjs` (`:20`); here that read helper lives in `agent-models-read.mjs` and the
+  swap module imports it from there, so E1 imports nothing of E2.
+- **Depends on.** Nothing in this plan. Its inputs are the source port and the scan of 2026-11-11.
+- **Done when.** `RELEASED_MOD` was watched RED, then equals the newest pin row, and that row equals the files at HEAD.
+  A source that differs in one file or in the version gives a refusal that names the first file. Step 1 changed no
+  behaviour and the suite is green. The company scan re-run on the branch finds nothing. `claude plugin validate` and
+  `claude plugin test mods/agent-models` pass by hand. The code round and the Opus review are resolved.
+- **Cornerstone area — the released-copy check.** This is the trust boundary: only reviewed bytes may become code that
+  runs in every session on the machine. The area is the identity (`MOD_FILES`, `RELEASED_MOD`, the pin row, raw sha256
+  under `eol=lf`), the one read of the source, and the refusal. Its spec settles what the read does with an extra
+  file, a missing file and a symlink in the source. It also fixes what E2 must keep: the copy writes only the bytes
+  that passed the check, never a second read.
+
+### E2 — The complete self-install
+
+- **Goal.** A session that starts in a consumer copies the released mod to `~/.claude/mods/agent-models`, registers it
+  in the user settings and says each thing once. Or it skips or refuses, and leaves nothing half-written.
+- **Scope.** The writing half of build-order step 3 (`agent-models-swap.mjs`, `agent-models-install.mjs`, their ported
+  tests), then steps 4, 5 and 6. Files: those two modules; `settings/hooks/ensure-user-guard.mjs`
+  (`ensureAgentModelsMod`, `SPEAKING`); the rewritten `install` and `step` tests and the new cases of the test plan,
+  run in a consumer-shaped project; `research/module_rules.md` and `research/module_tests.md`.
+- **Depends on.** E1: the exports, `RELEASED_MOD`, `readSource`, the check, and its rule for the copy.
+- **Done when.** Every new case of the test plan was watched RED, then green. The step installs, upgrades, registers,
+  skips and refuses as Design B says, and the reported file stays one file. The guard and effort steps still run when
+  the mod step throws. `npm test` and `npm run check` are green. The research docs describe the step as built, with
+  the CI and Sonar gaps. The pull request of step 6 is merged after the code round and the Opus review.
+- **Cornerstone area — the settings-file write.** `~/.claude/settings.json` is the user's own state for every project,
+  and it can hold tokens. The area is the registration as ONE operation: read, find the real target, apply the
+  `CLAUDE_CODE_PLUGIN_DIRS` value rule, back up, check again, write atomically with the mode kept, and create a
+  missing file. This file has two write roads today. The guard's road checks the bytes AND the resolved target again
+  (`changedUnderUs`, the test at `tools/install-user-hook.test.mjs:552`); the effort road reads the bytes again only.
+  The registration takes the guard's checks. It must not become a third assembly of the parts that drops one.
+- **Tests, not cornerstones.** The reference skip decided on the project, and the swap with its recovery. A mistake
+  there fails more narrowly: one skipped or repeated install, one folder. Both consultants said so; the split agrees.
+
+### E3 — Release and rollout
+
+- **Goal.** Every consumer pins the release and carries its hooks, and one real WSL session shows the band.
+- **Scope.** Build-order steps 7 and 8; no code in this repository. First the feature review that a plan of three
+  epics owes before its release, from `main` after E2's merge. Then count the open consumer pull requests and
+  in-flight releases, ask the owner, and promote `release`. Then one pin-bump commit per consumer of README
+  § *Consumers*: the submodule pin and the six hook files of Design C together, with `adapter-check` green.
+- **Depends on.** E2 merged to `main`, and the owner's answer at step 7.
+- **Done when.** Every consumer's pin-bump is merged with its checks present and green. A NEW WSL session in one
+  consumer installs the mod and shows the band, recorded with its date. The plan is promoted with its deviations.
+- **Cornerstone areas.** None.
+
+Cornerstones: 0 of 2 — the released-copy check (E1), the settings-file write (E2)
