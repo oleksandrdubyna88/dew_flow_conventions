@@ -530,7 +530,7 @@ Open stories:
       - the coai rounds.
 
       rag_qln's code-pin PR for `external/dew_flow_mcp` follows, with a build.
-- [ ] **Story 3.B — the Claude adapter in `dew_flow_benchmark`** (found by the re-review's judge, 2026-11-09:
+- [x] **Story 3.B — the Claude adapter in `dew_flow_benchmark`** (found by the re-review's judge, 2026-11-09:
       benchmark migrated in #113, but its `main` has only `.claude/settings.json`, no `.claude/hooks`, so a Claude
       session there starts without its rules). Its own PR, selected by the owner under the rule above, in the shape
       of rag_qln #85: the WHOLE adapter — every file `adapter-check.mjs` compares (`load-instructions.mjs`,
@@ -539,6 +539,17 @@ Open stories:
       `.claude/settings.json` without weakening a permission, and `node .agents/conventions/tools/adapter-check.mjs`
       in CI. `build-flags.mjs` then refuses a `dotnet build` without the worker-pool limit, so benchmark's build
       lines carry it in the same PR. It moves no code pin.
+      **Done 2026-11-11:** selected by the owner that day. benchmark #197 was squash-merged as `1ec5ece`, with:
+      - the five hooks byte-identical to release `26589a5`;
+      - the settings template, with permissions equal to the old file's;
+      - `adapter-check` in CI;
+      - `-m:4` on the one documented build line that lacked it;
+      - the architecture section, including how the hooks compose with `bench sessions install`.
+
+      Evidence: build-flags denies a build without the limit and allows the documented line; the SessionStart hook
+      prints the rules; both agents' § 7 smoke on the branch passes both parts (6 of 6, read-content harness);
+      4586 tests pass (the 572 PostgresFixture tests need Docker, which this machine lacks; CI has it); coai plan
+      and code rounds.
 - [ ] **Closing matrix:** one table of every consumer in `README.md` § Consumers — mount path, pin, adapter check,
       fresh clone, both agents (§ 7 pass conditions), legacy-reference count, rollback (the revert tried, with the
       clone and date; "none by construction" only for a consumer that never had the legacy mount), and a
@@ -565,7 +576,8 @@ Open stories:
   committed pin `153e6b5`. The runs are in the record's rerun section. This item stays open until mcp #71 and
   sidecar_rust #76 merge, and while benchmark has no Claude adapter (story 3.B, not selected). Both merged later that
   night (mcp `9bf9f5b`, sidecar_rust `97e174c`), so all nine repositories are on the neutral layout; the item stays
-  open for story 3.B only.
+  open for story 3.B only. Story 3.B merged on 2026-11-11 (benchmark #197, `1ec5ece`), so every consumer has the whole
+  adapter.
   On 2026-11-11, by the owner's go ("Release"), `release` moved `153e6b5` → `26589a5` (conventions #153, #154,
   #155: the user-guard installer resolves a link target as the kernel walks it). Pin bumps merged in eight consumers
   (coai #974, benchmark #196, rag_qln #99 with both code pins, wsl_care #195, vscode_kit #31, r9700 #31, mcp #72,
@@ -590,7 +602,7 @@ Open stories:
   | Consumer | Mount | Pin | Adapter check | Fresh clone / worktree | Both agents (§ 7) | Old-mount lines outside `todo/`, `research/`, `.gitmodules` | Rollback | Decision |
   |---|---|---|---|---|---|---|---|---|
   | dew_flow_connect_other_ais | `.agents/conventions` | `1341995` | OK | worktree of `ee8ad53`: `rules check` resolved; fresh clone of `63a868f2` from GitHub, 2026-11-11 (pin `26589a5`): `rules check` and `explain` resolved, the checks OK, the tree clean | reads verified for both (part 1), 8 of 8 rules; the observable (part 2) owed; **both parts verified for both on the trace** (part 2 by the literal § 7 sentence: the owner decides #156) in the rerun of 2026-11-10 evening, harness conventions #154 | 66, none executable for its own mount: the product's gate snippet and rule discovery support user repositories still on the old layout (and their tests), plus 14 comment and doc lines citing rules by the old path (corrective PR #972) | tried on `8d42647`: the revert gives its parent's tree, the old mount `895b24c` and its tools are back | migrated (#192) |
-  | dew_flow_benchmark | `.agents/conventions` | `1341995` | none: no `.claude/hooks` (story 3.B) | worktree of `3958ecc`: resolved; fresh clone of `3079acf` from GitHub, 2026-11-11 (pin `26589a5`): `rules check` and `explain` resolved, the checks OK, the tree clean | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both on the trace** (part 2 by the literal § 7 sentence: the owner decides #156) in the rerun of 2026-11-10 evening, harness conventions #154 | 23: the gate's tests and the spikes measure other repositories and old transcripts on the old layout; 2 comments cite rules by the old path (corrective PR #194) | tried on `89b4909`: parent's tree, old mount `e29883f`, low-priority wrapper runs | migrated (#113); the adapter is story 3.B, not selected |
+  | dew_flow_benchmark | `.agents/conventions` | `1341995` | none on the runs' commits (story 3.B); OK since #197 (`1ec5ece`, 2026-11-11) | worktree of `3958ecc`: resolved; fresh clone of `3079acf` from GitHub, 2026-11-11 (pin `26589a5`): `rules check` and `explain` resolved, the checks OK, the tree clean | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both on the trace** (part 2 by the literal § 7 sentence: the owner decides #156) in the rerun of 2026-11-10 evening, harness conventions #154 | 23: the gate's tests and the spikes measure other repositories and old transcripts on the old layout; 2 comments cite rules by the old path (corrective PR #194) | tried on `89b4909`: parent's tree, old mount `e29883f`, low-priority wrapper runs | migrated (#113); the adapter is story 3.B, selected by the owner and merged 2026-11-11 (#197) |
   | dew_flow_rag_qln | `.agents/conventions` | `1341995` | OK | worktree of `f7f4fc4`: resolved; fresh clone of `b55d283` from GitHub, 2026-11-11 (pin `26589a5`): `rules check` and `explain` resolved, the checks OK, the tree clean | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both on the trace** (part 2 by the literal § 7 sentence: the owner decides #156) in the rerun of 2026-11-10 evening, harness conventions #154 | 0 | tried on `d83315b`: parent's tree, old mount `cc24f9e`, low-priority wrapper runs | migrated (#83, #85) |
   | wsl_care | `.agents/conventions` | `1341995` | OK | worktree of `cb8046b`: resolved; fresh clone of `776d737` from GitHub, 2026-11-11 (pin `26589a5`): `rules check` and `explain` resolved, the checks OK, the tree clean | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both on the trace** (part 2 by the literal § 7 sentence: the owner decides #156) in the rerun of 2026-11-10 evening, harness conventions #154 | 0 | none by construction | joined on the neutral layout |
   | dew_flow_vscode_kit | `.agents/conventions` | `1341995` | OK | worktree of `a9ab150`: resolved; fresh clone of `fd905be` from GitHub, 2026-11-11 (pin `26589a5`): `rules check` and `explain` resolved, the checks OK, the tree clean | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both on the trace** (part 2 by the literal § 7 sentence: the owner decides #156) in the rerun of 2026-11-10 evening, harness conventions #154 | 0 | none by construction | joined on the neutral layout |
