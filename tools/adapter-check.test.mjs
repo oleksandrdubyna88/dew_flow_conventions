@@ -50,14 +50,21 @@ test('this repository hosts the adapter on itself, which is the only test the me
 
 test('a missing hook and missing settings are both named, with what to do', (t) => {
   const findings = adapterFindings(repository(t, 'adapter-bare'));
+  // One finding per reference hook file plus the settings file. Derived as the check derives its list, so a new hook
+  // file is counted without editing this line; the named matches below keep it from passing on a list that is empty.
+  const hooks = fs.readdirSync(path.join(REFERENCE, 'hooks'), { recursive: true })
+    .filter((file) => file.endsWith('.mjs') && !file.endsWith('.test.mjs'));
 
-  assert.equal(findings.length, 6);
+  assert.ok(hooks.length >= 7, `the reference lists ${hooks.length} hook files`);
+  assert.equal(findings.length, 1 + hooks.length);
   assert.match(findings.join('\n'), /\.claude\/settings\.json is missing/);
   assert.match(findings.join('\n'), /\.claude\/hooks\/load-instructions\.mjs is missing/);
   assert.match(findings.join('\n'), /\.claude\/hooks\/build-flags\.mjs is missing/);
   assert.match(findings.join('\n'), /\.claude\/hooks\/subagent-model\.mjs is missing/);
   assert.match(findings.join('\n'), /\.claude\/hooks\/ensure-user-guard\.mjs is missing/);
   assert.match(findings.join('\n'), /\.claude\/hooks\/lib\/user-guard-install\.mjs is missing/);
+  assert.match(findings.join('\n'), /\.claude\/hooks\/lib\/agent-models-decide\.mjs is missing/);
+  assert.match(findings.join('\n'), /\.claude\/hooks\/lib\/agent-models-read\.mjs is missing/);
 });
 
 test('a hook copy that has drifted is caught — that is the whole reason this tool exists', (t) => {

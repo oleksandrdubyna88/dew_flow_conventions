@@ -237,6 +237,52 @@ manifest, is completed rather than taken for an edit. The code round of the same
 the hook and a stop after the manifest (the old bytes are its `previous`) are both completed even when the source has
 moved on, every install records `previous`, and a relative source path is checked for uncommitted changes (it named
 a pathspec under the `-C` folder that did not exist); the last three red on the first fix.
+The agent-models mod and its self-install (2026-11-11) have one test file per part, all with temporary homes and
+projects made by `ownedDir` through `tools/lib/agent-models-fixtures.mjs` (never `os.homedir()`, never the real
+`~/.claude`), and each case was run red before its change. `tools/agent-models-decide.test.mjs` covers the pure
+decisions (version arithmetic, the copy and registration decisions, the released check) with no file read.
+`tools/agent-models-read.test.mjs` covers `readSource` and `readTarget`: what a refused source or an unreadable target
+names. `tools/agent-models-pin.test.mjs` covers the pin table: a change to a mod file without a new version is red, the
+live `mods/agent-models` equals its committed row, and `RELEASED_MOD` equals the newest row.
+`tools/agent-models-extract.test.mjs` runs the mod's session-log extractor with node over fixture logs.
+`tools/agent-models-imports.test.mjs` reads the installer modules as text: what each may import, no second body of a
+helper `user-guard-install.mjs` exports, no read of the source folder outside `readSource`, every write of `settings.json`
+through `commitSettings` (the guard's three operations and the mod's registration; the effort write, `writeConverged`, is
+separate and a recorded follow-up), and no `writeAtomic(` call naming `settings` anywhere in the four agent-models modules
+or `user-guard-install.mjs` but that one; each scan has a companion that it still finds a known instance.
+
+`tools/agent-models-swap.test.mjs`, `tools/agent-models-install.test.mjs` and `tools/agent-models-refusals.test.mjs`
+cover the copy: install, upgrade, no-op, an edited copy, a newer copy (also put back when another start installed it
+during the swap), the leftovers, each failure of the swap and its roll-back, the install record, a copy that writes only
+the bytes the released check saw (the source is changed after the read), and the refusal lines with their retry or
+fix-by-hand tail (a filesystem without hard links is by hand, an aside whose version cannot be read is put back).
+`tools/agent-models-register.test.mjs` covers the registration and the road under it: a created
+`settings.json`, a file or link that appears in the gap, a filesystem without hard links, a re-pointed link with equal
+bytes, a chain, a dangling chain and a loop, unwritable and unreadable files, and the guard's own install doing what it
+did before the road existed. `tools/agent-models-report.test.mjs` covers the said-once lines: every refusal, an edited
+and a newer copy, the reset by an install and by any run that ends with no refusal (the same refusal after a fix is said
+again), a `replaced-` folder named in a refusal, and that the reported file stays one file of `{ key, at }` under 1 KB.
+`tools/agent-models-step.test.mjs` runs the step as a session start does: a consumer-shaped project whose
+`.claude/hooks/` is a copy of `settings/hooks/` (the real released guard) and whose
+`.agents/conventions/mods/agent-models` is a copy of `mods/agent-models`, with the project's own
+`ensure-user-guard.mjs` spawned. It covers one line per step and nothing on the second run, each skip in its order (a
+project with this repository's layout is skipped; a consumer whose `.agents/conventions` has that layout is not),
+`SUBAGENT_MODEL_GUARD=off` still loading the mod, a throwing installer and a mod module that does not load (a missing
+sibling, a syntax error) leaving the guard and effort lines, a project
+without the mod, the carried-over session value, a stale or edited project copy refused once with the advice to update
+the submodule, and a copy another installer left giving no line.
+
+What these files do not prove. The installer is run against a temporary home, not against a Claude Code session that
+loads the mod: that the band is drawn is seen by hand, in a new session after an install. CI does not run the mod's own
+`.tsx` tests in `mods/agent-models/tests` (`claude plugin test` needs the `claude` CLI, and so does `claude plugin
+validate`); they are run by hand when the mod changes. Sonar's `sonar.sources=tools` covers neither `settings/hooks` nor
+`mods`, so the installer and the mod have no quality-gate coverage; their coverage is these tests alone. Windows and
+macOS were not run (CI is `ubuntu-latest`; the step is skipped on win32). `fs.linkSync`, the creation of
+`settings.json`, is run only on a filesystem with hard links. An existing `settings.json` that another program changes
+between the road's second read and its rename is replaced, as the guard's own write can be: no lock is shared with the
+host. Two sessions starting at once are serialised by the exclusive staging name, the atomicity of `rename` and the put-back,
+not by a lock.
+
 `tools/effort-converge.test.mjs` (10 cases, 2026-10-14) covers the effort convergence (`effortProblems`,
 `convergeEffort`, `applyEffort`, `ensureEffort`) with temporary homes: all keys set, input never mutated, other keys and
 their order kept, other `modelSettings` keys (`claude-opus-5`) pinned, idempotent (no write, backup or output),

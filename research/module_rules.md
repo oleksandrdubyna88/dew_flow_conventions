@@ -97,6 +97,76 @@ when already converged, skipped under `SUBAGENT_MODEL_GUARD=off` and in this rep
 record: [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md); its release to the consumers is recorded in
 [PLAN_subagent_model_tiers_rollout.md](PLAN_subagent_model_tiers_rollout.md).
 
+## The agent-models mod and its self-install (2026-11-11)
+
+`mods/agent-models/` is a Claude Code mod shipped with the rules: a hooks module that draws one band above the prompt
+with a row per running subagent and its model, the signed-in account, a login button, a viewer of the person's own
+prompts in the session and a list of notes. It holds no secret. The session self-install copies it into the user's own
+`~/.claude/mods/agent-models` and registers that folder in `env.CLAUDE_CODE_PLUGIN_DIRS` of `~/.claude/settings.json`,
+so a session in a consumer loads it from the next start. The login-method step of the original installer is not part of
+this repository.
+
+Only the released copy is installed. `RELEASED_MOD` in `settings/hooks/lib/agent-models-decide.mjs` is a version and the
+raw sha256 of each `MOD_FILES` entry; it equals the newest row of `tools/agent-models-pins.json`, and that row equals
+the files of `mods/agent-models` (tests fail when either drifts), and `.gitattributes` holds the folder at `eol=lf` so
+the raw bytes are the same on every checkout. `readSource` (`agent-models-read.mjs`) reads the source folder once and
+runs the released check on the bytes it returns; the copy writes only those bytes. A source that differs is refused
+naming the first file that differs (or the version), and nothing is copied.
+
+The step is `ensureAgentModelsMod` in `settings/hooks/ensure-user-guard.mjs`, the third step of the session start after
+the guard and effort, each inside `guardStep`, so a throw in one costs the others and the exit code nothing. The step is
+async: it loads the mod's four modules with a dynamic `import()` when it runs, never a static import, so a load failure
+(a missing sibling, a syntax error) is a silent skip of this step alone, and a call failure is a throw that `guardStep`
+isolates; both leave the guard and effort steps and the exit code as they are. The source
+is `<project>/.agents/conventions/mods/agent-models`, found from the project's `.claude/hooks/subagent-model.mjs`. It is
+skipped, in this order, for `AGENT_MODELS_MOD=off` (trimmed, any case), for win32 (the mod says Windows is not tested;
+macOS is not skipped and not tested either), for the conventions repository itself, for the
+`~/.claude/mods/agent-models.optout` marker and for a project without the mod folder (a submodule that is not
+initialised; silent). The reference test is made on the project's own hook path, the file the guard step uses, and never
+on the mod's folder: a consumer's `.agents/conventions` has this repository's layout, so a test on the mod would skip
+every consumer. `SUBAGENT_MODEL_GUARD=off` does not skip the step. `SPEAKING` holds `installed`, `upgraded`, `refused`,
+`newer`, `repaired`, `converged`, `edited` and `registered`.
+
+The copy (`agent-models-install.mjs`, its decisions in `agent-models-decide.mjs`, the swap in `agent-models-swap.mjs`)
+installs when the folder is missing and upgrades an older version by a rename swap, and never downgrades. The old folder
+is renamed aside, and when it holds a copy that differs from its install record it is kept as one
+`agent-models.replaced-<stamp>` folder (the older one is removed). The swap reads the version it moved aside: when that
+is newer than its own, another session start installed it a moment ago, so it goes back to its name, the staging folder
+is dropped and the registration goes on as for a lost race. The same when the version of that folder cannot be read now
+although the decision read one (it may be that newer copy, half seen); a folder that was already unreadable at the
+decision is a broken copy, which is what an upgrade replaces. When the put-back itself fails the line names the folder and
+says to rename it back by hand; until then a later start installs this repository's older copy and may remove the newer
+folder as a leftover (no marker guards that). A symlinked, foreign-owned or non-directory target is
+refused, never renamed or deleted through; staging and aside leftovers of an interrupted swap are removed at a later
+start once they are old enough.
+
+The registration ends in `commitSettings` of `settings/hooks/lib/user-guard-install.mjs`, the one road of the guard's three
+operations (install, repair, uninstall) and of the mod's registration; the effort write is separate (below). It runs the test seam, reads the bytes again
+and resolves the write target again (a difference in either is refused, or settled when the file now lists the
+folder), runs the backup only when a write follows, and writes atomically at the real file with the file's own mode. The
+value rule: the folder is appended once to a string of paths joined by `path.delimiter`; an entry equal to it after
+`normalise` and `~/` expansion means nothing to do; a non-string value or a non-object `env` is refused with nothing
+written; the first registration into an empty value carries the session's own variable over, because the settings
+value replaces the shell's. A missing `settings.json` is created holding only that key (so a session with the guard
+switched off still loads the mod), by a hard link, which fails when the name is taken: a file another writer created
+meanwhile is never replaced, and where hard links are not available nothing is created and the refusal names the code and
+says the filesystem cannot make the hard link: it is for a person to fix, because no later start can make the link. A
+chain of links is written at its last target and every link stays; a dangling chain is a retry and creates nothing; a
+loop, a chain of more than 40 links and an unwritable file or folder are refused for a person to fix. The effort
+convergence (`writeConverged`) keeps its own write and is not on this road (a recorded follow-up).
+
+Every refusal and every registration line is said once. `agent-models.reported.json` in `~/.claude/mods` holds one
+`{ key, at }`, overwritten: an edited or newer copy is keyed on its state and the repository version, a symlinked target
+on its link text, any other refusal on `line:` and the digest of its line (the random part of a swap's staging and aside names and the stamp of a
+`replaced-` name left out), so a new reason, version or digest is a new line and the same one is silent, a retry refusal
+included. "Said once" is once each time a bad state is entered: a run that ends with no refusal (the copy none, installed,
+upgraded or only its record written, and the registration none or appended) forgets the record, so the same refusal after
+a fix is said again. An edited or newer copy keeps its record. A refusal before the mods folder is known good records only when that folder can
+be made, never through a symlink; otherwise the line stands at every start. A source that is not the released mod makes
+the step add the advice to run `git submodule update`, which names the layout and so lives in the step, not in the
+installer. There is no reminder after the first showing; a stale submodule is shown once, and the consumers' `pin-check`
+and `adapter-check` catch it in CI.
+
 ## The plan-change-control rule and the change-ledger check (2026-10-29)
 
 `common/plan-change-control.md` (12 274 B by `wc -c`; the catalog's `bytes` is the same number) governs a plan's life

@@ -24,4 +24,4 @@ Host hooks are delivered beside the rules, not by the resolver: `settings/settin
 `settings/hooks/`, and `tools/adapter-check.mjs` demands their byte-identical copies in a migrated consumer. One of
 them, the subagent-model guard, also reaches the user's own host settings — `tools/install-user-hook.mjs`, or the
 `ensure-user-guard.mjs` session-start hook in a consumer, writes it into `~/.claude`, so it applies in every repository
-on that machine. The resolver itself still never changes host settings. See [module_rules.md](module_rules.md).
+on that machine. The same session self-install now also installs the agent-models mod from `mods/agent-models` into `~/.claude/mods` and registers it in `CLAUDE_CODE_PLUGIN_DIRS` of `~/.claude/settings.json`. The resolver itself still never changes host settings. See [module_rules.md](module_rules.md).
