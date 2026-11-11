@@ -674,12 +674,16 @@ const obsRead=`node "${obsOrigin.resolver.replaceAll("\\","/")}" read --task ins
 const obsPayload=`BEGIN RULE ${obsRule.id} sha256:${obsRule.hash}\n${text}\nEND RULE ${obsRule.id}`;
 const claudeTool=(id,name,input)=>({type:"assistant",message:{content:[{type:"tool_use",id,name,input}]}});
 const claudeResult=(id,content)=>({type:"user",message:{content:[{type:"tool_result",tool_use_id:id,content}]}});
-const claudeTrace=extra=>[claudeTool("r1","Read",{file_path:path.resolve(".agents/conventions/ENTRY.md")}),claudeResult("r1","entry"),
-  claudeTool("r2","Read",{file_path:path.resolve(".agents/PROJECT.md")}),claudeResult("r2","project"),
+// The real files of this checkout (the source repository keeps ENTRY.md at its root), and the way Claude Code's Read
+// shows them: each line prefixed with its number and a tab.
+const entryText=fs.readFileSync("ENTRY.md","utf8"),projectText=fs.readFileSync(path.join(".agents","PROJECT.md"),"utf8");
+const numbered=(body,from=1)=>body.split("\n").map((line,i)=>`${String(i+from).padStart(6)}\t${line}`).join("\n");
+const claudeTrace=extra=>[claudeTool("r1","Read",{file_path:path.resolve("ENTRY.md")}),claudeResult("r1",numbered(entryText)),
+  claudeTool("r2","Read",{file_path:path.resolve(".agents/PROJECT.md")}),claudeResult("r2",numbered(projectText)),
   claudeTool("r3","Bash",{command:obsRead}),claudeResult("r3",obsPayload),...extra,
   {type:"result",subtype:"success",is_error:false,result:"done"}].map(e=>JSON.stringify(e)).join("\n");
 const codexCmd=(command,out="")=>({type:"item.completed",item:{type:"command_execution",command,exit_code:0,aggregated_output:out}});
-const codexTrace=extra=>[codexCmd("/bin/bash -lc 'sed -n 1,200p .agents/conventions/ENTRY.md'"),codexCmd("/bin/bash -lc 'cat .agents/PROJECT.md'"),
+const codexTrace=extra=>[codexCmd("/bin/bash -lc 'sed -n 1,200p ENTRY.md'",entryText),codexCmd("/bin/bash -lc 'cat .agents/PROJECT.md'",projectText),
   codexCmd(`/bin/bash -lc '${obsRead}'`,obsPayload),...extra,{type:"turn.completed"}].map(e=>JSON.stringify(e)).join("\n");
 
 test("the observable is verified when ENTRY and PROJECT were read and every body came through the resolver (both agents)",()=>{
@@ -719,8 +723,8 @@ test("ENTRY and PROJECT count only when the path is this checkout's own file",()
     claudeTool("r3","Bash",{command:obsRead}),claudeResult("r3",obsPayload),{type:"result",subtype:"success",is_error:false,result:"done"}];
   const e=traceEvidence("claude",elsewhere.map(x=>JSON.stringify(x)).join("\n"),[obsRule],obsOrigin);
   assert.deepEqual([e.observable.entryRead,e.observable.projectRead],[false,false],"a look-alike outside the checkout");
-  const relative=[claudeTool("r1","Read",{file_path:".agents/conventions/ENTRY.md"}),claudeResult("r1","x"),
-    claudeTool("r2","Read",{file_path:"./.agents/PROJECT.md"}),claudeResult("r2","x"),
+  const relative=[claudeTool("r1","Read",{file_path:"ENTRY.md"}),claudeResult("r1",numbered(entryText)),
+    claudeTool("r2","Read",{file_path:"./.agents/PROJECT.md"}),claudeResult("r2",numbered(projectText)),
     claudeTool("r3","Bash",{command:obsRead}),claudeResult("r3",obsPayload),{type:"result",subtype:"success",is_error:false,result:"done"}];
   const r=traceEvidence("claude",relative.map(x=>JSON.stringify(x)).join("\n"),[obsRule],obsOrigin);
   assert.deepEqual([r.observable.entryRead,r.observable.projectRead,r.observable.verified],[true,true,true],"relative paths into the checkout");
@@ -735,8 +739,8 @@ test("a shell command that reaches a rule folder without naming one file is uncl
 
 // ---- the code round on this change (2026-11-10), red first ----
 test("a Read that failed is not a read: ENTRY and PROJECT count only when the tool result is not an error",()=>{
-  const failed=[claudeTool("r1","Read",{file_path:path.resolve(".agents/conventions/ENTRY.md")}),{type:"user",message:{content:[{type:"tool_result",tool_use_id:"r1",is_error:true,content:"ENOENT"}]}},
-    claudeTool("r2","Read",{file_path:path.resolve(".agents/PROJECT.md")}),claudeResult("r2","project"),
+  const failed=[claudeTool("r1","Read",{file_path:path.resolve("ENTRY.md")}),{type:"user",message:{content:[{type:"tool_result",tool_use_id:"r1",is_error:true,content:"ENOENT"}]}},
+    claudeTool("r2","Read",{file_path:path.resolve(".agents/PROJECT.md")}),claudeResult("r2",numbered(projectText)),
     claudeTool("r3","Bash",{command:obsRead}),claudeResult("r3",obsPayload),{type:"result",subtype:"success",is_error:false,result:"done"}];
   const e=traceEvidence("claude",failed.map(x=>JSON.stringify(x)).join("\n"),[obsRule],obsOrigin);
   assert.deepEqual([e.observable.entryRead,e.observable.projectRead,e.observable.verified],[false,true,false]);
@@ -786,8 +790,8 @@ test("a Codex command that started and never completed is still scanned, as a fa
   const started={type:"item.started",item:{id:"c9",type:"command_execution",command:"/bin/bash -lc 'cat .agents/conventions/common/sample.md'",status:"in_progress"}};
   const e=traceEvidence("codex",codexTrace([started]),[obsRule],obsOrigin);
   assert.deepEqual(e.observable.secondPathReads,[{id:"common.sample",via:"shell"}]);
-  const entryOnly=[{type:"item.started",item:{id:"c1",type:"command_execution",command:"cat .agents/conventions/ENTRY.md"}},
-    codexCmd("cat .agents/PROJECT.md"),codexCmd(`/bin/bash -lc '${obsRead}'`,obsPayload),{type:"turn.completed"}];
+  const entryOnly=[{type:"item.started",item:{id:"c1",type:"command_execution",command:"cat ENTRY.md"}},
+    codexCmd("cat .agents/PROJECT.md",projectText),codexCmd(`/bin/bash -lc '${obsRead}'`,obsPayload),{type:"turn.completed"}];
   assert.equal(traceEvidence("codex",entryOnly.map(x=>JSON.stringify(x)).join("\n"),[obsRule],obsOrigin).observable.entryRead,false,"a read that never finished is not a read");
 });
 
@@ -795,4 +799,56 @@ test("an unclassified entry says which tool and which target",()=>{
   const e=traceEvidence("codex",codexTrace([codexCmd("/bin/bash -lc 'cat .agents/conventions/common/*.md'","…")]),[obsRule],obsOrigin);
   assert.deepEqual(Object.keys(e.observable.unclassified[0]).sort(),["index","target","via"]);
   assert.equal(e.observable.unclassified[0].via,"shell");
+});
+
+// ---- CodeRabbit on #156 (2026-11-11), red first: naming a file is not reading it. A call reads ENTRY or PROJECT only
+// when its output shows 3 consecutive non-blank lines of that file, one of them 20 characters or longer. ----
+const withEntryAndProject=(entryCall,projectCall)=>[entryCall,projectCall,codexCmd(`/bin/bash -lc '${obsRead}'`,obsPayload),{type:"turn.completed"}]
+  .map(e=>JSON.stringify(e)).join("\n");
+
+test("a command that only names ENTRY or PROJECT (test -e, ls, a grep count) is not a read",()=>{
+  for(const [entry,project] of [
+    [codexCmd("/bin/bash -lc 'test -e ENTRY.md'",""),codexCmd("/bin/bash -lc 'test -e .agents/PROJECT.md'","")],
+    [codexCmd("ls -l ENTRY.md","-rw-r--r-- 1 u u 4200 Nov 11 ENTRY.md\n"),codexCmd("stat .agents/PROJECT.md","  File: .agents/PROJECT.md\n")],
+    [codexCmd("grep -c Rule ENTRY.md","3\n"),codexCmd("wc -l .agents/PROJECT.md","120 .agents/PROJECT.md\n")]]) {
+    const o=traceEvidence("codex",withEntryAndProject(entry,project),[obsRule],obsOrigin).observable;
+    assert.deepEqual([o.entryRead,o.projectRead,o.verified],[false,false,false],entry.item.command);
+  }
+});
+
+test("a generic line of the file in the output is not a read: it needs 3 consecutive lines, one of them distinctive",()=>{
+  const generic=entryText.split("\n").filter(line=>line.trim()).find(line=>line.trim().length<20)??"---";
+  const o=traceEvidence("codex",withEntryAndProject(codexCmd("head -c 3 ENTRY.md",`${generic}\n`),codexCmd("cat .agents/PROJECT.md",projectText)),[obsRule],obsOrigin).observable;
+  assert.equal(o.entryRead,false);
+  assert.equal(o.projectRead,true);
+});
+
+test("a read from the middle of the file counts, with Read's line numbers and with CRLF endings",()=>{
+  const lines=projectText.split("\n");
+  const middle=lines.slice(5,15).join("\n");
+  assert.ok(middle.trim()&&!lines[0].trim().startsWith(middle.trim().slice(0,20)),"the slice is the middle, not the head");
+  const claude=[claudeTool("r1","Read",{file_path:path.resolve("ENTRY.md"),offset:10}),claudeResult("r1",numbered(entryText.split("\n").slice(9).join("\n"),10)),
+    claudeTool("r2","Bash",{command:"sed -n 6,15p .agents/PROJECT.md"}),claudeResult("r2",middle.replaceAll("\n","\r\n")),
+    claudeTool("r3","Bash",{command:obsRead}),claudeResult("r3",obsPayload),{type:"result",subtype:"success",is_error:false,result:"done"}];
+  const o=traceEvidence("claude",claude.map(e=>JSON.stringify(e)).join("\n"),[obsRule],obsOrigin).observable;
+  assert.deepEqual([o.entryRead,o.projectRead,o.verified],[true,true,true]);
+});
+
+test("a call that names ENTRY but prints another file's text is not a read of ENTRY",()=>{
+  const o=traceEvidence("codex",withEntryAndProject(codexCmd("cat ENTRY.md README.md",fs.readFileSync("README.md","utf8")),codexCmd("cat .agents/PROJECT.md",projectText)),[obsRule],obsOrigin).observable;
+  assert.equal(o.entryRead,false);
+});
+
+test("the 3 lines must be consecutive in the output too, not scattered between other lines",()=>{
+  const lines=projectText.split("\n").map(line=>line.trim()).filter(Boolean);
+  const start=lines.findIndex((line,i)=>i+2<lines.length&&[line,lines[i+1],lines[i+2]].some(l=>l.length>=20));
+  const scattered=[lines[start],"unrelated line one",lines[start+1],"unrelated line two",lines[start+2]].join("\n");
+  const o=traceEvidence("codex",withEntryAndProject(codexCmd("cat ENTRY.md",entryText),codexCmd("grep -e a .agents/PROJECT.md",scattered)),[obsRule],obsOrigin).observable;
+  assert.equal(o.projectRead,false);
+});
+
+test("a line-number prefix of spaces (cat -n) is removed before the comparison",()=>{
+  const spaced=entryText.split("\n").map((line,i)=>`${String(i+1).padStart(6)}  ${line}`).join("\n");
+  const o=traceEvidence("codex",withEntryAndProject(codexCmd("cat -n ENTRY.md",spaced),codexCmd("cat .agents/PROJECT.md",projectText)),[obsRule],obsOrigin).observable;
+  assert.equal(o.entryRead,true);
 });

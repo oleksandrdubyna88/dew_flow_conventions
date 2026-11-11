@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import {sha256} from "./rule-catalog.mjs";
 
@@ -91,18 +92,19 @@ function claudeEvents(events,capture) {
 }
 
 /**
- * Every file-touching call of the trace, in order, each with its index and whether it failed: Claude's Read, Grep
- * and Bash tool uses (failed = its tool_result says is_error), Codex's shell commands (failed = a non-zero exit, or
- * started and never completed). The resolver's own single invocations are left out, since they ARE the first path.
+ * Every file-touching call of the trace, in order, each with its index, whether it failed and what it printed:
+ * Claude's Read, Grep and Bash tool uses (failed = its tool_result says is_error; output = that result's text),
+ * Codex's shell commands (failed = a non-zero exit, or started and never completed; output = aggregated_output).
+ * The resolver's own single invocations are left out, since they ARE the first path.
  */
 function toolCalls(agent,events,origin) {
-  const calls=[],failedIds=new Set(),codexById=new Map();
+  const calls=[],failedIds=new Set(),codexById=new Map(),outputs=new Map();
   for(const event of events) {
     if(agent==="codex") {
       const item=event.item;
       if(item?.type!=="command_execution"||!["item.started","item.completed"].includes(event.type))continue;
       const completed=event.type==="item.completed";
-      const call={via:"shell",command:String(item.command??""),error:!completed||item.exit_code!==0};
+      const call={via:"shell",command:String(item.command??""),error:!completed||item.exit_code!==0,output:String(item.aggregated_output??"")};
       const known=item.id!==undefined?codexById.get(item.id):undefined;
       if(known!==undefined)calls[known]=call;
       else {
@@ -112,7 +114,11 @@ function toolCalls(agent,events,origin) {
       continue;
     }
     if(event.type==="user") {
-      for(const block of event.message?.content??[])if(block?.type==="tool_result"&&block.is_error)failedIds.add(block.tool_use_id);
+      for(const block of event.message?.content??[]) {
+        if(block?.type!=="tool_result")continue;
+        if(block.is_error)failedIds.add(block.tool_use_id);
+        outputs.set(block.tool_use_id,resultText(block));
+      }
       continue;
     }
     if(event.type!=="assistant")continue;
@@ -123,8 +129,49 @@ function toolCalls(agent,events,origin) {
       else if(block.name==="Bash")calls.push({via:"shell",id:block.id,command:String(block.input?.command??"")});
     }
   }
-  return calls.map((call,index)=>({...call,index,error:call.error??failedIds.has(call.id)}))
+  return calls.map((call,index)=>({...call,index,error:call.error??failedIds.has(call.id),output:call.output??outputs.get(call.id)??""}))
     .filter(call=>!isSingleResolverCall(call.command,origin));
+}
+
+/** A line-number prefix: Claude Code's Read (a number and a tab, or an arrow), `cat -n` (spaces), or `nl -s:`. */
+const READ_PREFIX=/^\s*\d+(?:\t|→|:\s?|\s{2,})/;
+
+/** Text as a reader compares it: CRLF folded, each line trimmed, blank lines dropped. */
+const contentLines=(text,stripPrefix=false)=>String(text).replaceAll("\r\n","\n").split("\n")
+  .map(line=>(stripPrefix?line.replace(READ_PREFIX,""):line).trim()).filter(Boolean);
+
+/** A window of a file that proves a read: this many consecutive non-blank lines, one of them at least this long. */
+const READ_WINDOW=3,DISTINCT_LINE=20;
+
+/**
+ * True when `shown` (an output's comparable lines) holds some READ_WINDOW consecutive non-blank lines of the file
+ * (fewer only when the file has fewer), consecutive in the output too, one of them DISTINCT_LINE characters or longer.
+ * A line like `#` or `---` alone proves nothing, three lines scattered between others prove nothing, and a read from
+ * the middle of the file still counts (the plan and code rounds on #156, 2026-11-11).
+ */
+function showsFile(shown,fileLines) {
+  if(fileLines.length===0)return false;
+  const size=Math.min(READ_WINDOW,fileLines.length);
+  for(let start=0;start+size<=fileLines.length;start+=1) {
+    const window=fileLines.slice(start,start+size);
+    if(!window.some(line=>line.length>=DISTINCT_LINE))continue;
+    for(let at=shown.indexOf(window[0]);at!==-1;at=shown.indexOf(window[0],at+1)) {
+      if(window.every((line,offset)=>shown[at+offset]===line))return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The comparable lines of a checkout file, or none when it cannot be read (missing, a folder, no permission): a file
+ * the harness cannot read cannot be shown to have been read, so the answer is "not read", never a crash (the code round).
+ */
+function fileLinesOf(file) {
+  try {
+    return contentLines(fs.readFileSync(file,"utf8"));
+  } catch {
+    return [];
+  }
 }
 
 const SHELL_WRAPPER=/^\s*(?:\/(?:usr\/)?bin\/)?(?:ba)?sh\s+-l?c\s+(['"])([\s\S]*)\1\s*$/;
@@ -196,8 +243,12 @@ function mentionsRules(command,sources) {
 function observableEvidence(calls,expected,origin) {
   const repo=origin?.repo??process.cwd();
   const at=(...parts)=>resolvedIn(repo,path.join(...parts));
-  const targeted=calls.map(call=>({call,targets:targetsOf(call,repo)}));
-  const readOk=files=>targeted.some(({call,targets})=>!call.error&&files.some(file=>targets.has(file)));
+  const targeted=calls.map(call=>({call,targets:targetsOf(call,repo),shown:contentLines(call.output??"",true)}));
+  // A read of ENTRY or PROJECT names the file, did not fail, AND printed its text (CodeRabbit on #156: `test -e` named it).
+  const readOk=files=>{
+    const present=files.filter(Boolean).map(file=>({file,lines:fileLinesOf(file)}));
+    return targeted.some(({call,targets,shown})=>!call.error&&present.some(({file,lines})=>targets.has(file)&&showsFile(shown,lines)));
+  };
   const entryRead=readOk([at(MOUNT,"ENTRY.md"),at("ENTRY.md")]);
   const projectRead=readOk([at(".agents","PROJECT.md")]);
   const sources=expected.map(rule=>({id:rule.id,source:String(rule.source??"").replaceAll("\\","/")})).filter(rule=>rule.source);
