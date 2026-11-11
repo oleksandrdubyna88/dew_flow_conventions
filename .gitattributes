@@ -1,3 +1,4 @@
 tools/janitor.sh text eol=lf
 research/selection-matrix.json text eol=lf
 research/moved-blocks.json text eol=lf
+mods/agent-models/** text eol=lf

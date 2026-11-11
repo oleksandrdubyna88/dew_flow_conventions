@@ -1,0 +1,1 @@
+{ "name": "agent-models", "version": "1.3.3", "description": "Shows each running subagent with its model, the signed-in account with its limits, a login button and the session's tasks list in a row above the prompt", "types": "./types/index.d.ts" }
