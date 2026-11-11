@@ -162,6 +162,13 @@ with conventions at `afbe426` or later. The creds worktree moved from `dc6fa09` 
 later head of #328: two merges of `main` (release 1.19.0 text, the changelog, the version files) and one docs
 commit (two lines in `.agents/PROJECT.md` and the README's old-clone steps). The pin is `5e73780` in both.
 
+**Which evidence shows part 2 (added 2026-11-11, CodeRabbit on #152).** § 7's pass sentence asks for the
+observable "in the recorded final answer or in the checkout state". These runs show it in the recorded trace, as the
+harness classifies it. The final answers name both ENTRY and PROJECT in 7 of 9 Claude runs (wsl_care and creds name
+only PROJECT) and in 1 of 9 Codex runs (r9700). So part 2 passes on the trace, and under the literal sentence it is
+not shown by the final answers. Whether the trace is the evidence for a read observable is the owner's decision:
+the proposed plan change 2.1 is draft PR #156.
+
 ### dew_flow_creds_for_devs
 
 Consumer commit (worktree HEAD) for both runs below: `daa7e05` (worktree `creds-smoke-328`).
@@ -323,6 +330,24 @@ Consumer commit (worktree HEAD) for both runs below: `a691935` (worktree `rs-mig
 - trace: 441780 B, sha256 `a97e3cae00971afc16a83f69de1924a340bed7524ee4d6150013906c9eedb9d2`; models ["claude-opus-5-5"]
 - rules read in full (8 of 8): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.testing` `05ba365bbb16e70bee6927e069a0d37f808365938b27f49286555d2185dd9b74`, `common.http-contracts` `c19e1e22a62a1ed639170a464f4c9c3048704983ee399da13c8005c2803c5efd`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.logging-serilog` `e7c43d5c52ec64437a6ad95ebb5229af3246ac66928bb6805fd4944984ad3265`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `rust.doctrine` `5f112e562597ace8d676a3109088556947f8f76a15c1a997197985092da84c3a`
 - part 2 (the § 7 observable, recorded by the harness): ENTRY read yes; PROJECT read yes; a rule body by a second path: none; unclassified calls: none
+
+## Fresh clones, 2026-11-11
+
+The matrix asks for a fresh clone per consumer. For the six below, the first runs used a worktree of the local
+clone's `main` (CodeRabbit on #152). Each was cloned again from GitHub over HTTPS into an empty folder, with only
+the `.agents/conventions` submodule initialised (as the consumers' CI does), the resolver's packages installed
+(`npm ci --ignore-scripts`), and every rule check run. All six are on release `26589a5` by then (the 2026-11-11
+pin bumps). creds has its fresh clone in story 3.C, and mcp in #71. sidecar_rust has no fresh clone with a build
+here, because the Rust build cannot run on this machine; its CI built and tested it on both legs.
+
+| Repository | `main` | Pin | `rules check` | `explain --task inspect` | Checks | Status lines after | Time (UTC) |
+|---|---|---|---|---|---|---|---|
+| dew_flow_connect_other_ais | `63a868f2` | `26589a5` | resolved | resolved | adapter-check OK pin-check OK gate-snippet-check OK | 0 | 2026-11-11T00:36:18Z |
+| dew_flow_benchmark | `3079acf` | `26589a5` | resolved | resolved | adapter: none (story 3.B) pin-check OK gate-snippet-check OK | 0 | 2026-11-11T00:36:29Z |
+| dew_flow_rag_qln | `b55d283` | `26589a5` | resolved | resolved | adapter-check OK pin-check OK gate-snippet-check OK | 0 | 2026-11-11T00:36:35Z |
+| wsl_care | `776d737` | `26589a5` | resolved | resolved | adapter-check OK pin-check OK gate-snippet-check OK | 0 | 2026-11-11T00:36:41Z |
+| dew_flow_vscode_kit | `fd905be` | `26589a5` | resolved | resolved | adapter-check OK pin-check OK gate-snippet-check OK | 0 | 2026-11-11T00:36:46Z |
+| dew_flow_amd_r9700_tuning_ai | `b550f52` | `26589a5` | resolved | resolved | adapter-check OK pin-check OK gate-snippet-check OK | 0 | 2026-11-11T00:36:50Z |
 
 ## Rollback, tried 2026-11-10
 
