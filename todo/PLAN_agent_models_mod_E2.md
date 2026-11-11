@@ -282,8 +282,8 @@ source; the copy hashes to the identity after a source rewrite; `npm test`, `npm
 
 ## E2.S2 — The settings-file write as one operation · `model: fable` · cornerstone
 
-- **Size** M. **Model** scenarios and brief: **Fable** (written after this document is committed, so the cornerstone
-  is in the parent's ledger first); code: Sonnet; review: Opus. Fable unavailable → Opus, said in the summary.
+- **Size** M. **Model** scenarios and brief: **Fable** (this section, 2026-11-11, written after the document was
+  committed, so the cornerstone was in the parent's ledger first); code: Sonnet; review: Opus.
 - **Goal.** The registration of the mod in `~/.claude/settings.json` is ONE operation on ONE road: read; find the real
   write target (a link followed, never replaced; a chain of links to its last target); apply the
   `CLAUDE_CODE_PLUGIN_DIRS` value rule; back up; check AGAIN both the bytes and the resolved target before the write —
@@ -297,63 +297,428 @@ source; the copy hashes to the identity after a source rewrite; `npm test`, `npm
   duplicates of the carried value are dropped; a non-string value or a non-object `env` is refused with nothing
   written; the first registration into an empty value carries the session's own variable over, because the settings
   value replaces the shell's.
+- **Evidence.** This design ran in a scratch copy on 2026-11-11 (Node 26.12.1, WSL, ext4): the road and the
+  registration below, over a rough port of the source installer. The three guard suites (107 cases) were green before
+  and after the road change, with no byte of them changed. The RED messages in the table are the ones the ported road
+  printed. Every tooth below turned the named tests red there, run again after the road got the guard's defaults.
+  The scratch copy is evidence, not a source: the coder writes the tests and the code from this section.
+- **The guard does not change in this epic** (the caller's decision, 2026-11-11). The road's defaults are what the
+  guard does at HEAD. Only the mod's registration asks for more. What the guard could gain is recorded under
+  *Follow-ups for the guard* and is not built here.
 
-**Files** (the spec settles the ones marked "may").
+**Decisions** (Fable, 2026-11-11). One per question.
+
+- **D2.1 (Q1) One road, extracted.** `user-guard-install.mjs` gains one exported function,
+  `commitSettings({ settingsPath, original, target, data, beforeWrite, prepare, replace = true })`. Its order:
+  `beforeWrite()`; read the bytes again through `settingsPath`; resolve the target again; a difference in either
+  returns `{ written: false, now }` (`now` = the bytes just read); `prepare()`; the write at `target.file`. `install`,
+  `repairRegistration`, `uninstall` and the mod's registration all call it. At its defaults the road does what the
+  guard's three operations do at HEAD, and they pass nothing new. `settingsFileOf` gains `export`: the caller
+  resolves the target before it computes anything, as the guard does. `changedUnderUs`, `writeSettings`, `modeOf` and
+  `writeBackup` stay private; `changedUnderUs` and `writeSettings` are called only inside `commitSettings` (a scan,
+  2.30). The "settled" branch is the mod's own and stays in `agent-models-install.mjs`.
+- **D2.2 (Q2) Backup.** The mod uses `backupOnce`, beside the real file, with the file's mode. It runs in `prepare`,
+  so only when a write follows. A file that did not exist has no backup. The guard keeps its own backup
+  (`writeBackup`, beside the settings path): not changed.
+- **D2.3 (Q3) The re-check.** The mod's order: decide → the checks of D2.7 → `beforeWrite` → re-check → backup →
+  write. Bytes changed: `settled` when the bytes the re-check saw already list the target; otherwise refused, retry.
+  The target changed with equal bytes: refused, retry, the same text. **Rejected:** the source's re-read, which reads
+  the old real file only (F4). **Rejected for the mod:** the guard's order (backup before the re-check); a refused
+  change of the mod leaves no backup (the ported `:421` and `:434` pin it).
+- **D2.4 (Q4) A missing file.** There is no `missing` form. The registration passes `parseSettings(original)`, and
+  `parseSettings(null)` is `{ settings: {} }` — the guard's own rule for "no file". So the same lines decide a missing
+  file and the file `{}`. The `missing` branch of `decideRegistration` (`:253`) and its words in the comment (`:247`)
+  are deleted. A created file gets no mode of its own: it takes what `writeAtomic` gives a new file today (the
+  umask), the same as a file the guard creates, so the two creators agree. `~/.claude` exists at this point (the copy
+  made `~/.claude/mods`); `writeAtomic` still makes a missing folder, as today.
+- **D2.5 (Q5) The mod's creation never replaces.** `writeAtomic` is widened, not copied:
+  `writeAtomic(dest, data, mode, { replace = true } = {})`. With `replace: false` the complete temp file gets its name
+  by `fs.linkSync(tmp, dest)`. A hard link fails with `EEXIST` when the name is taken — by a file or by a link,
+  dangling or not — where a rename replaces. `writeAtomic` then returns `false` and `commitSettings` returns
+  `{ written: false, now }`. There is no window on a filesystem with hard links. Where the link fails for another
+  reason (no hard links there): one `lstat` of the name, then the rename; the window stays there only. ONLY the
+  registration passes `replace: false` to the road, and the road uses it only for a file that did not exist at the
+  read: an existing file is always replaced. The default is `true`, the rename the guard uses today. **Rejected:** an
+  exclusive open of the final name; a reader, or a kill, can meet an empty settings.json.
+- **D2.6 (Q6) Links.** An existing file behind one link or a chain is written at its real path, and every link stays.
+  A dangling chain: the mod refuses with the retry tail and creates nothing (the parent's rule). A link says the user
+  keeps the file in another place, and that place is not there now: a dotfiles checkout not made yet, a share not
+  mounted. `settingsFileOf` marks it: `{ file: <last target>, dangling: true }`. The guard still creates the last
+  target (not changed); on a machine with the guard on, the mod then finds a file. More than 40 links, and a target
+  through a missing folder and then `..`: refused, fix by hand. `settingsFileOf` returns `reason` beside `refusal`,
+  so the mod's line does not say "nothing changed" after a copy.
+- **D2.7 (Q7) Writable.** Checked in the mod, before `commitSettings`. An existing file that is not writable:
+  `<settings> is not writable (<code>)`, by hand (the port). The folder of the write target not writable:
+  `<folder> is not writable (<code>)`, by hand — for a file to create and for an existing one, because the temp file,
+  the backup and the rename all need the folder. Any later failure is the write's own error: retry.
+- **D2.8 (Q8) Values.** A non-empty value is kept byte for byte and gets `<delimiter><target>` (F5), also with empty
+  entries or a trailing delimiter. Nothing is carried into it. A missing file, `{}`, no `env`, `env` without the key
+  and the key `''` all carry the session's entries: empties and duplicates dropped, our target dropped in any
+  spelling, each kept entry verbatim. `~/` is expanded for the comparison only. `~` alone is not expanded and is not
+  our target. The comparison is text after `normalise`; no link is resolved.
+- **D2.9 (Q9) Texts and tails.** The table below. A created file adds nothing to a line, and the outcome stays
+  `registration: 'append'`: the `installed` and `registered` lines already name the file and the key.
+- **D2.10 (Q10) Reads that fail.** settings.json that is a folder, a link to a folder, or unreadable: the read
+  throws; one refusal, `<settings> could not be read (<code>)`, by hand; nothing written. A throw after the read is
+  `could not be written`, retry. **Rejected:** the source's single catch, which called every throw "could not be read".
+- **D2.11 (Q11) What stays.** `tools/install-user-hook.test.mjs`, `tools/effort-converge.test.mjs` and
+  `tools/ensure-user-guard.test.mjs` change by no byte and stay green. The effort road is not touched. The guard's
+  `install`, `repairRegistration` and `uninstall` do what they do at HEAD: the same lines, the same backup, the same
+  order, the same rename, the same mode. Their code changes in one way only: the last three steps (the seam, the
+  re-check, the write) are now the call of the road. Case 2.9 and scan 2.30 (B) hold the guard there.
+- **D2.12 (Q12) The RED order and the teeth.** The table and the list below.
+
+**The refusal texts** (D2.9). `<settings>` is `modTargets(home).settings`. Every line is
+`notRegistered(<version>, <reason>, <tail>)` of the fixtures.
+
+| Reason | Text of the reason | Tail |
+|---|---|---|
+| unparsable | `<settings> does not parse (<message>)` | by hand |
+| not an object | `<settings> is not a JSON object` | by hand |
+| `env` not an object | `<settings>: env is not an object` | by hand |
+| the value not a string | `<settings>: env.CLAUDE_CODE_PLUGIN_DIRS is not a string` | by hand |
+| the read throws | `<settings> could not be read (<code>)` | by hand |
+| more than 40 links | `<settings> has more than 40 links (a loop, or a chain too long to open)` | by hand |
+| a missing folder, then `..` | `<settings> is a link whose target goes through a folder that does not exist and then ".."` | by hand |
+| the file not writable | `<settings> is not writable (<code>)` | by hand |
+| the folder not writable | `<folder> is not writable (<code>)` | by hand |
+| a dangling chain | `<settings> is a link to <last target>, which does not exist` | retry |
+| changed under us, not settled | `settings.json changed while registering the agent-models mod; nothing written to it` | retry |
+| the write throws | `<settings> could not be written (<code>)` | retry |
+
+**Follow-ups for the guard (not built here).** Each is a change of the guard's behaviour, so each needs its own plan.
+The line numbers are of `settings/hooks/lib/user-guard-install.mjs` at HEAD; "measured" means run on 2026-11-11.
+
+- **G1 The guard's creation can replace a file that appeared after its re-check.** `writeAtomic` renames over the
+  name (`:180`). Measured in the scratch copy: at the road's defaults, a file written after the re-check was replaced.
+  The fix is one argument, `replace: false`, in the guard's calls of the road; an install that loses the name then
+  answers `changed while installing` with its hook already written, which the next session start registers.
+- **G2 A created settings.json takes the umask** (mode 0644 under umask 022, measured), and it may later hold tokens
+  in `env`. `writeSettings` (`:449-451`) passes no mode for a missing file. An owner-only mode at creation would
+  apply to both creators.
+- **The effort road re-reads the bytes only and writes by itself.** `commitEffort` reads again at `:593` and never
+  resolves the target again; `writeConverged` calls `writeAtomic` at `:576`. It is the one write of settings.json
+  outside `commitSettings`.
+- **The guard's road has no writable check.** `install` (`:313-344`) never calls `writableReason`. Measured at HEAD:
+  an install over a settings.json of mode 0444 answered code 0 and wrote the file.
+- **The guard backs up before its re-check.** `install` `:332` is before `:334`. Measured at HEAD: an install refused
+  as `changed while installing` left one backup.
+
+**What this does not prove.**
+
+- An EXISTING file that another program changes between the re-check and the rename is replaced. The gap is a few
+  system calls. No lock is shared with the host. The guard's road has the same gap today.
+- Windows and macOS were not run: CI is `ubuntu-latest`. `fs.linkSync` runs only in the mod's creation, and the mod's
+  step skips `win32` (E2.S3, D3.2). If that call fails for a reason other than "the name is taken", the road looks
+  once and takes the rename.
+
+**Files.**
 
 | File | How |
 |---|---|
-| `settings/hooks/lib/agent-models-install.mjs` | changed: the registration (`registerIn`, `appendRegistration`, `settledOrChanged`, `register`, source `:57-98`) |
-| `settings/hooks/lib/user-guard-install.mjs` | may change: `export` added before `settingsFileOf` (`:472`) and `changedUnderUs` (`:458`), or one shared settings-write function extracted from the guard's road (Q1) — no second body either way |
-| `settings/hooks/lib/agent-models-decide.mjs` | may change: `decideRegistration`'s `missing` branch (`:253`) (Q4) |
-| the `.claude/hooks/lib/` copy of each changed module | the mirror copies, same commit |
-| `tools/agent-models-install.test.mjs` | changed: the ported `:406` case ("never created") rewritten to Design B |
-| `tools/agent-models-refusals.test.mjs` | changed: the first half of 1j (`:25-36`) rewritten: a missing file is no longer "does not exist" |
-| `tools/agent-models-register.test.mjs` | new (suggested): the registration cases of the parent's test plan — a missing file created with only the registration; a chain of links registered at its last target; a dangling chain; a link re-pointed between read and write refused (the shape of F3); the carry-over into a created file |
-| `tools/agent-models-decide.test.mjs` | changed only if `decide.mjs` changes |
-| `tools/install-user-hook.test.mjs`, `tools/effort-converge.test.mjs`, `tools/ensure-user-guard.test.mjs` | unchanged and green: the guard's road and the effort road keep their behaviour |
+| `settings/hooks/lib/user-guard-install.mjs` | changed: `writeAtomic` widened and `placeNew` (R1); `settingsFileOf` exported, with `dangling` and `reason` (R2); `commitSettings` (R3); `install`, `repairRegistration`, `uninstall` call the road at its defaults (R4) |
+| `settings/hooks/lib/agent-models-decide.mjs` | changed: the `missing` branch and its words in the comment go (R5) |
+| `settings/hooks/lib/agent-models-install.mjs` | changed: the registration (`settledOrChanged`, `blocked`, `registerIn`, `register`), its import list and the comment of `register` (R6) |
+| the `.claude/hooks/lib/` copy of each of the three | the mirror copies, same commit |
+| `tools/agent-models-register.test.mjs` | new: the road (2.1-2.9) and the registration (2.11-2.15, 2.17-2.23, 2.25-2.27) |
+| `tools/agent-models-install.test.mjs` | changed: the ported `:406` case becomes 2.10; nothing else |
+| `tools/agent-models-refusals.test.mjs` | changed: the first half of 1j (`:25-36`) becomes the short form of 2.27; nothing else |
+| `tools/agent-models-decide.test.mjs` | changed: the `missing` line of `:199` goes; 2.29 is added |
+| `tools/agent-models-imports.test.mjs` | changed: the two road scans and their companions (2.30) |
+| `tools/install-user-hook.test.mjs`, `tools/effort-converge.test.mjs`, `tools/ensure-user-guard.test.mjs` | no byte changes; green |
 
-**The questions the spec must answer.**
+**The rewrites, each by name.**
 
-- **Q1 The one road.** Export `settingsFileOf` and `changedUnderUs` (F2) and assemble the registration in
-  `agent-models-install.mjs`, or extract the guard's read → resolve → backup → re-check → write sequence into one
-  exported function of `user-guard-install.mjs` that both `install`/`repairRegistration` and the registration call
-  (reuse-first, move 2)? If the second: does the guard's road keep its own tests unchanged, and where does the
-  mod-specific "settled" branch live?
-- **Q2 Backup.** `backupOnce` (the port: a retry adds no file) or the guard's `writeBackup` (a new file per write)? And
-  none for a file that did not exist?
-- **Q3 The re-check.** After `beforeWrite`: bytes changed → the port's "settled" branch (another session registered
-  first is not an error) or a refusal? Target changed with equal bytes → refused, retry? What `beforeWrite` sees and
-  where it runs (after the backup, before the re-check, as in the guard's road)?
-- **Q4 A missing file.** Decided as `{ settings: {} }` by the caller, or `decideRegistration`'s `missing` branch made to
-  answer as an empty value (an E1 file)? Which mode does a created file get (`writeAtomic` with no mode takes the
-  umask; the file may later hold tokens in `env`)? Does `~/.claude` get created when it is missing?
-- **Q5 Creation and a race.** `writeAtomic` renames over the destination. A file that ANOTHER start creates between the
-  re-check and the rename (the guard step of a parallel session does exactly that on a fresh machine) would be
-  replaced. How is a missing file created so that a file that appeared is never overwritten — an exclusive create of
-  the final name, a re-check that is part of the write, or a refusal with retry?
-- **Q6 Links.** The parent says a missing file is created AND "a dangling chain of links is a retry, not a fix by
-  hand"; `settingsFileOf` (`:472-483`) answers a dangling chain with its last target, where the guard's road creates
-  the file. Which one holds for the mod? And the `> 40 links` and `MISSING_FOLDER` refusals of `settingsFileOf`: the
-  "fix by hand" tail or the retry tail?
-- **Q7 Writable.** `writableReason` on an existing file (the port: fix by hand). And for a file to be created: the
-  folder's writability, or the write's own error as a retry?
-- **Q8 The value edge cases.** An existing value with empty entries (`/a::/b`) or a trailing delimiter: kept verbatim
-  and appended to (F5), or cleaned? `~` alone, `~/` with a trailing separator, the target already listed in another
-  spelling. `env` present without the key, `env` with the key `''`, the file `{}`: all carry the session's entries?
-- **Q9 The refusal texts and tails.** Which reasons are retry and which are fix by hand, per reason, with the text of
-  each; what a created file adds to the `installed` and `registered` lines, if anything.
-- **Q10 Reads that fail.** settings.json that is a folder, unreadable, or a link to a folder: one refusal each, nothing
-  written, and which tail?
-- **Q11 What stays as it was.** The guard's `install`, `repairRegistration`, `uninstall` and the effort road keep their
-  behaviour and their tests byte for byte, or a named, tested change if Q1 extracts a shared function.
-- **Q12 The RED order and the teeth.** Which production line of the road, removed, turns which test red: at least the
-  target re-check (the F3 shape), the byte re-check, the mode keep, the link follow, the creation guard of Q5, the
-  carry-over into a created file, and the non-object `env` refusal.
+- **R1 `writeAtomic` and `placeNew`.** One body; the old comment stays and gains one sentence about `replace`.
 
-**Done when** the spec's scenarios hold and its teeth were each seen red and restored; the registration is one function
-on one road; a re-pointed link with the same bytes is refused; a missing file is created with only the registration;
-the guard, effort and self-install suites are unchanged and green; `npm test`, `npm run check` and
-`node tools/adapter-check.mjs` are green.
+  ```js
+  export function writeAtomic(dest, data, mode, { replace = true } = {}) {
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    const tmp = `${dest}.tmp-${process.pid}`;
+    try {
+      fs.writeFileSync(tmp, data, mode === undefined ? undefined : { mode });
+      if (mode !== undefined) fs.chmodSync(tmp, mode);
+      if (!replace) return placeNew(tmp, dest);
+      fs.renameSync(tmp, dest);
+      return true;
+    } finally {
+      fs.rmSync(tmp, { force: true });
+    }
+  }
+
+  /**
+   * A complete temp file gets a NEW name. A hard link fails with EEXIST when the name is taken (by a file, or by a link,
+   * dangling or not), where a rename would replace it. Where the filesystem cannot make a hard link: one more look, then
+   * the rename; there the gap between the look and the rename stays. False when the name is taken.
+   */
+  function placeNew(tmp, dest) {
+    try {
+      fs.linkSync(tmp, dest);
+      return true;
+    } catch (e) {
+      if (e.code === 'EEXIST' || lstatOrNull(dest) !== null) return false;
+      fs.renameSync(tmp, dest);
+      return true;
+    }
+  }
+  ```
+
+- **R2 `settingsFileOf`.** `export` is added. Its two refusals and its last line become the lines below; `refusal`
+  keeps today's exact text. The comment gains: `dangling` marks a chain that ends in a missing file, and `reason` is
+  the refusal without its advice.
+
+  ```js
+  const linkRefusal = reason => ({ reason, refusal: `${reason}; nothing changed — point it at one file` });
+
+  // inside settingsFileOf, after `last` is known:
+  if (last === TOO_MANY_LINKS) return linkRefusal(`${settingsPath} has more than ${MAX_LINKS} links (a loop, or a chain too long to open)`);
+  if (last === MISSING_FOLDER) return linkRefusal(`${settingsPath} is a link whose target goes through a folder that does not exist and then ".."`);
+  return last === null ? { file: settingsPath } : { file: last, dangling: true };
+  ```
+- **R3 The road.** `changedUnderUs` becomes `(settingsPath, original, target, now)` and reads nothing itself:
+  `return !sameBytes(now, original) || settingsFileOf(settingsPath).file !== target.file;` (its comment stays).
+  `writeSettings` passes the options on and returns what `writeAtomic` returns; its comment stays.
+
+  ```js
+  function writeSettings(file, data, options) {
+    return writeAtomic(file, data, modeOf(file), options);
+  }
+
+  /**
+   * The ONE road a change of settings.json takes once its new text is known. install, repairRegistration, uninstall and
+   * the agent-models registration all end here, so none of them can drop a step. `original` and `target` are what the
+   * caller read and resolved (`settingsFileOf`) BEFORE it computed `data`. In order: `beforeWrite` (a test seam); the
+   * bytes are read again through the path and the target is resolved again, and a difference in either answers
+   * `{ written: false, now }` with the bytes just read; `prepare` (what a caller does only when the write follows: the
+   * guard copies its hook, the mod takes its backup); then the write at `target.file`, with the file's own mode when
+   * there is one. `replace: false` is for a file that did not exist at the read: it is then created only while its
+   * name is still free, and a name taken meanwhile is `{ written: false, now }` too. An existing file is always
+   * replaced. The default, `true`, renames over the name in both cases.
+   */
+  export function commitSettings({ settingsPath, original, target, data, beforeWrite = () => {}, prepare = () => {}, replace = true }) {
+    beforeWrite();
+    const now = readOrNull(settingsPath);
+    if (changedUnderUs(settingsPath, original, target, now)) return { written: false, now };
+    prepare();
+    if (writeSettings(target.file, data, { replace: replace || original !== null })) return { written: true };
+    return { written: false, now: readOrNull(settingsPath) };
+  }
+  ```
+
+- **R4 The three callers.** Each keeps its read, its `settingsFileOf` call, its backup line and its result lines.
+  Only the tail changes. No other line of the three functions moves. None of them passes `replace`.
+  - `repairRegistration` `:274-276`: the three lines `beforeWrite();`, `if (changedUnderUs(…)) return …;`,
+    `writeSettings(target.file, merged);` become
+    `const done = commitSettings({ settingsPath: t.settings, original, target, data: merged, beforeWrite });` and
+    `if (!done.written) return result(1, [...lines, CHANGED]);`.
+  - `install` `:333-334` (`beforeWrite();` and the `changedUnderUs` line) go. `:340-342` become: a
+    `const prepare = () => { writeManifest(t, source, sourceBytes, by, readOrNull(t.hook)); writeAtomic(t.hook, sourceBytes); };`,
+    then `const done = commitSettings({ settingsPath: t.settings, original, target, data: serialise(merged), beforeWrite, prepare });`
+    and `if (!done.written) return result(1, [...lines, CHANGED]);`. The comment `:335-339` stays as it is.
+  - `uninstall` `:363-365` become
+    `const done = commitSettings({ settingsPath: t.settings, original, target, data: serialise(removeEntry(parsed.settings, t.hook)), beforeWrite });`
+    and `if (!done.written) return result(1, [CHANGED]);`.
+- **R5 `decideRegistration`.** Line `:253` is deleted. The first sentence of the comment (`:247`) becomes:
+
+  ```js
+   * The registration decision over parsed settings (`{ settings }` or `{ error }`; a missing file is
+   * `parseSettings(null)`, an empty object). `inherited` is the
+  ```
+- **R6 The registration** in `agent-models-install.mjs`. `appendRegistration` goes. The import from
+  `./user-guard-install.mjs` becomes
+  `backupOnce, commitSettings, parseSettings, readOrNull, serialise, settingsFileOf, writableReason` — no
+  `effortTarget`, `sameBytes` or `writeAtomic`. The comment `beforeWrite  test seam: …` stays true. No line names a
+  created file.
+
+  ```js
+  /** The file changed under us: fine when what is there now lists the folder, a refusal otherwise. */
+  function settledOrChanged(now, target, home) {
+    return decideRegistration(parseSettings(now), target, home).action === 'none' ? { registration: 'settled' } : refusedRegistration(SETTINGS_CHANGED, true);
+  }
+
+  /** Why the write must not start, as a refused registration; null when it may. */
+  function blocked(t, original, target) {
+    if (target.refusal) return refusedRegistration(target.reason, false);
+    if (target.dangling) return refusedRegistration(`${t.settings} is a link to ${target.file}, which does not exist`, true);
+    const file = original === null ? '' : writableReason(target.file);
+    if (file) return refusedRegistration(`${t.settings} ${file}`, false);
+    const folder = path.dirname(target.file);
+    const reason = writableReason(folder);
+    return reason ? refusedRegistration(`${folder} ${reason}`, false) : null;
+  }
+
+  function registerIn({ t, home, beforeWrite, inheritedPluginDirs, original, target }) {
+    const decision = decideRegistration(parseSettings(original), t.target, home, inheritedPluginDirs);
+    if (decision.action === 'none') return { registration: 'none' };
+    if (decision.action === 'refuse') return refusedRegistration(decision.reason, decision.retry);
+    const refusal = blocked(t, original, target);
+    if (refusal) return refusal;
+    // A backup only when a write follows, and none of a file that did not exist; a retry adds no file (backupOnce).
+    const prepare = () => { if (original !== null) backupOnce(target.file, original, fs.statSync(target.file).mode & 0o777); };
+    // replace: false — a settings.json this step creates never takes the place of one that appeared after the re-check.
+    const done = commitSettings({ settingsPath: t.settings, original, target, data: serialise(decision.next), beforeWrite, prepare, replace: false });
+    return done.written ? { registration: 'append', carried: decision.carried } : settledOrChanged(done.now, t.target, home);
+  }
+
+  /** Registers the target in settings.json, creating a missing file. Never throws. */
+  function register(args) {
+    const { settings } = args.t;
+    let original;
+    let target;
+    try {
+      original = readOrNull(settings);
+      target = settingsFileOf(settings);
+    } catch (e) {
+      return refusedRegistration(`${settings} could not be read (${codeOf(e)})`, false);
+    }
+    try {
+      return registerIn({ ...args, original, target });
+    } catch (e) {
+      return refusedRegistration(`${settings} could not be written (${codeOf(e)})`, true);
+    }
+  }
+  ```
+
+**Scenarios.** Every case first runs RED for the reason named, then GREEN. "register", "install", "refusals",
+"decide" and "imports" are the test files above. "The road" cases call `commitSettings`, `settingsFileOf`,
+`writeAtomic` and `install` of `user-guard-install.mjs` in a folder made by `ownedDir`; "open" there means
+`{ settingsPath, original: readOrNull(settingsPath), target: settingsFileOf(settingsPath) }`. The registration cases
+run `sandbox(t).ensure(…)`, after `seedTarget()` unless the row says a fresh home. `D` is `path.delimiter`. "—" in the
+last column means the case is green on the ported road and names its RED tooth. A mode case skips on `win32`; a
+permission case also skips as root; a link case skips where a symlink cannot be made. A `:NNN` of an install or
+refusals case is its line in the SOURCE test file, as in F11 and F12. The guard's `:114`, `:322` and `:552` are lines
+of this repository's `tools/install-user-hook.test.mjs`, and decide `:199` is a line of `tools/agent-models-decide.test.mjs`.
+
+| # | Given / When | Then | RED before the change |
+|---|---|---|---|
+| 2.1 | the road: no file; `commitSettings({ ...open, data, replace: false })` under umask 022 | `{ written: true }`; the file holds `data`; mode `0644`, the umask's; no `.tmp-` file in the folder | `guard.settingsFileOf is not a function`, thrown by "open" |
+| 2.2 | the road, **the creation in the gap**: no file; `replace: false`; `prepare` writes `{"theme":"dark"}` at the path | `written: false`; `now` is the other bytes; the file still holds them; no `.tmp-` file | as 2.1 |
+| 2.3 | the road: no file; `replace: false`; `prepare` makes the path a link to a file that does not exist | `written: false`; the link stays a link; its target was not created | as 2.1 |
+| 2.4 | the road, no hard links: `replace: false`; `fs.linkSync` replaced for the call by a function that counts and throws `EPERM` (restored in `finally`); once with no file, once with `prepare` writing the other file | first: `{ written: true }`, the bytes, the replaced function ran once; second: `written: false`, the other bytes stay; no `.tmp-` file | as 2.1 |
+| 2.5 | the road: an existing 0644 file; `commitSettings({ ...open, data, replace: false })` under umask 077 | `{ written: true }`: an existing file is always replaced; the file holds `data`; mode `0644` | as 2.1 |
+| 2.6 | the road: an existing file; (a) `beforeWrite` writes other bytes; (b) the path is a link to `a.json`, and `beforeWrite` points it at `b.json` with the same bytes; `prepare` counts its calls | (a) `written: false`, `now` is the new bytes; (b) `written: false`, `a.json` and `b.json` byte-identical; `prepare` ran 0 times | as 2.1 |
+| 2.7 | the road: `settingsFileOf` on a plain missing path; on a chain `settings → mid → real` with `real` missing; with `real` present; on a loop | `{ file: <path> }`; `{ file: <real>, dangling: true }`; `{ file: <realpath of real> }`; `reason` is `<path> has more than 40 links (a loop, or a chain too long to open)`, `refusal` is `reason` + `; nothing changed — point it at one file`, no `file` | as 2.1 |
+| 2.8 | the road: a file `old`; `writeAtomic(file, 'new', undefined, { replace: false })`; then `writeAtomic(file, 'new')` | the first returns `false`, the file is `old`, no `.tmp-` file; the second returns `true`, the file is `new` | the first call replaced the file and returned `undefined` |
+| 2.9 | the road, **the guard as at HEAD**: a fresh home; the guard's `install({ home, source })` under umask 022, with `fs.linkSync` replaced for the call by a function that counts and throws | code 0; settings.json holds the guard's entry; its mode is `0644`, the umask's; the replaced function ran 0 times (the rename, never a hard link) | — (green before and after: the guard must not change; tooth M2.6) |
+| 2.10 | install (where `:406` stood), **a missing file is created**: a fresh home, `ensure()` under umask 022; then `ensure()` again | `[action, line, copy, registration]` = `['installed', installedLine('1.2.3'), 'install', 'append']`; the file text is `serialise({ env: { CLAUDE_CODE_PLUGIN_DIRS: <target> } })`; mode `0644`, the umask's, as the guard's file of 2.9; no backup; no `.tmp-` file; the second run is `['none', '', …, 'none']` | `refused`, `… NOT registered …: <settings> does not exist; the next session start registers it` |
+| 2.11 | register: a fresh home; `ensure({ inheritedPluginDirs })` with `/a`, an empty entry, `~/c`, `/a` again, `~/.claude/mods/agent-models`, a trailing delimiter | the line is `installedLine('1.2.3') + carriedText(2)`; the file deep-equals `{ env: { CLAUDE_CODE_PLUGIN_DIRS: '/a' + D + '~/c' + D + <target> } }` | as 2.10 |
+| 2.12 | register, three cases: `{ model }`; `{ model, env: { A } }`; `{ model, env: { A, CLAUDE_CODE_PLUGIN_DIRS: '' } }`; `ensure({ inheritedPluginDirs: '/a' + D + '/b' })` | `registered`, the line `registeredLine + carriedText(2)`; the value is `/a`, `/b`, then the target; `model`, `A` and the key order `['model', 'env']` kept; one backup that holds the old bytes | — (teeth M2.4, M2.10) |
+| 2.13 | register: the value `/a` + D + D + `/b` + D; `ensure({ inheritedPluginDirs: '/zzz' })` | the line is `registeredLine`; the new value is the old value + D + the target, byte for byte | — (a pin of D2.8) |
+| 2.14 | register, two spellings of a listed target: `~/.claude/mods/agent-models/`; `<mods>/../mods/agent-models`; `ensure({ inheritedPluginDirs: '/zzz' })` | `[action, registration]` = `['none', 'none']`; `snapshot(~/.claude)` equal before and after (bytes and mtimes; so no write, no backup) | — (a pin; the ported `:348` has three more spellings) |
+| 2.15 | register: the value `~` | the new value is `~` + D + the target | — (a pin) |
+| 2.16 | install, the ported `:379-404` (unparsable, an array, `env` an array, `env` a string, the value not a string) and refusals 1i | unchanged: the file byte-identical, no backup, the tail "by hand" | — (teeth M2.9, M2.17) |
+| 2.17 | register, **another start creates the file first**: a fresh home; (a) `beforeWrite` writes a settings.json that lists the target; (b) `beforeWrite` writes `{ "hooks": {} }`; (c) **after the re-check**: no settings.json, and `fs.linkSync` wrapped for the call so that it first writes `{ "hooks": {} }` at its destination, then calls the real function | (a) `['installed', installedLine('1.2.3'), 'settled']`, the other bytes stay; (b) the line is `notRegistered('1.2.3', <changed text>, RETRY_TAIL)`, the other bytes stay, no backup; the next `ensure()` is `registered` and the file deep-equals `{ hooks: {}, env: { … } }`; (c) the same line as (b), the wrapper ran once, the other bytes stay, no `.tmp-` file, and the next `ensure()` is `registered` | as 2.10 |
+| 2.18 | register, **a chain of links**: `settings → mid.json → settings.json` in a `dotfiles` folder, the real file `{"model":"x"}` with mode `0640` | `registered`; both links are still links; the real file deep-equals `{ model: 'x', env: { … } }` with mode `0640`; one backup beside the real file with mode `0640`; no backup in `~/.claude` | — (teeth M2.5, M2.7) |
+| 2.19 | register, **a dangling chain**: the same chain, the real file missing | the line is `notRegistered('1.2.3', '<settings> is a link to <real>, which does not exist', RETRY_TAIL)`; the real file does not exist; `dotfiles` holds only `mid.json`; the first link stays; after the real file is written as `{}`, the next run is `registered` | the reason was `<settings> does not exist` |
+| 2.20 | register, a loop: `settings → loop.json → settings` | the line is `notRegistered('1.2.3', '<settings> has more than 40 links (a loop, or a chain too long to open)', HAND_TAIL)`; both links stay | `<settings> does not exist`, with the retry tail |
+| 2.21 | register: a chain of 41 links that ends in an existing file `{}` | the same line as 2.20; the file byte-identical | as 2.20 |
+| 2.22 | register: `settings` is the link `missing/../real.json`; a decoy `~/.claude/real.json` | the line is `notRegistered('1.2.3', '<settings> is a link whose target goes through a folder that does not exist and then ".."', HAND_TAIL)`; the decoy byte-identical | as 2.20 |
+| 2.23 | register, **the re-pointed link** (the shape of F3): `settings → a.json`; `b.json` holds the same bytes; `beforeWrite` points the link at `b.json` | the line is `notRegistered('1.2.3', <changed text>, RETRY_TAIL)`; `a.json` and `b.json` byte-identical; no backup in `dotfiles`; the next `ensure()` is `registered`, `b.json` has the key, `a.json` is still byte-identical | the line was `registeredLine`, and `a.json` was written |
+| 2.24 | install, the ported `:421` (bytes changed: refused, the other bytes stay, no backup) and `:434` (another session registered first: settled) | unchanged and green | — (teeth M2.2, M2.14) |
+| 2.25 | register: `~/.claude` made `0555`; once with no settings.json, once with `{ "model": "x" }`. And the ported `:454` (a read-only file), unchanged | each: the line is `notRegistered('1.2.3', '<~/.claude> is not writable (EACCES)', HAND_TAIL)`; settings as before; `~/.claude` holds nothing new | with no file: `<settings> does not exist`; with a file: `<settings> could not be written (EACCES)` and the retry tail |
+| 2.26 | register: settings.json is a folder; is a link to a folder; is a file with mode `0000` | each: the line is `notRegistered('1.2.3', '<settings> could not be read (EISDIR)', HAND_TAIL)` (`EACCES` for the third); the folders stay empty; no backup | — (tooth M2.19) |
+| 2.27 | register: no settings.json and a FOLDER at `<settings>.tmp-<pid>`, three runs; then the folder removed. Refusals 1j, first half: the same, one run | each run: the line matches `could not be written \(\w+\)` and ends with `RETRY_TAIL`; no settings.json, no backup; then `registered` | the line was `<settings> does not exist` |
+| 2.28 | install, the ported `:475` and refusals 1j, second half (the write fails after the backup, three runs) | unchanged: one backup, the file byte-identical | — (teeth M2.11, M2.20) |
+| 2.29 | decide: `decideRegistration(guard.parseSettings(null), TARGET, HOME, '/a' + D + '/b')` | deep-equals `{ action: 'append', next: { env: { CLAUDE_CODE_PLUGIN_DIRS: '/a' + D + '/b' + D + TARGET } }, carried: 2 }` and the decision for `parsed({})` | — (a pin; 2.10 is the RED of the behaviour) |
+| 2.30 | imports, **one road**. (A) in `agent-models-install.mjs`: the names imported from the guard installer hold `commitSettings` and `settingsFileOf` and none of `writeAtomic`, `effortTarget`, `sameBytes`; the text holds `commitSettings(` exactly once, and that call holds `replace: false`. (B) in `user-guard-install.mjs`: outside the body of `commitSettings`, no call of `writeSettings(` or `changedUnderUs(` (a declaration is not a call); the bodies of `install`, `repairRegistration` and `uninstall` each hold `commitSettings(` once and never the word `replace`. The companions: the body of `commitSettings` is found and holds both calls; the body finder finds `install` | all hold | (A): the imported names lack `commitSettings`; (B): `the body of commitSettings is found` fails |
+| 2.31 | `git status --short -- tools/install-user-hook.test.mjs tools/effort-converge.test.mjs tools/ensure-user-guard.test.mjs`; then the three files run | no line; all green (107 cases on 2026-11-11) | — |
+| 2.32 | `cmp` of the three changed modules with their copies; `node tools/adapter-check.mjs`; `npm test`; `npm run check`; `node tools/plan-lifecycle.mjs` | equal; all green | before the copy: adapter-check names the three `.claude/hooks/lib/` files |
+
+**Teeth (RED → GREEN → RED), one at a time, each restored by the reverse edit.** "guard `:552`" is the guard's own
+re-pointed-link test.
+
+- **M2.1 The target re-check dropped** (`changedUnderUs` without `|| settingsFileOf(settingsPath).file !== target.file`)
+  → 2.6, 2.23 and guard `:552` red.
+- **M2.2 The byte re-check dropped** (`!sameBytes(now, original) ||` removed) → 2.6, the ported `:421` and `:434`, and
+  the guard's `:114` and `:322` red.
+- **M2.3 The mod's creation by rename.** (a) in `registerIn`, `replace: false` removed from the call → 2.17 (c) and
+  2.30 (A) red. (b) in `commitSettings`, the option becomes `{ replace: true }` → 2.2, 2.3, 2.4 and 2.17 (c) red.
+  (c) in `placeNew`, `fs.linkSync(tmp, dest)` becomes `fs.renameSync(tmp, dest)` → 2.2, 2.3, 2.4, 2.8 and 2.17 (c)
+  red. (d) in `placeNew`, `|| lstatOrNull(dest) !== null` removed → 2.4 red. (e) in `placeNew`, the last two lines
+  become `throw e;` → 2.4 red.
+- **M2.4 The carry-over skipped** (`registerIn` calls `decideRegistration` without `inheritedPluginDirs`) → 2.11,
+  2.12 and refusals A4 red.
+- **M2.5 The mode not kept** (`writeSettings` passes `undefined` in place of `modeOf(file)`) → 2.5, 2.18, the ported
+  `:490` and the guard's four mode tests red.
+- **M2.6 The guard changed by the road.** (a) the default becomes `replace = false` → 2.9 red (the replaced
+  `fs.linkSync` ran). (b) `writeSettings` gives a new file a fixed mode (`modeOf(file) ?? <a mode>`) → 2.1, 2.9 and
+  2.10 red. (c) `repairRegistration` passes `replace: false` → 2.30 (B) red.
+- **M2.7 The link not followed** (`commitSettings` writes at `settingsPath` in place of `target.file`) → 2.18, 2.23,
+  the ported `:490` and the guard's three "writes through a symlinked settings.json" tests red.
+- **M2.8 A dangling chain created** (the `dangling` line of `blocked` removed) → 2.19 red.
+- **M2.9 A non-object `env` accepted** (the `isObject(settings.env)` line of `decideRegistration` removed) → the
+  ported "env that is an array", "env that is a string" and refusals 1i red.
+- **M2.10 No backup** (the body of `prepare` in `registerIn` emptied) → 2.12, 2.18 and the first ported install case red.
+- **M2.11 The backup not once** (`backupOnce` returns `writeBackup(file, bytes, mode)` always) → the ported `:475` red.
+- **M2.12 The file's writable check dropped** (`const file = '';` in `blocked`) → the ported `:454` red.
+- **M2.13 The folder's writable check dropped** (`const reason = '';` in `blocked`) → 2.25 red.
+- **M2.14 The settled branch dropped** (`settledOrChanged` always refuses) → 2.17 and the ported `:434` red.
+- **M2.15 A loop not refused** (the `target.refusal` line of `blocked` removed) → 2.20, 2.21, 2.22 red.
+- **M2.16 `prepare` before the re-check** (the two lines of `commitSettings` swapped) → 2.6, 2.23, the ported `:421`
+  and `:434`, and the guard's `:322` and `:552` red.
+- **M2.17 A non-string value accepted** (the `typeof value !== 'string'` line removed) → the ported "a plugin dirs
+  value that is not a string" red.
+- **M2.18 The registration off the road** (in `registerIn`, the `commitSettings(…)` call replaced by `beforeWrite();`,
+  `prepare();`, `writeAtomic(target.file, serialise(decision.next));` and `const done = { written: true };`, with
+  `writeAtomic` imported in place of `commitSettings`) → 2.30 (A), 2.10, 2.17, 2.18, 2.23 and the ported `:421` red.
+- **M2.19 A read error told as a write error** (the first catch of `register` returns the second's text and `true`)
+  → 2.26 red.
+- **M2.20 A write error told as a read error** (the reverse) → 2.27 and the ported `:475` red.
+- **M2.21 An existing file not replaced under `replace: false`** (`replace || original !== null` becomes `replace`)
+  → 2.5, 2.12, 2.18 and the first ported install case red.
+
+**The brief.**
+
+1. Check that E2.S1 is committed (`settings/hooks/lib/agent-models-install.mjs` exists; its `registerIn` calls
+   `effortTarget`). Run `npm test` and the three guard files; write down the counts.
+2. **Tests first.** Write `tools/agent-models-register.test.mjs`: the road cases 2.1-2.9 and the registration cases
+   2.11-2.15, 2.17-2.23 and 2.25-2.27. Import `* as guard` from `user-guard-install.mjs`, `fs` from `node:fs` (the
+   same object the module calls, so 2.4, 2.9 and 2.17 (c) can replace `fs.linkSync` and restore it in `finally`), the lines and `sandbox`, `symlinkOrSkip`,
+   `snapshot`, `IS_ROOT`, `D` from the fixtures, and `ownedDir` for the road's folder. Every expected line is built with the fixtures'
+   builders (`notRegistered`, `installedLine`, `registeredLine`, `carriedText`, `RETRY_TAIL`, `HAND_TAIL`); the changed
+   text is one constant of the test file. Set the umask with `process.umask` and restore it in `finally`; restore
+   every `chmod` in `finally`. Name each test for its guarantee. Then: rewrite install `:406` to 2.10; rewrite the
+   first half of refusals 1j to 2.27's one run; in decide, delete the `missing` assertion and add 2.29; add 2.30 to
+   imports (a body finder: from `function <name>(` at a line start, with or without `export`, to the first line that
+   is exactly `}`). Run:
+   ```bash
+   node --test tools/agent-models-register.test.mjs tools/agent-models-install.test.mjs tools/agent-models-refusals.test.mjs tools/agent-models-decide.test.mjs tools/agent-models-imports.test.mjs
+   ```
+   Keep the RED messages. They must be the ones of the table; any other red is a stop.
+3. **The road.** In `settings/hooks/lib/user-guard-install.mjs`: R1, R2, R3, R4, nothing else. Run:
+   ```bash
+   node --test tools/install-user-hook.test.mjs tools/effort-converge.test.mjs tools/ensure-user-guard.test.mjs tools/agent-models-register.test.mjs
+   ```
+   The three guard files are green with the counts of step 1; 2.1-2.9 are green (2.9 was green before this step
+   too); the registration cases are still red.
+4. **The registration.** R5 in `agent-models-decide.mjs`, R6 in `agent-models-install.mjs`. Run the command of step 2
+   and the swap and report files: all green. Then
+   `grep -nE "missing: true|parsed\.missing|effortTarget|writeAtomic|sameBytes" settings/hooks/lib/agent-models-install.mjs settings/hooks/lib/agent-models-decide.mjs`
+   prints no line.
+5. **Teeth.** M2.1-M2.21, one at a time: make the edit, run the files of steps 2 and 3, write down the red tests and
+   one message each, undo. A tooth that turns nothing red is a stop: report it.
+6. **The mirror.** Copy the three modules to `.claude/hooks/lib/`; `cmp` each; `node tools/adapter-check.mjs`.
+7. The pointer grep of E2.S1's brief, step 5, and the company scan of E1.S2's brief, step 5, over the new and changed
+   files. Then:
+   ```bash
+   npm test
+   npm run check
+   node tools/adapter-check.mjs
+   node tools/plan-lifecycle.mjs
+   ```
+   and 2.31's `git status` line.
+8. **Commit** by path (the three modules, their three copies, the five test files):
+   `feat(adapter): the agent-models registration on the one settings road — a missing file created, never replaced; the link target checked again`,
+   with the RED messages, the GREEN counts, each tooth with the tests it turned red, the sentence "the guard's
+   behaviour is unchanged", and the `npm test` counts before and after in the body. Do not touch `ensure-user-guard.mjs`, `agent-models-swap.mjs`,
+   `agent-models-read.mjs`, the three guard test files or any plan.
+
+**Done when** 2.1-2.32 hold and M2.1-M2.21 were each seen red and restored; the registration writes settings.json
+only through `commitSettings`, and so do the guard's three operations; a re-pointed link with the same bytes is
+refused; a missing file is created with only the registration, with the mode the guard's creation has, and never in
+place of a file that appeared; a dangling chain is a retry and creates nothing; the guard does what it does at HEAD
+(2.9, 2.30 (B)) and its three test files are unchanged and green; and
+`npm test`, `npm run check`, `node tools/adapter-check.mjs` and `node tools/plan-lifecycle.mjs` are green.
 
 ---
 
