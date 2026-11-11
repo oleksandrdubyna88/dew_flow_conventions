@@ -580,6 +580,12 @@ Open stories:
   the proposed plan change 2.1 is draft PR #156. Until then, the cells
   below say "verified on the trace": part 1 and part 2 in the trace. That is no approved waiver or amendment of
   § 7's literal pass sentence.
+  **2026-11-11, the read-content rerun.** The owner approved plan change 2.1 (#156: for an observable that is itself a
+  read, the evidence is the recorded trace as the harness classifies it). CodeRabbit on #156 then found that the
+  harness counted a call that only named ENTRY or PROJECT; conventions #157 fixed it (a read needs the file's text in
+  the output), and all 18 runs were repeated on fresh clones of each `main` (release `26589a5`): **all 18 pass both
+  parts**. The record's section "The rerun with the read-content harness, 2026-11-11" has every run. #156 merges once
+  its last review thread is resolved; from then on § 7 is passed for every row on this evidence.
 
   | Consumer | Mount | Pin | Adapter check | Fresh clone / worktree | Both agents (§ 7) | Old-mount lines outside `todo/`, `research/`, `.gitmodules` | Rollback | Decision |
   |---|---|---|---|---|---|---|---|---|

@@ -333,6 +333,180 @@ Consumer commit (worktree HEAD) for both runs below: `a691935` (worktree `rs-mig
 - rules read in full (8 of 8): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.testing` `05ba365bbb16e70bee6927e069a0d37f808365938b27f49286555d2185dd9b74`, `common.http-contracts` `c19e1e22a62a1ed639170a464f4c9c3048704983ee399da13c8005c2803c5efd`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.logging-serilog` `e7c43d5c52ec64437a6ad95ebb5229af3246ac66928bb6805fd4944984ad3265`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `rust.doctrine` `5f112e562597ace8d676a3109088556947f8f76a15c1a997197985092da84c3a`
 - part 2 (the § 7 observable, recorded by the harness): ENTRY read yes; PROJECT read yes; a rule body by a second path: none; unclassified calls: none
 
+## The rerun with the read-content harness, 2026-11-11
+
+CodeRabbit on #156 found that the evening's harness counted a call that only NAMED ENTRY or PROJECT (`test -e`,
+`ls`) as a read. Conventions #157 (`6f6c16e`; the runs used its branch at `3a8219f`, with the same `tools/`) counts
+a read only when the call's output shows the file: 3 consecutive non-blank lines of it, consecutive in the output too,
+one of them 20 characters or longer. The evening's traces are not kept, so they cannot be classified again, and all
+runs were repeated: 18 runs, 9 repositories × 2 agents, each on a fresh clone of the repository's current `main` (all
+on release `26589a5`), in a disposable worktree of that clone. **On the trace, as this harness classifies it, all 18
+runs pass both parts:** every expected rule read in full with its hash; ENTRY and PROJECT read with their text in the
+output; no body by a second path; no unclassified call. Plan change 2.1 (#156, approved by the owner on 2026-11-11)
+makes this classification the § 7 evidence for the from-root rows; it merges once its last review thread is resolved.
+
+### dew_flow_creds_for_devs
+
+Fresh clone of `main` at `3abb01a`; both runs in a disposable worktree of it.
+
+**codex** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:07:17.806Z · linux · pin `26589a5` (pinned submodule) · files `src_minimalapi_server/src/Program.cs`, `src_vs_code/src/extension.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 260604 B, sha256 `eca720d16daa7ea174d5b2f56b5b9e31f5fda8b3dfcfca8b2b2a34e3873aebe9`; models []
+- rules read in full (7 of 7): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.logging-serilog` `e7c43d5c52ec64437a6ad95ebb5229af3246ac66928bb6805fd4944984ad3265`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+**claude** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:08:48.262Z · linux · pin `26589a5` (pinned submodule) · files `src_minimalapi_server/src/Program.cs`, `src_vs_code/src/extension.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 279942 B, sha256 `4423b328fb46ed29cba022e45e095280872ee7d9e7f9ce83dd5fe2b892b92fa6`; models ["claude-opus-5-5"]
+- rules read in full (7 of 7): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.logging-serilog` `e7c43d5c52ec64437a6ad95ebb5229af3246ac66928bb6805fd4944984ad3265`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+### dew_flow_connect_other_ais
+
+Fresh clone of `main` at `63a868f2`; both runs in a disposable worktree of it.
+
+**codex** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:09:33.733Z · linux · pin `26589a5` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 431042 B, sha256 `6deccad4a151ae02aeb96cb873a5604db8c3167ecb8df2e5d867da39ad657f44`; models []
+- rules read in full (8 of 8): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `local.common.review-gate` `5a8567d94f0b2090c8e4b0946b195cf4ebb0795bedbc747966519f539591adc7`, `local.common.vendor-routing` `c3d885655ab354725129b9a9f3a034e05a362db0168bca82fb740b6ccce9e486`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+**claude** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:11:19.365Z · linux · pin `26589a5` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 284304 B, sha256 `26d1a084caa405d69ce7c226b5ddf525cbadf85967f0f398828082372a0210b5`; models ["claude-opus-5-5"]
+- rules read in full (8 of 8): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `local.common.review-gate` `5a8567d94f0b2090c8e4b0946b195cf4ebb0795bedbc747966519f539591adc7`, `local.common.vendor-routing` `c3d885655ab354725129b9a9f3a034e05a362db0168bca82fb740b6ccce9e486`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+### dew_flow_benchmark
+
+Fresh clone of `main` at `3079acf`; both runs in a disposable worktree of it.
+
+**codex** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:12:10.406Z · linux · pin `26589a5` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 494144 B, sha256 `ade41b90aa26de8409cc7162069b76316db3854dd1fe7476e5412c2827997231`; models []
+- rules read in full (6 of 6): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+**claude** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:13:48.966Z · linux · pin `26589a5` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 191604 B, sha256 `e92ee6a6664bf743047dcfd20bfed2ef74c611e37b9a4dc28d9e2c959b10c8a2`; models ["claude-opus-5-5"]
+- rules read in full (6 of 6): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+### dew_flow_rag_qln
+
+Fresh clone of `main` at `b55d283`; both runs in a disposable worktree of it.
+
+**codex** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:14:34.016Z · linux · pin `26589a5` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 141451 B, sha256 `ee48a104300de74fd5752950dadecf607d48161d0a8d0d47f5175d9e4694ece7`; models []
+- rules read in full (6 of 6): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+**claude** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:15:42.269Z · linux · pin `26589a5` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 312376 B, sha256 `4d494393193665aef501ad4e83ad80022ae84644e99d413e4cdf7379e55ea7aa`; models ["claude-opus-5-5"]
+- rules read in full (6 of 6): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+### wsl_care
+
+Fresh clone of `main` at `776d737`; both runs in a disposable worktree of it.
+
+**codex** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:16:29.586Z · linux · pin `26589a5` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 535555 B, sha256 `289541b6b23e83c212fbb87c8e4901415b23c174caf33c71091fcd37144e80ad`; models []
+- rules read in full (6 of 6): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+**claude** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:19:21.675Z · linux · pin `26589a5` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 219884 B, sha256 `85a01169f3aad46b494b5e82bac3ecf7efd0dda8e28e9d324323da88d92ccd75`; models ["claude-opus-5-5"]
+- rules read in full (6 of 6): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+### dew_flow_vscode_kit
+
+Fresh clone of `main` at `fd905be`; both runs in a disposable worktree of it.
+
+**codex** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:20:01.465Z · linux · pin `26589a5` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 251512 B, sha256 `3ed5ff6797097b9bd39db9fc5aa481c2d88e4cba9f0f6f556fc4c99bfba1a2a5`; models []
+- rules read in full (6 of 6): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+**claude** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:21:31.279Z · linux · pin `26589a5` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 220255 B, sha256 `10017dba4e94a3a94f27ce0a20f8b07cc79ad471c05ccaf836697ab603013262`; models ["claude-opus-5-5"]
+- rules read in full (6 of 6): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+### dew_flow_amd_r9700_tuning_ai
+
+Fresh clone of `main` at `b550f52`; both runs in a disposable worktree of it.
+
+**codex** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:22:11.387Z · linux · pin `26589a5` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 98967 B, sha256 `42408dd71a0a1cfbae9717fe687d6a2bb01f04c36addc7e7cee3c21402b1d89c`; models []
+- rules read in full (6 of 6): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+**claude** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:23:21.154Z · linux · pin `26589a5` (pinned submodule) · files `src/Example.cs`, `src/example.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 288204 B, sha256 `cad5214cd850a7fc6bf039e4b5f093ce9ad4bff5e055b0f5493baef8232e4ce3`; models ["claude-opus-5-5"]
+- rules read in full (6 of 6): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+### dew_flow_mcp
+
+Fresh clone of `main` at `e407bd7`; both runs in a disposable worktree of it.
+
+**codex** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:24:03.960Z · linux · pin `26589a5` (pinned submodule) · files `src/Mcp.Server/Example.cs`, `http/example.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 107851 B, sha256 `30421b01fd8e9b136d8e3520025db023d26e313cc14e5ed4cedb269d31af332c`; models []
+- rules read in full (6 of 6): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+**claude** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:25:09.176Z · linux · pin `26589a5` (pinned submodule) · files `src/Mcp.Server/Example.cs`, `http/example.ts`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 299029 B, sha256 `9c64d2d78608d03f70210f0e2ba3f4897dbdd47b107762536d53f82a0592f4c6`; models ["claude-opus-5-5"]
+- rules read in full (6 of 6): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `csharp.doctrine` `b8ecae510e0fc421761418d3c19d2d4bf6996854b291c6e17fc8141c3bcd6c5a`, `typescript.doctrine` `90a8939f3004a8e81948867c3904bf66873bc8ef9ad4e196f8d2757769afef9a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+### dew_flow_sidecar_rust
+
+Fresh clone of `main` at `48c3ba8`; both runs in a disposable worktree of it.
+
+**codex** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:25:57.455Z · linux · pin `26589a5` (pinned submodule) · files `src/main.rs`, `http/sidecar.http`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 235076 B, sha256 `498a5f22bf10742bfe973e154613c0e2b89a2e014b94068b6ffe02e4e2f2518e`; models []
+- rules read in full (8 of 8): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.testing` `05ba365bbb16e70bee6927e069a0d37f808365938b27f49286555d2185dd9b74`, `common.http-contracts` `c19e1e22a62a1ed639170a464f4c9c3048704983ee399da13c8005c2803c5efd`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.logging-serilog` `e7c43d5c52ec64437a6ad95ebb5229af3246ac66928bb6805fd4944984ad3265`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `rust.doctrine` `5f112e562597ace8d676a3109088556947f8f76a15c1a997197985092da84c3a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
+**claude** — part 1 (reads) PASS · part 2 (observable) PASS · started 2026-11-11T10:27:35.815Z · linux · pin `26589a5` (pinned submodule) · files `src/main.rs`, `http/sidecar.http`
+
+- status: source reads verified; behavior requires review; exit 0; timed out false; output cut false; HEAD/index/status unchanged true
+- trace: 460313 B, sha256 `a2612d54797fce463e198cc73cdc7a7ace1919c80cae73dd8bb208e4369e4b58`; models ["claude-opus-5-5"]
+- rules read in full (8 of 8): `common.coding-style` `0ba570017a0414b2e46ec95307dbbc2703671293fd69ab7982a92964cf215ae7`, `common.testing` `05ba365bbb16e70bee6927e069a0d37f808365938b27f49286555d2185dd9b74`, `common.http-contracts` `c19e1e22a62a1ed639170a464f4c9c3048704983ee399da13c8005c2803c5efd`, `common.knowledge-base` `44712b79711c35be53ac5b7af8f14f4a2768434bb9f31779e5e20dccdab5ff68`, `common.logging-serilog` `e7c43d5c52ec64437a6ad95ebb5229af3246ac66928bb6805fd4944984ad3265`, `common.security` `47bbde205659cfc62a2fe57340d808483dd18b50762e13ce6af4d13a246c20a5`, `common.task-lifecycle` `2769609f1163c9ab7f32e7ee89f3834b3a4cb2c92a01d95867ea0ae26967c4bc`, `rust.doctrine` `5f112e562597ace8d676a3109088556947f8f76a15c1a997197985092da84c3a`
+- part 2 (recorded by the harness): ENTRY read, its text in the output yes; PROJECT read, its text in the output yes; a rule body by a second path: none; unclassified calls: none
+
 ## Fresh clones, 2026-11-11
 
 The matrix asks for a fresh clone per consumer. For the six below, the first runs used a worktree of the local
