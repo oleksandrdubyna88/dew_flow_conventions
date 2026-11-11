@@ -77,7 +77,14 @@ a timeout — only "not a git repository" means nothing to compare), refuses to 
 its install (its bytes match neither the manifest's `sha256`, its `previous` — the bytes that install replaced — nor
 the source; `--force` replaces it), writes the manifest, then the hook, then the registration, so a failed copy never
 leaves `settings.json` naming a missing file and a stop between the writes is completed at the next start
-(all three from the coai code gate on dew_flow_creds_for_devs #328, 2026-11-10). `load-instructions.mjs` bounds its
+(all three from the coai code gate on dew_flow_creds_for_devs #328, 2026-11-10). Since 2026-11-11 (the owner's go) it
+copies only the RELEASED guard: `RELEASED_GUARD` in the core is the `GUARD_VERSION` and the sha256 (CRLF folded to
+LF) of this commit's `settings/hooks/subagent-model.mjs`, and a project copy whose digest or version differs — edited
+and committed in some repository, say — is refused with one line, because the guard in `~/.claude` runs for every
+repository on the machine. A test fails when the pair does not match the file, so no release ships a stale one.
+`tools/install-user-hook.mjs --install` makes the same check and asks for `--unreleased` to install anything else.
+This keeps an unreviewed guard inside its repository; it is no sandbox (hostile hooks already run in their own
+sessions). `load-instructions.mjs` bounds its
 resolver call at 30 s (`RESOLVER_TIMEOUT_MS`; the host's own default for a command hook is 600 s) and then gives the
 INCOMPLETE notice naming the bound. `build-flags.mjs` suggests the command with `-m:4` directly after the build verb (after any leading assignments,
 quoted or not), and splits a wrapper's inner command line into its chain like the outer one. Every write of

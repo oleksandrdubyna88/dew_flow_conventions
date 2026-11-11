@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { ensureUserGuard, guardVersion } from '../settings/hooks/ensure-user-guard.mjs';
-import { OPTOUT_FILE, check, findEntries, install, targets } from '../settings/hooks/lib/user-guard-install.mjs';
+import { OPTOUT_FILE, RELEASED_GUARD, check, findEntries, guardDigest, install, targets } from '../settings/hooks/lib/user-guard-install.mjs';
 import { ownedDir } from './lib/owned.mjs';
 
 const ENTRY = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'settings', 'hooks', 'ensure-user-guard.mjs');
@@ -31,7 +31,13 @@ function sandbox(t, sourceVersion = 2) {
     encoding: 'utf8', input,
     env: { ...process.env, HOME: home, USERPROFILE: home, CLAUDE_PROJECT_DIR: project, SUBAGENT_MODEL_GUARD: '', ...env },
   });
-  const ensure = (env = {}) => ensureUserGuard({ home, source, env });
+  // The fake sources of these tests are 'released' for the test: the pair is taken from the source as it is now.
+  const releasedNow = () => {
+    if (!fs.existsSync(source) || fs.statSync(source).isDirectory()) return RELEASED_GUARD;
+    const text = fs.readFileSync(source, 'utf8');
+    return { version: guardVersion(text), sha256: guardDigest(text) };
+  };
+  const ensure = (env = {}) => ensureUserGuard({ home, source, env, released: releasedNow() });
   return { home, project, source, paths, seedInstalled, run, ensure };
 }
 
@@ -153,12 +159,14 @@ test('an unparsable settings.json is refused and stays byte-identical', t => {
 
 test('the entry point prints one systemMessage on the first run and nothing on the second', t => {
   const s = sandbox(t);
+  // The real hook process checks the released pair, so this project carries the released guard.
+  fs.writeFileSync(s.source, fs.readFileSync(REAL_GUARD));
   const first = s.run();
   assert.equal(first.status, 0, first.stderr);
   const lines = first.stdout.split('\n').filter(Boolean);
   assert.equal(lines.length, 1);
   // Fresh machine: the guard creates settings.json, and effort is converged in the SAME session, guard line first.
-  assert.deepEqual(JSON.parse(lines[0]), { systemMessage: 'subagent-model guard installed into ~/.claude (version 2)\neffort set to high for every model (was: effortLevel unset, sonnet unset, opus unset, fable unset) — takes effect from the next session; restart this one to run at high now' });
+  assert.deepEqual(JSON.parse(lines[0]), { systemMessage: `subagent-model guard installed into ~/.claude (version ${RELEASED_GUARD.version})\neffort set to high for every model (was: effortLevel unset, sonnet unset, opus unset, fable unset) — takes effect from the next session; restart this one to run at high now` });
   const second = s.run();
   assert.equal(second.status, 0);
   assert.equal(second.stdout, '');
@@ -166,13 +174,15 @@ test('the entry point prints one systemMessage on the first run and nothing on t
 
 test('garbage stdin still works and exits 0; the payload cwd stands in for CLAUDE_PROJECT_DIR', t => {
   const s = sandbox(t);
+  fs.writeFileSync(s.source, fs.readFileSync(REAL_GUARD));
   const garbage = s.run({}, '\u0000not json{{');
   assert.equal(garbage.status, 0);
-  assert.match(garbage.stdout, /installed into/);
+  assert.match(garbage.stdout, /subagent-model guard installed into/);
   const s2 = sandbox(t);
+  fs.writeFileSync(s2.source, fs.readFileSync(REAL_GUARD));
   const viaCwd = s2.run({ CLAUDE_PROJECT_DIR: '' }, JSON.stringify({ cwd: s2.project }));
   assert.equal(viaCwd.status, 0);
-  assert.match(viaCwd.stdout, /installed into/);
+  assert.match(viaCwd.stdout, /subagent-model guard installed into/);
   const s3 = sandbox(t);
   const none = s3.run({ CLAUDE_PROJECT_DIR: '' }, 'garbage');
   assert.equal(none.status, 0);
@@ -392,4 +402,66 @@ test('--check names an install cut short after its manifest as unfinished, not a
   assert.equal(r.code, 1);
   assert.doesNotMatch(r.lines.join('\n'), /edited after install/);
   assert.match(r.lines.join('\n'), /cut short after its manifest/);
+});
+
+// ---- the owner's go of 2026-11-11, red first: only the RELEASED guard leaves its repository for ~/.claude ----
+const REAL_GUARD = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'settings', 'hooks', 'subagent-model.mjs');
+const realText = () => fs.readFileSync(REAL_GUARD, 'utf8');
+
+test('RELEASED_GUARD is the digest and version of this commit\'s subagent-model.mjs (no release ships a stale pair)', () => {
+  assert.equal(RELEASED_GUARD.sha256, guardDigest(realText()));
+  assert.equal(RELEASED_GUARD.version, guardVersion(realText()));
+});
+
+test('a committed but edited guard is refused, and ~/.claude is not touched', t => {
+  const s = sandbox(t);
+  fs.writeFileSync(s.source, `${realText()}// a local edit\n`);
+  const r = ensureUserGuard({ home: s.home, source: s.source, env: {} });
+  assert.equal(r.action, 'refused');
+  assert.match(r.line, /subagent-model guard NOT installed into ~\/\.claude: the project copy is not the released guard \(sha256 [0-9a-f]{12}, released [0-9a-f]{12}\)/);
+  assert.equal(fs.existsSync(s.paths.hook), false);
+  assert.equal(fs.existsSync(s.paths.settings), false);
+});
+
+test('the released guard installs, with LF or CRLF line endings', t => {
+  for (const text of [realText(), realText().replaceAll('\n', '\r\n')]) {
+    const s = sandbox(t);
+    fs.writeFileSync(s.source, text);
+    const r = ensureUserGuard({ home: s.home, source: s.source, env: {} });
+    assert.equal(r.action, 'installed', r.line);
+  }
+});
+
+test('the right bytes under another released version are refused', t => {
+  const s = sandbox(t);
+  fs.writeFileSync(s.source, realText());
+  const r = ensureUserGuard({ home: s.home, source: s.source, env: {}, released: { ...RELEASED_GUARD, version: RELEASED_GUARD.version + 1 } });
+  assert.equal(r.action, 'refused');
+  assert.match(r.line, /is not the released guard/);
+});
+
+test('a project copy that cannot be read is a refusal line, never a throw', t => {
+  const s = sandbox(t);
+  fs.rmSync(s.source);
+  fs.mkdirSync(s.source);
+  const r = ensureUserGuard({ home: s.home, source: s.source, env: {} });
+  assert.equal(r.action, 'refused');
+  assert.match(r.line, /could not be read/);
+});
+
+// ---- the code round (2026-11-11), red first: the bytes checked are the bytes written (one read, no check-then-copy) ----
+test('install itself refuses bytes that are not the released pair, so nothing can swap the file after a check', t => {
+  const s = sandbox(t);
+  fs.writeFileSync(s.source, `${realText()}// swapped in after a check\n`);
+  const r = install({ home: s.home, source: s.source, released: RELEASED_GUARD });
+  assert.equal(r.code, 1);
+  assert.match(r.lines.at(-1), /is not the released guard/);
+  assert.equal(fs.existsSync(s.paths.hook), false);
+});
+
+test('a version-only difference says so, instead of two equal digests', t => {
+  const s = sandbox(t);
+  fs.writeFileSync(s.source, realText());
+  const r = ensureUserGuard({ home: s.home, source: s.source, env: {}, released: { ...RELEASED_GUARD, version: RELEASED_GUARD.version + 1 } });
+  assert.match(r.line, new RegExp(`version ${RELEASED_GUARD.version}, released version ${RELEASED_GUARD.version + 1}`));
 });
