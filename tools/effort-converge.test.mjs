@@ -22,7 +22,8 @@ function sandbox(t) {
   fs.mkdirSync(home);
   fs.mkdirSync(path.join(project, '.claude', 'hooks'), { recursive: true });
   const source = path.join(project, '.claude', 'hooks', 'subagent-model.mjs');
-  fs.writeFileSync(source, 'export const GUARD_VERSION = 2;\n');
+  // The released guard: the session hook and the manual installer copy only that one (the owner's go, 2026-11-11).
+  fs.copyFileSync(path.join(TOOLS, '..', 'settings', 'hooks', 'subagent-model.mjs'), source);
   const paths = targets(home);
   const write = value => {
     fs.mkdirSync(paths.dir, { recursive: true });

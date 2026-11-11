@@ -26,6 +26,38 @@ export function guardVersion(text) {
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const BACKUP_TAG = 'settings.json.bak-subagent-model-';
 
+/**
+ * The released guard: the `GUARD_VERSION` and the digest (`guardDigest`) of `settings/hooks/subagent-model.mjs` of
+ * the SAME commit. Both files are vendored byte-identically from one release, so a consumer's pair always matches;
+ * a guard edited and committed in some repository does not, and is not copied into ~/.claude, where it would run for
+ * every repository on the machine (the owner's go, 2026-11-11). A conventions test fails when this pair does not
+ * match the file, so no release can ship a stale one. This stops an unreviewed guard from leaving its repository; it
+ * is no sandbox: a repository with hostile hooks already runs code in its own sessions.
+ */
+export const RELEASED_GUARD = Object.freeze({
+  version: 3,
+  sha256: '13e13d5f6df35f4a18e8b3098afd4a80dc9308f82f8d734f23ccb943538aef12',
+});
+
+/** The digest of a guard's text with CRLF folded to LF, so a checkout that converts line endings still matches. */
+export const guardDigest = text => sha256(String(text).replaceAll('\r\n', '\n'));
+
+/**
+ * Why `source` must not be copied into ~/.claude as the released guard; '' when it may be. A file that cannot be read
+ * is a reason, never a throw (the plan round, 2026-11-11).
+ */
+export function releaseRefusal(source, released = RELEASED_GUARD) {
+  let text;
+  try {
+    text = fs.readFileSync(source, 'utf8');
+  } catch (error) {
+    return `the project copy of the hook could not be read (${error?.code ?? 'error'})`;
+  }
+  const digest = guardDigest(text);
+  if (digest === released.sha256 && guardVersion(text) === released.version) return '';
+  return `the project copy is not the released guard (sha256 ${digest.slice(0, 12)}, released ${released.sha256.slice(0, 12)})`;
+}
+
 /** Where the hook and the settings live for a home. */
 export function targets(home) {
   const dir = path.resolve(home, '.claude');

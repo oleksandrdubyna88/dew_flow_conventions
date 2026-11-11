@@ -2,14 +2,16 @@
 /**
  * Install (or remove, or verify) the subagent-model PreToolUse hook in a USER's Claude Code home.
  *
- * <p>`node tools/install-user-hook.mjs [--install | --uninstall | --check] [--force] [--home <dir>] [--source <file>]`.
+ * <p>`node tools/install-user-hook.mjs [--install | --uninstall | --check] [--force] [--unreleased] [--home <dir>] [--source <file>]`.
  * Exit 0 on success, 1 on a refusal or drift, 2 on bad arguments; one-line messages go to stderr.</p>
  *
  * <p>The logic lives in `settings/hooks/lib/user-guard-install.mjs`; this file is only the CLI. `--uninstall`
  * also writes `~/.claude/hooks/subagent-model.optout` so the session self-install does not undo it;
  * an explicit `--install` deletes that marker. `--force` installs over a NEWER installed guard, or over one changed
  * since its install (its bytes match neither the manifest's `sha256` and `previous` nor the source); without it both
- * are refused; every install writes `subagent-model.installed.json` (provenance), which `--check`
+ * are refused. `--unreleased` installs a guard that is not the released one (its sha256 and version differ from
+ * `RELEASED_GUARD`, the pair baked into this release): without it such an install is refused, because the guard in
+ * ~/.claude runs for every repository on the machine (the owner's go, 2026-11-11). Every install writes `subagent-model.installed.json` (provenance), which `--check`
  * prints and verifies and `--uninstall` removes.</p>
  *
  * <p>`--check` also prints one `effort:` line — `high for every model`, or the settings that are not
@@ -38,14 +40,14 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-import { check, install, uninstall } from '../settings/hooks/lib/user-guard-install.mjs';
+import { check, install, releaseRefusal, uninstall } from '../settings/hooks/lib/user-guard-install.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_SOURCE = path.resolve(HERE, '..', 'settings', 'hooks', 'subagent-model.mjs');
 
 /** Parsed CLI arguments, or `{ error }` (exit 2). */
 export function parseArgs(argv) {
-  const out = { action: '', home: os.homedir(), source: DEFAULT_SOURCE, force: false };
+  const out = { action: '', home: os.homedir(), source: DEFAULT_SOURCE, force: false, unreleased: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (['--install', '--uninstall', '--check'].includes(arg)) {
@@ -53,17 +55,26 @@ export function parseArgs(argv) {
       out.action = arg.slice(2);
     } else if (arg === '--force') {
       out.force = true;
+    } else if (arg === '--unreleased') {
+      out.unreleased = true;
     } else if (arg === '--home' || arg === '--source') {
       const value = argv[i + 1];
       if (!value || value.startsWith('--')) return { error: `${arg} needs a value` };
       out[arg.slice(2)] = path.resolve(value);
       i += 1;
-    } else return { error: `unknown argument ${arg}; usage: [--install | --uninstall | --check] [--home <dir>] [--source <file>]` };
+    } else return { error: `unknown argument ${arg}; usage: [--install | --uninstall | --check] [--force] [--unreleased] [--home <dir>] [--source <file>]` };
   }
   return { ...out, action: out.action || 'install' };
 }
 
-const ACTIONS = { install: a => install({ ...a, clearOptout: true }), uninstall, check };
+/** Install, after the release check: a guard that is not the released one needs `--unreleased`, and nothing is written. */
+export function installChecked(a) {
+  const reason = a.unreleased ? '' : releaseRefusal(a.source);
+  if (reason) return { code: 1, lines: [`refused: ${reason}; --unreleased installs it anyway (the guard in ~/.claude runs for every repository)`] };
+  return install({ ...a, clearOptout: true });
+}
+
+const ACTIONS = { install: installChecked, uninstall, check };
 
 if (process.argv[1]?.endsWith('install-user-hook.mjs')) {
   const args = parseArgs(process.argv.slice(2));
