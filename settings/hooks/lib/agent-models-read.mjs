@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { lstatOrNull, readOrNull } from './user-guard-install.mjs';
-import { MOD_FILES, PLUGIN_JSON, codeOf, currentUid, parseJsonObject, parseVersion, versionOf } from './agent-models-decide.mjs';
+import { MOD_FILES, PLUGIN_JSON, RELEASED_MOD, codeOf, currentUid, parseJsonObject, parseVersion, releasedModRefusal, versionOf } from './agent-models-decide.mjs';
 
 export { lstatOrNull };
 
@@ -37,7 +37,7 @@ function sourceVersion(file, bytes) {
   return version ? { version } : { error: `source plugin.json ${file} has no MAJOR.MINOR.PATCH version (got ${JSON.stringify(value.version)})` };
 }
 
-function readSourceFiles(source) {
+function readSourceFiles(source, released) {
   const files = new Map();
   let version = null;
   for (const rel of MOD_FILES) {
@@ -51,14 +51,22 @@ function readSourceFiles(source) {
       version = parsed.version;
     }
   }
-  return { version, files };
+  const held = { version, files };
+  // The release check runs on THESE buffers, the only ones returned: one read per file, so nothing can change a file
+  // between the check and the copy. The lstat in readRegular is a courtesy for an honest mistake, not a protection:
+  // a file swapped in after it is read through, and its bytes are then checked like any others.
+  const refusal = releasedModRefusal(held, released);
+  return refusal ? { error: `source ${source} ${refusal}`, unreleased: true } : held;
 }
 
-/** Reads the source folder ONCE. Never throws. */
-export function readSource(source) {
+/**
+ * Reads the source folder ONCE and returns its bytes only when they are the released mod. Never throws, whatever
+ * `source` is. `released` is a test seam (a fixture tree's own identity); production passes nothing.
+ */
+export function readSource(source, { released = RELEASED_MOD } = {}) {
   try {
     if (!fs.statSync(source, { throwIfNoEntry: false })?.isDirectory()) return { error: `source ${source} is not a directory` };
-    return readSourceFiles(source);
+    return readSourceFiles(source, released);
   } catch (e) {
     return { error: `source ${source} could not be read (${codeOf(e)})` };
   }

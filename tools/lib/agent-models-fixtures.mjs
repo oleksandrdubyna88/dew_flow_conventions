@@ -43,6 +43,12 @@ export function fixtureBytes(rel, version) {
   return Buffer.from(`// fixture ${rel}\nexport const here = ${JSON.stringify(rel)};\n`);
 }
 
+/** The released identity of a fixture tree: what a test tells `readSource` to accept. Built from bytes, never typed. */
+export const fixtureReleased = (version, overrides = {}) => ({
+  version,
+  sha256: Object.fromEntries(FILES.map(rel => [rel, sha(overrides[rel] ?? fixtureBytes(rel, version))])),
+});
+
 export function writeTree(dir, version, overrides = {}) {
   for (const rel of FILES) {
     const file = path.join(dir, rel);

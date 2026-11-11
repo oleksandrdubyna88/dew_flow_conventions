@@ -28,6 +28,28 @@ export const INTRODUCED = Object.freeze({
   'hooks/tasks.tsx': Object.freeze([1, 3, 0]),
   'hooks/limits.tsx': Object.freeze([1, 3, 0]),
 });
+
+/**
+ * The released mod: its version and the RAW sha256 of each `MOD_FILES` entry, from the SAME release as this file. A
+ * consumer carries this file in `.claude/hooks/lib/` and the mod in its pinned submodule, both from one release, so
+ * the pair matches. A folder that holds other bytes is not copied into ~/.claude, where it would run in every
+ * session on the machine. A test fails when this differs from the newest row of `tools/agent-models-pins.json`, and
+ * another when that row differs from `mods/agent-models`. Raw, never folded: the copy writes the held bytes as they
+ * are, so the digest names exactly what is written (`.gitattributes` keeps the folder LF). This keeps an unreviewed
+ * mod inside its repository; it is no sandbox: a repository with hostile hooks already runs code in its sessions.
+ */
+export const RELEASED_MOD = Object.freeze({
+  version: '1.3.3',
+  sha256: Object.freeze({
+    '.claude-plugin/plugin.json': '5559766d382b3c40e70ddc9b303146f4f28901090e15b6ded213560d8aa491e8',
+    'hooks/hooks.json': 'd842d789476d67282d0f04b7e5fdc68a3d981ccec65dd79cfa2d11eed13fb828',
+    'hooks/register.tsx': '9735c090c750807170d4ed25a9520210401ea6e46ba9bfc06b0e41b46ebf7975',
+    'hooks/prompts.ts': '6d3234bc066d2aecea3de829d1a00837433517dfe313d42ab862b556123cf68c',
+    'hooks/tasks.tsx': '52541431aad684757fac626a5c6d3231d7b633ff14d96efdc0d9dfbd0659e4cb',
+    'hooks/limits.tsx': '52606232202096d5f7d2be6c768e8b97c2a2ec9f4c40d9ee9650c4c6b917ba2d',
+    'types/index.d.ts': '79c8bd52d8a269c6d9f3ba33cacd0c79021aaf576a1e1ae5f27aaaa22a3f873b',
+  }),
+});
 export const OPTOUT_FILE = 'agent-models.optout';
 export const MANIFEST_FILE = 'agent-models.installed.json';
 export const STAGING_TAG = 'agent-models.staging-';
@@ -88,6 +110,30 @@ export function versionOf(pluginJsonBytes) {
 }
 
 export const versionText = version => version.join('.');
+
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+const isReleasedIdentity = released => isObject(released) && parseVersion(released.version) !== null
+  && isObject(released.sha256) && MOD_FILES.every(rel => SHA256_HEX.test(released.sha256[rel]));
+
+/**
+ * Why a source read (`{ version, files }`) is not the released mod; '' when it is. Pure. It names the first
+ * `MOD_FILES` entry whose raw sha256 differs; for plugin.json with another version it names the versions.
+ * `released` has no default here: a missing or malformed identity refuses, it never passes.
+ */
+export function releasedModRefusal(src, released) {
+  if (!isReleasedIdentity(released)) return 'cannot be checked: there is no valid released identity';
+  const not = `is not the released mod ${released.version}: `;
+  const version = versionText(src.version);
+  const otherVersion = `${PLUGIN_JSON} is version ${version}, released ${released.version}`;
+  for (const rel of MOD_FILES) {
+    const held = src.files.get(rel);
+    const digest = Buffer.isBuffer(held) ? sha256(held) : 'none';
+    if (digest === released.sha256[rel]) continue;
+    if (rel === PLUGIN_JSON && version !== released.version) return not + otherVersion;
+    return `${not}${rel} differs (sha256 ${digest.slice(0, 12)}, released ${released.sha256[rel].slice(0, 12)})`;
+  }
+  return version === released.version ? '' : not + otherVersion;
+}
 
 // ---------------------------------------------------------------------------------------------------------------------
 // decisions (pure)
