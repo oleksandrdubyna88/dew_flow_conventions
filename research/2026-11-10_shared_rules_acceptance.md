@@ -340,7 +340,8 @@ clone's `main` (CodeRabbit on #152). Each was cloned again from GitHub over HTTP
 the `.agents/conventions` submodule initialised (as the consumers' CI does), the resolver's packages installed
 (`npm ci --ignore-scripts`), and every rule check run. All six are on release `26589a5` by then (the 2026-11-11
 pin bumps). creds has its fresh clone in story 3.C, and mcp in #71. sidecar_rust has no fresh clone with a build
-here, because the Rust build cannot run on this machine; its CI built and tested it on both legs.
+here, because the Rust build cannot run on this machine; its CI built and tested it on both legs. Its fresh clone
+for the rule checks (which need only Node) was added the same night, after CodeRabbit on #152: the last row.
 
 | Repository | `main` | Pin | `rules check` | `explain --task inspect` | Checks | Status lines after | Time (UTC) |
 |---|---|---|---|---|---|---|---|
@@ -350,6 +351,7 @@ here, because the Rust build cannot run on this machine; its CI built and tested
 | wsl_care | `776d737` | `26589a5` | resolved | resolved | adapter-check OK pin-check OK gate-snippet-check OK | 0 | 2026-11-11T00:36:41Z |
 | dew_flow_vscode_kit | `fd905be` | `26589a5` | resolved | resolved | adapter-check OK pin-check OK gate-snippet-check OK | 0 | 2026-11-11T00:36:46Z |
 | dew_flow_amd_r9700_tuning_ai | `b550f52` | `26589a5` | resolved | resolved | adapter-check OK pin-check OK gate-snippet-check OK | 0 | 2026-11-11T00:36:50Z |
+| dew_flow_sidecar_rust | `48c3ba8` | `26589a5` | resolved | resolved | adapter-check OK pin-check OK gate-snippet-check OK | 0 | 2026-11-11T02:33:38Z |
 
 ## Rollback, tried 2026-11-10
 
