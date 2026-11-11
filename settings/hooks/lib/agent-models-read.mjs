@@ -19,14 +19,14 @@ function readRegular(file) {
   try {
     stat = lstatOrNull(file);
   } catch (e) {
-    return { problem: `could not be read (${e.code})` };
+    return { problem: `could not be read (${codeOf(e)})` };
   }
   if (stat === null) return { problem: 'is missing' };
   if (!stat.isFile()) return { problem: 'is not a regular file' };
   try {
     return { bytes: fs.readFileSync(file) };
   } catch (e) {
-    return { problem: `could not be read (${e.code})` };
+    return { problem: `could not be read (${codeOf(e)})` };
   }
 }
 

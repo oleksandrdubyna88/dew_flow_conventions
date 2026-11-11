@@ -201,6 +201,15 @@ test('3.19 an identity that is missing or malformed refuses, it never passes: nu
   }
 });
 
+test('3.19c an identity with a key outside MOD_FILES refuses, as the manifest check does: the key set must equal MOD_FILES exactly', t => {
+  const s = sandbox(t);
+  const extraDigest = sha(Buffer.from('an eighth file'));
+  const extra = { ...RELEASED, sha256: { ...RELEASED.sha256, 'hooks/extra.tsx': extraDigest } };
+  assert.match(extraDigest, /^[0-9a-f]{64}$/, 'the extra digest is a valid one, so only the extra key can refuse');
+  assert.equal(readSource(s.source, { released: RELEASED }).error, undefined, 'the same tree is released under the identity without the extra key');
+  assert.deepEqual(readSource(s.source, { released: extra }), { error: `source ${s.source} cannot be checked: there is no valid released identity`, unreleased: true });
+});
+
 test('3.19b options that are not an object never throw: readSource(dir, null) answers the refusal of the real released identity, naming the version it checked against', t => {
   const s = sandbox(t);
   let read;
@@ -221,6 +230,19 @@ test('3.21 a MOD_FILES entry that cannot be read (EACCES) is answered as an erro
   const read = readSource(s.source, { released: fixtureReleased('1.2.3') });
   assert.deepEqual(read, { error: `source file ${denied} could not be read (EACCES)` });
   assert.ok(fs.readFileSync.mock.calls.some(c => c.arguments[0] === denied), 'the denied file was really read through the mock');
+});
+
+test('3.21b a thrown value without a code is named by its message: the error names the file and ends could not be read (boom), never (undefined)', t => {
+  const s = sandbox(t);
+  const broken = s.sourceFile('hooks/prompts.ts');
+  const original = fs.readFileSync;
+  t.mock.method(fs, 'readFileSync', (file, ...rest) => {
+    if (file === broken) throw new Error('boom');
+    return original(file, ...rest);
+  });
+  const read = readSource(s.source, { released: RELEASED });
+  assert.deepEqual(read, { error: `source file ${broken} could not be read (boom)` });
+  assert.ok(fs.readFileSync.mock.calls.some(c => c.arguments[0] === broken), 'the broken file was really read through the mock');
 });
 
 test('3.20 the target is never checked against the released identity: seeded bytes that RELEASED_MOD does not name are read as they are', t => {

@@ -113,7 +113,8 @@ export const versionText = version => version.join('.');
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 const isReleasedIdentity = released => isObject(released) && parseVersion(released.version) !== null
-  && isObject(released.sha256) && MOD_FILES.every(rel => Object.hasOwn(released.sha256, rel) && SHA256_HEX.test(released.sha256[rel]));
+  && isObject(released.sha256) && Object.keys(released.sha256).length === MOD_FILES.length
+  && MOD_FILES.every(rel => Object.hasOwn(released.sha256, rel) && SHA256_HEX.test(released.sha256[rel]));
 
 /**
  * Why a source read (`{ version, files }`) is not the released mod; '' when it is. Pure. It names the first
