@@ -838,3 +838,17 @@ test("a call that names ENTRY but prints another file's text is not a read of EN
   const o=traceEvidence("codex",withEntryAndProject(codexCmd("cat ENTRY.md README.md",fs.readFileSync("README.md","utf8")),codexCmd("cat .agents/PROJECT.md",projectText)),[obsRule],obsOrigin).observable;
   assert.equal(o.entryRead,false);
 });
+
+test("the 3 lines must be consecutive in the output too, not scattered between other lines",()=>{
+  const lines=projectText.split("\n").map(line=>line.trim()).filter(Boolean);
+  const start=lines.findIndex((line,i)=>i+2<lines.length&&[line,lines[i+1],lines[i+2]].some(l=>l.length>=20));
+  const scattered=[lines[start],"unrelated line one",lines[start+1],"unrelated line two",lines[start+2]].join("\n");
+  const o=traceEvidence("codex",withEntryAndProject(codexCmd("cat ENTRY.md",entryText),codexCmd("grep -e a .agents/PROJECT.md",scattered)),[obsRule],obsOrigin).observable;
+  assert.equal(o.projectRead,false);
+});
+
+test("a line-number prefix of spaces (cat -n) is removed before the comparison",()=>{
+  const spaced=entryText.split("\n").map((line,i)=>`${String(i+1).padStart(6)}  ${line}`).join("\n");
+  const o=traceEvidence("codex",withEntryAndProject(codexCmd("cat -n ENTRY.md",spaced),codexCmd("cat .agents/PROJECT.md",projectText)),[obsRule],obsOrigin).observable;
+  assert.equal(o.entryRead,true);
+});

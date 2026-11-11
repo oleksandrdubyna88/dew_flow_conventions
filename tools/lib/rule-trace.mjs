@@ -133,8 +133,8 @@ function toolCalls(agent,events,origin) {
     .filter(call=>!isSingleResolverCall(call.command,origin));
 }
 
-/** Claude Code's Read prefixes each line with its number and a tab (or an arrow); a reader compares the line itself. */
-const READ_PREFIX=/^\s*\d+(?:\t|→)/;
+/** A line-number prefix: Claude Code's Read (a number and a tab, or an arrow), `cat -n` (spaces), or `nl -s:`. */
+const READ_PREFIX=/^\s*\d+(?:\t|→|:\s?|\s{2,})/;
 
 /** Text as a reader compares it: CRLF folded, each line trimmed, blank lines dropped. */
 const contentLines=(text,stripPrefix=false)=>String(text).replaceAll("\r\n","\n").split("\n")
@@ -144,28 +144,33 @@ const contentLines=(text,stripPrefix=false)=>String(text).replaceAll("\r\n","\n"
 const READ_WINDOW=3,DISTINCT_LINE=20;
 
 /**
- * True when `output` shows `fileLines`: some READ_WINDOW consecutive non-blank lines of the file (fewer only when the
- * file has fewer) all appear in it, and one of them is DISTINCT_LINE characters or longer. A line like `#` or `---`
- * alone proves nothing, and a read from the middle of the file still counts (the code round on #156, 2026-11-11).
+ * True when `shown` (an output's comparable lines) holds some READ_WINDOW consecutive non-blank lines of the file
+ * (fewer only when the file has fewer), consecutive in the output too, one of them DISTINCT_LINE characters or longer.
+ * A line like `#` or `---` alone proves nothing, three lines scattered between others prove nothing, and a read from
+ * the middle of the file still counts (the plan and code rounds on #156, 2026-11-11).
  */
-function showsFile(output,fileLines) {
+function showsFile(shown,fileLines) {
   if(fileLines.length===0)return false;
-  const seen=new Set(contentLines(output,true));
   const size=Math.min(READ_WINDOW,fileLines.length);
   for(let start=0;start+size<=fileLines.length;start+=1) {
     const window=fileLines.slice(start,start+size);
-    if(window.some(line=>line.length>=DISTINCT_LINE)&&window.every(line=>seen.has(line)))return true;
+    if(!window.some(line=>line.length>=DISTINCT_LINE))continue;
+    for(let at=shown.indexOf(window[0]);at!==-1;at=shown.indexOf(window[0],at+1)) {
+      if(window.every((line,offset)=>shown[at+offset]===line))return true;
+    }
   }
   return false;
 }
 
-/** The comparable lines of a checkout file, or none when it cannot be read. */
+/**
+ * The comparable lines of a checkout file, or none when it cannot be read (missing, a folder, no permission): a file
+ * the harness cannot read cannot be shown to have been read, so the answer is "not read", never a crash (the code round).
+ */
 function fileLinesOf(file) {
   try {
     return contentLines(fs.readFileSync(file,"utf8"));
-  } catch(e) {
-    if(e.code==="ENOENT"||e.code==="EISDIR"||e.code==="ENOTDIR")return [];
-    throw e;
+  } catch {
+    return [];
   }
 }
 
@@ -238,11 +243,11 @@ function mentionsRules(command,sources) {
 function observableEvidence(calls,expected,origin) {
   const repo=origin?.repo??process.cwd();
   const at=(...parts)=>resolvedIn(repo,path.join(...parts));
-  const targeted=calls.map(call=>({call,targets:targetsOf(call,repo)}));
+  const targeted=calls.map(call=>({call,targets:targetsOf(call,repo),shown:contentLines(call.output??"",true)}));
   // A read of ENTRY or PROJECT names the file, did not fail, AND printed its text (CodeRabbit on #156: `test -e` named it).
   const readOk=files=>{
     const present=files.filter(Boolean).map(file=>({file,lines:fileLinesOf(file)}));
-    return targeted.some(({call,targets})=>!call.error&&present.some(({file,lines})=>targets.has(file)&&showsFile(call.output,lines)));
+    return targeted.some(({call,targets,shown})=>!call.error&&present.some(({file,lines})=>targets.has(file)&&showsFile(shown,lines)));
   };
   const entryRead=readOk([at(MOUNT,"ENTRY.md"),at("ENTRY.md")]);
   const projectRead=readOk([at(".agents","PROJECT.md")]);
