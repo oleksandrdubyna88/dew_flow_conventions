@@ -500,6 +500,47 @@ test('repairRegistration resolves the same relative link from the real folder', 
   assert.equal(fs.existsSync(path.join(base, 'settings.json')), false);
 });
 
+// CodeRabbit on creds #343 (2026-11-10), red first: a `..` INSIDE a link target is taken after the folder before it is
+// made real, as the kernel does. `../jump/../settings.json`, with `jump` a link to another folder, names the file next
+// to jump's REAL folder; the lexical answer is a decoy beside the link's own folder, whose bytes must not change.
+function linkThroughJump(t) {
+  const s = sandbox(t);
+  const base = path.dirname(s.home);
+  const other = path.join(base, 'other', 'sub');
+  fs.mkdirSync(other, { recursive: true });
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  const decoy = path.join(path.dirname(s.paths.dir), 'settings.json');
+  fs.writeFileSync(decoy, '{"decoy":true}\n');
+  try {
+    fs.symlinkSync(other, path.join(path.dirname(s.paths.dir), 'jump'));
+    fs.symlinkSync('../jump/../settings.json', s.paths.settings);
+  } catch (error) { t.skip(`no symlink here (${error.code})`); return null; }
+  return { s, decoy, real: path.join(base, 'other', 'settings.json') };
+}
+
+for (const [name, run] of [['install', s => install({ home: s.home, source: s.source })], ['repairRegistration', s => repairRegistration({ home: s.home })]]) {
+  test(`${name}: a \`..\` after a linked folder inside the target is taken from that folder's real place, and the decoy is untouched`, t => {
+    const c = linkThroughJump(t);
+    if (c === null) return;
+    assert.equal(run(c.s).code, 0);
+    assert.equal(fs.existsSync(c.real), true, 'the real target was not written');
+    assert.equal(fs.readFileSync(c.decoy, 'utf8'), '{"decoy":true}\n', 'the decoy was overwritten');
+  });
+}
+
+test('a link target that goes through a missing folder and then `..` is refused, and the decoy is untouched', t => {
+  const s = sandbox(t);
+  fs.mkdirSync(s.paths.dir, { recursive: true });
+  const decoy = path.join(s.paths.dir, 'real.json');
+  fs.writeFileSync(decoy, '{"decoy":true}\n');
+  try { fs.symlinkSync('missing/../real.json', s.paths.settings); } catch (error) { return t.skip(`no symlink here (${error.code})`); }
+  const r = install({ home: s.home, source: s.source });
+  assert.equal(r.code, 1, r.lines.join('\n'));
+  assert.match(r.lines.at(-1), /goes through a folder that does not exist/);
+  assert.equal(fs.readFileSync(decoy, 'utf8'), '{"decoy":true}\n');
+  assert.equal(fs.existsSync(s.paths.hook), false, 'a refused install copied the hook');
+});
+
 // CodeRabbit on coai #970 (2026-11-10), red first: the link is pointed at ANOTHER file with the same bytes between the
 // resolve and the write. The byte re-read passed and the write went to the old file; the target is now re-resolved.
 test('a settings link re-pointed during the write is refused, even when both files hold the same bytes', t => {
