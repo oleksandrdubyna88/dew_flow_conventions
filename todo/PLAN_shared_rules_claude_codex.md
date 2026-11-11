@@ -14,9 +14,14 @@ paths: ["__conventions_planning_documentation_only__/**"]
 > `dew_flow_mcp`, `dew_flow_sidecar_rust`, `dew_flow_creds_for_devs`.
 >
 > Progress, 2026-11-10: `dew_flow_creds_for_devs` is on the neutral layout (story 3.C, #328, `75c1f1f`); both agents'
-> smoke passed on its committed pin, the first consumer of this plan to pass it. Still on `.claude/rules/shared`:
+> smoke read every expected rule on its committed pin (part 1 of the § 7 pass condition; part 2, the observable, is
+> owed — corrected the same day, see the closing matrix). Still on `.claude/rules/shared`:
 > `dew_flow_mcp` and `dew_flow_sidecar_rust` (stories 3.M and 3.R, not selected). Release `9b1d668` is pinned by every
 > consumer (conventions #147 and #148; the hook fixes the creds code gate found).
+> Later the same day: the owner selected 3.M and 3.R (migration PRs mcp #71 and sidecar_rust #76). The smoke harness
+> now records part 2 (conventions #154), and the rerun passes both parts of § 7 for both agents in all nine
+> repositories (mcp and sidecar_rust on their migration branches; see the closing matrix). That night both migrations
+> merged (mcp `9bf9f5b`, sidecar_rust `97e174c`): all nine consumers are on the neutral layout.
 >
 > **The stop, 2026-11-09:** entry 1.2 (the owner moves `dew_flow_creds_for_devs` ahead of
 > `dew_flow_sidecar_rust`) is this plan's second change since approval. No consumer migration and no new code on any
@@ -418,8 +423,8 @@ Open stories:
       old-clone cleanup steps; `pin-check` was green at the merge and reads stale now only because `release` moved on);
       the **rollback tried on `75c1f1f`** in that clone (the revert gives exactly its parent's tree; with the PR's steps
       the old mount at `37b9aa5` is back, its tools and the low-priority wrapper run, the tree is clean); the same
-      checks had also passed on the PR's first commit `8f31013`; **both agents' smoke passed on the committed pin
-      `5e73780`** before the promotion (two files, `Program.cs` and `extension.ts`: Codex and Claude, 7 of 7 rules each, hashes matched,
+      checks had also passed on the PR's first commit `8f31013`; **both agents' smoke read every expected rule on the committed
+      pin `5e73780`** (part 1 of § 7 only — part 2 is owed, see the item below) before the promotion (two files, `Program.cs` and `extension.ts`: Codex and Claude, 7 of 7 rules each, hashes matched,
       HEAD/index/status unchanged), after the harness fixes of conventions #147 (the resolver's git had a stdin pipe the
       Codex sandbox refused; the Claude trace was cut at 256 KiB, and one whole read reached the model only as a preview);
       CI 19/19 on the head; the CodeRabbit threads answered, the old-clone steps added to the README after its finding.
@@ -495,6 +500,14 @@ Open stories:
         this item as written; it is not a plan change. With the fix in a disposable creds worktree each agent read
         5 of 5 rules in full (a measuring run on one file, `extension.ts`, which selects 5); the evidence is the run on
         #328's committed pin `5e73780` (two files, 7 rules), recorded in the story's Done paragraph above.
+        **Corrected 2026-11-10 (CodeRabbit on #152):** that run proves part 1 of the § 7 pass condition only (every
+        expected rule read in full, hash matched). Part 2, the observable in the recorded answer or checkout, was not
+        checked: the Codex answer does not name ENTRY or PROJECT, and a second-path load is not recorded. This item
+        stays open until the harness records both and the run is repeated; #328 merged on part 1 alone.
+        **Ticked again 2026-11-10 evening:** the harness records part 2 (conventions #154), and the rerun in the
+        creds worktree (`daa7e05`, pin `5e73780`, two files, 7 rules) passes both parts for both agents: every rule
+        read in full with its hash, ENTRY and PROJECT read, no body by a second path, no unclassified call
+        ([the record](../research/2026-11-10_shared_rules_acceptance.md), the rerun section).
   - [x] **Product behaviour unchanged:** the broker, CLI, MCP server and extension builds and their test suites
         green on the migrated tree; no permission in `.claude/settings.json` weakened.
   - [x] **Rollback** named in the PR: the migration is ONE whole commit (squash-merged), so the rollback is the
@@ -502,13 +515,32 @@ Open stories:
         (`ROLLOUT.md` § Recovery); the revert is tried once in a disposable clone and the old mount, instructions and
         commands work again on the previous SHA.
   - [x] **Merge conditions of this PR** — below, the same for every migration PR.
-- [ ] **Story 3.R — `dew_flow_sidecar_rust`** (Rust: `csharp/` never matches, `rust/doctrine.md` is its doctrine).
+- [x] **Story 3.R — `dew_flow_sidecar_rust`** (Rust: `csharp/` never matches, `rust/doctrine.md` is its doctrine).
       Selected by the owner under the rule above when its prerequisites are met; its checklist is story 3.C's shape
       with its own product references (about 21 files on 2026-11-09) listed in the PR.
-- [ ] **Story 3.M — `dew_flow_mcp`** (.NET, public; pinned by rag_qln as `external/dew_flow_mcp`). Selected by the
+      **Done 2026-11-10:** selected by the owner that day. Migration PR #76 was squash-merged as `97e174c` (pin
+      `153e6b5`). Evidence in the PR:
+      - the tool's dry run (no dirty inputs; 15 "requires review" files edited by hand);
+      - `git grep` (no executable old-mount path);
+      - CI green on both legs (the Rust build cannot run on this machine);
+      - two tests that read moved files: each red in CI first, then green;
+      - both agents' § 7 smoke, both parts, 8 of 8 rules;
+      - the rollback in a fresh clone;
+      - the coai plan and code rounds.
+- [x] **Story 3.M — `dew_flow_mcp`** (.NET, public; pinned by rag_qln as `external/dew_flow_mcp`). Selected by the
       owner under the rule above; its migration PR moves no code pin, and rag_qln's later bump of that pin is a
       separate code-pin PR with a build.
-- [ ] **Story 3.B — the Claude adapter in `dew_flow_benchmark`** (found by the re-review's judge, 2026-11-09:
+      **Done 2026-11-10:** selected by the owner that day. Migration PR #71 was squash-merged as `9bf9f5b` (pin
+      `153e6b5`). Evidence in the PR:
+      - the tool's dry run;
+      - `git grep`;
+      - a fresh clone: all checks, the build, 622 tests, 0 failed;
+      - both agents' § 7 smoke, both parts, 6 of 6 rules;
+      - the rollback in a disposable clone;
+      - the coai rounds.
+
+      rag_qln's code-pin PR for `external/dew_flow_mcp` follows, with a build.
+- [x] **Story 3.B — the Claude adapter in `dew_flow_benchmark`** (found by the re-review's judge, 2026-11-09:
       benchmark migrated in #113, but its `main` has only `.claude/settings.json`, no `.claude/hooks`, so a Claude
       session there starts without its rules). Its own PR, selected by the owner under the rule above, in the shape
       of rag_qln #85: the WHOLE adapter — every file `adapter-check.mjs` compares (`load-instructions.mjs`,
@@ -517,6 +549,17 @@ Open stories:
       `.claude/settings.json` without weakening a permission, and `node .agents/conventions/tools/adapter-check.mjs`
       in CI. `build-flags.mjs` then refuses a `dotnet build` without the worker-pool limit, so benchmark's build
       lines carry it in the same PR. It moves no code pin.
+      **Done 2026-11-11:** selected by the owner that day. benchmark #197 was squash-merged as `1ec5ece`, with:
+      - the five hooks byte-identical to release `26589a5`;
+      - the settings template, with permissions equal to the old file's;
+      - `adapter-check` in CI;
+      - `-m:4` on the one documented build line that lacked it;
+      - the architecture section, including how the hooks compose with `bench sessions install`.
+
+      Evidence: build-flags denies a build without the limit and allows the documented line; the SessionStart hook
+      prints the rules; both agents' § 7 smoke on the branch passes both parts (6 of 6, read-content harness);
+      4586 tests pass (the 572 PostgresFixture tests need Docker, which this machine lacks; CI has it); coai plan
+      and code rounds.
 - [ ] **Closing matrix:** one table of every consumer in `README.md` § Consumers — mount path, pin, adapter check,
       fresh clone, both agents (§ 7 pass conditions), legacy-reference count, rollback (the revert tried, with the
       clone and date; "none by construction" only for a consumer that never had the legacy mount), and a
@@ -525,6 +568,59 @@ Open stories:
       row. Written into this plan before Stage 4. **Where a § 7 failure is fixed:** a corrective PR under that
       consumer's story (3.C, 3.R, 3.M, 3.B, or a new story for a consumer that joined on the neutral layout), never
       a new plan or a plan change; only a failure that changes the design is a change.
+
+  **The matrix, 2026-11-10** (read from each `main` and from disposable worktrees of it, after the pin bumps of
+  release `1341995` merged in all nine; the smoke and rollback evidence, run by run with rule ids, hashes, trace
+  sizes and dates, is [research/2026-11-10_shared_rules_acceptance.md](../research/2026-11-10_shared_rules_acceptance.md)).
+  This item stays open. **§ 7 is not passed yet for any consumer:** its pass condition has two parts, (1) the trace
+  shows every expected rule read in full with its hash, and (2) the row's observable is seen in the recorded answer
+  or the checkout state. For "Claude / Codex from root" that observable is: ENTRY and PROJECT read, the expected
+  sources read, no body loaded by a second path. Every run passed part 1. Part 2 is owed: the harness reports
+  `behavior requires review`; the Codex answers do not name ENTRY or PROJECT, one Claude answer (wsl_care) names
+  only PROJECT, and whether a body came by a second path is not recorded at all. The harness is being taught to
+  record both, and the runs follow (corrected 2026-11-10 after CodeRabbit on #152). The same evening `release` moved
+  to `153e6b5` (#151), with pin bumps open in every consumer.
+  **Update, the same evening:** the harness records part 2 now (conventions #154, `afbe426`), and the rerun in the same
+  worktrees passes **both parts for both agents in every row**: ENTRY and PROJECT read by a call that did not fail, no
+  rule body by a second path, no call it cannot classify. mcp and sidecar_rust ran on their migration branches, on the
+  committed pin `153e6b5`. The runs are in the record's rerun section. This item stays open until mcp #71 and
+  sidecar_rust #76 merge, and while benchmark has no Claude adapter (story 3.B, not selected). Both merged later that
+  night (mcp `9bf9f5b`, sidecar_rust `97e174c`), so all nine repositories are on the neutral layout; the item stays
+  open for story 3.B only. Story 3.B merged on 2026-11-11 (benchmark #197, `1ec5ece`), so every consumer has the whole
+  adapter.
+  On 2026-11-11, by the owner's go ("Release"), `release` moved `153e6b5` → `26589a5` (conventions #153, #154,
+  #155: the user-guard installer resolves a link target as the kernel walks it). Pin bumps merged in eight consumers
+  (coai #974, benchmark #196, rag_qln #99 with both code pins, wsl_care #195, vscode_kit #31, r9700 #31, mcp #72,
+  sidecar_rust #77); creds moves in #343, which waits for the owner to resolve a CodeRabbit thread. The owner resolved it, and
+  #343 merged the same night (`e48798a`): all nine consumers are on `26589a5`. The matrix's Pin
+  column shows the pins at the time of the runs (the first runs of 2026-11-10; every row's read-content rerun of
+  2026-11-11 used `26589a5`, named in its § 7 cell).
+  **Which evidence shows part 2 (added 2026-11-11, CodeRabbit on #152).** § 7's pass sentence asks for the
+  observable "in the recorded final answer or in the checkout state". These runs show it in the recorded trace, as the
+  harness classifies it. The final answers name both ENTRY and PROJECT in 7 of 9 Claude runs (wsl_care and creds name
+  only PROJECT) and in 1 of 9 Codex runs (r9700). So part 2 passes on the trace, and under the literal sentence it is
+  not shown by the final answers. Whether the trace is the evidence for a read observable is the owner's decision:
+  the proposed plan change 2.1 is draft PR #156. Until then, the cells
+  below say "verified on the trace": part 1 and part 2 in the trace. That is no approved waiver or amendment of
+  § 7's literal pass sentence.
+  **2026-11-11, the read-content rerun.** The owner approved plan change 2.1 (#156: for an observable that is itself a
+  read, the evidence is the recorded trace as the harness classifies it). CodeRabbit on #156 then found that the
+  harness counted a call that only named ENTRY or PROJECT; conventions #157 fixed it (a read needs the file's text in
+  the output), and all 18 runs were repeated on fresh clones of each `main` (release `26589a5`): **all 18 pass both
+  parts**. The record's section "The rerun with the read-content harness, 2026-11-11" has every run. #156 merges once
+  its last review thread is resolved; from then on § 7 is passed for every row on this evidence.
+
+  | Consumer | Mount | Pin | Adapter check | Fresh clone / worktree | Both agents (§ 7) | Old-mount lines outside `todo/`, `research/`, `.gitmodules` | Rollback | Decision |
+  |---|---|---|---|---|---|---|---|---|
+  | dew_flow_connect_other_ais | `.agents/conventions` | `1341995` | OK | worktree of `ee8ad53`: `rules check` resolved; fresh clone of `63a868f2` from GitHub, 2026-11-11 (pin `26589a5`): `rules check` and `explain` resolved, the checks OK, the tree clean | reads verified for both (part 1), 8 of 8 rules; the observable (part 2) owed; **both parts verified for both on the trace** (part 2 on the trace: plan change 2.1, approved by the owner 2026-11-11, #156 merging); **read-content rerun 2026-11-11** (harness conventions #157): fresh clone of `63a868f2`, pin `26589a5`, both parts pass for both; before it, the **rerun of 2026-11-10 evening** (harness conventions #154): worktree `ee8ad53`, pin `1341995`, both parts pass for both on the trace | 66, none executable for its own mount: the product's gate snippet and rule discovery support user repositories still on the old layout (and their tests), plus 14 comment and doc lines citing rules by the old path (corrective PR #972) | tried on `8d42647`: the revert gives its parent's tree, the old mount `895b24c` and its tools are back | migrated (#192) |
+  | dew_flow_benchmark | `.agents/conventions` | `1341995` | none on the runs' commits (story 3.B); OK since #197 (`1ec5ece`, 2026-11-11) | worktree of `3958ecc`: resolved; fresh clone of `3079acf` from GitHub, 2026-11-11 (pin `26589a5`): `rules check` and `explain` resolved, the checks OK, the tree clean | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both on the trace** (part 2 on the trace: plan change 2.1, approved by the owner 2026-11-11, #156 merging); **read-content rerun 2026-11-11** (harness conventions #157): fresh clone of `3079acf`, pin `26589a5`, both parts pass for both; before it, the **rerun of 2026-11-10 evening** (harness conventions #154): worktree `3958ecc`, pin `1341995`, both parts pass for both on the trace | 23: the gate's tests and the spikes measure other repositories and old transcripts on the old layout; 2 comments cite rules by the old path (corrective PR #194) | tried on `89b4909`: parent's tree, old mount `e29883f`, low-priority wrapper runs | migrated (#113); the adapter is story 3.B, selected by the owner and merged 2026-11-11 (#197) |
+  | dew_flow_rag_qln | `.agents/conventions` | `1341995` | OK | worktree of `f7f4fc4`: resolved; fresh clone of `b55d283` from GitHub, 2026-11-11 (pin `26589a5`): `rules check` and `explain` resolved, the checks OK, the tree clean | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both on the trace** (part 2 on the trace: plan change 2.1, approved by the owner 2026-11-11, #156 merging); **read-content rerun 2026-11-11** (harness conventions #157): fresh clone of `b55d283`, pin `26589a5`, both parts pass for both; before it, the **rerun of 2026-11-10 evening** (harness conventions #154): worktree `f7f4fc4`, pin `1341995`, both parts pass for both on the trace | 0 | tried on `d83315b`: parent's tree, old mount `cc24f9e`, low-priority wrapper runs | migrated (#83, #85) |
+  | wsl_care | `.agents/conventions` | `1341995` | OK | worktree of `cb8046b`: resolved; fresh clone of `776d737` from GitHub, 2026-11-11 (pin `26589a5`): `rules check` and `explain` resolved, the checks OK, the tree clean | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both on the trace** (part 2 on the trace: plan change 2.1, approved by the owner 2026-11-11, #156 merging); **read-content rerun 2026-11-11** (harness conventions #157): fresh clone of `776d737`, pin `26589a5`, both parts pass for both; before it, the **rerun of 2026-11-10 evening** (harness conventions #154): worktree `cb8046b`, pin `1341995`, both parts pass for both on the trace | 0 | none by construction | joined on the neutral layout |
+  | dew_flow_vscode_kit | `.agents/conventions` | `1341995` | OK | worktree of `a9ab150`: resolved; fresh clone of `fd905be` from GitHub, 2026-11-11 (pin `26589a5`): `rules check` and `explain` resolved, the checks OK, the tree clean | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both on the trace** (part 2 on the trace: plan change 2.1, approved by the owner 2026-11-11, #156 merging); **read-content rerun 2026-11-11** (harness conventions #157): fresh clone of `fd905be`, pin `26589a5`, both parts pass for both; before it, the **rerun of 2026-11-10 evening** (harness conventions #154): worktree `a9ab150`, pin `1341995`, both parts pass for both on the trace | 0 | none by construction | joined on the neutral layout |
+  | dew_flow_amd_r9700_tuning_ai | `.agents/conventions` | `1341995` | OK (`build-flags.mjs` added in #28) | worktree of `2ecb356`: resolved; fresh clone of `b550f52` from GitHub, 2026-11-11 (pin `26589a5`): `rules check` and `explain` resolved, the checks OK, the tree clean | reads verified for both (part 1), 6 of 6 rules; the observable (part 2) owed; **both parts verified for both on the trace** (part 2 on the trace: plan change 2.1, approved by the owner 2026-11-11, #156 merging); **read-content rerun 2026-11-11** (harness conventions #157): fresh clone of `b550f52`, pin `26589a5`, both parts pass for both; before it, the **rerun of 2026-11-10 evening** (harness conventions #154): worktree `2ecb356`, pin `1341995`, both parts pass for both on the trace | 0 | none by construction | joined on the neutral layout |
+  | dew_flow_creds_for_devs | `.agents/conventions` | `1341995` (`37b9aa5` → `5e73780` in #328 → `9b1d668` in #336 → `1341995` in #340); **the § 7 runs, first and rerun, used `5e73780`** | OK | fresh clone of `75c1f1f` (story 3.C) | reads verified for both (part 1), 7 of 7 (on `5e73780`, story 3.C) rules; the observable (part 2) owed; **both parts verified for both on the trace** (part 2 on the trace: plan change 2.1, approved by the owner 2026-11-11, #156 merging); **read-content rerun 2026-11-11** (harness conventions #157): fresh clone of `3abb01a`, pin `26589a5`, both parts pass for both; before it, the **rerun of 2026-11-10 evening** (harness conventions #154): worktree `daa7e05`, pin `5e73780`, both parts pass for both on the trace | 2: the README's old-clone cleanup steps | tried on `75c1f1f` (story 3.C) | migrated (#328, story 3.C) |
+  | dew_flow_mcp | `.agents/conventions` on `main` since #71 (`9bf9f5b`; before: `.claude/rules/shared`) | `153e6b5` (#71; before: `1341995`, mcp #70) | OK (#71) | fresh clone of `a0809f5` (#71): all checks, build and 622 tests green | **both parts verified for both on the trace** (part 2 on the trace: plan change 2.1, approved by the owner 2026-11-11, #156 merging); **read-content rerun 2026-11-11** (harness conventions #157): fresh clone of `e407bd7`, pin `26589a5`, both parts pass for both, 6 of 6 rules; before it, the **rerun of 2026-11-10 evening** (harness conventions #154): worktree `64f42d0`, pin `153e6b5`, both parts pass for both on the trace (the first run: reads verified for both, part 1; the observable, part 2, owed) | 1, a fixture pinning that the old mount is never entered (#71; about 18 files on 2026-11-09) | tried (#71): the revert gives `main`'s tree and the old mount is back | **migrated: merged 2026-11-10 as `9bf9f5b`** (story 3.M; selected by the owner that day; the PR stayed a draft until § 7 passed) |
+  | dew_flow_sidecar_rust | `.agents/conventions` on `main` since #76 (`97e174c`; before: `.claude/rules/shared`) | `153e6b5` (#76; before: `1341995`, sidecar_rust #75) | OK (#76; hooks byte-identical, permissions equal to the old file's) | CI green on both legs at `a691935` (#76); no local Rust build on this machine (libssl-dev missing); fresh clone of `48c3ba8` from GitHub, 2026-11-11 (pin `26589a5`): `rules check` and `explain` resolved, the checks OK, the tree clean | **both parts verified for both on the trace** (part 2 on the trace: plan change 2.1, approved by the owner 2026-11-11, #156 merging); **read-content rerun 2026-11-11** (harness conventions #157): fresh clone of `48c3ba8`, pin `26589a5`, both parts pass for both, 8 of 8 rules; before it, the **rerun of 2026-11-10 evening** (harness conventions #154): worktree `a691935`, pin `153e6b5`, both parts pass for both on the trace (owed until then) | 5 lines, none executable: the README's old-clone steps (2), the architecture note on the move (1), two fixture lines pinning that the old mount is never entered (#76; about 21 files on 2026-11-09) | tried on a fresh clone on `c446c69` and again on `a691935` (#76): one revert gives the tree of `main`, the old mount `1341995` is back (owed until then) | **migrated: merged 2026-11-10 as `97e174c`** (story 3.R; selected by the owner that day; the PR was a draft until its evidence was complete) |
 - [ ] Не двигать code dependency pins только для того, чтобы погасить старый pin-check; принять явное решение о совместимых версиях и проверить сборку при их изменении.
 - [ ] Обновить README/ROLLOUT/POST_DEPLOY и checklist каждого потребителя. Ссылки на инструменты старого mount не должны остаться исполняемыми путями.
 
