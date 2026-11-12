@@ -284,7 +284,10 @@ export async function readOnce($: EngineInterface, gen: number, pass: number): P
 
 // Single flight: a call during a read asks for exactly one more read, started after the call. Never rejects.
 // 1.4.0: a read has a ceiling (READ_CEILING_MS), so a hung call never holds the flight for the session. On the ceiling `generation`
-// moves on (the abandoned read's late result writes nothing), `inFlight` is cleared FIRST (before any await: the state write below can
+// moves on (the abandoned read's late result writes nothing) — except for a pass whose state write has already BEGUN: that pass is
+// landing, keeps its generation, and its late write is accepted (the write is `update`, which on a version miss reads the state again and
+// runs the updater again, so a write held past a newer read's result is dropped by its own generation check and never replaces it).
+// `inFlight` is cleared FIRST (before any await: the state write below can
 // hang too), the account says `read timed out`, and a read queued meanwhile starts at once. Known limits: a timer is a clock dispatch, so
 // with `$.clock.after` refused the ceilings never fire and the read is as in 1.3.3; a hot reload cancels the old environment's timers, so
 // an old read in flight then has no ceiling and its late answer (a real answer) can still be written; each abandoned read leaves at most

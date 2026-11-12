@@ -313,3 +313,31 @@ test('B15 a refused write in the first pass, then a hung second pass: the ceilin
   expect(await text(ui, 'account ? (read timed out)'), 'a refused first-pass write does not hide the second pass ceiling').toBeDefined()
   await ui.unmount()
 })
+
+test('B16 a write held across the ceiling lands after a newer read wrote: the band ends on the newer email', async ($, on) => {
+  const clock = base(on)
+  identities(on, [() => identityOf('old@example.com'), () => identityOf('new@example.com')])
+  let release: () => void = () => undefined
+  const held = new Promise<void>(resolve => {
+    release = resolve
+  })
+  let sets = 0
+  on('state.set', { plugin: 'agent-models', key: 'account' }, async (_, e, next) => {
+    sets += 1
+    if (sets === 1) await held // the first read's write: held past the ceiling
+    return next(e)
+  })
+  await start($)
+  await clock.advance(READ_CEILING) // the pass counts as landing: nothing is abandoned, nothing is written
+  await spin()
+  const ui = await band($) // the draw sees an unread account and starts a newer read, which writes the new email
+  await spin()
+  await ui.redraw()
+  expect(await text(ui, 'new@example.com')).toBeDefined()
+  release() // the older write is let go now
+  await spin()
+  await ui.redraw()
+  expect(await text(ui, 'new@example.com'), 'the older result does not replace the newer one').toBeDefined()
+  expect(await text(ui, 'old@example.com')).toBeUndefined()
+  await ui.unmount()
+})

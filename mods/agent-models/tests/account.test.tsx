@@ -372,7 +372,8 @@ test('L4 a rejection draws the reason, dim, and the next press clears it', async
   await ui.unmount()
 })
 
-test('L5 the 10-minute ceiling settles a login that never answered', async ($, on) => {
+// 20 minutes of the mock clock are 600 timer periods since the draw starts the 2 s timer (1.4.0): about 4 s, so the default 5 s is too tight
+test('L5 the 10-minute ceiling settles a login that never answered', { timeoutMs: 60_000 }, async ($, on) => {
   const clock = base(on)
   noIdentity(on)
   const { argvs } = status(on, () => ok(statusJson({})))
@@ -390,7 +391,7 @@ test('L5 the 10-minute ceiling settles a login that never answered', async ($, o
   await ui.redraw()
   expect((await loginButton(ui))?.props.dimColor).toBeFalsy()
   expect(argvs.length).toBe(2)
-  await clock.advance(120_000) // (was 600 000: since 1.4.0 the draw starts the 2 s timer, and the mock clock settles after every period)
+  await clock.advance(600_000)
   await spin()
   expect(argvs.length).toBe(2)
   release({ text: '' })
@@ -446,7 +447,7 @@ test('L8 a settle cancels the 10-minute ceiling timer', async ($, on) => {
   await ui.unmount()
 })
 
-test('L9 a late settle after the ceiling reads once and changes no state', async ($, on) => {
+test('L9 a late settle after the ceiling reads once and changes no state', { timeoutMs: 60_000 }, async ($, on) => {
   const clock = base(on)
   noIdentity(on)
   const { argvs } = status(on, () => ok(statusJson({})))
