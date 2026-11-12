@@ -220,8 +220,11 @@ commit for a fresh head, never an admin merge.
 temporary HOME, three session starts of `.claude/hooks/ensure-user-guard.mjs`: the first installed the guard, set
 effort to high, installed mod 1.3.3 and registered it (carrying the session's own `CLAUDE_CODE_PLUGIN_DIRS` entry
 over); the second and third printed nothing and changed nothing; `claude plugin validate` passed on the installed
-copy. The band itself was seen in the owner's own new WSL sessions (from Part A); a resumed session showed
-`account ?` (the mod's account read has no ceiling — first item for the next mod version).
+copy. **Not met as E3's done-when words it:** a second session with that temporary HOME was not started, so the
+band loading from a fresh install was not observed (it needs an interactive session signed in under that HOME). What
+was observed instead: the band in the owner's own new WSL sessions, loaded from Part A's install of the same 1.3.3
+bytes and the same registration shape; a resumed session there showed `account ?` (the mod's account read has no
+ceiling — first item for the next mod version).
 
 **What the plan said, and what shipped (deviations).**
 - The reference skip is decided on the project's own hook path, never on the mod's (the source tested the mod's root,
