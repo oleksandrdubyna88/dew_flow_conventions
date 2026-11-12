@@ -81,7 +81,7 @@ The parent's E1 scope is right in its counts and wrong in four details; these co
   and **leaves the worktree directory behind holding the junction**; Node's `fs.rmSync(dir, { recursive: true })` then
   removes it without following the junction (`lstat().isSymbolicLink()` is `true` for a junction). From PowerShell, a
   bare `bash` resolved to WSL's bash, not Git for Windows'.
-- **This repository is PUBLIC** (`gh repo view`: `oleksandrdubyna88/dew_flow_conventions`, visibility `PUBLIC`,
+- **This repository is PUBLIC** (`gh repo view`: visibility `PUBLIC`,
   checked 2026-10-15). Everything committed here — the rule body included — is published. See Judge's note J11.
 
 ## Order
