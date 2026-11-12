@@ -3,7 +3,8 @@
 > Status: **three machines recorded. The Ubuntu dev VM's barrier is OPEN (2026-10-27). The operator's WSL machine's barrier is
 > OPEN (2026-11-06): the administrator scan read its two root-only places and found nothing, so its merge condition (c) is met.
 > The owner's Windows machine was not tested, so its barrier is closed; since 2026-11-04 it does
-> not build or test E2's and E5's repositories, which meets condition (c) for it (P1 closed).** The checklist
+> not build or test E2's and E5's repositories, and since 2026-11-12 not E6's and E7's either, which meets condition (c)
+> for it for those epics (P1 closed).** The checklist
 > each section answers is the merged-core plan's *Barrier checklist* ([PLAN_test_leftovers_merged_core.md](../PLAN_test_leftovers_merged_core.md)).
 > A machine with no section here is a machine whose barrier is closed. Names of other repositories are not written here.
 
@@ -60,6 +61,12 @@ this machine for E2 and E5**: a machine that does not run their suites cannot be
 not opened; it stays **closed**, and the other merge conditions of each PR still apply. Checked on 2026-11-04 from the WSL machine below, through its Windows side: `where node` finds no Node, and the user
 profile holds no git checkout (only tool folders). **Before this machine builds or tests E2's or E5's repository again**, its
 section here gets the scan and the checklist; until then the statement is void for any repository the machine runs.
+
+**Owner statement, 2026-11-12:** this machine builds and tests neither E6's nor E7's repository (the rollout's wave 3),
+asked in the operator's session before the first E6 or E7 producer. It is the same second way as the 2026-11-04
+statement, so **condition (c) is met for this machine for E6 and E7**. The barrier itself stays **closed**, and the same
+rule holds: before this machine builds or tests E6's or E7's repository, its section here gets the scan and the
+checklist; until then the statement is void for any repository the machine runs.
 
 ## The operator's WSL machine (Ubuntu 26.04 under WSL 2, one developer account) — 2026-11-04, re-attest
 
