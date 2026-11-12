@@ -317,7 +317,7 @@ operator commands (work autonomously, consultants first) were followed; there is
   dew_flow_creds_for_devs #253; dew_flow_vscode_kit #19; wsl_care #162, #174, #178, #179, #180, #181; dew_flow_connect_other_ais #850,
   #909, #911, #918, #919, #920, #922, #923, #924, #925, #926, #927, #928, #930), and a message to the four Claude sessions then open on the
   operator's WSL machine. `promote-release.mjs --dry-run` passed (`ci` green on `115bbf8`), and the dispatch
-  ([run 41089908585](https://github.com/oleksandrdubyna88/dew_flow_conventions/actions/runs/41089908585)) moved `release` from `e29883f` to
+  (Actions run 41089908585 of this repository) moved `release` from `e29883f` to
   `115bbf8` (+16 commits, #78 to #91: among them E1 `2c96f83`, the merged core #82, F13 #89 and F12 #90). `release-distance`: OK, 0 commits behind main.
 
 ### R6 — The consumer migration

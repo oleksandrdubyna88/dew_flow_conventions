@@ -213,7 +213,7 @@ Its own conventions, read 2026-10-10 from a fresh clone:
 | knowledge_base | ui-template vitest without a cap; `node --test`; Blazor `dotnet test` | the caps per runner |
 
 - Each consumer gets one PR with its pin bump and its own scripts.
-- The work happens in fresh clones under `/tmp/orgmeter-concurrency-20261010T194657Z/`, driven by
+- The work happens in fresh clones under `/tmp/concurrency-20261010T194657Z/`, driven by
   script files only.
 - Each consumer's own CLAUDE.md wins in that repository.
 
@@ -243,7 +243,7 @@ Deviations from the plan above:
   owner's decision. Their bumps squashed with `[skip ci]` as usual. Their adoptions deployed, and each
   deploy run was watched.
 - **Clones:** the first batch of fresh clones was lost when WSL restarted. The work moved to
-  `/tmp/orgmeter-concurrency-20261011T124253Z/`.
+  `/tmp/concurrency-20261011T124253Z/`.
 - **The review gate** could not open a checkout inside WSL `/tmp`, so independent read-only reviewers stood
   in. They found nothing gating.
 
