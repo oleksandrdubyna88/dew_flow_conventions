@@ -1,6 +1,8 @@
 # PLAN — agent-models mod 1.4.0: the 5-hour reset time, and an account read that always ends
 
-> Status: **plan only, nothing implemented yet, 2026-11-12.** Scope: `mods/agent-models/` (limits line, account read,
+> Status: **shipped 2026-11-12, owner checks pending.** #165 merged (`4c9a684`), `release` promoted to it, all nine
+> consumer pin bumps merged; the installed copy on this WSL upgraded 1.3.3 → 1.4.0 by a consumer session start. The
+> plan moves to `research/` once the owner reports the two checks below. Scope: `mods/agent-models/` (limits line, account read,
 > version 1.4.0, the mod's own tests), the released-copy table in `settings/hooks/lib/agent-models-decide.mjs` (and its
 > `.claude/hooks` mirror), the new row of `tools/agent-models-pins.json`, then one `release` promotion and the pin bumps
 > of the nine consumers. Parent: [PLAN_agent_models_mod.md](../research/PLAN_agent_models_mod.md) § *Follow-ups*
@@ -184,10 +186,12 @@ draw's clock and `limitsMinute` read, `viewerFixedRows` with `now`), `types/inde
 
 ## Definition of Done
 
-- [ ] Plan round `proceed`; code round `proceed`; Opus reviews done, findings fixed or answered.
-- [ ] Tests A1–A11, B1–B10, C1 green; RED seen first for A1, A3, A5, A7, A10, A11, B1–B7.
+- [x] Plan round `proceed`; code round `proceed`; Opus reviews done, findings fixed or answered.
+- [x] Tests A1–A11, B1–B10, C1 green; RED seen first for A1, A3, A5, A7, A10, A11, B1–B7.
 - [ ] `claude plugin validate` passes; `tsc -p mods/agent-models` clean; `node --test tools/` green.
-- [ ] PR merged with green checks and no open thread.
-- [ ] `release` promoted after the owner's word; nine consumer pin bumps merged.
-- [ ] The installed mod on this WSL is 1.4.0 after a session start in a consumer.
+  (validate passes and `node --test` is green; `tsc` was run with a local TypeScript 6.0.3 and the engine types: no new
+  error in `hooks/` or `types/`, but the test files carry errors that were there before 1.4.0, so "clean" is not met.)
+- [x] PR merged with green checks and no open thread.
+- [x] `release` promoted after the owner's word; nine consumer pin bumps merged.
+- [x] The installed mod on this WSL is 1.4.0 after a session start in a consumer.
 - [ ] Owner checks reported; this plan promoted to `research/` with what shipped differently.
