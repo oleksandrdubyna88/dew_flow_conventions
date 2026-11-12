@@ -252,7 +252,10 @@ const viewerRows = ($: EngineInterface, e: RenderEvent, page: Page) => {
 }
 
 export const register: Register = on => {
-  let ticking: Timer | undefined // this environment's one refresh timer; a reload starts a fresh scope
+  let ticking: Timer | undefined // the refresh timer the session start made; a reload starts a fresh scope
+  // The timer a draw made when no session start had (a resume). Only `$.state.set` is documented as refused while drawing, so a draw's
+  // `clock.every` may be refused (a Timer that never fires): the session start then replaces it instead of trusting it.
+  let drawTicking: Timer | undefined
   // The newest hook's refresh. The engine refuses a module that assigns `$` itself, and lets it be passed only to
   // a function declared at the top of the file, so the timer holds this thunk, which refreshes with the `$` of the
   // newest hook that ran, never the `$` of the hook that started the timer.
@@ -261,9 +264,13 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     refreshNow = () => tick($)
     const result = await next(e)
-    ticking ??= $.clock.every(REFRESH_MS, () => {
-      void refreshNow?.().catch(() => undefined)
-    })
+    if (ticking === undefined) {
+      drawTicking?.cancel()
+      drawTicking = undefined
+      ticking = $.clock.every(REFRESH_MS, () => {
+        void refreshNow?.().catch(() => undefined)
+      })
+    }
     if (!isAccountReading()) {
       void readAccount($) // not awaited: the session starts as fast as before; a read already running (the draw's) is not queued twice
     }
@@ -297,9 +304,11 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     refreshNow = () => tick($)
-    ticking ??= $.clock.every(REFRESH_MS, () => {
-      void refreshNow?.().catch(() => undefined)
-    }) // a session that draws without a session.start (a resume) still ticks
+    if (ticking === undefined && drawTicking === undefined) {
+      drawTicking = $.clock.every(REFRESH_MS, () => {
+        void refreshNow?.().catch(() => undefined)
+      }) // a session that draws without a session.start (a resume) still ticks
+    }
     if (e.props.hasSurvey) {
       return next(e)
     }

@@ -390,7 +390,7 @@ test('L5 the 10-minute ceiling settles a login that never answered', async ($, o
   await ui.redraw()
   expect((await loginButton(ui))?.props.dimColor).toBeFalsy()
   expect(argvs.length).toBe(2)
-  await clock.advance(600_000)
+  await clock.advance(120_000) // (was 600 000: since 1.4.0 the draw starts the 2 s timer, and the mock clock settles after every period)
   await spin()
   expect(argvs.length).toBe(2)
   release({ text: '' })

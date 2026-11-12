@@ -206,6 +206,7 @@ export async function watchLimitsMinute($: EngineInterface): Promise<void> {
 export async function tickLimits($: EngineInterface): Promise<void> {
   try {
     const view = await read($, limits)
+    if (!view.isOpen) return // a closed line costs one state read, not an account read every 2 s
     const email = emailOf(await currentAccount($))
     if (email === undefined || !isLimitsShown(view, email)) return
     const now = await limitsClock($)

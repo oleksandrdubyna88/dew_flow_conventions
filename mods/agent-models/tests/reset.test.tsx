@@ -232,3 +232,20 @@ test('A13 a pending login and an open limits line ask the clock once per draw; a
   expect((await ui.find({ type: 'Button', key: 'login' }))?.props.dimColor, 'a refused clock reads 0: the login stays pending').toBe(true)
   await ui.unmount()
 })
+
+test('A14 a closed limits line costs the tick no account read', async ($, on) => {
+  let accountReads = 0
+  on('state.get', { plugin: 'agent-models', key: 'account' }, (_, e, next) => {
+    accountReads += 1
+    return next(e)
+  })
+  const w = await world($, on, answerWith(200, MEASURED))
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  await pressLimits(ui) // open
+  await pressLimits(ui) // closed
+  await spin()
+  accountReads = 0
+  await ui.unmount() // no draw reads the account below
+  await w.clock.advance(10_000) // 10 s: five ticks, too few for the account retry (30)
+  expect(accountReads).toBe(0)
+})

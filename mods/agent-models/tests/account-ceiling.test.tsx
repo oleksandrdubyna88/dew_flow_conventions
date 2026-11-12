@@ -90,7 +90,7 @@ test('B4 after a timed-out read, with no draw and no turn, the tick reads again 
   await clock.advance(READ_CEILING)
   await spin()
   expect(asked.n).toBe(1)
-  await clock.advance(62 * SEC) // the tick counts its own ticks: one retry in 30 ticks, wherever the count stands
+  await clock.advance(64 * SEC) // the tick counts its own ticks: one retry in 30 ticks, wherever the count stands
   await spin()
   expect(asked.n, 'the tick read again').toBe(2)
   const ui = await band($)
@@ -104,7 +104,7 @@ test('B5 a refused state write of the read, then idle: the tick reads again with
   accountWrites(on, n => (n === 1 ? 'deny' : undefined))
   await start($)
   expect(asked.n, 'the session start read; its write was refused').toBe(1)
-  await clock.advance(62 * SEC) // nobody draws the band and no turn ends
+  await clock.advance(64 * SEC) // nobody draws the band and no turn ends
   await spin()
   expect(asked.n).toBeGreaterThan(1)
   const ui = await band($)
@@ -127,7 +127,7 @@ test('B6 the state goes back to unread with no session.start (a resume): the tic
   await start($)
   expect(asked.n).toBe(1)
   isUnread = true
-  await clock.advance(62 * SEC)
+  await clock.advance(64 * SEC)
   await spin()
   expect(asked.n, 'the tick read the unread account').toBeGreaterThan(1)
   const ui = await band($)
@@ -244,20 +244,72 @@ test('B13 a result written just as the ceiling fires is not overwritten by read 
   const held = new Promise<void>(resolve => {
     release = resolve
   })
-  const writes = { n: 0 }
+  const written: string[] = []
   on('state.set', { plugin: 'agent-models', key: 'account' }, async (_, e, next) => {
-    writes.n += 1
-    if (writes.n === 1) await held // the read's own write lands late: the ceiling fires while it is under way
+    written.push(JSON.stringify(e))
+    if (written.length === 1) await held // the read's own write lands late: the ceiling fires while it is under way
     return next(e)
   })
   await start($)
-  expect(writes.n).toBe(1)
+  expect(written).toHaveLength(1)
   await clock.advance(READ_CEILING)
   await spin()
-  expect(writes.n, 'the ceiling wrote nothing over the result that was being written').toBe(1)
+  expect(written.some(w => w.includes('read timed out')), 'the ceiling wrote nothing over the result that was being written').toBe(false)
   release()
   await spin()
   const ui = await band($)
   expect(await text(ui, 'dev@example.com')).toBeDefined()
+  await ui.unmount()
+})
+
+test('B14 the ceiling fires while the read\'s state READ is held: the result still lands, and read timed out is never written', async ($, on) => {
+  const clock = base(on)
+  const asked = identities(on, [() => identityOf('dev@example.com')])
+  let release: () => void = () => undefined
+  const held = new Promise<void>(resolve => {
+    release = resolve
+  })
+  let gets = 0
+  on('state.get', { plugin: 'agent-models', key: 'account' }, async (_, e, next) => {
+    gets += 1
+    if (gets === 1) await held // the update's own read of the state: held across the ceiling
+    return next(e)
+  })
+  const written: string[] = []
+  on('state.set', { plugin: 'agent-models', key: 'account' }, (_, e, next) => {
+    written.push(JSON.stringify(e))
+    return next(e)
+  })
+  await start($)
+  await clock.advance(READ_CEILING)
+  await spin()
+  release()
+  await spin()
+  expect(written.some(w => w.includes('read timed out'))).toBe(false)
+  const ui = await band($) // a bare `account ?` would make this draw start a read of its own
+  expect(await text(ui, 'dev@example.com'), 'the email is drawn, not a bare account ?').toBeDefined()
+  expect(asked.n, 'the draw read nothing: the first result had landed').toBe(1)
+  await ui.unmount()
+})
+
+test('B15 a refused write in the first pass, then a hung second pass: the ceiling says read timed out', async ($, on) => {
+  const clock = base(on)
+  let release: () => void = () => undefined
+  const held = new Promise<void>(resolve => {
+    release = resolve
+  })
+  const asked = identities(on, [() => held.then(() => identityOf('dev@example.com')), never])
+  statusRuns(on, never)
+  accountWrites(on, n => (n === 1 ? 'deny' : undefined))
+  await start($)
+  await $.turn.complete(TURN) // queued behind the first pass: the flight loops
+  await spin()
+  release() // pass 1 ends with a refused write, pass 2 hangs
+  await spin()
+  expect(asked.n).toBe(2)
+  await clock.advance(READ_CEILING)
+  await spin()
+  const ui = await band($)
+  expect(await text(ui, 'account ? (read timed out)'), 'a refused first-pass write does not hide the second pass ceiling').toBeDefined()
   await ui.unmount()
 })

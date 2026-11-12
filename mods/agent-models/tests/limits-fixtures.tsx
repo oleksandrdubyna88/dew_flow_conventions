@@ -128,7 +128,7 @@ export const rowOf = (tree: unknown): Node | undefined => {
 
 // the tsconfig has no node types: the one timer the fixture needs, typed here
 const timers = globalThis as unknown as { setTimeout: (fn: () => void, ms: number) => unknown }
-export type OwnClock = { now: number; isRefused: boolean; nowCalls: number; tick: (ms: number) => Promise<void> }
+export type OwnClock = { now: number; isRefused: boolean; nowCalls: number; everyRefusals: number; tick: (ms: number) => Promise<void> }
 /**
  * A clock the test steers by hand, for a test that must count or refuse `$.clock.now`: the time is `now`, a refused clock denies it,
  * `tick(ms)` moves it on and fires one period of the 2 s timer. No `$.clock.after` ever fires (no ceiling runs). Register it BEFORE `world`.
@@ -139,6 +139,7 @@ export const ownClock = (on: On, start: number): OwnClock => {
     now: start,
     isRefused: false,
     nowCalls: 0,
+    everyRefusals: 0, // the next this many `$.clock.every` calls are refused: a Timer that never fires
     tick: async ms => {
       clock.now += ms
       waits.shift()?.()
@@ -151,6 +152,12 @@ export const ownClock = (on: On, start: number): OwnClock => {
     return clock.isRefused ? { deny: 'refused' } : { value: clock.now }
   })
   on('clock.after', () => new Promise<{ value: void }>(() => undefined))
-  on('clock.every', () => new Promise<{ value: void }>(resolve => waits.push(() => resolve({ value: undefined }))))
+  on('clock.every', () => {
+    if (clock.everyRefusals > 0) {
+      clock.everyRefusals -= 1
+      return new Promise<{ value: void }>(() => undefined)
+    }
+    return new Promise<{ value: void }>(resolve => waits.push(() => resolve({ value: undefined })))
+  })
   return clock
 }

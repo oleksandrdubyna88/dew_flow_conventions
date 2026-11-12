@@ -257,8 +257,9 @@ async function identityOrCeiling($: EngineInterface): Promise<string | undefined
 }
 
 // One read; keeps two fields of the answer (parseStatus), no stdout, log or toast. Never rejects. `gen` is the read's number: when it is
-// no longer the live one (the ceiling abandoned this read) nothing more is asked and nothing is written.
-export async function readOnce($: EngineInterface, gen: number): Promise<void> {
+// no longer the live one (the ceiling abandoned this read) nothing more is asked and nothing is written. `pass` numbers one pass of the
+// flight's loop: once its state write has BEGUN the ceiling no longer abandons it (its result is landing, see readAccount).
+export async function readOnce($: EngineInterface, gen: number, pass: number): Promise<void> {
   let next: Account
   try {
     const email = await identityOrCeiling($)
@@ -274,7 +275,7 @@ export async function readOnce($: EngineInterface, gen: number): Promise<void> {
       }
     }
     if (gen !== generation) return
-    wroteGen = gen // the ceiling must not overwrite a result that is being written as it fires
+    writeBegun = pass
     await update($, account, cur => (gen === generation ? next : cur)) // the check again: a newer read may have started during the write
   } catch {
     // a refused state write: the next trigger writes again
@@ -289,13 +290,14 @@ export async function readOnce($: EngineInterface, gen: number): Promise<void> {
 // an old read in flight then has no ceiling and its late answer (a real answer) can still be written; each abandoned read leaves at most
 // one unsettled `identity()` promise, and the retry starts at most one a minute.
 let generation = 0 // the live read's number
-let wroteGen = 0 // the number of the last read that began its state write
+let passes = 0 // the number of the last pass of any flight
+let writeBegun = 0 // the pass whose state write began last
 let inFlight: Promise<void> | undefined
 let again = false
 export const isAccountReading = (): boolean => inFlight !== undefined
 
 // A read that ends, or false when the ceiling came first. `readOnce` never rejects.
-async function readWithCeiling($: EngineInterface, gen: number): Promise<boolean> {
+async function readWithCeiling($: EngineInterface, gen: number, pass: number): Promise<boolean> {
   let timer: Timer | undefined
   const ceiling = new Promise<false>(resolve => {
     try {
@@ -305,7 +307,7 @@ async function readWithCeiling($: EngineInterface, gen: number): Promise<boolean
     }
   })
   try {
-    return await Promise.race([readOnce($, gen).then(() => true as const), ceiling])
+    return await Promise.race([readOnce($, gen, pass).then(() => true as const), ceiling])
   } finally {
     timer?.cancel()
   }
@@ -317,17 +319,22 @@ export function readAccount($: EngineInterface): Promise<void> {
     return inFlight
   }
   const gen = ++generation
+  retryTicks = 0 // the tick retries a full minute after the last read, whoever started it
   inFlight = (async () => {
     try {
       do {
         again = false
-        if (!(await readWithCeiling($, gen))) {
-          const mine = ++generation // the hung read is abandoned
+        const pass = ++passes
+        if (!(await readWithCeiling($, gen, pass))) {
           inFlight = undefined // FIRST: nothing below may keep the flight, and the writes below can hang
           const queued = again
           again = false
+          const isLanding = writeBegun === pass // this pass's own state write has begun: its result is landing
+          // A landing result keeps its generation, so its updater still accepts it (a state read held across the ceiling does not lose
+          // it) unless a newer read starts, whose own result then replaces it; the ceiling writes nothing over it. Otherwise the hung read is abandoned.
+          const mine = isLanding ? generation : ++generation
           if (queued) void readAccount($) // before any await; its own generation makes the write below skip
-          if (wroteGen === gen) return // the abandoned read's own write has begun: its result is not overwritten
+          if (isLanding) return
           const timedOut: Account = { kind: 'unknown', suffix: 'read timed out', readAt: await nowOrZero($) }
           if (generation === mine) {
             // only an account that is not known (change 1.1: a signed-in or signed-out one is KEPT) and not replaced by a newer read
@@ -363,14 +370,16 @@ export async function readAccountOnDraw($: EngineInterface, acc: Account): Promi
 }
 
 // The 2 s tick's account retry. It counts its own ticks and asks no clock (the draw's throttle reads `nowOrZero`, which is 0 for every
-// call while `$.clock.now` is refused, so it could block for ever): every RETRY_EVERY_TICKS-th call (about a minute) it starts a read
-// when none is running and the account is unread or unknown. A signed-in or signed-out account is never read here (no process a
-// minute while idle). Never rejects.
+// call while `$.clock.now` is refused, so it could block for ever): past RETRY_EVERY_TICKS calls since the last read of any kind started
+// (about a minute and one tick, so it does not meet the draw's own throttle at the minute) it starts a read when none is running and
+// the account is unread or unknown. A signed-in or signed-out account is never read here (no process a minute while idle). Never rejects.
 export const RETRY_EVERY_TICKS = 30
-let retryTicks = 0
+let retryTicks = 0 // calls since the last flight started (readAccount sets it to 0)
 export async function retryAccount($: EngineInterface): Promise<void> {
   retryTicks += 1
-  if (retryTicks % RETRY_EVERY_TICKS !== 0 || inFlight !== undefined) return
+  if (retryTicks <= RETRY_EVERY_TICKS) return
+  retryTicks = 0
+  if (inFlight !== undefined) return
   try {
     const acc = await currentAccount($)
     if (inFlight === undefined && (acc.kind === 'unread' || acc.kind === 'unknown')) void readAccount($)

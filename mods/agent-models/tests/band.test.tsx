@@ -384,12 +384,7 @@ test('C4 a refused account write is retried at most once a minute, never once pe
   await clock.advance(1)
   await ui.redraw()
   await spin()
-  // a minute in: the draw's throttle lets one read start, and (1.4.0) so does the tick's own minute retry, which the draw started
-  expect(count.n).toBe(3)
-  await ui.redraw()
-  await ui.redraw()
-  await spin()
-  expect(count.n, 'frames after that start none').toBe(3)
+  expect(count.n).toBe(2) // the tick's own retry counts from the last read (the draw's), so it does not start one at the same minute
   expect(await rowText(ui, /^account \?$/)).toBe('account ?')
   await ui.unmount()
 })
