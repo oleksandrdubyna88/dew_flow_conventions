@@ -1,6 +1,6 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 8 open (2026-11-07), approved by the reviewers after the re-review (`Narrowed: no`); one change recorded, entry 8.1 (2026-11-10), so the next accepted change is the eighth full stop. E2 (creds) is COMPLETE, 2026-11-10.** Its five producer PRs are merged on creds `main`: E2.1 #294 (`834c91b`), E2.2 #310 (`bf59e4f`), E2.3 #311 (`0ae0211`), E2.4 #329 (`6e08071`, 2026-11-10) and E2.5 #330 (`b6cc6b3`, 2026-11-10 19:48 UTC). E2.5 switched on both repository guards: the shipped Node guard in creds' `docs.yml` is clean over 640 files, and the copied C# guard is green on all OS legs. Exemption markers are only on the inventoried lines. Creds' mount moved to `.agents/conventions` (#328) and is pinned at release `1341995` (#340). Epoch 8 used one change only, entry 8.1. E2's progress is not a change, so it has no ledger entry; creds' build records give the reasons why nothing else was counted. E2's rows and Definition of Done parts: § *Epoch 8* item 3.3. Still open in this plan: E5.S7, E6, E7, the feature reviews (E2's stories document's review is now due, § *Epoch 8* item 5, point 2) and the promotion. Creds' notes N20–N25 and its side findings (`release.yml`'s publish from any branch; two product scripts' temp leaks) are carried to the follow-ups as F33–F40.
+> Status: **epoch 8 open (2026-11-07), approved by the reviewers after the re-review (`Narrowed: no`); one change recorded, entry 8.1 (2026-11-10), so the next accepted change is the eighth full stop. E2 (creds) is COMPLETE, 2026-11-10. E5.S7 (coai's drain) is COMPLETE, 2026-11-12.** Its five producer PRs are merged on creds `main`: E2.1 #294 (`834c91b`), E2.2 #310 (`bf59e4f`), E2.3 #311 (`0ae0211`), E2.4 #329 (`6e08071`, 2026-11-10) and E2.5 #330 (`b6cc6b3`, 2026-11-10 19:48 UTC). E2.5 switched on both repository guards: the shipped Node guard in creds' `docs.yml` is clean over 640 files, and the copied C# guard is green on all OS legs. Exemption markers are only on the inventoried lines. Creds' mount moved to `.agents/conventions` (#328) and is pinned at release `1341995` (#340). Epoch 8 used one change only, entry 8.1. E2's progress is not a change, so it has no ledger entry; creds' build records give the reasons why nothing else was counted. E2's rows and Definition of Done parts: § *Epoch 8* item 3.3. Still open in this plan: E6, E7, the feature reviews (E2's stories document's review is now due, § *Epoch 8* item 5, point 2; E2's round is held by `call_human` since 2026-11-10 — a reviewer failed, and the owner left it held on 2026-11-11) and the promotion. E5.S7 drained coai's `raw-temp` baseline from 778 entries to zero in six pull requests, one per suite, and deleted the file with its last entries (S7-d): § *Epoch 8* item 3.4. E5's progress is not a change, so it has no ledger entry. Creds' notes N20–N25 and its side findings (`release.yml`'s publish from any branch; two product scripts' temp leaks) are carried to the follow-ups as F33–F40.
 >
 > Was: Status: **epoch 8 open (2026-11-07), approved by the reviewers after the re-review (`Narrowed: no`); entry 8.1 recorded 2026-11-10 (E2.4.S3: D5's check and naming step and a failed command substitution), so the next accepted change is the eighth full stop.** Epoch 7 stopped at entries 7.1 and 7.2; the whole plan was revised (§ *Epoch 8*): D5 by option B, observed acceptance results for every remaining epic, the Windows exception restated by its true condition (a process whose new files are owned by Administrators); the Opus judge sorted epoch 7's work (fits, two cuts fixed forward, outside rows; coai #962 merged during the stop and is reported to the owner); the plan gate on an operative extract (sessions `39432dd3`, `6f58dbce`) and an independent Opus review passed. Epoch 8 starts at 0 changes.
 >
@@ -2490,6 +2490,37 @@ creds `main` at `b6cc6b3` **[D]**. "Part" means a part of creds' E2.4 build reco
 
 Two E2 items stay open in this plan: ~~row E2.4-g's quote (above)~~ (quoted 2026-11-10), and E2's feature review (item 5, point 2), which is
 due now.
+
+#### 3.4 E5.S7's rows at S7's end (2026-11-12; a progress record, not a change)
+
+S7 is complete: coai's `raw-temp-baseline.json` went from 778 entries to zero in six pull requests, one per suite, each
+through coai's plan and code gates and green on all CI legs, and the last one deleted the file. Read from coai `main` at
+`8a036eac` **[D]**: the briefs `todo/PLAN_test_leftovers_E5_S7_{bench,scripts,bugs,server,extension,mcp}_brief.md`, and
+`research/module_tests.md`, *S7, the drain*.
+
+| Suite (scope) | Entries | Pull request | The file after |
+|---|---|---|---|
+| bench (`src_bench/CoaiBench.Tests/`) | 8 | #977 `e1b63958` | 770 |
+| scripts (`scripts/`) | 10 | #979 `0107883e` | 760 |
+| ingest (`src_bugs/tests/`) | 26 | #980 `395332cf` | 734 |
+| Team server (`src_server/tests/`) | 57 | #981 `9c9f0929` | 677 |
+| extension (`src_vs_code/src/test/`) | 219 | #984 `9a429757` | 458 |
+| coai-mcp (`src_mcp/tests/`) | 458 | #985 `8a036eac` | deleted (S7-d) |
+
+| Row | Result | Evidence (coai) |
+|---|---|---|
+| S7-a | done | #977: the standing step *The raw-temp baseline only shrinks* lost its `number != 945` clause and has run on every later pull request |
+| S7-b | done | every drain PR removed a suite's entries together with their sites, RED first: the guard named exactly that suite's sites with the entries removed and the sites kept (8, 10, 26, 57, 219, 458), then GREEN, then RED again with one site put back; `--baseline-shrinks --base origin/main` "only shrinks" on each |
+| S7-c | done | the standing step fetches the base at depth 1; no drain PR was a creation, and each shrink passed in CI |
+| S7-d | done | #985, in one commit: the file deleted with its last 458 entries; `--baseline` dropped from the Node guard's run over the tree (`testLeftovers.test.mjs` N1) and from the C# repository guard (no baseline applied — the guard is red on ANY raw temp call outside the helpers); `The_baseline_file_exists…` became `The_drained_baseline_file_stays_gone`, RED with an empty file re-created; the two tests that only found the file retired; the shrink step stays and answers `absent now — drained` |
+| S7-e | done | `shared/leftovers-exemptions.json` unchanged by all six PRs (its rows are line-keyed: no line moved above a row); no new `testsToDelete-exempt` marker |
+
+What the drain found on the way, none of it a change to this plan: `LocalRuntimeTests` wrote into the machine's real
+`/tmp/out` (now under the run folder, #985); a resolved temp-root parent broke a macOS-only premise in the extension suite
+on its first CI run (fixed in #984 before merge: the replaced code used the unresolved root); `scripts/native/native.test.mjs`
+names scratch folders with two random bytes and collided once on CI (recorded in coai's scripts brief as found, not fixed —
+folding it in would have been a scope change); the coai macOS CI job sits at its 30-minute limit; one coai-mcp test read
+an empty `/proc/locks` once in the SonarCloud job. Each is with the owner as a question.
 
 ### 4. The dispositions of entries 7.1 and 7.2
 
