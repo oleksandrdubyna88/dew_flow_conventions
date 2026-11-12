@@ -1,8 +1,12 @@
-// The limits behind the email: a press on the signed-in email opens one line, `5h 87% left · week 74% left · Fable 82% left`,
-// read from the usage endpoint the built-in /usage reads. The parser is the ONE road in: of the answer only three numbers
-// and the model's label are kept; nothing else of the body, no header and not the credential handle is stored, drawn or
-// logged. The endpoint is internal and its shape can change without notice: a missing value is a dash, never a zero.
+// The limits behind the email: a press on the signed-in email opens one line,
+// `5h 87% left · resets in 1h 23m · week 74% left · Fable 82% left`, read from the usage endpoint the built-in /usage reads.
+// The parser is the ONE road in: of the answer only three numbers, the model's label and the 5-hour window's reset time are
+// kept; nothing else of the body, no header and not the credential handle is stored, drawn or logged. The endpoint is
+// internal and its shape can change without notice: a missing value is a dash, never a zero.
 // Each number is drawn in the colour of what is left, and a red Close beside the line shuts it (1.3.3).
+// 1.4.0: the reset time is kept as a moment and the text is made at DRAW time, so it counts down while the line is open: the
+// 2 s tick writes the drawn minute to `limitsMinute` (at most once a minute), which draws the band again. A passed reset
+// makes the tick fetch again (under the one-a-minute throttle), so the old window's numbers do not stay.
 // Every function that takes `$` is a function declaration (an arrow taking `$` is refused across an import).
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Timer } from 'claude-code'
@@ -18,6 +22,11 @@ export const LIMITS_UNAVAILABLE = 'limits unavailable'
 export const LIMITS_LOADING = 'loading limits…'
 
 const limits = atom({ plugin: 'agent-models', key: 'limits' } as const, { isOpen: false, isFailed: false } as LimitsView)
+// The minute the open line drew (null: a dash). The draw reads it only to be drawn again when it changes; the tick writes it.
+const limitsMinute = atom({ plugin: 'agent-models', key: 'limitsMinute' } as const, null as number | null)
+export const MINUTE_MS = 60_000
+export const RESET_GREEN_UNDER = 10 // minutes: under this green, up to RESET_ORANGE_UP_TO orange, over it red
+export const RESET_ORANGE_UP_TO = 30
 
 // The engine's scan reads `read($, x)` only for an atom written in the same file: register.tsx reads this one through here.
 export async function currentLimits($: EngineInterface): Promise<LimitsView> {
@@ -46,7 +55,17 @@ const modelOf = (entries: unknown): Limits['model'] => {
   return null
 }
 
-/** The three numbers and the label from the response text; null unless it is ONE JSON object. The parsed value dies here. */
+// An ISO 8601 moment WITH an offset (`Z` or `±hh:mm`): a string without one would be read as local time.
+const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/
+
+/** Epoch milliseconds of an ISO 8601 string with an offset; null for anything else. */
+export function parseResetsAt(value: unknown): number | null {
+  if (typeof value !== 'string' || !ISO_WITH_OFFSET.test(value)) return null
+  const ms = Date.parse(value)
+  return Number.isFinite(ms) ? ms : null
+}
+
+/** The three numbers, the label and the reset time from the response text; null unless it is ONE JSON object. The parsed value dies here. */
 export function limitsFromBody(text: string): Limits | null {
   let value: unknown
   try {
@@ -59,22 +78,44 @@ export function limitsFromBody(text: string): Limits | null {
     fiveHour: percentLeft(field(field(value, 'five_hour'), 'utilization')),
     week: percentLeft(field(field(value, 'seven_day'), 'utilization')),
     model: modelOf(field(value, 'limits')),
+    fiveHourResetsAt: parseResetsAt(field(field(value, 'five_hour'), 'resets_at')),
   }
 }
+
+/** Whole minutes from `now` to `resetsAt`; null while either is unknown or the reset has come (`now >= resetsAt`). */
+export function minutesLeft(resetsAt: number | null, now: number | null): number | null {
+  if (resetsAt === null || now === null || !Number.isFinite(now) || now >= resetsAt) return null
+  return Math.floor((resetsAt - now) / MINUTE_MS)
+}
+
+/** `1h 23m` from 60 minutes on (`1h 0m`, so the shape never jumps), `59m`, `<1m` under a minute; a dash when unknown. */
+export const resetText = (minutes: number | null): string =>
+  minutes === null ? '—' : minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : minutes < 1 ? '<1m' : `${minutes}m`
+
+/** The colour of the minutes left, taken on the whole minutes the text shows: under 10 green, 10-30 orange, over 30 red. */
+export const resetColor = (minutes: number): string =>
+  minutes < RESET_GREEN_UNDER ? LOGIN_COLOR : minutes <= RESET_ORANGE_UP_TO ? ACCOUNT_COLOR : CLOSE_COLOR
 
 /** The colour of a percent LEFT: over 60 green, 10–60 orange, under 10 red; none for a non-finite number. */
 export const limitColor = (left: number): string | undefined =>
   !Number.isFinite(left) ? undefined : left > 60 ? LOGIN_COLOR : left < 10 ? CLOSE_COLOR : ACCOUNT_COLOR
 
-type Part = { text: string; left?: number } // `left` only on a number's own part, `69%`
+// `isValue` only on a value's own part (`69%`, `1h 23m`): it is drawn as a Text of its own, in `color` (none for a non-finite number).
+type Part = { text: string; isValue?: true; color?: string }
 const segmentParts = (label: string, left: number | null): Part[] =>
-  left === null ? [{ text: `${label} —` }] : [{ text: `${label} ` }, { text: `${left}%`, left }, { text: ' left' }]
-const limitsParts = (v: Limits): Part[] =>
-  [segmentParts('5h', v.fiveHour), segmentParts('week', v.week), segmentParts(v.model?.label ?? 'Fable', v.model?.left ?? null)]
+  left === null ? [{ text: `${label} —` }] : [{ text: `${label} ` }, { text: `${left}%`, isValue: true, color: limitColor(left) }, { text: ' left' }]
+// `resets in 1h 23m`; a dash (bare text, no colour) when the time is unknown, the clock was refused or the reset has come.
+const resetParts = (resetsAt: number | null, now: number | null): Part[] => {
+  const minutes = minutesLeft(resetsAt, now)
+  return minutes === null ? [{ text: 'resets in —' }] : [{ text: 'resets in ' }, { text: resetText(minutes), isValue: true, color: resetColor(minutes) }]
+}
+// `now` is epoch ms from the draw's own clock read, or null when that was refused.
+const limitsParts = (v: Limits, now: number | null): Part[] =>
+  [segmentParts('5h', v.fiveHour), resetParts(v.fiveHourResetsAt, now), segmentParts('week', v.week), segmentParts(v.model?.label ?? 'Fable', v.model?.left ?? null)]
     .flatMap((parts, i) => (i === 0 ? parts : [{ text: ' · ' }, ...parts]))
 
-/** The one line: `5h 87% left · week 74% left · Fable 82% left`; an absent number is a dash with no `% left`. */
-export const limitsLine = (v: Limits): string => limitsParts(v).map(p => p.text).join('')
+/** The one line: `5h 87% left · resets in 1h 23m · week 74% left · Fable 82% left`; an absent value is a dash with no `% left`. */
+export const limitsLine = (v: Limits, now: number | null): string => limitsParts(v, now).map(p => p.text).join('')
 
 /** Whether an open needs a fetch: never fetched, or the last fetch ended LIMITS_INTERVAL_MS or more ago. */
 export const isLimitsStale = (view: LimitsView, now: number): boolean =>
@@ -83,10 +124,14 @@ export const isLimitsStale = (view: LimitsView, now: number): boolean =>
 /** The email of a signed-in account; undefined while the account is unknown, signed out or unread. */
 export const emailOf = (acc: Account): string | undefined => (acc.kind === 'signed-in' ? acc.email : undefined)
 
-/** What the open line says, or undefined while it is closed or the account is not the one the line was opened for. */
-export const limitsText = (view: LimitsView, email: string | undefined): string | undefined => {
+/** Whether the line is open for `email` and holds a value: then its text has a time that runs down. */
+export const isLimitsShown = (view: LimitsView, email: string | undefined): boolean =>
+  view.isOpen && email !== undefined && view.email === email && view.value !== undefined
+
+/** What the open line says at `now`, or undefined while it is closed or the account is not the one the line was opened for. */
+export const limitsText = (view: LimitsView, email: string | undefined, now: number | null): string | undefined => {
   if (!view.isOpen || email === undefined || view.email !== email) return undefined
-  if (view.value !== undefined) return limitsLine(view.value)
+  if (view.value !== undefined) return limitsLine(view.value, now)
   return view.isFailed ? LIMITS_UNAVAILABLE : LIMITS_LOADING // a refetch keeps the old line until the answer lands
 }
 
@@ -140,6 +185,40 @@ const needsFetch = (view: LimitsView, now: number, email: string): boolean => {
   return isLimitsStale(view, now) || (view.value === undefined && !view.isFailed)
 }
 
+// The draw's own clock read for the open line: null when the clock is refused or gives no finite number (the line then says a dash).
+export async function limitsClock($: EngineInterface): Promise<number | null> {
+  try {
+    const now = await $.clock.now()
+    return Number.isFinite(now) ? now : null
+  } catch {
+    return null
+  }
+}
+
+// The draw of an open line reads the minute: that subscribes the band, so a write of it (the tick, below) draws the band again.
+export async function watchLimitsMinute($: EngineInterface): Promise<void> {
+  await read($, limitsMinute)
+}
+
+// The 2 s tick for the limits line. While the line is open with a value (never otherwise: a closed line asks no clock and
+// writes nothing): writes the minute the draw would show when it changed, so the time counts down; and when the reset has come
+// fetches again, which `needsFetch` holds to one a minute. Never rejects.
+export async function tickLimits($: EngineInterface): Promise<void> {
+  try {
+    const view = await read($, limits)
+    if (!view.isOpen) return // a closed line costs one state read, not an account read every 2 s
+    const email = emailOf(await currentAccount($))
+    if (email === undefined || !isLimitsShown(view, email)) return
+    const now = await limitsClock($)
+    const resetsAt = view.value?.fiveHourResetsAt ?? null
+    const minutes = minutesLeft(resetsAt, now)
+    if (now !== null && resetsAt !== null && now >= resetsAt && needsFetch(view, now, email)) void fetchLimits($, email)
+    if ((await read($, limitsMinute)) !== minutes) await update($, limitsMinute, () => minutes)
+  } catch {
+    // a refused state call or clock: the next tick tries again
+  }
+}
+
 // The press on the email: toggles the line. An open of the line for an account it was not open for starts clean (the old
 // account's numbers are never kept) and fetches; a stale open fetches; a close never does. Not signed in: nothing.
 export async function toggleLimits($: EngineInterface): Promise<void> {
@@ -175,15 +254,15 @@ export function accountButton($: EngineInterface, e: RenderEvent, text: string) 
   )
 }
 
-// The open line, its numbers coloured by what is left (labels, `left` and `·` stay plain), then a red Close. A nested
+// The open line, its numbers and its reset time coloured (labels, `left`, `resets in` and `·` stay plain), then a red Close. A nested
 // Text, so the terminal wraps the line as ONE text; Close beside it in a row (a Button cannot sit inside a Text).
-export function limitsRow($: EngineInterface, e: RenderEvent, view: LimitsView, email: string | undefined) {
-  const line = limitsText(view, email)
+export function limitsRow($: EngineInterface, e: RenderEvent, view: LimitsView, email: string | undefined, now: number | null) {
+  const line = limitsText(view, email, now)
   if (line === undefined) return null
   const { Box, Button, Text } = $.ui.resolve(e)
   const body = view.value === undefined // `limitsText` returns `limitsLine(view.value)` whenever there is a value
     ? <Text dimColor>{line}</Text>
-    : <Text>{limitsParts(view.value).map(p => (p.left === undefined ? p.text : <Text color={limitColor(p.left)}>{p.text}</Text>))}</Text>
+    : <Text>{limitsParts(view.value, now).map(p => (p.isValue === undefined ? p.text : <Text color={p.color}>{p.text}</Text>))}</Text>
   return (
     <Box columnGap={LIMITS_GAP}>
       {body}

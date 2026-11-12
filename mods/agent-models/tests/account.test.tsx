@@ -372,7 +372,8 @@ test('L4 a rejection draws the reason, dim, and the next press clears it', async
   await ui.unmount()
 })
 
-test('L5 the 10-minute ceiling settles a login that never answered', async ($, on) => {
+// 20 minutes of the mock clock are 600 timer periods since the draw starts the 2 s timer (1.4.0): about 4 s, so the default 5 s is too tight
+test('L5 the 10-minute ceiling settles a login that never answered', { timeoutMs: 60_000 }, async ($, on) => {
   const clock = base(on)
   noIdentity(on)
   const { argvs } = status(on, () => ok(statusJson({})))
@@ -431,7 +432,7 @@ test('L8 a settle cancels the 10-minute ceiling timer', async ($, on) => {
   const ceilings: { ms: number; cancelled: boolean }[] = []
   on('clock.after', (_, e, next) => {
     const entry = { ms: e.ms, cancelled: false }
-    ceilings.push(entry)
+    if (e.ms === 600_000) ceilings.push(entry) // the login ceiling; the account read's own ceilings (5 s, 30 s, 1.4.0) are not this test's subject
     next.signal.addEventListener('abort', () => {
       entry.cancelled = true
     })
@@ -446,7 +447,7 @@ test('L8 a settle cancels the 10-minute ceiling timer', async ($, on) => {
   await ui.unmount()
 })
 
-test('L9 a late settle after the ceiling reads once and changes no state', async ($, on) => {
+test('L9 a late settle after the ceiling reads once and changes no state', { timeoutMs: 60_000 }, async ($, on) => {
   const clock = base(on)
   noIdentity(on)
   const { argvs } = status(on, () => ok(statusJson({})))
@@ -621,7 +622,8 @@ test('L12 an old attempt settling late never clears a new attempt that started i
   noIdentity(on)
   status(on, () => ok(statusJson({})))
   const fires: (() => void)[] = []
-  on('clock.after', () => new Promise<{ value: void }>(resolve => fires.push(() => resolve({ value: undefined }))))
+  // only the login ceiling fires here (600 000 ms); the account read's own ceilings (5 s, 30 s, 1.4.0) never do
+  on('clock.after', (_, e) => new Promise<{ value: void }>(resolve => { if (e.ms === 600_000) fires.push(() => resolve({ value: undefined })) }))
   const releases: ((r: CommandRunResult) => void)[] = []
   let calls = 0
   on('command.run', { command: 'login' }, () => {
@@ -659,7 +661,7 @@ test('L13 a pending login this module has no live attempt for is stale: a press 
   status(on, () => ok(statusJson({})))
   const ceilings: number[] = []
   on('clock.after', (_, e) => {
-    ceilings.push(e.ms)
+    if (e.ms === 600_000) ceilings.push(e.ms) // the login ceiling; the account read's own ceilings (1.4.0) are not this test's subject
     return new Promise<{ value: void }>(() => undefined)
   })
   // What a hot reload leaves: the state says pending, this module's attempt and timer are gone.

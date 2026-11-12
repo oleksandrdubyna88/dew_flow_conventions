@@ -13,6 +13,7 @@ Product audit: [REVIEW_product_audit_2026-09-09.md](REVIEW_product_audit_2026-09
 
 | Plan | What it delivers |
 |---|---|
+| [PLAN_agent_models_1_4_0.md](PLAN_agent_models_1_4_0.md) | agent-models mod 1.4.0: the time until the 5-hour limit resets on the limits line (coloured green under 10 min, orange 10–30, red over 30), and an account read with a ceiling so a resumed session never stays on a bare `account ?`; then one release and the nine pin bumps |
 | [PLAN_shared_rules_claude_codex.md](PLAN_shared_rules_claude_codex.md) | One canonical policy for Claude Code and Codex: AGENTS bootstrap, CLAUDE import, neutral submodule, shared rule selection and the migration of every consumer; S1/S2 shipped, six of nine repositories on the neutral layout; stopped for re-review 2026-11-09 (two build-order changes), revised whole the same day: the fixed consumer order becomes a selection rule, creds is story 3.C with its acceptance checklist; waits for the Opus judge and the plan round before epoch 2 |
 | [PLAN_product_improvements.md](PLAN_product_improvements.md) | Audit fixes, smaller Claude Code rule payload, reliable checker results, boundary tests and versioned rollout |
 | [PLAN_prod_checks_and_http_contracts.md](PLAN_prod_checks_and_http_contracts.md) | `.http` contract suites and a `POST_DEPLOY.md` in every consumer, plus the three Node tools that check them |

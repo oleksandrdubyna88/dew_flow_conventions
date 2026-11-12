@@ -237,6 +237,12 @@ manifest, is completed rather than taken for an edit. The code round of the same
 the hook and a stop after the manifest (the old bytes are its `previous`) are both completed even when the source has
 moved on, every install records `previous`, and a relative source path is checked for uncommitted changes (it named
 a pathspec under the `-C` folder that did not exist); the last three red on the first fix.
+The mod itself is tested by `claude plugin test mods/agent-models` (282 cases at 1.4.0, not run by CI): 1.4.0 adds
+`tests/reset.test.tsx` (the reset time: parse, text, colour bands, the countdown write and redraw, a refused clock, a
+passed reset fetched again), `tests/account-ceiling.test.tsx` and `tests/account-retry.test.tsx` (the read ceilings,
+the generation, a result that lands as the ceiling fires, the tick retry with no clock, a session with no
+`session.start`), with `tests/account-fixtures.tsx`.
+
 The agent-models mod and its self-install (2026-11-11) have one test file per part, all with temporary homes and
 projects made by `ownedDir` through `tools/lib/agent-models-fixtures.mjs` (never `os.homedir()`, never the real
 `~/.claude`), and each case was run red before its change. `tools/agent-models-decide.test.mjs` covers the pure

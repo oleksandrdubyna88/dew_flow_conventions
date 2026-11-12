@@ -4,7 +4,7 @@
 // file the installer copies is a row of MOD_FILES (settings/hooks/lib/agent-models-decide.mjs); a file added after the
 // first release also needs its INTRODUCED entry there.
 import { atom, read, update } from 'claude-code'
-import type { AgentInfo, EngineInterface, ProcessRunResult, SessionIdentity, SessionMessage } from 'claude-code'
+import type { AgentInfo, EngineInterface, ProcessRunResult, SessionIdentity, SessionMessage, Timer } from 'claude-code'
 
 import type { Account, AgentRow, Login, Viewer } from '../types'
 
@@ -95,6 +95,8 @@ export const CLOSE_COLOR = '#ef4444' // the Close button's text
 export const TASKS_COLOR = '#3b82f6' // the tasks button's text and the tasks header (blue)
 export const STATUS_ARGV = ['claude', 'auth', 'status', '--json'] as const
 export const STATUS_TIMEOUT_MS = 10_000 // measured 0.19 s; 10 s covers a cold, loaded VM
+export const IDENTITY_TIMEOUT_MS = 5_000 // `$.session.identity()` makes no request and answers at once; past this the read goes on to the status run (1.4.0)
+export const READ_CEILING_MS = 30_000 // identity 5 s + status 10 s + margin: a whole read ends by then, whatever hangs (1.4.0)
 export const READ_INTERVAL_MS = 60_000 // a turn.complete reads again only past this
 export const LOGIN_CEILING_MS = 10 * 60_000
 const REASON_MAX = 160
@@ -230,16 +232,38 @@ export async function nowOrZero($: EngineInterface): Promise<number> {
   }
 }
 
-// One read; keeps two fields of the answer (parseStatus), no stdout, log or toast. Never rejects.
-export async function readOnce($: EngineInterface): Promise<void> {
+// The email of `$.session.identity()`; undefined on a deny, a failure or the ceiling (IDENTITY_TIMEOUT_MS: the read then goes on to
+// the status run, so a signed-in session still shows its email). The abandoned call's late answer or failure is never used, and a
+// `.catch` keeps its failure from being an unhandled rejection. A refused `$.clock.after` never runs its callback (it does not throw):
+// the call then has no ceiling, as in 1.3.3.
+async function identityOrCeiling($: EngineInterface): Promise<string | undefined> {
+  const asked = (async () => identityEmail(await $.session.identity()))()
+  asked.catch(() => undefined)
+  let timer: Timer | undefined
+  const ceiling = new Promise<undefined>(resolve => {
+    try {
+      timer = $.clock.after(IDENTITY_TIMEOUT_MS, () => resolve(undefined))
+    } catch {
+      // no ceiling: the identity answer decides
+    }
+  })
+  try {
+    return await Promise.race([asked, ceiling])
+  } catch {
+    return undefined
+  } finally {
+    timer?.cancel()
+  }
+}
+
+// One read; keeps two fields of the answer (parseStatus), no stdout, log or toast. Never rejects. `gen` is the read's number: when it is
+// no longer the live one (the ceiling abandoned this read) nothing more is asked and nothing is written. `pass` numbers one pass of the
+// flight's loop: once its state write has BEGUN the ceiling no longer abandons it (its result is landing, see readAccount).
+export async function readOnce($: EngineInterface, gen: number, pass: number): Promise<void> {
   let next: Account
   try {
-    let email: string | undefined
-    try {
-      email = identityEmail(await $.session.identity())
-    } catch {
-      email = undefined
-    }
+    const email = await identityOrCeiling($)
+    if (gen !== generation) return
     if (email !== undefined) {
       next = { kind: 'signed-in', email, readAt: await nowOrZero($) }
     } else {
@@ -250,45 +274,121 @@ export async function readOnce($: EngineInterface): Promise<void> {
         next = accountFromFailure(error, await nowOrZero($))
       }
     }
-    await update($, account, () => next)
+    if (gen !== generation) return
+    writeBegun = pass
+    await update($, account, cur => (gen === generation ? next : cur)) // the check again: a newer read may have started during the write
   } catch {
     // a refused state write: the next trigger writes again
   }
 }
 
 // Single flight: a call during a read asks for exactly one more read, started after the call. Never rejects.
+// 1.4.0: a read has a ceiling (READ_CEILING_MS), so a hung call never holds the flight for the session. On the ceiling `generation`
+// moves on (the abandoned read's late result writes nothing) — except for a pass whose state write has already BEGUN: that pass is
+// landing, keeps its generation, and its late write is accepted (the write is `update`, which on a version miss reads the state again and
+// runs the updater again, so a write held past a newer read's result is dropped by its own generation check and never replaces it).
+// `inFlight` is cleared FIRST (before any await: the state write below can
+// hang too), the account says `read timed out`, and a read queued meanwhile starts at once. Known limits: a timer is a clock dispatch, so
+// with `$.clock.after` refused the ceilings never fire and the read is as in 1.3.3; a hot reload cancels the old environment's timers, so
+// an old read in flight then has no ceiling and its late answer (a real answer) can still be written; each abandoned read leaves at most
+// one unsettled `identity()` promise, and the retry starts at most one a minute.
+let generation = 0 // the live read's number
+let passes = 0 // the number of the last pass of any flight
+let writeBegun = 0 // the pass whose state write began last
 let inFlight: Promise<void> | undefined
 let again = false
 export const isAccountReading = (): boolean => inFlight !== undefined
+
+// A read that ends, or false when the ceiling came first. `readOnce` never rejects.
+async function readWithCeiling($: EngineInterface, gen: number, pass: number): Promise<boolean> {
+  let timer: Timer | undefined
+  const ceiling = new Promise<false>(resolve => {
+    try {
+      timer = $.clock.after(READ_CEILING_MS, () => resolve(false))
+    } catch {
+      // no ceiling, as in 1.3.3
+    }
+  })
+  try {
+    return await Promise.race([readOnce($, gen, pass).then(() => true as const), ceiling])
+  } finally {
+    timer?.cancel()
+  }
+}
+
 export function readAccount($: EngineInterface): Promise<void> {
   if (inFlight) {
     again = true
     return inFlight
   }
+  const gen = ++generation
+  retryTicks = 0 // the tick retries a full minute after the last read, whoever started it
   inFlight = (async () => {
     try {
       do {
         again = false
-        await readOnce($)
+        const pass = ++passes
+        if (!(await readWithCeiling($, gen, pass))) {
+          inFlight = undefined // FIRST: nothing below may keep the flight, and the writes below can hang
+          const queued = again
+          again = false
+          const isLanding = writeBegun === pass // this pass's own state write has begun: its result is landing
+          // A landing result keeps its generation, so its updater still accepts it (a state read held across the ceiling does not lose
+          // it) unless a newer read starts, whose own result then replaces it; the ceiling writes nothing over it. Otherwise the hung read is abandoned.
+          const mine = isLanding ? generation : ++generation
+          if (queued) void readAccount($) // before any await; its own generation makes the write below skip
+          if (isLanding) return
+          const timedOut: Account = { kind: 'unknown', suffix: 'read timed out', readAt: await nowOrZero($) }
+          if (generation === mine) {
+            // only an account that is not known (change 1.1: a signed-in or signed-out one is KEPT) and not replaced by a newer read
+            await update($, account, cur => (generation === mine && (cur.kind === 'unread' || cur.kind === 'unknown') ? timedOut : cur))
+          }
+          return
+        }
       } while (again)
+    } catch {
+      // a refused state write: the next trigger writes again
     } finally {
-      inFlight = undefined
+      if (generation === gen) inFlight = undefined // not after the ceiling: a newer flight may be the one in `inFlight`
     }
   })()
   return inFlight
 }
 
 // The draw's own read (1.3.2): an unread account is read when the band draws it, so a resumed or hot-loaded session shows
-// the email before its first turn ends. Never while a read is in flight (readAccount would QUEUE one more), and at most one
-// draw-started read per READ_INTERVAL_MS: the stamp is set before the read starts, so a refused state write costs one read
-// a minute, never one per frame. Never rejects; the caller does not await it.
+// the email before its first turn ends. 1.4.0: an unknown account older than READ_INTERVAL_MS is read the same way. The 2 s tick
+// does not call this (retryAccount has its own count): an idle band is not left on `account ?`. A signed-in or signed-out account is never read here.
+// Never while a read is in flight (readAccount would QUEUE one more), and at most one read started here per READ_INTERVAL_MS: the
+// stamp is set before the read starts, so a refused state write costs one read a minute, never one per frame. With `$.clock.now`
+// refused, `nowOrZero` gives 0 and this throttle can block for ever; the tick's own retry does not depend on it. Never rejects; the
+// caller does not await it.
 let drawReadAt: number | undefined
-export async function readAccountOnDraw($: EngineInterface): Promise<void> {
-  if (inFlight !== undefined) return
+export async function readAccountOnDraw($: EngineInterface, acc: Account): Promise<void> {
+  if (inFlight !== undefined || (acc.kind !== 'unread' && acc.kind !== 'unknown')) return
   const now = await nowOrZero($)
+  if (isAccountFresh(acc, now)) return // an unknown account within a minute of its read (an unread one is never fresh)
   if (inFlight !== undefined || (drawReadAt !== undefined && now - drawReadAt < READ_INTERVAL_MS)) return
   drawReadAt = now // no await between this check and the start: two draws cannot both start a read
   void readAccount($)
+}
+
+// The 2 s tick's account retry. It counts its own ticks and asks no clock (the draw's throttle reads `nowOrZero`, which is 0 for every
+// call while `$.clock.now` is refused, so it could block for ever): past RETRY_EVERY_TICKS calls since the last read of any kind started
+// (about a minute and one tick, so it does not meet the draw's own throttle at the minute) it starts a read when none is running and
+// the account is unread or unknown. A signed-in or signed-out account is never read here (no process a minute while idle). Never rejects.
+export const RETRY_EVERY_TICKS = 30
+let retryTicks = 0 // calls since the last flight started (readAccount sets it to 0)
+export async function retryAccount($: EngineInterface): Promise<void> {
+  retryTicks += 1
+  if (retryTicks <= RETRY_EVERY_TICKS) return
+  retryTicks = 0
+  if (inFlight !== undefined) return
+  try {
+    const acc = await currentAccount($)
+    if (inFlight === undefined && (acc.kind === 'unread' || acc.kind === 'unknown')) void readAccount($)
+  } catch {
+    // the next minute tries again
+  }
 }
 
 // --- the messages viewer: its state, the session log road and the transcript road (1.3.2) ---

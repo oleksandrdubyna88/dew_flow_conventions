@@ -5,9 +5,9 @@ import type { Account, AgentRow, LimitsView, Login, Tasks, Viewer } from '../typ
 import {
   accountLabel, ACTIVE, BUTTON_COLOR, capNote, clampIndex, CLOSE_COLOR, closeViewer, currentAccount, currentPrompts, currentViewer,
   isAccountFresh, isAccountReading, isLoginPending, LOG_NOTE, LOGIN_CEILING_MS, LOGIN_COLOR, movePage, nowOrZero, openViewer, readAccount,
-  readAccountOnDraw, reasonLine, refusalNote, settledLogin, textRows, toRow, VIEWER_NOTE, viewerFixedRows,
+  readAccountOnDraw, reasonLine, refusalNote, retryAccount, settledLogin, textRows, toRow, VIEWER_NOTE, viewerFixedRows,
 } from './prompts'
-import { accountButton, currentLimits, emailOf, limitsRow, limitsText } from './limits'
+import { accountButton, currentLimits, emailOf, isLimitsShown, limitsClock, limitsRow, limitsText, tickLimits, watchLimitsMinute } from './limits'
 import { closeTasks, currentTasks, tasksButton, tasksView } from './tasks'
 
 const models = atom({ plugin: 'agent-models', key: 'models' } as const, {} as Record<string, string>)
@@ -30,6 +30,12 @@ const refresh = async ($: EngineInterface): Promise<void> => {
   } catch {
     // the session is not bound yet, or a state call was refused; the next tick tries again
   }
+}
+
+// The 2 s timer's work: the agent rows, the limits line (its minute, a passed reset's fetch) and the account retry (an unread or
+// stale unknown account is read again without a draw or a turn). Each never rejects.
+const tick = async ($: EngineInterface): Promise<void> => {
+  await Promise.all([refresh($), tickLimits($), retryAccount($)])
 }
 
 // Reads when the last read is 60 s old; also repairs a login left pending past its ceiling.
@@ -178,6 +184,7 @@ type Page = {
   isLoginPending: boolean
   tasks: Tasks
   limits: LimitsView
+  limitsNow: number | null // the draw's clock read for the open limits line; null when none was asked or it was refused
 }
 
 // The prompt is drawn whole; the band scrolls a taller tree itself, so the header only says so.
@@ -187,7 +194,7 @@ const pageRows = ($: EngineInterface, e: RenderEvent, page: Page) => {
   const index = clampIndex(view.index, texts.length)
   const prompt = texts[index] ?? ''
   const note = view.isFromLog ? LOG_NOTE : VIEWER_NOTE
-  const fixed = viewerFixedRows(props.bodyColumns, view.isCapped, page.login.reason, limitsText(page.limits, emailOf(page.account)), note)
+  const fixed = viewerFixedRows(props.bodyColumns, view.isCapped, page.login.reason, limitsText(page.limits, emailOf(page.account), page.limitsNow), note)
   const used = agentCount + fixed + textRows(prompt, props.bodyColumns)
   const more = used > props.maxRows ? ' (scroll for more)' : ''
   return (
@@ -222,7 +229,7 @@ const accountRow = ($: EngineInterface, e: RenderEvent, page: Page, lead?: Retur
         <Text>{'  '}</Text>
         {tasksButton($, e, page.tasks, () => closeViewer($))}
       </Box>
-      {limitsRow($, e, page.limits, emailOf(page.account))}
+      {limitsRow($, e, page.limits, emailOf(page.account), page.limitsNow)}
       {page.login.reason !== undefined && <Text dimColor>{refusalNote(page.login.reason)}</Text>}
       {page.tasks.isOpen && !page.view.isOpen ? tasksView($, e, page.tasks) : null}
     </Box>
@@ -245,18 +252,25 @@ const viewerRows = ($: EngineInterface, e: RenderEvent, page: Page) => {
 }
 
 export const register: Register = on => {
-  let ticking: Timer | undefined // this environment's one refresh timer; a reload starts a fresh scope
+  let ticking: Timer | undefined // the refresh timer the session start made; a reload starts a fresh scope
+  // The timer a draw made when no session start had (a resume). Only `$.state.set` is documented as refused while drawing, so a draw's
+  // `clock.every` may be refused (a Timer that never fires): the session start then replaces it instead of trusting it.
+  let drawTicking: Timer | undefined
   // The newest hook's refresh. The engine refuses a module that assigns `$` itself, and lets it be passed only to
   // a function declared at the top of the file, so the timer holds this thunk, which refreshes with the `$` of the
   // newest hook that ran, never the `$` of the hook that started the timer.
   let refreshNow: (() => Promise<void>) | undefined
 
   on('session.start', async ($, e, next) => {
-    refreshNow = () => refresh($)
+    refreshNow = () => tick($)
     const result = await next(e)
-    ticking ??= $.clock.every(REFRESH_MS, () => {
-      void refreshNow?.().catch(() => undefined)
-    })
+    if (ticking === undefined) {
+      drawTicking?.cancel()
+      drawTicking = undefined
+      ticking = $.clock.every(REFRESH_MS, () => {
+        void refreshNow?.().catch(() => undefined)
+      })
+    }
     if (!isAccountReading()) {
       void readAccount($) // not awaited: the session starts as fast as before; a read already running (the draw's) is not queued twice
     }
@@ -272,7 +286,7 @@ export const register: Register = on => {
   })
 
   on('agent.spawn', async ($, e, next) => {
-    refreshNow = () => refresh($)
+    refreshNow = () => tick($)
     const result = await next(e)
     if (!result.deny && result.agentId) {
       const id = result.agentId
@@ -289,7 +303,12 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    refreshNow = () => refresh($)
+    refreshNow = () => tick($)
+    if (ticking === undefined && drawTicking === undefined) {
+      drawTicking = $.clock.every(REFRESH_MS, () => {
+        void refreshNow?.().catch(() => undefined)
+      }) // a session that draws without a session.start (a resume) still ticks
+    }
     if (e.props.hasSurvey) {
       return next(e)
     }
@@ -303,8 +322,14 @@ export const register: Register = on => {
       currentLimits($),
     ])
     const texts = view.isOpen ? await currentPrompts($) : [] // the prompts of a whole session are read only while they are shown
-    if (acc.kind === 'unread') void readAccountOnDraw($) // not awaited: a draw is never delayed
-    const now = state.startedAt === undefined ? 0 : await nowOrZero($) // an idle frame never asks the clock
+    void readAccountOnDraw($, acc) // not awaited: a draw is never delayed; it reads only an unread or a stale unknown account
+    // The open limits line draws a time that runs down: it reads `limitsMinute`, so the tick's write of a new minute draws the band
+    // again. A closed line does not. One clock read serves both needs, a pending login and the shown line; an idle frame asks none.
+    const isShown = isLimitsShown(limitsView, emailOf(acc))
+    if (isShown) await watchLimitsMinute($)
+    const clock = isShown || state.startedAt !== undefined ? await limitsClock($) : null // null: not asked, or refused
+    const now = state.startedAt === undefined ? 0 : (clock ?? 0) // the login's check: a refused clock reads 0 (as `nowOrZero`)
+    const limitsNow = isShown ? clock : null // the line's own rule: a refused clock is a dash, never a time from 0
     const page = {
       view,
       texts,
@@ -315,6 +340,7 @@ export const register: Register = on => {
       isLoginPending: isLoginPending(state, now),
       tasks: taskList,
       limits: limitsView,
+      limitsNow,
     }
     const { Box } = $.ui.resolve(e)
     return (

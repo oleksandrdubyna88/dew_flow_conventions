@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
-import type { AgentInfo, AgentStatus, On, SessionIdentity } from 'claude-code'
+import type { AgentInfo, AgentStatus, On, ProcessRunResult, SessionIdentity } from 'claude-code'
 
 const BAND = {
   plugin: 'agent-models',
@@ -310,20 +310,41 @@ test('C2 a draw never starts a read while one is in flight, and the stamp holds 
   await ui.unmount()
 })
 
-test('C2b a draw past the interval still starts no read while one is in flight', async ($, on) => {
-  const clock = mock.clock(on)
+// The in-flight guard of the draw's read: the read is started by a turn end (so no draw stamp holds the draw back) from a stale unknown
+// account, and its status run is held. A draw before the 30 s ceiling must start none: without the guard it would queue one more read,
+// which runs when the held one ends (a second identity call and a second status run).
+test('C2b a draw while a turn-started read is in flight asks identity and the status run once each', async ($, on) => {
+  mock.clock(on, { now: 120_000 })
   on('agent.list', () => ({ value: [] }))
-  const { held, release } = heldIdentity()
-  const count = identity(on, IDENT, held)
-  const ui = await mountTerminal($)
+  on('turn.complete', (_, ev) => ({ text: ev.answer }))
+  let isStale = true // the state says: unknown, read at 0, 120 s ago; the first write of a read ends it (version 0 is the store's own)
+  on('state.get', { plugin: 'agent-models', key: 'account' }, (_, ev, next) =>
+    isStale ? { value: { value: { kind: 'unknown', suffix: undefined, readAt: 0 }, version: 0 } } : next(ev),
+  )
+  on('state.set', { plugin: 'agent-models', key: 'account' }, (_, ev, next) => {
+    isStale = false
+    return next(ev)
+  })
+  const count = identity(on, { deny: 'not a managed mod' })
+  let release: (r: ProcessRunResult) => void = () => undefined
+  let runs = 0
+  on('process.run', () => {
+    runs += 1
+    return new Promise<{ value: ProcessRunResult }>(resolve => {
+      release = r => resolve({ value: r })
+    })
+  })
+  await $.turn.complete({ answer: 'ok', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' }) // starts the read: stale
   await spin()
-  await clock.advance(120_000)
+  expect([count.n, runs], 'the turn end started one read, held at its status run').toEqual([1, 1])
+  const ui = await mountTerminal($) // the draw sees a stale unknown account and a read in flight
   await ui.redraw()
   await spin()
-  release()
+  release({ exitCode: 0, stdout: JSON.stringify({ loggedIn: true, email: 'dev@example.com' }), stderr: '', isStdoutTruncated: false, isStderrTruncated: false })
   await spin()
   await ui.redraw()
-  expect(count.n).toBe(1)
+  expect(await rowText(ui, 'dev@example.com')).toBe('dev@example.com')
+  expect([count.n, runs], 'the draw queued no second read').toEqual([1, 1])
   await ui.unmount()
 })
 
@@ -363,7 +384,7 @@ test('C4 a refused account write is retried at most once a minute, never once pe
   await clock.advance(1)
   await ui.redraw()
   await spin()
-  expect(count.n).toBe(2)
+  expect(count.n).toBe(2) // the tick's own retry counts from the last read (the draw's), so it does not start one at the same minute
   expect(await rowText(ui, /^account \?$/)).toBe('account ?')
   await ui.unmount()
 })
