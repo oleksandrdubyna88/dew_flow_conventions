@@ -28,48 +28,80 @@ the guard and step follow-ups.
   `limitsRow` (`:180-195`). The draw asks the clock only while a login is pending (`register.tsx:307`), and nothing
   redraws the band on a timer: the 2 s `refresh` writes `rows` only when the agent rows change
   (`register.tsx:20-33`, `:257`).
-- **The account read has no ceiling.** `readOnce` (`prompts.ts:234`) awaits `$.session.identity()` (`:239`) with no
-  time limit; only the `claude auth status` fallback has one (`STATUS_TIMEOUT_MS`, `:97`). `readAccount` is a single
-  flight (`:260-279`): while `inFlight` is set no other read starts, and `readAccountOnDraw` (`:286`) returns at once
-  when a read is in flight. So ONE call that never settles leaves `inFlight` set for the rest of the session, the
-  state stays `{ kind: 'unread' }`, and the band says `account ?` with no suffix (`accountLabel`, `:191-199`) — what
-  the owner saw in a resumed session, while a new session was fine.
+- **The account read has no ceiling, and nothing retries an unread account while the band is idle.** `readOnce`
+  (`prompts.ts:234`) awaits `$.session.identity()` (`:239`) with no time limit; only the `claude auth status`
+  fallback has one (`STATUS_TIMEOUT_MS`, `:97`). `readAccount` is a single flight (`:260-279`): while `inFlight` is
+  set no other read starts. The draw starts a read only for `{ kind: 'unread' }` (`register.tsx:306`) and at most once
+  a minute, stamped BEFORE the read (`prompts.ts:286-292`); `turn.complete` reads only when a turn ends
+  (`register.tsx:36-49`). An idle band is drawn again only when a state value it read is written.
+- **The cause of the owner's bare `account ?` is NOT proven** (no log was kept). Each of these leaves
+  `{ kind: 'unread' }` with no suffix (`accountLabel`, `prompts.ts:191-199`) until a turn ends, and the code allows each:
+  (H1) `identity()` never settles, so `inFlight` stays set for the session — less likely, its doc says "No request is
+  made" (claude-code.d.ts `identity`); (H2) the state write of the read is refused (the session not bound yet,
+  `register.tsx:31`), the throttle stamp is already set, and an idle band is never drawn again; (H3) an in-process
+  `/resume` raises no `session.start` while the module's `inFlight`/`drawReadAt` carry over. The fix below covers all
+  three, so it does not depend on which one it was.
+
+## Plan changes
+
+> Epoch 1 · approved 2026-11-12 · by reviewers · state: open
+
+  (The findings accepted at the approving round — 4 of 5 from the gate and 13 from the Opus review — are the baseline
+  this epoch was approved on and are written into the text below, not counted as changes.)
 
 ## Design
 
 ### A. The reset time (limits.tsx, types/index.d.ts, register.tsx)
 
 - `Limits` gains ONE field, `fiveHourResetsAt: number | null` — epoch milliseconds from `Date.parse` of
-  `five_hour.resets_at`; `null` when the field is absent, not a string, or does not parse to a finite number. The
-  type comment says four values now. Nothing else of the answer is kept.
-- The line: `5h 2% left · resets in 1h 23m · week 42% left · Fable 55% left`. The reset part follows the 5h part,
-  before `week`. Absent value: `resets in —` (the existing "a missing value is a dash" rule). A 5h dash and a reset
-  time both drawn is allowed (they are read independently).
-- The time is computed at DRAW time from `$.clock.now()` (epoch ms, per its API doc), not stored as text:
-  `m = floor((resetsAt − now) / 60 000)`. `m ≥ 60` → `${h}h ${m % 60}m` (`1h 0m` kept, so the shape never jumps);
-  `1 ≤ m < 60` → `${m}m`; `m < 1` (also a time already passed) → `<1m`.
-- Colour of the time part only (the words `resets in` stay plain, as `left` does): `m < 10` green `LOGIN_COLOR`
-  `#22c55e`; `10 ≤ m ≤ 30` orange `ACCOUNT_COLOR` `#f97316`; `m > 30` red `CLOSE_COLOR` `#ef4444` — the owner's three
-  bands on the same whole minutes the text shows. A dash has no colour.
-- **It counts down while open.** The draw asks the clock when the limits line is open with a value (an idle closed
-  band still never asks). A new state key `limitsMinute: number` (the floor of `now / 60 000` at the last write) is
-  read by the draw; the existing 2 s tick writes it only while the line is open and only when the minute changed —
-  one write a minute at most, none while closed. The key is constant size (one number): no growth surface.
-- The row-count of the open viewer (`viewerFixedRows`, via `limitsText`) gets the longer line, so a wrapped line is
-  still counted.
+  `five_hour.resets_at`, accepted only when the string is ISO 8601 WITH an offset (`Z` or `±hh:mm`; a string without
+  one would parse as local time) and parses to a finite number; else `null`. The type comment says four values now.
+  Nothing else of the answer is kept.
+- The line: `5h 2% left · resets in 1h 23m · week 42% left · Fable 55% left`. The part `resets in ` is plain text and
+  the value is its own part, as `left` and the numbers are today. Not known (`null`, the clock refused, or a reset
+  time already passed): `resets in —`, the existing "a missing value is a dash" rule, no colour.
+- The time is computed at DRAW time, never stored as text: `m = floor((resetsAt − now) / 60 000)` with `now` from
+  `$.clock.now()` (epoch ms) read by the draw in its OWN try/catch — a refused clock draws `—`, never a time from 0.
+  `m ≥ 60` → `${h}h ${m % 60}m` (`1h 0m` kept, so the shape never jumps); `1 ≤ m < 60` → `${m}m`;
+  `0 ≤ remaining < 60 s` → `<1m`; `now ≥ resetsAt` → `—`.
+- Colour of the value only: `m < 10` green `LOGIN_COLOR` `#22c55e`; `10 ≤ m ≤ 30` orange `ACCOUNT_COLOR` `#f97316`;
+  `m > 30` red `CLOSE_COLOR` `#ef4444`. **Interpretation, recorded:** the bands are taken on the whole minutes the
+  text shows, so 30 m 59 s shows `30m` and is orange; 31 m 0 s is red. `<1m` is green.
+- **It counts down while open.** A new state key `limitsMinute: number | null` holds the DRAWN minute (`m`, or `null`
+  when the value is `—`). The draw reads it, which subscribes the band: the engine draws a state value's readers
+  again when it is written (reference.md, `$.state`: "a later `$.state.set` draws exactly the readers again"). A
+  function in `limits.tsx` (the atom is written in the file that defines it, `limits.tsx:22`), called by the existing
+  2 s tick (`register.tsx:257`), computes `m` and writes it only while the line is open and only when it differs —
+  at most one write a minute, none while closed. One number: no growth surface.
+- **A passed reset fetches again.** When the line is open and `now ≥ resetsAt`, the same tick calls `fetchLimits`
+  under its existing throttle (`lastEnd`, one fetch a minute, `limits.tsx:93-141`), so the stale `5h 2% left` is
+  replaced by the new window's numbers; until then the time is `—`.
+- `limitsText`/`limitsLine` take `now`; the viewer's row count (`viewerFixedRows`, `register.tsx:190`) uses the same
+  `now` as the draw, so the longer line is counted when it wraps.
+- The draw asks the clock only when the limits line is open with a value; an idle closed band still never asks.
 
-### B. An account read that always ends (prompts.ts)
+### B. An account read that always ends, and a retry that does not wait for a turn (prompts.ts, register.tsx)
 
 - `IDENTITY_TIMEOUT_MS = 5 000`: `$.session.identity()` races a `$.clock.after` ceiling (the pattern of
   `fetchLimits`, `limits.tsx:105-124`, timer cancelled in `finally`). On the ceiling the read goes on to the
-  `claude auth status` road as on a deny, so a signed-in session still shows its email.
-- `READ_CEILING_MS = 30 000` (≥ identity 5 s + status 10 s + margin): the whole `readOnce` races one more ceiling
-  inside `readAccount`. On it, the single flight ends (`inFlight` cleared), the state gets
-  `{ kind: 'unknown', suffix: 'timed out', readAt }` (an existing suffix, `types/index.d.ts` `AccountSuffix`), and a
-  generation number makes a late result of the abandoned read write nothing. The next trigger (draw read once a
-  minute, `turn.complete` when stale) reads again — so `account ?` with no reason can no longer last a session.
-- If the clock itself is refused, `nowOrZero` already returns 0; if `$.clock.after` is refused, the ceiling cannot
-  start: that case is caught and the read runs as today (no worse than 1.3.3), and a test names it.
+  `claude auth status` road as on a deny, so a signed-in session still shows its email. The abandoned identity
+  promise gets a `.catch` (no unhandled rejection) and its late answer is never used.
+- `READ_CEILING_MS = 30 000` (≥ identity 5 s + status 10 s + margin): inside `readAccount` each `readOnce` races one
+  more ceiling and carries a generation number. On the ceiling: `inFlight` is cleared FIRST (before any await, as
+  that write can hang too); the state gets `{ kind: 'unknown', suffix: 'read timed out', readAt }` — a NEW
+  `AccountSuffix`, so it is told apart from the status run's own `timed out`; if a read was queued meanwhile
+  (`again`, e.g. a login settled), a new read starts at once. A late result of the abandoned read writes nothing
+  (its generation is not the live one).
+- **The retry no longer waits for a draw or a turn.** The 2 s tick (`register.tsx:257`) calls the throttled draw
+  read (`readAccountOnDraw`, at most one start a minute) whenever the account is `unread`, or `unknown` and older than
+  `READ_INTERVAL_MS`. The draw's own trigger widens the same way. So H1, H2 and H3 all end within about a minute,
+  idle or not. A signed-in or signed-out account is not read by the tick (no process a minute while idle).
+- **Known limits, written in the code comment:** a timer is a clock dispatch, and a refused `$.clock.after` does not
+  throw — its callback never runs (claude-code.d.ts `TimerCall`: "never when a hook refuses it"). With timers refused
+  the ceilings and the 2 s tick do not run, and the read behaves as in 1.3.3 (no worse). With `$.clock.now` refused,
+  `nowOrZero` gives 0 and the draw-read throttle can block retries; the tick is then the only retry. A hot reload
+  cancels the old environment's timers: an old read in flight then has no ceiling and its late answer (a real answer)
+  can still be written; each abandoned read leaves at most one unsettled `identity()` promise, at most one a minute.
 
 ### C. Version and release
 
@@ -79,6 +111,16 @@ the guard and step follow-ups.
   the existing swap on the next session start in a consumer that pins the new release.
 - After the merge: one `release` promotion (`promote-release.yml`), then a pin bump in each of the nine consumers.
   Before the promotion the owner is asked about in-flight consumer releases and the open-PR counts (the PR cap).
+
+## Files
+
+`mods/agent-models/hooks/limits.tsx` (parser, parts, colour, the tick function, the passed-reset fetch),
+`hooks/prompts.ts` (ceilings, generation, suffix, the widened retry), `hooks/register.tsx` (the tick calls, the
+draw's clock and `limitsMinute` read, `viewerFixedRows` with `now`), `types/index.d.ts` (`Limits`, `AccountSuffix`,
+`limitsMinute` in `PluginState`), `.claude-plugin/plugin.json`, the tests and fixtures under `tests/`
+(`limits-fixtures.tsx`: the fixture clock set near the fixture's `resets_at`, `L1`/`NONE` updated),
+`settings/hooks/lib/agent-models-decide.mjs` + `.claude/hooks/lib/agent-models-decide.mjs`,
+`tools/agent-models-pins.json`.
 
 ## Build order
 
@@ -95,32 +137,38 @@ the guard and step follow-ups.
 
 | # | Case | Expected |
 |---|---|---|
-| A1 | body with `five_hour.resets_at` ISO | `fiveHourResetsAt` = `Date.parse` value |
-| A2 | `resets_at` null / absent / number / `"garbage"` | `null` |
+| A1 | body with `five_hour.resets_at` `…Z`, `…+00:00`, `….123456+00:00` | `fiveHourResetsAt` = the `Date.parse` value |
+| A2 | `resets_at` null / absent / number / `"garbage"` / `"2026-11-12T10:00:00"` (no offset) | `null` |
 | A3 | line, 83 min left | `5h 2% left · resets in 1h 23m · week 42% left · Fable 55% left` |
-| A4 | 60 min, 59 min, 1 min, 59 s, −5 min | `1h 0m`, `59m`, `1m`, `<1m`, `<1m` |
-| A5 | colours at 9, 10, 30, 31 min | green, orange, orange, red; only the time part coloured |
+| A4 | 60 min, 59 min, 1 min, 59 s, 0 s, −5 min | `1h 0m`, `59m`, `1m`, `<1m`, `—`, `—` |
+| A5 | colours at 9 m 59 s, 10 m, 30 m 0 s, 30 m 30 s, 31 m | green, orange, orange, orange, red; only the value coloured |
 | A6 | `fiveHourResetsAt` null | `resets in —`, no colour |
-| A7 | line open, clock moves 1 min | `limitsMinute` written once, the drawn time drops by one minute |
+| A7 | line open, clock moves 1 min; a `state.get` hook beneath the plugin | the draw reads `limitsMinute`; it is written once; after the redraw the time is one minute less |
 | A8 | line closed, clock moves | no `limitsMinute` write, no clock read by the draw |
-| A9 | viewer row count | counts the longer limits line at a narrow width |
+| A9 | viewer row count at a narrow width | counts the longer limits line with the draw's `now` |
+| A10 | `clock.now` refused at draw, line open | `resets in —`, no colour |
+| A11 | line open, `now ≥ resetsAt`, last fetch over a minute ago | the tick starts one fetch; a second tick within a minute starts none |
 | B1 | `identity()` never settles, status answers an email | after 5 s the email is drawn |
-| B2 | `identity()` and the status run never settle | after 30 s `account ? (timed out)`, `isAccountReading()` false |
+| B2 | `identity()` and the status run never settle | after 30 s `account ? (read timed out)`, `isAccountReading()` false |
 | B3 | late answer of an abandoned read | writes nothing; a newer read's result stays |
-| B4 | after B2, the next draw a minute later | starts a new read |
-| B5 | `$.clock.after` refused | the read runs as in 1.3.3 and ends when its calls end |
-| B6 | existing 233 mod tests | still pass (identity answering at once is unchanged) |
+| B4 | after B2, idle (no draw, no turn), a minute later | the tick starts a new read |
+| B5 | the read's state write refused once, then idle | the tick reads again within about a minute; the email is drawn |
+| B6 | state back to `unread` with no `session.start` (resume) | the tick reads; the email is drawn |
+| B7 | a read queued (`again`) while the hung read hits the ceiling | a new read starts at once |
+| B8 | `$.clock.after` refused (callback never runs) | the read behaves as in 1.3.3; nothing throws |
+| B9 | signed-in account, idle for 3 minutes | the tick starts no read |
+| B10 | the existing 233 mod tests, after the fixture update of § Files | pass |
 | C1 | existing `tools/agent-models-pin.test.mjs` | newest row = HEAD files = `RELEASED_MOD` |
 
 ## Owner checks after the rollout (a session cannot do these for itself)
 
 - A new session: press the email, see `resets in …` with the right colour, and watch it count down one minute.
-- A resumed session: the band shows the email (or `account ? (timed out)`), never a bare `account ?` past 30 s.
+- A resumed session: the band shows the email (or `account ? (read timed out)`), never a bare `account ?` for more than about a minute.
 
 ## Definition of Done
 
 - [ ] Plan round `proceed`; code round `proceed`; Opus reviews done, findings fixed or answered.
-- [ ] Tests A1–A9, B1–B6, C1 green; RED seen first for A1, A3, A5, A7, B1, B2, B3.
+- [ ] Tests A1–A11, B1–B10, C1 green; RED seen first for A1, A3, A5, A7, A10, A11, B1–B7.
 - [ ] `claude plugin validate` passes; `tsc -p mods/agent-models` clean; `node --test tools/` green.
 - [ ] PR merged with green checks and no open thread.
 - [ ] `release` promoted after the owner's word; nine consumer pin bumps merged.
