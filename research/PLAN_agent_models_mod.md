@@ -1,7 +1,8 @@
 # PLAN — the `agent-models` mod ships with the shared rules and the session self-install turns it on
 
-> Status: **plan approved 2026-11-11 (coai plan round `proceed`, 2 of 2 reviewers); E1 built on `feat/agent-models-mod-e1`
-> (ends at 248065d, its code rounds `proceed`), E2 in progress on `feat/agent-models-mod-e2`, nothing merged or released.** Scope: a
+> Status: **IMPLEMENTED, 2026-11-12.** E1 and E2 merged in #160 (`d23a2ea`), `release` promoted to it, all nine
+> consumers bumped and merged; a fresh-HOME check in a consumer installed, then stayed silent. What shipped differently:
+> § *Shipped, observed, deviations*; what was left on purpose: § *Follow-ups*. Scope: a
 > new `mods/agent-models/` folder (a Claude Code mod, version 1.3.3, ported from the owner's own earlier work), one new
 > step in `settings/hooks/ensure-user-guard.mjs` with four installer modules under `settings/hooks/lib/`, helpers
 > exported from `settings/hooks/lib/user-guard-install.mjs`, the version pin table, their tests,
@@ -188,11 +189,80 @@ shows the band.
 - [ ] Released, every consumer pins it with the hooks copied in the same commit, one real install observed on WSL.
 - [ ] This plan promoted with its deviations.
 
+## Shipped, observed, deviations (2026-11-11/12)
+
+**Shipped.** E1 and E2 in one pull request, #160, squash-merged as `d23a2ea` after two coai code rounds per epic
+(all `proceed`), an Opus review per epic, CodeRabbit (7 comments: 3 fixed, 4 answered and accepted by it) and
+SonarCloud (one S2871 fixed). `release` moved to `d23a2ea` by the `promote-release` workflow (run 43092527240, its
+`ci` green on that sha). The feature review (coai, 3 epics) ran from the merged `main`: 2 of 3 reviewers answered
+with 0 findings, the third (vibe 3.0.2) failed twice with its own error `Agent 'plan' not found`, so the gate stopped
+at `call_human`; the owner switched vibe off and pressed *Proceed despite the findings* on the card.
+
+**E3, the consumers** (one pin-bump PR each: the gitlink plus the six hook copies, 7 files, +1170/−44; the owner
+allowed the PR cap to be passed for this release):
+
+| Consumer | PR | Merge |
+|---|---|---|
+| dew_flow_benchmark | #201 | `7d79502` |
+| dew_flow_mcp | #74 | `21553ce` |
+| dew_flow_rag_qln | #103 | `8908ec2` — also moved its code pins mcp `7e83ba1..21553ce` and benchmark `babbd1b..7d79502`, each range only that repository's rules bump (pull-requests rule 9) |
+| dew_flow_vscode_kit | #33 | `3151731` |
+| wsl_care | #197 | `0e6f3d8` |
+| dew_flow_amd_r9700_tuning_ai | #34 | `fd0723a` |
+| dew_flow_connect_other_ais | #983 | `80dbe56` (CodeRabbit "Review limit reached": merged on the other checks, said in the PR) |
+| dew_flow_sidecar_rust | #79 | `7522be5` |
+| dew_flow_creds_for_devs | #356 | `9ffe978` (4 CodeRabbit threads on the copied hooks, answered as recorded limits, resolved with the owner's word) |
+
+A GitHub incident that day left check suites queued that could not be cancelled; mcp #74 and creds #356 got an empty
+commit for a fresh head, never an admin merge.
+
+**Observed.** In a fresh worktree of `dew_flow_vscode_kit` main (`3151731`, submodule at `d23a2ea`) with a fresh
+temporary HOME, three session starts of `.claude/hooks/ensure-user-guard.mjs`: the first installed the guard, set
+effort to high, installed mod 1.3.3 and registered it (carrying the session's own `CLAUDE_CODE_PLUGIN_DIRS` entry
+over); the second and third printed nothing and changed nothing; `claude plugin validate` passed on the installed
+copy. The band itself was seen in the owner's own new WSL sessions (from Part A); a resumed session showed
+`account ?` (the mod's account read has no ceiling — first item for the next mod version).
+
+**What the plan said, and what shipped (deviations).**
+- The reference skip is decided on the project's own hook path, never on the mod's (the source tested the mod's root,
+  which would have skipped every consumer).
+- `effortTarget` is reused under its own name; the parent's claim that a hardened road was taken was corrected before
+  approval. The settings write became ONE extracted road, `commitSettings`, for the guard's three operations at its
+  defaults (the guard's behaviour unchanged, its three test files byte-unchanged) and the mod's registration with
+  `replace: false`; the effort write stays outside it.
+- A filesystem without hard links is a by-hand refusal for the mod's creation (the first spec fell back to a look then a
+  rename, which reopened the gap).
+- The mod's modules load by `await import` inside the step (a static import let a broken mod module kill the guard step).
+- A start that ends with no refusal forgets the said-once record, so a refusal whose state comes back is said again;
+  the said-once key normalises staging-, aside- and replaced- folder names.
+- The swap puts the moved folder back when it is newer, or when its version was readable at the decision and is not
+  now; a target with an unreadable plugin.json is never treated as engine junk.
+- The E1 stories' test count was 28 in decide, not 27; the mod has 11 test files, not 10.
+- `lstatOrNull` and `sha256` were exported from the guard installer instead of being moved, so no second body exists.
+- Checked and not built: a third coai round for E1's round-2 fixes (the stage allows two; the fixes were verified by
+  the caller instead).
+
+## Follow-ups (not built here; each needs its own plan)
+
+- **The next mod version (1.4.0):** the owner's request (2026-11-11) for the time until the 5-hour limit resets,
+  `5h 2% left · resets in 1h 23m · week 42% left · Fable 55% left`, the time green under 10 minutes, orange from 10 to
+  30, red over 30; a ceiling on the account read; no double submit of a task after a refused state write; a cap on the
+  session-log prompts the messages viewer reads; the limits line after an A→B→A account switch; the viewer actions'
+  refused state writes.
+- **The step and the swap:** an unchanged refusal stays silent on consecutive starts; after a put-back that itself
+  fails a later start can install the older copy; `keep` is decided on the first read; `reconcile` can treat an aside
+  whose plugin.json cannot be read as a stale leftover; `CLAUDE_CODE_PLUGIN_DIRS` is written to `~/.claude` through
+  `os.homedir()`, not `CLAUDE_CONFIG_DIR` (as the guard).
+- **The guard** (listed in the E2 stories): its creation can replace a file that appeared after its re-check; a
+  created settings.json takes the umask; the effort write re-reads bytes only; no writable check; backup before re-check.
+- **Elsewhere:** the coai vibe reviewer fails with Vibe 3.0.2 (`Agent 'plan' not found`); the coai server lost the
+  record of one cadence consultation (its close was refused).
+
 ## Epics
 
 Three epics; cornerstone quota ⌈2·3/5⌉ = 2. Split by Fable on 2026-11-11 (entry 1.1), after the question consultants
 were asked what is important: 2 of 2 answered, both said three epics and the same two cornerstone areas, and the caller
-checked their reasons against the code. Each epic's stories are `todo/PLAN_agent_models_mod_E<n>.md`, written by Opus
+checked their reasons against the code. Each epic's stories are `research/PLAN_agent_models_mod_E<n>.md` (in `todo/` until the promotion), written by Opus
 when the epic starts, with its `todo/README.md` row in the same commit and no `## Plan changes` of its own. The ledger
 line at the end names the two areas; k stays 0 until a stories document marks its story.
 
