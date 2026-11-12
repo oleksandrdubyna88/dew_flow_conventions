@@ -1,7 +1,8 @@
 # PLAN — agent-models mod, E2: the complete self-install
 
-> Status: **built 2026-11-11 on `feat/agent-models-mod-e2` (760a6a9, 1cd74bd, bc3d04e), the coai code round
-> `proceed` and an Opus review; review fixes in progress; not merged yet, and it promotes with its parent.** Stories of epic E2 of
+> Status: **IMPLEMENTED, 2026-11-12.** Built on `feat/agent-models-mod-e2` (760a6a9, 1cd74bd, bc3d04e, review fixes
+> 7d3e1f5 and ae2fc3c), two coai code rounds `proceed`, an Opus review and CodeRabbit, merged in #160 (`d23a2ea`);
+> deviations in the parent's § *Shipped, observed, deviations*. Stories of epic E2 of
 > [PLAN_agent_models_mod.md](PLAN_agent_models_mod.md) (§ *Epics*, E2), written by Opus when the epic started. Scope:
 > the writing installer modules `agent-models-swap.mjs` and `agent-models-install.mjs`, the registration in
 > `~/.claude/settings.json`, the third session-start step `ensureAgentModelsMod` in `ensure-user-guard.mjs` with its
