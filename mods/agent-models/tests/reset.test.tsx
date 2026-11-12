@@ -208,3 +208,27 @@ test('A11b a closed line never fetches for a passed reset', async ($, on) => {
   expect(w.calls).toHaveLength(1)
   await ui.unmount()
 })
+
+// One clock read per draw: a pending login and the shown limits line both need the time, and share the one value.
+test('A13 a pending login and an open limits line ask the clock once per draw; a refused clock still says a dash', async ($, on) => {
+  on('command.run', { command: 'login' }, () => new Promise<{ text: string }>(() => undefined)) // the login never ends: pending
+  const clk = ownClock(on, CLOCK_START)
+  await world($, on, answerWith(200, MEASURED), undefined, { isClockOwn: true })
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  await pressLimits(ui)
+  await ui.press({ key: 'login' })
+  await spin()
+  await ui.redraw()
+  expect((await ui.find({ type: 'Button', key: 'login' }))?.props.dimColor, 'the login is pending').toBe(true)
+  clk.nowCalls = 0
+  await ui.redraw()
+  expect(clk.nowCalls, 'one clock read for both').toBe(1)
+  expect(await text(ui, L1)).toBeDefined()
+  clk.isRefused = true
+  clk.nowCalls = 0
+  await ui.redraw()
+  expect(clk.nowCalls).toBe(1)
+  expect(await text(ui, l1At('—'))).toBeDefined()
+  expect((await ui.find({ type: 'Button', key: 'login' }))?.props.dimColor, 'a refused clock reads 0: the login stays pending').toBe(true)
+  await ui.unmount()
+})

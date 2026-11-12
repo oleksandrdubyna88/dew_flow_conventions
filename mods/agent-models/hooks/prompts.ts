@@ -274,6 +274,7 @@ export async function readOnce($: EngineInterface, gen: number): Promise<void> {
       }
     }
     if (gen !== generation) return
+    wroteGen = gen // the ceiling must not overwrite a result that is being written as it fires
     await update($, account, cur => (gen === generation ? next : cur)) // the check again: a newer read may have started during the write
   } catch {
     // a refused state write: the next trigger writes again
@@ -288,6 +289,7 @@ export async function readOnce($: EngineInterface, gen: number): Promise<void> {
 // an old read in flight then has no ceiling and its late answer (a real answer) can still be written; each abandoned read leaves at most
 // one unsettled `identity()` promise, and the retry starts at most one a minute.
 let generation = 0 // the live read's number
+let wroteGen = 0 // the number of the last read that began its state write
 let inFlight: Promise<void> | undefined
 let again = false
 export const isAccountReading = (): boolean => inFlight !== undefined
@@ -321,14 +323,16 @@ export function readAccount($: EngineInterface): Promise<void> {
         again = false
         if (!(await readWithCeiling($, gen))) {
           const mine = ++generation // the hung read is abandoned
-          inFlight = undefined
+          inFlight = undefined // FIRST: nothing below may keep the flight, and the writes below can hang
           const queued = again
           again = false
+          if (queued) void readAccount($) // before any await; its own generation makes the write below skip
+          if (wroteGen === gen) return // the abandoned read's own write has begun: its result is not overwritten
           const timedOut: Account = { kind: 'unknown', suffix: 'read timed out', readAt: await nowOrZero($) }
           if (generation === mine) {
-            await update($, account, cur => (generation === mine ? timedOut : cur)) // a newer read's result is kept
+            // only an account that is not known (change 1.1: a signed-in or signed-out one is KEPT) and not replaced by a newer read
+            await update($, account, cur => (generation === mine && (cur.kind === 'unread' || cur.kind === 'unknown') ? timedOut : cur))
           }
-          if (queued) void readAccount($)
           return
         }
       } while (again)
@@ -342,11 +346,12 @@ export function readAccount($: EngineInterface): Promise<void> {
 }
 
 // The draw's own read (1.3.2): an unread account is read when the band draws it, so a resumed or hot-loaded session shows
-// the email before its first turn ends. 1.4.0: an unknown account older than READ_INTERVAL_MS is read the same way, and the 2 s tick
-// (retryAccount) calls this too, so an idle band is not left on `account ?`. A signed-in or signed-out account is never read here.
+// the email before its first turn ends. 1.4.0: an unknown account older than READ_INTERVAL_MS is read the same way. The 2 s tick
+// does not call this (retryAccount has its own count): an idle band is not left on `account ?`. A signed-in or signed-out account is never read here.
 // Never while a read is in flight (readAccount would QUEUE one more), and at most one read started here per READ_INTERVAL_MS: the
 // stamp is set before the read starts, so a refused state write costs one read a minute, never one per frame. With `$.clock.now`
-// refused, `nowOrZero` gives 0 and this throttle can block a retry; the tick calls it again. Never rejects; the caller does not await it.
+// refused, `nowOrZero` gives 0 and this throttle can block for ever; the tick's own retry does not depend on it. Never rejects; the
+// caller does not await it.
 let drawReadAt: number | undefined
 export async function readAccountOnDraw($: EngineInterface, acc: Account): Promise<void> {
   if (inFlight !== undefined || (acc.kind !== 'unread' && acc.kind !== 'unknown')) return
@@ -357,12 +362,20 @@ export async function readAccountOnDraw($: EngineInterface, acc: Account): Promi
   void readAccount($)
 }
 
-// The 2 s tick's account retry: reads the account the draw would (unread, or unknown and a minute old), idle or not. Never rejects.
+// The 2 s tick's account retry. It counts its own ticks and asks no clock (the draw's throttle reads `nowOrZero`, which is 0 for every
+// call while `$.clock.now` is refused, so it could block for ever): every RETRY_EVERY_TICKS-th call (about a minute) it starts a read
+// when none is running and the account is unread or unknown. A signed-in or signed-out account is never read here (no process a
+// minute while idle). Never rejects.
+export const RETRY_EVERY_TICKS = 30
+let retryTicks = 0
 export async function retryAccount($: EngineInterface): Promise<void> {
+  retryTicks += 1
+  if (retryTicks % RETRY_EVERY_TICKS !== 0 || inFlight !== undefined) return
   try {
-    await readAccountOnDraw($, await currentAccount($))
+    const acc = await currentAccount($)
+    if (inFlight === undefined && (acc.kind === 'unread' || acc.kind === 'unknown')) void readAccount($)
   } catch {
-    // the next tick tries again
+    // the next minute tries again
   }
 }
 

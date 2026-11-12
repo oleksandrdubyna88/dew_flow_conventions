@@ -297,6 +297,9 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     refreshNow = () => tick($)
+    ticking ??= $.clock.every(REFRESH_MS, () => {
+      void refreshNow?.().catch(() => undefined)
+    }) // a session that draws without a session.start (a resume) still ticks
     if (e.props.hasSurvey) {
       return next(e)
     }
@@ -311,12 +314,13 @@ export const register: Register = on => {
     ])
     const texts = view.isOpen ? await currentPrompts($) : [] // the prompts of a whole session are read only while they are shown
     void readAccountOnDraw($, acc) // not awaited: a draw is never delayed; it reads only an unread or a stale unknown account
-    const now = state.startedAt === undefined ? 0 : await nowOrZero($) // an idle frame never asks the clock
-    // The open limits line draws a time that runs down: it asks the clock (in its own try/catch: a refused clock is a dash, never
-    // a time from 0) and reads `limitsMinute`, so the tick's write of a new minute draws the band again. A closed line does neither.
+    // The open limits line draws a time that runs down: it reads `limitsMinute`, so the tick's write of a new minute draws the band
+    // again. A closed line does not. One clock read serves both needs, a pending login and the shown line; an idle frame asks none.
     const isShown = isLimitsShown(limitsView, emailOf(acc))
     if (isShown) await watchLimitsMinute($)
-    const limitsNow = isShown ? await limitsClock($) : null
+    const clock = isShown || state.startedAt !== undefined ? await limitsClock($) : null // null: not asked, or refused
+    const now = state.startedAt === undefined ? 0 : (clock ?? 0) // the login's check: a refused clock reads 0 (as `nowOrZero`)
+    const limitsNow = isShown ? clock : null // the line's own rule: a refused clock is a dash, never a time from 0
     const page = {
       view,
       texts,

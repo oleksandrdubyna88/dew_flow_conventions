@@ -126,6 +126,8 @@ export const rowOf = (tree: unknown): Node | undefined => {
   return undefined
 }
 
+// the tsconfig has no node types: the one timer the fixture needs, typed here
+const timers = globalThis as unknown as { setTimeout: (fn: () => void, ms: number) => unknown }
 export type OwnClock = { now: number; isRefused: boolean; nowCalls: number; tick: (ms: number) => Promise<void> }
 /**
  * A clock the test steers by hand, for a test that must count or refuse `$.clock.now`: the time is `now`, a refused clock denies it,
@@ -141,6 +143,7 @@ export const ownClock = (on: On, start: number): OwnClock => {
       clock.now += ms
       waits.shift()?.()
       await spin()
+      await new Promise<void>(resolve => timers.setTimeout(resolve, 0)) // the next period is asked after a macrotask
     },
   }
   on('clock.now', () => {
