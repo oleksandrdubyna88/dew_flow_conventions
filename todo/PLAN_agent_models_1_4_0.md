@@ -48,6 +48,11 @@ the guard and step follow-ups.
 
   (The findings accepted at the approving round — 4 of 5 from the gate and 13 from the Opus review — are the baseline
   this epoch was approved on and are written into the text below, not counted as changes.)
+- 1.1 · 2026-11-12 · reviewer · approach — the code round's Opus review: the 30 s ceiling wrote `read timed out` over a signed-in email; the ceiling now keeps a known account
+  (The code round's other accepted findings only make the code do what this text already says — the queued read
+  before any await, a tick retry that does not depend on the clock, the timer started by the draw too, one clock
+  read per draw, a test that tested nothing — and are not changes. Three low findings were not taken; see
+  § Follow-ups.)
 
 ## Design
 
@@ -88,10 +93,12 @@ the guard and step follow-ups.
   promise gets a `.catch` (no unhandled rejection) and its late answer is never used.
 - `READ_CEILING_MS = 30 000` (≥ identity 5 s + status 10 s + margin): inside `readAccount` each `readOnce` races one
   more ceiling and carries a generation number. On the ceiling: `inFlight` is cleared FIRST (before any await, as
-  that write can hang too); the state gets `{ kind: 'unknown', suffix: 'read timed out', readAt }` — a NEW
-  `AccountSuffix`, so it is told apart from the status run's own `timed out`; if a read was queued meanwhile
-  (`again`, e.g. a login settled), a new read starts at once. A late result of the abandoned read writes nothing
-  (its generation is not the live one).
+  that write can hang too); if a read was queued meanwhile (`again`, e.g. a login settled), a new read starts at
+  once, before any await; then, only while the account is `unread` or `unknown` (change 1.1: a signed-in or
+  signed-out account is KEPT, as in 1.3.3 — a slow re-read never hides a known email), the state gets
+  `{ kind: 'unknown', suffix: 'read timed out', readAt }` — a NEW `AccountSuffix`, so it is told apart from the status
+  run's own `timed out`. A late result of the abandoned read writes nothing (its generation is not the live one), and
+  a result that was written just as the ceiling fired is not overwritten by it.
 - **The retry no longer waits for a draw or a turn.** The 2 s tick (`register.tsx:257`) calls the throttled draw
   read (`readAccountOnDraw`, at most one start a minute) whenever the account is `unread`, or `unknown` and older than
   `READ_INTERVAL_MS`. The draw's own trigger widens the same way. So H1, H2 and H3 all end within about a minute,
@@ -99,7 +106,7 @@ the guard and step follow-ups.
 - **Known limits, written in the code comment:** a timer is a clock dispatch, and a refused `$.clock.after` does not
   throw — its callback never runs (claude-code.d.ts `TimerCall`: "never when a hook refuses it"). With timers refused
   the ceilings and the 2 s tick do not run, and the read behaves as in 1.3.3 (no worse). With `$.clock.now` refused,
-  `nowOrZero` gives 0 and the draw-read throttle can block retries; the tick is then the only retry. A hot reload
+  `nowOrZero` gives 0 and the draw-read throttle can block retries; the tick is then the only retry, so the tick's retry counts its own ticks (about one a minute) and does not use the clock. The tick timer is started by the first draw too, not only by `session.start`. A hot reload
   cancels the old environment's timers: an old read in flight then has no ceiling and its late answer (a real answer)
   can still be written; each abandoned read leaves at most one unsettled `identity()` promise, at most one a minute.
 
@@ -111,6 +118,16 @@ the guard and step follow-ups.
   the existing swap on the next session start in a consumer that pins the new release.
 - After the merge: one `release` promotion (`promote-release.yml`), then a pin bump in each of the nine consumers.
   Before the promotion the owner is asked about in-flight consumer releases and the open-PR counts (the PR cap).
+
+## Follow-ups (not built here; low findings of the code round, kept out so the plan does not change twice)
+
+- An account that stays `unknown` for a reason that will not pass by itself (`claude not on PATH`, `claude exited N`)
+  is read again once a minute while idle: one `claude auth status` process a minute. A back-off, or a retry only
+  after a timeout.
+- A refetch that the tick started after a passed reset and that fails turns the line into `limits unavailable`, and
+  the tick does not try again until a press. Keep the old numbers on such a failure, or retry while open.
+- The `resets_at` check accepts only `Z` and `±hh:mm`; a lowercase `z` or `+0530` becomes a dash. A reset time far in
+  the future (more than about 6 h) is drawn as it is; it could be a dash.
 
 ## Files
 
