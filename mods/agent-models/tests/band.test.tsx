@@ -310,14 +310,15 @@ test('C2 a draw never starts a read while one is in flight, and the stamp holds 
   await ui.unmount()
 })
 
-test('C2b a draw past the interval still starts no read while one is in flight', async ($, on) => {
+// 1.4.0: a read has a 30 s ceiling (it used to hang for ever), so "in flight" is bounded: this draw comes 29 s in, before it.
+test('C2b a draw while a read is in flight (before its ceiling) starts no read', async ($, on) => {
   const clock = mock.clock(on)
   on('agent.list', () => ({ value: [] }))
   const { held, release } = heldIdentity()
   const count = identity(on, IDENT, held)
   const ui = await mountTerminal($)
   await spin()
-  await clock.advance(120_000)
+  await clock.advance(29_000)
   await ui.redraw()
   await spin()
   release()

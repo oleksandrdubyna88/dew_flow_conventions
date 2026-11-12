@@ -5,7 +5,7 @@ import type { Account, AgentRow, LimitsView, Login, Tasks, Viewer } from '../typ
 import {
   accountLabel, ACTIVE, BUTTON_COLOR, capNote, clampIndex, CLOSE_COLOR, closeViewer, currentAccount, currentPrompts, currentViewer,
   isAccountFresh, isAccountReading, isLoginPending, LOG_NOTE, LOGIN_CEILING_MS, LOGIN_COLOR, movePage, nowOrZero, openViewer, readAccount,
-  readAccountOnDraw, reasonLine, refusalNote, settledLogin, textRows, toRow, VIEWER_NOTE, viewerFixedRows,
+  readAccountOnDraw, reasonLine, refusalNote, retryAccount, settledLogin, textRows, toRow, VIEWER_NOTE, viewerFixedRows,
 } from './prompts'
 import { accountButton, currentLimits, emailOf, isLimitsShown, limitsClock, limitsRow, limitsText, tickLimits, watchLimitsMinute } from './limits'
 import { closeTasks, currentTasks, tasksButton, tasksView } from './tasks'
@@ -32,10 +32,10 @@ const refresh = async ($: EngineInterface): Promise<void> => {
   }
 }
 
-// The 2 s timer's work: the agent rows, then the limits line (its minute, a passed reset's fetch). Each never rejects. Not
-// started when a hook refuses `$.clock.every`: then the band is as in 1.3.3.
+// The 2 s timer's work: the agent rows, the limits line (its minute, a passed reset's fetch) and the account retry (an unread or
+// stale unknown account is read again without a draw or a turn). Each never rejects.
 const tick = async ($: EngineInterface): Promise<void> => {
-  await Promise.all([refresh($), tickLimits($)])
+  await Promise.all([refresh($), tickLimits($), retryAccount($)])
 }
 
 // Reads when the last read is 60 s old; also repairs a login left pending past its ceiling.
@@ -310,7 +310,7 @@ export const register: Register = on => {
       currentLimits($),
     ])
     const texts = view.isOpen ? await currentPrompts($) : [] // the prompts of a whole session are read only while they are shown
-    if (acc.kind === 'unread') void readAccountOnDraw($) // not awaited: a draw is never delayed
+    void readAccountOnDraw($, acc) // not awaited: a draw is never delayed; it reads only an unread or a stale unknown account
     const now = state.startedAt === undefined ? 0 : await nowOrZero($) // an idle frame never asks the clock
     // The open limits line draws a time that runs down: it asks the clock (in its own try/catch: a refused clock is a dash, never
     // a time from 0) and reads `limitsMinute`, so the tick's write of a new minute draws the band again. A closed line does neither.

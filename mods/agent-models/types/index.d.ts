@@ -16,8 +16,17 @@ export type Viewer = {
   isFromLog: boolean
 }
 
-/** A suffix that says why the account is unknown; drawn as `account ? (<suffix>)`. */
-export type AccountSuffix = 'claude not on PATH' | 'timed out' | 'unreadable status' | 'no email reported' | `claude exited ${number}`
+/**
+ * A suffix that says why the account is unknown; drawn as `account ? (<suffix>)`. `read timed out` (1.4.0): the whole read hit its
+ * 30 s ceiling; `timed out` is the status run's own timeout.
+ */
+export type AccountSuffix =
+  | 'claude not on PATH'
+  | 'timed out'
+  | 'read timed out'
+  | 'unreadable status'
+  | 'no email reported'
+  | `claude exited ${number}`
 
 /** What the band knows of the signed-in account. `readAt`: `$.clock.now()` when that read ENDED. */
 export type Account =
