@@ -258,6 +258,12 @@ ceiling — first item for the next mod version).
   `os.homedir()`, not `CLAUDE_CONFIG_DIR` (as the guard).
 - **The guard** (listed in the E2 stories): its creation can replace a file that appeared after its re-check; a
   created settings.json takes the umask; the effort write re-reads bytes only; no writable check; backup before re-check.
+- **Windows (native, not WSL)** — parked by the owner on 2026-11-12: the step skips `win32` and the mod says Windows is
+  not tested. Two facts found that day on the owner's machine: Node.js is not installed on Windows (only `claude.exe`),
+  so no session-start hook of a dew_flow project runs there and the mod's own `node` read cannot run; and Claude on
+  Windows had been opened only in the home folder and the VS Code folder, never in a dew_flow project, where the
+  self-install runs. A start needs Node.js on Windows first, then its own plan: the skip removed, the mod and the
+  installer tested on Windows, a Windows CI job.
 - **Elsewhere:** the coai vibe reviewer fails with Vibe 3.0.2 (`Agent 'plan' not found`); the coai server lost the
   record of one cadence consultation (its close was refused).
 
