@@ -3,14 +3,14 @@ import { expect, test } from 'claude-code/testing'
 import { LIMITS_INTERVAL_MS, LIMITS_LOADING, LIMITS_TIMEOUT_MS, LIMITS_UNAVAILABLE } from '../hooks/limits'
 import { textRows, viewerFixedRows } from '../hooks/prompts'
 import {
-  BAND, closeButton, L1, lastView, limitsButton, measured, MEASURED, pressClose, pressLimits, rowOf, spin, SURFACES, text, window, world,
+  BAND, closeButton, L1, lastView, limitsButton, measured, MEASURED, pressClose, pressLimits, RESETS_AT, rowOf, spin, SURFACES, text, window, world,
 } from './limits-fixtures'
 import type { Answer } from './limits-fixtures'
 
 // The limits line and the account it was fetched for; the ceiling of the fetch; what the flight and the failure remember.
 
 const TURN = { answer: 'ok', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as const
-const OTHER_LINE = '5h 50% left · week 74% left · Fable 82% left'
+const OTHER_LINE = '5h 50% left · resets in 1h 22m · week 74% left · Fable 82% left' // drawn a minute after the clock start
 const OTHER_BODY = JSON.stringify(measured({ five_hour: window(50) }))
 
 test('A1 an account change clears the old numbers; a reopen under the new email within a minute fetches again', async ($, on) => {
@@ -186,7 +186,7 @@ test('L-C12 Close while loading: the answer that lands later is kept, and does n
   await ui.redraw()
   expect(await text(ui, /^5h /)).toBeUndefined()
   expect(await text(ui, LIMITS_LOADING)).toBeUndefined()
-  expect(lastView(w)?.value).toEqual({ fiveHour: 87, week: 74, model: { label: 'Fable', left: 82 } })
+  expect(lastView(w)?.value).toEqual({ fiveHour: 87, week: 74, model: { label: 'Fable', left: 82 }, fiveHourResetsAt: RESETS_AT })
   await pressLimits(ui)
   expect(await text(ui, L1)).toBeDefined()
   expect(w.calls).toHaveLength(1)
@@ -216,12 +216,12 @@ test('L-C14 the height count describes the drawn row: the line wraps beside the 
   const expected = textRows(line, Math.max(1, 30 - `[ ${button?.props.label} ]`.length - Number(gap)))
   const counted = viewerFixedRows(30, false, undefined, line) - viewerFixedRows(30, false, undefined)
   expect(counted).toBe(expected)
-  expect(counted).toBe(3)
+  expect(counted).toBe(4) // 63 characters in 19 columns (1.4.0: the line is 63 characters long; it was 44, 3 rows)
   await ui.unmount()
 })
 
-// the open viewer's rows at 30 columns: agents 0 + fixed 3 + limits 3 + the note (118 characters, 4 rows) + `hello` 1 = 11
-for (const [maxRows, header] of [[11, 'Message 1 / 1'], [10, 'Message 1 / 1 (scroll for more)']] as const) {
+// the open viewer's rows at 30 columns: agents 0 + fixed 3 + limits 4 + the note (118 characters, 4 rows) + `hello` 1 = 12
+for (const [maxRows, header] of [[12, 'Message 1 / 1'], [11, 'Message 1 / 1 (scroll for more)']] as const) {
   test(`L-C15 the viewer counts the limits line beside Close: at ${maxRows} rows the header says "${header}"`, async ($, on) => {
     on('session.messages', () => ({ value: [{ role: 'user', text: 'hello', toolUses: [] }] }))
     await world($, on, () => ({ status: 200, text: MEASURED }))

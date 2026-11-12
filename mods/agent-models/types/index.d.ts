@@ -53,11 +53,15 @@ export type Tasks = {
   sendingId?: number
 }
 
-/** What the mod keeps of the usage answer: three "% left" numbers (0-100, whole) and the server's label. NOTHING else. */
+/**
+ * What the mod keeps of the usage answer: three "% left" numbers (0-100, whole), the server's label, and (1.4.0) the moment the
+ * 5-hour window resets. NOTHING else.
+ */
 export type Limits = {
   fiveHour: number | null
   week: number | null
   model: { label: string; left: number } | null // the `weekly_scoped` entry named Fable; null when the answer has none
+  fiveHourResetsAt: number | null // epoch ms of `five_hour.resets_at` (ISO 8601 with an offset); null when absent or not that. The text is made at draw time
 }
 
 /**
@@ -78,6 +82,8 @@ declare module 'claude-code' {
       login: Login
       tasks: Tasks
       limits: LimitsView
+      /** The minute the open limits line drew (null: a dash). Only its change matters: it draws the band again as the time runs down. */
+      limitsMinute: number | null
     }
   }
 }
