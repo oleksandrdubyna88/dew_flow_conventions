@@ -1059,10 +1059,12 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   §7's grammar accepts only a class of its own table, so `tools/leftovers-check.mjs` answers "an exemption names an unknown
   class `container-scoped`" (measured at `8ae5eb6`, `scanText` on a `tests/X.cs`; over a `DROP DATABASE` line it gives that
   finding and `shared-store`). Written as `shared-store` it is refused for having no `lock:`.
-- **Fix.** The rollout's § *Epoch 9* item 4.2: an exemption kind of its own, form unchanged; valid when the reason holds
-  `lives and dies with ` and a word after it; a declaration (clean with nothing beside it); it exempts `shared-store` on its
-  line and the next, and no other class. The rule's §6 (b) and §7 say so. RED first: the fixtures and counterexamples of
-  the rollout's row F41-a. One release; benchmark's rules pin bumped to it.
+- **Fix.** The rollout's § *Epoch 9* item 4.2: an exemption kind of its own, form unchanged; valid when the reason
+  matches `\blives? and dies? with\s+\S+` (E6 writes the plural); a declaration (clean with nothing beside it); it
+  clears `shared-store` on its line and the next only for the container database's own teardown (`DROP DATABASE`,
+  `DROP SCHEMA`, `FLUSHDB`; a `TRUNCATE`, `FLUSHALL` or delete-all stays a finding), and no other class. The rule's
+  §6 (b) and §7 say so. RED first: the fixtures and counterexamples of the rollout's row F41-a. One release, which is a
+  promotion: the pin bump PRs in all nine consumers are planned with it (the rollout's § *Epoch 9* item 5).
 - **Owner.** The conventions repository. A prerequisite of benchmark's E6 story that writes the marker (row E6-f1).
 
 ## F42 — The C# template refuses the same marker, and its notes N1–N5 are not reproduced (found 2026-11-12, benchmark E6.S2 and E6.S3)
