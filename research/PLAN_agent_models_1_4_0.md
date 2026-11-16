@@ -1,11 +1,11 @@
 # PLAN — agent-models mod 1.4.0: the 5-hour reset time, and an account read that always ends
 
-> Status: **shipped 2026-11-12, owner checks pending.** #165 merged (`4c9a684`), `release` promoted to it, all nine
-> consumer pin bumps merged; the installed copy on this WSL upgraded 1.3.3 → 1.4.0 by a consumer session start. The
-> plan moves to `research/` once the owner reports the two checks below. Scope: `mods/agent-models/` (limits line, account read,
+> Status: **IMPLEMENTED, 2026-11-16.** #165 merged (`4c9a684`), `release` promoted to it, all nine consumer pin bumps
+> merged; the installed copy on this WSL upgraded 1.3.3 → 1.4.0 by a consumer session start; the owner reported the
+> checks on 2026-11-16 ("все ок"). What shipped differently: see § *Results*. Scope: `mods/agent-models/` (limits line, account read,
 > version 1.4.0, the mod's own tests), the released-copy table in `settings/hooks/lib/agent-models-decide.mjs` (and its
 > `.claude/hooks` mirror), the new row of `tools/agent-models-pins.json`, then one `release` promotion and the pin bumps
-> of the nine consumers. Parent: [PLAN_agent_models_mod.md](../research/PLAN_agent_models_mod.md) § *Follow-ups*
+> of the nine consumers. Parent: [PLAN_agent_models_mod.md](PLAN_agent_models_mod.md) § *Follow-ups*
 > (the first bullet; only its first two items are in this plan).
 
 ## Goal (the owner's words, 2026-11-12)
@@ -194,4 +194,21 @@ draw's clock and `limitsMinute` read, `viewerFixedRows` with `now`), `types/inde
 - [x] PR merged with green checks and no open thread.
 - [x] `release` promoted after the owner's word; nine consumer pin bumps merged.
 - [x] The installed mod on this WSL is 1.4.0 after a session start in a consumer.
-- [ ] Owner checks reported; this plan promoted to `research/` with what shipped differently.
+- [x] Owner checks reported; this plan promoted to `research/` with what shipped differently.
+
+## Results (2026-11-16)
+
+- **Check 2, the resumed session:** the owner reported it fine ("все ок"); the band showed the account, not a bare
+  `account ?`.
+- **Check 1, the reset time, could not be seen live.** On the owner's new personal account (switched 2026-11-12) the
+  usage answer carries no 5-hour limit: the line drew `5h — · resets in — · week 91% left · Fable 95% left`, and
+  after the account was used, `5h — · resets in — · week 78% left · Fable 75% left`. The built-in `/usage` agreed: it
+  showed only *Current week (all models)* 22% used and *Current week (Fable)* 25% used, with no *Current session*
+  bar. The parser reads `five_hour.utilization` and `five_hour.resets_at` on their own, so both dashes mean the
+  answer had neither. The countdown and its colours are covered by A3–A7, A10 and A11 only.
+- **The dash stays (owner, 2026-11-16: "у меня на акаунте реально нет 5ч лимита. пусть оставетс как есть").** Hiding
+  the `5h — · resets in —` part when the answer has no 5-hour limit was offered and declined. Two consultants
+  (coai, 2026-11-13) had advised against drawing `100% left · no window` from a missing value, and against a
+  fallback to the `limits` entry of kind `session` without first seeing that the real answer carries one.
+- **What shipped differently from the text above:** change 1.1 (the ceiling keeps a known account); `tsc` is not
+  clean because of type errors in the test files that predate 1.4.0 (the DoD box above stays open for that reason).

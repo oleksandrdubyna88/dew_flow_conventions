@@ -251,7 +251,8 @@ ceiling — first item for the next mod version).
   `5h 2% left · resets in 1h 23m · week 42% left · Fable 55% left`, the time green under 10 minutes, orange from 10 to
   30, red over 30; a ceiling on the account read; no double submit of a task after a refused state write; a cap on the
   session-log prompts the messages viewer reads; the limits line after an A→B→A account switch; the viewer actions'
-  refused state writes.
+  refused state writes. The first two (the reset time and the account ceiling) shipped in 1.4.0, IMPLEMENTED
+  2026-11-16: [PLAN_agent_models_1_4_0.md](PLAN_agent_models_1_4_0.md); the other four are still open.
 - **The step and the swap:** an unchanged refusal stays silent on consecutive starts; after a put-back that itself
   fails a later start can install the older copy; `keep` is decided on the first read; `reconcile` can treat an aside
   whose plugin.json cannot be read as a stale leftover; `CLAUDE_CODE_PLUGIN_DIRS` is written to `~/.claude` through

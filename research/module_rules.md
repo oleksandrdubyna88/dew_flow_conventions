@@ -106,7 +106,7 @@ prompts in the session and a list of notes. It holds no secret. The session self
 so a session in a consumer loads it from the next start. The login-method step of the original installer is not part of
 this repository.
 
-Version 1.4.0 (2026-11-12, [PLAN_agent_models_1_4_0.md](../todo/PLAN_agent_models_1_4_0.md)) adds the time until the 5-hour
+Version 1.4.0 (2026-11-12, [PLAN_agent_models_1_4_0.md](PLAN_agent_models_1_4_0.md)) adds the time until the 5-hour
 limit resets to the limits line (`5h 2% left · resets in 1h 23m · week 42% left · Fable 55% left`; the time green under
 10 minutes, orange from 10 to 30, red over 30; it counts down while the line is open, a passed reset is a dash and is
 fetched again). The account read has ceilings (identity 5 s, the whole read 30 s → `account ? (read timed out)`; a
