@@ -11,7 +11,7 @@
  *   docker-name   a `--name`, `volume create`, `network create`, `WithName`, a compose project name (`-p`, `--project-name`,
  *                 `COMPOSE_PROJECT_NAME`), or the tag of an image a test builds,
  *                 that is not one of the three spellings of §1
- *   shared-store  a `DROP`, `TRUNCATE`, `FLUSH` or delete-all against an unprefixed name
+ *   shared-store  a `DROP`, `TRUNCATE`, `FLUSH` or delete-all against an unprefixed name; `container-scoped` clears only a container's own teardown (see "The exemption grammar")
  *   ryuk-off      `TESTCONTAINERS_RYUK_DISABLED` set to true — no exemption accepted
  *   legacy-name   a literal, or a constant-built prefix, that spells a prefixed name whose second segment is not an owner (§1)
  *   owner-blind   a pattern, glob or filter that matches the prefix with no owner segment after it, written literally or through a
@@ -23,7 +23,7 @@
  * plus three that are about the guard's own grammar and inputs:
  *   unreadable    under `--profile node`, a `package.json` that is not valid JSON, is not an object, or whose `scripts` is not an object of strings (never skipped in silence); and, for any file, a folded line
  *                 over 256 KiB (`line <n> is <size>: the folded reading stops at 256 KiB`), a file that ends inside a block comment or a template at any depth (on the line where the outermost one opened), or a throw of the folding reader
- *   exemption     a `testsToDelete-exempt:` comment that is not well-formed
+ *   exemption     a `testsToDelete-exempt:` comment that is not well-formed (see "The exemption grammar" below)
  *   token         this repository's token is not a row of the rule's `## Tokens` table (§1), or is of the owner grammar, or a copied `owned.mjs` has
  *                 no `owned-token.mjs` beside it (the shipped helper holds no token: each repository writes its OWN `tools/lib/owned-token.mjs` — `REPO_TOKEN`, `REPO_ROW` — and never copies another's)
  *
@@ -110,6 +110,12 @@
  *
  * Exit 0 clean, 1 with every finding printed (`file:line — <class> — <text>`), 2 when it scanned nothing or its
  * arguments are bad — an empty scan is a broken discovery, never a clean repository.
+ *
+ * The exemption grammar. `testsToDelete-exempt: <class> — <reason>` on the line or the line above, a class of `EXEMPTIBLE` or the kind `container-scoped`; the reason is ten characters, three words, no
+ * placeholder; `shared-store` also needs `lock:`. `container-scoped` (rule §6 (b); `DECLARATION_KINDS`) needs an owner instead: `<what> lives and dies with <fixture or job>` (or `live and die with`), where after
+ * an optional article (the, a, an, its, this, that) comes a word of two characters or more that is no article. It is a declaration, not a class of finding: it clears `shared-store` and nothing else, and only on
+ * a line whose every hit is a `DROP DATABASE`, `DROP SCHEMA` or `FLUSHDB`; a `DROP TABLE`, `TRUNCATE`, `FLUSHALL` or delete-all needs a lock or a per-run name. A limit, stated: the guard reads a spelling,
+ * not whose database it is, so `DROP DATABASE production_db` under a valid marker is clean — the marker is the author's declaration, the code review reads it and the consumer's fixture test proves the lifetime.
  */
 
 import * as fs from "node:fs";
@@ -160,6 +166,13 @@ export const FOLDING_ALLOWANCES = Object.freeze([
 export const EXEMPTIBLE = Object.freeze(["raw-temp", "raw-worktree", "docker-run", "docker-name", "legacy-name", "shared-store"]);
 
 /**
+ * The kinds of marker that are DECLARATIONS, not classes of finding (rule §6 (b)): `container-scoped` says that a database or namespace lives and dies with the container
+ * its fixture or job owns. It is kept apart from `EXEMPTIBLE` so that list keeps its meaning — the finding classes an exemption may name. The kind clears one class,
+ * `shared-store`, and only a hit that is the container's own teardown (`CONTAINER_TEARDOWN`); it needs an owner in its reason, not a `lock:`.
+ */
+export const DECLARATION_KINDS = Object.freeze(["container-scoped"]);
+
+/**
  * Files whose `legacy-name` findings are skipped. EMPTY since the janitor reads the owner form: its own tests no longer
  * spell a name of the form before the owner segment (a test that needs one builds it from pieces at run time), so no file
  * is exempt from the class. A test pins that it stays empty.
@@ -188,11 +201,11 @@ export const CURES = Object.freeze({
   "docker-name": "Give the container, volume, network, compose project or test-built image one of the three spellings of testsToDelete-<owner>-<repo>-<what>-<id> — common/test-leftovers-detail.md §1, §7 (docker-name).",
   "legacy-name": "Build every name with the owner segment: testsToDelete-<owner>-<repo>-<what>-<id> from ownedName()/the helper of this repository — common/test-leftovers-detail.md §1, §7 (legacy-name).",
   "owner-blind": "Match the caller's owner after the prefix (^testsToDelete-<owner>-<repo>-), or delete the sweep and use the shipped janitor; this class takes no exemption — common/test-leftovers-detail.md §7 (owner-blind), the barrier.",
-  "shared-store": "Isolate the store per run, or add `testsToDelete-exempt: shared-store — <reason with lock: …>` — common/test-leftovers-detail.md §6, §7 (shared-store).",
+  "shared-store": "Isolate the store per run, add `testsToDelete-exempt: shared-store — <reason with lock: …>`, or — for a DROP DATABASE, DROP SCHEMA or FLUSHDB of a database inside a container the run owns — `testsToDelete-exempt: container-scoped — <what> lives and dies with <fixture or job>` — common/test-leftovers-detail.md §6, §7 (shared-store).",
   "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers-detail.md §5, §7 (ryuk-off).",
   unreadable: "Make the package.json valid JSON whose `scripts` is an object of strings (or remove the field): the guard reads no other shape, and never skips one — see the header of tools/leftovers-check.mjs (`--profile node`) and the README row of the guard. For a source file: the folded reading (tools/lib/leftovers-fold.mjs) stops at a folded line of 256 KiB (split the line), reads no file that ends inside a block comment (close the comment) or inside a template, at any depth (a backtick the reader did not recognise, in JSX text or in a regex, opens one: write it as \\x60, or move the regex, so that the reader sees the template close), and reports a throw of the folding reader; the finding takes no exemption and the raw readings were not skipped.",
   baseline: "Remove the stale or out-of-scope entry from the baseline, or move the site into the helper; nothing adds to it — common/test-leftovers-detail.md §7 (the `raw-temp` baseline).",
-  exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason — common/test-leftovers-detail.md §7 (the exemption grammar).",
+  exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason, or `container-scoped — <what> lives and dies with <fixture or job>` — common/test-leftovers-detail.md §7 (the exemption grammar).",
   token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers-detail.md § Tokens (§1 of the rule) — and write it, with its row, in this repository's own tools/lib/owned-token.mjs beside the copied owned.mjs (never copy another repository's).",
 });
 
@@ -334,7 +347,7 @@ function listFiles(repo) {
 
 /** Parse every `testsToDelete-exempt:` comment: `{ valid: Map<class, Set<line>>, findings }`. */
 export function readExemptions(file, lines) {
-  const valid = new Map(EXEMPTIBLE.map((cls) => [cls, new Set()]));
+  const valid = new Map([...EXEMPTIBLE, ...DECLARATION_KINDS].map((cls) => [cls, new Set()]));
   const findings = [];
   lines.forEach((line, index) => {
     const marker = MARKER.exec(line);
@@ -354,10 +367,24 @@ function exemptionProblem(rest) {
   if (cls === "") return { text: "an exemption names no class" };
   if (cls === "ryuk-off") return { text: "`ryuk-off` accepts no exemption" };
   if (cls === "owner-blind") return { text: "`owner-blind` accepts no exemption: the allowlist (file, line, hash) is the only pass" };
-  if (!EXEMPTIBLE.includes(cls)) return { text: `an exemption names an unknown class \`${cls}\`` };
+  if (!EXEMPTIBLE.includes(cls) && !DECLARATION_KINDS.includes(cls)) return { text: `an exemption names an unknown class \`${cls}\`` };
   if (!isReason(reason)) return { text: `the exemption of \`${cls}\` carries no reason (ten characters, three words, not a placeholder)` };
   if (cls === "shared-store" && !reason.includes("lock:")) return { text: "the exemption of `shared-store` must name its lock (`lock: …`)" };
+  if (cls === "container-scoped" && !namesOwner(reason)) return { text: "the exemption of `container-scoped` must name what it lives and dies with: `<what> lives and dies with <fixture or job>` (or `live and die with`), a word of two characters or more after an optional article" };
   return { cls };
+}
+
+const OWNER_SPELLING = /\b(?:lives\s+and\s+dies|live\s+and\s+die)\s+with\b(?=(.*)$)/gi;
+const OWNER_ARTICLES = new Set(["the", "a", "an", "its", "this", "that"]);
+const OWNER_WORD = /^[\p{L}\p{N}][\p{L}\p{N}_.-]*/u;
+
+/** Whether a `container-scoped` reason names its owner: after `lives and dies with` or `live and die with`, an optional article and then a word of two characters or more that is no article. */
+function namesOwner(reason) {
+  return [...reason.matchAll(OWNER_SPELLING)].some((match) => {
+    const words = match[1].trim().split(/\s+/).map((word) => OWNER_WORD.exec(word)?.[0] ?? "");
+    const owner = OWNER_ARTICLES.has(words[0]?.toLowerCase()) ? words[1] : words[0];
+    return owner !== undefined && owner.length >= 2 && !OWNER_ARTICLES.has(owner.toLowerCase());
+  });
 }
 
 const isExempt = (exemptions, cls, line) => exemptions.valid.get(cls)?.has(line) === true || exemptions.valid.get(cls)?.has(line - 1) === true;
@@ -389,6 +416,19 @@ function sharedStoreHit(line) {
     if (match !== null && !(named && PREFIX_OK.test(match[1].replace(/^["'`]/, "")))) return [match[0].trim()];
   }
   return [];
+}
+
+/** The hits that are a container's own teardown: a whole database or schema dropped, or one Redis database flushed. `DROP TABLE`, `TRUNCATE`, `FLUSHALL` and delete-all are resets, not teardowns. */
+const CONTAINER_TEARDOWN = /^(?:DROP\s+(?:DATABASE|SCHEMA)\b|FLUSHDB$)/;
+
+/**
+ * Whether EVERY `shared-store` hit of the line is a container teardown (and there is at least one): the test of the `container-scoped` exemption. It reads all the hits, not the first, so a
+ * teardown beside a reset on one line clears nothing. `sharedStoreHit` keeps its own contract (the first hit, for the finding's text).
+ */
+function isContainerTeardown(line) {
+  const hits = SHARED_STORE.flatMap(({ pattern, named }) =>
+    [...line.matchAll(new RegExp(pattern.source, "g"))].filter((match) => !(named && PREFIX_OK.test(match[1].replace(/^["'`]/, "")))).map((match) => match[0].trim()));
+  return hits.length > 0 && hits.every((hit) => CONTAINER_TEARDOWN.test(hit));
 }
 
 /** Every pattern's hit on the line, so a line that breaks a class twice is listed twice. */
@@ -483,6 +523,7 @@ function lineFindings(file, lines, exemptions, allowlist, baseline, allowances, 
   const add = (index, cls, text) => {
     if (cls === "ryuk-off" || !isExempt(exemptions, cls, index + 1)) found.push(finding(file, index + 1, cls, text));
   };
+  const containerCleared = (index, line) => isExempt(exemptions, "container-scoped", index + 1) && isContainerTeardown(line);
   const verdicts = classifyLines(lines.join("\n"), { allowlist, file }); // the file's own prefix bindings are read once, for every line
   const fold = foldReading(file, lines, allowances, reader);
   for (const entry of fold.findings) found.push(entry);
@@ -502,6 +543,7 @@ function lineFindings(file, lines, exemptions, allowlist, baseline, allowances, 
     for (const [cls, hits] of checks) {
       if (hits.length === 0) continue;
       // the baseline passes a `raw-temp` hit up to its entries; a line with a valid exemption is exempt first and consumes none
+      if (cls === "shared-store" && containerCleared(index, line)) continue; // a declared container's own teardown (§6 (b)): nothing else is cleared by the declaration
       if (cls === "raw-temp" && baseline !== undefined && !isExempt(exemptions, cls, index + 1) && baseline.take(file, siteSha256(line))) continue;
       add(index, cls, [...new Set(hits)].map((hit) => `\`${hit}\``).join(", "));
     }
