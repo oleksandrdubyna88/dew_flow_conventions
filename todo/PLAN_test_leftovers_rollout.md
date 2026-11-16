@@ -1,6 +1,6 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 10 open (2026-11-16), approved by the reviewers after the ninth re-review (`Narrowed: no`; the Opus judge: 11 fit, 5 cut by a fix forward or a local rewrite; plan gate `c6131b05`, `proceed`; an independent Opus review), with 0 changes: the next accepted change is 10.1, the second is the tenth full stop.** § *Epoch 10* is the plan now: a claim about a copied tool is observed before the gate of the story or brief that relies on it (item 8.1); E6's and E7's stories are amended in new PRs first; then F42-c, E6.S3 and E7.S3–S5 (the `external/` exclusion root-scoped, in S3); E7.S2 waits for the owner's live observations.
+> Status: **epoch 10 open (2026-11-16), approved by the reviewers after the ninth re-review (`Narrowed: no`; the Opus judge: 11 fit, 5 cut by a fix forward or a local rewrite; plan gate `c6131b05`, `proceed`; an independent Opus review), with ONE change, entry 10.1 (2026-11-16: E6-f2's configuration counterexample has no instance at Testcontainers 4.16.0); the next accepted change is the tenth full stop.** § *Epoch 10* is the plan now: a claim about a copied tool is observed before the gate of the story or brief that relies on it (item 8.1); E6's and E7's stories are amended in new PRs first; then F42-c, E6.S3 and E7.S3–S5 (the `external/` exclusion root-scoped, in S3); E7.S2 waits for the owner's live observations.
 >
 > Was: **epoch 9 STOPPED for re-review (2026-11-16): its second change, entry 9.2 (E7's stories model the copied C# guard's walk over `external/` wrongly), is the ninth full stop; no new code on any epic until the re-review.** Was: **epoch 9 open (2026-11-16), approved by the reviewers after the re-review (`Narrowed: no`; plan gate `b6933e14`, `proceed`; an independent Opus review), with ONE change, entry 9.1 (2026-11-16: F42-c needs benchmark-own touches its § 6 excluded); the next accepted change is the ninth full stop.** The revision is § *Epoch 9*: `container-scoped` becomes an exemption kind of its own in both guards (F41 in conventions, F42 in mcp, where N1–N5 were each tried first: N1, N4 and N5 reproduced and fixed, N2 did not reproduce, N3 is a Windows pin), row E6-f is split into E6-f1 (the marker, file-scoped) and E6-f2 (the container ends with the fixture; reuse proved at run time), E7's rows that need the live stores are blocked with the owner (item 7), and E6's and E7's stories are revised in new PRs before their next stories (item 8.3). E2 (creds) and E5 (coai, S7 included) are COMPLETE. Progress 2026-11-16 (§ *Epoch 9*, *Progress, 2026-11-16*, not a change): F41 merged (#171) and released (`b1746499`, all nine pins), F42 merged (mcp #81), E6 and E7 stories revised (benchmark #215, rag_qln #119). Still open: benchmark's copy re-synced to F42 (F42-c), E6.S3–S7, E7.S2–S5, the feature reviews and the promotion. The re-review is written (§ *Epoch 10*, 2026-11-16) and judged (11 fit; 5 cut, each by a fix forward or a local rewrite: E6's and E7's stories by NEW amendment PRs, F42-c's brief by new commits; nothing merged needs a revert; coai #1006 merged during the stop, outside the plan, reported); passed by the plan gate (`c6131b05`, proceed) and an independent Opus review; epoch 10 opens by the reviewers.
 >
@@ -755,6 +755,13 @@ Narrowed: no — entry 9.1 is settled by bounding F42-c by named paths, its mani
   item 8.1). None of them makes a condition smaller, so the Narrowed line stands.)
 
 > Epoch 10 · approved 2026-11-16 · by reviewers · state: open
+
+- 10.1 · 2026-11-16 · agent · merge-conditions — row E6-f2's counterexample "reuse enabled through configuration alone" has no instance at the pinned Testcontainers 4.16.0, so it cannot be red; it becomes a green pin (both configuration spellings set, the built container's Reuse stays False and the container still ends with the fixture), while the builder counterexample and the run-time disposal proof stay red-first
+  (Observed by E6.S3's brief, 2026-11-16, by a run at benchmark `5070beda`: the fixture's builder reads Reuse=False under
+  `TESTCONTAINERS_REUSE_ENABLE=true` and under `testcontainers.reuse.enable=true` in the properties file; only `.WithReuse(true)` sets
+  it; no member of the assembly reads reuse from configuration. The parent had anticipated it (§ *Epoch 9*, *Progress*, carried
+  (1)). Counted after the question consultants (`c3d71347`, two of two: a change — the row said "RED, each"). First change of
+  epoch 10; the next accepted change is the tenth full stop.)
 
 ## Symptom
 
@@ -3432,6 +3439,26 @@ review):
 reads and `scanText` runs named in each row; `gh pr list`, `gh api` and `git ls-remote` as the record's note says.
 Not checked: the consult texts (`a84fb14e`, `57ac1bd6`, `50be6245`, `6a830a2c`; the points are taken as the
 coordinator quoted them); every C# verdict (no .NET build run for this revision); anything with Docker; E2's held feature review.
+
+#### Progress, 2026-11-16 (epoch 10; a progress record, not a change)
+
+| Step | Result | Where |
+|---|---|---|
+| E6's stories amended (item 8.3) | merged; plan gate `3c0b375b` (three findings on unchanged text rejected with reasons), an independent Opus review (fact repairs applied) | benchmark #217 `191ef77f` |
+| E7's stories amended (item 8.3) | merged; plan gate `b8a3e4b9` (three rejected with reasons; two S2 design points carried to S2's Fable spec brief), an independent Opus review | rag_qln #122 `6e447156` |
+| F42-c (row F42-c) | merged: the copy at mcp `53f65130` (55 entries), the CI step installing the mount's dependencies, case 15's reason; checks (1)–(4b) on its final head, results on its PR; all 55 targets byte-checked by the Opus review; CI `build-test` 5775 tests, 0 failed | benchmark #218 `5070beda` |
+| rag_qln's benchmark pin | bumped to `5070beda` (the input E7-h2's probes were observed at) | rag_qln #123 |
+| E6.S3's brief, E7.S3–S5's brief | written with their item 8.1 observations (E7: the root-scoped exclusion observed on both walk paths, P1–P4 and P3b, D-8; E6: C2, C7, C9, the effective Ryuk setting, reuse by configuration — none, entry 10.1) | local, before their plan gates |
+
+Found on the way, carried as todos, not built here (each recorded where its owner reads it):
+
+- benchmark: during whole-suite runs `/tmp` was briefly a git work tree, so ModelArms and Scouts tests refused ("…is inside the
+  git checkout /tmp"), on base and head alike; what creates `/tmp/.git` is not known. A todo of benchmark's.
+- benchmark: the `ASPIRE010` warning of the AppHost on `main`; `score-steps.mjs:57-73` removes the scorer's own folders by marker age.
+- mcp's template (F44, the follow-ups plan): `Removal.ClearReadOnlyBelow` checks a reparse point and then walks by path (a junction
+  swapped in between would be followed); `RunNode` writes the differential test's stdin synchronously before its timeout starts.
+- E7.S2's Fable spec inputs: a collection created under a live claim survives every drop path; the `gpu_waiters` reset is scoped
+  or joins the lock, and a live daemon waiter survives it.
 
 ## Epics
 

@@ -1094,6 +1094,18 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   E6-f2). A shared reading is a follow-up only when a second consumer needs it.
 - **Owner.** Conventions and mcp. A pointer only.
 
+## F44 — Two findings on mcp's template, found by benchmark's F42-c code gate (2026-11-16)
+
+- **What.** (1) `tests/Mcp.Tests/Leftovers/Removal.cs` `ClearReadOnlyBelow` checks each entry for a reparse point and then
+  recurses by path, so a directory replaced by a junction between the check and the walk would be followed and files
+  outside the owned folder made writable (Windows only; the link-count check covers files with a second hard link, not this).
+  (2) `LeftoversGuardTests.RunNode` writes the differential test's whole scenario table to the child's stdin before
+  `WaitForExit`'s timeout starts, so a child that stops reading could block the test past its timeout.
+- **Fix.** (1) walk by directory handles opened without following reparse points, and verify each entry's identity before
+  changing attributes; (2) write stdin asynchronously under the same timeout, killing the tree on either. RED first for each.
+- **Owner.** mcp (the template); the copies (benchmark, and rag_qln after E7.S3) re-sync afterwards. Not a prerequisite of any
+  open story.
+
 ## Definition of Done
 
 - [ ] Each of F1 to F22, F24 and F25 (F23 is reserved by F3's note for other manifests) is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
