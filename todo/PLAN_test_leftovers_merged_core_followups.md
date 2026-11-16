@@ -1068,6 +1068,8 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - **Owner.** The conventions repository. A prerequisite of benchmark's E6 story that writes the marker (row E6-f1).
 - **Progress.** Fixed on branch `fix/f41-container-scoped`, not released (2026-11-16): the kind `container-scoped` in the guard, the rule's §6 (b), §7 and the core, with RED-GREEN-RED tests in `tools/leftovers-check.test.mjs`. The release (promotion and pin bumps) is a separate step after the merge.
   Correction (entry 1.1 of `todo/PLAN_F41_container_scoped.md`): the provisions live in the companion rule `common/test-leftovers-exemptions.md`, loaded through the detail's `depends`; the detail's body is unchanged.
+  *[2026-11-16: the plan named above is now `research/PLAN_F41_container_scoped.md` (promoted, IMPLEMENTED).]*
+  *[2026-11-16: merged as #171 (`b1746499`) and released: `release` = `b1746499`; the pin bump in all nine consumers (benchmark #216, mcp #82, sidecar_rust #81, vscode_kit #35, wsl_care #199, creds #372, amd_r9700 #37, rag_qln #121, coai #1004). Done.]*
 
 ## F42 — The C# template refuses the same marker, and its notes N1–N5 are not reproduced (found 2026-11-12, benchmark E6.S2 and E6.S3)
 
@@ -1080,6 +1082,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   reproduces and applies is fixed RED first, one that does not is recorded with its run. Then benchmark's copy is
   re-synced to that commit (row F42-c), and rag_qln's E7.S3 copies from it.
 - **Owner.** mcp, the template's owner. A prerequisite of E7.S3 and of benchmark's re-sync.
+- *[2026-11-16: done — mcp #81 (`53f65130`): the kind case for case with F41, one live differential check over both guards, N1 reproduced on `windows-latest` and fixed, N2 not reproduced (a pin), N3 a Windows pin, N4 and N5 reproduced and fixed. Benchmark's re-sync (F42-c) and E7.S3 copy from it.]*
 
 ## F43 — Pointer: neither guard reads Ryuk disabled through `SetEnvironmentVariable` in a `.cs` (found 2026-11-16, the rollout's re-review)
 
