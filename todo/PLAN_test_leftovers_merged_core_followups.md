@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (F27 fixed 2026-11-05, not released: a process cap and shim rule for the next planned release; F28 open: release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner). F30 added 2026-11-05 (open, with an owner and a proposed deadline: the shipped Node guard has no folding reader). F32 added 2026-11-06 (open: the raw readings of the guard and the sweeper are super-linear on a hostile line, and their time is not promised). F33–F40 added 2026-11-10 from creds' E2 (its notes for the parent N20–N25 and its side findings): F33 and F36 open, conventions' tools; F34 open, creds first; F35 a documented limit for now; F37 open, the C# template's; F38–F40 pointers to creds' todos. F41–F43 added 2026-11-16 from the rollout's re-review for epoch 9: F41 fixed 2026-11-16 on branch fix/f41-container-scoped, not released (conventions' rule and Node guard); F42 open, the C# template's; F43 a pointer.** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (F27 fixed 2026-11-05, not released: a process cap and shim rule for the next planned release; F28 open: release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner). F30 added 2026-11-05 (open, with an owner and a proposed deadline: the shipped Node guard has no folding reader). F32 added 2026-11-06 (open: the raw readings of the guard and the sweeper are super-linear on a hostile line, and their time is not promised). F33–F40 added 2026-11-10 from creds' E2 (its notes for the parent N20–N25 and its side findings): F33 and F36 open, conventions' tools; F34 open, creds first; F35 a documented limit for now; F37 open, the C# template's; F38–F40 pointers to creds' todos. F41–F43 added 2026-11-16 from the rollout's re-review for epoch 9: F41 fixed 2026-11-16 on branch fix/f41-container-scoped, not released (conventions' rule and Node guard); F42 open, the C# template's; F43 a pointer. Later 2026-11-16: F41 released (`b1746499`) and F42 merged (mcp #81), both done; F44 added (two template findings from F42-c's code gate, open).** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -1093,6 +1093,18 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - **Where it is handled.** Benchmark proves Ryuk on and reuse off by its own fixture tests (the rollout's rows E6-d and
   E6-f2). A shared reading is a follow-up only when a second consumer needs it.
 - **Owner.** Conventions and mcp. A pointer only.
+
+## F44 — Two findings on mcp's template, found by benchmark's F42-c code gate (2026-11-16)
+
+- **What.** (1) `tests/Mcp.Tests/Leftovers/Removal.cs` `ClearReadOnlyBelow` checks each entry for a reparse point and then
+  recurses by path, so a directory replaced by a junction between the check and the walk would be followed and files
+  outside the owned folder made writable (Windows only; the link-count check covers files with a second hard link, not this).
+  (2) `LeftoversGuardTests.RunNode` writes the differential test's whole scenario table to the child's stdin before
+  `WaitForExit`'s timeout starts, so a child that stops reading could block the test past its timeout.
+- **Fix.** (1) walk by directory handles opened without following reparse points, and verify each entry's identity before
+  changing attributes; (2) write stdin asynchronously under the same timeout, killing the tree on either. RED first for each.
+- **Owner.** mcp (the template); the copies (benchmark, and rag_qln after E7.S3) re-sync afterwards. Not a prerequisite of any
+  open story.
 
 ## Definition of Done
 
