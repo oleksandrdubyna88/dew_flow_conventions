@@ -1,10 +1,14 @@
 # PLAN — F41: `container-scoped` becomes an exemption kind of its own (the rule and the shipped Node guard)
 
-> Status: **plan, 2026-11-16, before its plan gate.** Branch `fix/f41-container-scoped` from `main` `739affe`. Parent:
+> Status: **epoch 1 open, 2026-11-16: approved by the plan gate (`a4ec9471`, `proceed`, five findings accepted and folded in); building.** Branch `fix/f41-container-scoped` from `main` `739affe`. Parent:
 > `todo/PLAN_test_leftovers_rollout.md` § *Epoch 9* item 4.2 and row F41-a; the follow-up F41 in
 > `todo/PLAN_test_leftovers_merged_core_followups.md`. One PR, docs and code. The release (a promotion with pin bumps in
 > all nine consumers, allowed by the owner on 2026-11-16 after a fresh check for releases in flight) is a separate step
 > after the merge. The C# template's half is F42, in mcp.
+
+## Plan changes
+
+> Epoch 1 · approved 2026-11-16 · by reviewers · state: open
 
 ## Goal
 
@@ -23,22 +27,28 @@ container".
 ## Decisions (the parent's § *Epoch 9* item 4.2, approved by the plan gate `b6933e14` and an independent Opus review)
 
 1. **The form does not change:** `testsToDelete-exempt: container-scoped — <reason>`.
-2. **Valid** when the general reason rule holds (ten characters, three words, not a placeholder) AND the reason matches
-   `\blives? and dies? with\s+\S+`: the owning fixture or job is named. Otherwise one `exemption` finding whose sentence
-   says what is missing.
+2. **Valid** when the general reason rule holds (ten characters, three words, not a placeholder) AND the reason names an
+   owner after `live and die with` or `lives and dies with`: after an optional article (`the`, `a`, `an`, `its`,
+   `this`, `that`), a word of at least two characters that is not itself an article. "… lives and dies with the" names
+   no owner and is one `exemption` finding whose sentence says what is missing (the plan gate, round 1).
 3. **A declaration.** A valid marker with no finding beside it is clean.
 4. **It clears one class, `shared-store`,** on its own line and the next (the reach `isExempt` already has), and only
    when the hit is the container database's own teardown: `DROP DATABASE`, `DROP SCHEMA`, `FLUSHDB`. A `DROP TABLE`,
    `TRUNCATE`, `FLUSHALL` or `deleteMany({})` stays `shared-store`: a reset that is not the container's own teardown
    needs (a)'s `lock:` or a per-run name. `sharedStoreHit` returns only the matched text today; the exemption test must
-   also know which pattern hit (a kind returned with the hit), so it can tell a teardown from a reset.
+   also know which pattern hit (a kind returned with the hit, or a separate helper that keeps `sharedStoreHit`'s
+   contract), so it can tell a teardown from a reset; every caller of `sharedStoreHit` is read first (decision 7).
+   **What the guard cannot know:** that the dropped database is the container's. It reads a spelling, not data flow
+   (its own header says so), so `DROP DATABASE production_db` under a valid marker is clean too. The marker is the
+   author's declaration, read by the code review; the lifetime is proved by the consumer's fixture test (benchmark's
+   E6-f2). The rule's §7 says this limit in words (the plan gate, round 1).
 5. **It never clears** `ryuk-off` or `owner-blind` (they refuse every exemption), nor `docker-run`, `docker-name`,
    `raw-temp`, `raw-worktree` or `legacy-name`: a fixture's container is still named in the owner form (§5).
 6. **"Exempt from the name" needs no guard change:** an unprefixed `CREATE DATABASE` and a workflow `services:` already
    give no finding (run by the independent review).
 7. **The smaller code change wins** between adding the kind to `EXEMPTIBLE` and keeping a separate list of declaration
-   kinds: the coder greps every importer of `EXEMPTIBLE` and `readExemptions` first, and keeps each exported name's
-   meaning for its current importers.
+   kinds: the coder greps every importer of `EXEMPTIBLE` and `readExemptions` and every caller of `sharedStoreHit`
+   first, and keeps each exported name's meaning for its current importers.
 
 ## Files
 
@@ -55,8 +65,10 @@ container".
 
 ## Test scenarios
 
-RED first: each new test runs and fails against `main`'s guard before the code changes; then GREEN; then RED again
-with only the code change reverted. Each scenario names its expected class.
+RED first: each new test of NEW behaviour runs and fails against `main`'s guard before the code changes; then GREEN;
+then RED again with only the code change reverted. A scenario of UNCHANGED behaviour (N15, and the classes that stay
+red under the marker where `main` is already red) passes before and after; it pins that the change does not widen the
+exemption. Each scenario names its expected class.
 
 Clean:
 - P1 the marker alone, `lives and dies with the X fixture`. P2 the plural, `live and die with the PostgresFixture
@@ -74,6 +86,10 @@ Red:
   N12 over `TESTCONTAINERS_RYUK_DISABLED=true` → `ryuk-off`. N13 over `rm -rf /tmp/testsToDelete-*` → `owner-blind`.
   N14 over `mkdtemp(` → `raw-temp`.
 - N15 the `shared-store` exemption without `lock:` stays an `exemption` finding (unchanged).
+- N16 a reason ending `… lives and dies with the` → `exemption`. N17 the marker over `git worktree add x HEAD` →
+  `raw-worktree`. N18 the marker over a legacy prefixed name (`testsToDelete-agent-x-1`) → `legacy-name`.
+- P7 `DROP DATABASE production_db` under a valid marker → clean: the stated limit of decision 4, pinned so that a later
+  change to it is a decision, not an accident.
 
 Whole repository: the guard over this repository gives the same result as on `main`; the repository's full test suite
 passes.
