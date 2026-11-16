@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (F27 fixed 2026-11-05, not released: a process cap and shim rule for the next planned release; F28 open: release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner). F30 added 2026-11-05 (open, with an owner and a proposed deadline: the shipped Node guard has no folding reader). F32 added 2026-11-06 (open: the raw readings of the guard and the sweeper are super-linear on a hostile line, and their time is not promised). F33–F40 added 2026-11-10 from creds' E2 (its notes for the parent N20–N25 and its side findings): F33 and F36 open, conventions' tools; F34 open, creds first; F35 a documented limit for now; F37 open, the C# template's; F38–F40 pointers to creds' todos.** Scope: six low findings of the
+> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (F27 fixed 2026-11-05, not released: a process cap and shim rule for the next planned release; F28 open: release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner). F30 added 2026-11-05 (open, with an owner and a proposed deadline: the shipped Node guard has no folding reader). F32 added 2026-11-06 (open: the raw readings of the guard and the sweeper are super-linear on a hostile line, and their time is not promised). F33–F40 added 2026-11-10 from creds' E2 (its notes for the parent N20–N25 and its side findings): F33 and F36 open, conventions' tools; F34 open, creds first; F35 a documented limit for now; F37 open, the C# template's; F38–F40 pointers to creds' todos. F41–F43 added 2026-11-16 from the rollout's re-review for epoch 9: F41 open, conventions' rule and Node guard; F42 open, the C# template's; F43 a pointer.** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -1052,6 +1052,40 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
 - **Where it is tracked.** Creds' E2 plan (as F33), E2.5 build record, *What is not done, and why* (its Q11: todos, not
   built).
 - **Owner.** Creds. A pointer only.
+
+## F41 — The rule's own `container-scoped` marker is refused by the shipped Node guard (found 2026-11-12, benchmark E6.S3's brief; the rollout's entry 8.2)
+
+- **What.** Rule §6 (b) prescribes `testsToDelete-exempt: container-scoped — <what> lives and dies with <fixture or job>`;
+  §7's grammar accepts only a class of its own table, so `tools/leftovers-check.mjs` answers "an exemption names an unknown
+  class `container-scoped`" (measured at `8ae5eb6`, `scanText` on a `tests/X.cs`; over a `DROP DATABASE` line it gives that
+  finding and `shared-store`). Written as `shared-store` it is refused for having no `lock:`.
+- **Fix.** The rollout's § *Epoch 9* item 4.2: an exemption kind of its own, form unchanged; valid when the reason holds
+  `lives and dies with ` and a word after it; a declaration (clean with nothing beside it); it exempts `shared-store` on its
+  line and the next, and no other class. The rule's §6 (b) and §7 say so. RED first: the fixtures and counterexamples of
+  the rollout's row F41-a. One release; benchmark's rules pin bumped to it.
+- **Owner.** The conventions repository. A prerequisite of benchmark's E6 story that writes the marker (row E6-f1).
+
+## F42 — The C# template refuses the same marker, and its notes N1–N5 are not reproduced (found 2026-11-12, benchmark E6.S2 and E6.S3)
+
+- **What.** `tests/Mcp.Tests/Leftovers/LeftoversGuardExemptions.cs` lists six exemptible classes (mcp `07a0f5b`, `:11`), so
+  the marker is "an unknown class" there too. And benchmark's E6.S2 brief § 17 left five notes on the copied template
+  files: N1 `Removal.Quietly` cannot remove read-only git objects on Windows; N2 `DirectoryLinks.Run` drains only stdout;
+  N3 its `cmd /c mklink` relies on a block list, not quoting; N4 `MountedSelectorPick` does not kill a child that times
+  out; N5 `LeftoversAudit.Discover` reads an unreadable temp root as empty. N1 is by reading; N2–N5 by a code gate.
+- **Fix.** The kind as F41, case for case (the rollout's row F42-a). Each note reproduced first (row F42-b); one that
+  reproduces and applies is fixed RED first, one that does not is recorded with its run. Then benchmark's copy is
+  re-synced to that commit (row F42-c), and rag_qln's E7.S3 copies from it.
+- **Owner.** mcp, the template's owner. A prerequisite of E7.S3 and of benchmark's re-sync.
+
+## F43 — Pointer: neither guard reads Ryuk disabled through `SetEnvironmentVariable` in a `.cs` (found 2026-11-16, the rollout's re-review)
+
+- **What.** `Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true")` in a `.cs` is no finding in the
+  Node guard (`[]`, measured at `8ae5eb6`) or in the C# template (its `RyukOff` wants `[:=]` after the name,
+  `LeftoversGuard.cs:93` at mcp `07a0f5b`, by reading); the same setting in a workflow or a `.sh` is `ryuk-off`. A
+  `.WithReuse(true)` is not read either (`[]`), which the rule forbids too.
+- **Where it is handled.** Benchmark proves Ryuk on and reuse off by its own fixture tests (the rollout's rows E6-d and
+  E6-f2). A shared reading is a follow-up only when a second consumer needs it.
+- **Owner.** Conventions and mcp. A pointer only.
 
 ## Definition of Done
 
