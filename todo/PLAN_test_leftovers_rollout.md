@@ -1,6 +1,6 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 9 open (2026-11-16), approved by the reviewers after the re-review (`Narrowed: no`; plan gate `b6933e14`, `proceed`; an independent Opus review), with 0 changes: the next accepted change is 9.1, the second is the ninth full stop.** The revision is § *Epoch 9*: `container-scoped` becomes an exemption kind of its own in both guards (F41 in conventions, F42 in mcp, with N1–N5 reproduced there), row E6-f is split into E6-f1 (the marker, file-scoped) and E6-f2 (the container ends with the fixture; reuse proved at run time), E7's rows that need the live stores are blocked with the owner (item 7), and E6's and E7's stories are revised in new PRs before their next stories (item 8.3). E2 (creds) and E5 (coai, S7 included) are COMPLETE. Still open: F41, F42, E6.S3–S7, E7.S2–S5, the feature reviews and the promotion.
+> Status: **epoch 9 open (2026-11-16), approved by the reviewers after the re-review (`Narrowed: no`; plan gate `b6933e14`, `proceed`; an independent Opus review), with 0 changes: the next accepted change is 9.1, the second is the ninth full stop.** The revision is § *Epoch 9*: `container-scoped` becomes an exemption kind of its own in both guards (F41 in conventions, F42 in mcp, with N1–N5 reproduced there), row E6-f is split into E6-f1 (the marker, file-scoped) and E6-f2 (the container ends with the fixture; reuse proved at run time), E7's rows that need the live stores are blocked with the owner (item 7), and E6's and E7's stories are revised in new PRs before their next stories (item 8.3). E2 (creds) and E5 (coai, S7 included) are COMPLETE. Progress 2026-11-16 (§ *Epoch 9* item 9.1, not a change): F41 merged (#171) and released (`b1746499`, all nine pins), F42 merged (mcp #81), E6 and E7 stories revised (benchmark #215, rag_qln #119). Still open: benchmark's copy re-synced to F42 (F42-c), E6.S3–S7, E7.S2–S5, the feature reviews and the promotion.
 >
 > Was: Status: **epoch 8 STOPPED for re-review (2026-11-12): its second change, entry 8.2 (E6-f: the rule's own `container-scoped` marker is refused by the released guard), is the eighth full stop; no new code on any epic until the re-review. The re-review is written (§ *Epoch 9*, 2026-11-16; Narrowed: no) , judged (13 fit, 3 cut by a fix forward), passed by the plan gate (`b6933e14`, proceed) and an independent Opus review; epoch 9 opens by the reviewers.** Epoch 8 opened 2026-11-07 (`Narrowed: no`) with entry 8.1 (2026-11-10). E2 (creds) is COMPLETE, 2026-11-10. E5.S7 (coai's drain) is COMPLETE, 2026-11-12.** Its five producer PRs are merged on creds `main`: E2.1 #294 (`834c91b`), E2.2 #310 (`bf59e4f`), E2.3 #311 (`0ae0211`), E2.4 #329 (`6e08071`, 2026-11-10) and E2.5 #330 (`b6cc6b3`, 2026-11-10 19:48 UTC). E2.5 switched on both repository guards: the shipped Node guard in creds' `docs.yml` is clean over 640 files, and the copied C# guard is green on all OS legs. Exemption markers are only on the inventoried lines. Creds' mount moved to `.agents/conventions` (#328) and is pinned at release `1341995` (#340). Epoch 8 used two changes: entry 8.1, and entry 8.2, which stopped it. E2's progress is not a change, so it has no ledger entry; creds' build records give the reasons why nothing else was counted. E2's rows and Definition of Done parts: § *Epoch 8* item 3.3. Still open in this plan: E6, E7, the feature reviews (E2's stories document's review is now due, § *Epoch 8* item 5, point 2; E2's round is held by `call_human` since 2026-11-10 — a reviewer failed, and the owner left it held on 2026-11-11) and the promotion. E5.S7 drained coai's `raw-temp` baseline from 778 entries to zero in six pull requests, one per suite, and deleted the file with its last entries (S7-d): § *Epoch 8* item 3.4. E5's progress is not a change, so it has no ledger entry. Creds' notes N20–N25 and its side findings (`release.yml`'s publish from any branch; two product scripts' temp leaks) are carried to the follow-ups as F33–F40.
 >
@@ -2947,6 +2947,38 @@ locally to the same rows (its plan to write the marker now and accept the `exemp
 stories, in a NEW PR before E7.S3's plan gate — D2's and S3's "mcp `9bf9f5b` or later" becomes "F42's commit or later",
 the build order gets F42 before S3, row E7-l is added, and rows E7-b, E7-c and E7-f say **blocked** with item 7's
 observations. The follow-ups plan carries F41–F43 (this revision).
+
+#### 9.1 Progress, 2026-11-16 (a progress record, not a change)
+
+The first two THEN steps of item 5 are done.
+
+| Step | Result | Where |
+|---|---|---|
+| E6's stories revised (item 8.3) | merged; plan gate `215fc3a2` (one finding accepted: the container pass runs inside `PostgresFixture.InitializeAsync`, before its container, as D9's "before the fixture starts" says; three rejected with reasons), an independent Opus review (eight points) | benchmark #215 `275f8fd7` |
+| E7's stories revised (item 8.3) | merged; plan gate `98d4b974` (three findings rejected with reasons), an independent Opus review | rag_qln #119 `e6c8d8cc` |
+| F41 (row F41-a) | merged: its own plan `todo/PLAN_F41_container_scoped.md` (plan gate `a4ec9471`, code gate two rounds, an Opus review; one entry, 1.1: the rule text is a companion rule, `common/test-leftovers-exemptions.md`, loaded by the detail's `depends`, because the detail is at its size cap and is never trimmed — the question consultants `7f0817ef`) | conventions #171 `b1746499` |
+| F41-b | `release` promoted to `b1746499` (2026-11-16, after the other sessions said no consumer release was in flight; coai's bump went first, at a peer's request); the pin bump in all nine consumers, over the cap where needed (the owner, 2026-11-16) | benchmark #216, mcp #82, sidecar_rust #81, vscode_kit #35, wsl_care #199, creds #372, amd_r9700 #37, rag_qln #121 (with its benchmark and mcp pins), coai #1004 |
+| F42 (rows F42-a, F42-b) | merged: its own plan in mcp (plan gate `53616e7e`, code gate four rounds, an Opus review). The marker reads case for case with the Node guard, and ONE live differential check runs both guards over one scenario table (line and class for every row; the text for `shared-store` and `exemption`, whose text is the contract). Its first run against the F41 release found one real difference — under the marker C# read the first match only — and C# now reads a marked line whole, as Node does. N1 reproduced on `windows-latest` (run 43928795620, the folder of a git repository kept) and fixed (read-only cleared below the folder, no reparse point entered, a file with a second hard link never changed); N2 did not reproduce (kept as a pin); N3 pins `cmd`'s own behaviour; N4 and N5 reproduced and fixed | mcp #81 `53f65130` |
+
+**Corrections to this section, plain facts** (found by the stories revisions and their reviews):
+
+- Row E7-l: the collection name is `teststodelete_<owner>_qln_<what>_<id>` — rag_qln's registered token is `qln`
+  (`common/test-leftovers-detail.md`, the Tokens table), not `rag`.
+- Item 3's sentence before the table names "E7-k": there is no row E7-k; the rows not restated are E7-a, e, g, i, j.
+- Rows E6-f2 and E6-d: benchmark has no `BENCH_REQUIRE_DOCKER`; its fixture fails loudly without Docker
+  (`PostgresFixture.cs:45-47` at `46e27108`), and only hosted CI has Docker.
+- Row E6-g: the guards read more than the row lists. The Node guard under `--profile node` also reads `.ps1` anywhere,
+  workflows, `*.spec.*`, and every non-binary file under the root `tests/`, `test/` and `scripts/` folders; the C#
+  copy also reads `.sh`, `.ps1` and `.py` everywhere, workflows, and `.mjs`/`.js` under `http/` and `.github/scripts/`.
+  E6's revised stories carry the measured table per directory.
+
+**Carried, not decided here:** (1) whether Testcontainers 4.16.0 has any configuration path that turns reuse on — its
+DLL's strings show none; E6.S3's brief settles it by a run, and if there is none, row E6-f2's "through configuration
+alone" counterexample has no instance and the record says so (counted by the rule if it changes the row). (2) E6.S3's
+brief checks the EFFECTIVE Ryuk setting at the fixture's start (the plan gate `215fc3a2`). (3) E7.S2's Fable spec gets
+a claim-first case where run A holds a live claim AND an existing collection while B sweeps (the plan gate `98d4b974`).
+
+Next (item 5): benchmark's copy re-synced to F42 (F42-c), then E6.S3; rag_qln's E7.S3 → S5 from F42's commit.
 
 ## Epics
 
