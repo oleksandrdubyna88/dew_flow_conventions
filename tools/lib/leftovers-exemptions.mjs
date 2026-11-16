@@ -20,7 +20,7 @@ export const EXEMPTIBLE = Object.freeze(["raw-temp", "raw-worktree", "docker-run
 /**
  * The kinds of marker that are DECLARATIONS, not classes of finding (`common/test-leftovers-exemptions.md`, extending §6 (b)): `container-scoped` says that a database or namespace lives and dies with the container
  * its fixture or job owns. It is kept apart from `EXEMPTIBLE` so that list keeps its meaning — the finding classes an exemption may name. The kind clears one class,
- * `shared-store`, and only a hit that is the container's own teardown (`CONTAINER_TEARDOWN`); it needs an owner in its reason, not a `lock:`.
+ * `shared-store`, and only a hit that is the container's own teardown (the `teardown` of its `SHARED_STORE` entry, read with that entry pattern's flags); it needs an owner in its reason, not a `lock:`.
  */
 export const DECLARATION_KINDS = Object.freeze(["container-scoped"]);
 
@@ -61,7 +61,7 @@ export function exemptionProblem(rest) {
 // The owner of a `container-scoped` marker: the spelling at a word edge, whitespace, an optional article and whitespace, then a word whose first character is a letter, a digit or `_` and that has one or more
 // of those or `.` or `-` after it, and that does not start with an article followed by a word edge (`a.`, `the-x`, `a.b` name no owner; `x.`, `_x`, `its_x` do).
 const SPACE = String.raw`[\f\n\r\t\v\x85\p{Z}]`;
-const WORD_CHAR = String.raw`[\p{L}\p{Mn}\p{Nd}\p{Pc}‌‍]`;
+const WORD_CHAR = String.raw`[\p{L}\p{Mn}\p{Nd}\p{Pc}\u200C\u200D]`; // U+200C and U+200D written as escapes: .NET counts them as word characters for \b
 /** `word` with every ASCII letter as a class of its two cases: the pattern has no `i` flag. */
 const anyCase = (word) => [...word].map((char) => (/[a-z]/.test(char) ? `[${char}${char.toUpperCase()}]` : char)).join("");
 const ARTICLE = `(?:${["the", "a", "an", "its", "this", "that"].map(anyCase).join("|")})`;
@@ -80,9 +80,9 @@ export const isExempt = (exemptions, cls, line) => exemptions.valid.get(cls)?.ha
 // --- the shared-store table ----------------------------------------------------------------------------------
 
 export const SHARED_STORE = [
-  { pattern: /\bDROP\s+(?:DATABASE|SCHEMA|TABLE)\s+(?:IF\s+EXISTS\s+)?(["'`]?[\w.$-]*)/, named: true },
+  { pattern: /\bDROP\s+(?:DATABASE|SCHEMA|TABLE)\s+(?:IF\s+EXISTS\s+)?(["'`]?[\w.$-]*)/, named: true, teardown: /^DROP\s+(?:DATABASE|SCHEMA)\b/ },
   { pattern: /\bTRUNCATE\s+(?:TABLE\s+)?(["'`]?[\w.$-]*)/, named: true },
-  { pattern: /\bFLUSH(?:ALL|DB)\b/, named: false },
+  { pattern: /\bFLUSH(?:ALL|DB)\b/, named: false, teardown: /^FLUSHDB$/ },
   { pattern: /deleteMany\(\s*\{\s*\}\s*\)/, named: false },
 ];
 
@@ -100,15 +100,23 @@ export function sharedStoreHit(line) {
 /** A copy of `pattern` that is global and keeps every flag it had. */
 export const globalCopy = (pattern) => new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`);
 
-/** Every hit of every pattern of the table on the line (an owner-form name is no hit), in the table's order and then the line's. */
-export const sharedStoreMatches = (line) =>
-  SHARED_STORE.flatMap((entry) => [...line.matchAll(globalCopy(entry.pattern))].filter((match) => !isOwnName(entry, match)).map((match) => match[0].trim()));
+/** An entry's `teardown` test with the entry pattern's own flags (minus `g`), so a flag added to a pattern reaches its teardown reading too. */
+export const teardownOf = (entry) => (entry.teardown === undefined ? undefined : new RegExp(entry.teardown.source, entry.pattern.flags.replace("g", "")));
 
-/** The hits that are a container's own teardown: a whole database or schema dropped, or one Redis database flushed. `DROP TABLE`, `TRUNCATE`, `FLUSHALL` and delete-all are resets, not teardowns. */
-const CONTAINER_TEARDOWN = /^(?:DROP\s+(?:DATABASE|SCHEMA)\b|FLUSHDB$)/;
+/** Every hit of every pattern of the table on the line (an owner-form name is no hit), in the table's order and then the line's: `{ text, teardown }`. */
+const classifiedMatches = (line) =>
+  SHARED_STORE.flatMap((entry) => {
+    const teardown = teardownOf(entry);
+    return [...line.matchAll(globalCopy(entry.pattern))]
+      .filter((match) => !isOwnName(entry, match))
+      .map((match) => ({ text: match[0].trim(), teardown: teardown?.test(match[0].trim()) === true }));
+  });
+
+/** Every hit of every pattern of the table on the line, as text. */
+export const sharedStoreMatches = (line) => classifiedMatches(line).map((hit) => hit.text);
 
 /** The `shared-store` hits of the line that are NOT a container teardown. Under a valid `container-scoped` marker these are the findings; empty means the line is cleared. */
-export const nonTeardownHits = (line) => sharedStoreMatches(line).filter((hit) => !CONTAINER_TEARDOWN.test(hit));
+export const nonTeardownHits = (line) => classifiedMatches(line).filter((hit) => !hit.teardown).map((hit) => hit.text);
 
 /** Whether EVERY `shared-store` hit of the line is a container teardown (and there is at least one): a teardown beside a reset on one line clears nothing. */
 export const isContainerTeardown = (line) => sharedStoreMatches(line).length > 0 && nonTeardownHits(line).length === 0;

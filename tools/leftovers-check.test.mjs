@@ -2088,3 +2088,12 @@ test("F41 D: the teardown reading reuses the shared-store table with each patter
   for (const name of ["EXEMPTIBLE", "DECLARATION_KINDS", "readExemptions"]) assert.equal(guard[name], lib[name], `${name} is re-exported by the guard`);
   assert.ok(fs.readFileSync(path.join(root, "tools", "leftovers-check.mjs"), "utf8").split("\n").length <= 800, "the guard is within the coding style's 800 lines");
 });
+
+test("F41 E: a pattern's teardown reading takes that pattern's flags, so a flag added to a shared-store pattern reaches its teardown classification (code gate, final round)", async () => {
+  const { teardownOf, SHARED_STORE } = await import("./lib/leftovers-exemptions.mjs");
+  const insensitive = teardownOf({ pattern: /\bdrop\s+database\b/i, teardown: /^drop\s+database\b/ });
+  assert.equal(insensitive.test("DROP DATABASE bench"), true, "the entry's `i` reaches its teardown reading");
+  assert.equal(insensitive.flags.includes("g"), false, "no `g`: a teardown test is stateless");
+  assert.equal(teardownOf({ pattern: /x/ }), undefined, "an entry without a teardown has none");
+  assert.deepEqual(SHARED_STORE.filter((entry) => entry.teardown !== undefined).map((entry) => entry.teardown.source), ["^DROP\\s+(?:DATABASE|SCHEMA)\\b", "^FLUSHDB$"]);
+});
