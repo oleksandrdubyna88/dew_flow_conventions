@@ -30,6 +30,8 @@ const DETAIL = "common/test-leftovers-detail.md";
 const COMPANION = "common/test-leftovers-janitor.md";
 /** The `raw-temp` baseline's full definition (N1 of `todo/PLAN_raw_temp_baseline.md`): a companion, so the detail keeps headroom under the per-read cap. */
 const BASELINE = "common/test-leftovers-baseline.md";
+/** The `container-scoped` exemption (F41): provisions that extend §6 (b) and §7 of the detail, which is at its size cap and carries the pointer in its `depends`. */
+const EXEMPTIONS = "common/test-leftovers-exemptions.md";
 /**
  * The rule as it was before the split (`git show 7852de2:common/test-leftovers.md`), committed so the test needs no history. It PINS
  * the detail to that text: a later edit of the rule text updates the detail AND this fixture in one commit (with the record in
@@ -171,8 +173,22 @@ test("S1 11 the companion is selected for `implement` on the baseline file: a co
   }
 });
 
+test("F41 the exemptions companion is selected for `implement` on a test file by the detail's depends, is under the per-read cap, and is the one place the `container-scoped` provisions live", () => {
+  const listed = (task, file) => JSON.parse(run(["explain", "--task", task, "--file", file, "--repo", sourceRoot], sourceRoot)).rules.map((rule) => rule.id);
+  for (const task of ["implement", "test", "audit", "policy", "release"]) {
+    const ids = listed(task, "tools/leftovers-check.test.mjs");
+    assert.ok(ids.includes("common.test-leftovers-detail"), `${task}: the detail is selected`);
+    assert.ok(ids.includes("common.test-leftovers-exemptions"), `${task}: the companion is selected`);
+  }
+  assert.ok(Buffer.byteLength(bodyOf(read(EXEMPTIONS))) <= CAP - 800, "the companion keeps headroom under the per-read cap");
+  const text = spansOf(read(EXEMPTIONS)).join("\n");
+  for (const phrase of ["lives and dies with", "live and die with", "§6 (b)", "§7", "DROP DATABASE", "DROP SCHEMA", "FLUSH" + "DB", "`shared-store`", "`ryuk-off`", "`owner-blind`", "`docker-run`", "`docker-name`", "`raw-temp`", "`raw-worktree`", "`legacy-name`", "`exemption`", "the guard cannot know", "fixture test"]) {
+    assert.ok(phrase === "the guard cannot know" ? /What the guard cannot know/.test(text) : text.includes(phrase), `the companion says: ${phrase}`);
+  }
+});
+
 test("S1 5 every example name carries an owner of the grammar; the old form appears only as the legacy name's own description", () => {
-  const text = [...spansOf(read(RULE)), ...spansOf(read(DETAIL)), ...spansOf(read(COMPANION)), ...spansOf(read(BASELINE))].join("\n");
+  const text = [...spansOf(read(RULE)), ...spansOf(read(DETAIL)), ...spansOf(read(COMPANION)), ...spansOf(read(BASELINE)), ...spansOf(read(EXEMPTIONS))].join("\n");
   const found = [...text.matchAll(/(teststodelete)[-_](<[a-z]+>|[A-Za-z0-9]+)/gi)].filter((match) => match[1] !== "TESTSTODELETE"); // the upper-case spelling is an environment variable, not a name
   assert.ok(found.length > 5, "the texts do carry examples");
   for (const { 2: segment, index } of found) {
@@ -212,5 +228,6 @@ test("S1 6 the companion is its own rule with a conditional load and three tasks
   assert.equal(head(BASELINE), '---\nid: "common.test-leftovers-baseline"\nload: "conditional"\ntasks: ["implement","test","audit","policy","release","pr"]', "the baseline companion is selected for the tasks that write, review or ship a baseline, and for the code that reads one");
   const TASKS = '["implement","test","audit","policy","release"]';
   assert.equal(head(RULE), `---\nid: "common.test-leftovers"\nload: "conditional"\ntasks: ${TASKS}\ndepends: ["common.test-leftovers-detail"]`);
-  assert.equal(head(DETAIL), `---\nid: "common.test-leftovers-detail"\nload: "conditional"\ntasks: ${TASKS}`);
+  assert.equal(head(DETAIL), `---\nid: "common.test-leftovers-detail"\nload: "conditional"\ntasks: ${TASKS}\ndepends: ["common.test-leftovers-exemptions"]`, "the detail loads the exemptions companion through depends: its frontmatter is outside the measured body");
+  assert.equal(head(EXEMPTIONS), `---\nid: "common.test-leftovers-exemptions"\nload: "conditional"\ntasks: ${TASKS}`, "the exemptions companion shares the detail's load and tasks");
 });

@@ -2,11 +2,17 @@
 id: "common.test-leftovers-detail"
 load: "conditional"
 tasks: ["implement","test","audit","policy","release"]
+depends: ["common.test-leftovers-exemptions"]
 ---
 # Test leftovers — the full rule text (the detail of `common/test-leftovers.md`)
 
-The full statement of `common/test-leftovers.md`; where the core summarises, this text decides. The former text moved
-whole: `tools/test-leftovers-rule.test.mjs` holds every line against the text before the split.
+This file is the **full statement** of the rule whose core is `common/test-leftovers.md`: every section of
+the core (§1–§7, the janitor, the barrier, Never, Definition of Done) is written out here in full, and the
+`## Tokens` registry lives only here. The core summarises so that a reviewer can judge a change without this
+text; where the core summarises, this text decides, and the two never disagree. The text below is the former
+rule text moved whole — nothing was dropped (a test in `tools/test-leftovers-rule.test.mjs` holds
+every line of it against the text before the split). Read the core first; read this when a sentence of the
+core is not enough.
 
 <!-- core:begin -->
 Whatever a test run, a probe or a measurement creates OUTSIDE its own process — a container, a Docker volume
@@ -244,9 +250,6 @@ guard reads them (§7):
   keeps the reaper on, never sets reuse and disposes it; a job names the service in the workflow; either carries
   `testsToDelete-exempt: container-scoped — <what> lives and dies with <fixture or job>`. The per-run path is still
   the better one where it exists (one code path for CI and a developer machine).
-  The guard clears only the container's own teardown (`DROP DATABASE`, `DROP SCHEMA`, `FLUSHDB`), never a reset
-  or another class, and cannot know the database is the container's: the marker is a declaration, the fixture's
-  test proves the lifetime.
 
 ## 7. The guard — what every repository's structural check refuses
 
@@ -269,8 +272,6 @@ red when it **scanned nothing** (exit 2, with a sentence — discovery broke; th
 least ten characters and three words and not a placeholder (*needed*, *see above*, *todo*); for
 `shared-store` it carries `lock:`. A reason-less, class-less or unknown-class exemption is a finding of class
 `exemption`.
-`container-scoped` (§6 (b)) is valid when its reason names an owner: `lives and dies with` or `live and die
-with`, an optional article, a word of 2+ characters that is no article.
 
 **The Node guard reads one line's spellings (F30).** Its header lists its limits. `legacy-name` and `owner-blind` see a line's literals joined and decoded; the bare word and half word are `legacy-name`, but a pattern after the bare word is `owner-blind` unless `legacyNameHits` reads that occurrence. A template or comment open at a file's end is `unreadable`. A zero is zero for those spellings only.
 

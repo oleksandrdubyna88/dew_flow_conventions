@@ -112,7 +112,7 @@
  * arguments are bad — an empty scan is a broken discovery, never a clean repository.
  *
  * The exemption grammar. `testsToDelete-exempt: <class> — <reason>` on the line or the line above, a class of `EXEMPTIBLE` or the kind `container-scoped`; the reason is ten characters, three words, no
- * placeholder; `shared-store` also needs `lock:`. `container-scoped` (rule §6 (b); `DECLARATION_KINDS`) needs an owner instead: `<what> lives and dies with <fixture or job>` (or `live and die with`), where after
+ * placeholder; `shared-store` also needs `lock:`. `container-scoped` (`common/test-leftovers-exemptions.md`, extending §6 (b) and §7; `DECLARATION_KINDS`) needs an owner instead: `<what> lives and dies with <fixture or job>` (or `live and die with`), where after
  * an optional article (the, a, an, its, this, that) comes a word of two characters or more that is no article. It is a declaration, not a class of finding: it clears `shared-store` and nothing else, and only on
  * a line whose every hit is a `DROP DATABASE`, `DROP SCHEMA` or `FLUSHDB`; a `DROP TABLE`, `TRUNCATE`, `FLUSHALL` or delete-all needs a lock or a per-run name. A limit, stated: the guard reads a spelling,
  * not whose database it is, so `DROP DATABASE production_db` under a valid marker is clean — the marker is the author's declaration, the code review reads it and the consumer's fixture test proves the lifetime.
@@ -166,7 +166,7 @@ export const FOLDING_ALLOWANCES = Object.freeze([
 export const EXEMPTIBLE = Object.freeze(["raw-temp", "raw-worktree", "docker-run", "docker-name", "legacy-name", "shared-store"]);
 
 /**
- * The kinds of marker that are DECLARATIONS, not classes of finding (rule §6 (b)): `container-scoped` says that a database or namespace lives and dies with the container
+ * The kinds of marker that are DECLARATIONS, not classes of finding (`common/test-leftovers-exemptions.md`, extending §6 (b)): `container-scoped` says that a database or namespace lives and dies with the container
  * its fixture or job owns. It is kept apart from `EXEMPTIBLE` so that list keeps its meaning — the finding classes an exemption may name. The kind clears one class,
  * `shared-store`, and only a hit that is the container's own teardown (`CONTAINER_TEARDOWN`); it needs an owner in its reason, not a `lock:`.
  */
@@ -201,11 +201,11 @@ export const CURES = Object.freeze({
   "docker-name": "Give the container, volume, network, compose project or test-built image one of the three spellings of testsToDelete-<owner>-<repo>-<what>-<id> — common/test-leftovers-detail.md §1, §7 (docker-name).",
   "legacy-name": "Build every name with the owner segment: testsToDelete-<owner>-<repo>-<what>-<id> from ownedName()/the helper of this repository — common/test-leftovers-detail.md §1, §7 (legacy-name).",
   "owner-blind": "Match the caller's owner after the prefix (^testsToDelete-<owner>-<repo>-), or delete the sweep and use the shipped janitor; this class takes no exemption — common/test-leftovers-detail.md §7 (owner-blind), the barrier.",
-  "shared-store": "Isolate the store per run, add `testsToDelete-exempt: shared-store — <reason with lock: …>`, or — for a DROP DATABASE, DROP SCHEMA or FLUSHDB of a database inside a container the run owns — `testsToDelete-exempt: container-scoped — <what> lives and dies with <fixture or job>` — common/test-leftovers-detail.md §6, §7 (shared-store).",
+  "shared-store": "Isolate the store per run, add `testsToDelete-exempt: shared-store — <reason with lock: …>`, or — for a DROP DATABASE, DROP SCHEMA or FLUSHDB of a database inside a container the run owns — `testsToDelete-exempt: container-scoped — <what> lives and dies with <fixture or job>` (common/test-leftovers-exemptions.md) — common/test-leftovers-detail.md §6, §7 (shared-store).",
   "ryuk-off": "Leave Testcontainers' reaper on; this class takes no exemption — common/test-leftovers-detail.md §5, §7 (ryuk-off).",
   unreadable: "Make the package.json valid JSON whose `scripts` is an object of strings (or remove the field): the guard reads no other shape, and never skips one — see the header of tools/leftovers-check.mjs (`--profile node`) and the README row of the guard. For a source file: the folded reading (tools/lib/leftovers-fold.mjs) stops at a folded line of 256 KiB (split the line), reads no file that ends inside a block comment (close the comment) or inside a template, at any depth (a backtick the reader did not recognise, in JSX text or in a regex, opens one: write it as \\x60, or move the regex, so that the reader sees the template close), and reports a throw of the folding reader; the finding takes no exemption and the raw readings were not skipped.",
   baseline: "Remove the stale or out-of-scope entry from the baseline, or move the site into the helper; nothing adds to it — common/test-leftovers-detail.md §7 (the `raw-temp` baseline).",
-  exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason, or `container-scoped — <what> lives and dies with <fixture or job>` — common/test-leftovers-detail.md §7 (the exemption grammar).",
+  exemption: "Write `testsToDelete-exempt: <class> — <reason>` with a class of §7 (not ryuk-off) and a real reason, or `container-scoped — <what> lives and dies with <fixture or job>` (common/test-leftovers-exemptions.md) — common/test-leftovers-detail.md §7 (the exemption grammar).",
   token: "Register this repository's token as a row of the rule's `## Tokens` table before using it — common/test-leftovers-detail.md § Tokens (§1 of the rule) — and write it, with its row, in this repository's own tools/lib/owned-token.mjs beside the copied owned.mjs (never copy another repository's).",
 });
 
@@ -374,18 +374,19 @@ function exemptionProblem(rest) {
   return { cls };
 }
 
-const OWNER_SPELLING = /\b(?:lives\s+and\s+dies|live\s+and\s+die)\s+with\b(?=(.*)$)/gi;
-const OWNER_ARTICLES = new Set(["the", "a", "an", "its", "this", "that"]);
-const OWNER_WORD = /^[\p{L}\p{N}][\p{L}\p{N}_.-]*/u;
+// The owner of a `container-scoped` marker. The C# template (`LeftoversGuardExemptions.cs`, `NamedOwner`) reads the SAME text, so this pattern is that one with .NET's classes spelled out: \s is
+// [\f\n\r\t\v\x85\p{Z}] and \b is a Unicode word edge ([\p{L}\p{Mn}\p{Nd}\p{Pc}]), which JavaScript's \s and \b are not. After the spelling: whitespace, an optional article and whitespace, then a word whose first
+// character is a letter, a digit or _ and that has one or more of those or . or - after it, and that does not start with an article followed by a word edge ("a.", "the-x" name no owner; "a.b" does not either; "its_x" does).
+const SPACE = String.raw`[\f\n\r\t\v\x85\p{Z}]`;
+const WORD_CHAR = String.raw`[\p{L}\p{Mn}\p{Nd}\p{Pc}]`;
+const ARTICLE = "(?:the|a|an|its|this|that)";
+const NAMED_OWNER = new RegExp(
+  `(?<!${WORD_CHAR})(?:lives${SPACE}+and${SPACE}+dies|live${SPACE}+and${SPACE}+die)${SPACE}+with${SPACE}+(?:${ARTICLE}${SPACE}+)?(?!${ARTICLE}(?!${WORD_CHAR}))[\\p{L}\\p{N}_][\\p{L}\\p{N}_.-]+`,
+  "iu",
+);
 
 /** Whether a `container-scoped` reason names its owner: after `lives and dies with` or `live and die with`, an optional article and then a word of two characters or more that is no article. */
-function namesOwner(reason) {
-  return [...reason.matchAll(OWNER_SPELLING)].some((match) => {
-    const words = match[1].trim().split(/\s+/).map((word) => OWNER_WORD.exec(word)?.[0] ?? "");
-    const owner = OWNER_ARTICLES.has(words[0]?.toLowerCase()) ? words[1] : words[0];
-    return owner !== undefined && owner.length >= 2 && !OWNER_ARTICLES.has(owner.toLowerCase());
-  });
-}
+const namesOwner = (reason) => NAMED_OWNER.test(reason);
 
 const isExempt = (exemptions, cls, line) => exemptions.valid.get(cls)?.has(line) === true || exemptions.valid.get(cls)?.has(line - 1) === true;
 

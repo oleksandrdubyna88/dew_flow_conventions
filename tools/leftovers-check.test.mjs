@@ -1915,6 +1915,10 @@ test("F41 P1/P2: the marker alone is clean in both spellings, with every optiona
     "the data lives and dies with an Orders fixture",
     "the data lives and dies with PostgresFixture",
     "The Data Lives And Dies With The Fixture",
+    "the data lives and dies with x.", // two owner characters, one of them punctuation: the C# template accepts it too
+    "the data lives and dies with the _x",
+    "the data lives and dies with its_x", // an underscore continues a word, so `its_x` is no article
+    "the data lives and dies with the\tPostgresFixture", // any whitespace between the words
   ]) assert.deepEqual(classesOf("tests/X.cs", containerMarker(reason)), [], reason);
 });
 
@@ -1950,6 +1954,11 @@ test("F41 N1/N16/N4: a reason that names no owner is an `exemption` finding that
     "the per-test databases lives and dies with the the",
     "the per-test databases lives and dies with a b", // a one-character word is no owner
     "the per-test databases lives and dies with the X",
+    "the per-test databases lives and dies with a. foo", // an article followed by punctuation is not an owner (agrees with the C# template)
+    "the per-test databases lives and dies with an. foo",
+    "the per-test databases lives and dies with a.b", // `a` ends at the dot: the word edge is the C# \b
+    "the per-test databases lives and dies with the-fixture",
+    "the per-test databases lives and dies with the the-fixture",
     "the per-test databases lives and dies with — the end",
     "the per-test databases are removed by the PostgresFixture", // N4: neither spelling
     "the databases die with the PostgresFixture container", // a half spelling

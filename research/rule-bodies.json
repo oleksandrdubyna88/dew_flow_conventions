@@ -444,7 +444,7 @@
     {
       "id": "common.test-leftovers",
       "source": "common/test-leftovers.md",
-      "bodySha256": "4c49f5d0085b5eca965a3254cbfbe2a9c80e54d9924ed1d9d1a92136ce40c390",
+      "bodySha256": "5ebbee73197c2271e3e28a41278c04792e44e404fbda26c5658821797b3ca0ba",
       "sections": [
         "# Test leftovers are named `testsToDelete-<owner>-…`, owned by their run, scoped to their user, and collected (MANDATORY)",
         "## 1. The name",
@@ -463,7 +463,7 @@
     {
       "id": "common.test-leftovers-detail",
       "source": "common/test-leftovers-detail.md",
-      "bodySha256": "944e3f81b4d051c75b92c49414d3e09d20785491c806b8aec3dcd2a3472952a1",
+      "bodySha256": "19ad92bcba611cf2fc773705fad3c3d2583439c20cc92d981257e2a78f6f9798",
       "sections": [
         "# Test leftovers — the full rule text (the detail of `common/test-leftovers.md`)",
         "## 1. The name — one form, three spellings",
@@ -503,6 +503,15 @@
         "## The file",
         "## What a guard does with it",
         "## The ratchet",
+        "## Never"
+      ]
+    },
+    {
+      "id": "common.test-leftovers-exemptions",
+      "source": "common/test-leftovers-exemptions.md",
+      "bodySha256": "179a7fdd9a9cd623bd9f1cdc4dee4ae43c9ac6245fbfcdffbcdc3d711c53d93f",
+      "sections": [
+        "# The `container-scoped` exemption — a kind of its own, for a container's own teardown",
         "## Never"
       ]
     },

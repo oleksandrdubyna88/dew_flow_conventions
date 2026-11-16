@@ -81,7 +81,7 @@ A test only reads a store it does not own. Clearing a shared store is exempt onl
 shared store whose configuration carries `testsToDelete-exempt: shared-store …` naming the endpoint, the
 store and, after `lock:`, the enforced lock that serialises every reset — never a reset wider than the run's
 own names; or **(b)** a database or namespace inside a disposable container the run or its job owns, reuse
-never set (`testsToDelete-exempt: container-scoped — … lives and dies with …`, its teardown only).
+never set (`testsToDelete-exempt: container-scoped — … lives and dies with …`, its teardown only: `common/test-leftovers-exemptions.md`).
 Detail: §6.
 
 ## 7. The guard
@@ -95,7 +95,7 @@ after it; the only pass is the janitor's inventory line by file, line and hash),
 `TRUNCATE`, `FLUSH` or delete-all on an unprefixed name without (a)), `ryuk-off` (`TESTCONTAINERS_RYUK_DISABLED`
 true). The one exemption form is a comment on the line or the line above,
 `testsToDelete-exempt: <class> — <reason>`: ten characters, three words, no placeholder, `lock:` for
-`shared-store`; `owner-blind` and `ryuk-off` take none; `container-scoped` names its owner; a malformed one is a finding of class `exemption`.
+`shared-store`; `owner-blind` and `ryuk-off` take none; a malformed one is a finding of class `exemption`.
 A `raw-temp` site that provably runs inside an owned, claimed run folder may instead be carried by the repository's
 **`raw-temp` baseline**: a multiset of sites (file and the content hash of the line; the line number a hint), read
 by the guard only when named, that only shrinks — an occurrence beyond it, a stale entry, a site outside a proven
