@@ -10,6 +10,14 @@
 
 > Epoch 1 · approved 2026-11-16 · by reviewers · state: open
 
+- 1.1 · 2026-11-16 · agent · approach — the rule text goes into a companion rule, `common/test-leftovers-exemptions.md`, loaded by the detail's `depends`, because the detail is at its size cap (6 bytes of headroom) and its intro may not be trimmed
+  (Found by the coder: the detail's body was 31962 of 31968 bytes, a cap from the read limit, and every pre-split line
+  must stay verbatim, so the plan's "§6 (b) and §7 say so" in the detail itself did not fit; the coder had condensed the
+  detail's 7-line intro, which drops rule text. Asked of the question consultants (`7f0817ef`): both against trimming;
+  codex: a companion delivered through `depends` (frontmatter is outside the measured body, `tools/lib/rule-body.mjs`
+  `bodyOf`, read). The detail stays byte for byte; the core's §6 sentence points to the companion. First change of
+  epoch 1.)
+
 ## Goal
 
 The marker rule §6 (b) prescribes is accepted by the shipped Node guard, and only for what §6 (b) exempts.
