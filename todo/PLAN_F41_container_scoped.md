@@ -1,6 +1,6 @@
 # PLAN — F41: `container-scoped` becomes an exemption kind of its own (the rule and the shipped Node guard)
 
-> Status: **epoch 1 open, 2026-11-16: approved by the plan gate (`a4ec9471`, `proceed`, five findings accepted and folded in); building.** Branch `fix/f41-container-scoped` from `main` `739affe`. Parent:
+> Status: **epoch 1 open, 2026-11-16: built and through its gates — plan gate `a4ec9471` (proceed, five findings folded in), code gate two rounds (proceed; three findings accepted, one rejected as a false positive with a run), an independent Opus review (nine points applied); entry 1.1 (the companion rule). PR open; the release (a promotion with nine pin bumps) follows the merge.** Branch `fix/f41-container-scoped` from `main` `739affe`. Parent:
 > `todo/PLAN_test_leftovers_rollout.md` § *Epoch 9* item 4.2 and row F41-a; the follow-up F41 in
 > `todo/PLAN_test_leftovers_merged_core_followups.md`. One PR, docs and code. The release (a promotion with pin bumps in
 > all nine consumers, allowed by the owner on 2026-11-16 after a fresh check for releases in flight) is a separate step
