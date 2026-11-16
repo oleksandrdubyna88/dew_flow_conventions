@@ -1,6 +1,8 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 8 STOPPED for re-review (2026-11-12): its second change, entry 8.2 (E6-f: the rule's own `container-scoped` marker is refused by the released guard), is the eighth full stop; no new code on any epic until the re-review.** Epoch 8 opened 2026-11-07 (`Narrowed: no`) with entry 8.1 (2026-11-10). E2 (creds) is COMPLETE, 2026-11-10. E5.S7 (coai's drain) is COMPLETE, 2026-11-12.** Its five producer PRs are merged on creds `main`: E2.1 #294 (`834c91b`), E2.2 #310 (`bf59e4f`), E2.3 #311 (`0ae0211`), E2.4 #329 (`6e08071`, 2026-11-10) and E2.5 #330 (`b6cc6b3`, 2026-11-10 19:48 UTC). E2.5 switched on both repository guards: the shipped Node guard in creds' `docs.yml` is clean over 640 files, and the copied C# guard is green on all OS legs. Exemption markers are only on the inventoried lines. Creds' mount moved to `.agents/conventions` (#328) and is pinned at release `1341995` (#340). Epoch 8 used two changes: entry 8.1, and entry 8.2, which stopped it. E2's progress is not a change, so it has no ledger entry; creds' build records give the reasons why nothing else was counted. E2's rows and Definition of Done parts: § *Epoch 8* item 3.3. Still open in this plan: E6, E7, the feature reviews (E2's stories document's review is now due, § *Epoch 8* item 5, point 2; E2's round is held by `call_human` since 2026-11-10 — a reviewer failed, and the owner left it held on 2026-11-11) and the promotion. E5.S7 drained coai's `raw-temp` baseline from 778 entries to zero in six pull requests, one per suite, and deleted the file with its last entries (S7-d): § *Epoch 8* item 3.4. E5's progress is not a change, so it has no ledger entry. Creds' notes N20–N25 and its side findings (`release.yml`'s publish from any branch; two product scripts' temp leaks) are carried to the follow-ups as F33–F40.
+> Status: **epoch 9 open (2026-11-16), approved by the reviewers after the re-review (`Narrowed: no`; plan gate `b6933e14`, `proceed`; an independent Opus review), with 0 changes: the next accepted change is 9.1, the second is the ninth full stop.** The revision is § *Epoch 9*: `container-scoped` becomes an exemption kind of its own in both guards (F41 in conventions, F42 in mcp, with N1–N5 reproduced there), row E6-f is split into E6-f1 (the marker, file-scoped) and E6-f2 (the container ends with the fixture; reuse proved at run time), E7's rows that need the live stores are blocked with the owner (item 7), and E6's and E7's stories are revised in new PRs before their next stories (item 8.3). E2 (creds) and E5 (coai, S7 included) are COMPLETE. Still open: F41, F42, E6.S3–S7, E7.S2–S5, the feature reviews and the promotion.
+>
+> Was: Status: **epoch 8 STOPPED for re-review (2026-11-12): its second change, entry 8.2 (E6-f: the rule's own `container-scoped` marker is refused by the released guard), is the eighth full stop; no new code on any epic until the re-review. The re-review is written (§ *Epoch 9*, 2026-11-16; Narrowed: no) , judged (13 fit, 3 cut by a fix forward), passed by the plan gate (`b6933e14`, proceed) and an independent Opus review; epoch 9 opens by the reviewers.** Epoch 8 opened 2026-11-07 (`Narrowed: no`) with entry 8.1 (2026-11-10). E2 (creds) is COMPLETE, 2026-11-10. E5.S7 (coai's drain) is COMPLETE, 2026-11-12.** Its five producer PRs are merged on creds `main`: E2.1 #294 (`834c91b`), E2.2 #310 (`bf59e4f`), E2.3 #311 (`0ae0211`), E2.4 #329 (`6e08071`, 2026-11-10) and E2.5 #330 (`b6cc6b3`, 2026-11-10 19:48 UTC). E2.5 switched on both repository guards: the shipped Node guard in creds' `docs.yml` is clean over 640 files, and the copied C# guard is green on all OS legs. Exemption markers are only on the inventoried lines. Creds' mount moved to `.agents/conventions` (#328) and is pinned at release `1341995` (#340). Epoch 8 used two changes: entry 8.1, and entry 8.2, which stopped it. E2's progress is not a change, so it has no ledger entry; creds' build records give the reasons why nothing else was counted. E2's rows and Definition of Done parts: § *Epoch 8* item 3.3. Still open in this plan: E6, E7, the feature reviews (E2's stories document's review is now due, § *Epoch 8* item 5, point 2; E2's round is held by `call_human` since 2026-11-10 — a reviewer failed, and the owner left it held on 2026-11-11) and the promotion. E5.S7 drained coai's `raw-temp` baseline from 778 entries to zero in six pull requests, one per suite, and deleted the file with its last entries (S7-d): § *Epoch 8* item 3.4. E5's progress is not a change, so it has no ledger entry. Creds' notes N20–N25 and its side findings (`release.yml`'s publish from any branch; two product scripts' temp leaks) are carried to the follow-ups as F33–F40.
 >
 > Was: Status: **epoch 8 open (2026-11-07), approved by the reviewers after the re-review (`Narrowed: no`); entry 8.1 recorded 2026-11-10 (E2.4.S3: D5's check and naming step and a failed command substitution), so the next accepted change is the eighth full stop.** Epoch 7 stopped at entries 7.1 and 7.2; the whole plan was revised (§ *Epoch 8*): D5 by option B, observed acceptance results for every remaining epic, the Windows exception restated by its true condition (a process whose new files are owned by Administrators); the Opus judge sorted epoch 7's work (fits, two cuts fixed forward, outside rows; coai #962 merged during the stop and is reported to the owner); the plan gate on an operative extract (sessions `39432dd3`, `6f58dbce`) and an independent Opus review passed. Epoch 8 starts at 0 changes.
 >
@@ -532,7 +534,7 @@ Narrowed: no — entry 7.2 is settled by option (B), which keeps D5's names in t
   `docker.yml` is hosted-only by creds' D4, and the check stops the job before any resource exists. None of the
   four makes a condition smaller, so the Narrowed line stands.)
 
-> Epoch 8 · approved 2026-11-07 · by reviewers · state: stopped
+> Epoch 8 · approved 2026-11-07 · by reviewers · state: closed
 
 - 8.1 · 2026-11-10 · reviewer · contract — E2.4.S3: `bash -e` does not stop on a failed command substitution inside another command, so D5's check passes when `docker` fails and its naming step can write an empty `SMOKE_ID`; both are corrected
   (Found by the Opus review of E2.4.S3, findings 2 and 4, measured with a stub `docker` that exits 1 and a failed
@@ -552,6 +554,57 @@ Narrowed: no — entry 7.2 is settled by option (B), which keeps D5's names in t
   option A, a change; the precedents are entries 5.2 and 7.2). This is the second change of epoch 8: the plan stops for
   re-review. Merged before the stop and fitting so far: E6 stories #103, E6.S1 #205, E6.S2 #207 (benchmark); E7
   stories #106, E7.S1 #109, pin #108 (rag_qln); conventions #166.)
+
+### Re-review for epoch 9
+
+Narrowed: no — entry 8.2 is settled by making `container-scoped` an exemption kind of its own in both guards (F41, F42), so row E6-f is kept whole and split into two stricter rows (E6-f1, E6-f2); E6-d (3) gets a check that exists; E7's rows that need the live stores are named blocked, not approved; N1–N5 are reproduced before E7 copies the template. Nothing of the goal, the Definition of Done, the merge conditions or the release is removed (§ *Epoch 9* item 4.2).
+  (Written 2026-11-16 with § *Epoch 9*, over the two entries of epoch 8: 8.1, E2.4.S3's failed command substitution
+  (built, merged as creds #329); 8.2, the `container-scoped` marker refused by both guards (no code). Re-review consult
+  `70aadaf7`; the question consultants before it: `144d10b2`. The Verdict and Action cells are `—` until an Opus judge
+  fills them (step 5 of the full stop); the judge adds what this list missed. The epoch 9 line is written only after
+  the re-review approves; with `Narrowed: no` the plan gate approves, not the owner.)
+
+| Work | Where | Verdict | Action |
+|---|---|---|---|
+| the epoch-8 revision, conventions #142 `fab7c13`, and the records #146 (entry 8.1), #153, #162 | main | fits | kept — records: #142, #146 (`d89a32f`) and #162 (`2f8dae2`) change this plan only, #153 (`df562ef`) this plan and the follow-ups (F33–F40) (file lists read). § *Epoch 9* names what it supersedes of § *Epoch 8*; the rest stands |
+| creds #329 `6e08071`, E2.4 (entry 8.1), and #330 `b6cc6b3`, E2.5 | main of creds | fits | kept — item 4.1 keeps entry 8.1 as built; E2's rows are done (§ *Epoch 8* item 3.3). Entry 8.2 does not reach creds: no Testcontainers fixture there (only the copied guard's `ryuk-off` class) and no `container-scoped` marker (`git grep` at creds `96994b1`) |
+| coai #977, #979, #980, #981, #984, #985, E5.S7 | main of coai | fits | kept — § *Epoch 8* item 3.4; they add no exemption marker and leave the inventory as it was, so neither the new kind nor F42 touches them |
+| benchmark #103 `239e078e`, E6's stories | main of benchmark | fits | kept, except the lines of the next row — rows E6-a to E6-k, D1–D11 and the stories stand where § *Epoch 9* does not restate them (item 3) |
+| the lines of #103 that § *Epoch 9* supersedes, at benchmark `46e27108`: E6-d (3) "no `.WithReuse(`" (`todo/PLAN_test_leftovers_E6.md:29`); E6-f's "**[M]** the Node guard knows the `container-scoped` class" (`:31`); E6-g by `tests/` and `tools/` only (`:32`); S3's dependency on S2 alone (`:194`); S3 scenario (3), "the C# guard is red on a planted `.WithReuse(true)`", and (4), "the guard reads the marker" (`:253-255`); S7's "a planted `.WithReuse(true)`" red for each guard (`:318`) (not in this table when it was written) | main of benchmark | cut | corrected in a NEW benchmark PR, E6's stories revision, before E6.S3's plan gate: rows E6-d, E6-f1, E6-f2, E6-g as item 3 restates them, S3 after F41-b and F42-c (item 5). #103 is not reverted. Measured at `8ae5eb6` (whose guard equals the release `4c9a684`'s): the marker is one `exemption` finding and `.WithReuse(true)` in a `.cs` is `[]` **[M]** |
+| benchmark #205 `2af2f0f1`, E6.S1 | main of benchmark | fits | kept — E6-h met; the held-out runner only, nothing of entry 8.2 in its files (file list read) |
+| benchmark #207 `84d4953e`, E6.S2 (the copy of mcp `21553ce`, whose guard refuses the marker) | main of benchmark | fits | kept — question (a): the copy is the template's bytes at `21553ce` (its manifest's `commit`, `TheAdaptedCopyTests`), which is row E6-e; the refusal is the template's, unchanged to mcp `07a0f5b` (`git diff --stat 21553ce 07a0f5b -- tests/Mcp.Tests/Leftovers` empty **[M]**). It writes no marker and no reuse check (its diff searched), and is brought forward by F42-a in mcp and F42-c's re-sync in a NEW benchmark PR, which the revision plans; nothing is reverted |
+| rag_qln #106 `36843c0`, E7's stories; #108 `815e7a6`, the benchmark pin; #109 `3cca951`, E7.S1 | main of rag_qln | fits | kept, except the lines of the next row — question (c): #106 never calls E7-b, E7-c or E7-f observed (E7-b and E7-c "to observe before S2's plan gate", E7-f "not re-measured"), and S2's plan gate waits for them, which is what "blocked" asks; #109 says E7-c is "still to observe"; #108 moves one gitlink to `84d4953e` |
+| the lines of #106 that § *Epoch 9* supersedes, at rag_qln `3cca951`: D2's "pinned at mcp `9bf9f5b` or later" (`todo/PLAN_test_leftovers_E7.md:114`) and S3's "the mcp commit S3's brief names (`9bf9f5b` or later)" (`:290`), which admit a copy from `21553ce`; the build order with S3 after S1 alone (`:223-232`); no row E7-l (not in this table when it was written) | main of rag_qln | cut | corrected in a NEW rag_qln PR, E7's stories revision, before E7.S3's plan gate: the copy from F42's commit (item 2 point 2), S3 after F42 (item 5), rows E7-b (its shared-store branch), E7-c and E7-f blocked with the owner (item 7), row E7-l added. #106 is not reverted |
+| conventions #166 `113e9c2`, the owner's Windows statement | main | fits | kept — `research/security/machines.md` only; merge condition (c) for E6 and E7 (item 1). Merged 14:56Z, before the stop |
+| creds #313 `f8a42f93`, E2's document revised for epoch 8 (the NEW PR epoch 8's cut row asked for), and #342 `14ea9e7b`, E2's status lines (not in this table when it was written) | main of creds | fits | kept — `todo/PLAN_test_leftovers_E2.md` (and #342 the E2.5 brief's and `todo/README.md`'s status) only; #313 merged 2026-11-07 21:14Z, after epoch 8's approval (#142, 20:42Z) |
+| coai #994 `8b1a0086` (the macOS limit), #996 `5e25da77` (`native.test.mjs`'s folders owned through E5's `wrap.ownedDir`) and #998 `4cb32a76` (its research plan), merged 2026-11-13 to 2026-11-15, DURING the stop (not in this table when it was written) | main of coai, outside this plan | — | outside this plan, no verdict: item 2 point 4 makes S7's findings coai's own follow-ups. REPORTED, because they merged during the stop and #996 edits E5's inventory: one `legacy-name` row moved with its line (`:507` → `:523`, the same sha256), no new marker. On content they fit |
+| the stop record, entry 8.2, conventions #167 | main: PR #167 merged 2026-11-16 as `ebb8a75` (squash of `56fe6ac`, `8245b7c` and two merges of `main`); this revision's branch is built on its head `8ae5eb6` | fits | kept — the stop |
+| E6.S3's brief, uncommitted (`wt/bench-e6-s3`) | local: `todo/PLAN_test_leftovers_E6_S3_brief.md`, untracked, on `feat/e6-s3-fixture` at `84d4953e` (never pushed) | fits | kept as the starting material of the revised brief (item 5): its measurements C5 (no guard reads `.WithReuse(`) and C10 (the marker refused) are this revision's evidence. The parts item 3 replaces are the next row |
+| the same brief's parts § *Epoch 9* replaces (not in this table when it was written): C10's marker written now, beside an `exemption` finding taken as expected ("210 and 3", `:93-100`, `:433-442`) | local, never pushed | cut | rewritten in the brief before E6.S3's plan gate (local work, it may be dropped): E6-f1 is blocked on F41-b and F42-c, and its check is clean, never one finding |
+| rag_qln `feat/e7-s3-s5-helpers`, local (not in this table when it was written) | local, at `3cca951`, no commit of its own | — | nothing built; the S3–S5 draft brief of item 1 was not found on disk |
+| this revision, § *Epoch 9* and this record (branch `docs/rollout-epoch-9`) | pushed, unmerged: `c12612e`, the judge's table `185e927`, the corrections after the plan gate and the independent review on top | fits | kept — the baseline epoch 9 is approved on, never an entry; the judge's corrections below go in with it |
+| the other merges since epoch 8's approval: conventions #145, #147–#152, #154–#161, #163–#165, #168, #169; creds #307, #312, #314–#319, #323–#328, #331–#338, #340, #341, #343, #344, #346–#360, #362–#364, #366–#369; coai #963, #964, #968–#976, #978, #982, #983, #986, #987, #989–#993, #995, #997, #999, #1000; benchmark #179–#204, #206, #208, #209; rag_qln #94–#103, #107; mcp #68–#75; sidecar_rust #73–#80; vscode_kit #27–#34; amd_r9700 #18–#36; wsl_care #191–#198; ai_language_comparison #4, #5 (not in this table when it was written) | main of each repository, outside this plan | — | outside this plan, no verdict. Titles read, and the file lists where a title could touch it: the shared-rules rollout and its pins, agent-models, product work. No release since `37b9aa5` changes the leftovers guard or the test-leftovers rules (`git diff --stat 37b9aa5 4c9a684` on `tools/leftovers-check.mjs` and `common/test-leftovers*.md`: empty **[M]**). #163 edits two closed test-leftovers plans in `research/` to remove names (privacy). coai #995 moves two `raw-temp` inventory rows with their lines (`:73` → `:74`, `:86` → `:87`, the same sha256) |
+  (Judged 2026-11-16 by an Opus judge against § *Epoch 9*, § *Epoch 8* (its item 3 table, item 3.3, item 3.4 and item 5), E6's stories at benchmark `46e27108`, E7's stories at rag_qln `3cca951`, and the local E6.S3 brief: 13 rows fit; 3 are cut (E6's and E7's stories' superseded lines, both merged, each by a NEW PR's revision; the local E6.S3 brief's marker plan, rewritten); 3 rows have no verdict (coai's S7 follow-ups merged during the stop, reported; a local branch with nothing built; the outside merges). Nothing merged in epoch 8 needs a revert.
+  Read: `gh pr list --state merged --search "merged:>=2026-11-07"` in eleven repositories, and the file lists of every conventions PR since #142, of creds #307, #309, #312, #313, #323, #331, #335, #337, #342, #344, #359, #366, of coai #950–#999 except its `chore(rules)` pin bumps and the release PRs #963, #978, #992, #993, #997, and of the plan PRs; `gh api repos/…/branches` for conventions, creds, coai, benchmark, rag_qln and mcp; `git ls-remote` of each `main`; `git worktree list` and the local branches of benchmark and rag_qln; `git grep` for `exempt: container-scoped`, `WithReuse` and a `testcontainers` class on the mains of benchmark, rag_qln, mcp, coai and creds; #207's diff and manifest; `git show` of the E6 and E7 stories, rag_qln's `research/module_tests.md`, mcp `07a0f5b`'s `LeftoversGuard.cs:93` and `LeftoversGuardExemptions.cs:11`, `:53`.
+  Run, read-only, with `scanText` of the guard at `8ae5eb6`: the marker alone gives one `exemption` ("an exemption names an unknown class `container-scoped`"); over a `DROP DATABASE` line, that and `shared-store`; the same reason under `shared-store` is refused for having no `lock:`; `.WithReuse(true)` and `SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true")` in a `.cs` give `[]`; the workflow spelling is `ryuk-off`. Each matches § *Epoch 9* items 1, 3 and 4.2.
+  The questions. (a) Benchmark #207 does not contradict the revision: it is the template's bytes, which row E6-e asks for, and it writes no marker; the refusal it carries is F42's to fix in mcp, and F42-c's re-sync brings the copy forward in a new PR. Fits, no cut. (b) No merged PR writes a `container-scoped` marker in code. What relies on a guard reading it, or claims a reuse check by a guard class, is text: E6's stories (#103), the cut row, and the local E6.S3 brief, which already measured both claims false (C5, C10). (c) Nothing merged in rag_qln treats E7-b, E7-c or E7-f as observed; what #106 must still change is the copy's commit and the order (the cut row) and row E7-l. (d) Nothing merged into the plan's epics after the stop record (`56fe6ac`, committed 17:36:01Z on 2026-11-12, PR #167 opened 17:36:17Z): after it, benchmark merged only lang-comparison work (#208, #209), rag_qln and mcp nothing, conventions agent-models plans (#168, #169), creds product work. Of coai's merges during the stop, four touch its CI, tests or leftovers files: #994, #995, #996 and #998; #996 is an S7 finding's fix with E5's helper and moves an E5 inventory row, so it is reported (its row), though item 2 point 4 puts it outside the plan.
+  Corrections made to § *Epoch 9*, plain facts: K1, item 1's E6 row: S2 added the audit's CI step, not a guard step; the copied repository guard test is `Explicit` until S7 and no Node guard step runs in benchmark's CI. K2, row E6-g: the Node guard step is S7's, and S2 planted no directory. K3, item 5's DONE line in merge order: the owner's statement (#166, 14:56Z) came after E6's stories (#103, 14:52Z) and before E7's (#106, 16:48Z); the stop is `56fe6ac`, pushed, with PR #167 open and unmerged (it merged after the judge, as `ebb8a75`). K4, item 7: coai #994 and #996 have since merged (the macOS limit and the collision). In this record: the stop record's and this revision's Where cells (pushed, not local).
+  Could not check: whether rag_qln #108 (17:22Z) and #109 (17:27Z) merged after entry 8.2's finding but before its record (17:36Z): the E6.S3 brief starts from #207's merge, so #207 came first, and the consult's time was not read; both fit on content. E2's feature review held by `call_human` (a coai session, not read). The E7 S3–S5 draft brief of item 1: not on disk, and `feat/e7-s3-s5-helpers` has no commit of its own. The consults `70aadaf7`, `144d10b2` and the five of item 7. Anything with Docker or .NET (no run), and Windows (N1).)
+  (After the judge, 2026-11-16. The plan gate read the operative extract (status line, epoch 8's entries, this record,
+  § *Epoch 9*, F41–F43): session `b6933e14`, `proceed`, two findings, both accepted: E6-f2 (3) proves reuse at run time
+  by (2), with reuse turned on by the builder and by configuration alone as counterexamples; E7-l's names come from one
+  builder tested at its bounds, and the shortest and longest are created live. An independent Opus review, run at the
+  same time, raised ten points, all accepted and applied: E6 writes the marker in the plural, so both spellings are
+  valid (item 4.2 points 1 and 2; measured: E6's stories `:49`, `:248`, the S3 brief `:183`); E6-f1's check is
+  file-scoped, as benchmark's tree is not clean before S7; F41's release is a promotion that reddens nine pin checks,
+  planned so (item 5); restated rows had dropped earlier checks (E6-g, E7-c, E7-h, the R6 tick), restored; E6-g named
+  plain `.mjs` files the Node guard does not read (`isScanned` measured), now per directory by what reads it; E7-l's
+  live half and E7-b's no-sharing branch need no owner, and E6-c's Windows half does not arise (no Windows leg); the
+  exemption is limited to the container database's own teardown, so no writer skips (a)'s lock; the stories
+  revisions and F42-a's order are in item 5; three stale cells; no re-split, said in item 4.2. None of them makes a
+  condition smaller, so the Narrowed line stands.)
+
+> Epoch 9 · approved 2026-11-16 · by reviewers · state: open
 
 ## Symptom
 
@@ -2682,6 +2735,218 @@ table. **E6 and E7, where they copy the C# helper, state the goal's exception by
 whose new files and folders are owned by `Administrators` (pwsh on `windows-latest`, measured), not "an elevated
 process" (elevated Git Bash makes the caller's files, measured). A pin of the limit in their suites reads who owns a new
 file, as coai #962's test does, and skips with its reason where the caller owns it.
+
+## Epoch 9 — the plan as revised at the re-review (2026-11-16)
+
+The whole plan read again, as step 4 of the full stop asks (`common/plan-change-control.md`), over the two entries of
+epoch 8: 8.1, E2.4.S3's `bash -e` and a failed command substitution (built and merged in creds #329); 8.2, the rule's
+own `container-scoped` marker refused by both guards. The re-review consult is `70aadaf7` (codex, two turns); the
+question consultants before it: `144d10b2` (whether 8.2 counts: two of two, yes), and five single-question consults of
+2026-11-12 on E7's open points (item 7). Advice, each point checked against the files or by a run (item 6). This
+section is the baseline epoch 9 is approved on. § *Epoch 8* stays as the plan for everything this section does not name.
+Superseded by this section, read from here: row E6-f of § *Epoch 8* item 3 (split into E6-f1 and E6-f2, item 3); proof
+(3) of row E6-d ("no `.WithReuse(`", which named a guard class that does not exist, item 3); the THEN line of wave 3 in
+§ *Epoch 8* item 5 (item 5 below).
+
+**How to read the evidence.** **[M]** and **[D]** as in § *Epoch 8*. New in this section, each remaining row carries ONE
+state: **observed** (the row's own check was run on a candidate that must pass AND on a counterexample that must fail,
+both at the consumer's pin), **proposed** (the check is written, not yet run; never approved as measured), or
+**blocked** (the check needs something this plan does not have; the row names what).
+
+### 1. What this plan is now
+
+**The root cause, the consultant's, checked.** Epoch 8 required an observed result for every row (§ *Epoch 8* item 8.1).
+Row E6-f had one: "**[M]** no `testsToDelete-exempt` marker … in the file". That observed the TREE, not the CONDITION: the
+condition was "the guard reads the marker", and nobody ran the guard on a marker. The rule was met in its letter. So from
+epoch 9 an observation counts only when it runs the row's own executable check, on a candidate and on a counterexample
+(item 8.1); a reading of the current tree is the starting point, written as such. The same slip is found twice more by
+this revision, both measured: proof (3) of E6-d named "the draft's guard class `testcontainers`", and no guard has it
+(`scanText('tests/X.cs', 'var c = new PostgreSqlBuilder("postgres:17").WithReuse(true).Build();')` → `[]` **[M]**);
+and neither guard reads `Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true")` in a `.cs` (Node
+`[]` **[M]**; the C# template's `RyukOff` wants `[:=]` after the name, mcp `07a0f5b` `LeftoversGuard.cs:93`, read, not
+run), while the same setting in a workflow or a `.sh` is `ryuk-off` **[M]**.
+
+**State at the stop (read 2026-11-16).**
+
+| Epic | State | Commits |
+|---|---|---|
+| E1, E3, E4 | DONE (wave 1) | as § *Epoch 8* |
+| E2 (creds) | COMPLETE 2026-11-10. Its feature review is held by `call_human` since 2026-11-10 | #294, #310, #311, #329, #330 |
+| E5 (coai) | COMPLETE 2026-11-12, S7's drain included (§ *Epoch 8* item 3.4) | #945; #977, #979, #980, #981, #984, #985 |
+| E6 (benchmark) | stories MERGED; S1 MERGED (E6-h met); S2 MERGED (the adapted copy of mcp `21553ce`, the start-of-run sweep, case 15, the audit and its CI step *The audit fails a run that leaves a claimed folder*; the copied repository guard test is `Explicit` until S7, and no Node guard step runs in CI yet: that is S7's (corrected by the judge)); S3's brief drafted, uncommitted; S4–S7 not started. `main` `46e27108` **[M]** | #103 `239e078e`, #205 `2af2f0f1`, #207 `84d4953e` |
+| E7 (rag_qln) | stories MERGED; S1 MERGED (E7-a met, E7-e recorded as known); the benchmark pin bumped; S2–S5 not started (a draft brief for S3–S5 in a worktree, unfinished). `main` `3cca951` **[M]** | #106 `36843c0`, #108 `815e7a6`, #109 `3cca951` |
+| Merge condition (c) | DONE for the WSL machine (#136); for E6 and E7 also by the owner's statement that their Windows machine builds and tests neither repository (conventions #166) | `37b9aa5`; #166 `113e9c2` |
+| F30, F31 | as § *Epoch 8* | — |
+| The feature reviews | not started | — |
+
+**Goal and Definition of Done.** Both stand word for word, with § *Epoch 8*'s reading. The Definition of Done's "every
+container-scoped database carries exemption (b)" (`common/test-leftovers-detail.md:352`) is now meetable only after F41
+and F42 (item 2): today no guard accepts the marker it names.
+
+### 2. Prerequisites
+
+1. **F41 (conventions): `container-scoped` is an exemption kind of its own** (item 4.2), in the rule (§6 (b), §7's
+   grammar) and in the shipped Node guard with its tests; one release; benchmark's rules pin bumped to it. Before the E6
+   story that writes the marker. A follow-up of `todo/PLAN_test_leftovers_merged_core_followups.md`, as F30 was.
+2. **F42 (mcp): the C# template takes the same kind, and N1–N5 are reproduced** (row F42-b): each one that reproduces and
+   applies is fixed in the template, RED first. Then benchmark's adapted copy is re-synced to that mcp commit (its
+   manifest re-pinned, `TheAdaptedCopyTests` green), and E7.S3 copies from that commit, never from `21553ce`.
+3. **E7.S2 waits for observations of the live stores** (rows E7-b's shared-store branch, E7-c, E7-f): the owner's, item 7; E7-l's live half runs on a throwaway Qdrant. Its Fable spec
+   may be written; its plan gate waits. E7.S3–S5 do not wait for it (the owner's answer of 2026-11-12).
+4. Not prerequisites: F32; F43 (item 3); the coai findings of S7 (`native.test.mjs`'s collision, the macOS limit,
+   `L_N1a`'s empty `/proc/locks`), which are coai's own follow-ups; rag_qln's search ranking, a todo of its own (item 6).
+
+### 3. Merge conditions — the rows this revision adds or restates
+
+Every other row of § *Epoch 8* item 3 and of E6's and E7's stories documents stands, word for word; a row restated here
+keeps every check its earlier text had and adds to it. State as defined above. The rows not restated here (E6-a, b, e,
+h; E7-a, e, g, i, j, k) carry the evidence their documents give; the stories revisions of item 8.3 write a state on each.
+
+| # | Condition | Implementation | Executable check | Does not prove | State |
+|---|---|---|---|---|---|
+| F41-a | the marker of §6 (b) is accepted, and only as item 4.2 says | conventions: `tools/leftovers-check.mjs` (`EXEMPTIBLE`, `exemptionProblem`, `isExempt`), the rule §6 (b) and §7 | fixtures in the guard's test: the marker alone → `[]`, in both spellings (`lives and dies with`, `live and die with`); over a `DROP DATABASE bench_case`, a `DROP SCHEMA bench_case` or a `FLUSHDB` line → `[]`. Counterexamples, each red: neither spelling followed by a word (`exemption`); a placeholder reason (`exemption`); the marker over a `TRUNCATE TABLE users`, a `FLUSHALL` or a delete-all (`shared-store` stays: a reset that is not the container database's own teardown needs (a)'s lock or a per-run name); the marker two lines above a `DROP DATABASE` (`shared-store` stays); the marker over a `docker run` without `--rm` (`docker-run` stays), over a `--name` not in the owner form (`docker-name` stays), over a `TESTCONTAINERS_RYUK_DISABLED=true` (`ryuk-off` stays), over an owner-blind glob (`owner-blind` stays), over `mkdtemp(` (`raw-temp` stays) | that the container really dies with the fixture: E6-f2 | **proposed**. Observed today, the RED half: the marker alone → one `exemption` finding ("an exemption names an unknown class `container-scoped`"); over the `DROP` line → that finding and `shared-store` **[M]** at `8ae5eb6` |
+| F41-b | consumers read F41 | the release; benchmark's `.agents/conventions` pin | the gitlink reads the release (GitHub API) | — | **proposed** |
+| F42-a | the C# template agrees with F41-a, case for case | mcp `tests/Mcp.Tests/Leftovers/LeftoversGuardExemptions.cs` (`Exemptible`, `ReasonProblem`), `LeftoversGuardTests.cs` | the same fixtures as F41-a in the template's tests | — | **proposed**. Observed today: `Exemptible` lacks the class, so the marker is "an unknown class" (mcp `07a0f5b`, `:11`, `:53`; read, not run: no .NET run here). F42 also corrects the class's doc comment, which says "a marker that exempts nothing is a finding" while `Read` passes such a marker (the independent review) |
+| F42-b | N1–N5: each reproduced, then fixed or bounded | mcp's template | N1: a claimed folder holding a git clone, removed on `windows-latest` (read-only object files); N2: a child writing more stderr than a pipe holds; N3: a link path with a space and a shell metacharacter; N4: a deliberately hanging child under `MountedSelectorPick`; N5: an existing temp root the user cannot read (`chmod 000`, not root) must not read as empty. RED first for each that reproduces | a reproduction on one OS for N2–N5 | **proposed**; N1 is hosted only (Windows). One that does not reproduce is recorded with its run, not fixed |
+| F42-c | benchmark's copy is the template's bytes again | benchmark's manifest, re-pinned to F42's commit | `TheAdaptedCopyTests` green; one byte changed in a copied file → red | — | **proposed** |
+| E6-f1 | the per-test databases carry the §6 (b) marker, and both guards accept it at benchmark's pins | `tests/Bench.Tests/Infrastructure/PostgresFixture.cs`, beside `NewEmptyDatabaseAsync` | FILE-scoped, because benchmark's tree is not clean before S7 (the Node guard: 209 findings at `46e27108`, entry 8.2; the copied C# repository test is `Explicit` until S7): no finding in `PostgresFixture.cs` from either guard (the copied C# guard's scan of that file; `scanText` of the Node guard), and the Node guard's count over the repository unchanged against the base; the same file with the reason's `live and die with` removed: one `exemption` in each. "Both guards clean on the head" stays S7's | the lifetime | **blocked** on F41-b and F42-c |
+| E6-f2 | the fixture's container ends with the fixture, and reuse is never set | benchmark's fixture tests (E6.S3) | (1) the container exists, by its captured id, BEFORE disposal, and the Docker query that says so succeeded; (2) after disposal the same query succeeds and finds nothing — a failed query is never "absent"; (3) reuse, proved at RUN time by (2): a reused container is not stopped by disposal, so (2) is red whenever reuse is in effect, whatever turned it on. RED, each: reuse enabled through the builder the fixture uses, and through configuration alone (`TESTCONTAINERS_REUSE_ENABLE=true`, or `testcontainers.reuse.enable=true` in the properties file the pinned version reads), with the fixture's source unchanged. A read of the built container's reuse setting (if the pinned API exposes it) or a source test may be added, never instead of (2) (the plan gate, round 1) | other consumers' fixtures; a shared `testcontainers-reuse` class is a follow-up only when a second consumer needs one (item 4.2) | **proposed**; Docker runs only in hosted CI (`BENCH_REQUIRE_DOCKER=1`; no `docker` here **[D]**) |
+| E6-d | restated: three separate proofs | `PostgresFixture.cs` | (1) Ryuk: the container exists (query succeeded) before the child is killed, and is gone after; (2) the owner label `testsToDelete.owner` on the builder, read by the container pass; (3) = E6-f2 (3). And no `TESTCONTAINERS_RYUK_DISABLED` in any spelling: a benchmark test over its `.cs`, because neither guard reads the `SetEnvironmentVariable` form (item 1, F43) | Ryuk collects by session, not by owner | **proposed**; hosted |
+| E6-c | a killed child's worktree is collected | the copied sweep, case 15 (S2) | case 15 | Windows: N1, which does not arise here: benchmark's workflows have no Windows leg (`git grep -i windows origin/main -- .github/workflows`: nothing, the independent review) and the owner's Windows machine builds neither repository (#166) | **observed** by S2 on Linux (#207, RED then GREEN, **[D]** its brief; not re-run by this revision). Windows: not applicable while benchmark has no Windows leg; N1 is F42's for the template |
+| E6-g | the guards read every directory E6 promises | the copied C# guard (copied in S2, its repository test `Explicit` until S7) and the Node guard step in CI (S7; S2 added none) (corrected by the judge) | both guards green on the head (S7, as E6's stories say); and per directory, a planted raw temp in a file of a kind that directory's guard READS is red: the C# copy reads `.cs` under `tests/` and `src/`; the Node guard under `--profile node` reads `*.test.mjs` and `.sh` but NOT a plain `.mjs` (`isScanned('node')`: `spikes/minigit-bench/lib/heldout-run.mjs`, `tools/x.mjs`, `spikes/policy-ab-quick/test/x.mjs` false; `spikes/policy-ab-quick/test/x.test.mjs`, `tools/x.sh` true **[M]**). A promised directory whose files no guard reads is named in the stories revision as a limit, with its file kinds; a scan of nothing is red | which plain `.mjs` files make temp paths: no guard reads them | **proposed**: S2 planted no directory for this row |
+| E7-b | a capped store never evicts a test collection, or tests never share a capped store | as E7's stories | as E7's stories | — | two branches. "Tests never share a capped store" can be enforced in code (the tests' store refuses a budget, or the suite refuses a store with one): **proposed**, S2's spec. "Never evicts a test collection" with a shared capped store: **blocked**, whether a running daemon with a budget shares the live tests' Qdrant is not known here; a read-only probe on the owner's machine observes it (item 7) |
+| E7-c | the live tests' writes are serialized across processes before any rename test runs against the store | as E7's stories | two live runs at once on one store, controlled: the second waits or refuses, by test | — | **blocked**: a live run with the stores, on the owner's machine (item 7), or on a throwaway store set if S2's spec shows the live suite can run against one (then **proposed**) |
+| E7-d | the four ownership states, one test each | S2's spec | as E7's stories | — | **proposed** (S2's spec) |
+| E7-f | the growth figure, measured with its command | E7's § Growth | `du -s -B1` of Qdrant's collections folder before and after one live run, and after a second run (no growth) | one machine, one date | **blocked**: the stores' folder is on the owner's machine (item 7) |
+| E7-h | the C# copy reads rag_qln's layout | E7.S3 | S3's manifest check, and the copied guard run on a recursive checkout | — | **proposed**; copies from F42's commit (item 2) |
+| E7-l | Qdrant accepts the owner-form collection name `teststodelete_<owner>_rag_<what>_<id>` and every name S2 makes | S2's spec: ONE name builder whose segments' characters and the whole name's longest length are written against Qdrant's documented collection-name rules | a unit test of the builder at its bounds (the longest owner, `<what>` and id it allows is within the limit; a segment with a refused character or one over the length is refused by the builder, never sent); then a live create and delete of the SHORTEST and the LONGEST name it builds (the plan gate, round 1) | — | the unit half **proposed**; the live half **proposed** on a throwaway Qdrant (a user process unpacked into an owned folder, as this machine runs stores; no owner's store needed), not blocked (corrected by the independent review). Added by this revision, from the consultant |
+| F43 | a pointer: neither guard reads Ryuk disabled through `SetEnvironmentVariable` in a `.cs` | the follow-ups plan | — | — | recorded; E6-d (1) proves Ryuk by a test, so it is not a prerequisite |
+
+### 4. The dispositions of entries 8.1 and 8.2
+
+**4.1 Entry 8.1 — kept as built** (creds #329; § *Epoch 8* item 3.3).
+
+**4.2 Entry 8.2 — `container-scoped` becomes an exemption kind of its own.** Decided:
+
+1. **The form does not change:** `testsToDelete-exempt: container-scoped — <what> lives and dies with <fixture or job>`,
+   as §6 (b) writes it. E6's text writes the plural, "the per-test databases **live and die** with the PostgresFixture
+   container" (E6's stories `:49`, `:248` at `46e27108`; the S3 brief `:183`), so both spellings are accepted (point 2)
+   and no consumer's text changes.
+2. **Valid** when the general reason rule holds (ten characters, three words, not a placeholder) AND the reason matches
+   `\blives? and dies? with\s+\S+`: the owning fixture or job is named.
+3. **It is a declaration.** A valid marker with no finding beside it is clean (both guards pass a valid marker that
+   exempts nothing: `[]` in Node, run by the independent review; C# `GuardExemptions.Read`, read, not run). "Exempt from
+   the name" needs no guard exemption: an unprefixed `CREATE DATABASE` and a workflow `services:` give `[]` (run by the
+   independent review). "Exempt from its own teardown" is the one finding it clears: `shared-store` on its line and the
+   next, and only for the teardown of the container's database, schema or namespace itself — `DROP DATABASE`,
+   `DROP SCHEMA`, `FLUSHDB`. A `TRUNCATE`, a `FLUSHALL` or a delete-all stays `shared-store`, so no writer avoids (a)'s
+   `lock:` by choosing this kind. Both guards key exemptions on the finding class (`isExempt`, `IsExempt`), so the
+   implementation must also see which statement hit. It never clears `ryuk-off` or `owner-blind` (they refuse every
+   exemption), nor `docker-run`, `docker-name`, `raw-temp`, `raw-worktree` or `legacy-name`: a fixture's container is
+   still named in the owner form (§5), and that stays checked. §7 says all of this.
+4. **Why not the `shared-store` class with a different reason:** its `lock:` is mandatory (the marker written as
+   `shared-store` is refused for having no lock **[M]**), and (a) means a long-lived shared store, the opposite of (b).
+5. **Why not narrow E6-f** (drop "the guard reads the marker"): it would make a merge condition smaller (`Narrowed: yes`)
+   and leave the Definition of Done's sentence unmeetable.
+6. **Reuse stays a consumer's fixture test** (E6-f2 (3)), not a shared class: a pattern for `.WithReuse(true)` misses
+   variables, wrappers and configuration, and the fixture test reads what was built. A shared class without an exemption,
+   like `ryuk-off`, is a follow-up only when a second consumer needs it.
+
+**Narrowed: no.** Two prerequisites are added (F41, F42), E6-f is split into two rows that each check more, E6-d (3)
+gets a check that exists, and E7's live rows are named blocked instead of being approved; nothing is removed. Every
+restated row keeps its earlier checks (E6-g's "both green on the head", E7-c's "before any rename test" and "by test",
+E7-h's recursive checkout, the LAST line's R6: restored after the independent review found them dropped). The
+exemption itself is narrower than a plain class exemption (point 3): that makes the guard stricter, not the plan
+smaller. **The epics do not change**: no Fable re-split; F41–F43 are follow-ups, as F30 was, and E6's and E7's stories
+are revised by Opus (item 8.3).
+
+### 5. Build order
+
+```
+DONE   epoch 8 approved (#142) → E2.4 (#329, entry 8.1) → E2.5 (#330) → E5.S7 (#977…#985) → E6 stories (#103)
+       → the owner's statement (#166) → E7 stories (#106) → E6.S1 (#205) → E6.S2 (#207) → the rag_qln pin (#108)
+       → E7.S1 (#109) → the stop (entry 8.2, PR #167, merged `ebb8a75`) → this revision.
+       (Merge order, corrected by the judge.)
+NEXT   the Opus judge sorts epoch 8's work (step 5) → the plan gate on an operative extract and an independent Opus
+       review → epoch 9 opens `by reviewers` (Narrowed: no).
+THEN, at once:
+  conventions  F41, its fixtures (F41-a) settled first → a release. A release is a promotion of `release`, and every
+               consumer's pin check wants its pin at that tip, so all nine consumers' pin checks turn red at once:
+               the promotion check runs first (the consumers' releases in flight, the open PRs against each cap), a
+               pin bump PR is planned in each of the nine (the owner's over-cap word where a repository is at its
+               cap), or F41 rides a promotion already planned. Benchmark's bump is F41-b.
+  benchmark    E6's stories revised (item 8.3), a NEW PR, by Opus.
+  rag_qln      E7's stories revised (item 8.3), a NEW PR, by Opus.
+THEN   mcp: F42 (F42-a after F41-a's fixtures are settled, so the two guards agree; N1–N5 reproduced, the applicable
+       ones fixed), one PR, RED first. It needs no F41 pin: the template reads only the rule's Tokens table.
+THEN, at once:
+  rag_qln      E7.S3 → S4 → S5 as E7's stories (one PR), copying from F42's commit. E7.S2's spec may be written; its
+               gate waits for item 7's observations.
+  benchmark    the copy re-synced to F42 (F42-c) → E6.S3 (its brief revised for E6-f1, E6-f2, E6-d; F41-b first)
+               → S4 … S7 as E6's stories.
+LAST   the feature reviews (§ *Epoch 8* item 5); the promotion of this plan and its stories documents; R6 ticked in
+       the remainder plan.
+```
+
+### 6. What the re-review consultant raised, and what was done with it
+
+| Point (consult `70aadaf7`) | Checked | Done |
+|---|---|---|
+| The failure is evidence that a mechanism exists taken as evidence that the condition holds | True: E6-f's "[M] no marker" (item 1) | Item 1; the three states; item 8.1 |
+| `container-scoped` a kind of its own, not `shared-store` (its `lock:` is mandatory), grammar with resource and owner, say what it suppresses; both guards, then manifests and pins | `lock:` measured; both guards read | Item 4.2; F41, F42, F42-c |
+| `.WithReuse(true)` is `[]` in the guard | `[]` **[M]** | E6-d, E6-f2 (3) |
+| Reuse: a benchmark fixture test, reading the built container if the API allows; a shared class later | — | E6-f2 (3); item 4.2 point 6 |
+| Split E6-f into the marker grammar and the fixture proof | — | E6-f1, E6-f2 |
+| E6-c, d, f, g: worktree collection, existence before the kill, a successful query before "absent", plants in every promised directory | True: no row asked for a successful query or for each directory | Rows E6-c, E6-d, E6-f2, E6-g |
+| E7: eviction, two processes, each state, Qdrant's acceptance of the name, the exact `du`; without the live store E7's dependent work stays blocked | True: none can be observed from here | Rows E7-b, c, d, f, l; item 2 point 3 |
+| N1–N5 under the template's owner; N1 and N5 threaten cleanup and the audit; reproduce before another copy relies on them | The notes are by reading or by a gate | F42-b, before E7.S3 |
+| Nothing merged needs a cut without evidence | The judge checks it (step 5) | The record's table |
+
+Added by this revision beyond the consultant: the Ryuk spelling neither guard reads (F43, E6-d), and the sweep's
+directory list of E6-g. Rejected: nothing.
+
+### 7. Questions for the owner
+
+None for the approval (`Narrowed: no`). Asked of the question consultants first, one question each (2026-11-12), and
+their answers taken: E7's failing live test is a ranking regression (it passed at `caf9f0b`), a rag_qln todo of its
+own, not built now; E7.S2's observations are a short read-only probe of the budget keys on a real daemon, one controlled
+run of two live processes, and `du -s -B1` before and after; the costly native store setup is not repeated by default;
+coai's `native.test.mjs` collision waits for coai's PR capacity; the macOS limit waits for ten runs' step timings;
+`L_N1a` is tracked now with the raw `/proc/locks` kept. (Since then, outside this plan, during the stop: coai #994
+`8b1a0086`, 2026-11-13, raised the macOS leg's limit to 45 minutes to release mcp 0.65.2, not on ten runs' timings; coai
+#996 `5e25da77`, 2026-11-15, made `native.test.mjs`'s PATH folders owned folders through E5's `wrap.ownedDir`, the
+owner allowing it over the PR cap. Added by the judge.) **What only the owner can give:** whether a running daemon
+shares the live tests' Qdrant, and whether they run the probe and the live run of rows E7-b, E7-c and E7-f on the
+machine that has the stores. Until then those rows stay blocked and E7.S2 does not go to its plan gate.
+
+### 8. The way of working — so a ninth stop is less likely
+
+**8.1 What changes.** Added to § *Epoch 8* item 8.1:
+
+- **An observation runs the row's own check.** "Observed" means the executable check of the row ran on a candidate that
+  must pass and a counterexample that must fail, at the pin. A reading of today's tree is the starting point and says so.
+- **A marker or an example spelling is run through BOTH guards** (the shipped Node guard and the consumer's C# copy) when
+  a document writes it.
+- **A row names its state** (observed, proposed, blocked); a blocked row names what unblocks it and who has it.
+
+**8.2 The surprises still likely.**
+
+| Story | What it is likely to meet | Why |
+|---|---|---|
+| F41 | a consumer's tree whose count changes with the new class; nine pin checks red at once | the kind is new; each pinned consumer re-runs the guard at the bump; the release is a promotion (item 5) |
+| F42 | N1 needs a flag change that follows no link; N4 on Windows | by reading only |
+| E6.S3 | whether the pinned Testcontainers API exposes the reuse setting | not read yet (E6-f2 (3)) |
+| E7.S3 | the copy taken before F42 ships | the order of item 5 |
+| E7.S2 | no machine with the stores | item 7 |
+
+**8.3 What the other documents' own revisions must say** (each its own gate work; added after the judge, who found the
+gap): benchmark's E6 stories, in a NEW PR before E6.S3's plan gate — rows E6-d (3), E6-f, E6-g and S3's dependency and
+scenarios as item 3 (E6-f1, E6-f2, the restated E6-d and E6-g; S3 after F41-b and F42-c), and S7's planted
+`.WithReuse(true)` replaced by E6-f2's fixture test (the judge's cut row lists the lines); the E6.S3 brief rewritten
+locally to the same rows (its plan to write the marker now and accept the `exemption` finding is cut). rag_qln's E7
+stories, in a NEW PR before E7.S3's plan gate — D2's and S3's "mcp `9bf9f5b` or later" becomes "F42's commit or later",
+the build order gets F42 before S3, row E7-l is added, and rows E7-b, E7-c and E7-f say **blocked** with item 7's
+observations. The follow-ups plan carries F41–F43 (this revision).
 
 ## Epics
 
