@@ -2,6 +2,7 @@
 id: "common.test-leftovers-detail"
 load: "conditional"
 tasks: ["implement","test","audit","policy","release"]
+depends: ["common.test-leftovers-exemptions"]
 ---
 # Test leftovers — the full rule text (the detail of `common/test-leftovers.md`)
 

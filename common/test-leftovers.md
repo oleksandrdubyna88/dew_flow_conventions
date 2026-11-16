@@ -81,7 +81,7 @@ A test only reads a store it does not own. Clearing a shared store is exempt onl
 shared store whose configuration carries `testsToDelete-exempt: shared-store …` naming the endpoint, the
 store and, after `lock:`, the enforced lock that serialises every reset — never a reset wider than the run's
 own names; or **(b)** a database or namespace inside a disposable container the run or its job owns, reuse
-never set (`testsToDelete-exempt: container-scoped — …`).
+never set (`testsToDelete-exempt: container-scoped — … lives and dies with …`, its teardown only: `common/test-leftovers-exemptions.md`).
 Detail: §6.
 
 ## 7. The guard
