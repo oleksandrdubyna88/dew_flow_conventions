@@ -1,6 +1,6 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 9 STOPPED for re-review (2026-11-16): its second change, entry 9.2 (E7's stories model the copied C# guard's walk over `external/` wrongly), is the ninth full stop; no new code on any epic until the re-review.** Was: **epoch 9 open (2026-11-16), approved by the reviewers after the re-review (`Narrowed: no`; plan gate `b6933e14`, `proceed`; an independent Opus review), with ONE change, entry 9.1 (2026-11-16: F42-c needs benchmark-own touches its § 6 excluded); the next accepted change is the ninth full stop.** The revision is § *Epoch 9*: `container-scoped` becomes an exemption kind of its own in both guards (F41 in conventions, F42 in mcp, where N1–N5 were each tried first: N1, N4 and N5 reproduced and fixed, N2 did not reproduce, N3 is a Windows pin), row E6-f is split into E6-f1 (the marker, file-scoped) and E6-f2 (the container ends with the fixture; reuse proved at run time), E7's rows that need the live stores are blocked with the owner (item 7), and E6's and E7's stories are revised in new PRs before their next stories (item 8.3). E2 (creds) and E5 (coai, S7 included) are COMPLETE. Progress 2026-11-16 (§ *Epoch 9*, *Progress, 2026-11-16*, not a change): F41 merged (#171) and released (`b1746499`, all nine pins), F42 merged (mcp #81), E6 and E7 stories revised (benchmark #215, rag_qln #119). Still open: benchmark's copy re-synced to F42 (F42-c), E6.S3–S7, E7.S2–S5, the feature reviews and the promotion. The re-review is written (§ *Epoch 10*, 2026-11-16) and judged (11 fit; 5 cut, each by a fix forward or a local rewrite: E6's and E7's stories by NEW amendment PRs, F42-c's brief by new commits; nothing merged needs a revert; coai #1006 merged during the stop, outside the plan, reported); next: the plan gate.
+> Status: **epoch 9 STOPPED for re-review (2026-11-16): its second change, entry 9.2 (E7's stories model the copied C# guard's walk over `external/` wrongly), is the ninth full stop; no new code on any epic until the re-review.** Was: **epoch 9 open (2026-11-16), approved by the reviewers after the re-review (`Narrowed: no`; plan gate `b6933e14`, `proceed`; an independent Opus review), with ONE change, entry 9.1 (2026-11-16: F42-c needs benchmark-own touches its § 6 excluded); the next accepted change is the ninth full stop.** The revision is § *Epoch 9*: `container-scoped` becomes an exemption kind of its own in both guards (F41 in conventions, F42 in mcp, where N1–N5 were each tried first: N1, N4 and N5 reproduced and fixed, N2 did not reproduce, N3 is a Windows pin), row E6-f is split into E6-f1 (the marker, file-scoped) and E6-f2 (the container ends with the fixture; reuse proved at run time), E7's rows that need the live stores are blocked with the owner (item 7), and E6's and E7's stories are revised in new PRs before their next stories (item 8.3). E2 (creds) and E5 (coai, S7 included) are COMPLETE. Progress 2026-11-16 (§ *Epoch 9*, *Progress, 2026-11-16*, not a change): F41 merged (#171) and released (`b1746499`, all nine pins), F42 merged (mcp #81), E6 and E7 stories revised (benchmark #215, rag_qln #119). Still open: benchmark's copy re-synced to F42 (F42-c), E6.S3–S7, E7.S2–S5, the feature reviews and the promotion. The re-review is written (§ *Epoch 10*, 2026-11-16) and judged (11 fit; 5 cut, each by a fix forward or a local rewrite: E6's and E7's stories by NEW amendment PRs, F42-c's brief by new commits; nothing merged needs a revert; coai #1006 merged during the stop, outside the plan, reported); passed by the plan gate (`c6131b05`, proceed) and an independent Opus review; epoch 10 opens by the reviewers.
 >
 > Was: Status: **epoch 8 STOPPED for re-review (2026-11-12): its second change, entry 8.2 (E6-f: the rule's own `container-scoped` marker is refused by the released guard), is the eighth full stop; no new code on any epic until the re-review. The re-review is written (§ *Epoch 9*, 2026-11-16; Narrowed: no) , judged (13 fit, 3 cut by a fix forward), passed by the plan gate (`b6933e14`, proceed) and an independent Opus review; epoch 9 opens by the reviewers.** Epoch 8 opened 2026-11-07 (`Narrowed: no`) with entry 8.1 (2026-11-10). E2 (creds) is COMPLETE, 2026-11-10. E5.S7 (coai's drain) is COMPLETE, 2026-11-12.** Its five producer PRs are merged on creds `main`: E2.1 #294 (`834c91b`), E2.2 #310 (`bf59e4f`), E2.3 #311 (`0ae0211`), E2.4 #329 (`6e08071`, 2026-11-10) and E2.5 #330 (`b6cc6b3`, 2026-11-10 19:48 UTC). E2.5 switched on both repository guards: the shipped Node guard in creds' `docs.yml` is clean over 640 files, and the copied C# guard is green on all OS legs. Exemption markers are only on the inventoried lines. Creds' mount moved to `.agents/conventions` (#328) and is pinned at release `1341995` (#340). Epoch 8 used two changes: entry 8.1, and entry 8.2, which stopped it. E2's progress is not a change, so it has no ledger entry; creds' build records give the reasons why nothing else was counted. E2's rows and Definition of Done parts: § *Epoch 8* item 3.3. Still open in this plan: E6, E7, the feature reviews (E2's stories document's review is now due, § *Epoch 8* item 5, point 2; E2's round is held by `call_human` since 2026-11-10 — a reviewer failed, and the owner left it held on 2026-11-11) and the promotion. E5.S7 drained coai's `raw-temp` baseline from 778 entries to zero in six pull requests, one per suite, and deleted the file with its last entries (S7-d): § *Epoch 8* item 3.4. E5's progress is not a change, so it has no ledger entry. Creds' notes N20–N25 and its side findings (`release.yml`'s publish from any branch; two product scripts' temp leaks) are carried to the follow-ups as F33–F40.
 >
@@ -624,7 +624,7 @@ Narrowed: no — entry 8.2 is settled by making `container-scoped` an exemption 
 
 ### Re-review for epoch 10
 
-Narrowed: no — entry 9.1 is settled by bounding F42-c by named paths, its manifest's hashes and transformations and a completeness run from a clean checkout, which WIDENS its scope and adds checks; entry 9.2 by moving the `external/` exclusion into E7.S3 with separate probes and an in-scope violation that stays red, and S5 keeping them as its regression, which replaces a plant that could never be red by three that can; every stories claim of item 3.2 gets a state and an observation before its gate. Nothing of the goal, the Definition of Done, the merge conditions or the release is removed (§ *Epoch 10* item 4.3).
+Narrowed: no — entry 9.1 is settled by bounding F42-c by named paths, its manifest's hashes and transformations and a completeness run from a clean checkout, which WIDENS its scope and adds checks; entry 9.2 by moving the `external/` exclusion into E7.S3 with separate probes and an in-scope violation that stays red, and S5 keeping them as its regression, which replaces a plant that could never be red by probes that can; every stories claim of item 3.2 gets a state and an observation before its gate. Nothing of the goal, the Definition of Done, the merge conditions or the release is removed (§ *Epoch 10* item 4.3).
   (Written 2026-11-16 with § *Epoch 10*, over the two entries of epoch 9: 9.1, F42-c's scope against E6's § 6 boundary
   (a brief only, pushed on benchmark `feat/e6-copy-f42`); 9.2, E7's stories against the copied C# guard's walk over
   `external/` (a brief only, on rag_qln `feat/e7-s3-s5`, local). Re-review consult `a84fb14e` (codex); the question
@@ -719,6 +719,38 @@ Narrowed: no — entry 9.1 is settled by bounding F42-c by named paths, its mani
   merged CI is the evidence); anything with Docker; E2's held feature review; whether `TheAdaptedCopyTests` would accept
   55 entries from a clean checkout (row F42-c (1), F42-c's own run); `npm test` at this branch (not re-run by the judge:
   the guard's tests ran green in #171's CI and on `745d7204`'s checks).)
+  (After the judge, 2026-11-16. The re-review consult `a84fb14e` (codex): the request quoted entries 9.1 and 9.2 in
+  full, as the ledger writes them, and the root-cause pattern (evidence that a mechanism exists taken for evidence that
+  the condition holds), and asked four questions: the way of working; E7's `external/` skip and its plant; F42-c's
+  touches; cuts. Its answer, in gist: (1) the approval evidence covers the acceptance-table rows and misses executable
+  claims elsewhere in the stories documents; one stories-gate requirement in the existing criteria, no new review
+  layer; (2) the exclusion into S3, on CI's recursive checkout, scoped to the root's `external/`; the `.sh` violation
+  and the foreign identity declaration separate probes, each with its diagnostic without the exclusion and gone with
+  it; one in-scope violation red with it; S5 keeps the regression; (3) F42-c's five touches are plausible, not proved
+  complete: the manifest's hashes and transformations explicit, completeness by the copy check and the differential
+  test from a clean recursive checkout, Node and the mount's `npm ci` before every job that runs that test, the scope
+  bound by dependencies and named paths, not a count; (4) no cut is justified by the evidence; a wrong stories claim
+  does not make its PR wrong; each merge is classified by its diff and checks; unavailable evidence is "unverified",
+  not "fits". The consultant read a stale checkout (conventions `61732bb`, `main` before #170; it said so), so each
+  point was checked against the files here (§ *Epoch 10* item 6).
+  The plan gate read the operative extract (the status line, epoch 9's entries, this record, § *Epoch 10*): session
+  `c6131b05`, `proceed`, three findings. Accepted: G1, E7.S3 uses the root-scoped exclusion only, the by-name
+  `NeverEntered` fallback is dropped, so "still reads everything else" holds (item 4.2 point 2, row E7-h2); G2, claim
+  D-5 is one condition per guard that both reads the plant's path and checks the planted behaviour, with the expected
+  result per guard written for each plant. Rejected: G3, that E7.S3 run the shared-rules repository's WSL `npm test`
+  and `npm run check`: those are this repository's suites, not E7.S3's; E7.S3's suites are rag_qln's own (`Rag.Tests`
+  as CI runs it, the copied template tests among them, the extension's vitest, `contract` and `plans`).
+  An independent Opus review, run at the same time, raised five points, all accepted and applied: R1 (high), item 8.1
+  could not be met as written and contradicted items 2 and 3.2: a claim is now observed before the gate of the story or
+  brief that relies on it, its "without" half against mcp `53f65130` in a scratch test (.NET is installed here), its
+  "with" half by the PR's RED → GREEN, and every not-yet-observed claim is written open-ended (item 3.2's **[R]** cells
+  rewritten so); R2, the token check walks the tree itself (`ConstantFindings` → `GuardFiles.Walk`, `IsScannable`),
+  bypassing `Discover` and `Read`: P3b added, P4 run on both paths, P4's folder named exactly; R3, D-5 merged with G2,
+  and item 4.3 weighs D-5 and C4 against the epoch-2 precedent; R4, row F42-c's per-path diff check (4b) and the
+  promoted briefs' `research/` paths (item 4.1); the manifest's `about` is also rewritten, as F42-c's brief § 4 writes
+  it, and (4b) allows that; R5, this note, and item 7's source for the owner's E6 permission (the owner's own answer,
+  not a document). Also added: a later bump of rag_qln's benchmark or mcp pin re-runs E7-h2's probes (row E7-h2,
+  item 8.1). None of them makes a condition smaller, so the Narrowed line stands.)
 
 ## Symptom
 
@@ -3112,8 +3144,8 @@ paths, item 4.1).
 § *Epoch 9*. New in this section: **[R]** marks a statement read from code and NOT run, as E7's brief marks it; a row
 resting on **[R]** is never observed. Every **[M]** here was run for this revision on 2026-11-16, read-only, at
 conventions `745d7204` (its `tools/` and `common/` equal the release `b1746499`: `git diff --stat b1746499 HEAD --
-tools/ common/` prints nothing), benchmark `83f166d6`, rag_qln `1e524b66` and mcp `53f65130`. No .NET and no Docker run
-here, so every statement about the C# guard's verdict is **[R]** or **[D]**.
+tools/ common/` prints nothing), benchmark `83f166d6`, rag_qln `1e524b66` and mcp `53f65130`. No .NET build and no Docker ran
+for this revision (.NET is installed here, item 8.1), so every statement about the C# guard's verdict is **[R]** or **[D]**.
 
 ### 1. What this plan is now
 
@@ -3187,27 +3219,30 @@ row restated here keeps every check its earlier text had and adds to it.
 | F41-a | as § *Epoch 9* | conventions #171 | as § *Epoch 9* | — | **observed**: the guard's own tests (both spellings `[]`; each counterexample red) pass in `npm test` at `745d7204` (this revision's run, item 8.4), and #171's CI **[D]**. Re-run here through `scanText('tests/Bench.Tests/Infrastructure/PostgresFixture.cs', …)`: the marker over `NewEmptyDatabaseAsync` → `[]`; the same marker without `live and die with` → one `exemption` **[M]** |
 | F41-b | as § *Epoch 9* | the nine pin bumps | the gitlink reads the release | — | **observed** for the candidate: all nine read `b1746499` **[M]**; the counterexample (a pin off `release` is red in that consumer's pin check) is the pin check's own test, not re-run here |
 | F42-a, F42-b | as § *Epoch 9* | mcp #81 | as § *Epoch 9* | — | **observed [D]**, mcp #81's record (§ *Epoch 9*, *Progress*): the differential check's first run against F41 red on one difference, then green; N1 red on `windows-latest` (run 43928795620) and fixed; N4 and N5 reproduced and fixed; N2 did not reproduce (a pin); N3 pins `cmd`. Its check runs green on three OSes **[M]**; nothing re-run here (no .NET) |
-| F42-c | restated (the consultant's point 3): benchmark's copy is the template's bytes at mcp `53f651309a271e7388c703e1ec73799ff6f1c76e`, and the re-sync is COMPLETE within the paths item 4.1 names | benchmark's manifest `tests/Bench.Tests/Leftovers/template-manifest.json`: `commit` → `53f65130…`; 55 entries; the nine changed blobs and the two new entries of item 4.1; the transformations of item 4.1 and no others | (1) from a CLEAN checkout of the PR head (a fresh clone; `git submodule update --init`, which is the mount only; then `npm ci --ignore-scripts` in `.agents/conventions`): `TheAdaptedCopyTests` green with 55 entries; one copied byte changed → its row red; the `mcp tests:` count set back to 6 → red at that op. (2) `LeftoversGuardDifferentialTests` 3 of 3 green, its marker rows RUN, not skipped; and red with the mount's `node_modules` absent (`YamlMissingError`). (3) CI `build-test` green on the head, where Node 20 or later (its version printed) and the mount's `npm ci` come before the *Test* step; `build-test` is the only job that runs `Bench.Tests`. (4) `git diff --name-only <base>..HEAD` lies within item 4.1's paths | Windows: benchmark has no Windows leg | **proposed**. Its inputs re-read here **[M]**: the nine blob pairs and two new blobs (`git rev-parse 21553ce:…`, `53f65130:…` in mcp), 53 files in mcp's folder, `mcp tests:` on 6 lines at `21553ce` and 7 at `53f65130`, benchmark's manifest at `21553ce` with 53 entries, `TheAdaptedCopyTests.cs:79` pinning `21553ce`, no `npm ci` in benchmark's `build-test`, case 15's Windows reason (`LeftoversSweepCase15Tests.cs:14-21`). The `YamlMissingError` without `node_modules` is the brief's **[M]**, not re-run here |
+| F42-c | restated (the consultant's point 3): benchmark's copy is the template's bytes at mcp `53f651309a271e7388c703e1ec73799ff6f1c76e`, and the re-sync is COMPLETE within the paths item 4.1 names | benchmark's manifest `tests/Bench.Tests/Leftovers/template-manifest.json`: `commit` → `53f65130…`; 55 entries; the nine changed blobs and the two new entries of item 4.1; the transformations of item 4.1 and no others | (1) from a CLEAN checkout of the PR head (a fresh clone; `git submodule update --init`, which is the mount only; then `npm ci --ignore-scripts` in `.agents/conventions`): `TheAdaptedCopyTests` green with 55 entries; one copied byte changed → its row red; the `mcp tests:` count set back to 6 → red at that op. (2) `LeftoversGuardDifferentialTests` 3 of 3 green, its marker rows RUN, not skipped; and red with the mount's `node_modules` absent (`YamlMissingError`). (3) CI `build-test` green on the head, where Node 20 or later (its version printed) and the mount's `npm ci` come before the *Test* step; `build-test` is the only job that runs `Bench.Tests`. (4) `git diff --name-only <base>..HEAD` lies within item 4.1's paths. (4b) `git diff -U0 <base>..HEAD` per path stays within item 4.1's bound for that path: the manifest changes only its `commit`, the nine blob SHAs, the `mcp tests:` count 6 → 7 and the two new entries (its `about` as the brief writes it); `TheAdaptedCopyTests.cs` only `:79`; case 15 only the reason's text; `ci.yml` only `build-test`, one step; no new kind of operation; E6's stories only their progress lines (the independent review) | Windows: benchmark has no Windows leg | **proposed**. Its inputs re-read here **[M]**: the nine blob pairs and two new blobs (`git rev-parse 21553ce:…`, `53f65130:…` in mcp), 53 files in mcp's folder, `mcp tests:` on 6 lines at `21553ce` and 7 at `53f65130`, benchmark's manifest at `21553ce` with 53 entries, `TheAdaptedCopyTests.cs:79` pinning `21553ce`, no `npm ci` in benchmark's `build-test`, case 15's Windows reason (`LeftoversSweepCase15Tests.cs:14-21`). The `YamlMissingError` without `node_modules` is the brief's **[M]**, not re-run here |
 | E6-f1 | as § *Epoch 9* | as § *Epoch 9* | as § *Epoch 9* | the lifetime: E6-f2 | **proposed** (S3; it is no longer blocked once F42-c merges: F41-b is done). The Node half is **observed** at `b1746499` **[M]**: the marker in `PostgresFixture.cs` → `[]`, without `live and die with` → one `exemption` (row F41-a's run). The C# half waits for F42-c's copy |
 | E7-h1 | restated row E7-h: the C# copy reads THIS repository's layout | E7.S3: the adapted copy of mcp `53f65130`, 55 entries | S3's manifest diff check (commit 1 red: targets missing; green with the copy; one byte → red; one count lowered → refused), and the copied guard (`LeftoversRepositoryGuardTests`, and `LeftoversGuardTests`' token test, mcp `LeftoversGuardTests.cs:486-490` **[R]**) green on CI's recursive checkout (`build-test`, `submodules: recursive`, rag_qln `ci.yml:21` **[M]**) | — | **proposed** |
-| E7-h2 | new, from entry 9.2: the copied walk never reads the repository root's `external/`, and it still reads everything else | E7.S3 (not S5): one manifest operation, in S3's copy, before S3's sites | Each probe a private tree through `LeftoversGuard.Scan` or `LeftoversGuard.ConstantFindings(tree, "qln")`, named with consumer SHA, upstream pin `53f65130`, invocation, fixture path, expected diagnostic and observed result (item 8.1). P1: `external/x/plant.sh` with a `mktemp -d` line → one `raw-temp` WITHOUT the operation, none with it. P2, separate from P1: `external/x/Token.cs` declaring a foreign `RepoToken` → its `token` findings without, none with. P3, in scope: the same `.sh` line at `tools/wsl/plant.sh` → `raw-temp` WITH the operation, so a scan the operation emptied cannot pass. P4, the root scope: a `.sh` line under a nested `x/external/` stays red with the operation; or, if the operation stays the brief's by-name one, a test that is red when any folder named `external` exists below the root | other repositories' trees under `external/` (they are theirs) | **proposed**. Inputs **[M]**: the only folders named `external` at `1e524b6` are the root's (`git ls-tree -r -d`); benchmark `83f166d6` has 203 `.sh`/`.ps1`/`.py` files, whose Node `scanText` at `external/dew_flow_benchmark/<path>` gives 16 findings (10 `raw-temp`, 2 `raw-worktree`, 3 `legacy-name`, 1 `owner-blind`); one `RepoToken` declaration each at mcp `53f65130` and benchmark `83f166d6`. **[R]**: the walk enters `external` (`LeftoversGuardFiles.cs:28`, `:52-53`), reads `.sh`, `.ps1`, `.py` anywhere (`:29`, `:68-69`), and the token check walks the same tree (`LeftoversGuardTokens.cs:131-135`) |
-| E7-h3 | new, from entry 9.2: S5 keeps E7-h2 as its regression | E7.S5, after its two `.ts` operations on `LeftoversGuardFiles.cs` | P1–P4 run again, same expectations. S5's break-it list carries no `external/x/tests/A.cs` plant (it cannot fail in either configuration, **[R]** `:63-64`); if the stories keep that line, it is a NOT-read statement with its observation. Each S5 break-it is red in every guard that reads its file kind, and in at least one (item 3.2, D-5) | — | **proposed** |
+| E7-h2 | new, from entry 9.2: the copied walk never reads the repository root's `external/`, and it still reads everything else | E7.S3 (not S5): the ROOT-scoped exclusion, by the manifest operations it needs, in S3's copy, before S3's sites. Both paths of the walk take it: `Discover`/`Read` (the scan) and `ConstantFindings`, which calls `GuardFiles.Walk` itself and filters by `IsScannable`, not by `Read` (`LeftoversGuardTokens.cs:134-135`, `:142-143` **[R]**). Never the by-name `NeverEntered` entry (the plan gate `c6131b05`) | Each probe a private tree through `LeftoversGuard.Scan` or `LeftoversGuard.ConstantFindings(tree, "qln")`, named with consumer SHA, upstream pin `53f65130`, invocation, fixture path, expected diagnostic and observed result (item 8.1). P1: `external/x/plant.sh` with a `mktemp -d` line → one `raw-temp` WITHOUT the operation, none with it. P2, separate from P1: `external/x/Token.cs` declaring a foreign `RepoToken` → its `token` findings without, none with. P3, in scope on the scan path: the same `.sh` line at `tools/wsl/plant.sh` → `raw-temp` WITH the operation, so a scan the operation emptied cannot pass. P3b, in scope on the token path: a second `RepoToken` declaration outside the token file and outside `external/` → its `token` finding WITH the operation. P4, the root scope, on BOTH paths: a `.sh` line and a `RepoToken` declaration in a folder named `external` other than `<root>/external`, at any depth, outside the never-entered folders → each stays red WITH the operation | other repositories' trees under `external/` (they are theirs) | **proposed**. A later bump of rag_qln's benchmark or mcp pin changes these inputs: the probes and the counts are run again (item 8.1). Inputs **[M]**: the only folders named `external` at `1e524b6` are the root's (`git ls-tree -r -d`); benchmark `83f166d6` has 203 `.sh`/`.ps1`/`.py` files, whose Node `scanText` at `external/dew_flow_benchmark/<path>` gives 16 findings (10 `raw-temp`, 2 `raw-worktree`, 3 `legacy-name`, 1 `owner-blind`); one `RepoToken` declaration each at mcp `53f65130` and benchmark `83f166d6`. **[R]**: the walk enters `external` (`LeftoversGuardFiles.cs:28`, `:52-53`), reads `.sh`, `.ps1`, `.py` anywhere (`:29`, `:68-69`), and the token check walks the same tree (`LeftoversGuardTokens.cs:131-135`) |
+| E7-h3 | new, from entry 9.2: S5 keeps E7-h2 as its regression | E7.S5, after its two `.ts` operations on `LeftoversGuardFiles.cs` | P1–P4 (P3b included) run again, same expectations. S5's break-it list carries no `external/x/tests/A.cs` plant (it cannot fail in either configuration, **[R]** `:63-64`); if the stories keep that line, it is a NOT-read statement with its observation. Each S5 break-it as claim D-5 defines it: the expected result written per guard, red in every guard whose observed read matrix includes the plant's path and which checks the planted behaviour | — | **proposed** |
 
 #### 3.2 The stories claims that state a tool's reach or a plant without an observation
 
 Found by reading both stories documents whole and searching them for "No ", "never", "only", "not read", "plant" and
 "red" where the sentence is about a guard, a copied tool or a PR's files (`grep -n -i -E` over each file at the commits
-above), then checking each against the code. Each gets a state; each is observed (item 8.1) before the plan gate named.
+above), then checking each against the code. Each gets a state; each is observed (item 8.1) before the plan gate named,
+which is the gate of the story or brief that RELIES on it. Every **[R]** below is an expectation, written open-ended:
+the observation fills in the result ("red or not, the plant says which"), and a result unlike the expectation changes
+the plant or the limit in that brief, not a claim this plan rests on (the independent review, R1).
 
 | # | The claim, where | Checked here | State, and before which gate it is observed |
 |---|---|---|---|
 | C1 | E6 § 6 *Before S3* `:315-316`, `:319`: "No benchmark-own file changes"; Files: manifest targets and the manifest only | false: entry 9.1. `TheAdaptedCopyTests.cs:79` pins `21553ce`; `build-test` installs nothing in the mount; case 15's reason names the old removal **[M]** | replaced by row F42-c and item 4.1's paths: **proposed**, before F42-c's plan gate |
 | C2 | E6 S3 Files `:352-353`: `PostgresFixture.cs`, `ContainerPass.cs` "on the copy check's own list", its tests, `module_tests.md` | incomplete: the own list is `BenchOwn` in `TheAdaptedCopyTests.cs` (`:32-46`), which S3 edits (F42-c's brief, K1, `:316-318`); the check refuses a file on neither list | the amendment names `TheAdaptedCopyTests.cs`; **proposed**, observed by S3's copy check red without the entry, before S3's plan gate |
 | C3 | E6 § 1 *E6-g by directory* `:65-85`, the C# copy's column ("by reading `GuardFiles` … not run", `:66-67`), and D7 `:211-212` (spikes read by kind) | **[R]**; the Node column is **[M]** there | **proposed**: each C# cell observed by a plant through the copy at `53f65130` (after F42-c), before S7's plan gate |
-| C4 | E6 `:78` (`src/`) and S7 `:413-414` (`tools/model-arms/` `.cs` after S7's operation): "a `GetTempPath()` in the forms the product kind judges" | **[R]** a plant that can never be red, the kind of entry 9.2: for a `Source` file the template reports no raw temp spelling (`HitsOutsideSource` returns nothing for `SourceKind.Source`, mcp `LeftoversGuard.cs:204-207`); it reads there only `owner-blind` (the bare prefix word, `Owned.Prefix`) and, as `raw-temp`, an `Owned.TempRoot` reference outside the helper's folder (`:216-219`, `:297-301`) (corrected by the judge: it said "no `raw-temp` at all"). The Node guard reads neither path (`isScanned('src/X.cs', 'node')`, `isScanned('tools/model-arms/X.cs', 'node')` → false **[M]**) | the amendment replaces the plant with one the `Source` kind reads, and writes `GetTempPath()` in `src/` and `tools/` `.cs` as a limit of both guards: **proposed**, observed before S7's plan gate |
-| C5 | E6 `:84`: the C# copy's reading of `mktemp -d` in a workflow `run:` "is to be run by S7" | **[R]** red: `.yml` is in `RawTempByExtension` (`LeftoversGuard.cs:84`, `:89`). Node `[]` **[M]** | **proposed**, before S7's plan gate |
-| C6 | E6 `:87-90`: nine `.py` `tempfile.mkdtemp(` lines, "whether the copy's `mkdtemp(` pattern reports them … was not run" | **[R]** red: `\bmkdtemp(?:Sync)?\s*\(` (`:78`) | **proposed**, before S7's plan gate (D7 says whose they are) |
-| C7 | E6-d `:50` and S3 (7) `:349-351`: "neither guard reads" `SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true")` | Node `[]` **[M]** (§ *Epoch 9*); C# **[R]**: `RyukOff` wants `[:=]` after the name (`:93`) | **proposed**: the C# half through the copy at `53f65130`, before S3's plan gate, so S3's own test is known to be the only reader |
+| C4 | E6 `:78` (`src/`) and S7 `:413-414` (`tools/model-arms/` `.cs` after S7's operation): "a `GetTempPath()` in the forms the product kind judges" | **[R]** expected to be a plant that can never be red, the kind of entry 9.2 (the observation says which): for a `Source` file the template reports no raw temp spelling (`HitsOutsideSource` returns nothing for `SourceKind.Source`, mcp `LeftoversGuard.cs:204-207`); it reads there only `owner-blind` (the bare prefix word, `Owned.Prefix`) and, as `raw-temp`, an `Owned.TempRoot` reference outside the helper's folder (`:216-219`, `:297-301`) (corrected by the judge: it said "no `raw-temp` at all"). The Node guard reads neither path (`isScanned('src/X.cs', 'node')`, `isScanned('tools/model-arms/X.cs', 'node')` → false **[M]**) | the amendment replaces the plant with one the `Source` kind reads, and writes `GetTempPath()` in `src/` and `tools/` `.cs` as a limit of both guards: **proposed**, observed before S7's plan gate |
+| C5 | E6 `:84`: the C# copy's reading of `mktemp -d` in a workflow `run:` "is to be run by S7" | **[R]** expected red, red or not to be observed: `.yml` is in `RawTempByExtension` (`LeftoversGuard.cs:84`, `:89`). Node `[]` **[M]** | **proposed**, before S7's plan gate |
+| C6 | E6 `:87-90`: nine `.py` `tempfile.mkdtemp(` lines, "whether the copy's `mkdtemp(` pattern reports them … was not run" | **[R]** expected red, red or not to be observed: `\bmkdtemp(?:Sync)?\s*\(` (`:78`) | **proposed**, before S7's plan gate (D7 says whose they are) |
+| C7 | E6-d `:50` and S3 (7) `:349-351`: "neither guard reads" `SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true")` | Node `[]` **[M]** (§ *Epoch 9*); C# **[R]**, expected not read: `RyukOff` wants `[:=]` after the name (`:93`); read or not to be observed | **proposed**: the C# half through the copy at `53f65130`, before S3's plan gate, so S3's own test is known to be the only reader, or the second |
 | C8 | E6-b `:48`: the C# guard reads `worktree add` "only outside `src/`" | **[R]** (`:91`, `:204-209`) | **proposed**, observed by S4's and S5's plants through the copy, before S4's plan gate |
 | C9 | E6-f1 `:52` and S3 (5) `:345-347`: the marker clean and, without `live and die with`, one `exemption` "in each" guard | Node **observed** **[M]** (row F41-a's run); C# after F42-c | **proposed** (the C# half), before S3's plan gate |
 | C10 | E6 S7 `:403-406`: one manifest operation on `LeftoversGuardFiles.cs` makes `.cs` under `tools/` a `Source` file | a discovery boundary changed by an operation, not run | **proposed**: S7's brief names the operation and observes it with C4's plant, before S7's plan gate |
@@ -3215,7 +3250,7 @@ above), then checking each against the code. Each gets a state; each is observed
 | D-2 | E7 D2 `:140-142` and the build order `:260`: the `external` exclusion beside S5's discovery; S5's "never `external/`" `:371-372` | on CI's recursive checkout S3's own copied tests read `external/` (the inputs of row E7-h2, **[M]** and **[R]**) | moved to S3 (row E7-h2): **proposed**, before E7.S3's plan gate |
 | D-3 | E7 S5 `:371-372`: the copied C# guard "reads `tests/`, `.github/`, the extension's `test/**/*.ts`" | incomplete, **[R]**: it also reads `.sh`, `.ps1` and `.py` anywhere and `.mjs`, `.js`, `.cjs` under `.github/scripts/` and `http/` (`LeftoversGuardFiles.cs:29-31`, `:68-69`); E7's brief lists twelve such scripts outside `tests/` (its M5 **[M]** there) | the amendment writes the read matrix (the brief's § 7.3), each cell with its state: **proposed**, before E7.S5's plan gate |
 | D-4 | E7 D5 `:150-155`: S5 "widens" the C# discovery to `tools/vscode-extension/test/**/*.ts` | two operations (`JavaScriptExtensions`, `ScriptFolders`, `:30-31`), **[R]** | **proposed**: the brief's L2 is its probe, observed before E7.S5's plan gate |
-| D-5 | E7 S5 Done-when `:381` and DoD `:462-463`: both guards "red on every break-it" | the TypeScript token plant is red in the Node guard only (E7's brief § 7.3, two `token` findings **[M]** there) and the C# token check reads no `.ts` (**[R]**); the `test/support` plant is red in the C# guard only, which S5 (2) already says | restated "each break-it red in every guard that reads its file kind, and in at least one", the reading S5 (2) already gives (item 4.3): **proposed**, before E7.S5's plan gate |
+| D-5 | E7 S5 Done-when `:381` and DoD `:462-463`: both guards "red on every break-it" | the TypeScript token plant is red in the Node guard only (E7's brief § 7.3, two `token` findings **[M]** there) and the C# token check reads no `.ts` (**[R]**); the `test/support` plant is red in the C# guard only, which S5 (2) `:379` already says ("red only in the C# guard") | restated as ONE condition (the plan gate `c6131b05` and the independent review): each break-it is red in every guard whose observed read matrix (D-3), fixed before S5's plan gate, includes the plant's path AND which checks the planted behaviour; for each plant the stories write the expected result per guard (red; read and not checked; not read), and every plant is red in at least one guard (item 4.3): **proposed**, before E7.S5's plan gate |
 | D-6 | E7 S3 Files `:329-330`: the copy, its manifest and five site files | incomplete: E7's brief adds `tests/Rag.Tests/Rag.Tests.csproj` (`AllowUnsafeBlocks`), a new `.gitattributes`, `ci.yml`'s `build-test` (the mount's `npm ci`) and `research/module_tests.md` (§ 5.3, § 5.6 there) | the amendment names each path and what needs it (item 4.1's rule): **proposed**, before E7.S3's plan gate |
 | D-7 | E7 S4 Files `:351-353` | incomplete: the brief adds `test/support/sweep.ts`, `test/owned.test.ts` and `research/module_tests.md` (§ 6.2, § 6.5 there) | named by the amendment: **proposed**, before E7.S3's plan gate (S4 rides that PR) |
 | D-8 | E7 row E7-h `:49`: "`external/` is entered: its `.sh`, `.ps1` and `.py` files are scripts to the walk", marked **[M]** | read from code, not run (**[R]**); "to observe in S3's brief" was not observed there either (no .NET) | re-marked **[R]**; observed by row E7-h2's P1 and P2, before E7.S3's plan gate |
@@ -3243,9 +3278,11 @@ proved complete. From now its scope is a list of named paths, each with the depe
   guard's Node rows ran there in S2 (#207, **[D]** F42-c's brief § 5); its version is not printed in any log read here;
 - `LeftoversSweepCase15Tests.cs`: the Windows reason's text only (the skip stays);
 - the docs: `research/module_tests.md`, `research/README.md`, `todo/README.md`, E6's stories (progress only: the § 6
-  boundary is amended by the stories amendment, item 5), F42-c's brief and S2's brief (their promotion).
+  boundary is amended by the stories amendment, item 5), F42-c's brief and S2's brief (their promotion:
+  `todo/PLAN_test_leftovers_E6_F42c_brief.md` → `research/PLAN_test_leftovers_E6_F42c_brief.md` and
+  `todo/PLAN_test_leftovers_E6_S2_brief.md` → `research/PLAN_test_leftovers_E6_S2_brief.md`).
 
-Completeness is proved, not counted: row F42-c's checks (1)–(4). A file the clean-checkout run needs outside these paths
+Completeness is proved, not counted: row F42-c's checks (1)–(4b). A file the clean-checkout run needs outside these paths
 is found BEFORE the PR, by that run; adding it is then a change of epoch 10 and counts. The F42-c brief is revised by new
 commits on its pushed branch, never a rewrite (item 8.3).
 
@@ -3255,26 +3292,41 @@ Decided:
 1. **S3 carries the operation**, because S3's own copied tests walk the recursive checkout in `build-test` (row E7-h1):
    without it, the copied repository guard reads benchmark's 203 scripts and the token test reads two foreign
    declarations (row E7-h2's inputs).
-2. **Scoped to the repository root's `external/`.** The template excludes folders by NAME at any depth (`NeverEntered`,
-   `LeftoversGuardFiles.cs:28`, `:52-53` **[R]**), and E7's brief adds `"external"` to that list, which is wider than the
-   root. Either the operation excludes only the root's `external/` (probe P4: a nested `x/external/` stays read), or the
-   by-name operation stays and a test is red when a folder named `external` exists below the root. Today only the root's
-   exists (**[M]**). The brief chooses and observes; the walk takes no root parameter (`Walk(string dir)`, `:49-50` **[R]**),
-   so the first way may need more than one operation, which the brief names.
-3. **Separate probes, and one that stays red** (row E7-h2): the `.sh` violation and the foreign identity declaration each
-   produce their own diagnostic without the operation and none with it; an in-scope violation stays red with it.
+2. **Scoped to the repository root's `external/`, and only that** (the plan gate `c6131b05`). The template excludes
+   folders by NAME at any depth (`NeverEntered`, `LeftoversGuardFiles.cs:28`, `:52-53` **[R]**), and E7's brief adds
+   `"external"` to that list, which is wider than the root and would stop a nested `external` folder being read: row
+   E7-h2's "still reads everything else" would not hold. So the by-name entry is not used. The operation excludes the
+   root's `external/` on both paths of the walk: the scan (`Discover`, `Read`) and the token check, which walks the tree
+   itself (`ConstantFindings` → `GuardFiles.Walk`, filtered by `IsScannable`, `LeftoversGuardTokens.cs:134-135`, `:142-143`
+   **[R]**). Probe P4 proves the scope on both paths. Today only the root's `external` exists (**[M]**). The walk takes no
+   root parameter (`Walk(string dir)`, `:49-50` **[R]**), so the exclusion may need more than one operation; the brief
+   names each.
+3. **Separate probes, and in-scope ones that stay red** (row E7-h2): the `.sh` violation and the foreign identity
+   declaration each produce their own diagnostic without the operation and none with it; an in-scope violation stays red
+   with it on each path (P3 on the scan, P3b on the token check).
 4. **S5 keeps the regression** (row E7-h3): the probes run again after S5's `.ts` operations. The `external/x/tests/A.cs`
    plant leaves the break-it list.
-5. **The DoD's "red on every break-it"** is read per guard that reads the file kind (claim D-5), as S5 (2) already reads
-   it for `test/support`.
+5. **The DoD's "red on every break-it"** is the one condition of claim D-5: red in every guard whose observed read matrix
+   includes the plant's path and which checks the planted behaviour, with the expected result per guard written for each
+   plant.
 
 **4.3 Narrowed: no.** F42-c's scope gets WIDER and its checks more (a clean-checkout completeness run, a RED without the
-mount's packages, the diff bounded by paths); E7's one plant that could never be red is replaced by four probes that
-can; the `external/` exclusion moves earlier, inside the same producer PR; eighteen stories claims get a state and an
-observation before a gate. Claim D-5's reading is not smaller: no guard could ever be red on a break-it of a file kind it
-does not read (the C# token check reads no `.ts`, **[R]**), and S5 (2) already wrote "red only in the C# guard" for
-`test/support`. Nothing of the goal, the Definition of Done, the merge conditions or the release is removed. **The epics
-do not change**: no Fable re-split; E6's and E7's stories are amended by Opus (item 5).
+mount's packages, the diff bounded by paths and per path); E7's one plant that could never be red is replaced by probes
+that can (P1, P2, P3, P3b, P4 on both paths); the `external/` exclusion moves earlier, inside the same producer PR;
+eighteen stories claims get a state and an observation before a gate.
+
+Two sentences could read as smaller, and the precedent says how to weigh them. At epoch 2 a smaller merge condition of
+ONE PR (E5's producer merging with the guard green-by-baseline instead of "at zero on every class") was enough for
+`Narrowed: yes` (the record for epoch 2). That test does not catch these two. Claim D-5: the old text contradicted
+itself — S5 (2) wrote "red only in the C# guard" for the `test/support` plant (rag_qln `todo/PLAN_test_leftovers_E7.md:379`),
+while S5's Done-when and the DoD wrote both guards "red on each break-it" (`:381`, `:462-463`); no reading of it could
+require a guard to be red on a path it does not read or a behaviour it does not check (the C# token check reads no
+`.ts`, **[R]**). The restatement removes no check that could ever have been met, and every plant must still be red in
+at least one guard. Claim C4: the `GetTempPath()` plants in `src/` and `tools/model-arms/` `.cs` are expected never to
+be red (**[R]**, the `Source` kind reads no raw temp spelling), so writing that spelling there as a limit of both guards
+removes no meetable check; and S7 keeps a plant there that the `Source` kind does read, so its check count stays.
+Nothing of the goal, the Definition of Done, the merge conditions or the release is removed. **The epics do not
+change**: no Fable re-split; E6's and E7's stories are amended by Opus (item 5).
 
 ### 5. Build order
 
@@ -3316,8 +3368,9 @@ Rejected: nothing.
 None for the approval (`Narrowed: no`). Still open, as § *Epoch 9* item 7: whether a running daemon shares the live
 tests' Qdrant, and whether the owner runs the read-only probe and the live runs of rows E7-b (branch 2), E7-c and E7-f on
 the machine that has the stores. Until then those rows stay **blocked** and E7.S2 does not go to its plan gate. The PR
-cap is settled for both amendments: the owner allowed every E6 PR (2026-11-16) and every E7 PR (2026-11-12) over it
-(**[D]** F42-c's brief § 12 Q4; E7's brief § 2 item 4, which asks the coordinator to confirm).
+cap is settled for both amendments. E6: the owner's own answer of 2026-11-16, in the coordinating session, "Yes, every E6
+PR", which also allowed one mcp PR for F42 and the F41 release with its nine pin bumps over the cap. E7: every E7 PR
+over the cap, allowed by the owner on 2026-11-12 (**[D]** E7's brief § 2 item 4, which asks the coordinator to confirm).
 
 ### 8. The way of working — so a tenth stop is less likely
 
@@ -3326,8 +3379,14 @@ review):
 
 - **Every copied-tool discovery boundary and every break-it plant** that a stories document or a brief states names
   six things: the consumer SHA, the upstream pin, the exact invocation, the fixture path, the expected diagnostic, and
-  the OBSERVED result. It is run before that document's plan gate, and again when any of the first five changes. Until it
-  is run it is **proposed**, and a claim read from code says **[R]**.
+  the OBSERVED result. It is observed before the plan gate of the story or brief that RELIES on it (item 3.2 names that
+  gate for each claim), and again when any of the first five changes (a pin bump included). The "without" half (the
+  tool as copied, before the consumer's operation or site) is observed before that gate against mcp `53f65130` in a
+  scratch test: .NET is installed on this machine (`/usr/bin/dotnet`), built as the repositories build it, `nice -n 19`,
+  `-m:4`, `-p:AppHostRuntimeIdentifier=linux-x64`. The "with" half is the PR's own RED → GREEN. Until it is observed the
+  claim is **proposed**, a claim read from code says **[R]**, and it is written open-ended ("red or not, the plant says
+  which"), so the observation fills it in and never contradicts it: a proposed claim found false would otherwise be a
+  counted change (the independent review, R1).
 - **A plant must be able to fail.** Each break-it names the configuration in which it is red; one that is red in no
   configuration is a NOT-read statement, never a break-it.
 - **An exclusion is proved from both sides**: each excluded diagnostic appears without it and is gone with it, by its own
@@ -3357,16 +3416,18 @@ review):
   § 6 (the amendment did).
 - **E6.S3's brief (local):** rewritten to rows E6-f1, E6-f2, E6-d and claim C7 before S3's plan gate.
 - **Rag_qln's E7 stories, a NEW PR, before E7.S3's plan gate:** D2 and the build order put the `external/` exclusion in
-  S3, scoped to the root (row E7-h2); S5 keeps the probes as its regression and drops the `external/x/tests/A.cs` plant
-  (row E7-h3); S5's discovery sentence becomes the read matrix with states (D-3, D-4); the DoD's break-it sentence as
-  D-5; S3's and S4's Files lines name D-6 and D-7; row E7-h's **[M]** at `:49` becomes **[R]** (D-8).
-- **E7.S3–S5's brief (local):** its L1 split into P1–P4; its § 10 corrections carried into the amendment.
+  S3, scoped to the root on both paths of the walk, never the by-name entry (row E7-h2); S5 keeps the probes as its
+  regression and drops the `external/x/tests/A.cs` plant (row E7-h3); S5's discovery sentence becomes the read matrix
+  with states (D-3, D-4); the DoD's break-it sentence as D-5, with the expected result per guard for each plant; S3's
+  and S4's Files lines name D-6 and D-7; row E7-h's **[M]** at `:49` becomes **[R]** (D-8).
+- **E7.S3–S5's brief (local):** its L1 split into P1, P2, P3, P3b and P4 (both paths); its by-name operation replaced
+  by the root-scoped one; its § 10 corrections carried into the amendment.
 - The follow-ups plan: nothing new.
 
 **8.4 Run for this revision.** `node tools/plan-lifecycle.mjs` and `npm test` at this branch (item 3.1, row F41-a); the
 reads and `scanText` runs named in each row; `gh pr list`, `gh api` and `git ls-remote` as the record's note says.
 Not checked: the consult texts (`a84fb14e`, `57ac1bd6`, `50be6245`, `6a830a2c`; the points are taken as the
-coordinator quoted them); every C# verdict (no .NET); anything with Docker; E2's held feature review.
+coordinator quoted them); every C# verdict (no .NET build run for this revision); anything with Docker; E2's held feature review.
 
 ## Epics
 
