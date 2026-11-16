@@ -113,9 +113,10 @@
  *
  * The exemption grammar. `testsToDelete-exempt: <class> — <reason>` on the line or the line above, a class of `EXEMPTIBLE` or the kind `container-scoped`; the reason is ten characters, three words, no
  * placeholder; `shared-store` also needs `lock:`. `container-scoped` (`common/test-leftovers-exemptions.md`, extending §6 (b) and §7; `DECLARATION_KINDS`) needs an owner instead: `<what> lives and dies with <fixture or job>` (or `live and die with`), where after
- * an optional article (the, a, an, its, this, that) comes a word of two characters or more that is no article. It is a declaration, not a class of finding: it clears `shared-store` and nothing else, and only on
+ * an optional article (the, a, an, its, this, that) comes an owner of two characters or more that is no article and does not start with an article followed by punctuation (`a.`, `the-x` are refused; `x.` is not). The reading
+ * (`tools/lib/leftovers-exemptions.mjs`, its header says what is emulated of .NET) is the C# template's, case for case. It is a declaration, not a class of finding: it clears `shared-store` and nothing else, and only on
  * a line whose every hit is a `DROP DATABASE`, `DROP SCHEMA` or `FLUSHDB`; a `DROP TABLE`, `TRUNCATE`, `FLUSHALL` or delete-all needs a lock or a per-run name. A limit, stated: the guard reads a spelling,
- * not whose database it is, so `DROP DATABASE production_db` under a valid marker is clean — the marker is the author's declaration, the code review reads it and the consumer's fixture test proves the lifetime.
+ * not whose database it is, so `DROP DATABASE production_db` under a valid marker is clean — the marker is the author's declaration, the code review reads it and the consumer's fixture test proves the lifetime. Under a valid marker a line with a reset names the first hit that is not a teardown; an unmarked line names the first hit, as always.
  */
 
 import * as fs from "node:fs";
@@ -134,8 +135,10 @@ import { MANIFEST_NAME, scanManifest } from "./lib/leftovers-package.mjs";
 import { FOLD_LIMIT, bareWordHits, decodeCode, foldFile, foldKind, pieceHits } from "./lib/leftovers-fold.mjs";
 
 export { PROFILES, parseArguments };
+/** Re-exported: the exemption reader lives in `tools/lib/leftovers-exemptions.mjs`. */
+export { DECLARATION_KINDS, EXEMPTIBLE, readExemptions };
 import { JANITOR_FILE, classifyLine, classifyLines, lineSha256, passes } from "./lib/sweeper-scan.mjs";
-import { isReason } from "./ownership-check.mjs";
+import { DECLARATION_KINDS, EXEMPTIBLE, isExempt, nonTeardownHits, readExemptions, sharedStoreHit } from "./lib/leftovers-exemptions.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -161,16 +164,6 @@ export const FOLDING_ALLOWANCES = Object.freeze([
   "tools/sweeper-scan.test.mjs",
   "tools/test-leftovers-rule.test.mjs",
 ]);
-
-/** Every class an exemption may name (`ryuk-off` never; `exemption` and `token` are not resources). */
-export const EXEMPTIBLE = Object.freeze(["raw-temp", "raw-worktree", "docker-run", "docker-name", "legacy-name", "shared-store"]);
-
-/**
- * The kinds of marker that are DECLARATIONS, not classes of finding (`common/test-leftovers-exemptions.md`, extending §6 (b)): `container-scoped` says that a database or namespace lives and dies with the container
- * its fixture or job owns. It is kept apart from `EXEMPTIBLE` so that list keeps its meaning — the finding classes an exemption may name. The kind clears one class,
- * `shared-store`, and only a hit that is the container's own teardown (`CONTAINER_TEARDOWN`); it needs an owner in its reason, not a `lock:`.
- */
-export const DECLARATION_KINDS = Object.freeze(["container-scoped"]);
 
 /**
  * Files whose `legacy-name` findings are skipped. EMPTY since the janitor reads the owner form: its own tests no longer
@@ -224,7 +217,6 @@ const isProofMarker = (match) => {
 /** The second segments that are not names: the quarantine sibling (`.<name>.<prefix>-quarantine-…`) and an environment variable (`TESTSTODELETE_OWNER`: upper case, underscore). */
 const notAName = (match) => match[1].toLowerCase() === "exempt" || isProofMarker(match) || match[1].toLowerCase() === "quarantine" || new RegExp(`^${WORD.toUpperCase()}_[A-Z]+$`).test(match[0]);
 const LEGACY_BUILT = new RegExp(`${WORD}[-_]\\$\\{?\\s*(?:REPO_TOKEN|RepoToken|repoToken)\\b`, "i");
-const MARKER = /(?:\/\/|#|--|\/\*|\*|<!--)\s*testsToDelete-exempt:(.*)$/;
 const JS_FILE = /\.(?:mjs|js|cjs)$/;
 
 // --- the yaml package -----------------------------------------------------------------------------------------
@@ -345,51 +337,6 @@ function listFiles(repo) {
 
 
 
-/** Parse every `testsToDelete-exempt:` comment: `{ valid: Map<class, Set<line>>, findings }`. */
-export function readExemptions(file, lines) {
-  const valid = new Map([...EXEMPTIBLE, ...DECLARATION_KINDS].map((cls) => [cls, new Set()]));
-  const findings = [];
-  lines.forEach((line, index) => {
-    const marker = MARKER.exec(line);
-    if (marker === null) return;
-    const problem = exemptionProblem(marker[1]);
-    if (problem.cls === undefined) findings.push(finding(file, index + 1, "exemption", problem.text));
-    else valid.get(problem.cls).add(index + 1);
-  });
-  return { valid, findings };
-}
-
-/** `{ cls }` when the text after the marker is a valid exemption, else `{ text }` saying why not. */
-function exemptionProblem(rest) {
-  const parsed = /^\s*([^\s—]*)\s*(?:—\s*(.*?))?\s*(?:\*\/|-->)?\s*$/.exec(rest);
-  const cls = parsed?.[1] ?? "";
-  const reason = parsed?.[2] ?? "";
-  if (cls === "") return { text: "an exemption names no class" };
-  if (cls === "ryuk-off") return { text: "`ryuk-off` accepts no exemption" };
-  if (cls === "owner-blind") return { text: "`owner-blind` accepts no exemption: the allowlist (file, line, hash) is the only pass" };
-  if (!EXEMPTIBLE.includes(cls) && !DECLARATION_KINDS.includes(cls)) return { text: `an exemption names an unknown class \`${cls}\`` };
-  if (!isReason(reason)) return { text: `the exemption of \`${cls}\` carries no reason (ten characters, three words, not a placeholder)` };
-  if (cls === "shared-store" && !reason.includes("lock:")) return { text: "the exemption of `shared-store` must name its lock (`lock: …`)" };
-  if (cls === "container-scoped" && !namesOwner(reason)) return { text: "the exemption of `container-scoped` must name what it lives and dies with: `<what> lives and dies with <fixture or job>` (or `live and die with`), a word of two characters or more after an optional article" };
-  return { cls };
-}
-
-// The owner of a `container-scoped` marker. The C# template (`LeftoversGuardExemptions.cs`, `NamedOwner`) reads the SAME text, so this pattern is that one with .NET's classes spelled out: \s is
-// [\f\n\r\t\v\x85\p{Z}] and \b is a Unicode word edge ([\p{L}\p{Mn}\p{Nd}\p{Pc}]), which JavaScript's \s and \b are not. After the spelling: whitespace, an optional article and whitespace, then a word whose first
-// character is a letter, a digit or _ and that has one or more of those or . or - after it, and that does not start with an article followed by a word edge ("a.", "the-x" name no owner; "a.b" does not either; "its_x" does).
-const SPACE = String.raw`[\f\n\r\t\v\x85\p{Z}]`;
-const WORD_CHAR = String.raw`[\p{L}\p{Mn}\p{Nd}\p{Pc}]`;
-const ARTICLE = "(?:the|a|an|its|this|that)";
-const NAMED_OWNER = new RegExp(
-  `(?<!${WORD_CHAR})(?:lives${SPACE}+and${SPACE}+dies|live${SPACE}+and${SPACE}+die)${SPACE}+with${SPACE}+(?:${ARTICLE}${SPACE}+)?(?!${ARTICLE}(?!${WORD_CHAR}))[\\p{L}\\p{N}_][\\p{L}\\p{N}_.-]+`,
-  "iu",
-);
-
-/** Whether a `container-scoped` reason names its owner: after `lives and dies with` or `live and die with`, an optional article and then a word of two characters or more that is no article. */
-const namesOwner = (reason) => NAMED_OWNER.test(reason);
-
-const isExempt = (exemptions, cls, line) => exemptions.valid.get(cls)?.has(line) === true || exemptions.valid.get(cls)?.has(line - 1) === true;
-
 // --- the single-line classes ---------------------------------------------------------------------------------
 
 const RAW_TEMP = [
@@ -404,34 +351,6 @@ const RAW_TEMP = [
 const RAW_TEMP_BY_EXTENSION = { ".sh": [/\bmktemp\b/], ".ps1": [/New-TemporaryFile|\$env:TE?MP\b/] };
 const RAW_WORKTREE = [/["']worktree["']\s*,\s*["']add["']/, /\bworktree\s+add\b/];
 const RYUK_OFF = /TESTCONTAINERS_RYUK_DISABLED\s*[:=]\s*["']?true/i;
-const SHARED_STORE = [
-  { pattern: /\bDROP\s+(?:DATABASE|SCHEMA|TABLE)\s+(?:IF\s+EXISTS\s+)?(["'`]?[\w.$-]*)/, named: true },
-  { pattern: /\bTRUNCATE\s+(?:TABLE\s+)?(["'`]?[\w.$-]*)/, named: true },
-  { pattern: /\bFLUSH(?:ALL|DB)\b/, named: false },
-  { pattern: /deleteMany\(\s*\{\s*\}\s*\)/, named: false },
-];
-
-function sharedStoreHit(line) {
-  for (const { pattern, named } of SHARED_STORE) {
-    const match = pattern.exec(line);
-    if (match !== null && !(named && PREFIX_OK.test(match[1].replace(/^["'`]/, "")))) return [match[0].trim()];
-  }
-  return [];
-}
-
-/** The hits that are a container's own teardown: a whole database or schema dropped, or one Redis database flushed. `DROP TABLE`, `TRUNCATE`, `FLUSHALL` and delete-all are resets, not teardowns. */
-const CONTAINER_TEARDOWN = /^(?:DROP\s+(?:DATABASE|SCHEMA)\b|FLUSHDB$)/;
-
-/**
- * Whether EVERY `shared-store` hit of the line is a container teardown (and there is at least one): the test of the `container-scoped` exemption. It reads all the hits, not the first, so a
- * teardown beside a reset on one line clears nothing. `sharedStoreHit` keeps its own contract (the first hit, for the finding's text).
- */
-function isContainerTeardown(line) {
-  const hits = SHARED_STORE.flatMap(({ pattern, named }) =>
-    [...line.matchAll(new RegExp(pattern.source, "g"))].filter((match) => !(named && PREFIX_OK.test(match[1].replace(/^["'`]/, "")))).map((match) => match[0].trim()));
-  return hits.length > 0 && hits.every((hit) => CONTAINER_TEARDOWN.test(hit));
-}
-
 /** Every pattern's hit on the line, so a line that breaks a class twice is listed twice. */
 function allMatches(patterns, line) {
   return patterns.flatMap((pattern) => {
@@ -524,7 +443,8 @@ function lineFindings(file, lines, exemptions, allowlist, baseline, allowances, 
   const add = (index, cls, text) => {
     if (cls === "ryuk-off" || !isExempt(exemptions, cls, index + 1)) found.push(finding(file, index + 1, cls, text));
   };
-  const containerCleared = (index, line) => isExempt(exemptions, "container-scoped", index + 1) && isContainerTeardown(line);
+  // under a valid container-scoped marker the findings are the hits that are not a teardown (the first one is named); without one, the first hit as always
+  const containerHits = (index, line) => (isExempt(exemptions, "container-scoped", index + 1) ? nonTeardownHits(line).slice(0, 1) : sharedStoreHit(line));
   const verdicts = classifyLines(lines.join("\n"), { allowlist, file }); // the file's own prefix bindings are read once, for every line
   const fold = foldReading(file, lines, allowances, reader);
   for (const entry of fold.findings) found.push(entry);
@@ -536,7 +456,7 @@ function lineFindings(file, lines, exemptions, allowlist, baseline, allowances, 
     const checks = comment ? [["legacy-name", folded.legacy]] : [
       ["raw-temp", allMatches([...RAW_TEMP, ...extra], line)],
       ["raw-worktree", allMatches(RAW_WORKTREE, line).slice(0, 1)],
-      ["shared-store", sharedStoreHit(line)],
+      ["shared-store", containerHits(index, line)],
       ["ryuk-off", RYUK_OFF.test(line) ? ["TESTCONTAINERS_RYUK_DISABLED"] : []],
       ["docker-name", composeEnvHits(line)],
       ["legacy-name", LEGACY_NAME_PENDING.includes(file) ? [] : [...legacyNameHits(line), ...folded.legacy]],
@@ -544,7 +464,6 @@ function lineFindings(file, lines, exemptions, allowlist, baseline, allowances, 
     for (const [cls, hits] of checks) {
       if (hits.length === 0) continue;
       // the baseline passes a `raw-temp` hit up to its entries; a line with a valid exemption is exempt first and consumes none
-      if (cls === "shared-store" && containerCleared(index, line)) continue; // a declared container's own teardown (§6 (b)): nothing else is cleared by the declaration
       if (cls === "raw-temp" && baseline !== undefined && !isExempt(exemptions, cls, index + 1) && baseline.take(file, siteSha256(line))) continue;
       add(index, cls, [...new Set(hits)].map((hit) => `\`${hit}\``).join(", "));
     }

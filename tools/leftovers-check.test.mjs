@@ -1898,7 +1898,7 @@ test("F30 review: a package.json script is read by the folded readings too (--pr
 
 // F41 — `container-scoped` is an exemption kind of its own (rule §6 (b), §7). todo/PLAN_F41_container_scoped.md, scenarios P1-P7 and N1-N18.
 // Each scenario runs the whole scan of one text and compares the classes found; the marker is spelled from pieces, as everywhere in this file.
-const CONTAINER_OWNER_SENTENCE = /the exemption of `container-scoped` must name what it lives and dies with/;
+const CONTAINER_OWNER_SENTENCE = "the exemption of `container-scoped` must name what it lives and dies with: `lives and dies with` or `live and die with`, then an optional article and an owner of two characters or more that is not an article and does not start with an article followed by punctuation (`the PostgresFixture container`, not `the-fixture`)";
 const classesOf = (file, text) => scanText(file, text).map((entry) => entry.cls);
 const containerMarker = (reason) => `// ${Q}-exempt: container-scoped — ${reason}\n`;
 const FIXTURE_REASON = "the per-test databases live and die with the PostgresFixture container";
@@ -1940,10 +1940,12 @@ test("F41 P4/P5: the marker over DROP SCHEMA and over FLUSHDB is clean", () => {
   assert.deepEqual(classesOf("tests/db.sh", `${containerMarker(FIXTURE_REASON)}psql -c "DROP SCHEMA bench_case"\n`), []);
   assert.deepEqual(classesOf("tests/db.sh", `${containerMarker(FIXTURE_REASON)}psql -c "DROP SCHEMA IF EXISTS bench_case"\n`), []);
   assert.deepEqual(classesOf("tests/db.sh", `${containerMarker(FIXTURE_REASON)}redis-cli FLUSHDB\n`), []);
+  for (const line of ['psql -c "DROP SCHEMA bench_case"', "redis-cli FLUSHDB"]) assert.deepEqual(classesOf("tests/db.sh", `${line}\n`), ["shared-store"], `${line} without the marker`);
 });
 
 test("F41 P7: DROP DATABASE production_db under a valid marker is clean too — the stated limit: the guard reads a spelling, not whose database it is", () => {
   assert.deepEqual(classesOf("tests/db.sh", `${containerMarker(FIXTURE_REASON)}psql -c "DROP DATABASE production_db"\n`), []);
+  assert.deepEqual(classesOf("tests/db.sh", 'psql -c "DROP DATABASE production_db"\n'), ["shared-store"], "without the marker it is a finding");
 });
 
 test("F41 N1/N16/N4: a reason that names no owner is an `exemption` finding that says what is missing", () => {
@@ -1965,7 +1967,7 @@ test("F41 N1/N16/N4: a reason that names no owner is an `exemption` finding that
   ]) {
     const found = scanText("tests/X.cs", containerMarker(reason));
     assert.deepEqual(found.map((entry) => entry.cls), ["exemption"], reason);
-    assert.match(found[0].text, CONTAINER_OWNER_SENTENCE, reason);
+    assert.equal(found[0].text, CONTAINER_OWNER_SENTENCE, reason);
   }
 });
 
@@ -2038,4 +2040,51 @@ test("F41: the shared-store cure and the exemption cure name the new kind; an un
 
 test("F41: a reason may say the spelling twice — one occurrence with an owner is enough", () => {
   assert.deepEqual(classesOf("tests/X.cs", containerMarker("the x lives and dies with the, and the y lives and dies with the Orders fixture")), []);
+});
+
+// F41 review rounds: the shared contract with the C# template (todo/PLAN_F41_container_scoped.md, entry 1.1 and the code gate's findings).
+test("F41 A: the owner spelling is read in any ASCII case and with no Unicode case folding; a zero-width joiner is a word character", () => {
+  for (const reason of ["the data LIVES AND DIES WITH THE Fixture", "the data Live And Die With An Orders", "the data lIvEs aNd dIeS wItH tHe fixture"]) assert.deepEqual(classesOf("tests/X.cs", containerMarker(reason)), [], reason);
+  for (const reason of [
+    "the data live\u017f and die\u017f with the fixture", // U+017F folds to s under a /i flag in JavaScript and not in .NET
+    "the data xlives and dies with the fixture", // the spelling must start at a word edge
+    "\u200dlives and dies with the fixture", // ZWJ and ZWNJ are word characters to .NET's \\b
+    "\u200clives and dies with the fixture",
+  ]) {
+    const found = scanText("tests/X.cs", containerMarker(reason));
+    assert.deepEqual(found.map((entry) => entry.cls), ["exemption"], reason);
+    assert.equal(found[0].text, CONTAINER_OWNER_SENTENCE, reason);
+  }
+  assert.deepEqual(classesOf("tests/X.cs", containerMarker("the data lives and dies with an\u200cx")), [], "an+ZWNJ+x is one word that starts with an article and a word character: an owner");
+  assert.deepEqual(classesOf("tests/X.cs", containerMarker("the data lives and dies with the\u200cx")), [], "the+ZWNJ+x is one word too");
+});
+
+test("F41 B: the finding for a teardown beside a reset under a valid marker names the first NON-teardown hit; an unmarked line keeps the first hit of each pattern", () => {
+  const text = (line, marker = true) => scanText("tests/db.sh", (marker ? containerMarker(FIXTURE_REASON) : "") + line + "\n").filter((entry) => entry.cls === "shared-store").map((entry) => entry.text);
+  assert.deepEqual(text("DROP DATABASE bench; TRUNCATE users"), ["`TRUNCATE users`"]);
+  assert.deepEqual(text("FLUSHDB; FLUSHALL"), ["`FLUSHALL`"]);
+  assert.deepEqual(text("DROP DATABASE a; DROP TABLE b"), ["`DROP TABLE b`"]);
+  assert.deepEqual(text("DROP TABLE b"), ["`DROP TABLE b`"]);
+  assert.deepEqual(text("DROP DATABASE bench; TRUNCATE users", false), ["`DROP DATABASE bench`"], "no marker: the first hit, as before");
+  assert.deepEqual(text("DROP DATABASE a; DROP TABLE b", false), ["`DROP DATABASE a`"], "no marker: one hit per pattern, the first, as before (no widening)");
+  assert.deepEqual(text("FLUSHDB; FLUSHALL", false), ["`FLUSHDB`"]);
+});
+
+test("F41 C: a teardown beside a prefixed (run-owned) name is clean; a prefixed reset is no hit at all", () => {
+  const owned = `${Q}-u1-bench-x-1`;
+  assert.deepEqual(classesOf("tests/db.sh", `${containerMarker(FIXTURE_REASON)}DROP DATABASE bench; DROP TABLE ${owned};\n`), []);
+  assert.deepEqual(classesOf("tests/db.sh", `DROP DATABASE bench; DROP TABLE ${owned};\n`), ["shared-store"], "the teardown alone is the finding without the marker");
+  assert.deepEqual(classesOf("tests/db.sh", `DROP TABLE ${owned};\n`), [], "an owner-form name is the run's own");
+});
+
+test("F41 D: the teardown reading reuses the shared-store table with each pattern's own flags; the exemption helpers live in tools/lib and the guard stays under the size limit", async () => {
+  const lib = await import("./lib/leftovers-exemptions.mjs");
+  const copy = lib.globalCopy(/abc/i);
+  assert.ok(copy.global && copy.ignoreCase, "a copy keeps the flags it had and adds g");
+  assert.equal(lib.globalCopy(/abc/gm).flags, "gm", "an already global pattern is not given a second g");
+  assert.deepEqual(lib.sharedStoreMatches("DROP DATABASE a; DROP SCHEMA b; TRUNCATE t; FLUSHDB; FLUSHALL; users.deleteMany({})"), ["DROP DATABASE a", "DROP SCHEMA b", "TRUNCATE t", "FLUSHDB", "FLUSHALL", "deleteMany({})"]);
+  for (const entry of lib.SHARED_STORE) assert.equal(lib.globalCopy(entry.pattern).source, entry.pattern.source, "the table is the one source of the patterns");
+  const guard = await import("./leftovers-check.mjs");
+  for (const name of ["EXEMPTIBLE", "DECLARATION_KINDS", "readExemptions"]) assert.equal(guard[name], lib[name], `${name} is re-exported by the guard`);
+  assert.ok(fs.readFileSync(path.join(root, "tools", "leftovers-check.mjs"), "utf8").split("\n").length <= 800, "the guard is within the coding style's 800 lines");
 });

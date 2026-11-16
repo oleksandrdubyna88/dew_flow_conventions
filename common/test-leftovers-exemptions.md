@@ -23,10 +23,19 @@ an optional article (*the*, *a*, *an*, *its*, *this*, *that*) and then a word of
 itself an article. `… lives and dies with the` names no owner and is a finding of class `exemption`; so is a reason with
 neither spelling. It needs no `lock:`: that belongs to (a).
 
+The refusal says: the exemption of `container-scoped` must name what it lives and dies with: `lives and dies with` or
+`live and die with`, then an optional article and an owner of two characters or more that is not an article and does
+not start with an article followed by punctuation (`the PostgresFixture container`, not `the-fixture`). The spelling is
+read in any ASCII case and at a word edge (`xlives and dies with …` has none). Accepted owners: `the PostgresFixture
+container`, `its fixture`, `PostgresFixture`, `_x`, `its_x`, and `x.` (the period counts as a character of the word). Refused:
+`the`, `the the`, `a b`, `the X` (one character), `a. foo`, `a.b`, `the-fixture` (an article ends at punctuation, so it is
+no owner). The C# template reads the same text, case for case.
+
 **What it clears.** One class, `shared-store`, on the marker's own line and the next, and only a hit that is the
 container's own teardown: `DROP DATABASE`, `DROP SCHEMA` or `FLUSHDB`. Every `shared-store` hit on that line must be
 one of these: a line that also holds a `DROP TABLE`, `TRUNCATE`, `FLUSHALL` or delete-all is not cleared, because that
 is a reset, not a teardown, and a reset needs (a)'s `lock:` or a per-run name.
+A name in the owner form (§1) is the run's own and is no hit. Where the marker is valid and the line also holds a reset, the finding names the first hit that is not a teardown, never the teardown.
 
 **What it never clears.** `ryuk-off` and `owner-blind` refuse every exemption. Nor does it clear `docker-run`,
 `docker-name`, `raw-temp`, `raw-worktree` or `legacy-name`: the container itself is still named in the owner form and

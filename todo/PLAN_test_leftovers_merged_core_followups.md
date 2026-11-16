@@ -1067,6 +1067,7 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   promotion: the pin bump PRs in all nine consumers are planned with it (the rollout's § *Epoch 9* item 5).
 - **Owner.** The conventions repository. A prerequisite of benchmark's E6 story that writes the marker (row E6-f1).
 - **Progress.** Fixed on branch `fix/f41-container-scoped`, not released (2026-11-16): the kind `container-scoped` in the guard, the rule's §6 (b), §7 and the core, with RED-GREEN-RED tests in `tools/leftovers-check.test.mjs`. The release (promotion and pin bumps) is a separate step after the merge.
+  Correction (entry 1.1 of `todo/PLAN_F41_container_scoped.md`): the provisions live in the companion rule `common/test-leftovers-exemptions.md`, loaded through the detail's `depends`; the detail's body is unchanged.
 
 ## F42 — The C# template refuses the same marker, and its notes N1–N5 are not reproduced (found 2026-11-12, benchmark E6.S2 and E6.S3)
 

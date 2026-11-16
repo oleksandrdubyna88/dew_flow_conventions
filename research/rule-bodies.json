@@ -509,7 +509,7 @@
     {
       "id": "common.test-leftovers-exemptions",
       "source": "common/test-leftovers-exemptions.md",
-      "bodySha256": "179a7fdd9a9cd623bd9f1cdc4dee4ae43c9ac6245fbfcdffbcdc3d711c53d93f",
+      "bodySha256": "9b6623f938b63e158f4a0a69d953e8d1c9743df9bd399b63a157788bb29ffcb9",
       "sections": [
         "# The `container-scoped` exemption — a kind of its own, for a container's own teardown",
         "## Never"
