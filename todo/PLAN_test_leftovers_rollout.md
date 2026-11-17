@@ -1,6 +1,8 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 11 STOPPED for re-review (2026-11-17); the re-review is written (§ *Epoch 12*, 2026-11-17, `Narrowed: yes`); no new code on any epic until epoch 12 opens by the owner.** Entry 11.2 (E6.S6's two runner lines go to the language-comparison plan) was the eleventh full stop. The revision: S6 merges with those two C# `raw-temp` findings on an approved standing list of exactly two and with policy-ab-quick's three named pre-existing failures, and S7 now also waits for the language-comparison plan's disposition of the two lines with the repository guard clean (items 4.1, 4.6; the record for epoch 3 is the precedent); every remaining story's *Files* become bounded folders plus the docs a grep at its base finds, its line lists and counts are observations at a SHA, and its *Done when* reads "zero unexplained findings of both guards in scope; each remaining one an individually approved, listed exception", with what still counts as a change listed (item 8.1); the `minigit-bench` and `lang-explore` whole suites start the system interpreter, which no allowance covers (item 7, question (a)). Re-review consult `59b325a3`. The Opus judge sorted epoch 11's work (`82c5a4b`: 11 fit, 3 cut by a fix forward, 2 outside, nothing reverted); after it, row E6-m was widened to the pre-existing failures S6's base runs record (benchmark #222's body: lang-explore 10 of 991, lang-bench 1 of 2394 on `main`), and every whole run takes an owned `TMPDIR`. The plan gate read the operative extract of `7254d77` and `06225b48` (session `10853099`, `proceed`): G1 and G3 accepted and folded into row E6-m (both runs complete, executed and skipped tests reconciled by name; a timing-list test that passed at base and fails at head goes by the S5 list's rule), G2 rejected (alias-safe `BENCH_PILOT_OUT` is built, #221). An independent Opus review (of `7c22aa1` and benchmark `7dcdffd9`) said "do not approve as written", and "approve with fixes" once B1 and B2 are fixed: both are folded, with S-1 to S-9 and N-1 to N-4 (the record's review note): row E6-m's standing failures are EXACTLY policy-ab-quick's three and the base lists the owner confirms within benchmark #222's counts (lang-explore ≤ 10, lang-bench ≤ 1, minigit-bench 0), the S5 timing list approves nothing, and the owned `TMPDIR` may keep only F2's named makers' entries. A second plan-gate round (`a0abb03e`, `proceed`, one reviewer answered) found that S6's claimed folders under `~` and `/var/tmp` are never swept after a kill; declared as one bounded exception (the Narrowed line, item 1's *Goal*, item 4.6 (3)). Next: the owner's approval and answers (item 7); epoch 12 opens `by owner`, at 0 changes. *Was:* "Next: the owner's approval and answers (item 7)"; before it, "Next: an independent Opus review, then the owner's approval and answers (item 7)"; before it, "Next: the plan gate on the operative extract, then the owner's approval and answers (item 7)"; before it, "Next: the Opus judge's verdicts (the record's table), the plan gate on the operative extract, the owner's approval and answer".
+> Status: **epoch 12 open (2026-11-17), approved by the owner (`Narrowed: yes`); 0 changes, so the next accepted change counts as 12.1.** Next: the E6 stories amendment PR, the E7 amendment, S6's brief rework and base runs. (The owner answered item 7 the same day: question 1 approved as written, question (a) yes; question (b) stays for S6's merge.)
+>
+> Was: **epoch 11 STOPPED for re-review (2026-11-17); the re-review is written (§ *Epoch 12*, 2026-11-17, `Narrowed: yes`); no new code on any epic until epoch 12 opens by the owner.** Entry 11.2 (E6.S6's two runner lines go to the language-comparison plan) was the eleventh full stop. The revision: S6 merges with those two C# `raw-temp` findings on an approved standing list of exactly two and with policy-ab-quick's three named pre-existing failures, and S7 now also waits for the language-comparison plan's disposition of the two lines with the repository guard clean (items 4.1, 4.6; the record for epoch 3 is the precedent); every remaining story's *Files* become bounded folders plus the docs a grep at its base finds, its line lists and counts are observations at a SHA, and its *Done when* reads "zero unexplained findings of both guards in scope; each remaining one an individually approved, listed exception", with what still counts as a change listed (item 8.1); the `minigit-bench` and `lang-explore` whole suites start the system interpreter, which no allowance covers (item 7, question (a)). Re-review consult `59b325a3`. The Opus judge sorted epoch 11's work (`82c5a4b`: 11 fit, 3 cut by a fix forward, 2 outside, nothing reverted); after it, row E6-m was widened to the pre-existing failures S6's base runs record (benchmark #222's body: lang-explore 10 of 991, lang-bench 1 of 2394 on `main`), and every whole run takes an owned `TMPDIR`. The plan gate read the operative extract of `7254d77` and `06225b48` (session `10853099`, `proceed`): G1 and G3 accepted and folded into row E6-m (both runs complete, executed and skipped tests reconciled by name; a timing-list test that passed at base and fails at head goes by the S5 list's rule), G2 rejected (alias-safe `BENCH_PILOT_OUT` is built, #221). An independent Opus review (of `7c22aa1` and benchmark `7dcdffd9`) said "do not approve as written", and "approve with fixes" once B1 and B2 are fixed: both are folded, with S-1 to S-9 and N-1 to N-4 (the record's review note): row E6-m's standing failures are EXACTLY policy-ab-quick's three and the base lists the owner confirms within benchmark #222's counts (lang-explore ≤ 10, lang-bench ≤ 1, minigit-bench 0), the S5 timing list approves nothing, and the owned `TMPDIR` may keep only F2's named makers' entries. A second plan-gate round (`a0abb03e`, `proceed`, one reviewer answered) found that S6's claimed folders under `~` and `/var/tmp` are never swept after a kill; declared as one bounded exception (the Narrowed line, item 1's *Goal*, item 4.6 (3)). Next: the owner's approval and answers (item 7); epoch 12 opens `by owner`, at 0 changes. *Was:* "Next: the owner's approval and answers (item 7)"; before it, "Next: an independent Opus review, then the owner's approval and answers (item 7)"; before it, "Next: the plan gate on the operative extract, then the owner's approval and answers (item 7)"; before it, "Next: the Opus judge's verdicts (the record's table), the plan gate on the operative extract, the owner's approval and answer".
 >
 > Was: **epoch 11 STOPPED for re-review (2026-11-17): its second change, entry 11.2 (E6.S6's two runner lines go to the language-comparison plan), is the eleventh full stop; no new code on any epic until the re-review.** Done in epoch 11 before the stop: E6.S4 (#221), E6.S5 (#223), the E6/E7 stories (#220, #128), follow-ups F45/F46 (#178), rag_qln's pins (#129–#131).
 >
@@ -900,7 +902,7 @@ Narrowed: yes — the DoD's first item accepts operator-retained pilot output (r
   `MODEL_ARMS_DRVFS_SCRATCH` = a new empty folder under `/mnt/c/Users/<owner>/AppData/Local/Temp/`, removed by exact path
   after; and allowed deleting rag_qln's pushed throwaway branch `tmp/e7-s4-red` (this record's row).)
 
-> Epoch 11 · approved 2026-11-17 · by owner · state: stopped
+> Epoch 11 · approved 2026-11-17 · by owner · state: closed
 - 11.1 · 2026-11-17 · owner · stories — E6.S4's *Files* (§ *Epoch 11* item 4.2) gains four lines of files already on it: `research/module_model_arms.md:2314` (a real edit: the living doc's M3 names, which item 7 promises to cover) and dated notes at `research/PLAN_model_arms_E3.md:1127` and `research/PLAN_model_arms_E6.md:344`, `:346`, `:818` (IMPLEMENTED plans: M2's and M3's names, and "a killed test run leaves one temp folder", which S4 makes false)
   (Found by S4's reworked brief, 2026-11-17, § 15 (benchmark `feat/e6-s4-modelarms` `43d6cacd`): item 4.2's line lists missed four lines
   its own grep finds, though item 8.1 says *Files* include the docs found by grep. The question consultants could not be
@@ -1080,6 +1082,15 @@ Narrowed: yes — E6.S6 merges with the two runner findings entry 11.2 leaves (C
   Narrowed line, § *Epoch 12* item 1's *Goal* (one bounded exception) and item 4.6 (3); row E6-m (7) lists those
   roots by name at base and head; the `/var/tmp` and `/run/user` roots go to the followups plan's S1 as a dated note
   (item 8.3). E6's amendment carries it (benchmark `743e3392`). The owner approves it with the Narrowed line.)
+  (The owner, 2026-11-17, in this session: approved the revised plan with its `Narrowed: yes` reading, worded as the
+  Narrowed line above (the two runner findings on a list of exactly two; exactly policy-ab-quick's three and the base
+  lists the owner confirms within benchmark #222's counts; the goal's bounded exception for S6's claimed folders under
+  `~` and `/var/tmp`; S7 waiting for the language-comparison plan's disposition) — epoch 12 opens by the owner;
+  answered item 7's question 1 (approve as written) and question (a) with (1), yes: S6 may call `/usr/bin/python3` in
+  the `minigit-bench` and `lang-explore` whole-suite runs, two runs each (base, head), on lang-bench's terms, with an
+  owned `TMPDIR` under `/tmp`. Question (b) stays for S6's merge.)
+
+> Epoch 12 · approved 2026-11-17 · by owner · state: open
 
 ## Symptom
 
@@ -4631,7 +4642,8 @@ DONE   the plan gate on the operative extract (session `10853099`, `proceed`; G1
 DONE   an independent Opus review ("do not approve as written"; approve with fixes once B1 and B2 are fixed): B1, B2,
        S-1 to S-9 and N-1 to N-4 folded in one round (the record's review note) → the second plan-gate round
        (`a0abb03e`, `proceed`; one finding accepted: the goal's bounded exception for S6's roots outside the temp root).
-NEXT   the owner approves (Narrowed: yes) and answers item 7 (a) → epoch 12 opens `by owner`, at 0 changes.
+DONE   the owner approved (Narrowed: yes) and answered item 7's question 1 and (a) with yes, 2026-11-17 → epoch 12
+       opened `by owner`, at 0 changes. (Question (b) stays for S6's merge.)
 THEN   benchmark   E6's stories amendment for epoch 12 (prepared on `docs/e6-stories-epoch-12`, a NEW PR) → S6's brief
                    revised by new commits (item 4.2, item 4.3, the owner's answer) → S6's plan gate → S6.
                    S7 after S4–S6, D7's S1 and S2, AND the language-comparison plan's disposition of the two runner
@@ -4673,6 +4685,7 @@ plan's S5 list, and you decide on one repeat run (*was:* "in the classes … or 
 exception to the goal (the second gate round): a killed run's claimed fake homes under `~` (and `/var/tmp` decoys) are listed, not collected, until F1/S1's home sweep (with two sockets under `/run/user/<uid>`), as item 1's *Goal*
 writes it — with S7 waiting for the language-comparison plan's disposition (row E6-g), and
 item 8.1's form for the remaining stories (recommended: approve as written).
+**Answered** by the owner, 2026-11-17: approved as written (`Narrowed: yes`); epoch 12 opened `by owner`.
 
 **(a) The system interpreter for two more suites** (E12-5, O12-e). May S6 run `/usr/bin/python3` through the
 `minigit-bench` and `lang-explore` whole-suite runs, two runs each (base, head), on the same terms as lang-bench's (the
@@ -4684,6 +4697,8 @@ no: then S6's evidence for those two suites is narrowed further (the files S6 ch
 interpreter; `heldout-run.test.mjs`, which S6 changes, starts it), which would be one more smaller condition to approve.
 Recommended: (1), yes. S6 does not go to its plan gate until this is answered. The question consultants could not be
 asked first: the day's cap of ten questions was spent (N-2); the rule for Python is the owner's anyway.
+**Answered** by the owner, 2026-11-17: (1), yes — two runs each (base, head) of the `minigit-bench` and `lang-explore`
+whole suites with `/usr/bin/python3`, on lang-bench's terms, with an owned `TMPDIR` under `/tmp`.
 
 **(b) Later, at S6's merge (not now; the independent review, S-2):** if the language-comparison plan has not recorded
 the hand-off of the two runner lines by then, the owner decides: wait, or a coordinated re-pin of `runner/` carrying a
