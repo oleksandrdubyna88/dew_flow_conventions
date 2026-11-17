@@ -1,6 +1,8 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 10 open (2026-11-16), approved by the reviewers after the ninth re-review (`Narrowed: no`; the Opus judge: 11 fit, 5 cut by a fix forward or a local rewrite; plan gate `c6131b05`, `proceed`; an independent Opus review), with ONE change, entry 10.1 (2026-11-16: E6-f2's configuration counterexample has no instance at Testcontainers 4.16.0); the next accepted change is the tenth full stop.** § *Epoch 10* is the plan now: a claim about a copied tool is observed before the gate of the story or brief that relies on it (item 8.1); E6's and E7's stories are amended in new PRs first; then F42-c, E6.S3 and E7.S3–S5 (the `external/` exclusion root-scoped, in S3); E7.S2 waits for the owner's live observations.
+> Status: **epoch 10 STOPPED for re-review (2026-11-17): its second change, entry 10.2 (E6.S4's pilot scaffolds need a disposition the story does not have), is the tenth full stop; no new code on any epic until the re-review.** Done in epoch 10 before the stop: E6 and E7 stories amended (#217, #122), F42-c (#218), E6.S3 (#219), E7.S3–S5 (#125), rag_qln's pins (#123, #127).
+>
+> Was: **epoch 10 open (2026-11-16), approved by the reviewers after the ninth re-review (`Narrowed: no`; the Opus judge: 11 fit, 5 cut by a fix forward or a local rewrite; plan gate `c6131b05`, `proceed`; an independent Opus review), with ONE change, entry 10.1 (2026-11-16: E6-f2's configuration counterexample has no instance at Testcontainers 4.16.0); the next accepted change is the tenth full stop.** § *Epoch 10* is the plan now: a claim about a copied tool is observed before the gate of the story or brief that relies on it (item 8.1); E6's and E7's stories are amended in new PRs first; then F42-c, E6.S3 and E7.S3–S5 (the `external/` exclusion root-scoped, in S3); E7.S2 waits for the owner's live observations.
 >
 > Was: **epoch 9 STOPPED for re-review (2026-11-16): its second change, entry 9.2 (E7's stories model the copied C# guard's walk over `external/` wrongly), is the ninth full stop; no new code on any epic until the re-review.** Was: **epoch 9 open (2026-11-16), approved by the reviewers after the re-review (`Narrowed: no`; plan gate `b6933e14`, `proceed`; an independent Opus review), with ONE change, entry 9.1 (2026-11-16: F42-c needs benchmark-own touches its § 6 excluded); the next accepted change is the ninth full stop.** The revision is § *Epoch 9*: `container-scoped` becomes an exemption kind of its own in both guards (F41 in conventions, F42 in mcp, where N1–N5 were each tried first: N1, N4 and N5 reproduced and fixed, N2 did not reproduce, N3 is a Windows pin), row E6-f is split into E6-f1 (the marker, file-scoped) and E6-f2 (the container ends with the fixture; reuse proved at run time), E7's rows that need the live stores are blocked with the owner (item 7), and E6's and E7's stories are revised in new PRs before their next stories (item 8.3). E2 (creds) and E5 (coai, S7 included) are COMPLETE. Progress 2026-11-16 (§ *Epoch 9*, *Progress, 2026-11-16*, not a change): F41 merged (#171) and released (`b1746499`, all nine pins), F42 merged (mcp #81), E6 and E7 stories revised (benchmark #215, rag_qln #119). Still open: benchmark's copy re-synced to F42 (F42-c), E6.S3–S7, E7.S2–S5, the feature reviews and the promotion. The re-review is written (§ *Epoch 10*, 2026-11-16) and judged (11 fit; 5 cut, each by a fix forward or a local rewrite: E6's and E7's stories by NEW amendment PRs, F42-c's brief by new commits; nothing merged needs a revert; coai #1006 merged during the stop, outside the plan, reported); passed by the plan gate (`c6131b05`, proceed) and an independent Opus review; epoch 10 opens by the reviewers.
 >
@@ -754,7 +756,7 @@ Narrowed: no — entry 9.1 is settled by bounding F42-c by named paths, its mani
   not a document). Also added: a later bump of rag_qln's benchmark or mcp pin re-runs E7-h2's probes (row E7-h2,
   item 8.1). None of them makes a condition smaller, so the Narrowed line stands.)
 
-> Epoch 10 · approved 2026-11-16 · by reviewers · state: open
+> Epoch 10 · approved 2026-11-16 · by reviewers · state: stopped
 
 - 10.1 · 2026-11-16 · agent · merge-conditions — row E6-f2's counterexample "reuse enabled through configuration alone" has no instance at the pinned Testcontainers 4.16.0, so it cannot be red; it becomes a green pin (both configuration spellings set, the built container's Reuse stays False and the container still ends with the fixture), while the builder counterexample and the run-time disposal proof stay red-first
   (Observed by E6.S3's brief, 2026-11-16, by a run at benchmark `5070beda`: the fixture's builder reads Reuse=False under
@@ -762,6 +764,12 @@ Narrowed: no — entry 9.1 is settled by bounding F42-c by named paths, its mani
   it; no member of the assembly reads reuse from configuration. The parent had anticipated it (§ *Epoch 9*, *Progress*, carried
   (1)). Counted after the question consultants (`c3d71347`, two of two: a change — the row said "RED, each"). First change of
   epoch 10; the next accepted change is the tenth full stop.)
+- 10.2 · 2026-11-17 · agent · stories, approach — E6.S4's two pilot scaffolds (`M2PilotScaffold.cs`, `M3PilotScaffold.cs`) make output that must outlive the test for the owner's manual pilot, and neither of the story's two dispositions for its 15 legacy literals fits them: the helper's claimed folder is collected by a later run's sweep once its owner is gone and old enough, and the `~` spelling is only for tests about the old name itself; a third disposition (an operator artifact outside the testsToDelete family) is needed
+  (Found by E6.S4's brief, 2026-11-17, read in `M2PilotScaffold.cs:11-16` ("meant to outlive the test — the owner removes it after the
+  pilot") and `M3PilotScaffold.cs:9-11`, against the stories' S4 text ("Each of the 15 legacy literals moves to the helper or, where the
+  test is about the old name itself, is spelled with the `~` precedent") and the rule's "never prefix something that must survive
+  the run". Counted after the question consultants (`33aa7f43`, two of two: a change to the story's approach). This is the second
+  change of epoch 10: the plan stops for re-review. No S4 code was written; S4's brief is local.)
 
 ## Symptom
 
