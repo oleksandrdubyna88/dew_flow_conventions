@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (F27 fixed 2026-11-05, not released: a process cap and shim rule for the next planned release; F28 open: release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner). F30 added 2026-11-05 (open, with an owner and a proposed deadline: the shipped Node guard has no folding reader). F32 added 2026-11-06 (open: the raw readings of the guard and the sweeper are super-linear on a hostile line, and their time is not promised). F33–F40 added 2026-11-10 from creds' E2 (its notes for the parent N20–N25 and its side findings): F33 and F36 open, conventions' tools; F34 open, creds first; F35 a documented limit for now; F37 open, the C# template's; F38–F40 pointers to creds' todos. F41–F43 added 2026-11-16 from the rollout's re-review for epoch 9: F41 fixed 2026-11-16 on branch fix/f41-container-scoped, not released (conventions' rule and Node guard); F42 open, the C# template's; F43 a pointer. Later 2026-11-16: F41 released (`b1746499`) and F42 merged (mcp #81), both done; F44 added (two template findings from F42-c's code gate, open).** Scope: six low findings of the
+> Status: **F45 and F46 added 2026-11-17 (benchmark docs left as history by the owner; findings carried from E6.S4 and the epoch-11 re-review). Earlier: plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (F27 fixed 2026-11-05, not released: a process cap and shim rule for the next planned release; F28 open: release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner). F30 added 2026-11-05 (open, with an owner and a proposed deadline: the shipped Node guard has no folding reader). F32 added 2026-11-06 (open: the raw readings of the guard and the sweeper are super-linear on a hostile line, and their time is not promised). F33–F40 added 2026-11-10 from creds' E2 (its notes for the parent N20–N25 and its side findings): F33 and F36 open, conventions' tools; F34 open, creds first; F35 a documented limit for now; F37 open, the C# template's; F38–F40 pointers to creds' todos. F41–F43 added 2026-11-16 from the rollout's re-review for epoch 9: F41 fixed 2026-11-16 on branch fix/f41-container-scoped, not released (conventions' rule and Node guard); F42 open, the C# template's; F43 a pointer. Later 2026-11-16: F41 released (`b1746499`) and F42 merged (mcp #81), both done; F44 added (two template findings from F42-c's code gate, open).** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -1105,6 +1105,35 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   changing attributes; (2) write stdin asynchronously under the same timeout, killing the tree on either. RED first for each.
 - **Owner.** mcp (the template); the copies (benchmark, and rag_qln after E7.S3) re-sync afterwards. Not a prerequisite of any
   open story.
+
+## F45 — Benchmark docs that E6.S5 makes stale, left as history by the owner (found 2026-11-17, E6.S5's brief)
+
+- **What.** Six lines describe what E6.S5 changes and are on neither its *Files* line nor a history list (S5's brief § 13,
+  benchmark `feat/e6-s5-rest`): `research/PLAN_question_consultant_probes.md:317` (`%TEMP%/bench-fake-cli/<model>/`),
+  `research/PLAN_model_arms_E1.md:517`, `:649` and `research/PLAN_model_arms.md:344`, `research/PLAN_model_arms_E5.md:83`
+  (the fake CLI's per-model home, true only for ids not in the owner form after S5), and `research/module_model_arms.md:922-923`
+  (a shipped story's deviation: "`TempGitRepo`'s `bench-src-<guid>` folder carries no leftover prefix", false after S5).
+- **Decided.** The owner, 2026-11-17, in the coordinating session: they are history, not S5's *Files* (no rollout entry);
+  S5's PR names them and this item. The living docs (`module_probes.md:318-319`, `module_tests.md:19`) stay true.
+- **Fix.** A dated note after each of the five IMPLEMENTED plan lines and one after the module doc's deviation, naming the
+  owner-form home and `TempGitRepo`'s owned folder; docs only, after E6 closes.
+- **Owner.** Benchmark. Not a prerequisite of any open story.
+
+## F46 — Benchmark and C#-template findings carried from E6.S4 and the epoch-11 re-review (2026-11-17)
+
+- **What.** (1) The copied C# guard reads `testSt` inside `ProbeCellReportDto.LatestState` as a piece of the prefix word
+  (`owner-blind`, no exemption; `tests/Bench.Tests/Probes/ProbeContractsGuardTests.cs:19`, rollout § *Epoch 11* E11-5): a
+  false positive of the template's folding, worked around in E6.S5 by a `nameof` concatenation. (2) A namespace run of
+  benchmark's ModelArms suite leaves about 140 `clr-debug-pipe-*` FIFOs in the temp root, from older tests that SIGKILL
+  .NET children (`ChainProcessTests`, `DetachedLauncherTests`, `PosixFolderIsolationTests` and others; E6.S4's own kill
+  tests give each child an owned `TMPDIR` and leave none). (3) `tests/Bench.Tests/ModelArms/StepBench.cs:64` still names the
+  old folder form in a doc comment (outside E6.S4's change list). (4) A `/tmp/.git` seen once on this machine made every
+  experiment root under `/tmp` refuse (`RootFacts.GitTopOf`'s ancestor check); no cause was found in benchmark (rollout
+  § *Epoch 11* item 4.5).
+- **Fix.** (1) in mcp's template: the folding must not join a piece across an identifier boundary; RED by that literal;
+  re-sync the copies. (2) give every SIGKILLed .NET child an owned `TMPDIR`, as E6.S4 did. (3) a one-line doc fix. (4)
+  a loud start-of-run check for `<temp root>/.git`, or a run-scoped temp root.
+- **Owner.** mcp for (1); benchmark for (2)–(4). Not a prerequisite of any open story.
 
 ## Definition of Done
 
