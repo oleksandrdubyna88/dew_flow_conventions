@@ -1,6 +1,8 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 11 STOPPED for re-review (2026-11-17): its second change, entry 11.2 (E6.S6's two runner lines go to the language-comparison plan), is the eleventh full stop; no new code on any epic until the re-review.** Done in epoch 11 before the stop: E6.S4 (#221), E6.S5 (#223), the E6/E7 stories (#220, #128), follow-ups F45/F46 (#178), rag_qln's pins (#129–#131).
+> Status: **epoch 11 STOPPED for re-review (2026-11-17); the re-review is written (§ *Epoch 12*, 2026-11-17, `Narrowed: yes`); no new code on any epic until epoch 12 opens by the owner.** Entry 11.2 (E6.S6's two runner lines go to the language-comparison plan) was the eleventh full stop. The revision: S6 merges with those two C# `raw-temp` findings on an approved standing list of exactly two and with policy-ab-quick's three named pre-existing failures, and S7 now also waits for the language-comparison plan's disposition of the two lines with the repository guard clean (items 4.1, 4.6; the record for epoch 3 is the precedent); every remaining story's *Files* become bounded folders plus the docs a grep at its base finds, its line lists and counts are observations at a SHA, and its *Done when* reads "zero unexplained findings of both guards in scope; each remaining one an individually approved, listed exception", with what still counts as a change listed (item 8.1); the `minigit-bench` and `lang-explore` whole suites start the system interpreter, which no allowance covers (item 7, question (a)). Re-review consult `59b325a3`. Next: the Opus judge's verdicts (the record's table), the plan gate on the operative extract, the owner's approval and answer; epoch 12 opens `by owner`, at 0 changes.
+>
+> Was: **epoch 11 STOPPED for re-review (2026-11-17): its second change, entry 11.2 (E6.S6's two runner lines go to the language-comparison plan), is the eleventh full stop; no new code on any epic until the re-review.** Done in epoch 11 before the stop: E6.S4 (#221), E6.S5 (#223), the E6/E7 stories (#220, #128), follow-ups F45/F46 (#178), rag_qln's pins (#129–#131).
 >
 > Was: **epoch 11 open (2026-11-17, by the owner, `Narrowed: yes`); entry 11.1 recorded the same day (E6.S4's *Files* gains four doc lines), so the next accepted change is the eleventh full stop.** Next: S4's plan gate on its reworked brief, then S4.
 >
@@ -910,6 +912,47 @@ Narrowed: yes — the DoD's first item accepts operator-retained pilot output (r
   session. Second change of epoch 11: the plan stops for re-review. No S6 code was written; S6's brief is local. The same
   day the owner allowed `/usr/bin/python3` for S6's two whole-suite runs of lang-bench only (the exec layer calls it by a
   fixed path, `lib/exec-layer/run.mjs:79`); the `.py` units run in wslc and an owned venv.)
+
+### Re-review for epoch 12
+
+Narrowed: yes — E6.S6 merges with the two runner findings entry 11.2 leaves (C# raw-temp, run_samples.py:35, :306) and policy-ab-quick's three pre-existing failures; S7's zero stays, and S7 waits for the language-comparison plan's disposition; consult 59b325a3
+  (Why yes, § *Epoch 12* item 4.6: by § *Epoch 11* E11-6 and E11-7 and the stories' S6 *Done when* (benchmark
+  `todo/PLAN_test_leftovers_E6.md:706-709` at `a8106448`), S6 merged only with the C# guard at 14 → 0 in `spikes/` and
+  "the suites … green". It now merges with 14 → 2, the two runner lines standing as findings the owner approves one by
+  one, and with policy-ab-quick's FAILED list equal to its base's (three named Windows-path cases): a smaller merge
+  condition for that PR. As in the record for epoch 3 (E5.S5's merge condition changed, and "E5's final Definition of
+  Done and this plan's did not get smaller"), the final Definition of Done does not get smaller: S7 still switches the
+  C# copy on at zero, and it now waits, as an explicit prerequisite beside D7, for the language-comparison plan's
+  disposition of the two lines on benchmark `main` with the repository guard clean on them; the three failures are the
+  minigit stack bench's own ("its four pre-existing Linux failures (§2) are not this epic's",
+  `todo/PLAN_minigit_stack_bench_E2.md:86-88`), handed to it by name. The prerequisites got wider (that disposition;
+  the owner's answer on the system interpreter for two more suites, § *Epoch 12* item 7). The epoch 12 line, when it is
+  written, says `by owner`.)
+  (Written 2026-11-17 with § *Epoch 12*, over the two entries of epoch 11: 11.1, E6.S4's *Files* gained four doc lines
+  (built, merged as benchmark #221); 11.2, E6.S6's two runner lines go to the language-comparison plan (a brief only,
+  benchmark `feat/e6-s6-spikes` `d836de52`, local). Both were counted by the owner in this session, the question
+  consultants' daily cap being spent. The re-review consult (step 3) is `59b325a3` (codex), every change of the epoch
+  quoted; its points (a) to (c) are checked against the files in § *Epoch 12* item 6. The Verdict and Action cells are
+  `—` until the Opus judge fills them (step 5): the judge adds what this list missed, classifies each row against
+  § *Epoch 12* by its diff and its checks, and writes "unverified" where the evidence cannot be read. The epoch 12
+  line is written only after the judge, the plan gate and the owner's approval, with `state: open` and `by owner`;
+  epoch 12 starts at 0 changes. No epic changes, so there is no Fable re-split (step 7).)
+
+| Work | Where | Verdict | Action |
+|---|---|---|---|
+| conventions #176 `eccf2d2f`, the epoch-11 revision (§ *Epoch 11*, its record and the judge's table; one file, +676-2; checks 10 success, 1 neutral) | main | — | — |
+| conventions #177 `488bdce2`, entry 11.1 (one file, +8-1; checks 13 success) | main | — | — |
+| conventions #178 `22351c2f`, follow-ups F45 (six S5 doc lines left as history, the owner's decision) and F46 (one file, +30-1; checks 13 success) | main | — | — |
+| conventions #179 `cb5a33a1`, entry 11.2 and the stop (one file, +10-2; checks 13 success); this revision is built on it | pushed, open PR at this writing (`docs/rollout-stop-11-2`) | — | — |
+| benchmark #220 `c17903c1`, E6's stories amended to § *Epoch 11* (two files, +280-30; checks 10 success) | main of benchmark | — | — |
+| the lines of #220's file that § *Epoch 12* supersedes, read at `a8106448`: D7 `:337-343` (S7's prerequisites); § 6's first paragraph `:412-416` (the form of every story's *Files* and *Done when*); S6 *Files* `:697-705` and *Done when* `:706-709`; S7 *Files* `:739-744` (its form) and *Done when* `:745-747` (its counts); § 11's exemption item `:814-826`; § 12 item 1 `:848-849` | main of benchmark | — | — (a NEW benchmark PR, E6's stories amendment for epoch 12, prepared on `docs/e6-stories-epoch-12`, local) |
+| benchmark #221 `e967df53`, E6.S4 (39 files, +1837-251; checks 11 success), with entry 11.1's four doc lines and the owner's one 9p run | main of benchmark | — | — |
+| benchmark #223 `a8106448`, E6.S5 (66 files, +1276-216; checks 10 success; one listed `raw-temp` exemption, the stories' § 11) | main of benchmark | — | — |
+| rag_qln #128 `24b6ce88`, E7's stories amended to § *Epoch 11* (four files, +252-29: the stories, `todo/README.md`, the E7.S3–S5 brief promoted with its `research/README.md` row; checks 6 success) | main of rag_qln | — | — |
+| rag_qln #129 `02475e3d`, #130 `4dfcadba`, #131 `cdc78d4c`: the benchmark gitlink to `c17903c1`, `e967df53`, `a8106448` (one file each, +1-1; checks 6 success each) | main of rag_qln | — | — |
+| benchmark `d836de52` on `feat/e6-s6-spikes`, S6's brief (Opus), docs only (two files, +412: the brief and one `todo/README.md` line; committed 19:06:28Z, before the stop's commit `cb5a33a1`, 19:25:15Z) | local, never pushed (`git ls-remote` of benchmark lists no such branch) | — | — |
+| this revision: § *Epoch 12* and this record (conventions `docs/rollout-epoch-12`), and E6's stories amendment for epoch 12 (benchmark `docs/e6-stories-epoch-12` `405dd714`, from `a8106448`) | local commits | — | — |
+| benchmark #222 `bf173aa4` (16:35:27Z: the language comparison's gated specs of tasks 04, 06, 07, 08, 10; eight files, seven under `spikes/*/inputs/` and `research/module_lang_explore.md`, +406-7; checks 10 success); dew_flow_ai_language_comparison #6 to #10 (15:53–15:54Z, the five task specs); coai #1014, #1017; creds #374, #375 | main of each, outside this plan | — | — (reported: merged during epoch 11; #222's files are the inputs the S6 brief's O1 read, no test or script) |
 
 ## Symptom
 
@@ -4156,6 +4199,386 @@ list of benchmark (item 1). After the re-review consult: item 3.3's scratch clon
 the consult texts (`1f60c647`, `33aa7f43`, `c3d71347`, `a6cfcc53`, `120652b8`; the points are taken as the coordinator
 quoted them and checked against the files); C# verdicts on lines other than item 3.3's plants; anything with Docker;
 Python (O-e); E2's held feature review; the merges outside the plan's repositories (the judge's).
+
+## Epoch 12 — the plan as revised at the re-review (2026-11-17)
+
+The whole plan read again, as step 4 of the full stop asks (`common/plan-change-control.md`), over the two entries of
+epoch 11: 11.1, E6.S4's *Files* missed four doc lines its own grep finds (built with them, benchmark #221); 11.2, E6.S6
+cannot change the lang-bench runner's two `mkdtemp(` lines (`spikes/lang-bench/runner/run_samples.py:35`, `:306`)
+without re-pinning a tree the language-comparison plan owns (found by S6's brief, benchmark `feat/e6-s6-spikes`
+`d836de52`, local, never pushed). The question consultants could not be asked for either (the day's cap was spent).
+**The owner's decisions of 2026-11-17, in this session, cited and not re-decided:** 11.1 was counted; 11.2 was counted,
+and its two lines go to the language-comparison plan; F45: six S5 doc lines stay as history (conventions #178);
+`/usr/bin/python3` is allowed for S6's two whole-suite `spikes/lang-bench` runs only (base and head); the 9p run of
+`PosixFolderIsolationTests` was allowed once, and it is done (#221). The re-review consult (step 3) is `59b325a3`
+(codex), every change of the epoch quoted: (a) 11.2 is a narrowing, kept honest only by an explicit prerequisite on
+S7; (b) a structural change against the recurring stop kind; (c) the known next blockers settled now. Each point was
+checked against the files (item 6) and folded in items 1, 3, 4 and 8. This section is the baseline epoch 12 is approved
+on. § *Epoch 11* stays as the plan for everything this section does not name, and the earlier sections under it.
+Superseded by this section, read from here: § *Epoch 11* item 3.2's E11-9 counts (item 3.2, E12-3); and in E6's stories
+(benchmark `todo/PLAN_test_leftovers_E6.md` at `a8106448`) D7 `:337-343` (S7's prerequisites), § 6's first paragraph
+`:412-416` (the form of every story's *Files* and *Done when*), S6's *Files* `:697-705` and *Done when* `:706-709`,
+S7's *Files* `:739-744` (its form) and *Done when* `:745-747` (its counts), § 11's exemption item `:814-826` (a reading
+added under it) and § 12 item 1 `:848-849`; in E7's stories (rag_qln `todo/PLAN_test_leftovers_E7.md` at `cdc78d4c`)
+the form of S2's *Files* `:505-547` and *Done when* `:565-578` (item 4.5).
+
+**How to read the evidence.** **[M]**, **[D]**, **[R]** and the three states (**observed**, **proposed**, **blocked**)
+as in § *Epoch 9* to § *Epoch 11*. Every **[M]** here was run for this revision on 2026-11-17, read-only: benchmark at
+`a8106448` (its `main`, `git rev-parse origin/main` after a fetch; the base of S6's brief) with its mount `b1746499` in a
+new worktree (`wt/bench-e6-amend12`), rag_qln at `cdc78d4c` (its `main`), conventions at `cb5a33a1` (#179's head), and
+this machine's folders. No build, no C# run, no Docker, no Python ran for this revision. The C# counts are the S6 brief's
+**[M]** (its § 11 O1, from the existing Release build of `wt/bench-e6s5`, tree equal to `a8106448`), cited **[D]**.
+
+### 1. What this plan is now
+
+**The root cause, checked (the re-review consult, point (b)).** The consult says the eleven stops came nearly all from
+*Files* lines or *Done when* counts written as exact lines that the next brief found incomplete. Read here entry by entry
+(§ *Plan changes*, 28 entries): NINE are a closed text the next brief found incomplete or unattainable — an exact matrix
+or count (3.2; 11.2's "C# 14 → 0"), an exact scope or line set (5.3; 9.1's "no benchmark-own file changes"; 11.1; 11.2's
+runner lines on S6's *Files*), a file outside a story's list (7.1), a closed list of dispositions or reasons (4.2, 6.1,
+10.2); SIX are a claim about a copied tool's reach that a brief ran first (3.1, 5.2, 7.2, 8.2, 9.2, 10.1: the kind
+§ *Epoch 10* item 8.1 now observes before the gate); the other thirteen are owner decisions, an order, a measured
+environment or a code fact (1.1–1.7, 2.1, 2.2, 4.1, 5.1, 6.2, 8.1). In epochs 9 to 11, four of the six entries (9.1, 10.2,
+11.1, 11.2) are of the closed-text kind. So the consult's "nearly all" holds for the last three epochs, not for the whole
+ledger: the kind is real and recurring, and it is the one item 8.1 changes. **What the change can and cannot prevent,
+said now so it is not overclaimed:** of the 28 entries, the new form would have kept ONE from counting (11.1: a doc line
+that a grep at the story's base finds is in scope by definition). 9.1 and 11.2 still count (files outside the bounded
+folders; a finding left standing), 4.2 and 10.2 still count (a disposition outside the decided classes), 3.2 still
+counts (a merge condition made smaller). Its effect is forward: a line list, a line number or a count that moves at a
+later base, and a site a list missed inside the story's folders, stop being causes of a stop; nothing that changes
+scope, approach, a contract, the build order or a merge condition stops counting (item 8.1).
+
+**State at the stop (read 2026-11-17).**
+
+| Epic | State | Commits |
+|---|---|---|
+| E1, E3, E4 | DONE (wave 1) | as § *Epoch 8* |
+| E2 (creds) | COMPLETE 2026-11-10. Its feature review is held by `call_human` since 2026-11-10 (not re-read) | as § *Epoch 10* |
+| E5 (coai) | COMPLETE 2026-11-12 | as § *Epoch 10* |
+| F41, F41-b, F42 | DONE | as § *Epoch 11* |
+| E6 (benchmark) | stories amended to epoch 11 (#220); S4 merged (#221: `ModelArms/` on the owned folder, row E6-l, the pilots' output under `BENCH_PILOT_OUT`; entry 11.1's four doc lines; the owner's one 9p run); S5 merged (#223: the rest of `Bench.Tests`, the fakes, the seams; the stories' status says both guards clean in S5's area, Node 160 → 87, C# 91 → 16, one listed exemption **[D]**); S6 a brief only (`feat/e6-s6-spikes` `d836de52`, local, never pushed **[M]**), entry 11.2; S7 not started. `main` `a8106448` | #220 `c17903c1`, #221 `e967df53`, #223 `a8106448` |
+| E7 (rag_qln) | stories amended to epoch 11 (#128); the benchmark pin at `a8106448` (#129–#131); S2 not started, its gate waits for the owner's observations (§ *Epoch 9* item 7). `main` `cdc78d4c`; since `48cbf896` only the stories, two READMEs, the S3–S5 brief's promotion and the gitlink changed (`git diff --stat 48cbf896 cdc78d4c`: five files **[M]**) | #128 `24b6ce88`, #129 `02475e3d`, #130 `4dfcadba`, #131 `cdc78d4c` |
+| The stop | entries 11.1 (#177) and 11.2 (#179, `cb5a33a1`, open at this writing) | `488bdce2`, `cb5a33a1` |
+| The feature reviews | not started | — |
+
+**Goal.** Stands as § *Epoch 11* item 1 writes it, with its exceptions, word for word. Nothing is added to it.
+
+**Definition of Done.** Stands word for word, with § *Epoch 8*'s reading and § *Epoch 11* item 4.3's. No further reading
+of the list is added: what got smaller is ONE merge condition, S6's (item 4.6), and E6's own Definition of Done gets a
+reading under its exemption item for the time between S6 and S7 (item 4.2, E12-10), which ends at S7.
+
+**What is still open, read 2026-11-17** (the form of § *Epoch 11* item 1; rows not named here stand as written there).
+
+| Item | State | Owner | Blocker |
+|---|---|---|---|
+| DoD 1: tests, scripts and CI create only owner-form resources or a documented exemption | open: E2, E5 complete; E6's S4 and S5 merged; E6's S6, S7 and E7.S2 remain | agent | E6's amendment for epoch 12, then S6, S7; E7.S2's gate (the owner's observations) |
+| DoD 2: no container without `--rm` or an always-run cleanup | open: `http/README.md:32-33` is S7's; E7's live stores are S2's | agent | E6.S7; E7.S2 |
+| DoD 3: a structural test per repository at zero | open: benchmark's switch-on is S7's, which waits for D7's S1 and S2 AND for the language-comparison plan's disposition of the two runner lines (item 4.1) | agent; that plan's owner for the disposition | O12-c, O12-d |
+| DoD 7: every prep or rename story recorded its invocation inventory | open for E6 S6, S7 and E7.S2 (S4's and S5's briefs are merged with their PRs; not re-read here) | agent | those stories |
+| Rows E6-i (S6's spike half), E6-g, E6-m (new) | **proposed** (S6, S7) | agent | E6's amendment, then each story |
+| Rows E6-i (S4's and S5's halves), E6-k, E6-l | built by S4 (#221) and S5 (#223), CI green; the stories' state cells still read **proposed** at `a8106448`: a records update on the next stories progress line, from those PRs' bodies, not a new check | agent | — |
+| Every other row of § *Epoch 11* item 1's table | as written there | as there | as there |
+
+### 2. Prerequisites
+
+1. **Nothing built is re-opened:** F41, F41-b, F42, F42-c; E6.S3 (#219), S4 (#221), S5 (#223); E7.S3–S5 (#125).
+2. **E6's stories amendment for epoch 12 comes first**: a NEW benchmark PR by Opus (prepared, local:
+   `docs/e6-stories-epoch-12` `405dd714` in `wt/bench-e6-amend12`, from `a8106448`), merged before S6's brief goes to its plan
+   gate. It writes items 4.1 to 4.3 and 8.1 into D7, § 6's first paragraph, S6, S7, § 11 and § 12.
+3. **S6's brief is revised by NEW commits on `feat/e6-s6-spikes`**, never a rewrite: § 0.1 and § 9 as item 4.2; § 13
+   S-1 and S-2 and § 14 Q1 to Q3 answered by items 4.1 to 4.3; § 7 and K13 extended by the owner's answer to item 7's
+   question (a).
+4. **The owner's answer to item 7's question (a)** (the system interpreter for the minigit-bench and lang-explore
+   whole-suite runs), before S6's plan gate.
+5. **E7's stories amendment for epoch 12** (item 4.5), a NEW rag_qln PR by Opus, before E7.S2's plan gate; not written by
+   this revision. S2's gate waits for the owner's observations anyway, so this adds no wait.
+6. Not prerequisites: F43, F44, F46; the `/tmp/.git` todo (§ *Epoch 11* item 4.5); the notes of item 8.3.
+
+### 3. Merge conditions — the rows this revision adds or restates
+
+Every other row of § *Epoch 11* item 3, of the earlier sections and of E6's and E7's stories stands, word for word; a
+row restated here keeps every check its earlier text had and adds to it, except the one narrowing item 4.6 names.
+
+#### 3.1 The rows
+
+| # | Condition | Implementation | Executable check | Does not prove | State |
+|---|---|---|---|---|---|
+| E6-i | restated, S6's half (`spikes/`): no test helper makes a LEGACY name, and no raw temp or bare-prefix reader stands unexplained, read by BOTH guards | the shipped Node helper (`ownedFor({ token: 'bench' })`) per test file; the `.py` sites inside the owned `TMPDIR` their launcher gives (S6's brief K10); S6's brief § 3a's two listed inline exemptions | both guards over S6's head, every finding in `spikes/` listed by file, line and class; ZERO unexplained: each finding is absent, cleared by a listed rule §7 marker, or on the approved standing list, which holds exactly `spikes/lang-bench/runner/run_samples.py:35` and `:306` (C# `raw-temp`, entry 11.2). *Observations, not scope* (item 8.1): at `a8106448` the Node guard reads 87, of them 85 in `spikes/` (46 `raw-temp`, 31 `legacy-name`, 8 `owner-blind`) **[M]**, and its default profile 3 **[M]**; the C# copy 16, of them 14 in `spikes/` (10 `raw-temp`, 3 `legacy-name`, 1 `owner-blind`) **[D]** S6's brief O1; expected at the head: Node 2 (the two D8 lines), default 2, C# 4 (D8's two and the runner's two) | that a path read through `tempRoot()` is never created (guards read spellings, not data flow) | **proposed** |
+| E6-m | new: S6's suite evidence | the four spike suites as `research/module_tests.md` runs them, at S6's base and head, each under an owned, empty `TMPDIR` | each suite's FAILED list at the head equals its base's; the ONLY standing failures approved are policy-ab-quick's three Windows-path cases, by name (`review2.test.mjs` "a runs root must be at least two folders deep" and "shedding a real directory still works, and refuses a shallow root outright", `review4.test.mjs` "a report whose every cell is void never overwrites the results file; it goes to the runs root"; S6's brief O10 **[D]**), each failing at the same assertion; `minigit-bench`, `lang-explore` and `lang-bench` green; a failure of a test on the benchmark followups plan's S5 timing list is recorded with `/proc/loadavg` and handled by that list's rule, and a whole-run repeat that runs the system interpreter needs the owner's word; any other failure stops S6 before its merge; the owned `TMPDIR` empty after each run | that the three cases pass anywhere (they are Windows-path cases on Linux, the minigit stack bench's) | **proposed**; the system interpreter for two of the suites is item 7's question (a) |
+| E6-g | restated, S7's starting counts and its merge (corrects E11-9) | as the stories' S7 | S7 starts from (expected, projected from S6's brief § 6 at `a8106448`): the Node guard 2 (`--profile node`) and 2 (default profile), the two D8 lines, `raw-worktree`; the C# copy **4**: the same two, and `run_samples.py:35`, `:306` (`raw-temp`). After S7: Node 0, default 0; the C# copy 2 until the language-comparison plan's disposition of the two lines is on benchmark `main`, then 0. S7 switches the C# repository test on (`FilesScanned > 0`, no finding), so **S7 merges only after that disposition, with the repository guard clean on those lines**, and after D7's S1 and S2 | — | **proposed**; **blocked** on that plan (O12-c) and on D7 (O12-d) |
+
+#### 3.2 The stories texts that would stop the next briefs — read now, each with a state
+
+Found by reading E6's D7, § 6, S6, S7, § 11 and § 12 at `a8106448`, S6's brief `d836de52` whole (§ 13 and § 14 among
+it), E7's S2 at `cdc78d4c`, and the code each sentence names.
+
+| # | The text, where | Checked here | What changes, and its state |
+|---|---|---|---|
+| E12-1 | E6 S6 *Files* `:697-705` names `spikes/lang-bench/runner/run_samples.py` | entry 11.2: any byte of `runner/` reds `test/runner-pin.test.mjs:103` (S6's brief O4 **[D]**; the test read **[R]**) | item 4.2: S6's *Files* are bounded folders that exclude `runner/`, every `lib/` and `inputs/` by name. **proposed** (E6's amendment) |
+| E12-2 | E6 S6 *Done when* `:706-709`: "the C# guard 14 → 0" and "the suites … green" | entry 11.2; S6's brief O10 and Q3 (three base failures in policy-ab-quick) | item 4.1, item 4.3 (Q3), row E6-m; the narrowing of item 4.6. **proposed** |
+| E12-3 | § *Epoch 11* E11-9 (`:3760` before this revision) and E6 S7 *Done when* `:745-747`: "the C# guard 2 … the two D8 lines" | after S6 the C# copy also holds the two runner lines (S6's brief § 6: head 4 **[D]**) | row E6-g restated: C# 4 at S7's start; 0 only after the language-comparison plan's disposition. **proposed** |
+| E12-4 | E6 D7 `:337-343`: S7 waits only for the followups plan's S1 and S2 | entry 11.2 | D7 gains the second prerequisite (item 4.1). **proposed** |
+| E12-5 | S6's brief § 7 and § 9: the `minigit-bench` and `lang-explore` suites run with no word on Python | both run `/usr/bin/python3` **[R]**: minigit's held-out runner (`spikes/minigit-bench/lib/heldout-run.mjs:19`, `:121`), reached by `test/heldout-run.test.mjs:199`, `:262` and `test/heldout-hostile.test.mjs:28`, `:148`; lang-explore's judge and parser (`spikes/lang-explore/lib/score.mjs:71`, `:75`; `lib/heldout-quick.mjs:173-174`) and its tests (`test/judge.test.mjs:91`, `:101`, `:146`, `:156`, `:165`; `test/olympiad-calibrate.test.mjs:290`, `:302`); the owner's allowance names lang-bench's two runs only | item 7's question (a), before S6's plan gate. **blocked** on the owner (O12-e) |
+| E12-6 | S6's brief § 13 S-2: `todo/PLAN_minigit_stack_bench_E2.md:89` ("Leftovers a test creates on disk keep E1's `testsToDelete-mgb-…` names (the pinned rule's form — §2: the release has no owner segment)") | read at `a8106448` **[M]**: that plan is open ("in progress — E2.S3 and E2.S4 open"), has no ledger (no `## Plan changes` in it or in `PLAN_minigit_stack_bench.md`); S6 makes the sentence false for the tests it converts | item 4.3: on S6's docs scope, a dated note beside the line, the old text kept. **proposed** |
+| E12-7 | S6's brief § 14 Q3: "suites green" read as "the same FAILED list" | the three cases test functions of `spikes/policy-ab-quick/lib/` (`safe-rm.mjs:7`, `:11`; `shed.mjs:7`; `reportTarget`) with Windows drive paths (`D:/…`) **[R]**: outside S6's folders, and named "pre-existing Linux failures … not this epic's" by the minigit stack bench (`PLAN_minigit_stack_bench_E2.md:86-88`) | item 4.3: not fixed in S6; part of the narrowing (item 4.6), bounded to the three named cases; row E6-m. **proposed** |
+| E12-8 | every remaining story's *Files* as an exact line list and its *Done when* as exact counts | item 1's root cause | item 8.1's form, written into E6's S6, S7 (E6's amendment) and E7's S2 (E7's amendment). **proposed** |
+| E12-9 | E7 S2 *Files* `:505-547`: "a path outside this list that S2's checks need … goes to the parent first (in doubt, a change of the parent)" | the closed-list kind, before a Fable spec that has not decided its files | item 4.5. **proposed** (E7's amendment) |
+| E12-10 | E6 § 11's item "No `raw-temp` … finding in either guard except the inline exemptions the stories list" (`:814`) | between S6 and S7 two findings stand that are not exemptions | a reading under the item (item 4.2): the approved standing list, its two lines, ending at S7. **proposed** |
+
+#### 3.3 The feasibility claims, observed during the re-review (before epoch 12 opens)
+
+As § *Epoch 11* item 3.3 and item 8.1: each claim S6, S7 and E7.S2 rely on that was not yet observed, in the six things
+where a run applies; what cannot be observed here is **blocked**, with the story's stop condition.
+
+| # | Claim (where) | Consumer SHA · upstream pin | Invocation | Fixture path, plant | Expected | Observed | State |
+|---|---|---|---|---|---|---|---|
+| O12-a | S6's base and the stories' spike counts hold on `main` | benchmark `a8106448` · mount `b1746499` | `git fetch`; `git rev-parse origin/main`; `node .agents/conventions/tools/leftovers-check.mjs --repo . --profile node --token bench --identity "the measuring harness"`, and the same without `--profile` | the new worktree `wt/bench-e6-amend12` | `main` = S6's base; Node 87 (85 in `spikes/`), default 3 | `origin/main` = `a8106448`; Node 87: `research/local-model-coding/harness/part6/t-lib.sh:12`, `t-lib.sh:20` (`raw-worktree`) and 85 in `spikes/` (46 `raw-temp`, 31 `legacy-name`, 8 `owner-blind`); default profile 3 (the two D8 lines, `prove.sh:7`). The C# 16 / 14 is S6's brief O1 **[D]** (not re-run: no build) | **observed** |
+| O12-b | entry 11.2: the runner is pinned, so S6 cannot touch it | benchmark `a8106448` | read `spikes/lang-bench/test/runner-pin.test.mjs:103-106` **[R]**; S6's brief O4 **[D]** (`pin-runner.mjs --check` exit 0, the pin hashes every file of `runner/`) | — | any byte of `runner/` reds the test | the test compares `inputs/specs.d/runner.json` with the runner tree **[R]**; O4 as quoted | **observed** (by reading, and by S6's brief's run) |
+| O12-c | S7's new prerequisite: the language-comparison plan disposes of `run_samples.py:35`, `:306` | benchmark `a8106448` | read `todo/PLAN_lang_comparison_v2.md` (`git show origin/main:…`; `grep -n` for `run_samples.py:35`, `mkdtemp`, `test-leftovers`, `E6.S6`) **[M]** | — | — | not yet written there: no line names the two lines or 11.2 (its test-leftovers lines are D75's C# wall-clock test and the followups plan's boundary). Its ledger is at `> Epoch 10 · approved 2026-11-08 · by owner · state: open` with ONE entry, 10.1 (2026-11-10) **[M]**: if that plan counts the hand-off as a change, it is its own second change and its own full stop — that plan's count, not this one's | **blocked** on that plan: S7's stop condition is its prerequisite (row E6-g): S7 does not go to its plan gate until the disposition is on `main` and the C# copy reads no finding on those lines |
+| O12-d | D7: the followups plan's S1 (F1) and S2 (F2) merge before S7 | benchmark `a8106448` | read `todo/PLAN_bench_test_leftovers_followups.md` whole; `gh pr list --state all --search` (sentinel, followups, read-only); the branch list; this host's folders: `ls -d ~/testsToDelete-u1000-bench-sentinel-*`, `~/.cache/minigit-bench/test-work/testsToDelete-*`, `/tmp/testsToDelete-mgb-*` **[M]** | — | — | OPEN and UNDATED: status "plan only, nothing implemented yet, 2026-11-03; S5 added … 2026-11-04; S5's list widened 2026-11-05" (`:3`); its build order (`:67-77`) has no date; no branch or PR for S1 or S2. On this host: 18 sentinel folders in the home (2026-11-02 18:33 to 2026-11-04 12:26; F1 named seven), 51 `testsToDelete-*` folders under `~/.cache/minigit-bench/test-work/` (F2's shape), one `/tmp/testsToDelete-mgb-home-K7exly` (2026-11-17 16:56). Nothing was removed (the owner's word is needed) | **blocked** on that plan: D7's own stop condition, unchanged (wait, or the owner moves those sites to E6; E6's § 12 item 1) |
+| O12-e | E12-5: S6's `minigit-bench` and `lang-explore` whole runs within this machine's rule for Python | benchmark `a8106448` | read **[R]** the lines of E12-5; `grep` of `python3` spawns over the two spikes' `lib/` and `test/` | — | — | both suites start `/usr/bin/python3` by a fixed path, as lang-bench's layer does; neither is covered by the owner's allowance | **blocked** on the owner: item 7 question (a); without an answer S6 STOPS before its plan gate |
+| O12-f | S6's whole `spikes/lang-bench` run with `BENCH_REQUIRE_SANDBOX=1` and `LANG_V2_TASK_REPO` | — | not run here: the owner's allowance is S6's two runs (base, head), not a third | — | — | — | **blocked** by design; S6's base run is its first observation, under the allowance and row E6-m's rule for a failure |
+| O12-g | E7.S2: its guard bases and its blocked rows | rag_qln `cdc78d4c` | `git diff --stat 48cbf896 cdc78d4c` **[M]** | — | no `src/` or `tests/` change since S2's stated base | five files: `todo/PLAN_test_leftovers_E7.md`, `todo/README.md`, the S3–S5 brief's promotion, `research/README.md`, the benchmark gitlink. So S2's base readings at `48cbf896` (Node clean over 213 files, the C# copy 0) stand for its code. Rows E7-b (branch 2), E7-c, E7-f stay **blocked** on the owner's observations | **observed** (the diff); the rows **blocked**, unchanged |
+
+### 4. The dispositions of entries 11.1 and 11.2, and the next blockers settled now
+
+**4.1 Entry 11.2 — a narrowing, bounded by an explicit prerequisite (the re-review consult, point (a)).** Checked: S6's
+*Done when* (`:706-709` at `a8106448`) asked for the C# guard 14 → 0 in `spikes/`; the two runner lines are two of the
+14 (E11-6's list; S6's brief O1); no form of S6 can change them without a re-pin of `runner/` (O12-b), which the owner
+gave to the language-comparison plan. So S6 merges with two findings that epoch 11 forbade: a smaller merge condition,
+`Narrowed: yes`, the owner approves (`common/plan-change-control.md`, step 8). The precedent is the record for epoch 3
+(its Narrowed line: "the producer PR's merge condition changed; E5's final Definition of Done and this plan's did not
+get smaller … and the prerequisites got wider"). The final promise is kept ONLY because completion stays an explicit
+prerequisite: **S7 also waits for the language-comparison plan's disposition of `runner/run_samples.py:35`, `:306`,
+with the repository guard clean on them** (row E6-g) — removed, made inside an owned folder, or carrying a rule §7
+marker that plan writes in its own re-pin; this plan does not choose which. Until then S7 does not go to its plan gate,
+and E6's switch-on (DoD 3) does not happen. The consult's count check holds: E11-9 (`:3760`) expected only the two D8
+`raw-worktree` findings after S6, and 11.2 leaves the two runner `raw-temp` findings as well; row E6-g corrects S7's
+counts to C# 4 at its start. The hand-off is NOT yet in the language-comparison plan (O12-c); E6's amendment and S6's PR
+name it on the benchmark side (item 8.3), and that plan's owner writes it there and counts it by that plan's own ledger.
+
+**4.2 E6.S6 restated in the form of item 8.1** (E6's amendment writes it; S6's brief's new commits follow).
+
+- *Files* (bounded folders, the observations below them): `spikes/policy-ab-quick/test/**`; `spikes/minigit-bench/test/**`
+  and `spikes/minigit-bench/run-tests.mjs`; `spikes/lang-bench/test/**`; `spikes/lang-explore/test/**` — never the files
+  the followups plan's F1 and F2 name (`spikes/lang-bench/lib/exec-probe/lines.mjs`, `probe.mjs`,
+  `test/exec-layer-isolation.test.mjs`; `spikes/minigit-bench/test/helpers.mjs`, `test/fake-home.mjs`,
+  `lib/cache-snapshot.mjs`; `spikes/lang-explore/test/commands.test.mjs`), and never any spike's `lib/`, `runner/`,
+  `inputs/`, `hooks/` or product file; plus **the docs a `git grep` at S6's base finds that describe what S6 changes**
+  (the old spellings S6 removes, over `*.md`: S6's brief O11's pattern), each with what it says now (an IMPLEMENTED or a
+  ledgered plan gets a dated note beside the old text, never a rewrite); plus the plan records (E11-10). *Observations at
+  `a8106448`, not scope:* the 39 files of the findings (S6's brief § 0.1, § 4), `research/module_tests.md` (§ *The
+  minigit stack bench scenarios*, § *The language-comparison runner scenarios*, § *Test leftovers*), and the grep's
+  hits: `todo/PLAN_bench_test_leftovers_followups.md:32`, `:102-103`, `:151`, `:156` (still true after S6: no edit),
+  `todo/PLAN_minigit_stack_bench_E2.md:89` (made false by S6: the dated note of item 4.3) and `:500` (still true).
+- *Done when* (the new form): both guards over S6's head show ZERO unexplained findings in `spikes/`: each finding there is
+  gone, cleared by a rule §7 marker the brief listed before its plan gate (§ 3a: `box_support.py`'s unit name,
+  `legacy-name`; `prove.sh`'s `mktemp`, `raw-temp`; copied into § 11 by the PR), or on the approved standing list, which
+  is exactly `runner/run_samples.py:35`, `:306` (C# `raw-temp`, this revision, the owner approving); none for
+  `owner-blind`; no finding added outside `spikes/`; row E6-m for the suites; `pin-runner.mjs --check` and
+  `pin-exec-layer.mjs --check` exit 0; `git diff --name-only <base>..HEAD` within the folders and docs above;
+  `plan-lifecycle.mjs` clean. The counts of row E6-i are what S6's PR quotes, as observations against its base.
+- S6's brief § 14 Q1 is decided as its option (b) with the prerequisite above; Q2 is the owner's answer of 2026-11-17
+  (allowed, lang-bench's two runs); Q3 is item 4.3; Q4 to Q6 stay brief-level, as the brief recommends.
+
+**4.3 The next blockers, settled now (the re-review consult, point (c)).**
+
+1. **Q3, policy-ab-quick's three failures — not fixed in S6; declared in the narrowing.** Checked: the three tests assert
+   Windows-drive behaviour (`depthOf('D:/')`, `shedCell('D:/', …)`, `reportTarget({ out: 'D:/x/y.json', … })`) of
+   functions in `spikes/policy-ab-quick/lib/` (`safe-rm.mjs:7`, `:11`; `shed.mjs:7`), which S6's folders exclude, and on
+   Linux `path.resolve` reads `D:/` as relative **[R]**; their own plan names them pre-existing and not its epic's
+   (`todo/PLAN_minigit_stack_bench_E2.md:86-88`, "four" there, three at `a8106448`, S6's brief O10). Fixing them means a
+   `lib/` change or a rewrite of what the tests assert, both that plan's. So S6's evidence for policy-ab-quick is row
+   E6-m: the same three by name, failing at the same assertions, and nothing else. A smaller merge condition for S6
+   only; item 4.6 declares it; the three are handed to the minigit stack bench by name (item 8.3).
+2. **S-2, `todo/PLAN_minigit_stack_bench_E2.md:89` — on S6's docs scope.** A grep at S6's base finds it, and S6 makes it
+   false for the tests it converts, so by item 8.1's *Files* form it is S6's: S6's PR adds ONE dated line beside it, the
+   old text kept: "*2026-11-xx (E6.S6, the test-leftovers rollout):* the tests of `spikes/policy-ab-quick/test/`,
+   `spikes/minigit-bench/test/`, `spikes/lang-bench/test/` and `spikes/lang-explore/test/` that E6.S6 changed make
+   owner-form names through the mount's shipped helper (`ownedFor({ token: 'bench' })`); `test/helpers.mjs` and
+   `test/fake-home.mjs` still make `testsToDelete-mgb-…` names until the followups plan's S2; the reason above (the
+   release has no owner segment) no longer holds at the mount `b1746499`." Not a change of that plan (a fact repaired,
+   no step of it changes); its owner decides any rewrite.
+3. **Python for S6's suites.** The `.py` units run in `wslc` and an owned venv (S6's brief K13 (a), (b), observed O5 to
+   O7). The whole `lang-bench` suite runs `/usr/bin/python3` under the owner's allowance (two runs). The `minigit-bench`
+   and `lang-explore` whole suites run `/usr/bin/python3` too (E12-5, O12-e), which no allowance covers: item 7
+   question (a). Recommended: the same allowance for their two runs each (base, head), with the same terms.
+4. **A flaky timing test at base or head** (the followups plan's S5 list): recorded with `/proc/loadavg`, never re-run in
+   a whole run that starts the system interpreter without the owner's word; a file that does not start it may be re-run
+   alone. Not a narrowing: the list's rule as that plan writes it (row E6-m).
+5. **E7.S2 stays blocked on the owner's observations** (§ *Epoch 9* item 7; O12-g).
+
+**4.4 Entry 11.1 — kept as built.** #221 carries the four doc lines (the stories' S4 *Files* as amended). Under item 8.1's
+form, a doc line that a grep at the story's base finds is on the story's *Files* by definition, so a later find of the
+same kind is no longer a change.
+
+**4.5 E6.S7 and E7.S2 in the form of item 8.1.**
+
+- *E6.S7 Files*: `tests/Bench.Tests/Leftovers/**` (the manifest, `LeftoversRepositoryGuardTests.cs`,
+  `LeftoversGuardFiles.cs`); `.github/workflows/ci.yml`; `research/local-model-coding/harness/**` (D8's two lines);
+  `http/README.md`; the docs a grep at S7's base finds that describe what it changes (the guards' reach and limits, the
+  CI step, D8's lines, the container line); the plan records. Never `spikes/**` (S6's and the followups plan's) nor
+  `spikes/lang-bench/runner/**` (the language-comparison plan's). *Done when*: E6's Definition of Done (§ 11) holds; both
+  guards on with `FilesScanned > 0` and ZERO findings at S7's head (every remaining one a listed rule §7 marker); row
+  E6-g's prerequisites met. Counts as observations (row E6-g).
+- *E7.S2 Files* (E7's amendment; S2's Fable spec names the files inside them): `src/Rag.Application/Runtime/**`,
+  `src/Rag.Application/Corpus/**`, `src/Rag.Domain/Corpus/**`, `src/Rag.Infrastructure/Indexing/**` (the record's store,
+  if the spec puts it there), `src/Platform/` (a registry's migration and its context), `src/Platform.Contracts/InfrastructureModels.cs`,
+  `src/Rag.Api/InfrastructureEndpoints.cs`, `src/Rag.Ui/Pages/Infrastructure.razor*`, `tests/Rag.Tests/**`; the docs a
+  grep at S2's base finds that describe what it changes (S2's own pattern: `qlntest`, `TestCorpusPrefix`,
+  `TestCorpusSweep`, over `*.md` outside `external/` and `.agents/`); the plan records. The named paths of `:505-547`
+  stay as observations at `48cbf896`. *Done when*: as written (`:565-578`), with its guard sentence in the new form:
+  ZERO unexplained findings of both guards on S2's lines, each remaining one a listed rule §7 marker (none for
+  `owner-blind`). Its two stop conditions (a retained corpus; a design that must spell the prefix word in code) stand.
+
+**4.6 Narrowed: yes — what got smaller, and why the Definition of Done does not.** Smaller: S6's merge condition, in two
+places — (1) the C# copy may read two findings in `spikes/` at S6's merge (`run_samples.py:35`, `:306`, `raw-temp`),
+approved one by one, on a list of exactly those two; (2) policy-ab-quick's evidence is "the same three named failures",
+not "green". Not smaller: the goal; the Definition of Done (§ *Definition of Done* with its readings), because S7 still
+ends with both guards at zero and switched on, and now ALSO waits for the language-comparison plan's disposition (row
+E6-g); E6's own Definition of Done (§ 11), which gets one reading under its exemption item for the time between S6 and
+S7 (E12-10: "*Epoch 12:* between S6's and S7's merges two findings stand that are not exemptions, `runner/run_samples.py:35`
+and `:306` (C# `raw-temp`), approved by the owner with the parent's epoch 12; they are gone or carry a rule §7 marker
+before S7 merges"); every other merge condition. Wider: the prerequisites (O12-c; item 7 question (a)). Item 8.1's
+structural change is NOT a narrowing: no condition gets smaller by it (a finding stays a finding; an exception still
+needs its listing or the owner), and it removes no kind from the count (item 8.1, *What still counts*).
+
+### 5. Build order
+
+```
+DONE   epoch 11 approved (#176) → E6's stories amended (#220) and E7's (#128) → entry 11.1 (#177) → E6.S4 (#221)
+       → the language comparison's gated specs (#222, outside) → follow-ups F45, F46 (#178) → E6.S5 (#223, `a8106448`)
+       → rag_qln's benchmark pins (#129, #130, #131) → S6's brief (local, `d836de52`, entry 11.2) → the stop (#179,
+       `cb5a33a1`) → this revision. (Merge order, read from each PR's `mergedAt`.)
+NEXT   the Opus judge sorts epoch 11's work (the record's table) → the plan gate on the operative extract → the owner
+       approves (Narrowed: yes) and answers item 7 → epoch 12 opens `by owner`, at 0 changes.
+THEN   benchmark   E6's stories amendment for epoch 12 (prepared on `docs/e6-stories-epoch-12`, a NEW PR) → S6's brief
+                   revised by new commits (item 4.2, item 4.3, the owner's answer) → S6's plan gate → S6.
+                   S7 after S4–S6, D7's S1 and S2, AND the language-comparison plan's disposition of the two runner
+                   lines on `main` (row E6-g).
+       rag_qln     E7's stories amendment for epoch 12 (item 4.5) → S2's Fable spec → the owner's observations → S2's
+                   plan gate.
+LAST   the feature reviews (§ *Epoch 8* item 5); the promotion of this plan and its stories documents; R6 ticked in
+       the remainder plan.
+```
+
+### 6. What the consultant raised, and what was done with it
+
+| Point (`59b325a3`) | Checked | Done |
+|---|---|---|
+| (a) 11.2 is a NARROWING: S6 may merge with two findings that were forbidden; `Narrowed: yes`, `by owner`; the epoch-3 narrowing record is the precedent | true: S6's *Done when* `:706-709` and E11-7 said C# 14 → 0; the record for epoch 3 says "the producer PR's merge condition changed; E5's final Definition of Done and this plan's did not get smaller" | the record's Narrowed line; item 4.1; item 4.6 |
+| (a) the runner lines' final promise is kept only if completion stays an explicit prerequisite: S7 waits for the language-comparison plan's disposition, the repository guard clean | true: S7 switches the C# repository test on, which is red on any finding (S7 *What*) | row E6-g; D7 widened (E12-4); item 4.1; DoD 3's blocker |
+| (a) E11-9 (`:3760`) expects only two `raw-worktree` findings after S6; 11.2 leaves two `raw-temp` more | true: S6's brief § 6 gives the C# copy 4 at its head | row E6-g; E12-3 |
+| (b) *Files* as bounded folders plus the docs a grep at the story's base finds | true as a cause (item 1: nine of 28 entries are closed texts; four of the last six) | item 8.1; items 4.2, 4.5 |
+| (b) line lists and counts as OBSERVATIONS at a SHA | true | item 8.1; rows E6-i, E6-g carry "observations, not scope" |
+| (b) *Done when* as "zero unexplained findings of both guards in scope; each remaining one an individually approved, listed exception" | adopted with what "approved" means (item 8.1), so the form does not hollow a condition | items 4.2, 4.5, 8.1 |
+| (b) do NOT adopt "only scope/DoD changes count" | true: the shared rule counts approach, contracts, build order and merge conditions too | kept; item 8.1 lists what still counts |
+| (c) S6 brief § 14 Q3: fix inside S6 or declare as narrowing | the failures are in `lib/` functions with Windows paths, outside S6's folders, and the minigit stack bench's own (E12-7) | declared, bounded to three named cases (item 4.3 point 1, row E6-m, item 4.6) |
+| (c) S6 brief § 13 S-2: a disposition for `PLAN_minigit_stack_bench_E2.md:89` | that plan is open, unledgered, and S6 makes the line false for its tests (E12-6) | a dated note on S6's docs scope, its text in item 4.3 point 2 |
+| (c) E7.S2 stays blocked on the owner's observations | true (§ *Epoch 9* item 7; O12-g) | unchanged |
+
+Added by this revision beyond the consultant: E12-5 and O12-e (the minigit-bench and lang-explore whole suites start the
+system interpreter, which no allowance covers: item 7 question (a)); O12-c's reading of the language-comparison plan's
+ledger; O12-d's host listing of F1's and F2's leftovers; row E6-m's rule for a timing failure. Rejected: nothing; "only
+scope/DoD changes count" is not adopted, as the consult itself says.
+
+### 7. Questions for the owner
+
+**For the approval (the record says `Narrowed: yes`):** the owner approves the revised plan with item 4.6's two smaller
+places in S6's merge condition — the two runner findings on an approved standing list of exactly those two, and
+policy-ab-quick's three named failures — with S7 waiting for the language-comparison plan's disposition (row E6-g), and
+item 8.1's form for the remaining stories (recommended: approve as written).
+
+**(a) The system interpreter for two more suites** (E12-5, O12-e). May S6 run `/usr/bin/python3` through the
+`minigit-bench` and `lang-explore` whole-suite runs, two runs each (base, head), on the same terms as lang-bench's (the
+suites' own fixed path, standard library, `-I`, nothing installed, lowered priority, an owned `TMPDIR`)? (1) yes; (2)
+no: then S6's evidence for those two suites is narrowed further (the files S6 changes run alone where they start no
+interpreter; `heldout-run.test.mjs`, which S6 changes, starts it), which would be one more smaller condition to approve.
+Recommended: (1). S6 does not go to its plan gate until this is answered.
+
+**For the owner's information (not a question to this plan):** the two runner lines' hand-off is not yet written in the
+language-comparison plan, whose epoch 10 has one entry (O12-c); how that plan records and counts it is that plan's.
+Unchanged, as § *Epoch 9* item 7 and E6's § 12 item 1 say: E7.S2's live-store observations; D7's "wait, or move F1/F2's
+sites to E6" if the followups plan is still open when S1 to S6 are merged. The PR cap is settled for E6's and E7's PRs
+(the owner's "Yes, every E6 PR" and "Yes, for all E7 PRs").
+
+### 8. The way of working — so a twelfth stop is less likely
+
+**8.1 What changes: the form of a remaining story's *Files* and *Done when*** (the re-review consult, point (b); E6.S6,
+E6.S7, E7.S2, and any story written after them). § *Epoch 10* item 8.1 and § *Epoch 11* item 8.1 stand.
+
+- ***Files*** are BOUNDED FOLDERS — the folders the story changes, with the folders and files it must not touch named —
+  plus **the docs a `git grep` at the story's base finds that describe what it changes** (the old spellings the story
+  removes, over `*.md`; each hit with what it says now; an IMPLEMENTED or a ledgered plan gets a dated note beside the
+  old text, never a rewrite), plus the plan records (E11-10).
+- **Line lists and counts are OBSERVATIONS at a named SHA**, labelled so, never binding scope: a line number that moves,
+  a count that differs at a later base, or a site the list missed INSIDE the bounded folders is the brief's to read, not
+  a change.
+- ***Done when*** says: **zero unexplained findings of both guards in scope; each remaining one is an individually
+  approved, listed exception.** "Approved" has exactly two meanings: (i) a rule §7 inline marker in a class that takes
+  one, listed by the brief (file, line, class, reason) before its plan gate and copied into the stories by the PR
+  (§ *Epoch 11* item 4.3) — passing that gate approves it, as before; (ii) a finding left STANDING without a marker,
+  approved only by the owner and recorded in this plan, as a counted change or in a re-review record that says
+  `Narrowed: yes` — never by a brief or a gate alone. `owner-blind` and `ryuk-off` take neither. At the epic's last story
+  (S7 for E6), only (i) remains: the guard is switched on at zero.
+- **Kept, not adopted:** "only scope or Definition-of-Done changes count". The shared rule counts a change to scope,
+  goals, the Definition of Done, the merge conditions, epics or stories, the build order, a contract or the approach,
+  and this plan keeps it.
+
+**What still counts as a change under the new wording** (so the form is honest, not a hollowing of the rule):
+
+1. a file outside the story's bounded folders that is not a doc the grep finds (9.1's and 11.2's kind) — scope;
+2. a finding left standing without a marker, or a new entry on a standing list (11.2's kind) — merge conditions, and a
+   narrowing: the owner approves it;
+3. a site whose lifetime fits no class of § *Epoch 11* item 4.2's table, or a new disposition (4.2's and 10.2's kind) —
+   approach;
+4. a change to a helper's or a guard's contract or reach (a walk that skips a folder, a template change, a new exemption
+   kind) — contract;
+5. a story that must wait for, or go before, something its text does not name (2.2's kind; S7's new prerequisite) —
+   build order;
+6. a suite failure accepted at merge that is not on the approved list (row E6-m) — merge conditions;
+7. a whole-run interpreter, sandbox or host action outside the owner's allowances — the owner's, and, if it makes the
+   evidence smaller, merge conditions;
+8. in doubt, a change.
+
+**What no longer stops:** a missed line inside the bounded folders, a moved line number or count, and a doc line the grep
+finds (11.1's kind). It would have kept ONE of the 28 entries from counting (item 1).
+
+**8.2 The surprises still likely.**
+
+| Story | What it is likely to meet | Why |
+|---|---|---|
+| S6 | the owner's answer to question (a) (O12-e, **blocked**); a timing failure in a whole run with only two runs allowed (row E6-m's rule); 99 findings in 39 files as a commit series per folder; `wslc`'s slow 9p mount (464 s for the units, S6's brief N6) | the machine's rule; F30's limits; the host's load |
+| S7 | the language-comparison plan's disposition (O12-c, **blocked**); D7's S1 and S2 (O12-d, **blocked**, undated); claims C3–C5 and C10's "with" half (observed by S7's brief as § *Epoch 10* item 8.1 allows: plants of its own operation) | two other plans' timing |
+| E7.S2 | as § *Epoch 11* item 8.2; the new *Files* form gives the Fable spec its folders | the spec's choice |
+
+**8.3 What the other documents' own revisions must say.**
+
+- **Benchmark's E6 stories, a NEW PR, before S6's plan gate** (prepared, local, `docs/e6-stories-epoch-12` `405dd714` from
+  `a8106448`): the status line; § 6's first paragraph in item 8.1's form; D7 with the second prerequisite (E12-4); S6 as
+  item 4.2 (with item 4.3); S7 as item 4.5 and row E6-g; rows E6-i (S6's half), E6-g and E6-m; § 11's reading
+  (E12-10); § 12 item 1 widened to the language-comparison plan's disposition.
+- **S6's brief (local, `feat/e6-s6-spikes`), new commits, never a rewrite:** § 0.1 as item 4.2's folders and the grep's
+  docs (with item 4.3 point 2's note); § 9 as item 4.2's *Done when* and row E6-m; § 13 and § 14 answered (items 4.1 to
+  4.3); § 7 with the owner's answer to question (a); the header's parent (§ *Epoch 12*).
+- **Rag_qln's E7 stories, a NEW PR, before E7.S2's plan gate:** item 4.5's *Files* and *Done when* form; § 6's standing
+  line as E6's.
+- **The language-comparison plan** (benchmark `todo/PLAN_lang_comparison_v2.md`): the hand-off of the two runner lines,
+  by its owner, counted by its own ledger; S6's PR names it in its body.
+- **The minigit stack bench** (`todo/PLAN_minigit_stack_bench_E2.md`): item 4.3 point 2's dated note (S6's PR), and the
+  three named policy-ab-quick failures (S6's PR body cites `:86-88`).
+- **The follow-ups plan** (conventions): nothing new; F46 stands.
+
+**8.4 Run for this revision.** `node tools/plan-lifecycle.mjs` at this branch; `git fetch` and `git rev-parse` of
+benchmark and rag_qln; the Node guard (`--profile node --token bench --identity "the measuring harness"`, and the default
+profile) at benchmark `a8106448` in a new worktree with its mount (O12-a); `git diff --stat 48cbf896 cdc78d4c` in rag_qln
+(O12-g); reads of the language-comparison plan and its ledger (O12-c), the benchmark followups plan whole (O12-d), the
+minigit stack bench E2 plan (E12-6, E12-7), the spikes' Python call sites (E12-5) and the policy-ab-quick tests and
+`lib/` functions (E12-7); `gh pr view` of every PR in the record's table, `gh pr list --state merged` since 11:00Z in
+conventions, benchmark, rag_qln, mcp, coai, creds, sidecar_rust, vscode_kit, amd_r9700, wsl_care and
+ai_language_comparison; `git ls-remote` of benchmark for S6's branch; the host listings of O12-d. Not checked: the
+consult text (`59b325a3`: its points are taken as the coordinator quoted them and checked against the files); any C#
+verdict (no build); anything with Docker; Python; the suites' runs (S6's); E2's held feature review.
 
 ## Epics
 
