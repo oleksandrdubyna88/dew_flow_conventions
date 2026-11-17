@@ -1,6 +1,8 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 11 open (2026-11-17, by the owner, `Narrowed: yes`); entry 11.1 recorded the same day (E6.S4's *Files* gains four doc lines), so the next accepted change is the eleventh full stop.** Next: S4's plan gate on its reworked brief, then S4.
+> Status: **epoch 11 STOPPED for re-review (2026-11-17): its second change, entry 11.2 (E6.S6's two runner lines go to the language-comparison plan), is the eleventh full stop; no new code on any epic until the re-review.** Done in epoch 11 before the stop: E6.S4 (#221), E6.S5 (#223), the E6/E7 stories (#220, #128), follow-ups F45/F46 (#178), rag_qln's pins (#129–#131).
+>
+> Was: **epoch 11 open (2026-11-17, by the owner, `Narrowed: yes`); entry 11.1 recorded the same day (E6.S4's *Files* gains four doc lines), so the next accepted change is the eleventh full stop.** Next: S4's plan gate on its reworked brief, then S4.
 >
 > Was: **epoch 11 open (2026-11-17), approved by the owner after the tenth re-review (`Narrowed: yes`: the Definition of Done's first item admits the M2/M3 pilot scaffolds' operator-retained output, row E6-l, item 4.3); 0 changes, so the next accepted change counts as 11.1.** Next: the E6 stories amendment PR, then the E7 stories amendment (item 4.4), the S4 brief's rework and its gate, then S4.
 >
@@ -896,12 +898,18 @@ Narrowed: yes — the DoD's first item accepts operator-retained pilot output (r
   `MODEL_ARMS_DRVFS_SCRATCH` = a new empty folder under `/mnt/c/Users/<owner>/AppData/Local/Temp/`, removed by exact path
   after; and allowed deleting rag_qln's pushed throwaway branch `tmp/e7-s4-red` (this record's row).)
 
-> Epoch 11 · approved 2026-11-17 · by owner · state: open
+> Epoch 11 · approved 2026-11-17 · by owner · state: stopped
 - 11.1 · 2026-11-17 · owner · stories — E6.S4's *Files* (§ *Epoch 11* item 4.2) gains four lines of files already on it: `research/module_model_arms.md:2314` (a real edit: the living doc's M3 names, which item 7 promises to cover) and dated notes at `research/PLAN_model_arms_E3.md:1127` and `research/PLAN_model_arms_E6.md:344`, `:346`, `:818` (IMPLEMENTED plans: M2's and M3's names, and "a killed test run leaves one temp folder", which S4 makes false)
   (Found by S4's reworked brief, 2026-11-17, § 15 (benchmark `feat/e6-s4-modelarms` `43d6cacd`): item 4.2's line lists missed four lines
   its own grep finds, though item 8.1 says *Files* include the docs found by grep. The question consultants could not be
   asked (the day's cap of ten questions was spent); the owner counted it as a change, in this session. First change of
   epoch 11; the next accepted change is the eleventh full stop.)
+- 11.2 · 2026-11-17 · owner · stories, merge-conditions — E6.S6 cannot change the lang-bench runner's two `mkdtemp(` lines (`spikes/lang-bench/runner/run_samples.py:35`, `:306`; row E11-6's C# list): any byte of `runner/` moves the runner pin (`test/runner-pin.test.mjs:103` red), and re-pinning it (`inputs/specs.d/runner.json`, `specs.json`, `runner-versions.json`, `rs_report.py`'s version, a CP2 addendum) belongs to the language-comparison plan; the two lines leave S6 for that plan, so S6's *Done when* reads C# 14 → 2 in `spikes/`, not 14 → 0
+  (Found by S6's brief, 2026-11-17, § 13 S-1 (benchmark `feat/e6-s6-spikes` `d836de52`). The question consultants could not be
+  asked (the day's cap was spent); the owner chose to count it and hand the lines to the language-comparison plan, in this
+  session. Second change of epoch 11: the plan stops for re-review. No S6 code was written; S6's brief is local. The same
+  day the owner allowed `/usr/bin/python3` for S6's two whole-suite runs of lang-bench only (the exec layer calls it by a
+  fixed path, `lib/exec-layer/run.mjs:79`); the `.py` units run in wslc and an owned venv.)
 
 ## Symptom
 
