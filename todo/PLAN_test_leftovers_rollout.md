@@ -4605,8 +4605,11 @@ same kind is no longer a change.
   (`ResidentSet`), `:285` (`InfrastructureSampler`), `src/Rag.Infrastructure/Vectors/QdrantVectorIndex.cs:396`
   (`DropCollectionAsync`), `src/Rag.Application/Ports/IVectorCatalog.cs:40` (its port), `src/Rag.Ui/Services/RagConsoleApi.cs:123`
   (`DeleteCollectionAsync`), and the options classes `RagIndexingOptions` (`src/Rag.Infrastructure/Indexing/OptionsFilterSource.cs:9`)
-  and `OllamaProbeOptions` (`Runtime/RuntimeInspector.cs:13`); `Graph/` has no class named `*Options` (`git grep`). After
-  S2's gate, a folder outside those its brief names counts (item 8.1, kind 13). *Done when*: as written (`:565-578`), with its guard sentence in the new form:
+  and `OllamaProbeOptions` (`src/Rag.Infrastructure/Runtime/RuntimeInspector.cs:13`); `Graph/` holds `Neo4jOptions`
+  (`src/Rag.Infrastructure/Graph/Neo4jGraphStore.cs:12`), and `src/Rag.Tools/SearchAnswer.cs:10` the record `RetrievalToolOptions`
+  (fact fix 2026-11-17 by E7's epoch-12 amendment, E12-F3; *was:* "`Graph/` has no class named `*Options` (`git grep`)", a grep that
+  missed a name holding a digit). After S2's gate, a folder outside those its brief names counts (item 8.1, kind 1 or 12;
+  *was:* "kind 13"). *Done when*: as written (`:565-578`), with its guard sentence in the new form:
   ZERO unexplained findings of both guards on S2's lines, each remaining one a listed rule §7 marker (none for
   `owner-blind`). Its two stop conditions (a retained corpus; a design that must spell the prefix word in code) stand.
 
