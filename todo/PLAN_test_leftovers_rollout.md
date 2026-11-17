@@ -1,6 +1,8 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 10 STOPPED for re-review (2026-11-17): its second change, entry 10.2 (E6.S4's pilot scaffolds need a disposition the story does not have), is the tenth full stop; no new code on any epic until the re-review.** Done in epoch 10 before the stop: E6 and E7 stories amended (#217, #122), F42-c (#218), E6.S3 (#219), E7.S3–S5 (#125), rag_qln's pins (#123, #127). The re-review is written (§ *Epoch 11*, 2026-11-17; `Narrowed: yes`, the Definition of Done's first item read with ONE further documented exemption, the two pilot scaffolds' operator-retained output; re-review consult `a6cfcc53`, `120652b8`): E6.S4's sites take a disposition by lifetime, and what must outlive the run (the M2 and M3 pilot scaffolds) goes to an operator-named folder from the required `BENCH_PILOT_OUT`, unprefixed, never the temp root (row E6-l); row E6-i reads both guards with counts; S5–S7 and E7.S2 are re-read and twelve texts that would stop a later brief are folded (E11-1 to E11-12); the feasibility claims the remaining stories rely on were observed during the re-review (§ *Epoch 11* item 3.3); the Opus judge sorted epoch 10's work (11 fit, 3 cut by a fix forward, 1 outside); the plan gate passed (`d8e14338`, `proceed`, three findings accepted); an independent Opus review said "do not approve as written", and its findings B1, B2, S1–S7 and N1–N5 are folded, each fix observed first (§ *Epoch 11* items 3.3, 3.4; no counted change); the second plan-gate round passed (`a209b8e4`, `proceed`, G1–G3 accepted, with the reviewer's re-check folded, text only); next: the owner's approval and the owner's 9p question (item 7); epoch 11 opens by the owner at 0 changes.
+> Status: **epoch 11 open (2026-11-17), approved by the owner after the tenth re-review (`Narrowed: yes`: the Definition of Done's first item admits the M2/M3 pilot scaffolds' operator-retained output, row E6-l, item 4.3); 0 changes, so the next accepted change counts as 11.1.** Next: the E6 stories amendment PR, then the E7 stories amendment (item 4.4), the S4 brief's rework and its gate, then S4.
+>
+> Was: **epoch 10 STOPPED for re-review (2026-11-17): its second change, entry 10.2 (E6.S4's pilot scaffolds need a disposition the story does not have), is the tenth full stop; no new code on any epic until the re-review.** Done in epoch 10 before the stop: E6 and E7 stories amended (#217, #122), F42-c (#218), E6.S3 (#219), E7.S3–S5 (#125), rag_qln's pins (#123, #127). The re-review is written (§ *Epoch 11*, 2026-11-17; `Narrowed: yes`, the Definition of Done's first item read with ONE further documented exemption, the two pilot scaffolds' operator-retained output; re-review consult `a6cfcc53`, `120652b8`): E6.S4's sites take a disposition by lifetime, and what must outlive the run (the M2 and M3 pilot scaffolds) goes to an operator-named folder from the required `BENCH_PILOT_OUT`, unprefixed, never the temp root (row E6-l); row E6-i reads both guards with counts; S5–S7 and E7.S2 are re-read and twelve texts that would stop a later brief are folded (E11-1 to E11-12); the feasibility claims the remaining stories rely on were observed during the re-review (§ *Epoch 11* item 3.3); the Opus judge sorted epoch 10's work (11 fit, 3 cut by a fix forward, 1 outside); the plan gate passed (`d8e14338`, `proceed`, three findings accepted); an independent Opus review said "do not approve as written", and its findings B1, B2, S1–S7 and N1–N5 are folded, each fix observed first (§ *Epoch 11* items 3.3, 3.4; no counted change); the second plan-gate round passed (`a209b8e4`, `proceed`, G1–G3 accepted, with the reviewer's re-check folded, text only); next: the owner's approval and the owner's 9p question (item 7); epoch 11 opens by the owner at 0 changes.
 >
 > Was: **epoch 10 open (2026-11-16), approved by the reviewers after the ninth re-review (`Narrowed: no`; the Opus judge: 11 fit, 5 cut by a fix forward or a local rewrite; plan gate `c6131b05`, `proceed`; an independent Opus review), with ONE change, entry 10.1 (2026-11-16: E6-f2's configuration counterexample has no instance at Testcontainers 4.16.0); the next accepted change is the tenth full stop.** § *Epoch 10* is the plan now: a claim about a copied tool is observed before the gate of the story or brief that relies on it (item 8.1); E6's and E7's stories are amended in new PRs first; then F42-c, E6.S3 and E7.S3–S5 (the `external/` exclusion root-scoped, in S3); E7.S2 waits for the owner's live observations.
 >
@@ -756,7 +758,7 @@ Narrowed: no — entry 9.1 is settled by bounding F42-c by named paths, its mani
   not a document). Also added: a later bump of rag_qln's benchmark or mcp pin re-runs E7-h2's probes (row E7-h2,
   item 8.1). None of them makes a condition smaller, so the Narrowed line stands.)
 
-> Epoch 10 · approved 2026-11-16 · by reviewers · state: stopped
+> Epoch 10 · approved 2026-11-16 · by reviewers · state: closed
 
 - 10.1 · 2026-11-16 · agent · merge-conditions — row E6-f2's counterexample "reuse enabled through configuration alone" has no instance at the pinned Testcontainers 4.16.0, so it cannot be red; it becomes a green pin (both configuration spellings set, the built container's Reuse stays False and the container still ends with the fixture), while the builder counterexample and the run-time disposal proof stay red-first
   (Observed by E6.S3's brief, 2026-11-16, by a run at benchmark `5070beda`: the fixture's builder reads Reuse=False under
@@ -887,6 +889,12 @@ Narrowed: yes — the DoD's first item accepts operator-retained pilot output (r
   `/mnt/c/Users/<owner>/AppData/Local/Temp/`, removed by exact path after. Finding 2: the killed-after-first-child check
   named "a scaffold"; it is now required for EACH scaffold, M2 and M3, each manifest naming every intended child (row
   E6-l; E6's stories S4 and § 11). Text only; nothing narrows; the Narrowed line stands.)
+  (The owner, 2026-11-17, in this session: approved the revised plan with its `Narrowed: yes` reading of the Definition
+  of Done (item 4.3) — epoch 11 opens by the owner; answered item 7's 9p question with (1): run it once, with
+  `MODEL_ARMS_DRVFS_SCRATCH` = a new empty folder under `/mnt/c/Users/<owner>/AppData/Local/Temp/`, removed by exact path
+  after; and allowed deleting rag_qln's pushed throwaway branch `tmp/e7-s4-red` (this record's row).)
+
+> Epoch 11 · approved 2026-11-17 · by owner · state: open
 
 ## Symptom
 
@@ -4015,8 +4023,8 @@ DONE   epoch 10 approved (#173) → E6's stories amended (#217) and E7's (#122) 
 DONE   … → the Opus judge sorted epoch 10's work (`a637c87`) → the plan gate on the operative extract (`d8e14338`,
        `proceed`, three findings accepted, `634905b`) → an independent Opus review, its findings folded (item 3.4).
        → the second plan-gate round (`a209b8e4`, `proceed`, G1–G3 accepted).
-NEXT   the owner approves (Narrowed: yes, item 4.3) and answers item 7's 9p question → epoch 11 opens `by owner`, at 0
-       changes.
+DONE   the owner approved (Narrowed: yes, item 4.3) and answered item 7's 9p question ((1), once), 2026-11-17 → epoch 11
+       opened `by owner`, at 0 changes.
 THEN   benchmark   E6's stories amendment (prepared on `docs/e6-stories-epoch-11`, a NEW PR) → S4's brief revised by new
                    commits on `feat/e6-s4-modelarms` (K5 as row E6-l; § 0.1 as item 4.2's *Files*; § 9 as its *Done
                    when*; § 14 answered; item 3.3's O-b quoted) → S4's plan gate → S4.
@@ -4062,6 +4070,7 @@ path after? ("It" is S4's killed-run → next-sweep check of `PosixFolderIsolati
 that folder.)
 (2) If not, does the owner approve an explicit exception: S4 merges with the 9p collection unproved, the start-of-test
 sweep in place and its limit stated? S4 does not merge until one of the two is answered (recommended: (1), once).
+**Answered** by the owner, 2026-11-17: (1), once.
 
 ### 8. The way of working — so an eleventh stop is less likely
 
