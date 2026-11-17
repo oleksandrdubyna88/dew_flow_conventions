@@ -4427,7 +4427,9 @@ same kind is no longer a change.
   `src/Rag.Api/InfrastructureEndpoints.cs`, `src/Rag.Ui/Pages/Infrastructure.razor*`, `tests/Rag.Tests/**`; the docs a
   grep at S2's base finds that describe what it changes (S2's own pattern: `qlntest`, `TestCorpusPrefix`,
   `TestCorpusSweep`, over `*.md` outside `external/` and `.agents/`); the plan records. The named paths of `:505-547`
-  stay as observations at `48cbf896`. *Done when*: as written (`:565-578`), with its guard sentence in the new form:
+  stay as observations at `48cbf896`. These folders are proposed here: E7's amendment confirms them against S2's Fable
+  spec if it is written by then, and a folder outside them that S2 needs goes to the parent first (in doubt, a change),
+  as S2's text already says. *Done when*: as written (`:565-578`), with its guard sentence in the new form:
   ZERO unexplained findings of both guards on S2's lines, each remaining one a listed rule §7 marker (none for
   `owner-blind`). Its two stop conditions (a retained corpus; a design that must spell the prefix word in code) stand.
 
