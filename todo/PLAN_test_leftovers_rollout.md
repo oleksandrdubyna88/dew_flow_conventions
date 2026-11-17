@@ -1,6 +1,8 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 11 open (2026-11-17), approved by the owner after the tenth re-review (`Narrowed: yes`: the Definition of Done's first item admits the M2/M3 pilot scaffolds' operator-retained output, row E6-l, item 4.3); 0 changes, so the next accepted change counts as 11.1.** Next: the E6 stories amendment PR, then the E7 stories amendment (item 4.4), the S4 brief's rework and its gate, then S4.
+> Status: **epoch 11 open (2026-11-17, by the owner, `Narrowed: yes`); entry 11.1 recorded the same day (E6.S4's *Files* gains four doc lines), so the next accepted change is the eleventh full stop.** Next: S4's plan gate on its reworked brief, then S4.
+>
+> Was: **epoch 11 open (2026-11-17), approved by the owner after the tenth re-review (`Narrowed: yes`: the Definition of Done's first item admits the M2/M3 pilot scaffolds' operator-retained output, row E6-l, item 4.3); 0 changes, so the next accepted change counts as 11.1.** Next: the E6 stories amendment PR, then the E7 stories amendment (item 4.4), the S4 brief's rework and its gate, then S4.
 >
 > Was: **epoch 10 STOPPED for re-review (2026-11-17): its second change, entry 10.2 (E6.S4's pilot scaffolds need a disposition the story does not have), is the tenth full stop; no new code on any epic until the re-review.** Done in epoch 10 before the stop: E6 and E7 stories amended (#217, #122), F42-c (#218), E6.S3 (#219), E7.S3–S5 (#125), rag_qln's pins (#123, #127). The re-review is written (§ *Epoch 11*, 2026-11-17; `Narrowed: yes`, the Definition of Done's first item read with ONE further documented exemption, the two pilot scaffolds' operator-retained output; re-review consult `a6cfcc53`, `120652b8`): E6.S4's sites take a disposition by lifetime, and what must outlive the run (the M2 and M3 pilot scaffolds) goes to an operator-named folder from the required `BENCH_PILOT_OUT`, unprefixed, never the temp root (row E6-l); row E6-i reads both guards with counts; S5–S7 and E7.S2 are re-read and twelve texts that would stop a later brief are folded (E11-1 to E11-12); the feasibility claims the remaining stories rely on were observed during the re-review (§ *Epoch 11* item 3.3); the Opus judge sorted epoch 10's work (11 fit, 3 cut by a fix forward, 1 outside); the plan gate passed (`d8e14338`, `proceed`, three findings accepted); an independent Opus review said "do not approve as written", and its findings B1, B2, S1–S7 and N1–N5 are folded, each fix observed first (§ *Epoch 11* items 3.3, 3.4; no counted change); the second plan-gate round passed (`a209b8e4`, `proceed`, G1–G3 accepted, with the reviewer's re-check folded, text only); next: the owner's approval and the owner's 9p question (item 7); epoch 11 opens by the owner at 0 changes.
 >
@@ -895,6 +897,11 @@ Narrowed: yes — the DoD's first item accepts operator-retained pilot output (r
   after; and allowed deleting rag_qln's pushed throwaway branch `tmp/e7-s4-red` (this record's row).)
 
 > Epoch 11 · approved 2026-11-17 · by owner · state: open
+- 11.1 · 2026-11-17 · owner · stories — E6.S4's *Files* (§ *Epoch 11* item 4.2) gains four lines of files already on it: `research/module_model_arms.md:2314` (a real edit: the living doc's M3 names, which item 7 promises to cover) and dated notes at `research/PLAN_model_arms_E3.md:1127` and `research/PLAN_model_arms_E6.md:344`, `:346`, `:818` (IMPLEMENTED plans: M2's and M3's names, and "a killed test run leaves one temp folder", which S4 makes false)
+  (Found by S4's reworked brief, 2026-11-17, § 15 (benchmark `feat/e6-s4-modelarms` `43d6cacd`): item 4.2's line lists missed four lines
+  its own grep finds, though item 8.1 says *Files* include the docs found by grep. The question consultants could not be
+  asked (the day's cap of ten questions was spent); the owner counted it as a change, in this session. First change of
+  epoch 11; the next accepted change is the eleventh full stop.)
 
 ## Symptom
 
