@@ -3962,7 +3962,8 @@ release is removed. **The epics do not change**: no Fable re-split; E6's and E7'
      already composes `<prefix>_<32 hex>_<8 hex>` (plus `_<12 hex>` for a variant), so a configured `_` would make a double
      one. The product LISTS by `name.StartsWith(prefix + "_", StringComparison.Ordinal)` and parses NOTHING past the token
      (the detail's §1 forbids reading past the repository token); the tail and its separator stay the spec's naming
-     decision, § *The cornerstone* item 5 (87 > 63 characters). The shape check cannot tell the word from any other letters
+     decision, § *The cornerstone* item 5 (78 > 63 characters with the decided configured value, 84 for the longest Windows owner;
+     *was:* 87, computed with `<what>_<id>` in the prefix). The shape check cannot tell the word from any other letters
      (`foo_u1000_qln` passes it): only the tests and the record check the word. The product's guarantee is therefore NOT
      "an unrelated prefix refuses" but "**no drop without a record**": `orders_u1000_prod`, `orders_u1000_qln`, an arbitrary
      submitted name, a record aimed at a pre-existing unrelated collection, and a collection replaced during clean-up each
@@ -3973,9 +3974,12 @@ release is removed. **The epics do not change**: no Fable re-split; E6's and E7'
    - **Item 9's rename and the legacy listing.** The owner-scoped prefix is configuration (an options property, empty by
      default and refused while empty), set by the live suite from the helper; no `src` line spells the word. The
      `qlntest_` selector STAYS in `src/`, list-only, until item 9's reviewed inventory of the existing `qlntest_*`
-     collections is done: today `TestCorpusPrefix.Value` (`src/Platform.Contracts/InfrastructureModels.cs:115`) is the only
-     thing that lists them (`InfrastructureSampler`, through `TestCorpusSweep.cs:25`) and tallies them (`Rag.Ui`,
-     `Infrastructure.razor.cs:48`). It is guard-clean: `"qlntest_"` is not the prefix word (O-m).
+     collections is done: today `TestCorpusPrefix.Value` (`src/Platform.Contracts/InfrastructureModels.cs:115`) is read for
+     selection only by the sampler (`InfrastructureSampler`, through `TestCorpusSweep.cs:25`, `:33-37`, which only logs,
+     case-insensitively); `Infrastructure.razor.cs:48` only prints it in one sentence of the page; the console lists every
+     collection and tallies them by the prefix decoded from each name (`CollectionListing.cs:23-56`, `:67-81`), not by
+     the constant (corrected 2026-11-17 from the code at `48cbf896` by E7's amendment; *was:* "is the only thing that lists
+     them … and tallies them (`Rag.Ui`, …)"; the decision stands). It is guard-clean: `"qlntest_"` is not the prefix word (O-m).
    - Option A — the word written into `appsettings.json`, which the guard does not read — is REJECTED as guard evasion.
    - No template change and no re-sync: nothing here is a counted change. A design that must still spell the word in code
      stops S2's brief before its gate (a template change in mcp and a re-sync would be a counted change).
