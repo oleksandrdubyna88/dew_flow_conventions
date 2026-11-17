@@ -1,6 +1,6 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 10 STOPPED for re-review (2026-11-17): its second change, entry 10.2 (E6.S4's pilot scaffolds need a disposition the story does not have), is the tenth full stop; no new code on any epic until the re-review.** Done in epoch 10 before the stop: E6 and E7 stories amended (#217, #122), F42-c (#218), E6.S3 (#219), E7.S3–S5 (#125), rag_qln's pins (#123, #127).
+> Status: **epoch 10 STOPPED for re-review (2026-11-17): its second change, entry 10.2 (E6.S4's pilot scaffolds need a disposition the story does not have), is the tenth full stop; no new code on any epic until the re-review.** Done in epoch 10 before the stop: E6 and E7 stories amended (#217, #122), F42-c (#218), E6.S3 (#219), E7.S3–S5 (#125), rag_qln's pins (#123, #127). The re-review is written (§ *Epoch 11*, 2026-11-17; `Narrowed: no`): E6.S4's sites take a disposition by lifetime, and what must outlive the run (the M2 and M3 pilot scaffolds) goes to an operator-named folder from the required `BENCH_PILOT_OUT`, unprefixed, never the temp root (row E6-l); row E6-i reads both guards with counts; S5–S7 and E7.S2 are re-read and twelve texts that would stop a later brief are folded (E11-1 to E11-12); next: the Opus judge, then the plan gate on an operative extract and an independent Opus review; epoch 11 opens by the reviewers at 0 changes.
 >
 > Was: **epoch 10 open (2026-11-16), approved by the reviewers after the ninth re-review (`Narrowed: no`; the Opus judge: 11 fit, 5 cut by a fix forward or a local rewrite; plan gate `c6131b05`, `proceed`; an independent Opus review), with ONE change, entry 10.1 (2026-11-16: E6-f2's configuration counterexample has no instance at Testcontainers 4.16.0); the next accepted change is the tenth full stop.** § *Epoch 10* is the plan now: a claim about a copied tool is observed before the gate of the story or brief that relies on it (item 8.1); E6's and E7's stories are amended in new PRs first; then F42-c, E6.S3 and E7.S3–S5 (the `external/` exclusion root-scoped, in S3); E7.S2 waits for the owner's live observations.
 >
@@ -770,6 +770,33 @@ Narrowed: no — entry 9.1 is settled by bounding F42-c by named paths, its mani
   test is about the old name itself, is spelled with the `~` precedent") and the rule's "never prefix something that must survive
   the run". Counted after the question consultants (`33aa7f43`, two of two: a change to the story's approach). This is the second
   change of epoch 10: the plan stops for re-review. No S4 code was written; S4's brief is local.)
+
+### Re-review for epoch 11
+
+Narrowed: no — entry 10.1 stands as built (E6.S3, #219: the configuration counterexample a green pin, the builder counterexample and the disposal proof red-first); entry 10.2 is settled by a THIRD disposition for S4's sites, by lifetime (output that must outlive the run goes to an operator-named folder from the required `BENCH_PILOT_OUT`, unprefixed, never the temp root), which adds a row (E6-l) and widens S4's files by named docs; row E6-i reads both guards with counts; S5, S6 and S7 gain named files, both guards and counts, and S6's scope widens by the C# guard's 14 spike findings. Nothing of the goal, the Definition of Done, the merge conditions or the release is removed (§ *Epoch 11* item 4.3).
+  (Written 2026-11-17 with § *Epoch 11*, over the two entries of epoch 10: 10.1, E6-f2's configuration counterexample
+  (built, merged as benchmark #219); 10.2, E6.S4's pilot scaffolds (a brief only, benchmark `feat/e6-s4-modelarms`
+  `4dc04820`, local). The question consultants: `c3d71347` (10.1), `33aa7f43` (10.2); the disposition: `1f60c647` (two
+  of two). The Verdict and Action cells are `—` until an Opus judge fills them (step 5 of the full stop); the judge adds
+  what this list missed (the merges outside the plan's four repositories among them), classifies each merge against
+  the revised plan by its diff and its checks, and writes "unverified" where the evidence cannot be read. The epoch 11
+  line is written only after the re-review approves, with `state: open`; with `Narrowed: no` the plan gate approves,
+  not the owner; epoch 11 starts at 0 changes.)
+
+| Work | Where | Verdict | Action |
+|---|---|---|---|
+| conventions #173 `af607536`, the epoch-10 revision (§ *Epoch 10*, its record, the judge's table) | main | — | — |
+| conventions #174 `87f065b0`, entry 10.1 and epoch 10's progress record; F44 in the follow-ups plan | main | — | — |
+| conventions #175 `62f9ae5d`, entry 10.2 and the stop | main | — | — |
+| benchmark #217 `191ef77f`, E6's stories amended to § *Epoch 10* | main of benchmark | — | — |
+| the lines of #217's file that § *Epoch 11* supersedes, at `b348bb33`: S4 *What* `:472-474` (two dispositions), *Files* `:482`, *Done when* `:483`; D6 `:254-256` (the probe path); S5 `:489` (shape G unbounded), `:500-501`; S6 `:503-512` ("Node", no *Files*); S7 `:514-542` (no *Files*); § 11 `:609` (who lists the exemptions) | main of benchmark | — | — |
+| benchmark #218 `5070beda`, F42-c | main of benchmark | — | — |
+| benchmark #219 `b348bb33`, E6.S3 (entry 10.1 as a green pin) | main of benchmark | — | — |
+| rag_qln #122 `6e447156`, E7's stories amended to § *Epoch 10*; #123 `0be37687` and #127 `48cbf896`, the benchmark pin | main of rag_qln | — | — |
+| the lines of #122's file that § *Epoch 11* item 4.4 amends, at `48cbf896`: § *The cornerstone* items 1 and 6, row E7-l, S2's *Files* and *Done when*, the status line | main of rag_qln | — | — |
+| rag_qln #125 `3ca58f43`, E7.S3–S5 | main of rag_qln | — | — |
+| benchmark `4dc04820` on `feat/e6-s4-modelarms`, S4's brief (Opus), docs only | local, never pushed (no such branch in the GitHub branch list) | — | — |
+| this revision: § *Epoch 11* and this record (conventions `docs/rollout-epoch-11`), and E6's stories amendment (benchmark `docs/e6-stories-epoch-11`, from `b348bb33`) | local commits | — | — |
 
 ## Symptom
 
@@ -3467,6 +3494,313 @@ Found on the way, carried as todos, not built here (each recorded where its owne
   swapped in between would be followed); `RunNode` writes the differential test's stdin synchronously before its timeout starts.
 - E7.S2's Fable spec inputs: a collection created under a live claim survives every drop path; the `gpu_waiters` reset is scoped
   or joins the lock, and a live daemon waiter survives it.
+
+## Epoch 11 — the plan as revised at the re-review (2026-11-17)
+
+The whole plan read again, as step 4 of the full stop asks (`common/plan-change-control.md`), over the two entries of
+epoch 10: 10.1, row E6-f2's configuration counterexample has no instance at Testcontainers 4.16.0 (found and settled by
+E6.S3's brief; built as a green pin in benchmark #219); 10.2, E6.S4's pilot scaffolds make output that must outlive the
+test, and the story's two dispositions for its legacy literals do not cover it (found by E6.S4's brief, benchmark
+`feat/e6-s4-modelarms` `4dc04820`, local, never pushed). The question consultants: `c3d71347` (10.1, two of two: a
+change), `33aa7f43` (10.2, two of two: a change to the story's approach). The disposition of 10.2 was settled by the
+consult `1f60c647` (two of two) and checked against the files by the coordinator and here (item 6). This section is the
+baseline epoch 11 is approved on. § *Epoch 10* stays as the plan for everything this section does not name, and the
+earlier sections under it. Superseded by this section, read from here: E6's S4 *What* sentence that names two
+dispositions for the 15 legacy literals, its *Files* line and its *Done when* (benchmark `todo/PLAN_test_leftovers_E6.md:470-483`
+at `b348bb33`; item 4.2, row E6-i, row E6-l); D6's "with the variable unset, the fake refuses to start" for the
+probe runner's launch path (`:254-256`; item 3.2, E11-3); S5's "the path-only lines read `TempDir.Root`" without a
+bound (`:489`; E11-4); S6's "(Node)" scope and its missing *Files* line (`:503-512`; E11-6 to E11-8); S7's missing
+*Files* line (`:514-542`; E11-9); and the two places that say who lists the inline exemptions (S5 `:500-501`, "the
+brief lists"; the DoD `:609`, "the stories list"; item 4.3).
+
+**How to read the evidence.** **[M]**, **[D]**, **[R]** and the three states (**observed**, **proposed**, **blocked**)
+as in § *Epoch 9* and § *Epoch 10*. Every **[M]** here was run for this revision on 2026-11-17, read-only, at conventions
+`62f9ae5d` (its `tools/` and `common/` equal the release `b1746499`: `git diff --stat b1746499 62f9ae5 -- tools/ common/`
+prints nothing), benchmark `b348bb33` with its mount at `b1746499`, and rag_qln `48cbf896`. ONE C# run was made: the
+copied repository guard test, `LeftoversRepositoryGuardTests` with `--explicit only`, from the existing Release build of
+benchmark `70eb6fc2` in the worktree `wt/bench-e6s3` (its tree equals `b348bb33`: `git diff --stat 70eb6fc2 b348bb33`
+prints nothing; the copy's guard files are F42-c's, unchanged since `5070beda`); no build ran for this revision, and no
+Docker. Its 173 findings equal F42-c's O10 and S4's O3 class for class (115 `raw-temp`, 22 `raw-worktree`, 18
+`legacy-name`, 18 `owner-blind`), so the build reads the tree as main's does.
+
+### 1. What this plan is now
+
+**The root cause, checked.** Item 8.1 of § *Epoch 10* made every copied-tool boundary and every break-it plant an
+observation before its gate, and it worked where it reached: entry 10.1 was found BY such an observation (E6.S3's brief
+ran the configuration counterexample and it could not be red), before any code. Entry 10.2 came from a place item 8.1
+does not reach: a story's closed list of DISPOSITIONS for the sites it names. S4's *What* said each legacy literal
+"moves to the helper or, where the test is about the old name itself, is spelled with the `~` precedent"; two of the 15
+sites make output that must outlive the test (`M2PilotScaffold.cs:11-16`, `M3PilotScaffold.cs:9-11` at `b348bb33`
+**[M]**), and the rule forbids the prefix on such output ("Never give the prefix to something that must survive the
+run", the detail's § *Never*). Nobody had classified the sites by LIFETIME before the story was approved. The same
+search, done now over every remaining story (item 3.2), finds four more texts of this kind or of item 8.1's kind that a
+brief would otherwise have met: D6's refusal on a launch path where no variable can arrive (E11-3), shape G offered
+without a bound (E11-4), S6's scope written as Node-only while the copied C# guard reads its `.py` and `.sh` files
+(E11-6), and two stories with no *Files* line (E11-8, E11-9). So from epoch 11 (item 8.1): every site a story disposes
+of is classified by lifetime before that story's plan gate, expected guard results name BOTH guards with a count per
+class, and every story's *Files* line names its plan records and the docs that describe what it changes.
+
+**State at the stop (read 2026-11-17).**
+
+| Epic | State | Commits |
+|---|---|---|
+| E1, E3, E4 | DONE (wave 1) | as § *Epoch 8* |
+| E2 (creds) | COMPLETE 2026-11-10. Its feature review is held by `call_human` since 2026-11-10 (not re-read) | as § *Epoch 10* |
+| E5 (coai) | COMPLETE 2026-11-12 | as § *Epoch 10* |
+| F41, F41-b, F42 | DONE (§ *Epoch 10* item 1) | conventions #171; nine pin bumps; mcp #81 |
+| E6 (benchmark) | stories amended to epoch 10 (#217); F42-c merged (#218, the copy at mcp `53f65130`, 55 entries); S3 merged (#219: rows E6-d, E6-f1, E6-f2, entry 10.1 as a green pin; brief promoted to `research/PLAN_test_leftovers_E6_S3_brief.md`); S4's brief local, never pushed (`feat/e6-s4-modelarms` `4dc04820`; the GitHub branch list has no such branch **[M]**), entry 10.2; S5–S7 not started. `main` `b348bb33` | #217 `191ef77f`, #218 `5070beda`, #219 `b348bb33` |
+| E7 (rag_qln) | stories amended to epoch 10 (#122); S3–S5 merged as ONE PR (#125: the adapted C# helper, the extension's wrap, both guards in CI); the benchmark pin at `b348bb33` (#127); S2 not started, its gate waits for the owner's observations (§ *Epoch 9* item 7). `main` `48cbf896` | #122 `6e447156`, #123 `0be37687`, #125 `3ca58f43`, #127 `48cbf896` |
+| The stop | entries 10.1 and 10.2, the stop recorded by #175 | `62f9ae5d` |
+| The feature reviews | not started | — |
+
+**Goal and Definition of Done.** Both stand word for word, with § *Epoch 8*'s reading. The Definition of Done's "the
+inline exemptions" are read with item 4.3: listed by the story's brief, copied into the stories by the PR that adds them.
+
+**Corrections, plain facts** (not changes): E7's stories' status line still says S3–S5 are "built … on
+`feat/e7-s3-s5-e10`"; they are merged as #125 (`3ca58f43`) **[M]**, a records fix for E7's amendment (item 4.4). E6's
+stories say `TempFolder` is constructed by "112 `new TempFolder()` in 26 files" (`:79`); at `b348bb33` there are 108
+`new TempFolder()` in 25 files and 4 `TempFolder _temp = new()` fields, 112 sites in all (S4's brief N2 **[M]** there);
+the count of sites stands.
+
+### 2. Prerequisites
+
+1. **Nothing of F41, F41-b, F42 or F42-c is re-opened**, and E6.S3 (#219) and E7.S3–S5 (#125) stand (item 4.1).
+2. **E6's stories amendment comes first**: a NEW benchmark PR by Opus (prepared, local: `docs/e6-stories-epoch-11`),
+   merged before S4's brief goes to its plan gate. It writes item 4.2 into S4 and items E11-1 to E11-10 into the rows and
+   stories they name.
+3. **E7's stories amendment** (item 4.4), a NEW rag_qln PR by Opus, merged before E7.S2's plan gate. S2's gate also waits
+   for the owner's observations (§ *Epoch 9* item 7), so this adds no wait of its own.
+4. Not prerequisites: the `/tmp/.git` todo (item 4.5); the copied C# guard's reading of a piece of the prefix word inside
+   an unrelated identifier (item 8.2, *Found on the way*); F43, F44.
+
+### 3. Merge conditions — the rows this revision adds or restates
+
+Every other row of § *Epoch 10* item 3, of the earlier sections and of E6's and E7's stories stands, word for word; a
+row restated here keeps every check its earlier text had and adds to it.
+
+#### 3.1 The rows
+
+| # | Condition | Implementation | Executable check | Does not prove | State |
+|---|---|---|---|---|---|
+| E6-i | restated: no test helper makes a LEGACY name, read by BOTH guards (S4 for `ModelArms/`, S6 for `spikes/`) | S4: `TempFolder` through the copied `OwnedDir`, the K2 sites to the helper, the scaffolds by row E6-l; S6: the shipped Node helper, and the `.py` sites by item E11-6 | S4, against the base `b348bb33`: under `ModelArms/` no `legacy-name`, `raw-temp` or `owner-blind` finding and no `raw-worktree` but the 10 marked lines, in each guard. The Node guard (`--profile node --token bench --identity "the measuring harness"`) 209 → **160** (its 49 there: 15 `legacy-name`, 14 `raw-temp`, 20 `raw-worktree`); its default profile 3 → 3. The copied C# guard (`LeftoversRepositoryGuardTests`, `--explicit only`, information until S7) 173 → **91** (its 82 there: 15 `legacy-name`, 16 `owner-blind`, 31 `raw-temp` of which 17 are `"/tmp"` literals, 20 `raw-worktree`). No finding added elsewhere. On a later base: that base's count less these | that a marker's named folder holds the clone (the code review reads it) | **proposed**. Inputs **[M]**: both lists at `b348bb33` (the Node guard in `wt/bench-e6s3`; the C# run above); the S4 brief's O3/O4 give the same counts **[D]** |
+| E6-l | new, from entry 10.2: output a test makes ON PURPOSE to outlive the run (the M2 and M3 pilot scaffolds) goes to an operator-named folder outside the testsToDelete family, never to the temp root | `M2PilotScaffold.cs`, `M3PilotScaffold.cs`: the folder from the REQUIRED variable `BENCH_PILOT_OUT`; unprefixed children `bench-m2-<what>-<id>`, `bench-m3-<what>-<id>`, `bench-m3-manifest-<id>.json`; M2's throwaway validation probe (`:72-78`, test lifetime) a `TempFolder` | (1) Each scaffold, run once with `--explicit only` and `BENCH_PILOT_OUT` unset → it fails before it makes anything, its message names `BENCH_PILOT_OUT` (RED first: today each writes under the temp root). The same for a value that is empty, relative, not an existing folder, or inside a git checkout (`init` refuses a root there, `tools/model-arms/ModelArms.Core/Experiment/ExperimentFile.cs:70` **[M]**). (2) Run once each with the variable set to a scratch folder outside every git checkout → every printed path is under it and named as above; the temp root holds no entry of theirs after the run (the probe's `TempFolder` gone with its claim); then the outputs removed by exact path (M3: its manifest's T4–T5 steps). (3) Both guards on the scaffolds' lines: no `raw-temp`, `legacy-name` or `owner-blind`, and no exemption marker in either file | that the owner's pilot itself runs (the pilot is the owner's, by hand) | **proposed**. The Node half of (3) **observed [M]**: `scanText('tests/Bench.Tests/ModelArms/M2PilotScaffold.cs', …)` of the planned lines (the variable's read, the refusal's message, `Path.Combine(output, $"bench-m2-target-{id}")`, `$"bench-m2-root-{id}"`, `$"bench-m3-{name}-{id}"`, `$"bench-m3-manifest-{id}.json"`, `new TempFolder()`) → `[]` each; controls: `Path.Combine(Path.GetTempPath(), $"bench-m2-target-{id}")` → one `raw-temp` (a rename alone under the temp root stays red); today's line → `raw-temp` and `legacy-name`. The C# half **[R]**, expected clean: no spelling of `RawTemp` (`GetTemp`+`Path2?`, `LeftoversGuard.cs:72` at `b348bb33`), no `"/tmp"` literal (`TempFolderLiteral`, `:137`), no piece of the prefix word (`PrefixPieces`: five characters or more across `sT` or `To`, `LeftoversGuardLiterals.cs:19`, `:104-109`); observed through the copy before S4's plan gate, red or not |
+
+#### 3.2 The stories texts that would stop the next briefs — read now, each with a state
+
+Found by reading E6's S4–S7, D5–D11, § 3 and § 11 (benchmark `b348bb33`) and E7's S2 and § *The cornerstone*
+(rag_qln `48cbf896`) whole, against both guards' finding lists at `b348bb33` (item 8.4), S3's and S4's briefs, and the
+code each sentence names. Each is fixed in the stories amendment named; each claim is observed before the gate named.
+
+| # | The text, where | Checked here | What changes, and its state |
+|---|---|---|---|
+| E11-1 | E6 S4 *What* `:472-474`: two dispositions for the 15 legacy literals | entry 10.2 | item 4.2: three dispositions by lifetime; row E6-l. **proposed**, before S4's plan gate |
+| E11-2 | E6 S4 *Files* `:482` (`tests/Bench.Tests/ModelArms/**`) and *Done when* `:483` (no guard named, no `owner-blind`) | the docs that print the scaffolds' paths, the kept reader's name and `TempFolder`'s form lie outside it (**[M]** `git grep -n -E "testsToDelete-(m2\|m3)\|modelarms-reader\|testsToDelete-modelarms"` over `*.md`); the C# guard adds 16 `owner-blind` and 17 `"/tmp"` findings there (S4's brief N1, **[M]** here) | item 4.2's *Files* (named paths) and row E6-i's counts. **proposed**, before S4's plan gate |
+| E11-3 | E6 D6 `:254-256`: "with the variable unset, the fake refuses to start" | the probe runner launches the fake CLI under a minimal REPLACED environment in which only `TEMP` passes, "so a test cannot hand the fake a variable at all" (`tests/FakeCli/Program.cs:658-661` **[R]**; `research/PLAN_question_consultant_probes.md:317-318` **[D]**); the probe tests name the home `<temp>/bench-fake-cli/<model>` (`tests/Bench.Tests/Probes/Driver/FakeCli.cs:15`) | D6 restated: on a launch path that passes the variable (`FAKE_CLI_HOME`, `COAI_DATA_DIR`), D6 as written; on the probe runner's path, the per-model home lies INSIDE an owned folder the test made, reached through the model id the test mints (the id names that folder, so the fake's `FakeHome.For` resolves inside it), and an id that names no existing folder makes the fake refuse; `<temp>/bench-fake-cli` is never made. No product file changes for it. **proposed**: S5's brief observes, before its plan gate, that the probe path accepts such a model id (red or not, the run says which); if it does not, the brief stops and reports (a product file is outside S5's *Files*) |
+| E11-4 | E6 S5 *What* `:489`: "the path-only lines read `TempDir.Root` (… coai's shape G)" | `TempDir.Root` is clean in both guards only because neither traces what a path is used for (consult `1f60c647`; S4's brief O6 **[D]**): it is a blind spot, not a proof | bounded: shape G only for a path that NOTHING creates or keeps — neither the test nor the product it calls (an `--artifact-root` the product writes into is created). The brief reads each such line's callee; a path that is created goes into an owned folder (`TempDir.For`, `OwnedDir`). Never for retained output (row E6-l). **proposed**, before S5's plan gate |
+| E11-5 | E6 S5 *Done when* `:500-501`: no guard named, no count | both lists **[M]**: under `tests/` outside `ModelArms/` and `Leftovers/`, the Node guard 73 (70 `raw-temp`, 1 `raw-worktree` — the `.ndjson` line — in `Bench.Tests`; 2 `raw-temp` in the fakes), the C# guard 75 (72 `raw-temp`, 1 `owner-blind` in `Bench.Tests`; 2 in the fakes). C#-only: `Gate/Driver/GateReplyParserTests.cs:125`, `:132` (`"/tmp"` in sample text) and `Probes/ProbeContractsGuardTests.cs:19` (`owner-blind`: the literal `ProbeCellReportDto.LatestState` holds `testSt`, a piece of the prefix word, case-insensitive). Node-only: the `.ndjson` line (the C# copy does not read `.ndjson`) | both guards, 73 → 0 and 75 → 0 there, except the inline exemptions the brief lists (item 4.3); the two `"/tmp"` literals rewritten as S4's K3, never exempted; `:19`'s literal rewritten so no literal spells the piece (for example through `nameof`), the product's member names unchanged (`owner-blind` takes no exemption). **observed** (the lists); the rewrites **proposed**, before S5's plan gate |
+| E11-6 | E6 S6's title "(Node)" `:503` and *What* `:505-509`; claim C6 | the copied C# guard reads `.py` and `.sh` anywhere: 14 findings in `spikes/lang-bench` **[M]**: 10 `raw-temp` (9 `mkdtemp(` in `runner/run_samples.py:35`, `:306`, `test/py/test_rs_kill.py:152`, `test_rs_launch.py:478`, `test_run_samples.py:174`, `:192`, `:241`, `:434`, `:449`; `mktemp` in `test/hello/prove.sh:7`, which the Node guard also reports), 3 `legacy-name` (`test/py/box_support.py:187`, `:192`, an owner segment built at run time from `os.getuid()`; `test/py/test_rs_abort.py:98`, a name never made), 1 `owner-blind` (`test/py/test_burner.py:39`, `startswith("testsToDelete-")`). None is a line the followups plan's F1 or F2 names (read: F1 names `lib/exec-probe/lines.mjs:38`, `probe.mjs:51`, `test/exec-layer-isolation.test.mjs:58`; F2 names `minigit-bench/test/helpers.mjs:30-37`, `fake-home.mjs:26`, `lib/cache-snapshot.mjs:42-45`, `lang-explore/test/commands.test.mjs:64-65`), so by D7 they are S6's | S6 reads both guards: its scope is every finding of either guard in `spikes/` at its base that is not on a line F1 or F2 names, listed by its brief by file, line and class. Claim C6 **observed [M]**: the copy reports all nine `.py` `mkdtemp(` lines as `raw-temp` (consumer `b348bb33`, upstream mcp `53f65130`, invocation the repository test above, fixture the repository itself, expected reported, observed reported). The `.py` sites are changed and run within this machine's rule for Python (a sandbox; S6's brief names how). **proposed**, before S6's plan gate |
+| E11-7 | E6 S6 *Done when* `:512` | the Node guard's 85 findings in `spikes/` **[M]**: `policy-ab-quick` 30 (25 `raw-temp`, 5 `legacy-name`), `lang-bench` 8 (5 `legacy-name`, 3 `raw-temp`), `lang-explore` 6 (`owner-blind`), `minigit-bench` 41 (21 `legacy-name`, 18 `raw-temp`, 2 `owner-blind`); none on an F1/F2 line | both guards, Node 85 → 0 and C# 14 → 0 in `spikes/`, except the inline exemptions the brief lists (none for `owner-blind`); a name built with a run-time owner segment (`testsToDelete-u${uid}`, `f"testsToDelete-u{…}"`) is red in both guards and goes through the shipped helper or takes a listed `legacy-name` exemption naming the run-time owner. **proposed**, before S6's plan gate |
+| E11-8 | E6 S6 has no *Files* line; "the suite gets a start sweep if it has none" | `spikes/minigit-bench/run-tests.mjs`, the runner the `policy-ab-quick` tests run through (`research/module_tests.md:183-185`), has no start sweep (`git grep -n -i sweepLeftovers -- spikes` → `lang-bench/run-tests.mjs:22-23`, `make-snapshots.mjs`, one test; not minigit-bench) **[M]** | *Files*: `spikes/policy-ab-quick/test/**`; the 39 files of both guards' spike findings by path (item 4.2 of the stories amendment lists them); `spikes/minigit-bench/run-tests.mjs` (its start sweep, lang-bench's shape `run-tests.mjs:19-26`, reuse-first); `research/module_tests.md`; the plan records. **proposed**, before S6's plan gate |
+| E11-9 | E6 S7 has no *Files* line | S7 deletes the `Explicit` operation of `LeftoversRepositoryGuardTests.cs` (the manifest's operation says "S7 deletes this operation" **[M]**) and adds one on `LeftoversGuardFiles.cs` (C10) | *Files*: `tests/Bench.Tests/Leftovers/template-manifest.json` and those two targets; `.github/workflows/ci.yml` (`build-test`: the Node guard step; Node and the mount's `npm ci` are there since F42-c **[D]**); `research/local-model-coding/harness/t-lib.sh`, `part6/t-lib.sh` (D8); `http/README.md`; `research/module_tests.md`; the plan records. Its counts: after S4–S6, Node 2 and C# 2 (the two D8 lines, `raw-worktree`, in both) and the default profile 2 → 0 each. **proposed**, before S7's plan gate |
+| E11-10 | E6 S5 *Files* `:498` and every story's *Files* | the plan records (brief, `todo/README.md` row, its promotion with `research/README.md`, the stories' progress line) are on no *Files* line; S3's brief needed them (its Q2) and S4's asks (Q5) | one standing line in § 6 of the stories: each story's PR carries its plan records; they count as in its *Files*. **proposed** |
+| E11-11 | E6 claims C8 and C10 | C8: S4's brief O1 observed the C# copy reading `worktree add` in a `tests/` `.cs` and not in a `src/` `.cs` (both guards alike for (a), (b)) **[D]**, local brief; C10's "without" half: a `.cs` under `tools/model-arms/` is not discovered (scanned 0, O1 (d)) **[D]** | C8 **observed** for S4's half (S5's half stays **proposed**, before S5's plan gate); C10's "without" half **observed**, its "with" half **proposed**, before S7's plan gate |
+| E11-12 | E7 § *The cornerstone* items 1, 6, 9–10 and row E7-l: the frame offers run-owned stores (the owner form) or exemption (a); item 6 asks whether the fixed ids are REUSED across runs | a reused corpus outlives the run: it is entry 10.2's kind, and the owner form would promise that its deletion is safe (the detail's § *Never*). And in rag_qln's copy the bare prefix word in any spelling, in a `.cs` of the `Tests` or `Source` kind outside `tests/Rag.Tests/Leftovers/`, is `owner-blind`, which takes no exemption (rag_qln `tests/Rag.Tests/Leftovers/LeftoversGuard.cs:28-31`, `:48`, `:216-218`, `:230-231` at `48cbf896` **[R]**), so a name builder or a sweep matcher in `src/` cannot spell `teststodelete_` | E7's amendment (item 4.4). **proposed**, before E7.S2's plan gate |
+
+### 4. The dispositions of entries 10.1 and 10.2
+
+**4.1 Entry 10.1 — kept as built.** E6.S3 (#219) carries row E6-f2's configuration half as the green pin entry 10.1
+describes, with the builder counterexample and the run-time disposal proof red-first (S3's brief, promoted; #219's CI
+**[D]**). Nothing in this revision changes it.
+
+**4.2 Entry 10.2 — a third disposition, by lifetime (disposition B; consult `1f60c647`, two of two).** S4's *What* is
+restated in E6's stories: each site S4 disposes of is classified by its lifetime, and each class has ONE disposition:
+
+| Lifetime | Disposition | S4's sites |
+|---|---|---|
+| the run (the test makes it and removes it) | the copied helper: `OwnedDir`, `TempFolder`, `TempDir.For`; owner form, claimed, removed by exact path | `TempFolder.cs:10`; `BriefFillerTests.cs:156`, `:184`, `:231`; `ModelArmsProgramTests.cs:83`; `PosixFolderIsolationTests.cs:321` (on the operator's 9p mount, `OwnedDir.Create("drvfs", scratch)`); `KernelFactsTests.cs:135`; M2's validation probe `M2PilotScaffold.cs:72-78` (also used by M3, `pilot = "m3"`) |
+| inside an owned folder, removed with it | a plain name inside, no prefix (rule §1, last item) | `PinnedConsumer.cs:126-137`, the kept scratch (the stories' S4 *What*, as written) |
+| a name never made, a path only read, sample text | a name from the helper (`Owned.NameFor`) where the name matters; otherwise a neutral literal; shape G only within E11-4's bound | `InitVerbTests.cs:138`; `TimingLineTests.cs:311-312`; the 17 `"/tmp"` literals; `KernelFactsTests.cs:27`; `ValidateVerbTests.cs:752`, `:755` |
+| must OUTLIVE the run (the owner's attended pilot) | an operator-named folder from the REQUIRED variable `BENCH_PILOT_OUT`, outside the testsToDelete family: unprefixed children `bench-m2-<what>-<id>`, `bench-m3-<what>-<id>`, `bench-m3-manifest-<id>.json`; refused, with a message naming the variable, when it is unset, empty, relative, missing or inside a git checkout; never the temp root as a default, never `Path.GetTempPath()` or `TempDir.Root` for this output, no exemption marker; retired by the pilot's own teardown (M2: the two printed paths; M3: its manifest, T1–T5, T4 reading `bench-m3-*-<id>`) | `M2PilotScaffold.cs:39`, `:40`; `M3PilotScaffold.cs:34`, `:37`, `:105` |
+| a test about the old name itself | the `~` spelling, in its form that is clean in BOTH guards: `"tests~To~Delete-…".Replace("~", …)` (S4's brief O5: `"tests~ToDelete-…"` leaves the piece `ToDelete`, `owner-blind` in the C# copy) | none in S4 (the stories' `~` precedent stays for the 10 `worktree add` assertion strings: `"work~tree add"`, clean in both, O2) |
+
+Why `BENCH_PILOT_OUT` and not a folder the test picks: the output is the owner's, kept for a manual pilot; the repository's
+precedent for an operator's output root is `BENCH_ARTIFACT_ROOT` (`hosts/Cli/ProbesInputs.cs:75-78`, refused with a sentence
+naming it, `:97`), and a required variable makes the operator choose, so nothing lands in the temp root by default. Why
+not the owner form: a claimed folder whose process has ended is `gone`, and the next run's sweep collects it ten minutes
+later, during an attended pilot (rule §4). Why not a rename under the temp root: it stays `raw-temp` in both guards (row
+E6-l's controls). Why not shape G: `TempDir.Root` is clean only because no guard traces callers.
+
+S4's *Files*, as named paths (the S4 brief's § 0.1 gives each `ModelArms/` file its sites):
+
+- `tests/Bench.Tests/ModelArms/**` (the code and its tests);
+- `research/module_model_arms.md`: the lines that describe today's behaviour — `:1462` (`TempFolder`'s folder form),
+  `:2114` (a timed-out reader's scratch, now kept inside the owned folder), `:2250-2256` (M2's procedure: step 1's printed
+  paths, `BENCH_PILOT_OUT`, the log's removal sentence); the logs of the runs (`:2262`, `:2322`, `:2370`) keep their
+  observed paths as history;
+- `research/PLAN_model_arms_E6.md` (IMPLEMENTED): one dated note each beside `:338-341` (the names), `:381` (T4's name
+  check), `:746` and `:819`, `:821` (the kept reader's name; the growth rows), the old text kept;
+- `research/PLAN_model_arms_E3.md` (IMPLEMENTED): one dated note each beside `:810-811`, `:876`, `:885`, `:1146`, the old
+  text kept;
+- the plan records (E11-10): S4's brief, its `todo/README.md` row, its promotion (`research/PLAN_test_leftovers_E6_S4_brief.md`,
+  `research/README.md`), the stories' progress line.
+
+Read and NOT on the line: `research/module_tests.md` and `research/PLAN_model_arms.md` print no pilot path, no kept
+reader's name and no `TempFolder` form (**[M]**, the `git grep` of E11-2); `research/module_model_arms.md:1308` and the
+other IMPLEMENTED model-arms plans that name `testsToDelete-modelarms-…` (E1 `:1166`, `:1187`; E3 `:80`, `:152`; E4 `:1139`)
+record what was built then, and stay.
+
+S4's *Done when* (restated): rows E6-i and E6-l met by their checks; the S4 brief's scenarios (1)–(5) each RED first and
+RED again quoted; the ModelArms namespace green with its time beside the base's (2 m 10.7 s, S4's brief O8 **[D]**); the
+whole suite's FAILED list equal to the base's; no growth of `/tmp/testsToDelete-*modelarms*` across a namespace run;
+`TheAdaptedCopyTests` green; `git diff --name-only <base>..HEAD` within the *Files* above; `plan-lifecycle.mjs` clean.
+
+**S4's brief questions** (brief `4dc04820` § 14), each decided:
+
+| Q | Decided | Plan text or brief-level | Source |
+|---|---|---|---|
+| Q1 | disposition B, as the last row of the lifetime table; M2's probe a `TempFolder` | plan text: S4 *What*, *Files*, *Done when*; row E6-l | consult `1f60c647` (two of two); `33aa7f43` counted it |
+| Q2 | the C# guard's 33 extra findings under `ModelArms/` (16 `owner-blind` on the legacy lines and `M2:78`, 17 `"/tmp"` literals) are S4's; the literals are rewritten, never exempted; `owner-blind` takes no exemption anyway | plan text: row E6-i names both guards and the counts (it is the baseline here; under § *Epoch 10* it was already S4's by § 11's "in either guard") | this revision; the stories' DoD `:609` |
+| Q3 | `TimingLineTests.cs:311-312` becomes a neutral sample (`"/srv/x_1/arm.d ~y"`), the slug rule kept character for character | brief-level: the line makes nothing, it is within the *Files* and it only satisfies the *Done when* | S4's brief K2 |
+| Q4 | `PinnedConsumer`'s kept scratch moves INSIDE the owned folder under a plain name, as the stories already write; the failure message is the record; the docs that name the old kept name are on S4's *Files* | brief-level for the code (the stories decided it); plan text only for the *Files* | the stories' S4 *What*; E11-2 |
+| Q5 | the plan records are within every story's PR (E11-10); `research/module_tests.md` is not on S4's line (S7 closes those docs); the model-arms docs above are | plan text (*Files*) | this revision |
+| Q6 | `TempFolder.Dispose` no longer throws on a failed removal; the end-of-run audit names the folder | brief-level: rule §2 ("never throws") decides it | the detail § 2 |
+| Q7 | `PosixFolderIsolationTests.cs:321`: `OwnedDir.Create("drvfs", scratch)` on the operator's 9p mount; its limit written in the test's summary and the brief: a killed run leaves the claimed folder on that mount, which no start-of-run sweep reads; not run here or in CI (the variable is unset) | brief-level, with the limit stated | S4's brief K2, Q7 |
+| Q8 | the killed-child test sweeps the real temp root through the `Mine` seam restricted to its own folder and claim, and asserts that `Removed` holds exactly those two | brief-level | S4's brief K7, Q8 |
+
+**4.3 Narrowed: no.** S4 gains a disposition and a row (E6-l); row E6-i reads both guards with counts; S5, S6 and S7 gain
+named *Files* lines, both guards and counts (S6's scope widens by 14 C# findings); D6 and shape G are bounded so that
+nothing lands outside an owned folder by a path no guard reads. The one sentence that could read as smaller is who lists
+the inline exemptions: the DoD said "the stories list" (`:609`), S5 said "the brief lists" (`:500-501`). One rule now:
+the story's brief lists each exemption by file, line, class and reason before its plan gate, and the PR that adds it
+copies the list into the stories' § 11, so at merge the stories list every one, as the DoD says; no exemption is allowed
+that was not listed. Nothing of the goal, the Definition of Done, the merge conditions or the release is removed. **The
+epics do not change**: no Fable re-split; E6's and E7's stories are amended by Opus (item 5).
+
+**4.4 E7.S2 — the amendment it needs** (a NEW rag_qln PR, by Opus, before S2's plan gate; not written by this revision):
+
+1. § *The cornerstone* item 1 (the frame) and item 6 (the fixed ids): every store resource the live suite makes is one of
+   THREE: run-owned (the owner form `teststodelete_<owner>_qln_<what>_<id>`, dropped by the run, collected when abandoned);
+   a shared store under exemption (a); or, when the spec keeps a corpus across runs for the incremental path, a RETAINED,
+   operator-named resource outside the testsToDelete family (named from a required variable, never the prefix, never
+   collected by the test sweep, retired by a named operator step, with its number in § Growth). Entry 10.2's lesson, for
+   collections.
+2. A new item: the copied C# guard's word rule (E11-12). The spec names where the prefix is spelled (only the helper
+   folder; or a value the product receives rather than spells; or a manifest operation that changes the copy's helper
+   list, a discovery boundary), and both guards are observed on the name builder's and the sweep matcher's lines before
+   S2's plan gate (§ *Epoch 10* item 8.1).
+3. Row E7-l and S2's *Done when*: the guards' results on S2's own lines named per guard, with counts (item 8.1 below).
+4. S2's *Files*: named paths with the dependency that needs each, the plan records included (E11-10's rule).
+5. The status line: S3–S5 merged as #125.
+
+**4.5 The `/tmp/.git` finding — a benchmark todo, not built in S4.** `RootFacts.GitTopOf`
+(`tools/model-arms/ModelArms/Adapters/RootFacts.cs:19-23`) takes the nearest ancestor-or-self holding a `.git` file or
+folder, so ONE `/tmp/.git` makes every experiment root and scout root under `/tmp` refuse as "inside the git checkout
+/tmp" (`ExperimentFile.cs:70`, `ScoutRoots.cs:67`, `ProbeRoots.cs:41`, `FileSystemGateArtifactStore.cs:45`), as F42-c's two
+whole-suite runs met (`research/PLAN_test_leftovers_E6_F42c_brief.md:749-750` **[D]**). Checked by S4's brief § 12, read at
+`b348bb33`: every `git init` argv (40 sites), every `.git` written by hand (15), the temp root as a working directory,
+the spikes' Node tests: no cause in benchmark. Not checked: other repositories' tests and other processes on this shared
+machine; when the entry appeared. S4 does not change the exposure (its owned folders are in the same `/tmp`). The todo,
+for benchmark (recorded in E6's stories § 12 by the amendment, outside S4–S7): name a `<temp root>/.git` loudly at the
+start-of-run sweep instead of letting each test refuse, or run the suite under a run-scoped temp root outside `/tmp`;
+and find the creator on the machine. Not a prerequisite of any story.
+
+### 5. Build order
+
+```
+DONE   epoch 10 approved (#173) → E6's stories amended (#217) and E7's (#122) → F42-c (#218, `5070beda`) → rag_qln's
+       benchmark pin (#123) → entry 10.1 and the progress record (#174) → E7.S3–S5 (#125) → E6.S3 (#219, `b348bb33`)
+       → rag_qln's benchmark pin (#127) → S4's brief (local, entry 10.2) → the stop (#175, `62f9ae5d`) → this revision.
+       (Merge order, read from each PR's `mergedAt`.)
+NEXT   the Opus judge sorts epoch 10's work (step 5) → the plan gate on an operative extract and an independent Opus
+       review → epoch 11 opens `by reviewers` (Narrowed: no), at 0 changes.
+THEN   benchmark   E6's stories amendment (prepared on `docs/e6-stories-epoch-11`, a NEW PR) → S4's brief revised by new
+                   commits on `feat/e6-s4-modelarms` (K5 as row E6-l; § 0.1 as item 4.2's *Files*; § 9 as its *Done
+                   when*; § 14 answered; the C# half of row E6-l (3) observed) → S4's plan gate → S4.
+                   S5 and S6 briefs, each with its E11 items observed before its gate (at most three open PRs, the
+                   owner's allowance for E6 PRs over the cap); S7 after S4–S6 and the followups plan's S1 and S2 (D7).
+       rag_qln     E7's stories amendment (item 4.4) → S2's Fable spec → the owner's observations → S2's plan gate.
+LAST   the feature reviews (§ *Epoch 8* item 5); the promotion of this plan and its stories documents; R6 ticked in
+       the remainder plan.
+```
+
+### 6. What the consultants raised, and what was done with it
+
+| Point | Checked | Done |
+|---|---|---|
+| `33aa7f43`: a third disposition for the pilot scaffolds is a change of the story's approach | true: S4's *What* names two and neither fits (item 1) | entry 10.2, the stop |
+| `1f60c647` (1): the retained output goes to an operator-named folder from a REQUIRED variable, refused without it with a message naming the variable, never the temp root | the precedent `BENCH_ARTIFACT_ROOT` (`ProbesInputs.cs:75-78`, `:97`) refuses the same way | row E6-l; item 4.2 |
+| (2): children unprefixed `bench-m2-<what>-<id>`, `bench-m3-<what>-<id>` | no sweep matches an unprefixed name (D11; rule §1) | row E6-l |
+| (3): M2's probe (`:72-78`) has test lifetime → the helper | it is removed in `finally` today (`M2PilotScaffold.cs:118-124`), and M3 calls it too (`M3PilotScaffold.cs:54`) | item 4.2's first row |
+| (4): expected zero `raw-temp`, `legacy-name`, `owner-blind` in both guards on those lines, no marker | the Node half run (row E6-l, **[M]**); the C# half read (**[R]**) | row E6-l (3), observed before S4's gate |
+| (5): a rename under `Path.GetTempPath()` is still `raw-temp` in both guards | the Node control run (**[M]**); C# `LeftoversGuard.cs:72` | row E6-l's controls |
+| (6): `TempDir.Root` is clean only because the guards do not trace callers; never for retained output | S4's brief O6 **[D]** | E11-4; item 4.2 |
+| (7): the docs that print the old paths and the teardown steps are updated, historical observed paths kept; that puts named `research/*.md` files on S4's *Files* | the `git grep` of E11-2 **[M]**: three files print them; `module_tests.md` and `PLAN_model_arms.md` do not | item 4.2's *Files* |
+
+Added by this revision beyond the consultants: E11-3 to E11-12 (item 3.2), the lifetime table (item 4.2), the
+exemption-list rule (item 4.3) and E7's amendment (item 4.4). Rejected: nothing.
+
+### 7. Questions for the owner
+
+None for the approval (`Narrowed: no`). Still open, as § *Epoch 9* item 7: the live-store observations of rows E7-b
+(branch 2), E7-c and E7-f; until then E7.S2 does not go to its plan gate. The PR cap is settled for both amendments and
+for E6's stories (§ *Epoch 10* item 7: the owner's "Yes, every E6 PR" and "Yes, for all E7 PRs"). For the owner's next
+attended pilot (not a question): M2 and M3 now need `BENCH_PILOT_OUT` set to a folder outside every git checkout (and
+outside `/tmp`, which a WSL restart empties); `research/module_model_arms.md` says so after S4.
+
+### 8. The way of working — so an eleventh stop is less likely
+
+**8.1 What changes.** § *Epoch 10* item 8.1 stands as written (a claim about a copied tool is observed before the gate of
+the story or brief that relies on it, its six things named). Added, as criteria of the existing stories and brief gates:
+
+- **Every site a story disposes of is classified by LIFETIME before its plan gate** (item 4.2's table: the run; inside an
+  owned folder; a name never made or a path only read; must outlive the run; a test about the old name). A site that
+  fits no class STOPS before the gate, and the stories name the class's ONE disposition. Output that must outlive the run
+  never takes the prefix and never defaults to the temp root.
+- **Expected guard results name BOTH guards and give a count per class**, before and after, at a named base; a guard
+  that does not read a file kind is named as such (the read matrix), never assumed.
+- **Shape G (`TempDir.Root`, or any path built on it) only for a path nothing creates or keeps** (E11-4).
+- **Every story's *Files* line names its plan records and the docs that describe what it changes**, found by a `git
+  grep` of the old spellings over `*.md` at the brief's base, each doc line with what it says now; an IMPLEMENTED plan
+  gets a dated note beside the old text, never a rewrite of it.
+- **The inline exemptions are listed by the brief** (file, line, class, reason) and copied into the stories by the PR
+  (item 4.3).
+
+**8.2 The surprises still likely.**
+
+| Story | What it is likely to meet | Why |
+|---|---|---|
+| S4 | the C# half of row E6-l (3); the 9p site never run; the killed-child test on a loaded host | **[R]**; the variable is unset everywhere (Q7); a SIGKILL timing |
+| S5 | the probe path refuses a model id that names an owned folder (E11-3); more C#-only literals once the 72 sites are rewritten; product callees that create a "path-only" path (E11-4) | not run; the lists are of today's lines; not traced |
+| S6 | the `.py` tests run by Node through `python3 -I -m unittest` (`spikes/lang-bench/run-tests.mjs:7-8`), against this machine's rule for Python; run-time owner segments red in both guards (E11-7); its size (99 findings, 39 files) may need a commit series per folder | the machine's rule; F30's limits; counted here |
+| S7 | the followups plan's S1 and S2 not merged (D7); claims C3–C5 and C10's "with" half | that plan has no date; **[R]** |
+| E7.S2 | the C# word rule against a product-side name builder or sweep (E11-12); a reused corpus (item 4.4 point 1) | **[R]**; the spec's choice |
+
+*Found on the way* (2026-11-17, carried, not built): the copied C# guard reads a piece of the prefix word inside an
+unrelated identifier in a literal (`ProbeCellReportDto.LatestState` holds `testSt`, `owner-blind`, which takes no
+exemption; `Probes/ProbeContractsGuardTests.cs:19`): a limit of the template's `PrefixPieces` (five characters or more,
+case-insensitive), for the follow-ups plan's next record, beside F44; S5 rewrites its one line (E11-5).
+
+**8.3 What the other documents' own revisions must say.**
+
+- **Benchmark's E6 stories, a NEW PR, before S4's plan gate** (prepared, local, `docs/e6-stories-epoch-11` from
+  `b348bb33`): S4 as item 4.2 (*What*, *Files*, *Done when*); rows E6-i (restated) and E6-l (new); D6 as E11-3; S5 as
+  E11-4, E11-5; S6 as E11-6 to E11-8; S7 as E11-9; the plan-records line (E11-10); claims C6, C8 and C10 as E11-6 and
+  E11-11; the exemption-list rule in S5 and § 11 (item 4.3); the `/tmp/.git` todo in § 12 (item 4.5); the status line.
+- **S4's brief (local, `feat/e6-s4-modelarms`), new commits, never a rewrite:** K5 as row E6-l; § 0.1 as item 4.2's
+  *Files*; § 9 as its *Done when*; § 14's answers as item 4.2's table; the C# half of row E6-l (3) observed (§ 11).
+- **Rag_qln's E7 stories, a NEW PR, before E7.S2's plan gate:** item 4.4.
+- The follow-ups plan: the *Found on the way* note above, at its next record.
+
+**8.4 Run for this revision.** `node tools/plan-lifecycle.mjs` at this branch; the copied C# repository guard test
+(`--explicit only --filter-class "*LeftoversRepositoryGuardTests"`, the existing build in `wt/bench-e6s3`, tree =
+`b348bb33`): 173 findings over the tree, listed by file, line and class; the Node guard (`--profile node --token bench
+--identity "the measuring harness"`) in the same worktree: 209; `comm` of the two lists under `tests/` (the C#-only and
+Node-only lines of E11-5); `scanText` of the planned scaffold lines and controls (row E6-l); `git grep` of the old pilot
+and kept-reader spellings over `*.md` (E11-2), of `sweepLeftovers` over `spikes/` (E11-8), of `FakeHome`/`bench-fake-cli`
+(E11-3); `gh pr list --state merged` in conventions, benchmark, rag_qln and mcp since 2026-11-16 and the GitHub branch
+list of benchmark (item 1). Not checked: the consult texts (`1f60c647`, `33aa7f43`, `c3d71347`; the points are taken as
+the coordinator quoted them and checked against the files); every C# verdict on a NEW line (no build); anything with
+Docker; Python; E2's held feature review; the merges outside the plan's repositories (the judge's).
 
 ## Epics
 
