@@ -88,7 +88,7 @@ Not started; it follows the merge. Before the promotion, asked and counted (MAND
 `pin-check` at once in all nine consumers and on every open pull request there:
 
 1. **In-flight consumer releases:** for each of the nine, an open release pull request or a release workflow running; ask the
-   consultants, then the owner, whether any consumer is mid-release. A consumer mid-release is bumped after its release.
+   consultants, then the owner, whether any consumer is mid-release. The promotion waits until no consumer is mid-release: its release finishes first, because a promotion reddens its `pin-check` while the release still needs green checks (plan round 1, finding 2).
 2. **Open pull requests per repository**, counted that day against the cap of three
    ([common/pull-requests.md](../common/pull-requests.md) rule 7). A bump that would put a repository over three needs the
    owner's agreement, asked in one sentence that names what is queued there.
