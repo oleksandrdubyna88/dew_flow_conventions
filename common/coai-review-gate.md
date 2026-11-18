@@ -91,10 +91,11 @@ has reached a verdict that advances the stage (`proceed`, `continue_anyway`, `go
    which you declined. Verdict `escalated` → apply the named step and run a fresh round.
 
    Verdict `call_human` → surface the open findings to the person and stop.
-   **Do not proceed on your own judgement.** It comes only from a policy for *When the rounds run
-   out* that asks a person. Under `auto` — the default of every server that knows it — this gate
-   asks nobody: a plan, code or document round nobody answered ends `not_reviewed`, spent rounds end
-   `good_enough`, and no hold is raised. So `call_human` is the operator's choice: `human` or another
+   **Do not proceed on your own judgement.** It comes only under a policy other than `auto`:
+   `human` (and `escalate`, once its ladder is spent) when the rounds run out, and any other value
+   when nobody answered or a feature review reached its cap. Under `auto` — the default of every
+   server that knows it — this gate asks nobody: a plan, code or document round nobody answered ends
+   `not_reviewed`, spent rounds end `good_enough`, and no hold is raised. So `call_human` is the operator's choice: `human` or another
    value they set, including one a repository's workspace settings keep in force — or a server too
    old to know `auto`, which still asks a person by default.
 
@@ -115,7 +116,8 @@ has reached a verdict that advances the stage (`proceed`, `continue_anyway`, `go
    when one is recorded: tell the person, and stop as above. Any other hold from a build that predates
    `auto` is released by the next call that reads it. The next review call says so (or why it could
    not be released yet: call again), and `status` shows it in the held round's note; `ask_human`'s
-   reply says nothing about a release. Then call `resolve` once — with your decisions, or none — and
+   reply says nothing about a release that went through. One it could not write yet is answered
+   `no_answer_yet` with the reason: call again. Then call `resolve` once — with your decisions, or none — and
    the stage advances.
 
    This is enforced because it was not, and the cost is measured: on a three-round budget a stage

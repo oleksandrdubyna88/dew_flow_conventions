@@ -20,13 +20,12 @@ enforces.
 **The server's phase rule is the floor, not the target.** It lets a question asked while the plan is
 being formed, and the first two batches after the plan's `proceed`, go straight to the person, and it
 sends every later one — until the work is released to the stage environment — through
-`ask_consultants` first. That is what `mcp__coai__ask_human` checks.
-Under policy `auto` the floor rises to this rule's bar: in every phase, your own question without a
-`consultId` the server accepts is answered `consult_first`, unless no consultant can be had or it is a
-production risk. Measured 2026-10-09: a session put
-a list of planning questions straight to the person, which the floor allowed, and the person's answer
-was that most of the list belonged to the consultants — they wanted only what the two of you could not
-decide.
+`ask_consultants` first. That is what `mcp__coai__ask_human` checks. Under policy `auto` the floor
+rises to this rule's bar: in every phase, your own question without a `consultId` the server accepts
+is answered `consult_first`, unless no consultant can be had or it is a production risk. Measured
+2026-10-09: a session put a list of planning questions straight to the person, which the floor
+allowed, and the person's answer was that most of the list belonged to the consultants — they wanted
+only what the two of you could not decide.
 
 **So: no question reaches the person before the consultants have had it** — in every phase, the
 planning questions the server would let through included.
@@ -73,11 +72,11 @@ planning questions the server would let through included.
   asks the consultants itself and returns their answers in `consultantAnswers` — show those beside your
   question. While the plan is being formed, after the release, with the question consultants switched
   off, or when none can be had, it reaches the person at once with no consultant, under every policy.
-  On a round held under policy `auto` it writes no card: the hold is answered `no_answer_yet` at once.
+  On a held round, while the policy is `auto`, it writes no card: the hold is answered `no_answer_yet` at once.
 - **A skill or workflow whose step is to ask the person still asks.** A guided workflow's
   clarifying-questions phase is such a step: consult first if it sharpens the questions and put the
   answers beside them, but the step's questions go to the person, as the workflow says.
-  Under policy `auto` `mcp__coai__ask_human` answers such a question `consult_first` too, when it brings
+  Under policy `auto`, `mcp__coai__ask_human` answers such a question `consult_first` too, when it brings
   no accepted `consultId` and a consultant can be had: consult once for the step's batch, then bring the
   `consultId` and put the step's questions to the person.
 - **It is not the stuck consultant.** `common.coai-consultant` is for when YOU are stuck on the work;
