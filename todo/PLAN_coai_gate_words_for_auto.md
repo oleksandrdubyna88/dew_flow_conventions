@@ -1,8 +1,14 @@
 # PLAN — the four coai gate rules say what a server running policy `auto` does
 
-> Status: **plan only; the rule text is written on `docs/coai-gate-words-for-auto` and not yet merged, 2026-11-18.** Branch from `origin/main` `4ab5207`. Scope: `common/coai-review-gate.md`, `common/coai-document-gate.md`, `common/coai-feature-gate.md`, `common/coai-question-consultant.md`, their records in `research/rule-bodies.json`, this plan, and — after the merge — one `release` promotion and a pin bump in each of the nine consumers. No tool changes.
+> Status: **plan only, nothing implemented yet, 2026-11-18.** Scope: `common/coai-review-gate.md`, `common/coai-document-gate.md`, `common/coai-feature-gate.md`, `common/coai-question-consultant.md`, their records in `research/rule-bodies.json`, this plan, and — after the merge — one `release` promotion and a pin bump in each of the nine consumers. No tool changes. The rule text is drafted on branch `docs/coai-gate-words-for-auto` (from `origin/main` `4ab5207`) and is not merged.
 >
-> Source (a cross-repository citation is a path, so it is carried over here rather than linked): `dew_flow_connect_other_ais · todo/PLAN_auto_never_asks_a_person.md` § *E3* and its stories document `todo/PLAN_auto_never_asks_a_person_E3.md` (§ 4 is this plan's text, § 5 its release and pins). The change is named in both repositories' plans, as [common/planning-docs.md](../common/planning-docs.md) § *Across repositories* asks. A change ledger opens at this plan's first approval (its plan round's first passing verdict).
+> Source (a cross-repository citation is a path, so it is carried over here rather than linked): `dew_flow_connect_other_ais · todo/PLAN_auto_never_asks_a_person.md` § *E3* and its stories document `todo/PLAN_auto_never_asks_a_person_E3.md` (§ 4 is this plan's text, § 5 its release and pins). The change is named in both repositories' plans, as [common/planning-docs.md](../common/planning-docs.md) § *Across repositories* asks. The change ledger below opened at this plan's first approval: the plan round's first passing verdict, `proceed` (coai session `d9977293`, 2026-11-18).
+
+## Plan changes
+
+> Epoch 1 · approved 2026-11-18 · by reviewers · state: open
+
+  No entries. Finding 2 of the approving round (the promotion waits for a release in flight) was accepted in that round, before the approval. The judge's findings of the same day are folded into this plan and its rule text in the commit that records the approval; each is wording, a repaired accuracy, or a fix that only satisfies the plan as written ([common/plan-change-control.md](../common/plan-change-control.md) § *What counts as a change*, "not a change"). The one added sentence, in the feature rule, exists because that file would otherwise contradict itself under `auto`.
 
 ## Goal
 
@@ -15,7 +21,7 @@ on; an AI that meets `consult_first` asks the consultants and comes back with th
 the released server does (coai-mcp 0.66.0), and every sentence about `auto` is conditional on `auto`, so it stays true beside
 an older server.
 
-The cut: this plan is the rule text and its delivery. It changes no code in any repository.
+The cut: this plan is the rule text and its delivery. It changes no code in this repository; the coai bump's constant and test changes belong to the coai plan's E3.S2.
 
 ## The change, file by file
 
@@ -23,14 +29,14 @@ The wording is fixed in the source's § 4.1–4.4 and is carried by the branch's
 
 | File | Marker | Where | What changes |
 |---|---|---|---|
-| `common/coai-review-gate.md` | `coai-snippet` v5 → **v6** | the order sentence before step 1 | `review_code` REFUSES until a plan round reached a verdict that advances the stage (`proceed`, `continue_anyway`, `good_enough` or `not_reviewed`) and was resolved |
-| | | step 4 | `continue_anyway`, `good_enough`, `not_reviewed` advance the stage too; step 6 says what each asks |
-| | | step 6 | `not_reviewed` (resolve, say the stage was NOT reviewed and why, go on); `good_enough` and `continue_anyway`; `call_human` only from a policy that asks a person, never under `auto`, and a server too old to know `auto` still asks |
-| | | step 6, after the hold paragraph | under `auto` `ask_human` never waits and writes no card; a hold the person owns is answered `no_answer_yet` at once; any other hold from an older build is released by the next call that reads it, then one `resolve` |
-| | | before "Report the verdicts" | an AI's OWN question to `ask_human` is answered `consult_first` under `auto` without an accepted `consultId`, unless no consultant can be had or it is a production risk |
-| `common/coai-document-gate.md` | `coai-document` v3 → **v4** | the "applies here unchanged" sentence, step 4, the DoD | `not_reviewed` joins `call_human` there; step 4 gains the `not_reviewed` arm (resolve with the same `document`; the summary says the document was NOT reviewed) and marks `call_human` "never under policy `auto`"; the DoD line gains it |
-| `common/coai-feature-gate.md` | `coai-feature` v3 → **v4** | the verdicts paragraph, a new `not_reviewed` bullet, the person's request, the `call_human` bullet, the "unchanged" sentence, the DoD | under `auto` only two grounds remain for a second round; `not_reviewed` is the closing round nobody answered, resolved with `feature`, never a pass; the person's request is answered at once that no second round runs; `call_human` stops the release under any policy but `auto`, which ends `good_enough` or `not_reviewed` |
-| `common/coai-question-consultant.md` | `coai-question` v1 → **v2** | the floor paragraph, step 6, "What it does not change" (three bullets), the DoD | under `auto` the floor rises to the rule's bar: `consult_first` in every phase; the gate's own question writes no card (`no_answer_yet`); a production risk keeps its own path, spelled out by phase; a workflow step's questions get `consult_first` too, then one consultation for the batch |
+| `common/coai-review-gate.md` | `coai-snippet` v5 → **v6** | the order sentence before step 1 (`:42-43`) | `review_code` REFUSES until a plan round reached a verdict that advances the stage (`proceed`, `continue_anyway`, `good_enough` or `not_reviewed`) and was resolved |
+| | | step 4 (`:61-62`) | `continue_anyway`, `good_enough`, `not_reviewed` advance the stage too; step 6 says what each asks |
+| | | step 6 (`:84-88`) | `not_reviewed` (resolve, say the stage was NOT reviewed and why, go on); `good_enough` and `continue_anyway`; `call_human` only under a policy other than `auto` (`human`, and a spent `escalate` ladder, when the rounds run out; any other value when nobody answered or a feature review reached its cap), and a server too old to know `auto` still asks |
+| | | step 6, a new paragraph after `:96` | under `auto` `ask_human` never waits and writes no card; a hold the person owns is answered `no_answer_yet` at once; any other hold from an older build is released by the next call that reads it (`ask_human`'s reply says nothing about a release that went through, and answers `no_answer_yet` with the reason for one it could not write yet), then one `resolve` |
+| | | a new paragraph before `:108` ("Report the verdicts") | an AI's OWN question to `ask_human` is answered `consult_first` under `auto` without an accepted `consultId`, unless no consultant can be had or it is a production risk |
+| `common/coai-document-gate.md` | `coai-document` v3 → **v4** | the "applies here unchanged" sentence (`:39-40`), step 4 (`:59-64`), the DoD (`:86-87`) | `not_reviewed` joins `call_human` there; step 4 gains the `not_reviewed` arm (resolve with the same `document`; the summary says the document was NOT reviewed) and marks `call_human` "never under policy `auto`"; the DoD line gains it |
+| `common/coai-feature-gate.md` | `coai-feature` v3 → **v4** | the verdicts paragraph (`:50-52`), the `good_enough` bullet (`:57-61`), a new `not_reviewed` bullet after `:61`, the person's request (`:68-71`), the `call_human` bullet (`:72-74`), the "unchanged" sentence (`:80-82`), the DoD (`:93-94`) | under `auto` only two grounds remain for a second round; `good_enough` at the cap can carry a `blocking` finding the second round did not clear, landed as a NEW pull request and named in the summary; `not_reviewed` is the closing round nobody answered, resolved with `feature`, never a pass; the person's request is answered at once that no second round runs; `call_human` stops the release under any policy but `auto`, which ends `good_enough` or `not_reviewed` |
+| `common/coai-question-consultant.md` | `coai-question` v1 → **v2** | the floor paragraph (`:20-23`), step 6 (`:53-56`), "What it does not change" (the bullets at `:60-62`, `:63-65`, `:66-68`), the DoD (`:94-96`) | under `auto` the floor rises to the rule's bar: `consult_first` in every phase; the gate's own question writes no card (`no_answer_yet`); a production risk keeps its own path, spelled out by phase; a workflow step's questions get `consult_first` too, then one consultation for the batch |
 
 `coai-caller` (v2) and `coai-consultant` (v4) are unchanged. Not touched, with the reason: the document gate's and the
 caller rule's "it is separate because the gate rule is frozen" blockquotes — false since 2026-09-15 (`747887d`,
@@ -39,12 +45,25 @@ caller rule's "it is separate because the gate rule is frozen" blockquotes — f
 as written, which leaves open what opens a plan's epoch 1 when every plan round says `not_reviewed` (a finding for the
 parent coai plan, not this one).
 
+## A boundary with PLAN_product_manuals_go_home.md
+
+[PLAN_product_manuals_go_home.md](PLAN_product_manuals_go_home.md) has `common/coai-review-gate.md` and
+`common/coai-document-gate.md` in its scope, so the two plans meet on those files. This section is the same table that plan
+carries, seen from this side: a boundary, not a change to either plan's scope.
+
+| Item | Built by | The other plan's part |
+|---|---|---|
+| The verdict and status words for `auto` (`not_reviewed`, `consult_first`) in the four coai rules | this plan (E3 of the coai plan) | for `coai-review-gate.md` and `coai-document-gate.md`, the two that plan names: when it runs, moves them with the rest of the protocol. The feature and question rules are outside that plan. |
+| Merging `coai-caller-model.md` and `coai-document-gate.md` back (which removes the blockquotes), and their "frozen" blockquotes | PLAN_product_manuals_go_home.md, step 4 | none — this plan leaves both blockquotes as they are |
+
+Order: this plan first (it edits in place); the manuals plan later moves whatever is there. Disjoint otherwise.
+
 ## Markers
 
 The gate half's marker may move: the migration map that once froze it is read by one provenance test that never compares a
 live body, and what a body is checked against is `research/rule-bodies.json`. `tools/canonical-markers.test.mjs` pins only
 that each half's marker is `v\d+`. After this plan: v6, v4, v4, v2. A repository whose pasted copy or mounted rule is still at
-`coai-snippet v5` (or the other halves' old numbers) is reported `older` by the coai extension that carries v19 — until that
+`coai-snippet v5` (or the other halves' old numbers) is reported `older` by a coai extension whose artefact version is v19 (the menu title) — until that
 repository's pin bump lands. That is the panel saying the truth during the cascade, not a defect.
 
 ## Test plan — RED first

@@ -90,8 +90,8 @@ files. This section is a boundary, not a change to this plan's scope.
 
 | Item | Built by | The other plan's part |
 |---|---|---|
-| The verdict and status words for `auto` (`not_reviewed`, `consult_first`) in the four coai rules | PLAN_coai_gate_words_for_auto.md (E3 of the coai plan) | when it runs, moves them with the rest of the protocol; the server already carries them on its own surfaces (instructions and tool texts, coai-mcp 0.66.0) |
-| Merging `coai-caller-model.md` and `coai-document-gate.md` back, and their "frozen" blockquotes | this plan, step 4 | none — the other plan leaves both blockquotes as they are |
+| The verdict and status words for `auto` (`not_reviewed`, `consult_first`) in the four coai rules | PLAN_coai_gate_words_for_auto.md (E3 of the coai plan) | for `coai-review-gate.md` and `coai-document-gate.md`, the two this plan names: when it runs, moves them with the rest of the protocol. The feature and question rules are outside this plan. |
+| Merging `coai-caller-model.md` and `coai-document-gate.md` back (which removes the blockquotes), and their "frozen" blockquotes | this plan, step 4 | none — the other plan leaves both blockquotes as they are |
 
 Order: the other plan first (it edits in place); this plan later moves whatever is there. Disjoint otherwise.
 
