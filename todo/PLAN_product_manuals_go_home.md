@@ -82,6 +82,19 @@ change.
   whole catalog wherever the local rule is absent.
 - **The armed check stays armed.** Anything that survives the split is declared in its own file.
 
+## A boundary with the plan that rewrites the four coai gate rules' words for policy `auto`
+
+[PLAN_coai_gate_words_for_auto.md](PLAN_coai_gate_words_for_auto.md) edits `common/coai-review-gate.md` and
+`common/coai-document-gate.md` in place (and two coai rules this plan does not name), so the two plans meet on those
+files. This section is a boundary, not a change to this plan's scope.
+
+| Item | Built by | The other plan's part |
+|---|---|---|
+| The verdict and status words for `auto` (`not_reviewed`, `consult_first`) in the four coai rules | PLAN_coai_gate_words_for_auto.md (E3 of the coai plan) | when it runs, moves them with the rest of the protocol; the server already carries them on its own surfaces (instructions and tool texts, coai-mcp 0.66.0) |
+| Merging `coai-caller-model.md` and `coai-document-gate.md` back, and their "frozen" blockquotes | this plan, step 4 | none — the other plan leaves both blockquotes as they are |
+
+Order: the other plan first (it edits in place); this plan later moves whatever is there. Disjoint otherwise.
+
 ## Test plan
 
 - `node tools/ownership-check.mjs` — still exit 0, with no baseline, after every step.
