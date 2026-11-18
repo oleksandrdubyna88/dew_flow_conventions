@@ -67,7 +67,7 @@
     {
       "id": "common.coai-review-gate",
       "source": "common/coai-review-gate.md",
-      "bodySha256": "605e85ae3a3b4493c6908160d65379ca8ae96f5683a8bbc84db48225c5d9c331",
+      "bodySha256": "30ba246bd7dff5c375c1cdaa920e45cce7d46c9ae5048e4f305360ceb7c444b6",
       "sections": [
         "## Multi-model review gate (ConnectOtherAIs)"
       ]
