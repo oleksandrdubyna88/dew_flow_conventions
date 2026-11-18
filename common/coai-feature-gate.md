@@ -3,7 +3,7 @@ id: "common.coai-feature-gate"
 load: "conditional"
 tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
 ---
-<!-- coai-feature v3 -->
+<!-- coai-feature v4 -->
 ## Reviewing the whole FEATURE before release (ConnectOtherAIs)
 
 <!-- owns: coai — the MCP server this stage belongs to, named in its tool prefix -->
@@ -49,7 +49,7 @@ checks you are where you think you are, so one naming any other commit is refuse
 
 **What the verdicts mean.** One round is the budget. A second runs only on one of three grounds — a
 reviewer failure, a `blocking` finding, or the person asking for it — and no request of yours adds a
-third.
+third. Under policy `auto` the person cannot ask for a second round, so only the first two grounds remain.
 
 - `skipped` does NOT block the release. Nobody could review it — no vendor ticked for features, the
   stage switched off, or a plan under three epics. Tell the person the feature review did not run, and
@@ -59,6 +59,13 @@ third.
   but none is blocking: apply the ones that are true and useful as NEW pull requests, never by
   rewriting merged epics, and reject the rest with reasons. Your summary says what you took and what
   you declined.
+- `not_reviewed` — under policy `auto`, nobody answered the round that closes the review: a second
+  round (after a reviewer failure or a `blocking` finding in the first) or the only round of a budget
+  of one. That closing round reviewed nothing; a first round that was answered stays what it was, with
+  your decisions on its findings. Resolve with `feature` — a decision for each finding the reply still
+  carries (the security lane's), otherwise none — and say in your summary that the closing round was
+  NOT reviewed and why, apart from what an earlier round reviewed and found. It does not block the
+  release, and it is never a pass.
 - `revise` comes back only with a ground for the second round, and the reply names which:
   - **a `blocking` finding** — resolve every finding, land the accepted fixes as NEW pull requests, then
     call `mcp__coai__review_feature` again with `again: true` from the checkout once it holds them: its
@@ -68,10 +75,12 @@ third.
 - **The person's request** is the third ground, and only theirs: after the first round, ask with
   `mcp__coai__ask_human` and `feature`. Your own `again: true` is refused over the same base until they
   answer; once they say to keep going, call `mcp__coai__review_feature` again with `again: true` — it
-  needs no new commit.
-- `call_human` stops the release. It is also what a second round that still carries a `blocking`
-  finding, or fails again, comes back with. Surface the open findings and call `mcp__coai__ask_human`;
-  only the person's answer moves it on.
+  needs no new commit. Under policy `auto` that call is answered at once that no second round runs on
+  request, and the review closes on `mcp__coai__resolve`.
+- `call_human` stops the release — under any policy but `auto`. It is also what a second round that
+  still carries a `blocking` finding, or fails again, comes back with under such a policy; under `auto`
+  that round ends `good_enough`, or `not_reviewed` when nobody answered. Surface the open findings and
+  call `mcp__coai__ask_human`; only the person's answer moves it on.
 - `again: true` with a DIFFERENT `baseRef` starts a fresh review of the same plan — a release branch, a
   backport — and the earlier rounds stay on the record.
 
@@ -79,7 +88,7 @@ third.
 the other gates, and — because this session is keyed by the plan rather than the branch — it needs
 `feature: <planPath>`; so do `mcp__coai__status` and `mcp__coai__ask_human`. Everything the review-gate
 rule says about this being additional to your own review, about the `commands` a reply may carry and
-about `call_human` applies here unchanged.
+about `call_human` and `not_reviewed` applies here unchanged.
 
 ### Definition of Done
 
@@ -90,5 +99,5 @@ about `call_human` applies here unchanged.
 - [ ] Every finding got an accept or a reasoned reject through `mcp__coai__resolve`, with `feature` set
       to the plan path.
 - [ ] A second round ran only for a reviewer failure, a `blocking` finding or the person's request.
-- [ ] The summary names the verdict and the reviewer count — and, for `skipped`, why the review did not
-      run.
+- [ ] The summary names the verdict and the reviewer count — and, for `skipped` or `not_reviewed`, why
+      the review did not run or reviewed nothing.

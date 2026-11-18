@@ -3,7 +3,7 @@ id: "common.coai-question-consultant"
 load: "conditional"
 tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
 ---
-<!-- coai-question v1 -->
+<!-- coai-question v2 -->
 ## Before you ask the person, ask the consultants (ConnectOtherAIs)
 
 <!-- owns: coai — the MCP server this rule is about, and the prefix of every tool below -->
@@ -20,7 +20,10 @@ enforces.
 **The server's phase rule is the floor, not the target.** It lets a question asked while the plan is
 being formed, and the first two batches after the plan's `proceed`, go straight to the person, and it
 sends every later one — until the work is released to the stage environment — through
-`ask_consultants` first. That is what `mcp__coai__ask_human` checks. Measured 2026-10-09: a session put
+`ask_consultants` first. That is what `mcp__coai__ask_human` checks.
+Under policy `auto` the floor rises to this rule's bar: in every phase, your own question without a
+`consultId` the server accepts is answered `consult_first`, unless no consultant can be had or it is a
+production risk. Measured 2026-10-09: a session put
 a list of planning questions straight to the person, which the floor allowed, and the person's answer
 was that most of the list belonged to the consultants — they wanted only what the two of you could not
 decide.
@@ -53,19 +56,30 @@ planning questions the server would let through included.
 6. **Then the door, for what still goes to the person.** Call `mcp__coai__ask_human` with the `consultId` the consultants' reply gave you
    — it is accepted once, from this session, for 30 minutes — and with `document` or `feature` when the
    question belongs to one of those reviews. For your own question it answers `ask_in_conversation`:
-   ask the person in this conversation, with your own question tool.
+   ask the person in this conversation, with your own question tool. Without an accepted `consultId`,
+   under policy `auto`, it answers `consult_first` instead and reaches nobody — when a consultant can
+   be had and the question is not a production risk: ask the consultants, as above, and come back with
+   the `consultId` only for what they did not settle.
 
 ### What it does not change
 
 - **The review gate's own question never goes to the consultants.** A round held by `call_human`, or a
   feature review's request for a second round, is the person's: `mcp__coai__ask_human` puts it on a
-  card directly.
+  card directly. Under policy `auto` it writes no card and waits for nobody: a held round is answered
+  `no_answer_yet` at once, and its instruction says what to do; a request for a second feature round
+  is answered at once that none runs on request.
 - **A production risk keeps its own path.** When a wrong answer could take production down, pass
-  `productionRisk: true` with a `riskReason` to `mcp__coai__ask_human`: it asks the consultants itself
-  and returns their answers in `consultantAnswers` — show those beside your question.
+  `productionRisk: true` with a `riskReason` to `mcp__coai__ask_human`. While the work is being built it
+  asks the consultants itself and returns their answers in `consultantAnswers` — show those beside your
+  question. While the plan is being formed, after the release, with the question consultants switched
+  off, or when none can be had, it reaches the person at once with no consultant, under every policy.
+  On a round held under policy `auto` it writes no card: the hold is answered `no_answer_yet` at once.
 - **A skill or workflow whose step is to ask the person still asks.** A guided workflow's
   clarifying-questions phase is such a step: consult first if it sharpens the questions and put the
   answers beside them, but the step's questions go to the person, as the workflow says.
+  Under policy `auto` `mcp__coai__ask_human` answers such a question `consult_first` too, when it brings
+  no accepted `consultId` and a consultant can be had: consult once for the step's batch, then bring the
+  `consultId` and put the step's questions to the person.
 - **It is not the stuck consultant.** `common.coai-consultant` is for when YOU are stuck on the work;
   this rule is for a question you would otherwise put to the person.
 
@@ -93,4 +107,5 @@ do you ask the person in this conversation directly.
       recommendation.
 - [ ] `mcp__coai__ask_human` received the `consultId` when the consultants answered; when none could be
       had it was called without one, and only with the `coai` tools absent was the person asked in this
-      conversation directly. The review gate's own question and a production risk took their own paths.
+      conversation directly. A `consult_first` reply was followed by `mcp__coai__ask_consultants`, never
+      by asking the person. The review gate's own question and a production risk took their own paths.

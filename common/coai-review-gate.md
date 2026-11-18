@@ -3,7 +3,7 @@ id: "common.coai-review-gate"
 load: "conditional"
 tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
 ---
-<!-- coai-snippet v5 -->
+<!-- coai-snippet v6 -->
 ## Multi-model review gate (ConnectOtherAIs)
 
 <!-- A token is matched EXACTLY, so `coai` does not cover `mcp__coai__open`: every tool name below
@@ -40,7 +40,8 @@ Follow them, and say in your summary which ones you applied. An empty list means
 nothing, which is the default.
 
 **The order is a contract, and the server enforces it — `review_code` REFUSES until a plan round
-has reached `proceed`.**
+has reached a verdict that advances the stage (`proceed`, `continue_anyway`, `good_enough` or
+`not_reviewed`) and was resolved.**
 
 1. **Before implementing anything non-trivial**, call `open` for the repository you are working in:
    `repoPath` is that checkout's own path (`git rev-parse --show-toplevel`), `branch` is
@@ -59,7 +60,8 @@ has reached `proceed`.**
    falls. Rejecting early is not a way to move faster — it is the only way the round after this one
    is about the same document.
 4. Verdict `revise` → fix the accepted findings, run `review_plan` again. Verdict `proceed`
-   → implement.
+   → implement. `continue_anyway`, `good_enough` and `not_reviewed` advance the stage too; step 6
+   says what each asks of you first.
 5. **When the branch is written and COMMITTED**, call `review_code` with the same `planText` and
    the `baseRef` you branched from. Three independent reviewers per vendor read the diff. Same
    `resolve` duty, same loop. Only committed changes are reviewed; an empty diff is refused, never
@@ -81,11 +83,23 @@ has reached `proceed`.**
    `baseRef`. The plan you passed at step 2 is kept with the session and reused automatically,
    so in the normal flow this costs you nothing.
 
-6. Verdict `call_human` → surface the open findings to the person and stop.
-   **Do not proceed on your own judgement.** Verdict `escalated` → apply the named step and run
-   a fresh round.
+6. Verdict `not_reviewed` → no reviewer answered, so this stage was NOT reviewed. It is never a
+   pass. Call `resolve` — with a decision for each finding the reply still carries (the security
+   lane's can stand), otherwise with none — say in your summary that the stage was not reviewed and
+   why (the reply names what failed), and go on. Verdict `good_enough` or `continue_anyway` → the
+   rounds are spent: do what the reply says, and say in your summary which findings you took and
+   which you declined. Verdict `escalated` → apply the named step and run a fresh round.
 
-   **The server will not take another round until a person answers, and this is enforced.** After
+   Verdict `call_human` → surface the open findings to the person and stop.
+   **Do not proceed on your own judgement.** It comes only from a policy for *When the rounds run
+   out* that asks a person. Under `auto` — the default of every server that knows it — this gate
+   asks nobody: a plan, code or document round nobody answered ends `not_reviewed`, spent rounds end
+   `good_enough`, and no hold is raised. So `call_human` is the operator's choice: `human` or another
+   value they set, including one a repository's workspace settings keep in force — or a server too
+   old to know `auto`, which still asks a person by default.
+
+   **When `call_human` does come, the server will not take another round until a person answers,
+   and this is enforced.** After
    `call_human`, `review_plan` and `review_code` REFUSE — running the review again is not one
    of your options, and neither is resolving your way past it: recording decisions no longer
    reopens it. Call `ask_human`. Their answer decides: *keep going* and *stop and act on the
@@ -94,6 +108,15 @@ has reached `proceed`.**
    hold's own notice card. When `status` says a person pressed Proceed, call `resolve` to advance.
    **Never pass `humanDecision` yourself.** No argument of yours releases a held gate: the server
    refuses one that would change the outcome and ignores one that would not.
+
+   Under `auto`, `ask_human` never waits and writes no card. A hold the person owns — one raised
+   under a policy that asks a person by a server that knows `auto`, or one from before `auto` that
+   the person has already answered — is answered `no_answer_yet` at once, naming the hold's notice
+   when one is recorded: tell the person, and stop as above. Any other hold from a build that predates
+   `auto` is released by the next call that reads it. The next review call says so (or why it could
+   not be released yet: call again), and `status` shows it in the held round's note; `ask_human`'s
+   reply says nothing about a release. Then call `resolve` once — with your decisions, or none — and
+   the stage advances.
 
    This is enforced because it was not, and the cost is measured: on a three-round budget a stage
    reached round TEN, every round after the third a full panel of reviewers. The AI running it
@@ -104,6 +127,13 @@ has reached `proceed`.**
    "Stop" here means stop SHIPPING over open findings — it does not end the task. Your own review,
    your summary, and anything else your workflow does still run: this gate decides whether the
    change may proceed, not what else you owe the person.
+
+**Your OWN question to `ask_human`** — not one this gate asks — is answered `consult_first` under
+`auto` when it brings no `consultId` the server accepts, unless no consultant can be had or it is a
+production risk: call `ask_consultants`, settle it with them, and call `ask_human` again with their
+`consultId` only for what you did not settle; then it reaches the person (`ask_in_conversation`).
+When no consultant can be had it reaches the person at once, and its `note` says why. A production
+risk keeps its own path: the question rule, `common.coai-question-consultant`, says which.
 
 Report the verdicts and the reviewer counts in your summary. A round that ran with four of six
 reviewers says so — pass that on rather than implying a full panel agreed.

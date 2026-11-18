@@ -37,7 +37,7 @@
     {
       "id": "common.coai-document-gate",
       "source": "common/coai-document-gate.md",
-      "bodySha256": "6da343a2f7559e0d725965c804bb8b46ac079887d64c983237ecc52aec9c380a",
+      "bodySha256": "04490818917e1ce2b8f842f53a9156c87198579609d84235393cb783e357e1e4",
       "sections": [
         "## Reviewing a DOCUMENT rather than a change",
         "## Definition of Done"
@@ -46,7 +46,7 @@
     {
       "id": "common.coai-feature-gate",
       "source": "common/coai-feature-gate.md",
-      "bodySha256": "cbf1c0deec3a5b99fea4ca93acb8d2c0d7fb3a422613774bb14bd26813bf4f4e",
+      "bodySha256": "820835111eb2595e7c24d823f86eecd3dd59f33a08f9ede6c0366f7bb55541d8",
       "sections": [
         "## Reviewing the whole FEATURE before release (ConnectOtherAIs)",
         "### Definition of Done"
@@ -55,7 +55,7 @@
     {
       "id": "common.coai-question-consultant",
       "source": "common/coai-question-consultant.md",
-      "bodySha256": "369af5c4661daad28cdc34c7ecb2bab7cc9626d2e80edac08f8f7d5b357cf48a",
+      "bodySha256": "8b57a69c05b734dc0539f74c87be78c3c0f8d14611541fd6017bf63cb3495bfa",
       "sections": [
         "## Before you ask the person, ask the consultants (ConnectOtherAIs)",
         "### How",
@@ -67,7 +67,7 @@
     {
       "id": "common.coai-review-gate",
       "source": "common/coai-review-gate.md",
-      "bodySha256": "d3203daf7b07d7172b710bec0c84b0f8399ee69feda43374fa55dfb07215c923",
+      "bodySha256": "5a137d1acd2b7bec95bc4408712de81a5544acc7b4d70c647f31a7ed11397f18",
       "sections": [
         "## Multi-model review gate (ConnectOtherAIs)"
       ]

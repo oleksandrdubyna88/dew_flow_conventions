@@ -3,7 +3,7 @@ id: "common.coai-document-gate"
 load: "conditional"
 tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
 ---
-<!-- coai-document v3 -->
+<!-- coai-document v4 -->
 ## Reviewing a DOCUMENT rather than a change
 
 <!-- owns: coai — the MCP server this stage belongs to, named in its tool prefix -->
@@ -37,7 +37,7 @@ round is keyed by the document while the code gate asks about the branch — and
 eventually meet says nothing about which gate you used by mistake.
 
 Everything the review-gate rule says about this being ADDITIONAL to your own review, about the
-`commands` a round may carry, and about `call_human` applies here unchanged.
+`commands` a round may carry, and about `call_human` and `not_reviewed` applies here unchanged.
 
 1. `open` for the repository you are working in — `repoPath` is that checkout's own path, `branch`
    is its current branch. A document review still happens IN a repository.
@@ -59,9 +59,11 @@ Everything the review-gate rule says about this being ADDITIONAL to your own rev
 4. Act on the VERDICT before you consider another round, exactly as you would at the other gates:
    `revise` → fix what you accepted and call `review_document` again; `proceed`, `good_enough` or
    `continue_anyway` → the document gate is done, and your summary says what you took and what you
-   declined; `call_human` → surface the open findings and stop, with `ask_human` to fetch the
-   person; `escalated` → apply the named step and run a fresh round. Running the review again is
-   never a way past a verdict that asked for something else.
+   declined; `not_reviewed` → no reviewer answered: `resolve` with the same `document`, and your
+   summary says the document was NOT reviewed and why — never that it passed; `call_human` (never
+   under policy `auto`) → surface the open findings and stop, with `ask_human` to fetch the person;
+   `escalated` → apply the named step and run a fresh round. Running the review again is never a way
+   past a verdict that asked for something else.
 5. Editing the document between rounds keeps the session: identity is the path, or the name you gave
    raw text, never the content. A review that has FINISHED is re-opened only with
    `newReview: true`, which starts a fresh review and leaves the finished one on the record.
@@ -84,7 +86,8 @@ add their own, in their own language, with their own prompt.
 - [ ] Every finding of every round got an `accept` or a reasoned `reject` through `resolve`, with
       the same `document` passed back.
 - [ ] The verdict was acted on rather than re-run: fixes for `revise`, a person for `call_human`,
-      the named step for `escalated`.
+      the named step for `escalated`, and a summary that says the document was not reviewed for
+      `not_reviewed`.
 - [ ] The reviewers' `notes` were read and passed on — that is the account somebody asked for, and
       it is the one thing a findings list does not contain.
 - [ ] The summary names the verdict, the reviewer count, and what was accepted and declined.
