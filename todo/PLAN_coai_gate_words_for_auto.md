@@ -1,6 +1,6 @@
 # PLAN — the four coai gate rules say what a server running policy `auto` does
 
-> Status: **plan only, nothing implemented yet, 2026-11-18.** Scope: `common/coai-review-gate.md`, `common/coai-document-gate.md`, `common/coai-feature-gate.md`, `common/coai-question-consultant.md`, their records in `research/rule-bodies.json`, this plan, and — after the merge — one `release` promotion and a pin bump in each of the nine consumers. No tool changes. The rule text is drafted on branch `docs/coai-gate-words-for-auto` (from `origin/main` `4ab5207`) and is not merged.
+> Status: **the rule text merged 2026-11-18 as #182 (`25d551b8`); the pre-checks of the release made and answered 2026-11-19 (below), the promotion next.** Before that: **plan only, nothing implemented yet, 2026-11-18.** Scope: `common/coai-review-gate.md`, `common/coai-document-gate.md`, `common/coai-feature-gate.md`, `common/coai-question-consultant.md`, their records in `research/rule-bodies.json`, this plan, and — after the merge — one `release` promotion and a pin bump in each of the nine consumers. No tool changes. The rule text is drafted on branch `docs/coai-gate-words-for-auto` (from `origin/main` `4ab5207`) and is not merged.
 >
 > Source (a cross-repository citation is a path, so it is carried over here rather than linked): `dew_flow_connect_other_ais · todo/PLAN_auto_never_asks_a_person.md` § *E3* and its stories document `todo/PLAN_auto_never_asks_a_person_E3.md` (§ 4 is this plan's text, § 5 its release and pins). The change is named in both repositories' plans, as [common/planning-docs.md](../common/planning-docs.md) § *Across repositories* asks. The change ledger below opened at this plan's first approval: the plan round's first passing verdict, `proceed` (coai session `d9977293`, 2026-11-18).
 
@@ -105,7 +105,7 @@ still asks a person by default" names that server. Nothing is false.
 
 ## Release, and the nine bumps
 
-Not started; it follows the merge. Before the promotion, asked and counted (MANDATORY), because a promotion reddens
+The rule text merged as #182 (`25d551b8`, 2026-11-18). Before the promotion, asked and counted (MANDATORY), because a promotion reddens
 `pin-check` at once in all nine consumers and on every open pull request there:
 
 1. **In-flight consumer releases:** for each of the nine, an open release pull request or a release workflow running; ask the
@@ -115,6 +115,17 @@ Not started; it follows the merge. Before the promotion, asked and counted (MAND
    owner's agreement, asked in one sentence that names what is queued there.
 3. **What the release carries:** `git log --oneline origin/release..<this plan's merge sha>`. Anything beyond this plan and
    plan documents — a tier rule above all — is said, and the consumer that pins a rule-size budget re-baselines in its bump.
+
+**The pre-checks, made and answered 2026-11-19, before the dispatch:**
+
+1. **In flight:** no release workflow running in any of the nine. Open release-please pull requests, standing between
+   releases: dew_flow_sidecar_rust 0.3.0, wsl_care daemon 0.7.0, dew_flow_creds_for_devs extension 1.23.0 (held by the
+   owner) and cli 0.6.0. The four live agent sessions each answered that they run no release. The consultants (coai
+   `e4628965…`) split — one for promoting, one for asking the owner — so the owner was asked: **promote now** (2026-11-19).
+2. **Open pull requests:** benchmark 5, mcp 5, sidecar_rust 8, vscode_kit 3, wsl_care 10, creds 6, amd_r9700 0, rag_qln 17,
+   the coai repository 12 — the bump puts seven over the cap. The owner agreed to **all nine** bumps (2026-11-19).
+3. **What the release carries** (`origin/release` `b174649` → `25d551b8`): this plan's #182 and plan documents only
+   (#172–#180: the test-leftovers rollout plan, its follow-ups, and `research/README.md`). No tier rule and no tool moved.
 
 Then `gh workflow run promote-release.yml --ref main -f "sha=<merge sha, 40 hex>" -f reason="the coai gate's words for policy auto"`,
 verified by `git ls-remote <the repository> refs/heads/release` answering that sha (the workflow refuses a sha whose `ci` run
