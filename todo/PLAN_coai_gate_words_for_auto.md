@@ -8,7 +8,9 @@
 
 > Epoch 1 · approved 2026-11-18 · by reviewers · state: open
 
-  No entries. Finding 2 of the approving round (the promotion waits for a release in flight) was accepted in that round, before the approval. The judge's findings of the same day are folded into this plan and its rule text in the commit that records the approval; each is wording, a repaired accuracy, or a fix that only satisfies the plan as written ([common/plan-change-control.md](../common/plan-change-control.md) § *What counts as a change*, "not a change"). The one added sentence, in the feature rule, exists because that file would otherwise contradict itself under `auto`.
+- 1.1 · 2026-11-18 · reviewer · dod — the post-deploy native-agent smoke (item 3) is run, no longer recordable as not run
+
+  Before 1.1, no entries. Finding 2 of the approving round (the promotion waits for a release in flight) was accepted in that round, before the approval. The judge's findings of the same day are folded into this plan and its rule text in the commit that records the approval; each is wording, a repaired accuracy, or a fix that only satisfies the plan as written ([common/plan-change-control.md](../common/plan-change-control.md) § *What counts as a change*, "not a change"). The one added sentence, in the feature rule, exists because that file would otherwise contradict itself under `auto`.
 
 ## Goal
 
@@ -141,6 +143,7 @@ Rollback is a forward release (revert here, promote), then bump again — never 
 - [ ] Nine bump pull requests merged with their checks present and green; rag_qln's code pins moved after benchmark and mcp.
 - [ ] **The post-deploy run:** after the coai repository's bump merged, from a pulled checkout of its `main`,
       `node .agents/conventions/tools/post-deploy-check.mjs --target <that checkout>` — items 1–2 automatic (`rules check` on the
-      target; `gate-snippet-check`, which prints `(v6)`); item 3, the native-agent smoke, run or recorded as not run, with the
-      reason. Its result, its date and the delivered sha are written here.
+      target; `gate-snippet-check`, which prints `(v6)`); item 3, the native-agent smoke, RUN — `tools/smoke-rules.mjs` for both native CLIs against a disposable
+      worktree at the delivered coai commit, the successful source reads of the four rules and the final constraints
+      inspected (`POST_DEPLOY.md`: a rollout is not complete without it; plan round 2, finding 0). Its result, its date and the delivered sha are written here.
 - [ ] This plan is promoted to `research/` with its deviations once the release and the nine bumps are merged.
