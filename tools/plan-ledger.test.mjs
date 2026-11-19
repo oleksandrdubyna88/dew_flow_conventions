@@ -117,7 +117,8 @@ test("the lists are the contract: pinned to the parent plan's §2, and frozen", 
   assert.deepEqual([...SOURCES], ["owner", "agent", "reviewer"]);
   assert.deepEqual([...KINDS], ["scope", "goals", "dod", "merge-conditions", "epics", "stories", "build-order", "contract", "approach"]);
   assert.deepEqual([...STATES], ["open", "stopped", "closed"]);
-  assert.deepEqual([...APPROVERS], ["reviewers", "owner"]);
+  // `nobody` added 2026-11-19 (todo/PLAN_coai_auto_followups.md § P2): additive, no recorded plan changes
+  assert.deepEqual([...APPROVERS], ["reviewers", "owner", "nobody"]);
   assert.deepEqual([...VERDICTS], ["fits", "cut", "—"]);
   assert.equal(STOP_PHRASE.source, "\\bstopped for re-review\\b");
   assert.equal(STOP_PHRASE.flags, "i");
@@ -474,6 +475,28 @@ test("row 8 — a narrowed re-review approved by reviewers is red; by owner it i
   said(check(B({ rec: { narrowed } })), "epoch 2 is narrowed (Narrowed: yes) and approved by reviewers", "a smaller plan needs the owner");
   clean(check(B({ rec: { narrowed }, e2: { by: "owner" } })));
   clean(check(B({ rec: { narrowed: "Narrowed: no" }, e2: { by: "owner" } }))); // not red by choice: a whole plan may still go to the owner
+});
+
+// ---- P2: an epoch opened by a plan round nobody reviewed (todo/PLAN_coai_auto_followups.md § P2) ----
+
+test("P2 a `by nobody` epoch counts exactly like a reviewed one: one change goes on, the second stops", () => {
+  const nobody = (lines) => lines.map((line) => line.replace("· by reviewers ·", "· by nobody ·"));
+  clean(check(nobody(A())), "a not-reviewed baseline with one change is clean");
+  for (const [shape, options] of [[A2(), {}], [A2("stopped"), { status: STOPPED }], [A2("stopped"), {}]]) {
+    const reviewed = check(shape, options);
+    assert.deepEqual(check(nobody(shape), options), reviewed, "the count and the stop must not depend on who opened the epoch");
+  }
+  assert.ok(check(A2()).length > 0, "the reviewed twin of a second change in an open epoch is red, so the equality above has teeth");
+});
+
+test("P2 a re-review that nobody reviewed opens the next epoch `by nobody`; narrowed, it needs the owner", () => {
+  clean(check(B({ e1: { by: "nobody" }, e2: { by: "nobody" } })));
+  const narrowed = "Narrowed: yes — the Windows run left the merge conditions";
+  said(check(B({ rec: { narrowed }, e2: { by: "nobody" } })), "epoch 2 is narrowed (Narrowed: yes) and approved by nobody", "a smaller plan needs the owner");
+});
+
+test("P2 the missing-epoch hint names every approver, `nobody` too", () => {
+  said(check(["- 1.1 · 2026-10-26 · owner · epics — a cause"]), "by reviewers|owner|nobody · state: open");
 });
 
 // ---- row 9 ----

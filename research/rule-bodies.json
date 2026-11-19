@@ -46,7 +46,7 @@
     {
       "id": "common.coai-feature-gate",
       "source": "common/coai-feature-gate.md",
-      "bodySha256": "1a31da17d31ab669d51781478a6a7098e64593c6a32afdd21887a73de40de019",
+      "bodySha256": "696b2ce6099fcd9937bfb3bb948649880c601f5c6273464a78827da4da655d73",
       "sections": [
         "## Reviewing the whole FEATURE before release (ConnectOtherAIs)",
         "### Definition of Done"
@@ -244,7 +244,7 @@
     {
       "id": "common.plan-change-control",
       "source": "common/plan-change-control.md",
-      "bodySha256": "bea33465ca71f25c98b47d3fee2cdda30eb58fd39fdbf6732eec5d46dd8258d2",
+      "bodySha256": "1dba4b62c7159218aad1436b9e32796bb81494e1c27170383fa0cb91db998c0b",
       "sections": [
         "# A plan changed twice after its approval stops for a whole re-review (MANDATORY)",
         "## Why — measured",

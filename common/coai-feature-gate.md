@@ -3,7 +3,7 @@ id: "common.coai-feature-gate"
 load: "conditional"
 tasks: ["plan","implement","docs","policy","test","git","pr","release","deploy","dependencies"]
 ---
-<!-- coai-feature v4 -->
+<!-- coai-feature v5 -->
 ## Reviewing the whole FEATURE before release (ConnectOtherAIs)
 
 <!-- owns: coai — the MCP server this stage belongs to, named in its tool prefix -->
@@ -58,9 +58,9 @@ third. Under policy `auto` the person cannot ask for a second round, so only the
   is owed — one runs later only if the person asks for it (below). On `good_enough` the findings gate
   but none is blocking: apply the ones that are true and useful as NEW pull requests, never by
   rewriting merged epics, and reject the rest with reasons — except under policy `auto` at the cap,
-  where `good_enough` can carry a `blocking` finding the second round did not clear: land it as a NEW
-  pull request like the rest and name it in your summary. Your summary says what you took and what
-  you declined.
+  where `good_enough` can carry a `blocking` finding the second round did not clear: verify it as any
+  other finding: land a true one as a NEW pull request and name it in your summary, reject a false one
+  with its reason. Your summary says what you took and what you declined.
 - `not_reviewed` — under policy `auto`, nobody answered the round that closes the review: a second
   round (after a reviewer failure or a `blocking` finding in the first) or the only round of a budget
   of one. That closing round reviewed nothing; a first round that was answered stays what it was, with

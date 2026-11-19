@@ -60,6 +60,10 @@ FIRST change is not free of the other rules: if it changes the shape of the work
 - Approval is the first passing plan-round verdict (`proceed`, `good_enough` or `continue_anyway`) or the owner's
   go-ahead where no review server runs, whichever comes first. It opens epoch 1: that commit writes the heading and
   the epoch 1 line.
+- Under policy `auto`, a resolved plan round that ended `not_reviewed` advances the stage without passing. When no
+  approval came first, it opens epoch 1 `by nobody`: a counting baseline, never an approval. A `by nobody` epoch is
+  opened, not approved, yet it stands where this rule says "approval": the ONE change and the full stop count from it
+  as from any epoch, and the summary still says the plan was NOT reviewed ([coai-review-gate.md](coai-review-gate.md)).
 - Two branches that each record one change merge into a plan with two: the check turns red at the merge, which is where
   the stop belongs. That merge or the commit after it renumbers the later entry `k.2` and writes the stop.
 - A plan approved before this rule reaches its repository (with the rules pin)
@@ -95,7 +99,7 @@ Narrowed: yes — the Windows run left the merge conditions
 - 2.1 · 2026-10-29 · agent · build-order — E3 needs E2's helper first
 ```
 
-Line shapes: `> Epoch <k> · approved <YYYY-MM-DD> · by reviewers|owner · state: open|stopped|closed` and
+Line shapes: `> Epoch <k> · approved <YYYY-MM-DD> · by reviewers|owner|nobody · state: open|stopped|closed` and
 `- <k>.<n> · <YYYY-MM-DD> · owner|agent|reviewer · <kinds> — <cause>`, kinds comma-separated from `scope`, `goals`,
 `dod`, `merge-conditions`, `epics`, `stories`, `build-order`, `contract`, `approach`. The highest epoch is current, the
 rest `closed`. The separators are ` · ` (U+00B7) and ` — ` (U+2014), never `|`, `--` or an en dash; keywords and values
@@ -132,7 +136,10 @@ is never written**: it is the entries of the current epoch.
    when they start; the cornerstone ledger is recounted.
 8. **Re-review**, then **resume**: epoch k+1's line, `open`; epoch k becomes `closed`. If scope, the Definition of Done,
    the merge conditions or the release got smaller, the record says `Narrowed: yes`, the owner approves first and the
-   epoch line says `by owner`. Epoch k+1 starts at 0 changes.
+   epoch line says `by owner`. Under policy `auto` the plan round of the re-review may end `not_reviewed`; the
+   whole plan was still reviewed again by steps 3–7 (the consultation, the whole revision, the Opus judge), so it opens
+   epoch k+1 `by nobody` — unless it is narrowed: that still needs the owner, and the plan stays stopped. Epoch k+1
+   starts at 0 changes.
 
 ## Reviewing the revised plan
 
@@ -158,7 +165,7 @@ review runs as always, in addition.
 [`tools/plan-lifecycle.mjs`](../tools/plan-lifecycle.mjs) reads the ledger of every plan in `todo/` — never `research/`
 or git history. It is red when the current epoch has two entries and is not stopped, a stop is not in the status
 paragraph, a line cannot be read, numbers or epochs are out of order or an epoch's date goes back, a re-review record is
-missing, reviewers approved a narrowed epoch, or a stories document whose parent is in `todo/` carries a ledger.
+missing, a narrowed epoch is approved by anyone but the owner, or a stories document whose parent is in `todo/` carries a ledger.
 
 **The check validates the prescribed ledger syntax and detects specified malformed variants; a clean result does not prove that every change was recorded or the stop obeyed.**
 
