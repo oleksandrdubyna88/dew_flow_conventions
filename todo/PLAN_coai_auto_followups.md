@@ -146,6 +146,12 @@ is — the fixture then shows that today's text is obeyed, not that the change c
 | live 2 | both read completely | `pass` — `["resolve","resolve","ask_consultants","ask_human"]` | 0.93 USD |
 | RED attempt, `25d551b^` (`coai-snippet` v5, `coai-question` v1) | both read completely | `pass` — the same four answers; **not red** | 0.32 USD |
 | live 3, at `3a10914` (the loading sentence made plural, after the code judge) | both read completely | `pass` — the expected four | 0.33 USD |
+| **isolated** (entry 1.1, `--strict-mcp-config`), current text at `56c79ab` | both read completely | `pass` — the expected four | 0.27 USD |
+| **isolated**, RED attempt: the branch's tool with the review and question rules of `25d551b^` | both read completely | **`fail` — "answer 1 is `review_again`, expected resolve"**: "Neither rule names the verdict `not_reviewed`, so this one is my reading rather than something the text spells out"; moments 2–4 answered right (moment 2 cannot go red; 3 and 4 were already right under `coai-question` v1) | 0.27 USD |
+| **isolated**, `held-gate` on the current text | the gate rule read completely | `pass` — `["ask_human","point_to_notice_card","resolve","ask_human"]` | 0.23 USD |
+
+Isolated, the fixture tells the texts apart at moment 1: RED on the old rules, GREEN on the new. Total of the six live
+runs: 2.95 USD.
 
 The RED attempt is not red, and the session said why: "The `common.coai-review-gate` rule I loaded names only `proceed`
 as the verdict that moves the stage forward … My answers to 1 and 2 come from two other sources … The coai server's own
