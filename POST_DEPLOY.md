@@ -4,7 +4,7 @@ This repository is delivered through reviewed consumer gitlinks. The actual moun
 working loader and the rules each native agent reads must agree before a rollout is complete.
 
 Target: a migrated consumer checkout, given as `$TARGET`
-Last verified: 2026-11-19 · dew_flow_connect_other_ais main 4ec6cf3d · pin 5d2d5ec (items 1–2 automated PASS; item 3 run: claude + codex inspect, held-gate behaviour pass)
+Last verified: 2026-11-19 · dew_flow_connect_other_ais main 4ec6cf3d · pin 5d2d5ec (items 1–2 automated PASS; item 3 run: claude + codex inspect read the inspect-selected rules, held-gate behaviour pass on the gate rule; the other three coai rules are selected for implement/policy and were not shown read)
 
 | # | What a person loses if this is broken | Check | Auto |
 |---|---|---|---|

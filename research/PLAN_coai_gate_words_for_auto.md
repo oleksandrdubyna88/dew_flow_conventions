@@ -1,6 +1,6 @@
 # PLAN — the four coai gate rules say what a server running policy `auto` does
 
-> Status: **IMPLEMENTED, 2026-11-19.** #182 merged (`25d551b8`, 2026-11-18); the release pre-checks merged as #183 (`5d2d5ec`); `release` promoted to `5d2d5ec334a3c8701a3f064f0fe932d1c072f5e6` on 2026-11-19; the pin bump merged in all nine consumers; the post-deploy run passed on 2026-11-19 (§ *Results*). What shipped differently: § *Results*, deviations. Three follow-ups are open in its Results (§ *Open follow-ups*).
+> Status: **IMPLEMENTED, 2026-11-19.** #182 merged (`25d551b8`, 2026-11-18); the release pre-checks merged as #183 (`5d2d5ec`); `release` promoted to `5d2d5ec334a3c8701a3f064f0fe932d1c072f5e6` on 2026-11-19; the pin bump merged in all nine consumers; the post-deploy run passed on 2026-11-19 (§ *Results*). What shipped differently: § *Results*, deviations. Four follow-ups are open in its Results, and one Definition-of-Done box is partly met (the post-deploy read of the four rules) (§ *Open follow-ups*).
 >
 > Was: Status: **the rule text merged 2026-11-18 as #182 (`25d551b8`); the pre-checks of the release made and answered 2026-11-19 (below), the promotion next.** Before that: **plan only, nothing implemented yet, 2026-11-18.** Scope: `common/coai-review-gate.md`, `common/coai-document-gate.md`, `common/coai-feature-gate.md`, `common/coai-question-consultant.md`, their records in `research/rule-bodies.json`, this plan, and — after the merge — one `release` promotion and a pin bump in each of the nine consumers. No tool changes. The rule text is drafted on branch `docs/coai-gate-words-for-auto` (from `origin/main` `4ab5207`) and is not merged.
 >
@@ -160,7 +160,7 @@ Rollback is a forward release (revert here, promote), then bump again — never 
       #182), read back with `git ls-remote origin refs/heads/release`.
 - [x] Nine bump pull requests merged with their checks present and green; rag_qln's code pins moved after benchmark and mcp.
       Evidence: § *Results*.
-- [x] **The post-deploy run:** after the coai repository's bump merged, from a pulled checkout of its `main`,
+- [ ] **The post-deploy run** — partly met (CodeRabbit on #184, 2026-11-19): items 1–2 PASS and item 3 RUN, but the run cannot show the four rules read. `tools/smoke-rules.mjs` inspects under the task `inspect`, which in the coai repository selects the always-loaded and local rules, not the four coai rules (they are selected for `implement` and `policy`); `--behaviour held-gate` read `common.coai-review-gate` at `5d2d5ec` and passed. The document, feature and question rules were not shown read by a native agent — an open follow-up below. The box as written: after the coai repository's bump merged, from a pulled checkout of its `main`,
       `node .agents/conventions/tools/post-deploy-check.mjs --target <that checkout>` — items 1–2 automatic (`rules check` on the
       target; `gate-snippet-check`, which prints `(v6)`); item 3, the native-agent smoke, RUN — `tools/smoke-rules.mjs` for both native CLIs against a disposable
       worktree at the delivered coai commit, the successful source reads of the four rules and the final constraints
@@ -209,9 +209,14 @@ Rollback is a forward release (revert here, promote), then bump again — never 
 
 ### Open follow-ups (filed here, not in another plan)
 
-Three findings, open, none a prerequisite of any open story. They are not test-leftovers findings, so they are not in
+Four findings, open, none a prerequisite of any open story. They are not test-leftovers findings, so they are not in
 `todo/PLAN_test_leftovers_merged_core_followups.md`; they stay here until a plan of their own takes them.
 
+- **Item 3 cannot show task-selected rules read.** `tools/smoke-rules.mjs` inspects under the task `inspect` only, so a
+  consumer whose required rules are selected for `implement` or `policy` (the four coai rules in the coai repository) cannot
+  show them read; this plan's run showed the gate rule only through `--behaviour held-gate`. A `--task` option for the
+  inspect smoke (or a rule-loading fixture per coai rule) would let item 3 show all four. Until then the document, feature
+  and question rules are shown by the rule records and the consumer's snippet tests, not by a native agent's read.
 - **P7 — the released feature rule does not say a blocking `good_enough` finding may be false.**
   `common/coai-feature-gate.md` (`coai-feature` v4, released in `5d2d5ec`) tells an AI to land a blocking `good_enough`
   finding as a new pull request and name it in the summary, and does not say the finding may be false. Fix in the next
