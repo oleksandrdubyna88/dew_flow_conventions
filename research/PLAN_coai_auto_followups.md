@@ -153,15 +153,15 @@ is — the fixture then shows that today's text is obeyed, not that the change c
 | **isolated**, RED attempt: the branch's tool with the review and question rules of `25d551b^` | both read completely | **`fail` — "answer 1 is `review_again`, expected resolve"**: "Neither rule names the verdict `not_reviewed`, so this one is my reading rather than something the text spells out"; moments 2–4 answered right (moment 2 cannot go red; 3 and 4 were already right under `coai-question` v1) | 0.27 USD |
 | **isolated**, `held-gate` on the current text | the gate rule read completely | `pass` — `["ask_human","point_to_notice_card","resolve","ask_human"]` | 0.23 USD |
 
-Isolated, the fixture tells the texts apart at moment 1: RED on the old rules, GREEN on the new. Total of the six live
-runs: 2.95 USD.
+Isolated, the fixture tells the texts apart at moment 1: RED on the old rules, GREEN on the new. Total of the seven live
+runs: 3.29 USD (six `auto-gate`, 3.06 USD; one `held-gate`, 0.23 USD).
 
 The RED attempt is not red, and the session said why: "The `common.coai-review-gate` rule I loaded names only `proceed`
 as the verdict that moves the stage forward … My answers to 1 and 2 come from two other sources … The coai server's own
 instructions say that under `auto` those two verdicts advance the stage". The behaviour session inherits the operator's
 MCP configuration, so the coai server's own instructions reach it beside the loaded rule; the fixture cannot tell the
 rule's words from the server's. So `auto-gate` shows that an agent with today's rules and today's server answers right,
-not that the rules alone make it answer right. Filed as an open follow-up below (*Open follow-ups*).
+not that the rules alone make it answer right. Filed as an open follow-up at the time; **superseded the same day by entry 1.1**: behaviour runs now load no MCP server, and the isolated runs in the table above are red on the old rules at moment 1 and green on the new (§ *Taken in by entry 1.1*).
 
 ## Taken in by entry 1.1 (code round 2, `3f86ba81`)
 
