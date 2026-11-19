@@ -143,6 +143,7 @@ is — the fixture then shows that today's text is obeyed, not that the change c
 | live 1 | both read completely | `fail` — "0 answer(s), 4 expected": the reply held two JSON arrays, the first with a slip at moment 2 and then "Correction — …" with the expected four; the judge reads one array, so it read none | 0.94 USD |
 | live 2 | both read completely | `pass` — `["resolve","resolve","ask_consultants","ask_human"]` | 0.93 USD |
 | RED attempt, `25d551b^` (`coai-snippet` v5, `coai-question` v1) | both read completely | `pass` — the same four answers; **not red** | 0.32 USD |
+| live 3, at `3a10914` (the loading sentence made plural, after the code judge) | both read completely | `pass` — the expected four | 0.33 USD |
 
 The RED attempt is not red, and the session said why: "The `common.coai-review-gate` rule I loaded names only `proceed`
 as the verdict that moves the stage forward … My answers to 1 and 2 come from two other sources … The coai server's own
