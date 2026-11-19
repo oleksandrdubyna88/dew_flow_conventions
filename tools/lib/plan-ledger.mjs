@@ -53,7 +53,9 @@ import { folded, outsideFencedBlocks } from "./rule-body.mjs";
 export const SOURCES = Object.freeze(["owner", "agent", "reviewer"]);
 export const KINDS = Object.freeze(["scope", "goals", "dod", "merge-conditions", "epics", "stories", "build-order", "contract", "approach"]);
 export const STATES = Object.freeze(["open", "stopped", "closed"]);
-export const APPROVERS = Object.freeze(["reviewers", "owner"]);
+/** `nobody`: a plan round that ended `not_reviewed` under policy `auto` opened the epoch — a counting baseline, never an
+ *  approval (todo/PLAN_coai_auto_followups.md § P2, 2026-11-19). */
+export const APPROVERS = Object.freeze(["reviewers", "owner", "nobody"]);
 export const VERDICTS = Object.freeze(["fits", "cut", "—"]);
 
 /** The stop must be visible in the status paragraph. `plan-lifecycle.mjs` imports this too, so the ledger check and
@@ -310,7 +312,7 @@ function addTableRow(record, line) {
 function checkShape(model, say) {
   if (model.unreadableEpoch) return; // the unreadable line is the finding; "no epoch line" would be noise on top of it
   if (model.epochs.length === 0) {
-    model.findings.push(say('no epoch line; the section opens with "> Epoch 1 · approved <YYYY-MM-DD> · by reviewers|owner · state: open"'));
+    model.findings.push(say(`no epoch line; the section opens with "> Epoch 1 · approved <YYYY-MM-DD> · by ${APPROVERS.join("|")} · state: open"`));
     model.structural = true;
     return;
   }
@@ -439,7 +441,7 @@ function checkRecordPlace(record, model, say) {
 }
 
 /** Rows 7 and 8: every record is well formed and stands once (also for an epoch not yet opened), every epoch k ≥ 2 has
- *  one, and a narrowed one needs the owner. */
+ *  one, and a narrowed one needs the owner (`by reviewers` and `by nobody` alike). */
 function checkRecords(model, say) {
   const byEpoch = new Map();
   for (const record of model.records) {
@@ -463,9 +465,9 @@ function checkRecords(model, say) {
         "the re-review must leave a record",
       ));
     }
-    if (own[0]?.narrowed[0] === "yes" && epoch.approver === "reviewers") {
+    if (own[0]?.narrowed[0] === "yes" && epoch.approver !== "owner") {
       model.findings.push(say(
-        `epoch ${epoch.k} is narrowed (Narrowed: yes) and approved by reviewers; a smaller plan needs the owner (by owner)`,
+        `epoch ${epoch.k} is narrowed (Narrowed: yes) and approved by ${epoch.approver}; a smaller plan needs the owner (by owner)`,
       ));
     }
   }

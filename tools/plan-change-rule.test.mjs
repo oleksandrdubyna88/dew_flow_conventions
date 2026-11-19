@@ -5,7 +5,7 @@
  * the new hash, and leave an agent holding a plan that keeps building. A hash is evidence about review, never about
  * meaning (`gate-routing.test.mjs` made the same argument for the document gate, on 2026-09-16).
  *
- * So the three sentences `common/plan-change-control.md` exists for are asserted, each with a splice case that removes
+ * So the four sentences `common/plan-change-control.md` exists for are asserted, each with a splice case that removes
  * its paragraph and requires the phrase to vanish with it (without that second case the first passes on a file where the
  * words happen to occur somewhere else), and a placement case: a sentence in the wrong section reads as something else.
  *
@@ -45,8 +45,11 @@ const PINS = [
     text: "counts exactly like one you find",
     why: "an owner's change is counted, or the measured case's two owner changes would be free" },
   { opens: "**This is the only case where a plan goes to the document review", section: "## Reviewing the revised plan",
-    text: "This is the only case where a plan goes to the document review, and only on a branch whose plan round has already passed.",
+    text: "This is the only case where a plan goes to the document review, and only on a branch whose plan round has already passed or, under policy `auto`, advanced on `not_reviewed`.",
     why: "the narrow exception to coai-document-gate — without its second half every plan would go to the document review" },
+  { opens: "- Under policy `auto`, a resolved plan round that ended", section: "## How it is counted",
+    text: "it opens epoch 1 `by nobody`: a counting baseline, never an approval",
+    why: "under auto a plan nobody reviewed would otherwise run with no ledger, and the brake on drift would be off by default" },
 ];
 
 function rule() {
@@ -55,9 +58,9 @@ function rule() {
   return bodyOf(fs.readFileSync(file, "utf8"));
 }
 
-// ---- meaning: the three sentences, their paragraphs and their sections ----
+// ---- meaning: the four sentences, their paragraphs and their sections ----
 
-test("the rule says its three sentences", () => {
+test("the rule says its four sentences", () => {
   const body = rule();
   for (const pin of PINS) {
     assert.match(body, phrase(pin.text),

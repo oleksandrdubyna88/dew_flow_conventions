@@ -1120,6 +1120,22 @@ runner printed on 2026-10-29, on Node 26.12.1, not typed from memory.
   a crash.
 - **The dry run over the estate** (E1.S4): zero `changes` lines added in any of the eleven checkouts, twice; the record is
   the *Dry run record* section of `research/PLAN_plan_change_control_E1.md`.
+- **P2, 2026-11-19 (coai policy auto follow-up 4, `todo/PLAN_coai_auto_followups.md` § P2).** `APPROVERS` gains `nobody`
+  (additive; the lists test "the lists are the contract…" pins `["reviewers","owner","nobody"]`), and three cases in
+  `tools/plan-ledger.test.mjs`, each red before the lib change:
+  - *P2 a `by nobody` epoch counts exactly like a reviewed one: one change goes on, the second stops* — the same
+    findings for a `by nobody` ledger and its `by reviewers` twin in three shapes (open, stopped with and without the
+    stopped status), and the reviewed twin of a second change is red, so the equality has teeth;
+  - *P2 a re-review that nobody reviewed opens the next epoch `by nobody`; narrowed, it needs the owner* — epoch 2
+    `by nobody` is clean; with `Narrowed: yes` it is the finding "approved by nobody … a smaller plan needs the owner";
+  - *P2 the missing-epoch hint names every approver, `nobody` too* — the hint reads `by reviewers|owner|nobody · state: open`.
+- **`tools/plan-change-rule.test.mjs`** now pins a fourth sentence (the file says "the four sentences"): under policy
+  `auto` a resolved plan round that ended `not_reviewed` opens epoch 1 `by nobody`, "a counting baseline, never an
+  approval", in § *How it is counted*; its splice case and its placement case run over it like the other three.
+- **`tools/coai-feature-rule.test.mjs`** (pure, 3 cases; `common/coai-feature-gate.md` v5): *the capped good_enough clause
+  says a blocking finding is verified: a true one landed, a false one rejected* (the clause is in the `good_enough`
+  bullet); *the clause comes from the good_enough bullet and nowhere else* (the splice case: the clause is absent from the
+  body once the bullet is cut, so the first case cannot stay green without it); *the marker is coai-feature v5*.
 - **`tools/plan-change-rule.test.mjs`** (pure, 8 cases) and three selection cases in `tools/rules.test.mjs`. The freeze
   proves a body changed, never that it still says what it exists to say, so the rule's three sentences (one change is
   allowed and the second stops all new code; an owner's request counts exactly like one you find; the interim path is the
@@ -1413,6 +1429,27 @@ gate rule when it was not read); they were red with *"rule common.subagent-model
 scenario holds a `loadOnly` run that also read another rule to `inconclusive`, naming that rule: the judge gave `pass` for it before (CodeRabbit, 2026-11-05).
 Paid runs: on the OLD rule text the model answered `resolve_with_humandecision` for *"the person says ship it in chat"*,
 quoting the rule — the RED that motivated the text change. **GREEN on the new text, 2026-11-05:** `node tools/smoke-rules.mjs --behaviour held-gate` (cap USD 2, the fixture's own `maxBudgetUsd`) gave outcome `pass`, exit 0, cost USD 0.31, aggregate model usage including the opus family (92438 tokens) and haiku (1963 tokens), only `common.coai-review-gate` read, no denials, nothing changed. Its four answers were `["ask_human", "point_to_notice_card", "resolve", "ask_human"]`; none is `resolve_with_humandecision`. One run, not repeated.
+
+**`--task`, `--only` and a fifth fixture, `auto-gate` (2026-11-19, coai policy auto follow-ups 1 and 2).** `smoke-rules.mjs` takes `--task <task>` (default `inspect`; the resolver's own "Unknown task …; legal: …" refusal reaches the user, no separate list) and a repeatable `--only <rule-id>` (the run expects, asks for and verifies only those ids, refuses an id the task did not select naming the selected ones, records `only`); the report records `task`; a read of a rule beyond `--only` is recorded in `readBeyondOnly` and leaves the run incomplete. `lib/rule-trace.mjs` reads the rule body and the resolver command, not the task, and did not change. `auto-gate` loads `common.coai-review-gate` and `common.coai-question-consultant` and asks four no-tool moments under policy `auto` (`not_reviewed` → `resolve`, `good_enough` → `resolve`, `consult_first` with no `consultId` → `ask_consultants`, consultants did not settle it and a `consultId` is held → `ask_human`); outside `BEHAVIOUR_ORDER`, run by name. Tests in `tools/smoke-rules.test.mjs`, each red before its change except the `Missing value` guard, which the CLI already had:
+
+| Test | What it pins |
+|---|---|
+| inspectPrompt with a task carries it in both commands, never --task inspect | `explain` and `read --only` carry `--task implement`; the default prompt keeps `inspect` |
+| inspectPrompt with --only ids asks to read exactly those ids and no others | the named ids, `ONLY for … and for no other rule`, no `<id>` placeholder |
+| an unknown --task is refused by the resolver before anything launches, and its task list reaches the user | `Unknown task nonsense; legal: inspect, …` from `smoke()` and on the CLI's stderr; the fake CLI never ran |
+| an inspect smoke with --task implement records the task and counts the reads it made with that task | fake CLI reads with `--task implement`; `task: "implement"`, every read complete |
+| the default task of the inspect smoke is inspect and is recorded | `task: "inspect"` without the option |
+| --only verifies just the named rule ids, records them, and refuses an id the task did not select | one read, `only` recorded; an unselected id refused naming the selected ids, nothing launched |
+| smoke-rules.mjs takes --task and a repeatable --only; each needs a value | the CLI's `Missing value` guard covers both |
+| a run with --only that also read an unnamed selected rule is not verified, and names it | the trace is judged over every selected rule; the extra complete read is `readBeyondOnly`, the named rule is still `allSourcesRead`, the status is `incomplete` (code judge, 2026-11-19) |
+| a run with --only that Reads an unnamed selected rule's file directly is caught as a second path and a read beyond --only | `observable.secondPathReads` names it, `observable.verified` is false (the first version filtered the rules before the trace and missed it); since CodeRabbit on #185 it is also in `readBeyondOnly` and the run is `incomplete` (red before that fix) |
+| a clean --only run has no read beyond it and stays verified | `readBeyondOnly: []`, no second path, status verified |
+| --task and --only are refused with --behaviour, naming both | the CLI stops before any run (they were silently ignored) |
+| the loading prompt of a two-id loadOnly says those rules are read, never that rule | `loadingPrompt` is plural-correct for a fixture that loads two rules |
+| the auto-gate fixture validates, loads exactly the review-gate and question-consultant rules, and stays out of the paid default order | shape, `loadOnly`, caps copied from held-gate and the `capsNote` saying so (one rule there, two here), `measured: false`, not in `BEHAVIOUR_ORDER` |
+| the auto-gate prompt states policy auto, no server and no tools, and defines the five answer words and four moments | the prompt's content |
+| auto-gate passes … / fails ask_human at moment 3 / fails ask_consultants at moment 4 / is inconclusive when either rule was not read | `judgeBehaviour` on a trace that reads both rules (the held-gate trace helper takes a rule list) |
+| a behaviour run loads no MCP server: the operator's servers and their instructions stay out | `behaviourCliArgs` passes `--strict-mcp-config` and no `--mcp-config` for every fixture (behaviour, classification, held-gate, auto-gate), before the prompt separator; red before the flag (auto-gate's RED attempt of 2026-11-19 answered from the coai server's own instructions) |
 
 ## Test leftovers (the merged core: owner segment, kernel owner, liveness — `tools/lib/owned.mjs`, `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/sweeper-scan.mjs`; first built as epic E1, 2026-10-15; merged core on PR #82, 2026-10-27)
 

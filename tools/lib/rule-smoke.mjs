@@ -134,13 +134,31 @@ export const INSPECT_TRACE_MAX_BYTES=8388608;
  * of a Bash output over about 30 KB, and one whole read of a consumer's rules measured 31,963 B on 2026-11-10, so a
  * single read put no rule body into the trace. Behaviour mode's `loadingPrompt` asks for the same.
  */
-export function inspectPrompt(scope,{resolver,root}) {
+export function inspectPrompt(scope,{resolver,root,task="inspect",only=[]}) {
   const node=`node "${forwardSlashes(resolver)}"`,repo=`--repo "${forwardSlashes(root)}"`;
   const files=scope.map(file=>`--file ${JSON.stringify(file)}`).join(" ");
-  return `Read the repository instructions and explain the rules governing hypothetical new files ${scope.map(file=>JSON.stringify(file)).join(", ")}. This is read-only inspection, not implementation. Follow the repository loading procedure. Invoke ${node} as a single command per tool call, with ${repo}; do not prefix cd or combine shell commands. Load the rules this way: run \`${node} explain ${repo} --task inspect ${files}\` once, then run \`${node} read ${repo} --task inspect ${files} --only <id>\` for each selected rule id (the whole payload is too large for one read: the host keeps only a preview of a long output). Keep the final answer concise: selected rule ids/hashes and a concrete constraint from each applicable language. Do not delegate, call reviewers, edit files, inspect credentials, or read outside this repository.`;
+  const read=id=>`${node} read ${repo} --task ${task} ${files} --only ${id}`;
+  const reads=only.length>0?`ONLY for ${only.map(id=>`\`${id}\``).join(", ")} and for no other rule, one command per id (${only.map(id=>`\`${read(id)}\``).join(", ")})`:`\`${read("<id>")}\` for each selected rule id`;
+  return `Read the repository instructions and explain the rules governing hypothetical new files ${scope.map(file=>JSON.stringify(file)).join(", ")}. This is read-only inspection, not implementation. Follow the repository loading procedure. Invoke ${node} as a single command per tool call, with ${repo}; do not prefix cd or combine shell commands. Load the rules this way: run \`${node} explain ${repo} --task ${task} ${files}\` once, then run ${reads} (the whole payload is too large for one read: the host keeps only a preview of a long output). Keep the final answer concise: selected rule ids/hashes and a concrete constraint from each applicable language. Do not delegate, call reviewers, edit files, inspect credentials, or read outside this repository.`;
 }
 
-export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
+/**
+ * With `--only`, the trace is still judged over EVERY selected rule (a second path to an unnamed rule is still seen), but
+ * completeness is asked of the named ids alone, and a complete read of any other rule is named in `readBeyondOnly` and
+ * leaves the run incomplete (the prompt says "and for no other rule"; behaviour mode's loadOnly does the same).
+ */
+function narrowedToOnly(evidence,only) {
+  if(only.length===0)return evidence;
+  const reads=evidence.reads.filter(read=>only.includes(read.id));
+  // A rule outside --only counts as read beyond it whether it came through the resolver or by a direct Read (a second path).
+  const beyond=[...evidence.reads.filter(read=>read.complete).map(read=>read.id),...(evidence.observable?.secondPathReads??[]).map(read=>read.id)]
+    .filter((id,index,all)=>!only.includes(id)&&all.indexOf(id)===index);
+  return {...evidence,reads,readBeyondOnly:beyond,
+    allSourcesRead:reads.length>0&&reads.every(read=>read.complete)};
+}
+
+/** `task` is checked by the resolver's own refusal (it names the legal tasks); `only` narrows the rules the run must read to ids the task selected. */
+export async function smoke({repo,agent,files,cwd=".",cli:explicitCli,task="inspect",only=[]}) {
   if(!["claude","codex"].includes(agent))throw new Error("Agent must be claude or codex");
   const root=path.resolve(git(repo,"rev-parse","--show-toplevel"));
   if(!fs.statSync(path.join(root,".git")).isFile())throw new Error("Smoke requires a disposable worktree, never the original checkout");
@@ -149,14 +167,16 @@ export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
   const working=within(root,cwd);
   console.error(`smoke-rules: ${agent} preflight started`);
   const resolver=smokeResolver(root);
-  const manifest=JSON.parse(execFileSync(process.execPath,[resolver,"explain","--repo",root,"--task","inspect",...scope.flatMap(file=>["--file",file])],{encoding:"utf8",timeout:10000,maxBuffer:262144}));
+  const manifest=JSON.parse(execFileSync(process.execPath,[resolver,"explain","--repo",root,"--task",task,...scope.flatMap(file=>["--file",file])],{encoding:"utf8",timeout:10000,maxBuffer:262144,stdio:["ignore","pipe","pipe"]}));
+  const unselected=only.filter(id=>!manifest.rules.some(rule=>rule.id===id));
+  if(unselected.length>0)throw new Error(`--only ${unselected.join(", ")} is not selected for task ${task}; selected: ${manifest.rules.map(rule=>rule.id).join(", ")}`);
   const expected=manifest.rules.map(rule=>({...rule,text:normalizedText(within(root,rule.source))}));
-  const prompt=inspectPrompt(scope,{resolver,root});
+  const prompt=inspectPrompt(scope,{resolver,root,task,only});
   const cli=nativeCli(agent,working,prompt,resolver,explicitCli);
   const snapshotPaths=[...manifest.instructions.map(item=>item.path),...manifest.rules.map(item=>item.source),...scope];
   const {report,lock,save}=smokeReports(root,agent);
   const initial={status:"incomplete: running",agent,platform:process.platform,started:new Date().toISOString(),pid:process.pid,
-    version:manifest.version,scope,cwd,report,promptHash:sha256(prompt),
+    version:manifest.version,task,...(only.length>0?{only}:{}),scope,cwd,report,promptHash:sha256(prompt),
     unchangedScope:"Git HEAD/index/status plus instruction, selected rule, requested file and host-setting content; other file content is not hashed"};
   const controller=new AbortController();
   const cancel=()=>controller.abort();
@@ -167,8 +187,8 @@ export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
     save(initial);
     const result=await run(cli.command,cli.args,{cwd:working,timeoutMs:180000,maxOutputBytes:INSPECT_TRACE_MAX_BYTES,containTree:true,signal:controller.signal});
     const unchanged=before===snapshot(root,snapshotPaths);
-    const evidence=traceEvidence(agent,result.out,expected,{resolver,cwd:working,repo:root});
-    const complete=result.code===0&&!evidence.parseFailed&&unchanged&&evidence.completed&&evidence.allSourcesRead;
+    const evidence=narrowedToOnly(traceEvidence(agent,result.out,expected,{resolver,cwd:working,repo:root}),only);
+    const complete=result.code===0&&!evidence.parseFailed&&unchanged&&evidence.completed&&evidence.allSourcesRead&&!evidence.readBeyondOnly?.length;
     const outcome={...initial,status:complete?"source reads verified; behavior requires review":"incomplete",unchanged,
       exitCode:result.code,timedOut:result.timedOut,overflow:result.overflow,cancelled:result.cancelled,spawnFailed:result.spawnFailed,
       ...(result.spawnError?{spawnError:result.spawnError}:{}),
@@ -188,13 +208,15 @@ const TOY_CHECKS_PATTERN="Bash(node --test tools/fixtures/behaviour/toy/*)";
 /**
  * Argument list of a behaviour run. Caps and the tool set come from the fixture, never from constants here.
  * Bash is narrowed to the toy checks and a rev-parse (resolver verbs come with rule loading); every other offered tool is allowed outright (disposable worktree).
+ * No MCP server is loaded (`--strict-mcp-config`, no `--mcp-config`).
  */
 export function behaviourCliArgs(fixture,prompt,prefix=[],resolver="") {
   const offered=fixture.tools.split(",").map(name=>name.trim()).filter(Boolean);
   const loading=fixture.loadRules?loadingTools(resolver):{tools:[],allowed:[]};
   const tools=[...new Set([...offered,...loading.tools])];
   const allowed=[...new Set([...offered.flatMap(name=>name==="Bash"?[TOY_CHECKS_PATTERN,"Bash(git rev-parse *)","Bash(pwd)"]:[name]),...loading.allowed])];
-  return [...prefix,"-p","--no-session-persistence","--output-format","stream-json","--verbose",
+  // --strict-mcp-config with no --mcp-config: no MCP server, so no server's own instructions answer for the rule (auto-gate's RED attempt, 2026-11-19).
+  return [...prefix,"-p","--no-session-persistence","--strict-mcp-config","--output-format","stream-json","--verbose",
     "--max-budget-usd",String(fixture.caps.maxBudgetUsd),"--tools",tools.join(","),
     ...(allowed.length?["--allowedTools",...allowed]:[]),"--",prompt];
 }
@@ -310,7 +332,7 @@ export function loadingPrompt(fixture,{resolver,root}) {
     :`then run \`${node} read ${repo} --task implement ${files} --only <id>\` for each selected rule id (the whole payload is too large for one read). `;
   return `First load this repository's rules for the task through the resolver. Run \`${node} explain ${repo} --task implement ${files}\` once, `
     +reads
-    +`One command per tool call; do not prefix cd, do not chain or combine shell commands. Only after ${only?"that rule is":"every selected rule is"} read, do the task below.
+    +`One command per tool call; do not prefix cd, do not chain or combine shell commands. Only after ${only?(fixture.loadOnly.length>1?"those rules are":"that rule is"):"every selected rule is"} read, do the task below.
 
 ${fixture.prompt}`;
 }
