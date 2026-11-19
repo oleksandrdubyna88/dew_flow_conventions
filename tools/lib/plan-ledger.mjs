@@ -54,7 +54,7 @@ export const SOURCES = Object.freeze(["owner", "agent", "reviewer"]);
 export const KINDS = Object.freeze(["scope", "goals", "dod", "merge-conditions", "epics", "stories", "build-order", "contract", "approach"]);
 export const STATES = Object.freeze(["open", "stopped", "closed"]);
 /** `nobody`: a plan round that ended `not_reviewed` under policy `auto` opened the epoch — a counting baseline, never an
- *  approval (todo/PLAN_coai_auto_followups.md § P2, 2026-11-19). */
+ *  approval (research/PLAN_coai_auto_followups.md § P2, 2026-11-19). */
 export const APPROVERS = Object.freeze(["reviewers", "owner", "nobody"]);
 export const VERDICTS = Object.freeze(["fits", "cut", "—"]);
 

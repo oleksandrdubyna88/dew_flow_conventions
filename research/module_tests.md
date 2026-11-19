@@ -1120,7 +1120,7 @@ runner printed on 2026-10-29, on Node 26.12.1, not typed from memory.
   a crash.
 - **The dry run over the estate** (E1.S4): zero `changes` lines added in any of the eleven checkouts, twice; the record is
   the *Dry run record* section of `research/PLAN_plan_change_control_E1.md`.
-- **P2, 2026-11-19 (coai policy auto follow-up 4, `todo/PLAN_coai_auto_followups.md` § P2).** `APPROVERS` gains `nobody`
+- **P2, 2026-11-19 (coai policy auto follow-up 4, `research/PLAN_coai_auto_followups.md` § P2).** `APPROVERS` gains `nobody`
   (additive; the lists test "the lists are the contract…" pins `["reviewers","owner","nobody"]`), and three cases in
   `tools/plan-ledger.test.mjs`, each red before the lib change:
   - *P2 a `by nobody` epoch counts exactly like a reviewed one: one change goes on, the second stops* — the same
