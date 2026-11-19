@@ -1,6 +1,6 @@
 # PLAN — the four coai gate rules say what a server running policy `auto` does
 
-> Status: **IMPLEMENTED, 2026-11-19.** #182 merged (`25d551b8`, 2026-11-18); the release pre-checks merged as #183 (`5d2d5ec`); `release` promoted to `5d2d5ec334a3c8701a3f064f0fe932d1c072f5e6` on 2026-11-19; the pin bump merged in all nine consumers; the post-deploy run passed on 2026-11-19 (§ *Results*). What shipped differently: § *Results*, deviations.
+> Status: **IMPLEMENTED, 2026-11-19.** #182 merged (`25d551b8`, 2026-11-18); the release pre-checks merged as #183 (`5d2d5ec`); `release` promoted to `5d2d5ec334a3c8701a3f064f0fe932d1c072f5e6` on 2026-11-19; the pin bump merged in all nine consumers; the post-deploy run passed on 2026-11-19 (§ *Results*). What shipped differently: § *Results*, deviations. Three follow-ups are open in its Results (§ *Open follow-ups*).
 >
 > Was: Status: **the rule text merged 2026-11-18 as #182 (`25d551b8`); the pre-checks of the release made and answered 2026-11-19 (below), the promotion next.** Before that: **plan only, nothing implemented yet, 2026-11-18.** Scope: `common/coai-review-gate.md`, `common/coai-document-gate.md`, `common/coai-feature-gate.md`, `common/coai-question-consultant.md`, their records in `research/rule-bodies.json`, this plan, and — after the merge — one `release` promotion and a pin bump in each of the nine consumers. No tool changes. The rule text is drafted on branch `docs/coai-gate-words-for-auto` (from `origin/main` `4ab5207`) and is not merged.
 >
@@ -206,12 +206,27 @@ Rollback is a forward release (revert here, promote), then bump again — never 
 
 - The coai gate session was lost by the server twice, and the plan and code rounds were rerun.
 - Entry 1.1 (2026-11-18): item 3 of the post-deploy check is run, no longer recordable as not run.
-- Three follow-ups, filed in [PLAN_test_leftovers_merged_core_followups.md](../todo/PLAN_test_leftovers_merged_core_followups.md),
-  the register of findings that carries F-numbers (it is about the test-leftovers work by origin; no other open register
-  numbers findings, and its header says that adding an item is filing a finding, not a plan change):
-  **F47** (this plan's P7) the released feature rule tells an AI to land a blocking `good_enough` finding as a new pull
-  request without saying that a false one may be rejected — fix in the next release: "verify it as any other finding:
-  land a true one as a new pull request, reject a false one with its reason"; **F48** (P2)
-  `common/plan-change-control.md` does not say what opens epoch 1 when every plan round ends `not_reviewed`; **F49** the
-  behaviour harness has no moment for `not_reviewed` and `consult_first` (rejected in plan round 2, named as a residual
-  in #182).
+
+### Open follow-ups (filed here, not in another plan)
+
+Three findings, open, none a prerequisite of any open story. They are not test-leftovers findings, so they are not in
+`todo/PLAN_test_leftovers_merged_core_followups.md`; they stay here until a plan of their own takes them.
+
+- **P7 — the released feature rule does not say a blocking `good_enough` finding may be false.**
+  `common/coai-feature-gate.md` (`coai-feature` v4, released in `5d2d5ec`) tells an AI to land a blocking `good_enough`
+  finding as a new pull request and name it in the summary, and does not say the finding may be false. Fix in the next
+  release, one added clause: "verify it as any other finding: land a true one as a new pull request, reject a false one
+  with its reason". That moves the marker to `coai-feature` v5, the body record (`research/rule-bodies.json`, `--update`)
+  and the consumers' cascade (a release, nine pin bumps, the coai repository's regenerated snippet). RED first: a rule
+  test that the bullet names both outcomes.
+- **P2 — `common/plan-change-control.md` does not say what opens epoch 1 when every plan round ends `not_reviewed`.**
+  § *How it is counted* names `proceed`, `good_enough`, `continue_anyway` or the owner's go-ahead where no review server
+  runs; under policy `auto` a plan round nobody reviewed ends `not_reviewed`, which is none of them, and a server is
+  running. Left to the owner to decide (a `not_reviewed` that is never an approval, or one that opens the epoch); the
+  rule's tests and the lifecycle check follow the decision.
+- **The behaviour harness has no moment for `not_reviewed` and `consult_first`.** `tools/fixtures/behaviour/held-gate.json`
+  and `tools/smoke-rules.mjs --behaviour` do not observe that an AI meeting either word says the stage was not reviewed
+  and goes on, or asks the consultants and returns the `consultId`. Rejected in plan round 2 (this plan makes no tool
+  changes) and named as a residual in #182. The 2026-11-19 held-gate run shows the four old moments still hold under the
+  v6 text, not that the new words are obeyed. Fix: two moments with expected answers, a live run per native CLI with its
+  cost recorded, RED first against the v5 text.

@@ -1,6 +1,6 @@
 # PLAN — Test leftovers, merged core: follow-ups parked by the security pass
 
-> Status: **F47–F49 added 2026-11-19 (three findings of the coai gate-words plan, not about test leftovers: the register is the only one that numbers findings; see each item). Earlier: F45 and F46 added 2026-11-17 (benchmark docs left as history by the owner; findings carried from E6.S4 and the epoch-11 re-review). Earlier: plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (F27 fixed 2026-11-05, not released: a process cap and shim rule for the next planned release; F28 open: release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner). F30 added 2026-11-05 (open, with an owner and a proposed deadline: the shipped Node guard has no folding reader). F32 added 2026-11-06 (open: the raw readings of the guard and the sweeper are super-linear on a hostile line, and their time is not promised). F33–F40 added 2026-11-10 from creds' E2 (its notes for the parent N20–N25 and its side findings): F33 and F36 open, conventions' tools; F34 open, creds first; F35 a documented limit for now; F37 open, the C# template's; F38–F40 pointers to creds' todos. F41–F43 added 2026-11-16 from the rollout's re-review for epoch 9: F41 fixed 2026-11-16 on branch fix/f41-container-scoped, not released (conventions' rule and Node guard); F42 open, the C# template's; F43 a pointer. Later 2026-11-16: F41 released (`b1746499`) and F42 merged (mcp #81), both done; F44 added (two template findings from F42-c's code gate, open).** Scope: six low findings of the
+> Status: **F45 and F46 added 2026-11-17 (benchmark docs left as history by the owner; findings carried from E6.S4 and the epoch-11 re-review). Earlier: plan only, nothing implemented yet, 2026-10-26; F7, F8 and F9 added 2026-10-27; F1 and F9 widened by PR #82's CodeRabbit review, 2026-10-27.; F10 and F11 added 2026-10-27 from the private sibling's review; F12 and F13 added 2026-10-27; F13's fix decided 2026-10-28; F14 added 2026-10-28; F15 added 2026-10-28; F16 added 2026-10-31; F17–F20 added 2026-11-01; F21 and F22 added 2026-11-02; F24 added 2026-11-03; F25 added 2026-11-03 (parked, not to be built now: the owner). F26 added 2026-11-04 (open, the owner's: the private sibling's mirror of the later spans). F27 and F28 added 2026-11-04 (F27 fixed 2026-11-05, not released: a process cap and shim rule for the next planned release; F28 open: release refs for product submodules, other repositories' work). F29 added 2026-11-04 (open: on Windows an exclusive rename has no single winner). F30 added 2026-11-05 (open, with an owner and a proposed deadline: the shipped Node guard has no folding reader). F32 added 2026-11-06 (open: the raw readings of the guard and the sweeper are super-linear on a hostile line, and their time is not promised). F33–F40 added 2026-11-10 from creds' E2 (its notes for the parent N20–N25 and its side findings): F33 and F36 open, conventions' tools; F34 open, creds first; F35 a documented limit for now; F37 open, the C# template's; F38–F40 pointers to creds' todos. F41–F43 added 2026-11-16 from the rollout's re-review for epoch 9: F41 fixed 2026-11-16 on branch fix/f41-container-scoped, not released (conventions' rule and Node guard); F42 open, the C# template's; F43 a pointer. Later 2026-11-16: F41 released (`b1746499`) and F42 merged (mcp #81), both done; F44 added (two template findings from F42-c's code gate, open).** Scope: six low findings of the
 > security pass of PR #82 (`research/security/test-leftovers-merged-core.md`, L-1 and L-3 to L-7; its L-2 and M-1 to M-4
 > were fixed in the same PR), two test gaps the Opus review of the real-daemon volume fix (9b62ba3) found (F7, F8), and
 > the Windows run the owner moved out of the PR's merge conditions on 2026-10-27 (F9), in `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/lib/sweeper-scan.mjs` and
@@ -1135,43 +1135,6 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
   a loud start-of-run check for `<temp root>/.git`, or a run-scoped temp root.
 - **Owner.** mcp for (1); benchmark for (2)–(4). Not a prerequisite of any open story.
 
-## F47 — The released feature rule does not say a blocking `good_enough` finding may be false (found 2026-11-19, the coai gate-words plan's promotion)
-
-- **What.** `common/coai-feature-gate.md` (`coai-feature` v4, released in `5d2d5ec`): under policy `auto`, `good_enough` at
-  the cap can carry a `blocking` finding the second round did not clear, and the rule tells the AI to land it as a NEW pull
-  request and name it in the summary. It does not say that the finding may be false. An AI that follows it lands a
-  false finding as a pull request.
-- **Fix.** In the next release, one added clause: "verify it as any other finding: land a true one as a new pull request,
-  reject a false one with its reason". Marker `coai-feature` v5, the record in `research/rule-bodies.json` with `--update`,
-  and the consumer snippet follows the usual cascade (a release, nine pin bumps, the coai repository's regenerated snippet).
-  RED first: a rule test that the bullet names both outcomes.
-- **Owner.** conventions (the rule); the coai repository's bump carries the regenerated snippet. Not a prerequisite of any
-  open story. This is the plan's P7.
-
-## F48 — `plan-change-control.md` does not say what opens epoch 1 when every plan round ends `not_reviewed` (found 2026-11-19)
-
-- **What.** `common/plan-change-control.md` § *How it is counted*: "Approval is the first passing plan-round verdict
-  (`proceed`, `good_enough` or `continue_anyway`) or the owner's go-ahead where no review server runs". Under policy
-  `auto` a plan round nobody reviewed ends `not_reviewed`, which is none of these, and a review server is running, so
-  neither arm applies: nothing opens the ledger's epoch 1. The coai gate-words plan named the gap and left it to the parent
-  coai plan (`todo/PLAN_auto_never_asks_a_person.md` in the coai repository).
-- **Fix.** Decide and write one sentence: either `not_reviewed` is never an approval (the owner's go-ahead is then asked
-  for, as with no server), or the epoch opens on it with the reviewer column saying `not reviewed`. The rule's reading
-  tests (`tools/rules.test.mjs`) and the plan-lifecycle check's accepted epoch lines follow the decision. RED first.
-- **Owner.** conventions; the decision is the owner's. This is the plan's P2.
-
-## F49 — No behaviour moment for `not_reviewed` and `consult_first` (found 2026-11-18, plan round 2 of the coai gate-words plan)
-
-- **What.** `tools/fixtures/behaviour/held-gate.json` has four moments and is read by `tools/smoke-rules.mjs --behaviour`; none
-  puts an AI before a `not_reviewed` verdict or a `consult_first` answer, so nothing observes that an AI which meets them
-  says the stage was not reviewed and goes on, or asks the consultants and returns the `consultId`. The addition was
-  rejected in plan round 2 of that plan (outside its scope: no tool changes) and named as a residual in #182. The
-  2026-11-19 held-gate run (`5d2d5ec`, outcome pass, four answers unchanged from 2026-11-05) shows the old moments still
-  hold under the v6 text, not that the new words are obeyed.
-- **Fix.** Two fixtures (or two moments), each with its expected answers; a live run per native CLI recorded with its cost;
-  RED first by running them against the v5 text, where the AI has no instruction for either word.
-- **Owner.** conventions (tools). Not a prerequisite of any open story.
-
 ## Definition of Done
 
 - [ ] Each of F1 to F22, F24 and F25 (F23 is reserved by F3's note for other manifests) is fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
@@ -1192,7 +1155,6 @@ reference (coai E5, creds E2, the private sibling) take it with that pin. The po
       promoted to a commit whose CI was green (the promoting commit or pull request is linked), (2) rag_qln's `.gitmodules` names
       that ref for both submodules in the form F28 states (a plain name for a branch, `refs/tags/…` for a tag), and (3) a rag_qln pull request with that setting built and tested the whole solution; the
       three links are recorded under F28.
-- [ ] F47, F48 and F49 are each fixed with a RED test observed first, or closed with a recorded decision that it stays a documented limit.
 - [ ] The companion and the rule's body records match the code (`node tools/rule-bodies.mjs`).
 - [ ] `node tools/leftovers-check.mjs` and `node tools/plan-lifecycle.mjs` are clean; this file is promoted or deleted when the
       last item is closed, and its row in `todo/README.md` goes with it.
