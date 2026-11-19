@@ -244,7 +244,7 @@
     {
       "id": "common.plan-change-control",
       "source": "common/plan-change-control.md",
-      "bodySha256": "d6e9aeda2902e9cddb60ad9a2118e8928fbb12adf26c820c93f787f79d0e50c6",
+      "bodySha256": "14411f3ca10c70e3046d1d16093dd866a116e346e32734cdfba72d46bdb8deb1",
       "sections": [
         "# A plan changed twice after its approval stops for a whole re-review (MANDATORY)",
         "## Why — measured",

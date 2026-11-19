@@ -150,7 +150,10 @@ export function inspectPrompt(scope,{resolver,root,task="inspect",only=[]}) {
 function narrowedToOnly(evidence,only) {
   if(only.length===0)return evidence;
   const reads=evidence.reads.filter(read=>only.includes(read.id));
-  return {...evidence,reads,readBeyondOnly:evidence.reads.filter(read=>read.complete&&!only.includes(read.id)).map(read=>read.id),
+  // A rule outside --only counts as read beyond it whether it came through the resolver or by a direct Read (a second path).
+  const beyond=[...evidence.reads.filter(read=>read.complete).map(read=>read.id),...(evidence.observable?.secondPathReads??[]).map(read=>read.id)]
+    .filter((id,index,all)=>!only.includes(id)&&all.indexOf(id)===index);
+  return {...evidence,reads,readBeyondOnly:beyond,
     allSourcesRead:reads.length>0&&reads.every(read=>read.complete)};
 }
 

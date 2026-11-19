@@ -1442,7 +1442,7 @@ quoting the rule — the RED that motivated the text change. **GREEN on the new 
 | --only verifies just the named rule ids, records them, and refuses an id the task did not select | one read, `only` recorded; an unselected id refused naming the selected ids, nothing launched |
 | smoke-rules.mjs takes --task and a repeatable --only; each needs a value | the CLI's `Missing value` guard covers both |
 | a run with --only that also read an unnamed selected rule is not verified, and names it | the trace is judged over every selected rule; the extra complete read is `readBeyondOnly`, the named rule is still `allSourcesRead`, the status is `incomplete` (code judge, 2026-11-19) |
-| a run with --only that Reads an unnamed selected rule's file directly is still caught as a second path | `observable.secondPathReads` names it, `observable.verified` is false (the first version filtered the rules before the trace and missed it) |
+| a run with --only that Reads an unnamed selected rule's file directly is caught as a second path and a read beyond --only | `observable.secondPathReads` names it, `observable.verified` is false (the first version filtered the rules before the trace and missed it); since CodeRabbit on #185 it is also in `readBeyondOnly` and the run is `incomplete` (red before that fix) |
 | a clean --only run has no read beyond it and stays verified | `readBeyondOnly: []`, no second path, status verified |
 | --task and --only are refused with --behaviour, naming both | the CLI stops before any run (they were silently ignored) |
 | the loading prompt of a two-id loadOnly says those rules are read, never that rule | `loadingPrompt` is plural-correct for a fixture that loads two rules |

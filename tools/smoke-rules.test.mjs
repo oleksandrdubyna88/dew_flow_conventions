@@ -682,14 +682,16 @@ test("a run with --only that also read an unnamed selected rule is not verified,
   assert.equal(outcome.status,"incomplete");
   assert.deepEqual(outcome.reads.map(read=>read.id),only,"the report keeps the named rules");
 });
-test("a run with --only that Reads an unnamed selected rule's file directly is still caught as a second path",async t=>{
+test("a run with --only that Reads an unnamed selected rule's file directly is caught as a second path and a read beyond --only",async t=>{
   const {home,worktree}=disposableWorktree(t,"smoke-only-direct");
   const only=["common.coai-review-gate"],direct=["common.coai-document-gate"];
   const {fake}=fakeInspectClaude(home,"src/sample.ts",{only,direct});
   const outcome=await smoke({repo:worktree,agent:"claude",files:["src/sample.ts"],task:"implement",only,cli:fake});
   assert.deepEqual(outcome.observable.secondPathReads.map(read=>read.id),direct);
   assert.equal(outcome.observable.verified,false);
-  assert.deepEqual(outcome.readBeyondOnly,[]);
+  // CodeRabbit #185: a direct Read of an unnamed rule is a read beyond --only, and the run is not verified
+  assert.deepEqual(outcome.readBeyondOnly,direct);
+  assert.equal(outcome.status,"incomplete");
 });
 test("a clean --only run has no read beyond it and stays verified",async t=>{
   const {home,worktree}=disposableWorktree(t,"smoke-only-clean");

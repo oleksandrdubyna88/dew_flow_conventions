@@ -148,14 +148,15 @@ is never written**: it is the entries of the current epoch.
 The re-review is planning work: select rules with `--task plan`. Epics not yet started get their own
 `mcp__coai__review_plan` on their own branch.
 
-A branch whose plan round has already passed (its session is in the code stage, whether or not a code round has run)
+A branch whose plan round has already passed, or under policy `auto` advanced on `not_reviewed` (its session is in
+the code stage, whether or not a code round has run)
 takes an **interim path, named so**: `mcp__coai__review_document` with `documentPath` = the plan file and a
 `purposeText` naming the re-review of epoch k+1 (after `open`, per [coai-document-gate.md](coai-document-gate.md)),
 `newReview: true` when an earlier review of that file finished, and `mcp__coai__resolve` for every finding with the same
 `document`. The next `mcp__coai__review_code` there passes the revised plan as `planText`, with `again: true` when its
 last code round closed.
 
-**This is the only case where a plan goes to the document review, and only on a branch whose plan round has already passed.**
+**This is the only case where a plan goes to the document review, and only on a branch whose plan round has already passed or, under policy `auto`, advanced on `not_reviewed`.**
 coai-document-gate keeps plans out because a document round leaves the code round shut; here the code round is already
 open, and what is missing is a reading of the whole plan.
 

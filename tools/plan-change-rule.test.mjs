@@ -45,7 +45,7 @@ const PINS = [
     text: "counts exactly like one you find",
     why: "an owner's change is counted, or the measured case's two owner changes would be free" },
   { opens: "**This is the only case where a plan goes to the document review", section: "## Reviewing the revised plan",
-    text: "This is the only case where a plan goes to the document review, and only on a branch whose plan round has already passed.",
+    text: "This is the only case where a plan goes to the document review, and only on a branch whose plan round has already passed or, under policy `auto`, advanced on `not_reviewed`.",
     why: "the narrow exception to coai-document-gate — without its second half every plan would go to the document review" },
   { opens: "- Under policy `auto`, a resolved plan round that ended", section: "## How it is counted",
     text: "it opens epoch 1 `by nobody`: a counting baseline, never an approval",
