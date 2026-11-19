@@ -84,7 +84,7 @@ change.
 
 ## A boundary with the plan that rewrites the four coai gate rules' words for policy `auto`
 
-[PLAN_coai_gate_words_for_auto.md](PLAN_coai_gate_words_for_auto.md) edits `common/coai-review-gate.md` and
+[PLAN_coai_gate_words_for_auto.md](../research/PLAN_coai_gate_words_for_auto.md) (IMPLEMENTED 2026-11-19) edited `common/coai-review-gate.md` and
 `common/coai-document-gate.md` in place (and two coai rules this plan does not name), so the two plans meet on those
 files. This section is a boundary, not a change to this plan's scope.
 

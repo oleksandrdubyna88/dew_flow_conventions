@@ -1,6 +1,8 @@
 # PLAN — the four coai gate rules say what a server running policy `auto` does
 
-> Status: **the rule text merged 2026-11-18 as #182 (`25d551b8`); the pre-checks of the release made and answered 2026-11-19 (below), the promotion next.** Before that: **plan only, nothing implemented yet, 2026-11-18.** Scope: `common/coai-review-gate.md`, `common/coai-document-gate.md`, `common/coai-feature-gate.md`, `common/coai-question-consultant.md`, their records in `research/rule-bodies.json`, this plan, and — after the merge — one `release` promotion and a pin bump in each of the nine consumers. No tool changes. The rule text is drafted on branch `docs/coai-gate-words-for-auto` (from `origin/main` `4ab5207`) and is not merged.
+> Status: **IMPLEMENTED, 2026-11-19.** #182 merged (`25d551b8`, 2026-11-18); the release pre-checks merged as #183 (`5d2d5ec`); `release` promoted to `5d2d5ec334a3c8701a3f064f0fe932d1c072f5e6` on 2026-11-19; the pin bump merged in all nine consumers; the post-deploy run passed on 2026-11-19 (§ *Results*). What shipped differently: § *Results*, deviations.
+>
+> Was: Status: **the rule text merged 2026-11-18 as #182 (`25d551b8`); the pre-checks of the release made and answered 2026-11-19 (below), the promotion next.** Before that: **plan only, nothing implemented yet, 2026-11-18.** Scope: `common/coai-review-gate.md`, `common/coai-document-gate.md`, `common/coai-feature-gate.md`, `common/coai-question-consultant.md`, their records in `research/rule-bodies.json`, this plan, and — after the merge — one `release` promotion and a pin bump in each of the nine consumers. No tool changes. The rule text is drafted on branch `docs/coai-gate-words-for-auto` (from `origin/main` `4ab5207`) and is not merged.
 >
 > Source (a cross-repository citation is a path, so it is carried over here rather than linked): `dew_flow_connect_other_ais · todo/PLAN_auto_never_asks_a_person.md` § *E3* and its stories document `todo/PLAN_auto_never_asks_a_person_E3.md` (§ 4 is this plan's text, § 5 its release and pins). The change is named in both repositories' plans, as [common/planning-docs.md](../common/planning-docs.md) § *Across repositories* asks. The change ledger below opened at this plan's first approval: the plan round's first passing verdict, `proceed` (coai session `d9977293`, 2026-11-18).
 
@@ -42,14 +44,14 @@ The wording is fixed in the source's § 4.1–4.4 and is carried by the branch's
 
 `coai-caller` (v2) and `coai-consultant` (v4) are unchanged. Not touched, with the reason: the document gate's and the
 caller rule's "it is separate because the gate rule is frozen" blockquotes — false since 2026-09-15 (`747887d`,
-`rule-bodies.json` with `--update`) and owned by [PLAN_product_manuals_go_home.md](PLAN_product_manuals_go_home.md) step 4
+`rule-bodies.json` with `--update`) and owned by [PLAN_product_manuals_go_home.md](../todo/PLAN_product_manuals_go_home.md) step 4
 (see its boundary section); `common/plan-change-control.md`'s "approval is the first passing plan-round verdict" line, true
 as written, which leaves open what opens a plan's epoch 1 when every plan round says `not_reviewed` (a finding for the
 parent coai plan, not this one).
 
 ## A boundary with PLAN_product_manuals_go_home.md
 
-[PLAN_product_manuals_go_home.md](PLAN_product_manuals_go_home.md) has `common/coai-review-gate.md` and
+[PLAN_product_manuals_go_home.md](../todo/PLAN_product_manuals_go_home.md) has `common/coai-review-gate.md` and
 `common/coai-document-gate.md` in its scope, so the two plans meet on those files. This section is the same table that plan
 carries, seen from this side: a boundary, not a change to either plan's scope.
 
@@ -140,21 +142,76 @@ Rollback is a forward release (revert here, promote), then bump again — never 
 ## Build order
 
 1. The four rule edits, the body record, this plan, its `todo/README.md` row and the boundary section in
-   [PLAN_product_manuals_go_home.md](PLAN_product_manuals_go_home.md) — one branch, two commits.
+   [PLAN_product_manuals_go_home.md](../todo/PLAN_product_manuals_go_home.md) — one branch, two commits.
 2. The dry run (test plan 8) beside it; the plan round on this plan; the code round over the diff; one pull request.
 3. Merge; the pre-checks above; the promotion; the nine bumps.
 4. The post-deploy check below, then the promotion of this plan to `research/` with its deviations.
 
 ## Definition of Done
 
-- [ ] The four files carry the planned text; the markers are v6, v4, v4, v2; `research/rule-bodies.json` moved in the same
+- [x] The four files carry the planned text; the markers are v6, v4, v4, v2; `research/rule-bodies.json` moved in the same
       commit; test plan 1–7 green, each RED seen first; 8 run and its result in the pull request; 9 read.
-- [ ] The two-way reading is in the pull request description, with the stale promise named as the window's residual.
-- [ ] The pre-checks of the release were made and their answers written here before the dispatch; `release` points at the merge sha.
-- [ ] Nine bump pull requests merged with their checks present and green; rag_qln's code pins moved after benchmark and mcp.
-- [ ] **The post-deploy run:** after the coai repository's bump merged, from a pulled checkout of its `main`,
+      Evidence: #182 merged as `25d551b8` (2026-11-18), through its plan and code rounds.
+- [x] The two-way reading is in the pull request description, with the stale promise named as the window's residual.
+      Evidence: #182's description.
+- [x] The pre-checks of the release were made and their answers written here before the dispatch; `release` points at the merge sha.
+      Evidence: the pre-checks above, merged as #183 (`5d2d5ec`); `release` was promoted on 2026-11-19 by the
+      `promote-release` run 44420296772, to `5d2d5ec334a3c8701a3f064f0fe932d1c072f5e6` (the head of #183, which carries
+      #182), read back with `git ls-remote origin refs/heads/release`.
+- [x] Nine bump pull requests merged with their checks present and green; rag_qln's code pins moved after benchmark and mcp.
+      Evidence: § *Results*.
+- [x] **The post-deploy run:** after the coai repository's bump merged, from a pulled checkout of its `main`,
       `node .agents/conventions/tools/post-deploy-check.mjs --target <that checkout>` — items 1–2 automatic (`rules check` on the
       target; `gate-snippet-check`, which prints `(v6)`); item 3, the native-agent smoke, RUN — `tools/smoke-rules.mjs` for both native CLIs against a disposable
       worktree at the delivered coai commit, the successful source reads of the four rules and the final constraints
       inspected (`POST_DEPLOY.md`: a rollout is not complete without it; plan round 2, finding 0). Its result, its date and the delivered sha are written here.
-- [ ] This plan is promoted to `research/` with its deviations once the release and the nine bumps are merged.
+      Evidence: § *Results*, the post-deploy run.
+- [x] This plan is promoted to `research/` with its deviations once the release and the nine bumps are merged.
+      Evidence: this commit.
+
+## Results (2026-11-19)
+
+**The release.** #182 (`25d551b8`, 2026-11-18) and the pre-checks #183 (`5d2d5ec`). `release` was promoted on
+2026-11-19 by `promote-release` run 44420296772 to `5d2d5ec334a3c8701a3f064f0fe932d1c072f5e6`, and read back with
+`git ls-remote`.
+
+**The nine bumps**, each merged with its checks present and green on the head sha:
+
+| Repository | Pull request | Merge commit | Note |
+|---|---|---|---|
+| dew_flow_benchmark | #229 | `e3da9ba3` | |
+| dew_flow_mcp | #83 | `b94031c4` | |
+| dew_flow_sidecar_rust | #82 | `198ce315` | |
+| dew_flow_vscode_kit | #36 | `5c8eb375` | |
+| wsl_care | #200 | `52e20218` | |
+| dew_flow_creds_for_devs | #384 | `7ccbcf09` | |
+| dew_flow_amd_r9700_tuning_ai | #38 | `2fcf85b9` | its `tests/test_comfy_watch.sh` 1-second timing test failed once per run and passed on one rerun |
+| dew_flow_rag_qln | #134 | `66c36a4b` | after benchmark and mcp merged; also moved `external/dew_flow_benchmark` `a7009fd1` → `e3da9ba3` and `external/dew_flow_mcp` `53f65130` → `b94031c4` |
+| dew_flow_connect_other_ais | #1024 | `4ec6cf3d` | the regenerated snippet, artefact v19; shipped in extension 0.89.1 |
+
+**The post-deploy run, 2026-11-19**, against a pulled checkout of dew_flow_connect_other_ais `main` at `4ec6cf3d` (pin
+`5d2d5ec`), `node tools/post-deploy-check.mjs --target <that checkout>`:
+
+- Item 1 (`rules check`): PASS.
+- Item 2 (`gate-snippet-check`): PASS — "OK — … (v6)".
+- Item 3 (the native-agent smoke): RUN. `tools/smoke-rules.mjs` inspect runs for claude and codex against the
+  disposable checkout: both "source reads verified", `allSourcesRead` true, exit 0. (The inspect task selects the
+  always-loaded and local rules there; the four coai rules are selected for implement and policy tasks.) Plus `tools/smoke-rules.mjs --behaviour held-gate` on this repository at `5d2d5ec` (the
+  v6 gate text): outcome pass, answers `["ask_human","point_to_notice_card","resolve","ask_human"]` (unchanged from
+  2026-11-05), cost USD 0.90, nothing changed.
+
+`POST_DEPLOY.md`'s "Last verified:" line was updated in this commit.
+
+**What shipped differently from the plan:**
+
+- The coai gate session was lost by the server twice, and the plan and code rounds were rerun.
+- Entry 1.1 (2026-11-18): item 3 of the post-deploy check is run, no longer recordable as not run.
+- Three follow-ups, filed in [PLAN_test_leftovers_merged_core_followups.md](../todo/PLAN_test_leftovers_merged_core_followups.md),
+  the register of findings that carries F-numbers (it is about the test-leftovers work by origin; no other open register
+  numbers findings, and its header says that adding an item is filing a finding, not a plan change):
+  **F47** (this plan's P7) the released feature rule tells an AI to land a blocking `good_enough` finding as a new pull
+  request without saying that a false one may be rejected — fix in the next release: "verify it as any other finding:
+  land a true one as a new pull request, reject a false one with its reason"; **F48** (P2)
+  `common/plan-change-control.md` does not say what opens epoch 1 when every plan round ends `not_reviewed`; **F49** the
+  behaviour harness has no moment for `not_reviewed` and `consult_first` (rejected in plan round 2, named as a residual
+  in #182).
