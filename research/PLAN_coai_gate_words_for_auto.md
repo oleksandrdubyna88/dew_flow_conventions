@@ -1,6 +1,6 @@
 # PLAN — the four coai gate rules say what a server running policy `auto` does
 
-> Status: **IMPLEMENTED, 2026-11-19.** #182 merged (`25d551b8`, 2026-11-18); the release pre-checks merged as #183 (`5d2d5ec`); `release` promoted to `5d2d5ec334a3c8701a3f064f0fe932d1c072f5e6` on 2026-11-19; the pin bump merged in all nine consumers; the post-deploy run passed on 2026-11-19 (§ *Results*). What shipped differently: § *Results*, deviations. Four follow-ups are open in its Results, and one Definition-of-Done box is partly met (the post-deploy read of the four rules) (§ *Open follow-ups*).
+> Status: **IMPLEMENTED, 2026-11-19.** #182 merged (`25d551b8`, 2026-11-18); the release pre-checks merged as #183 (`5d2d5ec`); `release` promoted to `5d2d5ec334a3c8701a3f064f0fe932d1c072f5e6` on 2026-11-19; the pin bump merged in all nine consumers; the post-deploy run passed on 2026-11-19 (§ *Results*). What shipped differently: § *Results*, deviations. Four follow-ups are open in its Results, and one Definition-of-Done box is partly met (the post-deploy read of the four rules) (§ *Open follow-ups*). **All four follow-ups were taken, and that box met, on 2026-11-19 by [PLAN_coai_auto_followups.md](PLAN_coai_auto_followups.md) (#185, release `c598a11`).**
 >
 > Was: Status: **the rule text merged 2026-11-18 as #182 (`25d551b8`); the pre-checks of the release made and answered 2026-11-19 (below), the promotion next.** Before that: **plan only, nothing implemented yet, 2026-11-18.** Scope: `common/coai-review-gate.md`, `common/coai-document-gate.md`, `common/coai-feature-gate.md`, `common/coai-question-consultant.md`, their records in `research/rule-bodies.json`, this plan, and — after the merge — one `release` promotion and a pin bump in each of the nine consumers. No tool changes. The rule text is drafted on branch `docs/coai-gate-words-for-auto` (from `origin/main` `4ab5207`) and is not merged.
 >
@@ -160,10 +160,12 @@ Rollback is a forward release (revert here, promote), then bump again — never 
       #182), read back with `git ls-remote origin refs/heads/release`.
 - [x] Nine bump pull requests merged with their checks present and green; rag_qln's code pins moved after benchmark and mcp.
       Evidence: § *Results*.
-- [ ] **The post-deploy run** — partly met (CodeRabbit on #184, 2026-11-19): items 1–2 PASS and item 3 RUN, but the run cannot show the four rules read. `tools/smoke-rules.mjs` inspects under the task `inspect`, which in the coai repository selects the always-loaded and local rules, not the four coai rules (they are selected for `implement` and `policy`); `--behaviour held-gate` read `common.coai-review-gate` at `5d2d5ec` and passed. The document, feature and question rules were not shown read by a native agent — an open follow-up below. The box as written: after the coai repository's bump merged, from a pulled checkout of its `main`,
+- [x] **The post-deploy run** — met 2026-11-19 by the follow-ups plan (below); first recorded as partly met (CodeRabbit on #184, 2026-11-19): items 1–2 PASS and item 3 RUN, but the run cannot show the four rules read. `tools/smoke-rules.mjs` inspects under the task `inspect`, which in the coai repository selects the always-loaded and local rules, not the four coai rules (they are selected for `implement` and `policy`); `--behaviour held-gate` read `common.coai-review-gate` at `5d2d5ec` and passed. The document, feature and question rules were not shown read by a native agent — an open follow-up below. The box as written: after the coai repository's bump merged, from a pulled checkout of its `main`,
       `node .agents/conventions/tools/post-deploy-check.mjs --target <that checkout>` — items 1–2 automatic (`rules check` on the
       target; `gate-snippet-check`, which prints `(v6)`); item 3, the native-agent smoke, RUN — `tools/smoke-rules.mjs` for both native CLIs against a disposable
       worktree at the delivered coai commit, the successful source reads of the four rules and the final constraints
+      **Met 2026-11-19** by [PLAN_coai_auto_followups.md](PLAN_coai_auto_followups.md): with `--task implement` and `--only`
+      for the four rules, Claude and Codex read all four completely at the delivered coai commit `8ff658d5` (pin `c598a11`).
       inspected (`POST_DEPLOY.md`: a rollout is not complete without it; plan round 2, finding 0). Its result, its date and the delivered sha are written here.
       Evidence: § *Results*, the post-deploy run.
 - [x] This plan is promoted to `research/` with its deviations once the release and the nine bumps are merged.
@@ -208,6 +210,8 @@ Rollback is a forward release (revert here, promote), then bump again — never 
 - Entry 1.1 (2026-11-18): item 3 of the post-deploy check is run, no longer recordable as not run.
 
 ### Open follow-ups (filed here, not in another plan)
+
+**Taken 2026-11-19 — all four closed by [PLAN_coai_auto_followups.md](PLAN_coai_auto_followups.md) (#185, release `c598a11`)**: `--task`/`--only`, the `auto-gate` fixture (run with no MCP server), `coai-feature` v5, and the epoch `by nobody` (P2, decided by the consultants). The record below is kept as it was filed.
 
 Four findings, open, none a prerequisite of any open story. They are not test-leftovers findings, so they are not in
 `todo/PLAN_test_leftovers_merged_core_followups.md`; they stay here until a plan of their own takes them.

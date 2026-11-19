@@ -1,14 +1,17 @@
 # coai policy `auto` — the four follow-ups of the gate-words release
 
-> Status: **approved 2026-11-19 (plan round `proceed`, coai session `3f86ba81`); implementation in progress on
-> `docs/coai-auto-followups`.** Scope: `tools/smoke-rules.mjs` and `tools/lib/rule-smoke.mjs` (`--task` and `--only`),
+> Status: **IMPLEMENTED, 2026-11-19.** #185 merged (`c598a11`); `release` promoted to
+> `c598a11bdc5069e0db852395377d4001d9db8dc2`; the pin bump merged in all nine consumers; the coai extension 0.89.2
+> (snippet v20) published to the Marketplace; post-deploy item 3 met with both native CLIs (§ *Results*).
+>
+> Was: approved 2026-11-19 (plan round `proceed`, coai session `3f86ba81`). Scope: `tools/smoke-rules.mjs` and `tools/lib/rule-smoke.mjs` (`--task` and `--only`),
 > one new behaviour fixture `tools/fixtures/behaviour/auto-gate.json`, `common/coai-feature-gate.md` (one clause,
 > `coai-feature` v4 → v5), `common/plan-change-control.md` and `tools/lib/plan-ledger.mjs` (what opens an epoch when a
 > plan round ended `not_reviewed`), their tests, `research/rule-bodies.json`, `POST_DEPLOY.md` item 3,
 > `research/module_tests.md`, this plan and its `todo/README.md` row — and, after the merge, one `release` promotion, a
 > pin bump in each of the nine consumers, and the coai repository's regenerated snippet (`FEATURE_VERSION` 5).
 >
-> Source: [research/PLAN_coai_gate_words_for_auto.md](../research/PLAN_coai_gate_words_for_auto.md) § *Open follow-ups*,
+> Source: [research/PLAN_coai_gate_words_for_auto.md](PLAN_coai_gate_words_for_auto.md) § *Open follow-ups*,
 > four findings filed there on 2026-11-19 "until a plan of their own takes them". The owner took all four on 2026-11-19
 > ("да делай", to "take them in the next pass?"). The coai side of the change (the snippet v20 bump and its extension
 > release) is named in the coai repository's bump pull request and its `src_vs_code/CHANGELOG.md` section, as
@@ -150,15 +153,15 @@ is — the fixture then shows that today's text is obeyed, not that the change c
 | **isolated**, RED attempt: the branch's tool with the review and question rules of `25d551b^` | both read completely | **`fail` — "answer 1 is `review_again`, expected resolve"**: "Neither rule names the verdict `not_reviewed`, so this one is my reading rather than something the text spells out"; moments 2–4 answered right (moment 2 cannot go red; 3 and 4 were already right under `coai-question` v1) | 0.27 USD |
 | **isolated**, `held-gate` on the current text | the gate rule read completely | `pass` — `["ask_human","point_to_notice_card","resolve","ask_human"]` | 0.23 USD |
 
-Isolated, the fixture tells the texts apart at moment 1: RED on the old rules, GREEN on the new. Total of the six live
-runs: 2.95 USD.
+Isolated, the fixture tells the texts apart at moment 1: RED on the old rules, GREEN on the new. Total of the seven live
+runs: 3.29 USD (six `auto-gate`, 3.06 USD; one `held-gate`, 0.23 USD).
 
 The RED attempt is not red, and the session said why: "The `common.coai-review-gate` rule I loaded names only `proceed`
 as the verdict that moves the stage forward … My answers to 1 and 2 come from two other sources … The coai server's own
 instructions say that under `auto` those two verdicts advance the stage". The behaviour session inherits the operator's
 MCP configuration, so the coai server's own instructions reach it beside the loaded rule; the fixture cannot tell the
 rule's words from the server's. So `auto-gate` shows that an agent with today's rules and today's server answers right,
-not that the rules alone make it answer right. Filed as an open follow-up below (*Open follow-ups*).
+not that the rules alone make it answer right. Filed as an open follow-up at the time; **superseded the same day by entry 1.1**: behaviour runs now load no MCP server, and the isolated runs in the table above are red on the old rules at moment 1 and green on the new (§ *Taken in by entry 1.1*).
 
 ## Taken in by entry 1.1 (code round 2, `3f86ba81`)
 
@@ -174,7 +177,7 @@ produce a passing result"), accepted, so it is this plan's one change after appr
 
 ## Release, and the nine bumps
 
-As in [research/PLAN_coai_gate_words_for_auto.md](../research/PLAN_coai_gate_words_for_auto.md) § *Release, and the nine
+As in [research/PLAN_coai_gate_words_for_auto.md](PLAN_coai_gate_words_for_auto.md) § *Release, and the nine
 bumps*: the three pre-checks (in-flight consumer releases, asked; open pull requests per repository against the cap of
 three, the owner's agreement for a bump over it; what the release carries), then the promotion with read-back, then the
 bumps in the F41 order with the coai repository's bump in parallel. **Before the promotion**, the candidate is smoked in
@@ -193,13 +196,65 @@ after it is fixed by a forward release and re-verified. Rollback is a forward re
 
 ## Definition of Done
 
-- [ ] This plan's `## Plan changes` opened at its approval; its `todo/README.md` row.
-- [ ] `--task` and `--only` shipped, tested RED-GREEN-RED; `POST_DEPLOY.md` item 3 says when to use them; its stamp.
-- [ ] `auto-gate` shipped and tested; one live run recorded with its cost, and the RED attempt recorded as it came out.
-- [ ] `coai-feature` v5 says a blocking `good_enough` finding is verified like any other; its rule test RED first.
-- [ ] P2 written into the rule and its checker, with the tests of test plan 5.
-- [ ] `npm test` and `npm run check` green; the plan and code gates run, their verdicts recorded.
-- [ ] The candidate smoke passed; released; nine bumps merged; the coai snippet v20 released.
-- [ ] Post-deploy item 3 shows the four coai gate rules read (`reads[].complete`) in the coai repository with both
+- [x] This plan's `## Plan changes` opened at its approval; its `todo/README.md` row.
+- [x] `--task` and `--only` shipped, tested RED-GREEN-RED; `POST_DEPLOY.md` item 3 says when to use them; its stamp.
+- [x] `auto-gate` shipped and tested; the live runs recorded with their costs, and the RED attempt recorded as it came out
+      (not red with MCP servers loaded; red at moment 1 once isolated, entry 1.1).
+- [x] `coai-feature` v5 says a blocking `good_enough` finding is verified like any other; its rule test RED first.
+- [x] P2 written into the rule and its checker, with the tests of test plan 5.
+- [x] `npm test` and `npm run check` green; the plan and code gates run, their verdicts recorded (§ *Results*).
+- [x] The candidate smoke passed; released; nine bumps merged; the coai snippet v20 released (extension 0.89.2).
+- [x] Post-deploy item 3 shows the four coai gate rules read (`reads[].complete`) in the coai repository with both
       native CLIs. A CLI that does not is a red item, fixed forward, not recorded as met.
-- [ ] This plan promoted to `research/`, and the gate-words plan's partly-met DoD box points at the run that met it.
+- [x] This plan promoted to `research/`, and the gate-words plan's partly-met DoD box points at the run that met it.
+
+## Results (2026-11-19)
+
+**Gates.** coai session `3f86ba81` (this repository): plan round `proceed` (4 findings, all accepted); code rounds 1
+`proceed` (0), 2 `proceed` (2 accepted: MCP isolation — entry 1.1 — and the POST_DEPLOY wording), 3 `proceed` (0), 4
+over CodeRabbit's two fixes `proceed` (0). Opus judges: on the plan (2 blocking, 5 should-fix, 1 nit — folded at
+approval) and on the code (4 should-fix, 5 nits — all fixed). CodeRabbit on #185: two Major findings (the interim path
+for a `by nobody` epoch; a direct Read beyond `--only`), both fixed RED first and confirmed by it. `npm test` 1981 tests,
+0 fail; `npm run check` green.
+
+**Release.** Pre-checks: no consumer release in flight (the live sessions answered; two benchmark pull requests were let
+land first at their sessions' request, #231 and #232); open pull requests over the cap in seven repositories, the owner
+agreed to all nine bumps (2026-11-19). The release carried #185 and two plan documents (`5d2d5ec..c598a11`). Candidate
+smoke in a coai worktree pinned to `c598a11`, before the promotion: Claude and Codex, `--task implement` with the four
+`--only` ids, all four read completely, none beyond. Promoted by `promote-release.yml` (run 44570328154), read back
+`c598a11…` on `refs/heads/release`.
+
+| Consumer | Bump PR | Merge |
+|---|---|---|
+| dew_flow_benchmark | #233 | `777ec70a` |
+| dew_flow_mcp | #84 | `e23c0e8b` |
+| dew_flow_sidecar_rust | #83 | `2ddb5e73` |
+| dew_flow_vscode_kit | #37 | `732d9cd5` |
+| wsl_care | #201 | `07bb2498` |
+| dew_flow_creds_for_devs | #385 | `3a6afd22` |
+| dew_flow_amd_r9700_tuning_ai | #39 | `6067fbbf` (base moved under it; `main` merged in, clean) |
+| dew_flow_rag_qln | #135 | `a3dc1ab9` (code pins: benchmark `777ec70a`, mcp `e23c0e8b`) |
+| dew_flow_connect_other_ais | #1027 | `25b21d77` (snippet v20, `coai-feature` v5, `SNIPPET_BODY_SHA` `edc9eea979fd2b2d`) |
+
+Every bump was a gitlink move only (no rule-size re-baseline); coai's carried the regenerated snippet. **The coai extension
+0.89.2**: #1027 merged as `chore`, which release-please does not release; a CHANGELOG-only `fix(extension)` (#1028) was
+refused by coai's docs-only guard and closed; the release went through a `Release-As: 0.89.2` commit touching only
+`src_vs_code` code (#1029), the shape coai's `research/PLAN_the_release_guards_contradict.md` records (#605). Release
+pull request #1030: on its head the extension suite (7030 tests, 0 fail) and a VSIX built locally carried `coai-feature v5`
+and the new clause and not the old one; tag `extension-v0.89.2` (`8ff658d5`); `release.yml` run 44598961239 published
+`remsoftdev.connect-other-ais v0.89.2`; the release's own VSIX inspected the same way.
+
+**Post-deploy**, from this repository against a coai worktree at `main` `8ff658d5` (pin `c598a11`): items 1–2 PASS
+(`gate-snippet-check` `(v6)`); item 3: Claude and Codex, `--task implement` and the four `--only` ids, every read complete,
+`readBeyondOnly` empty, the tree unchanged. The gate-words plan's partly-met box is met by this run.
+
+**Deviations.**
+- Entry 1.1: behaviour runs load no MCP server — taken in from an open follow-up of this plan on code round 2's finding.
+- The first live `auto-gate` run failed on its reply's shape (two arrays); the RED attempt with MCP servers loaded was
+  not red; both are recorded above as they came out.
+- The coai bump merged as `chore` and needed the two extra pull requests above to release.
+- The Sonnet coder of the bumps created two worktrees inside main checkouts by a relative path (removed at once) and moved
+  an older session's `bump-wsl_care` submodule by mistake (restored to `b174649`, verified clean).
+
+**Open.** None of this plan's. The `held-gate` and `auto-gate` fixtures still measure Claude only (`behaviourSmoke` drives
+no other CLI), as test plan § *The live run* says.

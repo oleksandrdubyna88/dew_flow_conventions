@@ -117,7 +117,7 @@ test("the lists are the contract: pinned to the parent plan's §2, and frozen", 
   assert.deepEqual([...SOURCES], ["owner", "agent", "reviewer"]);
   assert.deepEqual([...KINDS], ["scope", "goals", "dod", "merge-conditions", "epics", "stories", "build-order", "contract", "approach"]);
   assert.deepEqual([...STATES], ["open", "stopped", "closed"]);
-  // `nobody` added 2026-11-19 (todo/PLAN_coai_auto_followups.md § P2): additive, no recorded plan changes
+  // `nobody` added 2026-11-19 (research/PLAN_coai_auto_followups.md § P2): additive, no recorded plan changes
   assert.deepEqual([...APPROVERS], ["reviewers", "owner", "nobody"]);
   assert.deepEqual([...VERDICTS], ["fits", "cut", "—"]);
   assert.equal(STOP_PHRASE.source, "\\bstopped for re-review\\b");
@@ -477,7 +477,7 @@ test("row 8 — a narrowed re-review approved by reviewers is red; by owner it i
   clean(check(B({ rec: { narrowed: "Narrowed: no" }, e2: { by: "owner" } }))); // not red by choice: a whole plan may still go to the owner
 });
 
-// ---- P2: an epoch opened by a plan round nobody reviewed (todo/PLAN_coai_auto_followups.md § P2) ----
+// ---- P2: an epoch opened by a plan round nobody reviewed (research/PLAN_coai_auto_followups.md § P2) ----
 
 test("P2 a `by nobody` epoch counts exactly like a reviewed one: one change goes on, the second stops", () => {
   const nobody = (lines) => lines.map((line) => line.replace("· by reviewers ·", "· by nobody ·"));
