@@ -58,7 +58,7 @@ third. Under policy `auto` the person cannot ask for a second round, so only the
   is owed — one runs later only if the person asks for it (below). On `good_enough` the findings gate
   but none is blocking: apply the ones that are true and useful as NEW pull requests, never by
   rewriting merged epics, and reject the rest with reasons — except under policy `auto` at the cap,
-  where `good_enough` can carry a `blocking` finding the second round did not clear: verify it as any
+  where `good_enough` can carry a `blocking` finding the second round did not clear. Verify it like any
   other finding: land a true one as a NEW pull request and name it in your summary, reject a false one
   with its reason. Your summary says what you took and what you declined.
 - `not_reviewed` — under policy `auto`, nobody answered the round that closes the review: a second

@@ -55,7 +55,7 @@ node tools/smoke-rules.mjs --repo <worktree> --agent claude --file src/Example.c
 node tools/smoke-rules.mjs --repo <worktree> --agent codex --cwd src --file src/Example.cs
 ```
 
-`--task <task>` (default `inspect`) runs the smoke for another task, for a consumer whose required rules are selected for it; an unknown task is refused by the resolver, naming the legal ones. `--only <rule-id>` (repeatable) limits what the run must read to those ids, which the task must select: use it when the task selects a rule larger than what the host keeps of one output. The report records `task` and `only`.
+`--task <task>` (default `inspect`) runs the smoke for another task, for a consumer whose required rules are selected for it; an unknown task is refused by the resolver, naming the legal ones. `--only <rule-id>` (repeatable) limits what the run must read to those ids, which the task must select: use it when the task selects a rule larger than what the host keeps of one output. The report records `task` and `only`; a complete read of any rule outside `--only` is listed in `readBeyondOnly` and leaves the run incomplete, and a direct read of an unnamed selected rule still shows in `observable.secondPathReads`.
 
 Use `--cli <installed-executable-or-js-entry>` for a nondefault CLI installation. Windows shell
 wrappers are refused; native executables and installed npm JavaScript entries are supported.

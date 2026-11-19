@@ -27,7 +27,7 @@ const SOURCE = "common/coai-feature-gate.md";
 const phrase = (text) => new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s+"));
 
 const BULLET_OPENS = "- `proceed` or `good_enough`";
-const CLAUSE = "verify it as any other finding: land a true one as a NEW pull request and name it in your summary, reject a false one with its reason";
+const CLAUSE = "Verify it like any other finding: land a true one as a NEW pull request and name it in your summary, reject a false one with its reason";
 
 const rule = () => bodyOf(fs.readFileSync(path.join(root, SOURCE), "utf8"));
 

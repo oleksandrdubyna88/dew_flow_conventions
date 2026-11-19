@@ -471,6 +471,7 @@ test("the auto-gate fixture validates, loads exactly the review-gate and questio
   assert.equal(fixture.tools,"");
   assert.deepEqual(fixture.expectation.answers,AUTO_ANSWERS);
   assert.deepEqual([fixture.caps.maxBudgetUsd,fixture.caps.timeoutMs,fixture.caps.measured],[2,300000,false]);
+  assert.match(fixture.caps.capsNote,/caps copied from held-gate \(one rule, no tools\); this fixture loads two; not measured/);
   assert.equal(BEHAVIOUR_ORDER.includes("auto-gate"),false);
   assert.equal(loadFixture(path.resolve("."),"auto-gate").name,"auto-gate");
 });
@@ -533,6 +534,12 @@ test("loadOnly narrows the loading prompt to the named rule ids",()=>{
   assert.doesNotMatch(prompt,/for each selected rule id/);
   assert.ok(prompt.endsWith(fixture.prompt));
 });
+test("the loading prompt of a two-id loadOnly says those rules are read, never that rule",()=>{
+  const prompt=loadingPrompt({...loadNamed("auto-gate")},{resolver:"/r/rules.mjs",root:"/w"});
+  assert.match(prompt,/ONLY for `common\.coai-review-gate`, `common\.coai-question-consultant` and for no other rule/);
+  assert.match(prompt,/Only after those rules are read, do the task below/);
+  assert.equal(prompt.includes("that rule is"),false);
+});
 test("validateFixture accepts loadOnly as non-empty id strings and refuses it without loadRules",()=>{
   const good=loadNamed("classification");
   assert.equal(validateFixture({...good,loadOnly:["a.b"]}).loadOnly[0],"a.b");
@@ -557,7 +564,7 @@ test("the classification fixture loads only the rule under test, with the measur
 // could not be decoded. The same run showed the second cause: Claude Code keeps only a 2 KB preview of a Bash output
 // over about 30 KB, and the one whole `read` was 31,963 bytes — so no rule body reached the trace. The fake below
 // writes what a good run writes: one `read --only <id>` per selected rule, then 400 KB of answer text.
-function fakeInspectClaude(home,file,{only}={}) {
+function fakeInspectClaude(home,file,{only,also=[],direct=[]}={}) {
   const fake=path.join(home,"fake-inspect-claude.mjs"),promptFile=path.join(home,"prompt.txt");
   fs.writeFileSync(fake,`import fs from "node:fs";import {execFileSync} from "node:child_process";
 const prompt=process.argv.at(-1);fs.writeFileSync(${JSON.stringify(promptFile)},prompt);
@@ -565,11 +572,14 @@ const resolver=/node "([^"]+)"/.exec(prompt)[1],repo=/--repo "([^"]+)"/.exec(pro
 const resolve=args=>execFileSync(process.execPath,[resolver,...args],{encoding:"utf8"});
 const task=/ --task (\\w+)/.exec(prompt)[1];
 const scope=["--repo",repo,"--task",task,"--file",${JSON.stringify(file)}];
-const ids=JSON.parse(resolve(["explain",...scope])).rules.map(rule=>rule.id).filter(id=>!${JSON.stringify(only)}||${JSON.stringify(only)}.includes(id));
-const events=ids.flatMap((id,index)=>[
+const rules=JSON.parse(resolve(["explain",...scope])).rules;
+const ids=[...rules.map(rule=>rule.id).filter(id=>!${JSON.stringify(only)}||${JSON.stringify(only)}.includes(id)),...${JSON.stringify(also)}];
+const events=[...${JSON.stringify(direct)}.flatMap((id,index)=>{const source=rules.find(rule=>rule.id===id).source;return [
+  {type:"assistant",message:{model:"claude-fake",content:[{type:"tool_use",id:"direct_"+index,name:"Read",input:{file_path:repo+"/"+source}}]}},
+  {type:"user",message:{content:[{type:"tool_result",tool_use_id:"direct_"+index,content:fs.readFileSync(repo+"/"+source,"utf8")}]}}];}),...ids.flatMap((id,index)=>[
   {type:"assistant",message:{model:"claude-fake",content:[{type:"tool_use",id:"toolu_"+index,name:"Bash",
     input:{command:'node "'+resolver+'" read --repo "'+repo+'" --task '+task+' --file '+${JSON.stringify(JSON.stringify(file))}+' --only '+id}}]}},
-  {type:"user",message:{content:[{type:"tool_result",tool_use_id:"toolu_"+index,content:resolve(["read",...scope,"--only",id])}]}}]);
+  {type:"user",message:{content:[{type:"tool_result",tool_use_id:"toolu_"+index,content:resolve(["read",...scope,"--only",id])}]}}])];
 events.push({type:"assistant",message:{model:"claude-fake",content:[{type:"text",text:"x".repeat(400000)}]}});
 events.push({type:"result",subtype:"success",is_error:false,result:"done"});
 process.stdout.write(events.map(event=>JSON.stringify(event)).join("\\n")+"\\n");`);
@@ -650,6 +660,38 @@ test("--only verifies just the named rule ids, records them, and refuses an id t
   await assert.rejects(smoke({repo:worktree,agent:"claude",files:["src/sample.ts"],task:"implement",only:["common.coai-review-gate","common.nope"],cli:fake}),
     /--only common\.nope is not selected for task implement; selected: [^]*common\.coai-review-gate/);
   assert.equal(fs.existsSync(promptFile),false,"the CLI never launched");
+});
+test("a run with --only that also read an unnamed selected rule is not verified, and names it",async t=>{
+  const {home,worktree}=disposableWorktree(t,"smoke-only-beyond");
+  const only=["common.coai-review-gate"],also=["common.coai-document-gate"];
+  const {fake}=fakeInspectClaude(home,"src/sample.ts",{only,also});
+  const outcome=await smoke({repo:worktree,agent:"claude",files:["src/sample.ts"],task:"implement",only,cli:fake});
+  assert.deepEqual(outcome.readBeyondOnly,also);
+  assert.equal(outcome.allSourcesRead,true,"the named rule itself was read completely");
+  assert.equal(outcome.status,"incomplete");
+  assert.deepEqual(outcome.reads.map(read=>read.id),only,"the report keeps the named rules");
+});
+test("a run with --only that Reads an unnamed selected rule's file directly is still caught as a second path",async t=>{
+  const {home,worktree}=disposableWorktree(t,"smoke-only-direct");
+  const only=["common.coai-review-gate"],direct=["common.coai-document-gate"];
+  const {fake}=fakeInspectClaude(home,"src/sample.ts",{only,direct});
+  const outcome=await smoke({repo:worktree,agent:"claude",files:["src/sample.ts"],task:"implement",only,cli:fake});
+  assert.deepEqual(outcome.observable.secondPathReads.map(read=>read.id),direct);
+  assert.equal(outcome.observable.verified,false);
+  assert.deepEqual(outcome.readBeyondOnly,[]);
+});
+test("a clean --only run has no read beyond it and stays verified",async t=>{
+  const {home,worktree}=disposableWorktree(t,"smoke-only-clean");
+  const only=["common.coai-review-gate"];
+  const {fake}=fakeInspectClaude(home,"src/sample.ts",{only});
+  const outcome=await smoke({repo:worktree,agent:"claude",files:["src/sample.ts"],task:"implement",only,cli:fake});
+  assert.deepEqual([outcome.readBeyondOnly,outcome.observable.secondPathReads,outcome.status],[[],[],"source reads verified; behavior requires review"]);
+});
+test("--task and --only are refused with --behaviour, naming both",()=>{
+  const cli=spawnSync(process.execPath,[fileURLToPath(new URL("./smoke-rules.mjs",import.meta.url)),"--behaviour","held-gate","--task","implement","--only","common.coai-review-gate"],{encoding:"utf8"});
+  assert.equal(cli.status,1);
+  assert.match(cli.stderr,/smoke-rules: INCOMPLETE — --task and --only apply to the inspect smoke, not to --behaviour/);
+  assert.doesNotMatch(cli.stdout,/"outcome"/,"nothing ran");
 });
 test("smoke-rules.mjs takes --task and a repeatable --only; each needs a value",()=>{
   const cli=args=>spawnSync(process.execPath,[fileURLToPath(new URL("./smoke-rules.mjs",import.meta.url)),...args],{encoding:"utf8"});

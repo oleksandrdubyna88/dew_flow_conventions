@@ -136,6 +136,30 @@ text before the gate words (`25d551b^`: `coai-snippet` v5, `coai-question` v1) i
 moment 2 was right under the old text too and cannot go red; if the others are not red either, that is recorded as it
 is — the fixture then shows that today's text is obeyed, not that the change caused it.
 
+**The runs, 2026-11-19** (Claude, model family opus, from a clean worktree of the branch at `7d421d5`):
+
+| Run | Rules | Outcome | Cost |
+|---|---|---|---|
+| live 1 | both read completely | `fail` — "0 answer(s), 4 expected": the reply held two JSON arrays, the first with a slip at moment 2 and then "Correction — …" with the expected four; the judge reads one array, so it read none | 0.94 USD |
+| live 2 | both read completely | `pass` — `["resolve","resolve","ask_consultants","ask_human"]` | 0.93 USD |
+| RED attempt, `25d551b^` (`coai-snippet` v5, `coai-question` v1) | both read completely | `pass` — the same four answers; **not red** | 0.32 USD |
+
+The RED attempt is not red, and the session said why: "The `common.coai-review-gate` rule I loaded names only `proceed`
+as the verdict that moves the stage forward … My answers to 1 and 2 come from two other sources … The coai server's own
+instructions say that under `auto` those two verdicts advance the stage". The behaviour session inherits the operator's
+MCP configuration, so the coai server's own instructions reach it beside the loaded rule; the fixture cannot tell the
+rule's words from the server's. So `auto-gate` shows that an agent with today's rules and today's server answers right,
+not that the rules alone make it answer right. Filed as an open follow-up below (*Open follow-ups*).
+
+## Open follow-ups
+
+- **The behaviour harness does not isolate the MCP server instructions.** `behaviourCliArgs` passes no
+  `--strict-mcp-config`/empty MCP config, so a `claude -p` run carries the operator's servers (coai among them) and their
+  instructions; a fixture about a server's words cannot then go red on the rule alone. Fix: run behaviour sessions with no
+  MCP servers (`--strict-mcp-config` and an empty `--mcp-config`), RED first with the `auto-gate` RED attempt above, and
+  re-run `held-gate` and `auto-gate` with their costs. Not taken here: it changes every fixture's conditions and needs its
+  own measurement.
+
 ## Release, and the nine bumps
 
 As in [research/PLAN_coai_gate_words_for_auto.md](../research/PLAN_coai_gate_words_for_auto.md) § *Release, and the nine

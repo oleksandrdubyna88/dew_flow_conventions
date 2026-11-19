@@ -12,6 +12,7 @@ try {
     else if(key==="--behaviour")options.fixture=value;
     else throw new Error(`Unknown option: ${key}`);
   }
+  if(options.fixture&&(options.task!==undefined||options.only.length>0))throw new Error("--task and --only apply to the inspect smoke, not to --behaviour (a fixture states its own task and rules)");
   if(options.fixture) {
     // pass 0 · fail 1 · inconclusive 1 (named in the printed finding; the outcome stays distinct in the report)
     const result=await behaviourSmoke(options);

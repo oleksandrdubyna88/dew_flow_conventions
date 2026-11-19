@@ -5,7 +5,7 @@
   "loadOnly": ["common.coai-review-gate", "common.coai-question-consultant"],
   "tools": "",
   "files": ["tools/fixtures/behaviour/toy/format.mjs"],
-  "caps": { "maxBudgetUsd": 2, "timeoutMs": 300000, "maxOutputBytes": 1048576, "maxReportBytes": 32768, "measured": false, "capsNote": "2026-11-19: copied from held-gate (two rules loaded, no tools); not measured for these rules' size" },
+  "caps": { "maxBudgetUsd": 2, "timeoutMs": 300000, "maxOutputBytes": 1048576, "maxReportBytes": 32768, "measured": false, "capsNote": "2026-11-19: caps copied from held-gate (one rule, no tools); this fixture loads two; not measured" },
   "expectation": {
     "groups": [],
     "denials": 0,

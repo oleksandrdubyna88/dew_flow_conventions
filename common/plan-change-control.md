@@ -99,7 +99,8 @@ Narrowed: yes — the Windows run left the merge conditions
 - 2.1 · 2026-10-29 · agent · build-order — E3 needs E2's helper first
 ```
 
-Line shapes: `> Epoch <k> · approved <YYYY-MM-DD> · by reviewers|owner|nobody · state: open|stopped|closed` and
+Line shapes (for `by nobody`, `approved` records the date the epoch opened):
+`> Epoch <k> · approved <YYYY-MM-DD> · by reviewers|owner|nobody · state: open|stopped|closed` and
 `- <k>.<n> · <YYYY-MM-DD> · owner|agent|reviewer · <kinds> — <cause>`, kinds comma-separated from `scope`, `goals`,
 `dod`, `merge-conditions`, `epics`, `stories`, `build-order`, `contract`, `approach`. The highest epoch is current, the
 rest `closed`. The separators are ` · ` (U+00B7) and ` — ` (U+2014), never `|`, `--` or an en dash; keywords and values
@@ -136,10 +137,11 @@ is never written**: it is the entries of the current epoch.
    when they start; the cornerstone ledger is recounted.
 8. **Re-review**, then **resume**: epoch k+1's line, `open`; epoch k becomes `closed`. If scope, the Definition of Done,
    the merge conditions or the release got smaller, the record says `Narrowed: yes`, the owner approves first and the
-   epoch line says `by owner`. Under policy `auto` the plan round of the re-review may end `not_reviewed`; the
-   whole plan was still reviewed again by steps 3–7 (the consultation, the whole revision, the Opus judge), so it opens
-   epoch k+1 `by nobody` — unless it is narrowed: that still needs the owner, and the plan stays stopped. Epoch k+1
-   starts at 0 changes.
+   epoch line says `by owner`. Under policy `auto` the re-review's round — the plan round, or the interim document round
+   below — may end `not_reviewed`; the whole plan was still read again (the consultation, the whole revision and your own
+   Opus review of it, below), so it opens epoch k+1 `by nobody` and the summary says the re-review round was NOT
+   reviewed — unless it is narrowed: that still needs the owner, and the plan stays stopped. Epoch k+1 starts at 0
+   changes.
 
 ## Reviewing the revised plan
 
