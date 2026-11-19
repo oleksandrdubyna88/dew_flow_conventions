@@ -134,13 +134,16 @@ export const INSPECT_TRACE_MAX_BYTES=8388608;
  * of a Bash output over about 30 KB, and one whole read of a consumer's rules measured 31,963 B on 2026-11-10, so a
  * single read put no rule body into the trace. Behaviour mode's `loadingPrompt` asks for the same.
  */
-export function inspectPrompt(scope,{resolver,root}) {
+export function inspectPrompt(scope,{resolver,root,task="inspect",only=[]}) {
   const node=`node "${forwardSlashes(resolver)}"`,repo=`--repo "${forwardSlashes(root)}"`;
   const files=scope.map(file=>`--file ${JSON.stringify(file)}`).join(" ");
-  return `Read the repository instructions and explain the rules governing hypothetical new files ${scope.map(file=>JSON.stringify(file)).join(", ")}. This is read-only inspection, not implementation. Follow the repository loading procedure. Invoke ${node} as a single command per tool call, with ${repo}; do not prefix cd or combine shell commands. Load the rules this way: run \`${node} explain ${repo} --task inspect ${files}\` once, then run \`${node} read ${repo} --task inspect ${files} --only <id>\` for each selected rule id (the whole payload is too large for one read: the host keeps only a preview of a long output). Keep the final answer concise: selected rule ids/hashes and a concrete constraint from each applicable language. Do not delegate, call reviewers, edit files, inspect credentials, or read outside this repository.`;
+  const read=id=>`${node} read ${repo} --task ${task} ${files} --only ${id}`;
+  const reads=only.length>0?`ONLY for ${only.map(id=>`\`${id}\``).join(", ")} and for no other rule, one command per id (${only.map(id=>`\`${read(id)}\``).join(", ")})`:`\`${read("<id>")}\` for each selected rule id`;
+  return `Read the repository instructions and explain the rules governing hypothetical new files ${scope.map(file=>JSON.stringify(file)).join(", ")}. This is read-only inspection, not implementation. Follow the repository loading procedure. Invoke ${node} as a single command per tool call, with ${repo}; do not prefix cd or combine shell commands. Load the rules this way: run \`${node} explain ${repo} --task ${task} ${files}\` once, then run ${reads} (the whole payload is too large for one read: the host keeps only a preview of a long output). Keep the final answer concise: selected rule ids/hashes and a concrete constraint from each applicable language. Do not delegate, call reviewers, edit files, inspect credentials, or read outside this repository.`;
 }
 
-export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
+/** `task` is checked by the resolver's own refusal (it names the legal tasks); `only` narrows the rules the run must read to ids the task selected. */
+export async function smoke({repo,agent,files,cwd=".",cli:explicitCli,task="inspect",only=[]}) {
   if(!["claude","codex"].includes(agent))throw new Error("Agent must be claude or codex");
   const root=path.resolve(git(repo,"rev-parse","--show-toplevel"));
   if(!fs.statSync(path.join(root,".git")).isFile())throw new Error("Smoke requires a disposable worktree, never the original checkout");
@@ -149,14 +152,16 @@ export async function smoke({repo,agent,files,cwd=".",cli:explicitCli}) {
   const working=within(root,cwd);
   console.error(`smoke-rules: ${agent} preflight started`);
   const resolver=smokeResolver(root);
-  const manifest=JSON.parse(execFileSync(process.execPath,[resolver,"explain","--repo",root,"--task","inspect",...scope.flatMap(file=>["--file",file])],{encoding:"utf8",timeout:10000,maxBuffer:262144}));
-  const expected=manifest.rules.map(rule=>({...rule,text:normalizedText(within(root,rule.source))}));
-  const prompt=inspectPrompt(scope,{resolver,root});
+  const manifest=JSON.parse(execFileSync(process.execPath,[resolver,"explain","--repo",root,"--task",task,...scope.flatMap(file=>["--file",file])],{encoding:"utf8",timeout:10000,maxBuffer:262144,stdio:["ignore","pipe","pipe"]}));
+  const unselected=only.filter(id=>!manifest.rules.some(rule=>rule.id===id));
+  if(unselected.length>0)throw new Error(`--only ${unselected.join(", ")} is not selected for task ${task}; selected: ${manifest.rules.map(rule=>rule.id).join(", ")}`);
+  const expected=manifest.rules.filter(rule=>only.length===0||only.includes(rule.id)).map(rule=>({...rule,text:normalizedText(within(root,rule.source))}));
+  const prompt=inspectPrompt(scope,{resolver,root,task,only});
   const cli=nativeCli(agent,working,prompt,resolver,explicitCli);
   const snapshotPaths=[...manifest.instructions.map(item=>item.path),...manifest.rules.map(item=>item.source),...scope];
   const {report,lock,save}=smokeReports(root,agent);
   const initial={status:"incomplete: running",agent,platform:process.platform,started:new Date().toISOString(),pid:process.pid,
-    version:manifest.version,scope,cwd,report,promptHash:sha256(prompt),
+    version:manifest.version,task,...(only.length>0?{only}:{}),scope,cwd,report,promptHash:sha256(prompt),
     unchangedScope:"Git HEAD/index/status plus instruction, selected rule, requested file and host-setting content; other file content is not hashed"};
   const controller=new AbortController();
   const cancel=()=>controller.abort();

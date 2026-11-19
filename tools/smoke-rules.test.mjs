@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {smoke,traceEvidence,smokeResolver,installedCli,snapshot,behaviourCliArgs,behaviourSmoke,recordedLaunches,judgeBehaviour,loadingPrompt,changedPaths,parseArgs} from "./lib/rule-smoke.mjs";
+import {smoke,inspectPrompt,traceEvidence,smokeResolver,installedCli,snapshot,behaviourCliArgs,behaviourSmoke,recordedLaunches,judgeBehaviour,loadingPrompt,changedPaths,parseArgs} from "./lib/rule-smoke.mjs";
 import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
 import {delegationEvidence} from "./lib/rule-trace.mjs";
@@ -421,14 +421,12 @@ test("a fixture that loads no rules is judged without the gate",()=>{
 // ---- defect: a fixture that loads only ANOTHER rule was judged on common.subagent-models, so it could never pass or fail ----
 const GATE_RULE_TEXT="Step 6: after call_human, call ask_human.\n";
 const reviewGateRule={id:"common.coai-review-gate",text:GATE_RULE_TEXT,hash:sha256(GATE_RULE_TEXT)};
-function heldGateTrace({read,answers}) {
-  const command=`node "${origin.resolver.replaceAll("\\","/")}" read --repo "${origin.repo.replaceAll("\\","/")}" --task implement --only ${reviewGateRule.id}`;
-  const payload=`BEGIN RULE ${reviewGateRule.id} sha256:${reviewGateRule.hash}\n${GATE_RULE_TEXT}\nEND RULE ${reviewGateRule.id}`;
+function heldGateTrace({read,answers,rules=[reviewGateRule]}) {
   const events=withoutLaunches(derive(trace=>{trace.at(-1).result=JSON.stringify(answers);return trace;}));
   events.at(-1).subagent_stats={spawned:0,completed:0,requested:{background:0,foreground:0}};
-  if(read)events.splice(0,0,
-    {type:"assistant",parent_tool_use_id:null,message:{content:[{type:"tool_use",id:"load-1",name:"Bash",input:{command}}]}},
-    {type:"user",parent_tool_use_id:null,message:{content:[{type:"tool_result",tool_use_id:"load-1",is_error:false,content:payload}]}});
+  if(read)events.splice(0,0,...rules.flatMap(({id,text,hash},index)=>[
+    {type:"assistant",parent_tool_use_id:null,message:{content:[{type:"tool_use",id:`load-${index}`,name:"Bash",input:{command:`node "${origin.resolver.replaceAll("\\","/")}" read --repo "${origin.repo.replaceAll("\\","/")}" --task implement --only ${id}`}}]}},
+    {type:"user",parent_tool_use_id:null,message:{content:[{type:"tool_result",tool_use_id:`load-${index}`,is_error:false,content:`BEGIN RULE ${id} sha256:${hash}\n${text}\nEND RULE ${id}`}]}}]));
   return events.map(event=>JSON.stringify(event)).join("\n");
 }
 const judgeHeldGate=(read,answers)=>judgeBehaviour({fixture:loadNamed("held-gate"),out:heldGateTrace({read,answers}),expected:[reviewGateRule],origin});
@@ -460,6 +458,51 @@ test("a fixture that loads only the gate rule, run after also reading another ru
   assert.deepEqual(judged.rulesRead,["common.coai-review-gate","common.other"],"the fixture must really have read both");
   assert.equal(judged.verdict.outcome,"inconclusive");
   assert.match(judged.verdict.reasons.join(),/common\.other was read beyond the fixture's loadOnly/);
+});
+// ---- auto-gate (coai policy auto follow-up 2): what a session does at not_reviewed, good_enough, consult_first ----
+const QUESTION_RULE_TEXT="Step 6: without a consultId, ask_human answers consult_first.\n";
+const questionRule={id:"common.coai-question-consultant",text:QUESTION_RULE_TEXT,hash:sha256(QUESTION_RULE_TEXT)};
+const AUTO_ANSWERS=["resolve","resolve","ask_consultants","ask_human"];
+const judgeAutoGate=(rules,answers=AUTO_ANSWERS)=>judgeBehaviour({fixture:loadNamed("auto-gate"),out:heldGateTrace({read:true,answers,rules}),expected:[reviewGateRule,questionRule],origin});
+test("the auto-gate fixture validates, loads exactly the review-gate and question-consultant rules, and stays out of the paid default order",()=>{
+  const fixture=validateFixture(loadNamed("auto-gate"),"auto-gate");
+  assert.deepEqual(fixture.loadOnly,["common.coai-review-gate","common.coai-question-consultant"]);
+  assert.equal(fixture.loadRules,true);
+  assert.equal(fixture.tools,"");
+  assert.deepEqual(fixture.expectation.answers,AUTO_ANSWERS);
+  assert.deepEqual([fixture.caps.maxBudgetUsd,fixture.caps.timeoutMs,fixture.caps.measured],[2,300000,false]);
+  assert.equal(BEHAVIOUR_ORDER.includes("auto-gate"),false);
+  assert.equal(loadFixture(path.resolve("."),"auto-gate").name,"auto-gate");
+});
+test("the auto-gate prompt states policy auto, no server and no tools, and defines the five answer words and four moments",()=>{
+  const {prompt}=loadNamed("auto-gate");
+  assert.match(prompt,/policy `auto`/);
+  assert.match(prompt,/no coai server/);
+  for(const word of ["resolve","ask_consultants","ask_human","review_again","stop_and_wait"])assert.ok(prompt.includes(word),word);
+  for(const word of ["not_reviewed","good_enough","consult_first","consultId"])assert.ok(prompt.includes(word),word);
+  assert.match(prompt,/exactly four strings/);
+});
+test("auto-gate passes a trace that read both rules and gave the four expected answers",()=>{
+  const judged=judgeAutoGate([reviewGateRule,questionRule]);
+  assert.deepEqual(judged.verdict,{outcome:"pass",reasons:[]});
+  assert.deepEqual(judged.rulesRead,["common.coai-review-gate","common.coai-question-consultant"]);
+});
+test("auto-gate fails ask_human at moment 3 (a question without a consultId), and names the answer",()=>{
+  const judged=judgeAutoGate([reviewGateRule,questionRule],["resolve","resolve","ask_human","ask_human"]);
+  assert.equal(judged.verdict.outcome,"fail");
+  assert.match(judged.verdict.reasons.join(),/answer 3 is "ask_human"/);
+});
+test("auto-gate fails ask_consultants at moment 4 (the consultants did not settle it and a consultId is held)",()=>{
+  const judged=judgeAutoGate([reviewGateRule,questionRule],["resolve","resolve","ask_consultants","ask_consultants"]);
+  assert.equal(judged.verdict.outcome,"fail");
+  assert.match(judged.verdict.reasons.join(),/answer 4 is "ask_consultants"/);
+});
+test("auto-gate is inconclusive when either of its two rules was not read, naming it",()=>{
+  for(const [read,missing] of [[[reviewGateRule],"common.coai-question-consultant"],[[questionRule],"common.coai-review-gate"]]) {
+    const judged=judgeAutoGate(read);
+    assert.equal(judged.verdict.outcome,"inconclusive");
+    assert.match(judged.verdict.reasons.join(),new RegExp(`rule ${missing.replaceAll(".","\\.")} was not loaded`));
+  }
 });
 test("every fixture states whether it loads rules, and validation requires the key",()=>{
   assert.deepEqual(fixtureNames.map(name=>loadNamed(name).loadRules),[false,true,true]);
@@ -514,17 +557,18 @@ test("the classification fixture loads only the rule under test, with the measur
 // could not be decoded. The same run showed the second cause: Claude Code keeps only a 2 KB preview of a Bash output
 // over about 30 KB, and the one whole `read` was 31,963 bytes — so no rule body reached the trace. The fake below
 // writes what a good run writes: one `read --only <id>` per selected rule, then 400 KB of answer text.
-function fakeInspectClaude(home,file) {
+function fakeInspectClaude(home,file,{only}={}) {
   const fake=path.join(home,"fake-inspect-claude.mjs"),promptFile=path.join(home,"prompt.txt");
   fs.writeFileSync(fake,`import fs from "node:fs";import {execFileSync} from "node:child_process";
 const prompt=process.argv.at(-1);fs.writeFileSync(${JSON.stringify(promptFile)},prompt);
 const resolver=/node "([^"]+)"/.exec(prompt)[1],repo=/--repo "([^"]+)"/.exec(prompt)[1];
 const resolve=args=>execFileSync(process.execPath,[resolver,...args],{encoding:"utf8"});
-const scope=["--repo",repo,"--task","inspect","--file",${JSON.stringify(file)}];
-const ids=JSON.parse(resolve(["explain",...scope])).rules.map(rule=>rule.id);
+const task=/ --task (\\w+)/.exec(prompt)[1];
+const scope=["--repo",repo,"--task",task,"--file",${JSON.stringify(file)}];
+const ids=JSON.parse(resolve(["explain",...scope])).rules.map(rule=>rule.id).filter(id=>!${JSON.stringify(only)}||${JSON.stringify(only)}.includes(id));
 const events=ids.flatMap((id,index)=>[
   {type:"assistant",message:{model:"claude-fake",content:[{type:"tool_use",id:"toolu_"+index,name:"Bash",
-    input:{command:'node "'+resolver+'" read --repo "'+repo+'" --task inspect --file '+${JSON.stringify(JSON.stringify(file))}+' --only '+id}}]}},
+    input:{command:'node "'+resolver+'" read --repo "'+repo+'" --task '+task+' --file '+${JSON.stringify(JSON.stringify(file))}+' --only '+id}}]}},
   {type:"user",message:{content:[{type:"tool_result",tool_use_id:"toolu_"+index,content:resolve(["read",...scope,"--only",id])}]}}]);
 events.push({type:"assistant",message:{model:"claude-fake",content:[{type:"text",text:"x".repeat(400000)}]}});
 events.push({type:"result",subtype:"success",is_error:false,result:"done"});
@@ -548,6 +592,69 @@ test("the inspect smoke asks for one `read --only <id>` per selected rule, never
   const prompt=fs.readFileSync(promptFile,"utf8");
   assert.match(prompt,/ read --repo "[^"]+" --task inspect --file "src\/sample\.ts" --only <id>` for each selected rule id/);
   assert.match(prompt,/too large for one read/);
+});
+
+// ---- --task and --only of the inspect smoke (coai policy auto follow-up 1, 2026-11-19) ----
+// A consumer whose required rules are selected for `implement` (the coai rules in the coai repository) could not show
+// them read: the smoke asked for `--task inspect` only. And `--task implement` there selects 33 rules, one of them
+// (common.test-leftovers-detail, 32,126 B) larger than what Claude keeps of one output, so a full read never completes:
+// `--only <id>` narrows what the smoke expects and asks for.
+const promptOf=options=>inspectPrompt(["src/sample.ts"],{resolver:"/r/tools/rules.mjs",root:"/w",...options});
+test("inspectPrompt with a task carries it in both commands, never --task inspect",()=>{
+  const prompt=promptOf({task:"implement"});
+  assert.match(prompt,/ explain --repo "\/w" --task implement --file "src\/sample\.ts"`/);
+  assert.match(prompt,/ read --repo "\/w" --task implement --file "src\/sample\.ts" --only <id>`/);
+  assert.equal(prompt.includes("--task inspect"),false);
+  assert.equal(promptOf({}).includes("--task inspect"),true,"the default stays inspect");
+});
+test("inspectPrompt with --only ids asks to read exactly those ids and no others",()=>{
+  const prompt=promptOf({task:"implement",only:["common.coai-review-gate","common.coai-feature-gate"]});
+  assert.match(prompt,/--only common\.coai-review-gate`[^]*--only common\.coai-feature-gate`/);
+  assert.match(prompt,/ONLY for `common\.coai-review-gate`, `common\.coai-feature-gate` and for no other rule/);
+  assert.equal(prompt.includes("<id>"),false,"no placeholder: the ids are named");
+});
+test("an unknown --task is refused by the resolver before anything launches, and its task list reaches the user",async t=>{
+  const {home,worktree}=disposableWorktree(t,"smoke-inspect-task");
+  const {fake,promptFile}=fakeInspectClaude(home,"src/sample.ts");
+  await assert.rejects(smoke({repo:worktree,agent:"claude",files:["src/sample.ts"],task:"nonsense",cli:fake}),/Unknown task nonsense; legal: inspect, /);
+  assert.equal(fs.existsSync(promptFile),false,"the CLI never launched");
+  const cli=spawnSync(process.execPath,[fileURLToPath(new URL("./smoke-rules.mjs",import.meta.url)),"--repo",worktree,"--agent","claude","--file","src/sample.ts","--task","nonsense","--cli",fake],{encoding:"utf8"});
+  assert.equal(cli.status,1);
+  assert.match(cli.stderr,/smoke-rules: INCOMPLETE[^]*Unknown task nonsense; legal: inspect, /);
+  assert.equal(fs.existsSync(promptFile),false);
+});
+test("an inspect smoke with --task implement records the task and counts the reads it made with that task",async t=>{
+  const {home,worktree}=disposableWorktree(t,"smoke-inspect-impl");
+  const {fake,promptFile}=fakeInspectClaude(home,"src/sample.ts");
+  const outcome=await smoke({repo:worktree,agent:"claude",files:["src/sample.ts"],task:"implement",cli:fake});
+  assert.equal(outcome.task,"implement");
+  assert.match(fs.readFileSync(promptFile,"utf8"),/--task implement --file "src\/sample\.ts" --only <id>/);
+  assert.ok(outcome.reads.length>0);
+  assert.deepEqual([outcome.reads.every(read=>read.complete),outcome.allSourcesRead,outcome.status],[true,true,"source reads verified; behavior requires review"]);
+  assert.equal(outcome.only,undefined,"no --only: no field");
+});
+test("the default task of the inspect smoke is inspect and is recorded",async t=>{
+  const {home,worktree}=disposableWorktree(t,"smoke-inspect-deftask");
+  const {fake}=fakeInspectClaude(home,"src/sample.ts");
+  assert.equal((await smoke({repo:worktree,agent:"claude",files:["src/sample.ts"],cli:fake})).task,"inspect");
+});
+test("--only verifies just the named rule ids, records them, and refuses an id the task did not select, naming the selected ones",async t=>{
+  const {home,worktree}=disposableWorktree(t,"smoke-inspect-only");
+  const only=["common.coai-review-gate"];
+  const {fake,promptFile}=fakeInspectClaude(home,"src/sample.ts",{only});
+  const outcome=await smoke({repo:worktree,agent:"claude",files:["src/sample.ts"],task:"implement",only,cli:fake});
+  assert.deepEqual(outcome.reads.map(read=>read.id),only);
+  assert.deepEqual([outcome.only,outcome.allSourcesRead],[only,true]);
+  assert.match(fs.readFileSync(promptFile,"utf8"),/ONLY for `common\.coai-review-gate` and for no other rule/);
+  fs.unlinkSync(promptFile);
+  await assert.rejects(smoke({repo:worktree,agent:"claude",files:["src/sample.ts"],task:"implement",only:["common.coai-review-gate","common.nope"],cli:fake}),
+    /--only common\.nope is not selected for task implement; selected: [^]*common\.coai-review-gate/);
+  assert.equal(fs.existsSync(promptFile),false,"the CLI never launched");
+});
+test("smoke-rules.mjs takes --task and a repeatable --only; each needs a value",()=>{
+  const cli=args=>spawnSync(process.execPath,[fileURLToPath(new URL("./smoke-rules.mjs",import.meta.url)),...args],{encoding:"utf8"});
+  assert.match(cli(["--task"]).stderr,/Missing value: --task/);
+  assert.match(cli(["--only"]).stderr,/Missing value: --only/);
 });
 
 // ---- the real code path: behaviourSmoke end to end with a fake claude, no paid run ----

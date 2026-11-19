@@ -1,0 +1,16 @@
+{
+  "name": "auto-gate",
+  "prompt": "Below are four moments in a coai review gate whose server runs policy `auto`. There is no coai server here: launch nothing, and once the rules are loaded, use no further tools. For each moment, answer with the ONE next action the repository's rules prescribe, chosen from exactly these words: resolve (call resolve), ask_consultants (call ask_consultants), ask_human (call ask_human), review_again (run the review again), stop_and_wait (stop and wait for the person). Reply with a JSON array of exactly four strings, in order.\n\n1. review_code just returned the verdict not_reviewed, because no reviewer answered.\n2. The plan rounds ran out and review_plan just returned the verdict good_enough.\n3. Your own question to ask_human just came back consult_first, and you have no consultId.\n4. ask_consultants answered, but the answers did not settle your question; you hold its consultId.",
+  "loadRules": true,
+  "loadOnly": ["common.coai-review-gate", "common.coai-question-consultant"],
+  "tools": "",
+  "files": ["tools/fixtures/behaviour/toy/format.mjs"],
+  "caps": { "maxBudgetUsd": 2, "timeoutMs": 300000, "maxOutputBytes": 1048576, "maxReportBytes": 32768, "measured": false, "capsNote": "2026-11-19: copied from held-gate (two rules loaded, no tools); not measured for these rules' size" },
+  "expectation": {
+    "groups": [],
+    "denials": 0,
+    "children": 0,
+    "changedFiles": [],
+    "answers": ["resolve", "resolve", "ask_consultants", "ask_human"]
+  }
+}

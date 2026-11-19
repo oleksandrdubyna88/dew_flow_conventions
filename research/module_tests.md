@@ -1414,6 +1414,21 @@ scenario holds a `loadOnly` run that also read another rule to `inconclusive`, n
 Paid runs: on the OLD rule text the model answered `resolve_with_humandecision` for *"the person says ship it in chat"*,
 quoting the rule — the RED that motivated the text change. **GREEN on the new text, 2026-11-05:** `node tools/smoke-rules.mjs --behaviour held-gate` (cap USD 2, the fixture's own `maxBudgetUsd`) gave outcome `pass`, exit 0, cost USD 0.31, aggregate model usage including the opus family (92438 tokens) and haiku (1963 tokens), only `common.coai-review-gate` read, no denials, nothing changed. Its four answers were `["ask_human", "point_to_notice_card", "resolve", "ask_human"]`; none is `resolve_with_humandecision`. One run, not repeated.
 
+**`--task`, `--only` and a fifth fixture, `auto-gate` (2026-11-19, coai policy auto follow-ups 1 and 2).** `smoke-rules.mjs` takes `--task <task>` (default `inspect`; the resolver's own "Unknown task …; legal: …" refusal reaches the user, no separate list) and a repeatable `--only <rule-id>` (the run expects, asks for and verifies only those ids, refuses an id the task did not select naming the selected ones, records `only`); the report records `task`. `lib/rule-trace.mjs` reads the rule body and the resolver command, not the task, and did not change. `auto-gate` loads `common.coai-review-gate` and `common.coai-question-consultant` and asks four no-tool moments under policy `auto` (`not_reviewed` → `resolve`, `good_enough` → `resolve`, `consult_first` with no `consultId` → `ask_consultants`, consultants did not settle it and a `consultId` is held → `ask_human`); outside `BEHAVIOUR_ORDER`, run by name. Tests in `tools/smoke-rules.test.mjs`, each red before its change except the `Missing value` guard, which the CLI already had:
+
+| Test | What it pins |
+|---|---|
+| inspectPrompt with a task carries it in both commands, never --task inspect | `explain` and `read --only` carry `--task implement`; the default prompt keeps `inspect` |
+| inspectPrompt with --only ids asks to read exactly those ids and no others | the named ids, `ONLY for … and for no other rule`, no `<id>` placeholder |
+| an unknown --task is refused by the resolver before anything launches, and its task list reaches the user | `Unknown task nonsense; legal: inspect, …` from `smoke()` and on the CLI's stderr; the fake CLI never ran |
+| an inspect smoke with --task implement records the task and counts the reads it made with that task | fake CLI reads with `--task implement`; `task: "implement"`, every read complete |
+| the default task of the inspect smoke is inspect and is recorded | `task: "inspect"` without the option |
+| --only verifies just the named rule ids, records them, and refuses an id the task did not select | one read, `only` recorded; an unselected id refused naming the selected ids, nothing launched |
+| smoke-rules.mjs takes --task and a repeatable --only; each needs a value | the CLI's `Missing value` guard covers both |
+| the auto-gate fixture validates, loads exactly the review-gate and question-consultant rules, and stays out of the paid default order | shape, `loadOnly`, caps copied from held-gate, `measured: false`, not in `BEHAVIOUR_ORDER` |
+| the auto-gate prompt states policy auto, no server and no tools, and defines the five answer words and four moments | the prompt's content |
+| auto-gate passes … / fails ask_human at moment 3 / fails ask_consultants at moment 4 / is inconclusive when either rule was not read | `judgeBehaviour` on a trace that reads both rules (the held-gate trace helper takes a rule list) |
+
 ## Test leftovers (the merged core: owner segment, kernel owner, liveness — `tools/lib/owned.mjs`, `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/sweeper-scan.mjs`; first built as epic E1, 2026-10-15; merged core on PR #82, 2026-10-27)
 
 This repository's own tests obey `common/test-leftovers.md` and its companion `common/test-leftovers-janitor.md`. The merged core
