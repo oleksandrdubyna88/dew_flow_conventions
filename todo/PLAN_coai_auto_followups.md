@@ -19,7 +19,9 @@
 
 > Epoch 1 · approved 2026-11-19 · by reviewers · state: open
 
-  No entries. Plan round 1 (`3f86ba81`) answered `proceed` with four findings, all accepted in that round, before the
+- 1.1 · 2026-11-19 · reviewer · scope — behaviour runs load no MCP server (`--strict-mcp-config`); the auto-gate RED attempt answered from the coai server's own instructions
+
+  Before 1.1, no entries. Plan round 1 (`3f86ba81`) answered `proceed` with four findings, all accepted in that round, before the
   approval: `npm run check` beside `npm test`; the P2 ledger cases named; the plan round before the code (the build
   order below); both native CLIs smoked against the candidate before the promotion. The Opus judge's findings of the same
   day are folded in the commit that records the approval; each is a repaired accuracy or a fix that only satisfies the
@@ -52,7 +54,7 @@ The gate-words release (`5d2d5ec`) left four things open. When this plan is done
 | File | What changes |
 |---|---|
 | `tools/smoke-rules.mjs` | accepts `--task <task>` (default `inspect`, so every existing call is unchanged) and `--only <id>`, repeatable |
-| `tools/lib/rule-smoke.mjs` | `smoke({…, task, only})`: the task goes to the preflight `explain` (the resolver refuses an unknown task there, naming its task list, before anything launches), to `inspectPrompt` (its `explain` and `read --only` commands) and into the report as `task`. With `only`, the expected rules are those ids alone, an id the manifest did not select is refused before launch, the prompt reads exactly those ids, and the report records `only`. The trace parser is task-agnostic (`lib/rule-trace.mjs` checks the resolver, the `read` verb and `--repo`), so it does not change |
+| `tools/lib/rule-smoke.mjs` (also, by entry 1.1: `behaviourCliArgs` passes `--strict-mcp-config`) | `smoke({…, task, only})`: the task goes to the preflight `explain` (the resolver refuses an unknown task there, naming its task list, before anything launches), to `inspectPrompt` (its `explain` and `read --only` commands) and into the report as `task`. With `only`, the expected rules are those ids alone, an id the manifest did not select is refused before launch, the prompt reads exactly those ids, and the report records `only`. The trace parser is task-agnostic (`lib/rule-trace.mjs` checks the resolver, the `read` verb and `--repo`), so it does not change |
 | `tools/fixtures/behaviour/auto-gate.json` | new: `loadOnly` `common.coai-review-gate` and `common.coai-question-consultant`; four moments; the answer words `resolve`, `ask_consultants`, `ask_human`, `review_again`, `stop_and_wait`; expected `["resolve", "resolve", "ask_consultants", "ask_human"]`; caps copied from `held-gate` (2 USD, 300 s), `measured: false` until the live run measures them; not in `BEHAVIOUR_ORDER` (paid, run by name only) |
 | `common/coai-feature-gate.md` | marker v4 → v5; the `good_enough` bullet's `auto`-at-the-cap clause: "land it as a NEW pull request like the rest and name it in your summary" becomes "verify it as any other finding: land a true one as a NEW pull request and name it in your summary, reject a false one with its reason" |
 | `common/plan-change-control.md` | § *How it is counted*: a new bullet (below); § *The ledger*: the line shape names `nobody`; § *The full stop* step 8: a re-review whose round ended `not_reviewed`; § *The check*: "reviewers approved a narrowed epoch" becomes "a narrowed epoch is approved by anyone but the owner". The lead sentence and § *Never* stay: the new bullet says a `by nobody` epoch stands where the rule says "approval" |
@@ -152,14 +154,17 @@ MCP configuration, so the coai server's own instructions reach it beside the loa
 rule's words from the server's. So `auto-gate` shows that an agent with today's rules and today's server answers right,
 not that the rules alone make it answer right. Filed as an open follow-up below (*Open follow-ups*).
 
-## Open follow-ups
+## Taken in by entry 1.1 (code round 2, `3f86ba81`)
 
-- **The behaviour harness does not isolate the MCP server instructions.** `behaviourCliArgs` passes no
+Filed here first as an open follow-up; code round 2 raised it as a gating finding ("a later rule regression can also
+produce a passing result"), accepted, so it is this plan's one change after approval (ledger 1.1).
+
+- **The behaviour harness did not isolate the MCP server instructions.** `behaviourCliArgs` passes no
   `--strict-mcp-config`/empty MCP config, so a `claude -p` run carries the operator's servers (coai among them) and their
   instructions; a fixture about a server's words cannot then go red on the rule alone. Fix: run behaviour sessions with no
   MCP servers (`--strict-mcp-config` and an empty `--mcp-config`), RED first with the `auto-gate` RED attempt above, and
-  re-run `held-gate` and `auto-gate` with their costs. Not taken here: it changes every fixture's conditions and needs its
-  own measurement.
+  re-run `held-gate` and `auto-gate` with their costs. Done: `behaviourCliArgs` passes `--strict-mcp-config` and no
+  `--mcp-config` for every fixture, its test red before the flag; the runs below.
 
 ## Release, and the nine bumps
 

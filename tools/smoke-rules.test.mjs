@@ -252,6 +252,17 @@ test("the caps and the tool set of a run come from the fixture",()=>{
   assert.equal(none.includes("--allowedTools"),false,"a toolless fixture that loads nothing allows nothing");
   assert.equal(none[none.indexOf("--tools")+1],"");
 });
+test("a behaviour run loads no MCP server: the operator's servers and their instructions stay out (auto-gate's RED attempt, 2026-11-19)",()=>{
+  // The 2026-11-19 auto-gate run against the pre-gate-words rules answered from the coai server's own instructions,
+  // which the session inherited from the operator's MCP configuration, so the fixture could not go red on the rule.
+  for(const name of ["behaviour","classification","held-gate","auto-gate"]){
+    const args=behaviourCliArgs(loadNamed(name),"P",[],"C:/r/tools/rules.mjs");
+    const strict=args.indexOf("--strict-mcp-config");
+    assert.notEqual(strict,-1,`${name}: --strict-mcp-config is passed`);
+    assert.ok(strict<args.indexOf("--"),`${name}: the flag stands before the prompt separator`);
+    assert.equal(args.includes("--mcp-config"),false,`${name}: no MCP config is loaded`);
+  }
+});
 test("the negative fixture expects one unmodelled launch, one denial and no child",()=>{
   const {expectation}=loadNamed("negative");
   assert.deepEqual([expectation.groups[0].model,expectation.groups[0].count,expectation.denials,expectation.children],[null,1,1,0]);

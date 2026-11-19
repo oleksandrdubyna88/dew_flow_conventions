@@ -1449,6 +1449,7 @@ quoting the rule — the RED that motivated the text change. **GREEN on the new 
 | the auto-gate fixture validates, loads exactly the review-gate and question-consultant rules, and stays out of the paid default order | shape, `loadOnly`, caps copied from held-gate and the `capsNote` saying so (one rule there, two here), `measured: false`, not in `BEHAVIOUR_ORDER` |
 | the auto-gate prompt states policy auto, no server and no tools, and defines the five answer words and four moments | the prompt's content |
 | auto-gate passes … / fails ask_human at moment 3 / fails ask_consultants at moment 4 / is inconclusive when either rule was not read | `judgeBehaviour` on a trace that reads both rules (the held-gate trace helper takes a rule list) |
+| a behaviour run loads no MCP server: the operator's servers and their instructions stay out | `behaviourCliArgs` passes `--strict-mcp-config` and no `--mcp-config` for every fixture (behaviour, classification, held-gate, auto-gate), before the prompt separator; red before the flag (auto-gate's RED attempt of 2026-11-19 answered from the coai server's own instructions) |
 
 ## Test leftovers (the merged core: owner segment, kernel owner, liveness — `tools/lib/owned.mjs`, `tools/lib/leftovers-sweep.mjs`, `tools/janitor.sh`, `tools/leftovers-check.mjs`, `tools/sweeper-scan.mjs`; first built as epic E1, 2026-10-15; merged core on PR #82, 2026-10-27)
 

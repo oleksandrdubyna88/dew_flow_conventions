@@ -205,13 +205,15 @@ const TOY_CHECKS_PATTERN="Bash(node --test tools/fixtures/behaviour/toy/*)";
 /**
  * Argument list of a behaviour run. Caps and the tool set come from the fixture, never from constants here.
  * Bash is narrowed to the toy checks and a rev-parse (resolver verbs come with rule loading); every other offered tool is allowed outright (disposable worktree).
+ * No MCP server is loaded (`--strict-mcp-config`, no `--mcp-config`).
  */
 export function behaviourCliArgs(fixture,prompt,prefix=[],resolver="") {
   const offered=fixture.tools.split(",").map(name=>name.trim()).filter(Boolean);
   const loading=fixture.loadRules?loadingTools(resolver):{tools:[],allowed:[]};
   const tools=[...new Set([...offered,...loading.tools])];
   const allowed=[...new Set([...offered.flatMap(name=>name==="Bash"?[TOY_CHECKS_PATTERN,"Bash(git rev-parse *)","Bash(pwd)"]:[name]),...loading.allowed])];
-  return [...prefix,"-p","--no-session-persistence","--output-format","stream-json","--verbose",
+  // --strict-mcp-config with no --mcp-config: no MCP server, so no server's own instructions answer for the rule (auto-gate's RED attempt, 2026-11-19).
+  return [...prefix,"-p","--no-session-persistence","--strict-mcp-config","--output-format","stream-json","--verbose",
     "--max-budget-usd",String(fixture.caps.maxBudgetUsd),"--tools",tools.join(","),
     ...(allowed.length?["--allowedTools",...allowed]:[]),"--",prompt];
 }
