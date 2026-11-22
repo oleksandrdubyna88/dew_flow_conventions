@@ -1,129 +1,204 @@
-# PLAN — agent-models mod 1.5.0: a `last answer` button that scrolls to the answer to your last question
+# PLAN — agent-models mod 1.5.0: a `last answer` button, and the weekly reset time on the limits line
 
-> Status: **DRAFT, 2026-11-22.** Plan round not run yet. Scope: `mods/agent-models/` (one new hooks file, the band row,
-> version 1.5.0, the mod's own tests), the released-copy table in `settings/hooks/lib/agent-models-decide.mjs` (and its
-> `.claude/hooks` mirror), the new row of `tools/agent-models-pins.json`, `research/module_tests.md`, then one
-> `release` promotion and the pin bumps of the nine consumers. Parent: [PLAN_agent_models_mod.md](../research/PLAN_agent_models_mod.md).
+> Status: **APPROVED, 2026-11-22 (epoch 1, by reviewers); two changes since (1.1 owner scope, 1.2 probe).** Build
+> next. Scope: `mods/agent-models/` (one new hooks file, the band row, the limits line, version 1.5.0, the mod's own
+> tests), the installer's file list and released-copy table in `settings/hooks/lib/agent-models-decide.mjs` (and its
+> `.claude/hooks` mirror), the new row of `tools/agent-models-pins.json`, the installer tests under `tools/`,
+> `research/module_tests.md`, then one `release` promotion and the pin bumps of the nine consumers. Parent:
+> [PLAN_agent_models_mod.md](../research/PLAN_agent_models_mod.md).
 
 ## Goal (the owner's words, 2026-11-22, translated from Russian)
 
-"I want to add a button — to the last answer. When pressed it scrolls to the answer to my question."
+1. "I want to add a button — to the last answer. When pressed it scrolls to the answer to my question."
+   The owner's screenshot: the band `[ messages ] [ <account> ] [ login ] [ tasks (0) ]` under a long answer, the
+   question far above, out of view. The button brings the owner's last question to the top of the transcript window,
+   so the answer starts right under it.
+2. Added the same day, after the plan round: "and also add here [the limits line
+   `5h 48% left · resets in 2h 24m · week 83% left · Fable 97% left`] when the weekly limit resets: if more than a
+   day — just the date; if less — how many hours are left."
 
-The owner's screenshot: the band `[ messages ] [ <account> ] [ login ] [ tasks (0) ]` under a long answer, the
-question far above, out of view. The button brings the owner's last question to the top of the transcript window, so
-the answer starts right under it.
+Not in this plan: buttons for older questions, a key binding, a reset time for the Fable weekly entry, and the open
+follow-ups of [1.4.0](../research/PLAN_agent_models_1_4_0.md) § *Follow-ups*.
 
-Not in this plan: buttons for older questions, a key binding, the desktop or mobile surfaces beyond what the band
-already draws there, and the open follow-ups of [1.4.0](../research/PLAN_agent_models_1_4_0.md) § *Follow-ups*.
+## Plan changes
 
-## What the engine gives (Claude Code 2.1.330 types, read 2026-11-22)
+> Epoch 1 · approved 2026-11-22 · by reviewers · state: open
 
-- **`$.ui.scroll({ to: { requestId }, block })`** brings a render instance into view; `block: 'start'` puts its top at
-  the top of the window. "A transcript row moves only while this call answers the person's own input" — a press is
-  such input. It resolves `{}` or `{ deny }` (`not person-initiated`, `the window moved meanwhile`, `no-surface`, …).
-  The docs do not say whether the press still counts after an `await`; the design below calls `scroll` before any
-  `await`, so the question does not arise.
-- **`ui.render` on `{ component: 'UserMessage' }`** runs for each user-message row drawn. `e.requestId` is the row's
-  render id; `e.props.text` is the prompt as shown; `e.props.origin.kind` says who sent it (`composer` = typed here,
-  `bridge` = sent from a remote client; others — `task-notification`, `sdk`, … — are not the person's question).
-  A render hook must not write `$.state`, so what it records lives in a module variable, lost on a hot reload.
-- **`prompt.submit`** gives `e.text` (pastes expanded) and `e.isMeta` (true on a prompt the person does not see as
-  typed).
+  (The plan round's five accepted findings — no fallback to an unrelated row, repeated text, a bridge question after
+  a local one, a check of a candidate build before the rollout, the npm checks — are the baseline this epoch was
+  approved on.)
+- 1.1 · 2026-11-22 · owner · scope — the weekly reset time on the limits line (§ Design D, tests W1–W8)
+- 1.2 · 2026-11-22 · probe · approach — the target is the transcript message's uuid kept in `$.state` at the person's
+  submit, not a list of drawn rows: after a hot reload the older rows are not drawn again, so a row list is empty
+  (§ *Probe*, run 2); with it the Opus review's findings are folded in (§ Design A–C)
 
-### Probe (2026-11-22, a throw-away dev mod in this session)
+## What the code and the engine do today (read 2026-11-22 at `42119f6`, Claude Code 2.1.330)
 
-A `UserMessage` hook recorded each row's `requestId`, origin and text; a tool compared them with
-`$.session.messages({ last: 40 })`:
+- The band row is `accountRow` (`mods/agent-models/hooks/register.tsx:215-237`), drawn with the viewer open and
+  closed (`:241`, `:247`). The viewer counts the account row as one row (`FIXED_ROWS`, `hooks/prompts.ts:213`).
+- The installer copies exactly the files of `MOD_FILES` (`settings/hooks/lib/agent-models-decide.mjs:16-25`, seven
+  files, frozen; `INTRODUCED` at `:27-30`). Its tests name that list: `tools/agent-models-decide.test.mjs:18,24,35-40`,
+  `tools/agent-models-install.test.mjs:93`, `tools/agent-models-pin.test.mjs:111-116`.
+- **`$.ui.scroll({ to: { requestId }, block })`**: `requestId` may be "a transcript message's" id (types `UiScrollTarget`).
+  A transcript row moves only "while this call answers the person's own input, where one scrolls"; on the terminal's
+  main screen the transcript is the terminal's own scrollback (deny `none scrolls`), so it works in fullscreen only
+  (`e.viewport.isFullscreen`). The test harness cannot observe the target or the `block` of a scroll (the `ui.scroll`
+  event fires for the plugin's own sites only).
+- **`prompt.submit`** gives `e.origin` (`PromptOrigin`: the person's Enter, a notification, a peer, a plugin) and
+  `e.isMeta`; `next(e)` resolves "once the prompt entered the session and its turn started, or it was queued behind
+  the running one". `$.session.messages({ last })` gives `uuid` but no origin.
 
-| row `requestId` | transcript `uuid` | text |
+### Probe (2026-11-22, a throw-away dev mod in this session, fullscreen terminal)
+
+Run 1 — a `UserMessage` hook recorded each row; a tool compared them with `$.session.messages({ last: 40 })`. A row's
+`requestId` was the message uuid with its last 12 hex digits zeroed (`c983645b-e851-4e16-b475-000000000000` for
+`c983645b-e851-4e16-b475-4e5a54afae23`); a row of a task notification had the whole uuid; a fresh submit was first
+drawn with the id `placeholder`.
+
+Run 2 — after a hot reload the hook saw only the rows drawn since (the older questions were not drawn again), and a
+button that scrolled to the newest recorded row toasted `no question row recorded`. A message typed during a running
+turn got a row id of its own that `ui.scroll` refused (`nothing drawn under that requestId`) and no user message of its
+own in the transcript read.
+
+Run 3 — four buttons, each `block: 'start'`, the question scrolled out of view first. The owner: A, B, C move; D does
+not.
+
+| Button | Target | Result |
 |---|---|---|
-| `58b036a6-4e49-4335-b709-000000000000` | (compacted away) | `[Image #1] у нас в конвешинс есть мод на…` |
-| `c983645b-e851-4e16-b475-000000000000` | `c983645b-e851-4e16-b475-4e5a54afae23` | `готвов?` |
+| A | the newest recorded row id, no await | moved |
+| B | the transcript uuid, read before the press, no await | moved (also to an older question far off screen) |
+| C | that uuid with the last 12 digits zeroed, no await | moved |
+| D | as C, but the transcript read after the press (an `await` before the scroll) | did not move |
 
-So the row id is **not** the transcript uuid (the last 12 hex digits are zeroed). That shape is not documented, so the
-design does not rely on it: it matches by the shown text. The probe also showed that after a hot reload the earlier
-rows are drawn again in transcript order, and that a compaction summary has no `composer` row.
+So: the transcript uuid is a working target, a far-off row is reached, and the target must be known before the press.
 
 ## Design
 
-### A. Remember the person's prompt rows (new file `hooks/answer.tsx`)
+### A. Know the last question before any press (new file `hooks/answer.tsx`, `types/index.d.ts`)
 
-- `on('ui.render', { component: 'UserMessage' }, …)`: when `origin.kind` is `composer` or `bridge`, and the row's
-  `requestId` is not recorded yet, append `{ id, text }` to a module list (a new array each time, never mutated in
-  place), capped at the newest 200 entries. The hook always returns `next(e)`: the row is drawn as before.
-- `on('prompt.submit', …)`: after `next(e)`, when the submit was not dropped, not `isMeta` and not a slash command,
-  keep `e.text` as the *last question text* (a module variable).
+- A new state value `lastQuestion: { uuid: string } | { pending: string } | null` in `PluginState['agent-models']`
+  (non-render hooks write it; it survives a hot reload, as `$.state` does).
+- `on('prompt.submit')`: when `e.origin` is the person's own (the Enter in this terminal or a bridge client — the
+  coder reads `PromptOrigin` and names the members), not `isMeta`, not a slash command, and `next(e)` did not drop it:
+  write `{ pending: <the entered text> }`, then read `$.session.messages({ last: 50 })` and find the newest user message
+  with no `toolResults` whose text equals it; found → `{ uuid }`. A submit of a notification, a peer or a plugin leaves
+  the value as it is. Two questions with the same text are told apart because the lookup runs at each submit and takes
+  the newest such message.
+- `on('turn.start')` and `on('turn.complete')`: while the value is `pending` (the prompt was queued behind a running
+  turn), try the lookup again. A message typed into a running turn that never becomes a user message of its own (run 2)
+  stays pending until the next submit; while pending, the press shows a toast (B), never an older question.
+- `on('session.start')` (new session, `/resume`, reload): when the value is `null` — a resumed session or a session
+  from before 1.5.0 — take the newest transcript user message that has no `toolResults`, is not a compaction summary
+  (`This session is being continued from a previous conversation`) and does not start with `<` (notification and peer
+  wrappers). A value already set is kept: a reload keeps the session.
+- A failed or refused read or write leaves the value as it was; nothing throws out of a hook.
 
 ### B. The press (`hooks/answer.tsx`, `register.tsx`)
 
-- `lastQuestionRow(list, lastText)`: the newest recorded row whose text equals `lastText`; when there is none (no
-  submit seen since the load, or the shown text differs from the submitted one), the newest recorded row; when the
-  list is empty, none. Pure, synchronous.
-- The button press calls `$.ui.scroll({ to: { requestId: row.id }, block: 'start' })` at once — no `await` before it.
-  - `{}`: nothing more.
-  - `{ deny }`: a toast `last answer: <deny>`.
-  - no row: a toast `last answer: no question of yours in view yet — scroll up to it once`.
-  - a thrown or rejected call: a toast with the message; the press never throws.
-- The button is drawn in `accountRow` after `tasks (n)`: `[ last answer ]`, `key="last-answer"`, colour
-  `BUTTON_COLOR`, in both band states (viewer open and closed), because `accountRow` is drawn in both.
+- `pressLastAnswer(scroll, toast, question)`: pure apart from its two arguments, so the tests pass fakes (the harness
+  cannot see a scroll target). With `{ uuid }` it calls `scroll({ to: { requestId: uuid }, block: 'start' })` at once —
+  no `await` before it (run 3, D). `{}`: nothing more. `{ deny }`: a toast in plain words (`none scrolls` → "works in
+  fullscreen only"; else `last answer: <deny>`). A rejection: a toast; the press never throws. With `pending` or
+  `null`: a toast `last answer: no question yet` (or `… still being sent`), no scroll.
+- The draw reads `lastQuestion` (a read, never a write) and passes the value to the press.
+- The button `[ last answer ]`, `key="last-answer"`, colour `BUTTON_COLOR`, after `tasks (n)` in `accountRow`, in both
+  viewer states. It is drawn only when `e.viewport?.isFullscreen !== false` (on the main screen it cannot work).
+- The viewer's row count counts the account row by its width at `bodyColumns` (it can wrap with a long email), not as a
+  fixed one row.
 
-### C. Version and release
+### C. The weekly reset time (`limits.tsx`, `types/index.d.ts`) — plan change 1.1
 
-- `plugin.json` version `1.5.0`. `tools/agent-models-pins.json` gets the `1.5.0` row (raw sha256 of the mod files,
-  now one more: `hooks/answer.tsx`); `RELEASED_MOD` in `settings/hooks/lib/agent-models-decide.mjs` and its
-  `.claude/hooks/lib` copy become that row.
-- After the merge: one `release` promotion, then a pin bump in each of the nine consumers. Before the promotion the
-  owner is asked about in-flight consumer releases and the open-PR counts.
+- Today the line keeps only `five_hour.resets_at` (`mods/agent-models/hooks/limits.tsx:81`); `Limits` has no weekly
+  time (`types/index.d.ts:69-74`). Add `weekResetsAt: number | null`, read by the same `parseResetsAt`
+  (`limits.tsx:62`) from `seven_day.resets_at`.
+- The text goes right after `week N% left`:
+  `5h 48% left · resets in 2h 24m · week 83% left · resets Nov 27 · Fable 97% left`.
+  - 24 hours or more left: `resets <Mon> <day>` — the date in the engine's local time zone, English month
+    abbreviation, no time, no year.
+  - Under 24 hours: `resets in <time>` with the existing `resetText` (`limits.tsx:92`): `23h 59m`, `5h 0m`, `59m`,
+    `<1m`.
+  - Unknown, clock refused or passed: `resets —`.
+  - No colour (the owner asked for none).
+- A stored `Limits` value from 1.4.0 has no `weekResetsAt`: read as `null` (a dash) until the next fetch; the guard of
+  the stored value must not reject it.
+- The line redraws each minute while open (the 1.4.0 `limitsMinute` tick), so it turns from a date into hours at the
+  24-hour mark without a new fetch.
+
+### D. Version, installer and release
+
+- `plugin.json` version `1.5.0`, its `description` names the button and the weekly time.
+- `MOD_FILES` gains `hooks/answer.tsx` and `INTRODUCED['hooks/answer.tsx'] = [1, 5, 0]` in
+  `settings/hooks/lib/agent-models-decide.mjs` and its mirror; the installer tests that name the list are updated, and
+  a new one shows a 1.4.0 copy upgrading to 1.5.0 with the new file copied.
+- `tools/agent-models-pins.json` gets the `1.5.0` row (eight files); `RELEASED_MOD` and its mirror become that row.
+- **Before the promotion**: the owner runs the owner checks (below) on the branch build, loaded in a session with
+  `claude --plugin-dir <worktree>/mods/agent-models` (or the installed copy swapped by hand and put back); a failed
+  check blocks the rollout. Then the owner is asked about in-flight consumer releases and the open-PR counts, one
+  `release` promotion, a pin bump in each of the nine consumers.
 
 ## Files
 
-New `mods/agent-models/hooks/answer.tsx` (the row list, the last question text, `lastQuestionRow`, the button, the
-press), `hooks/register.tsx` (calls the hooks of `answer.tsx`, the button in `accountRow`), `.claude-plugin/plugin.json`,
-new `tests/answer.test.tsx`, `settings/hooks/lib/agent-models-decide.mjs` + `.claude/hooks/lib/agent-models-decide.mjs`,
-`tools/agent-models-pins.json`, `research/module_tests.md`.
+New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.ts` (row count), `hooks/limits.tsx`,
+`types/index.d.ts`, `.claude-plugin/plugin.json`; new `tests/answer.test.tsx`, the limits tests and fixtures;
+`settings/hooks/lib/agent-models-decide.mjs` + `.claude/hooks/lib/agent-models-decide.mjs`;
+`tools/agent-models-pins.json`, `tools/agent-models-decide.test.mjs`, `tools/agent-models-install.test.mjs`,
+`tools/agent-models-pin.test.mjs`; `research/module_tests.md`.
 
 ## Build order
 
-1. Plan round (coai `review_plan` + an Opus review at once) until the stage advances.
+1. Plan round — done (proceed); changes 1.1 and 1.2 recorded.
 2. RED: the tests below, watched failing for the right reason.
-3. GREEN: A, then B (Sonnet coder; the caller reviews).
-4. Version, pin row, `RELEASED_MOD` + mirror; `node --test tools/` and `claude plugin test mods/agent-models` green;
-   `claude plugin validate` passes; `tsc` shows no new error.
+3. GREEN: A–B, then C, then D's installer part (Sonnet coder; Opus brief and review).
+4. Version, pin row, `RELEASED_MOD` + mirror. `npm ci --ignore-scripts`, `npm test`, `npm run check`,
+   `node --test tools/`, `claude plugin test mods/agent-models` green; `claude plugin validate` passes; `tsc` no new
+   error.
 5. Code round (coai `review_code` + an Opus review), fixes, PR, checks, threads, merge.
-6. Ask the owner, promote `release`, nine pin bumps, merge each.
-7. Owner checks (below); promote this plan to `research/`.
+6. Owner checks on the branch build; then ask the owner, promote `release`, nine pin bumps, merge each.
+7. Promote this plan to `research/`.
 
 ## Test plan (`claude plugin test mods/agent-models`; installer tests by `node --test`)
 
 | # | Case | Expected |
 |---|---|---|
-| T1 | band drawn, viewer closed and open | a `last-answer` button after `tasks (n)` in both |
-| T2 | two `composer` rows drawn, then press | `ui.scroll` called once with the second row's `requestId`, `block: 'start'` |
-| T3 | rows of origin `task-notification`, `sdk` | not recorded; press with only those → the "no question" toast, no scroll |
-| T4 | a `bridge` row | recorded like `composer` |
-| T5 | submit `B`, rows `A`, `B`, `A` (redrawn `A` seen last after a reload) | scroll to the `B` row |
-| T6 | submitted text differs from every row | scroll to the newest recorded row |
-| T7 | the same row drawn many times | recorded once |
-| T8 | 250 rows | only the newest 200 kept; the press still finds the newest |
-| T9 | `ui.scroll` answers `{ deny: 'not person-initiated' }` | toast `last answer: not person-initiated` |
-| T10 | `ui.scroll` rejects | a toast; the press does not throw |
-| T11 | `isMeta` submit, a slash command, a dropped submit | the last question text does not change |
-| T12 | the UserMessage hook | returns `next(e)` unchanged (the row is drawn as before) |
-| T13 | the existing 282 mod tests | pass |
-| T14 | existing `tools/agent-models-pin.test.mjs` | newest row = HEAD files = `RELEASED_MOD` |
+| T1 | band drawn fullscreen, viewer closed and open | a `last-answer` button after `tasks (n)` in both |
+| T2 | band drawn with `isFullscreen: false` | no `last-answer` button; absent `viewport` → drawn |
+| T3 | person submit `Q`, the transcript stub has `Q` as the newest user message | `lastQuestion` = `{ uuid }` of it |
+| T4 | submits of a notification, a peer, a plugin; an `isMeta` submit; a slash command; a dropped submit | value unchanged |
+| T5 | a bridge submit after a local one | the bridge question's uuid |
+| T6 | `Q` asked twice (two user messages with that text) | the newer uuid |
+| T7 | submit queued: not in the transcript at submit, present at `turn.start` | `pending`, then `{ uuid }` |
+| T8 | `session.start` with `null`: transcript ends with a summary, a `<task-notification…>`, a tool result, before them a question | the question's uuid |
+| T9 | `session.start` with a value set (reload) | the value is kept |
+| T10 | press with `{ uuid }` (fake scroll) | scroll called once, synchronously in the press, with `{ requestId: uuid }`, `block: 'start'` |
+| T11 | press: scroll answers `{ deny: 'none scrolls' }`; another deny; a rejection | the fullscreen toast; `last answer: <deny>`; a toast, no throw |
+| T12 | press with `pending`; with `null` | a toast, no scroll |
+| T13 | the messages read throws in each hook | value unchanged, no throw |
+| T14 | the viewer row count with a long email at 80 columns | the wrapped account row counted |
+| W1 | body with `seven_day.resets_at` `…Z` / `…+00:00` | `weekResetsAt` = the `Date.parse` value |
+| W2 | `seven_day.resets_at` null / absent / garbage / no offset | `weekResetsAt` null; `resets —` after `week` |
+| W3 | 4 days left (fixed fixture clock and time zone) | `week 83% left · resets Nov 27` (the date the fixture names) |
+| W4 | exactly 24 h 0 m left; 23 h 59 m left | the date; `resets in 23h 59m` |
+| W5 | 5 h 0 m, 59 m, 30 s left | `resets in 5h 0m`, `resets in 59m`, `resets in <1m` |
+| W6 | reset passed; clock refused | `resets —` |
+| W7 | a stored 1.4.0 value with no `weekResetsAt` | drawn with `resets —`, no throw, the value kept |
+| W8 | the owner's example line | `5h 48% left · resets in 2h 24m · week 83% left · resets Nov 27 · Fable 97% left` |
+| I1 | installer: `MOD_FILES` has eight files; a 1.4.0 copy upgrades to 1.5.0 | `hooks/answer.tsx` copied; pins row = HEAD files = `RELEASED_MOD` |
+| R1 | the existing mod tests (fixtures updated for the new field and the longer line) and `node --test tools/` | pass |
 
-## Owner checks after the rollout (a session cannot do these for itself)
+## Owner checks (on the branch build before the promotion, again after the rollout)
 
-- Ask a question that gets a long answer, scroll to the end, press `last answer`: the question is at the top of the
-  window and the answer under it.
-- The same after `/resume` of an older session, and after a hot reload of the mod.
+- Ask a question that gets a long answer, scroll away, press `last answer`: the question is at the top of the window
+  and the answer under it.
+- The same after a hot reload of the mod, and after `/resume` of an older session.
+- The limits line shows `resets <date>` after `week`, or `resets in …h …m` when the week resets within a day.
 
 ## Definition of Done
 
-- [ ] Plan round and code round advanced; Opus reviews done, findings fixed or answered.
-- [ ] Tests T1–T14 green; RED seen first for T1–T11.
-- [ ] `claude plugin validate` passes; `tsc -p mods/agent-models` shows no new error; `node --test tools/` green.
+- [x] Plan round advanced (proceed, 2026-11-22); Opus plan review folded.
+- [ ] Tests T1–T14, W1–W8, I1, R1 green; RED seen first for each new case.
+- [ ] `npm test`, `npm run check`, `node --test tools/` green; `claude plugin validate` passes; `tsc` no new error.
+- [ ] Code round advanced; Opus code review done; findings fixed or answered.
 - [ ] PR merged with green checks and no open thread.
-- [ ] `release` promoted after the owner's word; nine consumer pin bumps merged.
+- [ ] Owner checks passed on the branch build; `release` promoted after the owner's word; nine pin bumps merged.
 - [ ] The installed mod on this WSL is 1.5.0 after a session start in a consumer.
-- [ ] Owner checks reported; this plan promoted to `research/` with what shipped differently.
+- [ ] This plan promoted to `research/` with what shipped differently.
