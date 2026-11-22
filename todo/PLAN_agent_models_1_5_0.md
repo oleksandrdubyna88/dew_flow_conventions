@@ -1,6 +1,6 @@
 # PLAN — agent-models mod 1.5.0: a `last answer` button, and the weekly reset time on the limits line
 
-> Status: **APPROVED, 2026-11-22 (epoch 1, by reviewers); two changes since (1.1 owner scope, 1.2 probe).** Build
+> Status: **APPROVED, 2026-11-22 (epoch 1, by reviewers); three changes since (1.1 owner scope, 1.2 probe, 1.3 code round).** Code round fixes
 > next. Scope: `mods/agent-models/` (one new hooks file, the band row, the limits line, version 1.5.0, the mod's own
 > tests), the installer's file list and released-copy table in `settings/hooks/lib/agent-models-decide.mjs` (and its
 > `.claude/hooks` mirror), the new row of `tools/agent-models-pins.json`, the installer tests under `tools/`,
@@ -31,6 +31,11 @@ follow-ups of [1.4.0](../research/PLAN_agent_models_1_4_0.md) § *Follow-ups*.
 - 1.2 · 2026-11-22 · probe · approach — the target is the transcript message's uuid kept in `$.state` at the person's
   submit, not a list of drawn rows: after a hot reload the older rows are not drawn again, so a row list is empty
   (§ *Probe*, run 2); with it the Opus review's findings are folded in (§ Design A–C)
+- 1.3 · 2026-11-23 · reviewer · approach — the code round (coai + Opus): a pending question keeps the question before
+  it (`previous`) in `$.state`; a press while pending goes to `previous` (the question being answered now), not a
+  toast — a message typed into a running turn never becomes a user message of its own, so the button lost the turn's
+  question; `previous` is also the persisted lookup boundary (a reload kept only the text); `session.end` clears the
+  value; the limits line ticks on the clock minute, not on the 5-hour time (§ Design A–C)
 
 ## What the code and the engine do today (read 2026-11-22 at `42119f6`, Claude Code 2.1.330)
 
@@ -76,8 +81,11 @@ So: the transcript uuid is a working target, a far-off row is reached, and the t
 
 ### A. Know the last question before any press (new file `hooks/answer.tsx`, `types/index.d.ts`)
 
-- A new state value `lastQuestion: { uuid: string } | { pending: string } | null` in `PluginState['agent-models']`
-  (non-render hooks write it; it survives a hot reload, as `$.state` does).
+- A new state value `lastQuestion: { uuid: string } | { pending: string; previous?: string } | null` in
+  `PluginState['agent-models']` (non-render hooks write it; it survives a hot reload, as `$.state` does). `previous`
+  is the uuid of the question before the pending one (change 1.3); it is the lookup boundary: a row at or before it is
+  never the pending question. The pending write is one `update` with no `await` before it, so submits are written in
+  their order and an older submit never overwrites a newer one.
 - `on('prompt.submit')`: when `e.origin` is the person's own (the Enter in this terminal or a bridge client — the
   coder reads `PromptOrigin` and names the members), not `isMeta`, not a slash command, and `next(e)` did not drop it:
   write `{ pending: <the entered text> }`, then read `$.session.messages({ last: 50 })` and find the newest user message
@@ -85,12 +93,16 @@ So: the transcript uuid is a working target, a far-off row is reached, and the t
   the value as it is. Two questions with the same text are told apart because the lookup runs at each submit and takes
   the newest such message.
 - `on('turn.start')` and `on('turn.complete')`: while the value is `pending` (the prompt was queued behind a running
-  turn), try the lookup again. A message typed into a running turn that never becomes a user message of its own (run 2)
-  stays pending until the next submit; while pending, the press shows a toast (B), never an older question.
+  turn), try the lookup again; at `turn.complete` the lookup reads back past the newest 50 rows (up to the engine cap)
+  so a long answer does not hide the question. A message typed into a running turn that never becomes a user message
+  of its own (run 2) stays pending until the next submit; while pending, the press goes to `previous` (B).
+- `on('session.end')` writes `null` (a `/clear` raises no `session.start`, so an old uuid must not carry over).
 - `on('session.start')` (new session, `/resume`, reload): when the value is `null` — a resumed session or a session
   from before 1.5.0 — take the newest transcript user message that has no `toolResults`, is not a compaction summary
-  (`This session is being continued from a previous conversation`) and does not start with `<` (notification and peer
-  wrappers). A value already set is kept: a reload keeps the session.
+  (`This session is being continued from a previous conversation`) and is not empty after the mod's `cleanPrompts`
+  (which drops the engine's notification and peer wrappers); it reads the newest 200 rows first and the engine cap only
+  when none is found. A value already set is kept: a reload keeps the session. Text is compared after `cleanPrompts` on
+  both sides.
 - A failed or refused read or write leaves the value as it was; nothing throws out of a hook.
 
 ### B. The press (`hooks/answer.tsx`, `register.tsx`)
@@ -98,8 +110,9 @@ So: the transcript uuid is a working target, a far-off row is reached, and the t
 - `pressLastAnswer(scroll, toast, question)`: pure apart from its two arguments, so the tests pass fakes (the harness
   cannot see a scroll target). With `{ uuid }` it calls `scroll({ to: { requestId: uuid }, block: 'start' })` at once —
   no `await` before it (run 3, D). `{}`: nothing more. `{ deny }`: a toast in plain words (`none scrolls` → "works in
-  fullscreen only"; else `last answer: <deny>`). A rejection: a toast; the press never throws. With `pending` or
-  `null`: a toast `last answer: no question yet` (or `… still being sent`), no scroll.
+  fullscreen only"; else `last answer: <deny>`). A rejection: a toast; the press never throws. With `pending` and a
+  `previous`: scroll to `previous`, the same way. With `pending` and no `previous`: a toast `last answer: your question
+  is not in the transcript yet`. With `null`: a toast `last answer: no question yet`. No scroll in those two.
 - The draw reads `lastQuestion` (a read, never a write) and passes the value to the press.
 - The button `[ last answer ]`, `key="last-answer"`, colour `BUTTON_COLOR`, after `tasks (n)` in `accountRow`, in both
   viewer states. It is drawn only when `e.viewport?.isFullscreen !== false` (on the main screen it cannot work).
@@ -121,7 +134,9 @@ So: the transcript uuid is a working target, a far-off row is reached, and the t
   - No colour (the owner asked for none).
 - A stored `Limits` value from 1.4.0 has no `weekResetsAt`: read as `null` (a dash) until the next fetch; the guard of
   the stored value must not reject it.
-- The line redraws each minute while open (the 1.4.0 `limitsMinute` tick), so it turns from a date into hours at the
+- The line redraws each minute while open (the 1.4.0 `limitsMinute` tick, keyed from 1.5.0 on the clock minute, not on
+  the 5-hour time, which can be unknown; a passed weekly reset starts a refetch as a passed 5-hour reset does), so it
+  turns from a date into hours at the
   24-hour mark without a new fetch.
 
 ### D. Version, installer and release
@@ -171,7 +186,12 @@ New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.t
 | T9 | `session.start` with a value set (reload) | the value is kept |
 | T10 | press with `{ uuid }` (fake scroll) | scroll called once, synchronously in the press, with `{ requestId: uuid }`, `block: 'start'` |
 | T11 | press: scroll answers `{ deny: 'none scrolls' }`; another deny; a rejection | the fullscreen toast; `last answer: <deny>`; a toast, no throw |
-| T12 | press with `pending`; with `null` | a toast, no scroll |
+| T12 | press with `pending` + `previous`; `pending` alone; `null` | scroll to `previous`; a toast, no scroll; a toast, no scroll |
+| T15 | Q settled as u1; Q typed again, not yet in the transcript; then u2 appears and `turn.start` runs; also after a simulated reload (module state fresh) | `{ pending: Q, previous: u1 }`, never u1; then u2 |
+| T16 | submits A then B with A's state work delayed | the value ends at B |
+| T17 | the question's turn has more than 50 rows before `turn.complete` | found at `turn.complete` |
+| T18 | `session.end` | value `null` |
+| W9 | the line open, the 5-hour reset unknown, 24 h 1 m to the weekly reset, the clock moves 2 min (no manual redraw) | the date, then `resets in 23h 59m` |
 | T13 | the messages read throws in each hook | value unchanged, no throw |
 | T14 | the viewer row count with a long email at 80 columns | the wrapped account row counted |
 | W1 | body with `seven_day.resets_at` `…Z` / `…+00:00` | `weekResetsAt` = the `Date.parse` value |
@@ -195,7 +215,7 @@ New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.t
 ## Definition of Done
 
 - [x] Plan round advanced (proceed, 2026-11-22); Opus plan review folded.
-- [ ] Tests T1–T14, W1–W8, I1, R1 green; RED seen first for each new case.
+- [ ] Tests T1–T18, W1–W9, I1, R1 green; RED seen first for each new case.
 - [ ] `npm test`, `npm run check`, `node --test tools/` green; `claude plugin validate` passes; `tsc` no new error.
 - [ ] Code round advanced; Opus code review done; findings fixed or answered.
 - [ ] PR merged with green checks and no open thread.
