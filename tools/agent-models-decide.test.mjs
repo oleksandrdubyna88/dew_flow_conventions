@@ -14,14 +14,16 @@ import {
   fixtureBytes, goodManifest, FILES, D, sha,
 } from './lib/agent-models-fixtures.mjs';
 
-/** The files a 1.2.x install did not have: the ones introduced at 1.3.0. */
-const LATER = ['hooks/tasks.tsx', 'hooks/limits.tsx'];
+/** The files a 1.2.x install did not have: the ones introduced at 1.3.0 and (1.5.0) the answer button's. */
+const LATER = ['hooks/tasks.tsx', 'hooks/limits.tsx', 'hooks/answer.tsx'];
+/** The file a 1.4.x install did not have: the one introduced at 1.5.0. */
+const NEWEST = ['hooks/answer.tsx'];
 
 // ---------------------------------------------------------------------------------------------------------------------
 // 4.1 pure decisions
 // ---------------------------------------------------------------------------------------------------------------------
 
-test('modTargets names every path the module may touch, the manifest a sibling of the target; MOD_FILES is the seven files, INTRODUCED names the release of the sixth and the seventh', () => {
+test('modTargets names every path the module may touch, the manifest a sibling of the target; MOD_FILES is the eight files, INTRODUCED names the release of the sixth, the seventh and the eighth', () => {
   const home = path.resolve('/h');
   const t = mod.modTargets(home);
   assert.deepEqual(t, {
@@ -34,10 +36,11 @@ test('modTargets names every path the module may touch, the manifest a sibling o
   assert.equal(t.settings, guard.targets(home).settings);
   assert.deepEqual([...mod.MOD_FILES], FILES);
   assert.equal(Object.isFrozen(mod.MOD_FILES), true);
-  assert.equal(FILES.length, 7);
+  assert.equal(FILES.length, 8);
   assert.equal(FILES[FILES.indexOf('hooks/prompts.ts') + 1], 'hooks/tasks.tsx');
   assert.equal(FILES[FILES.indexOf('hooks/tasks.tsx') + 1], 'hooks/limits.tsx');
-  assert.deepEqual(mod.INTRODUCED, { 'hooks/tasks.tsx': [1, 3, 0], 'hooks/limits.tsx': [1, 3, 0] });
+  assert.equal(FILES[FILES.indexOf('hooks/limits.tsx') + 1], 'hooks/answer.tsx');
+  assert.deepEqual(mod.INTRODUCED, { 'hooks/tasks.tsx': [1, 3, 0], 'hooks/limits.tsx': [1, 3, 0], 'hooks/answer.tsx': [1, 5, 0] });
   assert.equal(Object.isFrozen(mod.INTRODUCED), true);
   for (const rel of LATER) assert.equal(Object.isFrozen(mod.INTRODUCED[rel]), true);
 });
@@ -134,7 +137,7 @@ const fiveOf = version => {
   return { files, manifest };
 };
 
-test('I2: a 1.2.2 copy of the five older files with a manifest naming those five upgrades without `keep` (the sixth and seventh files did not exist yet)', () => {
+test('I2: a 1.2.2 copy of the five older files with a manifest naming those five upgrades without `keep` (the sixth, seventh and eighth files did not exist yet)', () => {
   const old = fiveOf([1, 2, 2]);
   assert.deepEqual(Object.keys(old.manifest.sha256), FILES.filter(rel => !LATER.includes(rel)));
   assert.deepEqual(mod.decideCopy(srcOk([1, 3, 0]), dirState({ version: [1, 2, 2], ...old })), { action: 'upgrade', keep: false });
@@ -147,6 +150,37 @@ for (const rel of LATER) {
     assert.deepEqual(mod.decideCopy(srcOk([1, 3, 0]), dirState({ version: [1, 2, 2], ...old })), { action: 'upgrade', keep: true });
   });
 }
+
+/** What a 1.3.x-1.4.x install wrote: the seven files that release held, a seven-key manifest (no hooks/answer.tsx). */
+const sevenOf = version => {
+  const files = srcOk(version).files;
+  const manifest = goodManifest(version.join('.'), Object.fromEntries(files));
+  for (const rel of NEWEST) {
+    delete manifest.sha256[rel];
+    files.set(rel, null);
+  }
+  return { files, manifest };
+};
+
+test('I8: a 1.4.0 copy of the seven files with a manifest naming those seven upgrades to 1.5.0 without `keep` (the eighth file did not exist yet)', () => {
+  const old = sevenOf([1, 4, 0]);
+  assert.deepEqual(Object.keys(old.manifest.sha256), FILES.filter(rel => !NEWEST.includes(rel)));
+  assert.deepEqual(mod.decideCopy(srcOk([1, 5, 0]), dirState({ version: [1, 4, 0], ...old })), { action: 'upgrade', keep: false });
+});
+
+test('I9: the same seven-key manifest while the 1.4.0 target ALSO holds a regular hooks/answer.tsx is not vouched for: `keep`', () => {
+  const old = sevenOf([1, 4, 0]);
+  old.files.set('hooks/answer.tsx', Buffer.from('somebody put this here'));
+  assert.deepEqual(mod.decideCopy(srcOk([1, 5, 0]), dirState({ version: [1, 4, 0], ...old })), { action: 'upgrade', keep: true });
+});
+
+test('I10: a seven-key manifest vouches below 1.5.0 and only while the target lacks hooks/answer.tsx; at 1.5.0 it no longer suffices', () => {
+  const old = sevenOf([1, 4, 0]);
+  assert.equal(mod.manifestMatches(old.manifest, old.files, [1, 4, 0]), true);
+  assert.equal(mod.manifestMatches(old.manifest, new Map(old.files).set('hooks/answer.tsx', Buffer.from('x')), [1, 4, 0]), false);
+  const atRelease = sevenOf([1, 5, 0]);
+  assert.equal(mod.manifestMatches(atRelease.manifest, atRelease.files, [1, 5, 0]), false);
+});
 
 test('I4: a 1.3.0 manifest that lacks the files introduced AT 1.3.0 does not vouch for a 1.3.0 target that lacks them either', () => {
   const lacking = fiveOf([1, 3, 0]);

@@ -3,7 +3,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import { limitColor, limitsFromBody, limitsLine, LIMITS_LOADING, LIMITS_TIMEOUT_MS, LIMITS_UNAVAILABLE, LIMITS_URL, percentLeft } from '../hooks/limits'
 import { textRows, viewerFixedRows } from '../hooks/prompts'
 import {
-  answerWith, BAND, closeButton, COLOURED, L1, l1At, LC, lastView, limitsButton, measured, MEASURED, NONE, ok, pressLimits, RESETS_AT, scoped, spin, SURFACES, text, window, world,
+  answerWith, BAND, closeButton, COLOURED, L1, l1At, LC, lastView, limitsButton, measured, MEASURED, NONE, ok, pressLimits, RESETS_AT, scoped, spin, SURFACES, text, WEEK_AT, WEEK_RESETS_AT, window, world,
 } from './limits-fixtures'
 import type { Answer } from './limits-fixtures'
 
@@ -23,8 +23,8 @@ test('P3 percentLeft refuses what is not a number', () => {
 
 test('B1 the measured body gives three numbers and the label, and nothing else', () => {
   const value = limitsFromBody(MEASURED)
-  expect(value).toEqual({ fiveHour: 87, week: 74, model: { label: 'Fable', left: 82 }, fiveHourResetsAt: RESETS_AT })
-  expect(Object.keys(value ?? {})).toEqual(['fiveHour', 'week', 'model', 'fiveHourResetsAt'])
+  expect(value).toEqual({ fiveHour: 87, week: 74, model: { label: 'Fable', left: 82 }, fiveHourResetsAt: RESETS_AT, weekResetsAt: WEEK_RESETS_AT })
+  expect(Object.keys(value ?? {})).toEqual(['fiveHour', 'week', 'model', 'fiveHourResetsAt', 'weekResetsAt'])
   expect(Object.keys(value?.model ?? {}).sort()).toEqual(['label', 'left'])
 })
 
@@ -34,7 +34,7 @@ test('B2 the model name matches in any case and the label keeps the server spell
 })
 
 test('B3 no Fable entry, or no limits at all: model null, the two windows still read', () => {
-  const none = { fiveHour: 87, week: 74, model: null, fiveHourResetsAt: RESETS_AT }
+  const none = { fiveHour: 87, week: 74, model: null, fiveHourResetsAt: RESETS_AT, weekResetsAt: WEEK_RESETS_AT }
   expect(limitsFromBody(JSON.stringify(measured({ limits: [] })))).toEqual(none)
   const noKey = measured()
   delete noKey.limits
@@ -60,7 +60,7 @@ test('B7 only ONE JSON object is an answer', () => {
 })
 
 test('B8 an empty object is an answer with nothing in it', () => {
-  expect(limitsFromBody('{}')).toEqual({ fiveHour: null, week: null, model: null, fiveHourResetsAt: null })
+  expect(limitsFromBody('{}')).toEqual({ fiveHour: null, week: null, model: null, fiveHourResetsAt: null, weekResetsAt: null })
 })
 
 test('B9 a number sent as a string is no number', () => {
@@ -68,23 +68,23 @@ test('B9 a number sent as a string is no number', () => {
 })
 
 test('L1 the line names the three numbers', () => {
-  expect(limitsLine({ fiveHour: 87, week: 74, model: { label: 'Fable', left: 82 }, fiveHourResetsAt: RESETS_AT }, RESETS_AT - 83 * 60_000)).toBe(L1)
+  expect(limitsLine({ fiveHour: 87, week: 74, model: { label: 'Fable', left: 82 }, fiveHourResetsAt: RESETS_AT, weekResetsAt: WEEK_RESETS_AT }, RESETS_AT - 83 * 60_000)).toBe(L1)
 })
 
 test('L2 an absent number is a dash with no percent', () => {
-  expect(limitsLine({ fiveHour: null, week: 74, model: null, fiveHourResetsAt: null }, RESETS_AT)).toBe('5h — · resets in — · week 74% left · Fable —')
+  expect(limitsLine({ fiveHour: null, week: 74, model: null, fiveHourResetsAt: null, weekResetsAt: WEEK_RESETS_AT }, RESETS_AT)).toBe('5h — · resets in — · week 74% left · resets Nov 14 · Fable —')
 })
 
 test('L3 all three absent', () => {
-  expect(limitsLine({ fiveHour: null, week: null, model: null, fiveHourResetsAt: null }, RESETS_AT)).toBe(NONE)
+  expect(limitsLine({ fiveHour: null, week: null, model: null, fiveHourResetsAt: null, weekResetsAt: null }, RESETS_AT)).toBe(NONE)
 })
 
 test('S16 the open line counts as rows for the viewer, wrapped beside the Close button', () => {
   const before = viewerFixedRows(80, false, undefined)
-  expect(viewerFixedRows(80, false, undefined, L1)).toBe(before + 1)
-  // 63 characters wrapped at 20 - 11 (the Close button, 9 cells, never shrinks; the row's gap 2)
-  expect(viewerFixedRows(20, false, undefined, L1)).toBe(viewerFixedRows(20, false, undefined) + 7)
-  expect(viewerFixedRows(30, false, undefined, L1)).toBe(viewerFixedRows(30, false, undefined) + 4)
+  expect(viewerFixedRows(80, false, undefined, L1)).toBe(before + 2) // 79 characters (1.5.0: with the week's reset) in 80 - 11 = 69
+  // 79 characters wrapped at 20 - 11 (the Close button, 9 cells, never shrinks; the row's gap 2)
+  expect(viewerFixedRows(20, false, undefined, L1)).toBe(viewerFixedRows(20, false, undefined) + 9)
+  expect(viewerFixedRows(30, false, undefined, L1)).toBe(viewerFixedRows(30, false, undefined) + 5)
   expect(viewerFixedRows(11, false, undefined, LIMITS_LOADING)).toBe(viewerFixedRows(11, false, undefined) + 15) // textRows floors the width at 1; this case pins the count at 11 columns, not the Math.max in viewerFixedRows
 })
 
@@ -119,7 +119,7 @@ for (const surface of SURFACES) {
     for (const part of [/^5h $/, /^ left$/, /^ · $/, /^week $/, /^resets in $/]) expect(await text(ui, part)).toBeUndefined()
     // L-C5 the joined text is what limitsLine says
     expect(outer?.text).toBe(LC)
-    expect(outer?.text).toBe(limitsLine({ fiveHour: 69, week: 35, model: { label: 'Fable', left: 8 }, fiveHourResetsAt: RESETS_AT }, RESETS_AT - 83 * 60_000))
+    expect(outer?.text).toBe(limitsLine({ fiveHour: 69, week: 35, model: { label: 'Fable', left: 8 }, fiveHourResetsAt: RESETS_AT, weekResetsAt: WEEK_RESETS_AT }, RESETS_AT - 83 * 60_000))
     await ui.unmount()
   })
 }
@@ -128,8 +128,8 @@ test('L-C6 an absent number is a bare dash: no colour, no Text of its own', asyn
   await world($, on, answerWith(200, JSON.stringify(measured({ five_hour: window(null), limits: [] }))))
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await pressLimits(ui)
-  const outer = await ui.find({ type: 'Text', text: '5h — · resets in 1h 23m · week 74% left · Fable —' })
-  expect(outer?.text).toBe('5h — · resets in 1h 23m · week 74% left · Fable —')
+  const outer = await ui.find({ type: 'Text', text: '5h — · resets in 1h 23m · week 74% left · resets Nov 14 · Fable —' })
+  expect(outer?.text).toBe('5h — · resets in 1h 23m · week 74% left · resets Nov 14 · Fable —')
   expect(outer?.props).toEqual({})
   const inner = elementsOf(outer?.children)
   expect(inner).toHaveLength(2) // the reset time and the week number
@@ -204,7 +204,7 @@ test('S2 only the three numbers and the label reach state', async ($, on) => {
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await pressLimits(ui)
   const view = lastView(w)
-  expect(view?.value).toEqual({ fiveHour: 87, week: 74, model: { label: 'Fable', left: 82 }, fiveHourResetsAt: RESETS_AT })
+  expect(view?.value).toEqual({ fiveHour: 87, week: 74, model: { label: 'Fable', left: 82 }, fiveHourResetsAt: RESETS_AT, weekResetsAt: WEEK_RESETS_AT })
   const all = JSON.stringify(w.writes)
   for (const leak of ['spend', 'extra_usage', 'limit_dollars', 'resets_at', '2026-11-10T22:00:00Z', 'h-1', 'limits_dollars', 'weekly_scoped_shares', 'experiment_']) {
     expect(all).not.toContain(leak)
@@ -216,7 +216,7 @@ test('S3 a body without a Fable entry draws a dash for it', async ($, on) => {
   await world($, on, answerWith(200, JSON.stringify(measured({ limits: [] }))))
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await pressLimits(ui)
-  expect(await text(ui, '5h 87% left · resets in 1h 23m · week 74% left · Fable —')).toBeDefined()
+  expect(await text(ui, '5h 87% left · resets in 1h 23m · week 74% left · resets Nov 14 · Fable —')).toBeDefined()
   await ui.unmount()
 })
 
@@ -299,10 +299,10 @@ test('S9 an empty object draws dashes, never zeros', async ($, on) => {
 })
 
 test('S10 an out-of-range percent is clamped', async ($, on) => {
-  await world($, on, answerWith(200, JSON.stringify(measured({ five_hour: window(130), seven_day: window(-5) }))))
+  await world($, on, answerWith(200, JSON.stringify(measured({ five_hour: window(130), seven_day: window(-5, WEEK_AT) }))))
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await pressLimits(ui)
-  expect(await text(ui, '5h 0% left · resets in 1h 23m · week 100% left · Fable 82% left')).toBeDefined()
+  expect(await text(ui, '5h 0% left · resets in 1h 23m · week 100% left · resets Nov 14 · Fable 82% left')).toBeDefined()
   await ui.unmount()
 })
 
@@ -324,7 +324,7 @@ test('S12 a reopen after a minute fetches again and keeps the old line until the
   second({ status: 200, text: JSON.stringify(measured({ five_hour: window(50) })) })
   await spin()
   await ui.redraw()
-  expect(await text(ui, '5h 50% left · resets in 1h 22m · week 74% left · Fable 82% left')).toBeDefined()
+  expect(await text(ui, '5h 50% left · resets in 1h 22m · week 74% left · resets Nov 14 · Fable 82% left')).toBeDefined()
   await ui.unmount()
 })
 
@@ -368,7 +368,7 @@ test('S17 an answer that lands after the line was closed is kept and drawn by th
   await pressLimits(ui) // close
   release({ status: 200, text: MEASURED })
   await spin()
-  expect(lastView(w)?.value).toEqual({ fiveHour: 87, week: 74, model: { label: 'Fable', left: 82 }, fiveHourResetsAt: RESETS_AT })
+  expect(lastView(w)?.value).toEqual({ fiveHour: 87, week: 74, model: { label: 'Fable', left: 82 }, fiveHourResetsAt: RESETS_AT, weekResetsAt: WEEK_RESETS_AT })
   await pressLimits(ui)
   expect(await text(ui, L1)).toBeDefined()
   expect(w.calls).toHaveLength(1)

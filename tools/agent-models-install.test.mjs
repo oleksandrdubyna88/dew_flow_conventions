@@ -34,7 +34,7 @@ function withUmask(mask, run) {
 // 4.2 install, upgrade, no-op, edited, newer
 // ---------------------------------------------------------------------------------------------------------------------
 
-test('a fresh home installs the seven files, writes the manifest last, registers the target and backs settings up once', t => {
+test('a fresh home installs the eight files, writes the manifest last, registers the target and backs settings up once', t => {
   const s = sandbox(t);
   s.writeSettings({ model: 'opus' });
   const r = s.ensure();
@@ -86,11 +86,11 @@ test('an older copy is replaced whole: extra files go with the old folder, the m
   assert.equal(s.readSettings(), settingsBefore);
 });
 
-test('I6: a 1.2.2 install written the five-file way (five files, five-key manifest) upgrades whole: not kept, no replaced- folder, seven files, a seven-key manifest', t => {
+test('I6: a 1.2.2 install written the five-file way (five files, five-key manifest) upgrades whole: not kept, no replaced- folder, eight files, an eight-key manifest', t => {
   const s = sandbox(t, { version: '1.3.0' });
   s.writeSettings(s.registered());
   const files = s.seedTarget({ version: '1.2.2' });
-  const later = ['hooks/tasks.tsx', 'hooks/limits.tsx'];
+  const later = ['hooks/tasks.tsx', 'hooks/limits.tsx', 'hooks/answer.tsx'];
   for (const rel of later) {
     fs.rmSync(path.join(s.t_.target, rel));
     delete files[rel];
@@ -109,6 +109,28 @@ test('I6: a 1.2.2 install written the five-file way (five files, five-key manife
   assert.deepEqual(treeFiles(s.t_.target), [...FILES].sort());
   assert.deepEqual(Object.keys(s.manifest().sha256), FILES);
   assert.equal(s.manifest().version, '1.3.0');
+});
+
+test('I1: a 1.4.0 install (seven files, a seven-key manifest) upgrades to 1.5.0: not kept, no replaced- folder, hooks/answer.tsx copied, an eight-key manifest', t => {
+  const s = sandbox(t, { version: '1.5.0' });
+  s.writeSettings(s.registered());
+  const files = s.seedTarget({ version: '1.4.0' });
+  fs.rmSync(path.join(s.t_.target, 'hooks/answer.tsx'));
+  delete files['hooks/answer.tsx'];
+  const seven = FILES.filter(rel => rel !== 'hooks/answer.tsx');
+  fs.writeFileSync(s.t_.manifest, `${JSON.stringify({
+    version: '1.4.0', source: '/somewhere', sha256: Object.fromEntries(seven.map(rel => [rel, sha(files[rel])])), installedAt: '2026-01-01T00:00:00.000Z', by: 'seed',
+  }, null, 2)}\n`);
+  assert.deepEqual(treeFiles(s.t_.target), [...seven].sort(), 'the seed holds exactly the seven files of 1.4.0');
+  assert.equal(FILES.length, 8);
+  const r = s.ensure();
+  assert.equal(r.action, 'upgraded');
+  assert.equal(r.line, upgradedLine('1.4.0', '1.5.0'));
+  assert.deepEqual(s.listMods().filter(name => name.includes('agent-models.replaced-')), []);
+  assert.deepEqual(treeFiles(s.t_.target), [...FILES].sort());
+  assert.deepEqual(s.installedBytes('hooks/answer.tsx'), fs.readFileSync(s.sourceFile('hooks/answer.tsx')), 'the new file is copied');
+  assert.deepEqual(Object.keys(s.manifest().sha256), FILES);
+  assert.equal(s.manifest().version, '1.5.0');
 });
 
 test('an older AND edited copy is replaced, and the line says where the differing copy was kept (A3)', t => {

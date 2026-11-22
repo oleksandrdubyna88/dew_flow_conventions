@@ -13,7 +13,7 @@ import { isObject, normalise, sha256 } from './user-guard-install.mjs';
 
 export const MOD_NAME = 'agent-models';
 export const PLUGIN_DIRS_KEY = 'CLAUDE_CODE_PLUGIN_DIRS';
-/** The seven files that are the mod: the ONLY list the copy reads. Frozen; the order is the copy order. */
+/** The eight files that are the mod: the ONLY list the copy reads. Frozen; the order is the copy order. */
 export const MOD_FILES = Object.freeze([
   '.claude-plugin/plugin.json',
   'hooks/hooks.json',
@@ -21,12 +21,14 @@ export const MOD_FILES = Object.freeze([
   'hooks/prompts.ts',
   'hooks/tasks.tsx',
   'hooks/limits.tsx',
+  'hooks/answer.tsx',
   'types/index.d.ts',
 ]);
 /** The release that first shipped a file of MOD_FILES; a copy of an older release has no such file. Frozen. */
 export const INTRODUCED = Object.freeze({
   'hooks/tasks.tsx': Object.freeze([1, 3, 0]),
   'hooks/limits.tsx': Object.freeze([1, 3, 0]),
+  'hooks/answer.tsx': Object.freeze([1, 5, 0]),
 });
 
 /**
@@ -39,15 +41,16 @@ export const INTRODUCED = Object.freeze({
  * mod inside its repository; it is no sandbox: a repository with hostile hooks already runs code in its sessions.
  */
 export const RELEASED_MOD = Object.freeze({
-  version: '1.4.0',
+  version: '1.5.0',
   sha256: Object.freeze({
-    '.claude-plugin/plugin.json': '5953668f9dc146986e11af4c59f7230d7a6c3cb00da14d57046301c2895e66c8',
+    '.claude-plugin/plugin.json': '199cf5c3d3f04bb997988be1ce368b6726797e69aa36e3e1e64e307451ef314b',
     'hooks/hooks.json': 'd842d789476d67282d0f04b7e5fdc68a3d981ccec65dd79cfa2d11eed13fb828',
-    'hooks/register.tsx': 'f27f45e9e35ba0bd4410aaebb6fc72fcff69f3e120eb85d0575ea6160747f649',
-    'hooks/prompts.ts': '4de06f11b308b753d28f9171ef9727512badf8fc284b4935588d8ad0437f7a8d',
+    'hooks/register.tsx': '5de60d645cc1b0bca64643ac2ccad77d33d60a3d61ab559511f986fab847a95a',
+    'hooks/prompts.ts': '27bfdc68d0245324ca8c77580cbeb5ea39055a9fd4edeb53a6680c54317291d6',
     'hooks/tasks.tsx': '52541431aad684757fac626a5c6d3231d7b633ff14d96efdc0d9dfbd0659e4cb',
-    'hooks/limits.tsx': '77b6c214d56a25c15363231d8e8ec8c71d8bd574abd8aedef410b74e4d7b449b',
-    'types/index.d.ts': '367b2f22db3d42f2ea596c378373e0d4e6a43fad18a48649dcb84eae72d086a5',
+    'hooks/limits.tsx': '6b2b668d9fa96cd733fe43ada15bd7da70437d564c2ef921d8030a0b60ef2514',
+    'hooks/answer.tsx': '4894ba6942c3ef13286443b180c2478a139ebffa3a8135b0e68abb809a5c8fbb',
+    'types/index.d.ts': '2728d735a065e2b1e936890831bf5859ae38423b0a27cd634e4a58324955059b',
   }),
 });
 export const OPTOUT_FILE = 'agent-models.optout';

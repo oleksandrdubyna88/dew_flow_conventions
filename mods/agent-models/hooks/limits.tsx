@@ -1,12 +1,14 @@
 // The limits behind the email: a press on the signed-in email opens one line,
-// `5h 87% left · resets in 1h 23m · week 74% left · Fable 82% left`, read from the usage endpoint the built-in /usage reads.
-// The parser is the ONE road in: of the answer only three numbers, the model's label and the 5-hour window's reset time are
+// `5h 87% left · resets in 1h 23m · week 74% left · resets Nov 27 · Fable 82% left`, read from the usage endpoint the built-in /usage reads.
+// The parser is the ONE road in: of the answer only three numbers, the model's label and the two windows' reset times are
 // kept; nothing else of the body, no header and not the credential handle is stored, drawn or logged. The endpoint is
 // internal and its shape can change without notice: a missing value is a dash, never a zero.
 // Each number is drawn in the colour of what is left, and a red Close beside the line shuts it (1.3.3).
 // 1.4.0: the reset time is kept as a moment and the text is made at DRAW time, so it counts down while the line is open: the
 // 2 s tick writes the drawn minute to `limitsMinute` (at most once a minute), which draws the band again. A passed reset
 // makes the tick fetch again (under the one-a-minute throttle), so the old window's numbers do not stay.
+// 1.5.0: the weekly window's reset follows `week N% left`: its date (the engine's local zone, no time) while 24 hours or more are left,
+// `in 5h 0m` under that, a dash when unknown, passed or the clock was refused. A value stored by 1.4.0 has no such time: a dash.
 // Every function that takes `$` is a function declaration (an arrow taking `$` is refused across an import).
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Timer } from 'claude-code'
@@ -79,6 +81,7 @@ export function limitsFromBody(text: string): Limits | null {
     week: percentLeft(field(field(value, 'seven_day'), 'utilization')),
     model: modelOf(field(value, 'limits')),
     fiveHourResetsAt: parseResetsAt(field(field(value, 'five_hour'), 'resets_at')),
+    weekResetsAt: parseResetsAt(field(field(value, 'seven_day'), 'resets_at')),
   }
 }
 
@@ -91,6 +94,24 @@ export function minutesLeft(resetsAt: number | null, now: number | null): number
 /** `1h 23m` from 60 minutes on (`1h 0m`, so the shape never jumps), `59m`, `<1m` under a minute; a dash when unknown. */
 export const resetText = (minutes: number | null): string =>
   minutes === null ? '—' : minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : minutes < 1 ? '<1m' : `${minutes}m`
+
+export const DAY_MS = 24 * 60 * MINUTE_MS
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
+
+/** `Nov 27`: the date of a moment in the engine's local time zone, an English month, no time and no year. */
+export const dateText = (ms: number): string => {
+  const day = new Date(ms)
+  return `${MONTHS[day.getMonth()] ?? '—'} ${day.getDate()}`
+}
+
+/**
+ * What follows `resets ` for the weekly window: the date with 24 hours or more left, `in 5h 0m` (the 5-hour window's time text) under that;
+ * a dash when the time is unknown (a value stored by 1.4.0 has none), the clock was refused or the reset has come.
+ */
+export const weekResetText = (resetsAt: number | null | undefined, now: number | null): string => {
+  if (typeof resetsAt !== 'number' || now === null || !Number.isFinite(now) || now >= resetsAt) return '—'
+  return resetsAt - now >= DAY_MS ? dateText(resetsAt) : `in ${resetText(minutesLeft(resetsAt, now))}`
+}
 
 /** The colour of the minutes left, taken on the whole minutes the text shows: under 10 green, 10-30 orange, over 30 red. */
 export const resetColor = (minutes: number): string =>
@@ -111,10 +132,10 @@ const resetParts = (resetsAt: number | null, now: number | null): Part[] => {
 }
 // `now` is epoch ms from the draw's own clock read, or null when that was refused.
 const limitsParts = (v: Limits, now: number | null): Part[] =>
-  [segmentParts('5h', v.fiveHour), resetParts(v.fiveHourResetsAt, now), segmentParts('week', v.week), segmentParts(v.model?.label ?? 'Fable', v.model?.left ?? null)]
+  [segmentParts('5h', v.fiveHour), resetParts(v.fiveHourResetsAt, now), segmentParts('week', v.week), [{ text: `resets ${weekResetText(v.weekResetsAt, now)}` }], segmentParts(v.model?.label ?? 'Fable', v.model?.left ?? null)]
     .flatMap((parts, i) => (i === 0 ? parts : [{ text: ' · ' }, ...parts]))
 
-/** The one line: `5h 87% left · resets in 1h 23m · week 74% left · Fable 82% left`; an absent value is a dash with no `% left`. */
+/** The one line: `5h 87% left · resets in 1h 23m · week 74% left · resets Nov 27 · Fable 82% left`; an absent value is a dash with no `% left`. */
 export const limitsLine = (v: Limits, now: number | null): string => limitsParts(v, now).map(p => p.text).join('')
 
 /** Whether an open needs a fetch: never fetched, or the last fetch ended LIMITS_INTERVAL_MS or more ago. */

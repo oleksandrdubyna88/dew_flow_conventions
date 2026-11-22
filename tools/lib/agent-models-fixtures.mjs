@@ -14,7 +14,7 @@ import * as mod from '../../settings/hooks/lib/agent-models-install.mjs';
 import { MOD_FILES } from '../../settings/hooks/lib/agent-models-decide.mjs';
 import { ownedDir } from './owned.mjs';
 
-/** The seven files of the mod, taken from the installer's own list, never typed a second time. */
+/** The eight files of the mod, taken from the installer's own list, never typed a second time. */
 export const FILES = [...MOD_FILES];
 export const D = path.delimiter;
 export const NOW = new Date('2026-11-10T00:00:00Z');
