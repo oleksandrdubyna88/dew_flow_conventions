@@ -2,12 +2,12 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine, Mounted } from 'claude-code/testing'
 import type { UiScrollArgs, UiScrollResult } from 'claude-code'
 
-import { accountRowCells, pressLastAnswer } from '../hooks/answer'
+import { accountRowCells, findQuestion, newestQuestion, pressLastAnswer } from '../hooks/answer'
 import { VIEWER_NOTE, viewerFixedRows } from '../hooks/prompts'
 import { tasksLabel } from '../hooks/tasks'
 import { TURN } from './account-fixtures'
 import { BAND, SURFACES, answerWith, MEASURED, text as drawnText, world } from './limits-fixtures'
-import { answer, COMPOSER, KEY, question, session, spin, SUMMARY, toolRow, typed, valueOf } from './answer-fixtures'
+import { answer, COMPOSER, held, KEY, question, session, spin, submitOf, SUMMARY, toolRow, typed, valueOf } from './answer-fixtures'
 
 // The `last answer` button (1.5.0): the band row, the lookup of the owner's last question (a transcript message's uuid kept in
 // state at the person's submit), the press. The harness cannot see where a transcript scroll goes, so the press is tested through
@@ -62,7 +62,7 @@ test('T3 a submit of the person finds its transcript message: lastQuestion is it
   s.rows = [...s.rows, question('Q', 'u1')] // typed after the session start
   await typed($, 'Q')
   expect(valueOf(s)).toEqual({ uuid: 'u1' })
-  expect(s.writes).toEqual([{ uuid: 'u0' }, { pending: 'Q' }, { uuid: 'u1' }]) // the first is the session start's: the newest question then
+  expect(s.writes).toEqual([{ uuid: 'u0' }, { pending: 'Q', previous: 'u0' }, { uuid: 'u1' }]) // the first is the session start's: the newest question then
   expect(s.reads.at(-1)).toEqual({ last: 50 })
 })
 
@@ -111,13 +111,13 @@ test('T7 a queued submit is pending, then found at turn.start; another at turn.c
   const s = session(on, [question('first', 'u1')])
   await start($)
   await typed($, 'queued') // not in the transcript yet
-  expect(valueOf(s)).toEqual({ pending: 'queued' })
+  expect(valueOf(s)).toEqual({ pending: 'queued', previous: 'u1' })
   s.rows = [...s.rows, answer('a1'), question('queued', 'u2')]
   await $.turn.start({ text: 'queued', turnId: 't2' })
   await spin()
   expect(valueOf(s)).toEqual({ uuid: 'u2' })
   await typed($, 'queued again')
-  expect(valueOf(s)).toEqual({ pending: 'queued again' })
+  expect(valueOf(s)).toEqual({ pending: 'queued again', previous: 'u2' })
   s.rows = [...s.rows, answer('a2'), question('queued again', 'u3')]
   await $.turn.complete(TURN)
   await spin()
@@ -148,7 +148,26 @@ test('T8 a session start with no value takes the newest question, not a summary,
   ])
   await start($)
   expect(valueOf(s)).toEqual({ uuid: 'u1' })
-  expect(s.reads.some(r => r.last === undefined || r.last > 50)).toBe(true) // a resumed session may hold a long answer after the question
+  expect(s.reads, 'the newest 200 rows first; the engine cap only when none is a question').toEqual([{ last: 200 }])
+})
+
+test('T8b a question typed 200 rows back is found with a read of the engine cap', async ($, on) => {
+  const s = session(on, [question('the real question', 'u1'), ...Array.from({ length: 250 }, (_, i) => answer(`a${i}`))])
+  await start($)
+  expect(valueOf(s)).toEqual({ uuid: 'u1' })
+  expect(s.reads).toEqual([{ last: 200 }, { last: 4096 }])
+})
+
+test('T8c a question that starts with a tag is a question; a notification and a peer wrapper are not', async ($, on) => {
+  const s = session(on, [
+    question('<b>bold</b> why is this red?', 'u1'),
+    answer('a1'),
+    question('<task-notification>done</task-notification>', 'u2'),
+    question('<teammate-message from="x">hi</teammate-message>', 'u3'),
+    question('<agent-message from="x">hi</agent-message>', 'u4'),
+  ])
+  await start($)
+  expect(valueOf(s)).toEqual({ uuid: 'u1' })
 })
 
 test('T9 a session start with a value set (a reload) keeps it', async ($, on) => {
@@ -161,6 +180,128 @@ test('T9 a session start with a value set (a reload) keeps it', async ($, on) =>
   await start($)
   expect(valueOf(s)).toEqual({ uuid: 'u1' })
   expect(s.writes).toHaveLength(before)
+})
+
+// --- the pending question keeps the question before it ---
+
+test('T15 the same text typed again is never the old row: pending with previous, then the new row', async ($, on) => {
+  const s = session(on)
+  await start($)
+  s.rows = [question('Q', 'u1')]
+  await typed($, 'Q')
+  expect(valueOf(s)).toEqual({ uuid: 'u1' })
+  s.rows = [...s.rows, answer('a1')]
+  await typed($, 'Q') // the second Q is not in the transcript yet; the first one is
+  expect(valueOf(s)).toEqual({ pending: 'Q', previous: 'u1' })
+  await $.turn.complete(TURN)
+  await spin()
+  expect(valueOf(s), 'a retry does not settle on the old row').toEqual({ pending: 'Q', previous: 'u1' })
+  s.rows = [...s.rows, question('Q', 'u2')]
+  await $.turn.start({ text: 'Q', turnId: 't2' })
+  await spin()
+  expect(valueOf(s)).toEqual({ uuid: 'u2' })
+})
+
+test('T15b after a reload the stored previous is still the boundary (this module has no memory of it)', async ($, on) => {
+  const s = session(on, [question('Q', 'u1'), answer('a1')])
+  s.seed = { pending: 'Q', previous: 'u1' }
+  await $.turn.start({ text: 'Q', turnId: 't2' })
+  await $.turn.complete(TURN)
+  await spin()
+  expect(s.writes, 'u1 is the question before it: nothing settles').toEqual([])
+  s.rows = [...s.rows, question('Q', 'u2')]
+  await $.turn.start({ text: 'Q', turnId: 't3' })
+  await spin()
+  expect(valueOf(s)).toEqual({ uuid: 'u2' })
+})
+
+test('T15c a second submit while pending keeps the question before the first one', async ($, on) => {
+  const s = session(on, [question('first', 'u1')])
+  await start($)
+  await typed($, 'second')
+  expect(valueOf(s)).toEqual({ pending: 'second', previous: 'u1' })
+  await typed($, 'third')
+  expect(valueOf(s), 'previous is still the settled question').toEqual({ pending: 'third', previous: 'u1' })
+})
+
+test('T16 two submits where the first one\'s write is slow: the value ends at the second', async ($, on) => {
+  const s = session(on, [question('earlier', 'u0')])
+  let release: () => void = () => undefined
+  const gate = new Promise<void>(resolve => {
+    release = resolve
+  })
+  let isHeld = false
+  on('state.set', KEY, async (_, e, next) => {
+    if (!isHeld && JSON.stringify(e.value).includes('"A"')) {
+      isHeld = true
+      await gate // A's write waits
+    }
+    return next(e)
+  })
+  await start($)
+  s.rows = [...s.rows, question('A', 'u1'), question('B', 'u2')]
+  await $.prompt.submit(submitOf('A'))
+  await $.prompt.submit(submitOf('B'))
+  await spin()
+  release()
+  await spin()
+  await spin()
+  const value = await held($, s)
+  expect(value, 'B is the last question').toEqual({ uuid: 'u2' })
+})
+
+test('T17 a question with a long answer after it is found at turn.complete, not at turn.start', async ($, on) => {
+  const s = session(on, [question('earlier', 'u0')])
+  await start($)
+  s.rows = [...s.rows, question('Q', 'u1'), ...Array.from({ length: 60 }, (_, i) => answer(`a${i}`))]
+  await typed($, 'Q') // the newest 50 rows are all answers
+  expect(valueOf(s)).toEqual({ pending: 'Q', previous: 'u0' })
+  await $.turn.start({ text: 'Q', turnId: 't2' })
+  await spin()
+  expect(valueOf(s)).toEqual({ pending: 'Q', previous: 'u0' })
+  expect(s.reads.every(r => r.last !== 4096), 'turn.start reads the newest 50 only').toBe(true)
+  await $.turn.complete(TURN)
+  await spin()
+  expect(valueOf(s)).toEqual({ uuid: 'u1' })
+  expect(s.reads.at(-1)).toEqual({ last: 4096 })
+})
+
+test('T17b the deep read stops at previous: an older row with the same text is not taken', async ($, on) => {
+  const s = session(on, [question('Q', 'u0')])
+  await start($)
+  s.rows = [...s.rows, ...Array.from({ length: 60 }, (_, i) => answer(`a${i}`))]
+  await typed($, 'Q') // the new Q is not in the transcript; u0 is the question before it
+  await $.turn.complete(TURN)
+  await spin()
+  expect(valueOf(s)).toEqual({ pending: 'Q', previous: 'u0' })
+})
+
+test('T18 a session end clears the value; a lookup that lands after it writes nothing', async ($, on) => {
+  const s = session(on)
+  await start($)
+  s.rows = [question('Q', 'u1')]
+  await typed($, 'Q')
+  expect(valueOf(s)).toEqual({ uuid: 'u1' })
+  await $.session.end({ reason: 'clear', sessionId: 's1', resume: { id: 's1' } })
+  await spin()
+  expect(valueOf(s)).toBeNull()
+  expect(await held($, s)).toBeNull()
+})
+
+// --- the lookup compares what the person typed ---
+
+test('findQuestion compares the clean text on both sides, and never matches an empty one', () => {
+  const rows = [question('Q  <system-reminder>noise</system-reminder>', 'u1'), question('plain', 'u2')]
+  expect(findQuestion(rows, 'Q')).toBe('u1')
+  expect(findQuestion(rows, '<system-reminder>noise</system-reminder>Q ')).toBe('u1')
+  expect(findQuestion(rows, '<system-reminder>only a reminder</system-reminder>')).toBeUndefined()
+  expect(findQuestion([question('<system-reminder>x</system-reminder>', 'u3')], '<system-reminder>y</system-reminder>')).toBeUndefined()
+  expect(findQuestion(rows, '   ')).toBeUndefined()
+})
+
+test('newestQuestion drops a compaction summary, wrappers and tool results, not a tag the person typed', () => {
+  expect(newestQuestion([question('<b>hi</b>', 'u1'), question(SUMMARY, 'u2'), toolRow('u3')])).toBe('u1')
+  expect(newestQuestion([question('<agent-message from="x">y</agent-message>', 'u1')])).toBeUndefined()
 })
 
 // --- the press ---
@@ -209,14 +350,27 @@ test('T11 a refused or failed scroll is told in a toast and never thrown', async
   expect(thrown.toasts).toEqual(['last answer: sync boom'])
 })
 
-test('T12 a press with a pending or no question toasts and never scrolls', async () => {
-  const pending = fakes()
-  await pressLastAnswer(pending.scroll, pending.toast, { pending: 'Q' })
-  expect(pending.toasts).toEqual(['last answer: your question is still being sent'])
+test('T12 a press while pending goes to the question before it; with none before it, or with no question, it toasts', async () => {
+  const before = fakes()
+  const pressing = pressLastAnswer(before.scroll, before.toast, { pending: 'Q', previous: 'u1' })
+  expect(before.scrolls, 'the scroll is called before the press yields').toEqual([{ to: { requestId: 'u1' }, block: 'start' }])
+  await pressing
+  expect(before.toasts).toEqual([])
+  const denied = fakes(async () => ({ deny: 'none scrolls' }))
+  await pressLastAnswer(denied.scroll, denied.toast, { pending: 'Q', previous: 'u1' })
+  expect(denied.toasts).toEqual(['last answer: works in fullscreen only'])
+  const broken = fakes(async () => {
+    throw new Error('boom')
+  })
+  await pressLastAnswer(broken.scroll, broken.toast, { pending: 'Q', previous: 'u1' })
+  expect(broken.toasts).toEqual(['last answer: boom'])
+  const alone = fakes()
+  await pressLastAnswer(alone.scroll, alone.toast, { pending: 'Q' })
+  expect(alone.toasts).toEqual(['last answer: your question is not in the transcript yet'])
   const none = fakes()
   await pressLastAnswer(none.scroll, none.toast, null)
   expect(none.toasts).toEqual(['last answer: no question yet'])
-  expect(pending.scrolls).toEqual([])
+  expect(alone.scrolls).toEqual([])
   expect(none.scrolls).toEqual([])
 })
 
@@ -252,13 +406,15 @@ test('T13 a messages read that throws leaves the value and breaks nothing, in ea
   expect(valueOf(s)).toEqual({ uuid: 'u1' }) // and it recovers when the read works again
 })
 
-test('T13b a refused write of lastQuestion breaks nothing', async ($, on) => {
-  session(on, [question('Q', 'u1')])
+test('T13b a refused write of lastQuestion breaks nothing and leaves the value as it was', async ($, on) => {
+  const s = session(on, [question('Q', 'u1')])
   on('state.set', KEY, () => ({ deny: 'refused' }))
   await start($)
   await typed($, 'Q') // the hooks end without throwing
   await $.turn.complete(TURN)
   await spin()
+  expect(s.writes.length, 'the hooks did try to write').toBeGreaterThan(0)
+  expect(await held($, s), 'every write was refused: the value is still null').toBeNull()
 })
 
 // --- the viewer counts a wrapped account row ---

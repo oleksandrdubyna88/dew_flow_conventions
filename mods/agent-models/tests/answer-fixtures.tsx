@@ -2,6 +2,7 @@ import type { Engine } from 'claude-code/testing'
 import type { On, PromptOrigin, PromptSubmitInput, SessionMessage } from 'claude-code'
 
 import type { LastQuestion } from '../types'
+import { BAND } from './limits-fixtures'
 import { base, identities, identityOf, ok, spin, statusRuns } from './account-fixtures'
 
 // The helpers of the last answer tests (answer.test.tsx): typed builders for transcript rows and submits, and a session whose
@@ -33,11 +34,13 @@ export type Session = {
   reads: Reads
   writes: LastQuestion[] // every write of `lastQuestion`, in order
   toasts: string[]
+  seed: LastQuestion | undefined // a value the session already holds (a hot reload kept it): read until the first write
+  read: LastQuestion // what the newest read of the state value answered (see `held`)
 }
 
 /** A session whose transcript, `lastQuestion` writes and toasts the test sees. `$.session.start` is called by the test. */
 export const session = (on: On, rows: SessionMessage[] = []): Session => {
-  const s: Session = { rows, isBroken: false, drop: undefined, reads: [], writes: [], toasts: [] }
+  const s: Session = { rows, isBroken: false, drop: undefined, reads: [], writes: [], toasts: [], seed: undefined, read: null }
   base(on)
   identities(on, [() => identityOf('dev@example.com')])
   statusRuns(on, () => ok(JSON.stringify({ loggedIn: false })))
@@ -49,6 +52,12 @@ export const session = (on: On, rows: SessionMessage[] = []): Session => {
     const all = s.rows
     return { value: e.last === undefined ? all : all.slice(-e.last) }
   })
+  on('state.get', KEY, async (_, e, next) => {
+    const result = s.seed !== undefined && s.writes.length === 0 ? { value: { value: s.seed, version: 0 } } : await next(e)
+    s.read = result.value?.value ?? null
+    return result
+  })
+  on('session.end', (_, e) => ({ sessionId: e.sessionId }))
   on('state.set', KEY, (_, e, next) => {
     s.writes.push(e.value)
     return next(e)
@@ -67,4 +76,11 @@ export const valueOf = (s: Session): LastQuestion => s.writes.at(-1) ?? null
 export const typed = async ($: Engine, text: string, origin: PromptOrigin = COMPOSER, extra: Partial<PromptSubmitInput> = {}) => {
   await $.prompt.submit(submitOf(text, origin, extra))
   await spin()
+}
+
+/** What the engine's state holds for `lastQuestion` now: a draw of the band reads it, the state hook above sees what the engine answered. */
+export const held = async ($: Engine, s: Session): Promise<LastQuestion> => {
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal', viewport: { columns: 80, rows: 24, isFullscreen: true } })
+  await ui.unmount()
+  return s.read
 }

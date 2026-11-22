@@ -215,6 +215,7 @@ const FIXED_ROWS = 2 // the header and the page buttons; the account row (it wra
 /**
  * Rows of the open viewer beside the agent rows and the prompt: the two fixed rows, the account row (`accountCells` wide: it wraps with a long email;
  * 0 counts one row) and each note, wrapped at `columns`; the open limits line is counted beside its Close button, which never shrinks.
+ * The account row's height is an estimate (a flex row with a non-shrinking email Button) and only moves the `(scroll for more)` header.
  */
 export function viewerFixedRows(columns: number, isCapped: boolean, reason: string | undefined, limitsText?: string, note: string = VIEWER_NOTE, accountCells = 0): number {
   return (

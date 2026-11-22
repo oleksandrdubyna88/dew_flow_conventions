@@ -78,9 +78,11 @@ export type Limits = {
 /**
  * The owner's last question (1.5.0), what the `last answer` button scrolls to: `uuid` is the transcript message's id (known before any
  * press, so the press scrolls without waiting); `pending` is the text of a question submitted but not yet found in the transcript
- * (queued behind a running turn); null: no question seen yet. Absent in a state stored before 1.5.0: read it as null.
+ * (queued behind a running turn, or typed into a running turn), and `previous` is the uuid of the question before it: the press goes
+ * there (it is the question being answered now) and the lookup never goes back past it; null: no question seen yet. Absent in a state
+ * stored before 1.5.0: read it as null.
  */
-export type LastQuestion = { uuid: string } | { pending: string } | null
+export type LastQuestion = { uuid: string } | { pending: string; previous?: string } | null
 
 /**
  * The limits line under the account row. `email`: the account the line was opened for (a line is drawn only while the signed-in
@@ -100,7 +102,7 @@ declare module 'claude-code' {
       login: Login
       tasks: Tasks
       limits: LimitsView
-      /** The minute the open limits line drew (null: a dash). Only its change matters: it draws the band again as the time runs down. */
+      /** The clock minute (epoch ms / 60000, floored) of the open limits line's tick; null: the clock was refused. Only its change matters: it draws the band again as the times run down. */
       limitsMinute: number | null
       lastQuestion: LastQuestion
     }

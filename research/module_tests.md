@@ -237,18 +237,24 @@ manifest, is completed rather than taken for an edit. The code round of the same
 the hook and a stop after the manifest (the old bytes are its `previous`) are both completed even when the source has
 moved on, every install records `previous`, and a relative source path is checked for uncommitted changes (it named
 a pathspec under the `-C` folder that did not exist); the last three red on the first fix.
-The mod itself is tested by `claude plugin test mods/agent-models` (282 cases at 1.4.0, 315 at 1.5.0, not run by CI): 1.4.0 adds
+The mod itself is tested by `claude plugin test mods/agent-models` (282 cases at 1.4.0, 328 at 1.5.0, not run by CI): 1.4.0 adds
 `tests/reset.test.tsx` (the reset time: parse, text, colour bands, the countdown write and redraw, a refused clock, a
 passed reset fetched again), `tests/account-ceiling.test.tsx` and `tests/account-retry.test.tsx` (the read ceilings,
 the generation, a result that lands as the ceiling fires, the tick retry with no clock, a session with no
 `session.start`), with `tests/account-fixtures.tsx`.
-1.5.0 adds `tests/answer.test.tsx` with `tests/answer-fixtures.tsx` (T1–T14: the `last answer` button in both viewer states and its absence on the
-terminal's main screen; the lookup of the owner's last question at a person's submit, a queued submit that is `pending` until `turn.start` or
-`turn.complete`, a session start with no value; the press through `pressLastAnswer` with fake scroll and toast functions, because the harness
-cannot see a transcript scroll target, and a scroll that is called before the press yields; a throwing or refused read and write; the viewer's
-row count with a wrapped account row) and `tests/week-reset.test.tsx` (W1–W10: the weekly reset time on the limits line, its date from 24 hours
-on and its time left under that, a dash, a value stored by 1.4.0 with no `weekResetsAt`, the turn from a date into hours with no new fetch). The
-longer limits line (79 characters) and the wider account row changed the literals and row counts of `limits`, `limits-race` and `reset` tests.
+1.5.0 adds `tests/answer.test.tsx` with `tests/answer-fixtures.tsx` (T1–T18: the `last answer` button in both viewer states and its absence on the
+terminal's main screen; the lookup of the owner's last question at a person's submit; a queued submit that is `pending` with the question before it
+as `previous` until `turn.start` or `turn.complete` (which reads back to the engine cap, stopping at `previous`), the same text typed again, also
+after a reload that kept only the stored value, two submits whose first write is slow, a session start with no value (200 rows, then the engine cap;
+a tag the person typed is a question, a notification and a peer wrapper are not), a session end that clears the value; the press through
+`pressLastAnswer` with fake scroll and toast functions, because the harness cannot see a transcript scroll target, a scroll that is called before
+the press yields, and a press while pending that goes to `previous`; a throwing or refused read and write that leaves the value; the viewer's
+row count with a wrapped account row) and `tests/week-reset.test.tsx` (W1–W11: the weekly reset time on the limits line, its date from 24 hours
+on and its time left under that, a dash, a value stored by 1.4.0 with no `weekResetsAt`, the turn from a date into hours with no new fetch and no
+manual redraw, also with the 5-hour reset unknown, a passed weekly reset fetched again). The tick key is the clock minute (`reset.test.tsx` A7 expects
+the clock minute, not the 5-hour minutes left). The week fixture dates are built from local noon, so the tests pass in any time zone (run with
+`TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`). The longer limits line (79 characters) and the wider account row changed the literals and
+row counts of `limits`, `limits-race` and `reset` tests.
 The installer tests name eight files: a 1.4.0 copy upgrades to 1.5.0 with `hooks/answer.tsx` copied (`I1` in `agent-models-install.test.mjs`,
 `I8`–`I10` in `agent-models-decide.test.mjs`), and the 1.5.0 pin row carries the new file.
 

@@ -89,11 +89,11 @@
   "1.5.0": {
     ".claude-plugin/plugin.json": "199cf5c3d3f04bb997988be1ce368b6726797e69aa36e3e1e64e307451ef314b",
     "hooks/hooks.json": "d842d789476d67282d0f04b7e5fdc68a3d981ccec65dd79cfa2d11eed13fb828",
-    "hooks/register.tsx": "5de60d645cc1b0bca64643ac2ccad77d33d60a3d61ab559511f986fab847a95a",
-    "hooks/prompts.ts": "27bfdc68d0245324ca8c77580cbeb5ea39055a9fd4edeb53a6680c54317291d6",
+    "hooks/register.tsx": "a6da938a1966726a0e2d8b911f2986c2f14c2997d7c37ecda3b4792bad929f61",
+    "hooks/prompts.ts": "04e203f2e7f6675065c8e0269978ce92f4ca2529a940f09d91fb89244e853ccf",
     "hooks/tasks.tsx": "52541431aad684757fac626a5c6d3231d7b633ff14d96efdc0d9dfbd0659e4cb",
-    "hooks/limits.tsx": "6b2b668d9fa96cd733fe43ada15bd7da70437d564c2ef921d8030a0b60ef2514",
-    "hooks/answer.tsx": "4894ba6942c3ef13286443b180c2478a139ebffa3a8135b0e68abb809a5c8fbb",
-    "types/index.d.ts": "2728d735a065e2b1e936890831bf5859ae38423b0a27cd634e4a58324955059b"
+    "hooks/limits.tsx": "764e1126be2cd9df4e16201177feb57482624795c7a36b12d3a7a68e883df366",
+    "hooks/answer.tsx": "33027575cfe56527b129ba3ca7e9d758f60909708552150c38ee72649cd5930f",
+    "types/index.d.ts": "fe19a7675155d49f4283bf717a2ae82968635bf9a7d8ed95383f936c15f99436"
   }
 }

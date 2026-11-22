@@ -21,7 +21,7 @@ export const scoped = (name: string, percent: unknown) => ({
   kind: 'weekly_scoped', group: 'weekly', percent, severity: 'ok', resets_at: '2026-11-14T00:00:00Z', is_active: true,
   scope: { model: { display_name: name }, surface: {} },
 })
-export const WEEK_AT = '2026-11-14T10:00:00Z' // the fixture week's `resets_at`: 10:00 UTC, so its local date is Nov 14 in any zone from UTC-10 to UTC+13
+export const WEEK_AT = new Date(2026, 10, 14, 12, 0).toISOString() // the fixture week's `resets_at`: Nov 14, noon in the machine's own zone, so its local date is Nov 14 in any zone
 export const window = (utilization: unknown, resetsAt: unknown = '2026-11-10T22:00:00Z') => ({
   utilization, resets_at: resetsAt, limit_dollars: 5, used_dollars: 1, remaining_dollars: 4, locked_reason: null,
 })

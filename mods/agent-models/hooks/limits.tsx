@@ -5,7 +5,7 @@
 // internal and its shape can change without notice: a missing value is a dash, never a zero.
 // Each number is drawn in the colour of what is left, and a red Close beside the line shuts it (1.3.3).
 // 1.4.0: the reset time is kept as a moment and the text is made at DRAW time, so it counts down while the line is open: the
-// 2 s tick writes the drawn minute to `limitsMinute` (at most once a minute), which draws the band again. A passed reset
+// 2 s tick writes the minute to `limitsMinute` (at most once a minute), which draws the band again. A passed reset
 // makes the tick fetch again (under the one-a-minute throttle), so the old window's numbers do not stay.
 // 1.5.0: the weekly window's reset follows `week N% left`: its date (the engine's local zone, no time) while 24 hours or more are left,
 // `in 5h 0m` under that, a dash when unknown, passed or the clock was refused. A value stored by 1.4.0 has no such time: a dash.
@@ -24,7 +24,7 @@ export const LIMITS_UNAVAILABLE = 'limits unavailable'
 export const LIMITS_LOADING = 'loading limits…'
 
 const limits = atom({ plugin: 'agent-models', key: 'limits' } as const, { isOpen: false, isFailed: false } as LimitsView)
-// The minute the open line drew (null: a dash). The draw reads it only to be drawn again when it changes; the tick writes it.
+// The clock minute the open line drew (null: the clock was refused). The draw reads it only to be drawn again when it changes; the tick writes it.
 const limitsMinute = atom({ plugin: 'agent-models', key: 'limitsMinute' } as const, null as number | null)
 export const MINUTE_MS = 60_000
 export const RESET_GREEN_UNDER = 10 // minutes: under this green, up to RESET_ORANGE_UP_TO orange, over it red
@@ -222,8 +222,9 @@ export async function watchLimitsMinute($: EngineInterface): Promise<void> {
 }
 
 // The 2 s tick for the limits line. While the line is open with a value (never otherwise: a closed line asks no clock and
-// writes nothing): writes the minute the draw would show when it changed, so the time counts down; and when the reset has come
-// fetches again, which `needsFetch` holds to one a minute. Never rejects.
+// writes nothing): writes the clock minute when it changed, so every time of the line counts down (1.5.0: not the 5-hour minutes left,
+// which stay still when that reset is unknown or has passed, and the week text counts down too); and when a reset has come, the 5-hour
+// one or the weekly one, fetches again, which `needsFetch` holds to one a minute. Never rejects.
 export async function tickLimits($: EngineInterface): Promise<void> {
   try {
     const view = await read($, limits)
@@ -231,10 +232,11 @@ export async function tickLimits($: EngineInterface): Promise<void> {
     const email = emailOf(await currentAccount($))
     if (email === undefined || !isLimitsShown(view, email)) return
     const now = await limitsClock($)
-    const resetsAt = view.value?.fiveHourResetsAt ?? null
-    const minutes = minutesLeft(resetsAt, now)
-    if (now !== null && resetsAt !== null && now >= resetsAt && needsFetch(view, now, email)) void fetchLimits($, email)
-    if ((await read($, limitsMinute)) !== minutes) await update($, limitsMinute, () => minutes)
+    const minute = now === null ? null : Math.floor(now / MINUTE_MS)
+    const resets = [view.value?.fiveHourResetsAt, view.value?.weekResetsAt] // a value stored by 1.4.0 has no weekly one
+    const hasPassed = now !== null && resets.some(at => typeof at === 'number' && now >= at)
+    if (now !== null && hasPassed && needsFetch(view, now, email)) void fetchLimits($, email)
+    if ((await read($, limitsMinute)) !== minute) await update($, limitsMinute, () => minute)
   } catch {
     // a refused state call or clock: the next tick tries again
   }

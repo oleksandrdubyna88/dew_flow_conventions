@@ -123,7 +123,9 @@ test('A7 the open line counts down: the draw reads limitsMinute, a minute is wri
   expect(reads, 'the draw of the open line subscribes to the minute').toBeGreaterThan(0)
   const before = reads
   await w.clock.advance(MIN) // 83 min 59 s left at the press, 82 min 59 s a minute later
-  expect(writes, 'one write a minute, none for the 28 ticks between').toEqual([83, 82])
+  // 1.5.0: the key is the clock minute (it ticks the week text too, even with no 5-hour reset); 1.4.0 wrote the minutes left (83, 82)
+  const clockMinute = Math.floor(CLOCK_START / MIN)
+  expect(writes, 'one write a minute, none for the 28 ticks between').toEqual([clockMinute, clockMinute + 1])
   expect(reads, 'the write drew the reader again').toBeGreaterThan(before)
   await ui.redraw()
   expect(await text(ui, l1At('1h 22m'))).toBeDefined()

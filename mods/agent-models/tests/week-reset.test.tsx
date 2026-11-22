@@ -2,16 +2,16 @@ import { expect, test } from 'claude-code/testing'
 import type { Limits, LimitsView } from '../types'
 
 import { limitsFromBody, limitsLine } from '../hooks/limits'
-import { answerWith, BAND, CLOCK_START, lastView, measured, MEASURED, pressLimits, RESETS_AT, SURFACES, text, window, world } from './limits-fixtures'
+import { answerWith, BAND, CLOCK_START, lastView, measured, MEASURED, pressLimits, RESETS_AT, SURFACES, text, WEEK_AT as FIXTURE_WEEK_AT, WEEK_RESETS_AT, window, world } from './limits-fixtures'
 
 // The weekly reset time of the limits line (1.5.0): the parser keeps `seven_day.resets_at`, and right after `week N% left` the line says
 // the date when 24 hours or more are left, the time left under that, a dash when it is unknown, passed or the clock was refused.
-// Dates are the engine's local ones; every fixture moment is 10:00 UTC, so its date is the same in any zone from UTC-10 to UTC+13.
+// Dates are the engine's local ones; every fixture week moment is built from local noon, so its date text is the same in any time zone.
 
 const MIN = 60_000
 const HOUR = 60 * MIN
 const DAY = 24 * HOUR
-const WEEK_AT = Date.parse('2026-11-27T10:00:00Z')
+const WEEK_AT = new Date(2026, 10, 27, 12, 0).getTime() // Nov 27, noon local time
 const numbers = { fiveHour: 48, week: 83, model: { label: 'Fable', left: 97 } }
 const weekLine = (weekResetsAt: number | null, now: number | null): string | undefined =>
   limitsLine({ ...numbers, fiveHourResetsAt: null, weekResetsAt }, now).split(' · ')[3]
@@ -81,7 +81,7 @@ for (const surface of SURFACES) {
   })
 }
 
-test('W9 the drawn week reset is bare text: no colour and no Text of its own', async ($, on) => {
+test('W9b the drawn week reset is bare text: no colour and no Text of its own', async ($, on) => {
   await world($, on, answerWith(200, MEASURED))
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await pressLimits(ui)
@@ -90,16 +90,47 @@ test('W9 the drawn week reset is bare text: no colour and no Text of its own', a
   await ui.unmount()
 })
 
-test('W10 an open line turns from the date into the time left at the 24-hour mark, with no new fetch', async ($, on) => {
-  const start = Date.parse('2026-11-14T10:00:00Z') - (DAY + 90_000) // 24 h 1 m 30 s before the week resets
-  const body = JSON.stringify(measured({ five_hour: window(13, '2026-11-14T08:00:00Z'), seven_day: window(26, '2026-11-14T10:00:00Z') }))
+test('W10 an open line turns from the date into the time left at the 24-hour mark, with no new fetch and no manual redraw', async ($, on) => {
+  // 24 h 1 m 29 s before the week resets: the clock minute turns at +29 s and +89 s, between two 2 s ticks (at an exact tick the mock
+  // clock gives the tick and the draw the same instant, which is 24 h 0 m 0 s, still a date)
+  const start = WEEK_RESETS_AT - (DAY + 89_000)
+  const body = JSON.stringify(measured({ five_hour: window(13, new Date(WEEK_RESETS_AT - 2 * HOUR).toISOString()), seven_day: window(26, FIXTURE_WEEK_AT) }))
   const w = await world($, on, answerWith(200, body), undefined, { now: start })
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await pressLimits(ui)
   expect(await ui.find({ type: 'Text', text: /week 74% left · resets Nov 14 · Fable/ })).toBeDefined()
-  await w.clock.advance(2 * MIN) // 23 h 59 m 30 s left
-  await ui.redraw()
+  await w.clock.advance(2 * MIN) // 23 h 59 m 29 s left
   expect(await ui.find({ type: 'Text', text: /week 74% left · resets in 23h 59m · Fable/ })).toBeDefined()
   expect(w.calls, 'no second fetch').toHaveLength(1)
+  await ui.unmount()
+})
+
+// The 5-hour reset is unknown here, so the 1.4.0 tick key (the 5-hour minutes left) would be null all the time.
+test('W9 with the 5-hour reset unknown the week text still counts down: the date, then the time left, with no manual redraw', async ($, on) => {
+  const body = JSON.stringify(measured({ five_hour: window(13, null), seven_day: window(26, FIXTURE_WEEK_AT) }))
+  const w = await world($, on, answerWith(200, body), undefined, { now: WEEK_RESETS_AT - (DAY + MIN) }) // 24 h 1 m left
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  await pressLimits(ui)
+  expect(await ui.find({ type: 'Text', text: /resets in — · week 74% left · resets Nov 14 · Fable/ })).toBeDefined()
+  await w.clock.advance(2 * MIN) // 23 h 59 m left
+  expect(await ui.find({ type: 'Text', text: /resets in — · week 74% left · resets in 23h 59m · Fable/ })).toBeDefined()
+  expect(w.calls, 'no second fetch').toHaveLength(1)
+  await ui.unmount()
+})
+
+test('W11 an open line whose weekly reset has passed fetches again, once a minute, with the 5-hour reset unknown', async ($, on) => {
+  const body = JSON.stringify(measured({ five_hour: window(13, null), seven_day: window(26, FIXTURE_WEEK_AT) }))
+  const w = await world($, on, answerWith(200, body), undefined, { now: WEEK_RESETS_AT - MIN })
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  await pressLimits(ui) // fetch 1, a minute before the weekly reset
+  expect(w.calls).toHaveLength(1)
+  await w.clock.advance(MIN - 2_000)
+  expect(w.calls, 'the reset has not come yet').toHaveLength(1)
+  await w.clock.advance(2_000) // the weekly reset has passed
+  expect(w.calls, 'the passed weekly reset fetched').toHaveLength(2)
+  await w.clock.advance(MIN - 2_000)
+  expect(w.calls, 'a second tick within a minute fetches nothing').toHaveLength(2)
+  await w.clock.advance(2_000)
+  expect(w.calls, 'a minute after the last fetch it fetches again').toHaveLength(3)
   await ui.unmount()
 })

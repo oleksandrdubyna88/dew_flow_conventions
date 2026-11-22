@@ -9,7 +9,7 @@ import {
 } from './prompts'
 import { accountButton, currentLimits, emailOf, isLimitsShown, limitsClock, limitsRow, limitsText, tickLimits, watchLimitsMinute } from './limits'
 import { closeTasks, currentTasks, tasksButton, tasksLabel, tasksView } from './tasks'
-import { accountRowCells, answerButton, currentLastQuestion, isAnswerShown, noteSubmit, restoreQuestion, retryPending } from './answer'
+import { accountRowCells, answerButton, clearQuestion, currentLastQuestion, isAnswerShown, noteSubmit, restoreQuestion, retryPending } from './answer'
 
 const models = atom({ plugin: 'agent-models', key: 'models' } as const, {} as Record<string, string>)
 const rows = atom({ plugin: 'agent-models', key: 'rows' } as const, [] as AgentRow[])
@@ -290,7 +290,7 @@ export const register: Register = on => {
     const result = await next(e)
     if (e.agentId === undefined) {
       void refreshAccountIfStale($) // a subagent's end never reads
-      void retryPending($) // a question queued behind this turn is in the transcript now
+      void retryPending($, true) // a question queued behind this turn is in the transcript now, maybe far back past a long answer
     }
     return result
   })
@@ -298,9 +298,14 @@ export const register: Register = on => {
   on('turn.start', async ($, e, next) => {
     const result = await next(e)
     if (e.agentId === undefined) {
-      void retryPending($) // the queued question's own turn begins: it is a transcript message now
+      void retryPending($, false) // the queued question's own turn begins: it is a transcript message now
     }
     return result
+  })
+
+  on('session.end', async ($, e, next) => {
+    await clearQuestion($) // before the end step: the exit shares one short bound
+    return next(e)
   })
 
   on('prompt.submit', async ($, e, next) => {
