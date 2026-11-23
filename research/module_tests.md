@@ -245,7 +245,7 @@ and its epics.
 
 The marketplace step (2026-11-23, `todo/PLAN_dew_flow_mods_E3.md`) has one test file per part, all with temporary homes
 made by `ownedDir` through `tools/lib/mods-marketplace-fixtures.mjs` (never `os.homedir()`, never the real `~/.claude`), and
-each case was run red before its code. `tools/mods-marketplace.test.mjs` (96 cases) runs `settings/hooks/lib/mods-marketplace.mjs`
+each case was run red before its code. `tools/mods-marketplace.test.mjs` (101 cases) runs `settings/hooks/lib/mods-marketplace.mjs`
 in process: the registration (R1–R9: no file, other keys kept in place with one backup, already registered, the person's
 `false`, a differing entry, refused shapes, the skips, a link), the proof and the retirement (M1–M9: no install record, an
 incomplete install in each way, a record naming another source, the whole proof writing the tombstone then `false`, a stop
@@ -253,30 +253,37 @@ after each sub-step, the 24 hours, a folder that is edited or a link or foreign,
 the lines said once (U1, W1), the lib's own limits (T1: no child process, network, worker or timer, and 40 files under one
 second) and its imports (A3: only `node:` builtins and `./user-guard-install.mjs`, every imported name an export of the guard
 core, one body per helper, `settings.json` only through `commitSettings`); each scan has a companion that finds a planted
-instance. `tools/mods-marketplace-step.test.mjs` (24 cases) runs the hook step in `ensure-user-guard.mjs` (the skips in
+instance. `tools/mods-marketplace-step.test.mjs` (27 cases) runs the hook step in `ensure-user-guard.mjs` (the skips in
 their order, the lib that fails to load becoming a refusal line while the guard and effort steps still run, the copy of the
 hook and of the lib in `.claude/hooks` equal byte for byte) and the spawned hook on one home for several starts (S1, S2, W2). It
 also plays the FROZEN old step (`tools/fixtures/retired-installer/`, below) against the same home: the control M5p proves the
 frozen step still installs the 1.4.0 mod and registers its folder, and M5a and M5b cut the new step off after the tombstone and
 after the settings write, then check that the old step installs nothing and the next start finishes without a second line.
 
-`tools/retired-installer-fixture.test.mjs` (3 cases, F1) holds the sha256 of the six code files of the frozen copy as they
+`tools/retired-installer-fixture.test.mjs` (5 cases, F1 and F2) holds the sha256 of the six code files of the frozen copy as they
 were released in `c598a11`, fails on one changed byte or line ending, and reads the same bytes from git history, so the clone
-that runs the suite must hold that commit (CI fetches full history for this). `.gitattributes` holds the folder at `eol=lf`, so
+that runs the suite must hold that commit (CI fetches full history for this). F2 holds the README's word that only
+`tools/mods-marketplace-step.test.mjs` imports the fixture: it resolves every import, re-export, dynamic import and `require`
+under `tools/` and fails on any other file, and it finds each planted spelling. `.gitattributes` holds the folder at `eol=lf`, so
 the hashes are those of the raw bytes on every checkout; nothing folds a line ending. `tools/retired-names.test.mjs`
-(6 cases, A4, scan in `tools/lib/retired-names.mjs`) fails when one of three retired names (the mod's folder path in this
-repository, the old installer's released-version constant and its pins table; the list is `NAMES` there) is named in a tracked
+(9 cases, A4, scan in `tools/lib/retired-names.mjs`) fails when one of four retired names (the mod's folder path in this
+repository with a slash or a backslash, in any letter case, and its split form (the two words as two quoted arguments of a path join), the old
+installer's released-version constant and its pins table; the list is `NAMES` there) is named in a tracked
 or new file outside the plan files, the frozen fixture, the E1 probe record and the places listed there with a reason; the
-person's own old folder under `~/.claude/mods` and a path qualified by a commit are data of the new step, not hits.
-It finds a planted hit of each name. `tools/adapter-check.test.mjs` names the new lib as missing in a bare repository (A2)
-and a retired `.claude/hooks/lib/agent-models-*.mjs` in a consumer, one finding for each, on the command line with exit 1 (A1).
+person's own old folder spelled `~/.claude/mods/agent-models` and a path qualified by a commit hash of 7 to 40 hex digits are
+data of the new step, not hits (`HEAD:`, a branch name and `$HOME/.claude/` are). It finds a planted hit of each name. `tools/adapter-check.test.mjs` names the new lib as missing in a bare repository (A2)
+and each of the four retired libs (`agent-models-install`, `-decide`, `-read` and `-swap` `.mjs`) in a consumer's `.claude/hooks/lib`, one
+finding for each, on the command line with exit 1; a consumer's own `agent-models-notes.mjs` is not a finding (A1).
 
-`tools/user-guard-road.test.mjs` (19 cases) holds what was tested of the settings core before the installer went: the road
+`tools/user-guard-road.test.mjs` (30 cases) holds what was tested of the settings core before the installer went: the road
 called directly (a created file with the umask's mode, a file or a link that appears in the gap, a filesystem without hard
 links, the re-check of the bytes and of the resolved target, an existing file replaced and keeping its mode, `settingsFileOf`
 for a chain, a dangling chain and a loop, `writeAtomic` with `replace: false`, and the guard's own install doing what it did
 before the road existed), the same refusals at the registration of the marketplace (no hard link, a file that appears in the
-gap or after the re-check), and the scans: only `commitSettings` calls the road's two parts, the registration imports
+gap or after the re-check, a chain of links written at its last target with the backup beside it, a dangling chain, a loop, 41
+links, a missing folder and `..`, a re-pointed link, a file or a folder that is not writable, a fresh machine whose home is not
+writable, a `settings.json` that is a folder or cannot be read, a creation whose write fails, a folder that takes the name in
+the gap; every branch of `blockedReason` in the lib was removed once by hand and a case turned red), and the scans: only `commitSettings` calls the road's two parts, the registration imports
 `commitSettings` and calls it once with `replace: false`, no `writeAtomic(` call naming `settings` outside the effort write, and
 no U+FEFF in a hook module. Each scan has a companion that finds a known or planted instance.
 

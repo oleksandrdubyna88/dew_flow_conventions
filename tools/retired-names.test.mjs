@@ -61,11 +61,62 @@ test('A4: the person\'s own old folder (~/.claude/mods/agent-models) and a commi
   assert.deepEqual(where(scanFiles(files({ 'tools/q.mjs': 'path.join(root, "mods/agent-models")\n.agents/conventions/mods/agent-models\n' }))), ['tools/q.mjs:1 mods/agent-models', 'tools/q.mjs:2 mods/agent-models']);
 });
 
-test('A4: only the new step\'s control test may name RELEASED_MOD, and only that name: it imports the frozen constant', () => {
+test('A4: the split form of the folder, backslashes and other letter cases are hits, in both kinds of quote', () => {
+  const planted = files({
+    'tools/a.mjs': "const p = path.join(root, 'mods', 'agent-models', 'hooks');\n",
+    'tools/b.mjs': 'const p = path.join(root, "mods" , "agent-models");\n',
+    'tools/c.mjs': 'const p = path.join(root, `mods`,`agent-models`);\n',
+    'tools/d.mjs': 'const p = "mods\\\\agent-models\\\\hooks";\nconst q = "mods\\agent-models";\n',
+    'tools/e.mjs': '// see Mods/Agent-Models and MODS/AGENT-MODELS\n',
+    'tools/f.mjs': "const p = path.join(root, 'Mods', 'agent-Models');\n",
+  });
+  assert.deepEqual(where(scanFiles(planted)), [
+    'tools/a.mjs:1 mods, agent-models',
+    'tools/b.mjs:1 mods, agent-models',
+    'tools/c.mjs:1 mods, agent-models',
+    'tools/d.mjs:1 mods/agent-models',
+    'tools/d.mjs:2 mods/agent-models',
+    'tools/e.mjs:1 mods/agent-models',
+    'tools/f.mjs:1 mods, agent-models',
+  ]);
+  assert.deepEqual(where(scanFiles(files({ 'tools/ok.mjs': "path.join(mods, 'agent-models'); path.join(home, '.claude', 'mods');\n" }))), [], 'a variable named mods is not the folder');
+});
+
+test('A4: only a commit hash of 7 to 40 hex digits before the colon makes a path a read from history; any other qualifier is a hit', () => {
+  const ok = files({
+    'tools/h.mjs': '# git show c598a11:mods/agent-models/x and C598A11F:mods/agent-models and ' + 'a'.repeat(40) + ':mods/agent-models\n',
+  });
+  assert.deepEqual(where(scanFiles(ok)), []);
+  const planted = files({
+    'tools/g.mjs': '# git show HEAD:mods/agent-models/x\n',
+    'tools/h.mjs': '# main:mods/agent-models and origin/main:mods/agent-models\n',
+    'tools/i.mjs': '# c598a1:mods/agent-models (six digits) and ' + 'a'.repeat(41) + ':mods/agent-models and xyzc598a11:mods/agent-models\n',
+    'tools/j.mjs': '# C:mods/agent-models and abc:mods/agent-models\n',
+  });
+  assert.deepEqual(where(scanFiles(planted)), [
+    'tools/g.mjs:1 mods/agent-models',
+    'tools/h.mjs:1 mods/agent-models',
+    'tools/i.mjs:1 mods/agent-models',
+    'tools/j.mjs:1 mods/agent-models',
+  ]);
+});
+
+test('A4: only the person\'s home spelling ~/.claude/mods/agent-models is exempt, with either separator; $HOME, a bare .claude and a repository path are hits', () => {
+  assert.deepEqual(where(scanFiles(files({ 'tools/k.mjs': "'~/.claude/mods/agent-models' and '~\\.claude\\mods\\agent-models'\n" }))), []);
+  assert.deepEqual(where(scanFiles(files({
+    'tools/l.mjs': 'rm -r $HOME/.claude/mods/agent-models\n',
+    'tools/m.mjs': 'cp .claude/mods/agent-models x\n',
+    'tools/n.mjs': 'rm ~/mods/agent-models and /home/u/.claude/mods/agent-models\n',
+  }))), ['tools/l.mjs:1 mods/agent-models', 'tools/m.mjs:1 mods/agent-models', 'tools/n.mjs:1 mods/agent-models']);
+});
+
+test('A4: only the new step\'s control test may name RELEASED_MOD and the folder (it reads the frozen mod from history), and no other name', () => {
   const step = 'tools/mods-marketplace-step.test.mjs';
   assert.deepEqual(where(scanFiles(files({ [step]: 'import { RELEASED_MOD as FROZEN_RELEASED } from "./fixtures/x.mjs";\n' }))), []);
-  assert.deepEqual(where(scanFiles(files({ [step]: 'mods/agent-models-pins and agent-models-pins\n' }))), [`${step}:1 mods/agent-models`, `${step}:1 agent-models-pins`]);
+  assert.deepEqual(where(scanFiles(files({ [step]: "git show ${C}:mods/agent-models/x; path.join(p, 'mods', 'agent-models');\n" }))), []);
+  assert.deepEqual(where(scanFiles(files({ [step]: 'mods/agent-models-pins and agent-models-pins\n' }))), [`${step}:1 agent-models-pins`]);
   assert.deepEqual(where(scanFiles(files({ 'tools/other.test.mjs': 'import { RELEASED_MOD } from "x";\n' }))), ['tools/other.test.mjs:1 RELEASED_MOD']);
+  assert.deepEqual(where(scanFiles(files({ 'tools/other.test.mjs': "git show ${C}:mods/agent-models/x; path.join(p, 'mods', 'agent-models');\n" }))), ['tools/other.test.mjs:1 mods/agent-models', 'tools/other.test.mjs:1 mods, agent-models']);
 });
 
 test('A4: a file git lists but that is gone from the disk is skipped, and the real listing is not empty', () => {

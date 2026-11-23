@@ -411,6 +411,11 @@ test('W3: the refusal line says the step could not run, with the code, and never
   assert.ok(!modsStepRefusal('x').includes('NOT registered'));
 });
 
+test('the hook\'s refusal for a lib that cannot load starts with the very words the lib uses for an error it did not foresee', async () => {
+  const { LINES } = await import('../settings/hooks/lib/mods-marketplace.mjs');
+  for (const code of ['ERR_MODULE_NOT_FOUND', 'EBOOM']) assert.ok(modsStepRefusal(code).startsWith(LINES.couldNotRun(code)), code);
+});
+
 test('the refusal line for a lib that cannot load names no path of the user and starts like the other lines of the step', () => {
   assert.ok(!modsStepRefusal('ERR_MODULE_NOT_FOUND').includes(os.homedir()));
   assert.ok(modsStepRefusal('x').startsWith('agent-models'));

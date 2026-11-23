@@ -30,7 +30,8 @@ const SETTINGS = '.claude/settings.json';
 const ADAPTER = 'CLAUDE.md';
 const LEGACY = '.claude/rules';
 const RETIRED_LIB_DIR = '.claude/hooks/lib';
-const RETIRED_LIB = /^agent-models-.*\.mjs$/;
+/** Exactly the four libs of the retired installer; any other `agent-models-*.mjs` is the consumer's own. */
+const RETIRED_LIBS = new Set(['agent-models-install.mjs', 'agent-models-decide.mjs', 'agent-models-read.mjs', 'agent-models-swap.mjs']);
 
 const hookPath = (file) => `.claude/hooks/${file}`;
 
@@ -165,12 +166,12 @@ function hookFindings(repo, reference, files) {
  * (`lib/mods-marketplace.mjs`) and Claude Code installs the mod itself. A bump that only added the new
  * lib would leave the four old ones beside it, dead code that nothing loads and nobody reads. They are
  * not in the reference any more, so the missing-file check cannot see them; this finding does.
- * Only the files of that folder are looked at: a name in a subfolder, or another extension, is the
- * consumer's own.</p>
+ * Only these four names in that folder are looked at: any other name, a subfolder or another
+ * extension is the consumer's own.</p>
  */
 function retiredFindings(repo) {
   return listIn(repo, RETIRED_LIB_DIR, 'hook libs')
-    .filter((name) => RETIRED_LIB.test(name))
+    .filter((name) => RETIRED_LIBS.has(name))
     .sort()
     .map((name) => `${RETIRED_LIB_DIR}/${name} is retired — delete it; the session step now registers the dew-flow-mods `
       + 'marketplace and Claude Code installs the mod, so nothing loads this file');

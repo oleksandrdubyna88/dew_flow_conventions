@@ -104,6 +104,7 @@ export const LINES = Object.freeze({
   shell: () => `agent-models: this session's ${PLUGIN_DIRS_KEY} still lists ${SHOWN_OLD}, which is removed — take it out of your shell profile (said once)`,
   changed: what => `${SHOWN_SETTINGS} changed while ${what}; nothing of ours was written to it — the next start tries again`,
   notRegistered: reason => `agent-models: marketplace NOT registered: ${reason}`,
+  couldNotRun: code => `agent-models: the dew-flow-mods step could not run (${code})`,
   notRetired: reason => `agent-models: old copy NOT retired: ${reason}`,
   notRemoved: reason => `agent-models: old copy NOT removed: ${reason}`,
   deleteFailed: code => `the folder of the old copy, renamed aside, could not be deleted (${code}) — the next start tries again`,
@@ -710,7 +711,7 @@ export function ensureModsMarketplace({
   try {
     return run({ home, env, now, uid, beforeWrite, beforeMarker, beforeRename, remove, stopAfter, sessionSource });
   } catch (e) {
-    const line = LINES.notRegistered(`unexpected error (${codeOf(e)})`);
+    const line = LINES.couldNotRun(codeOf(e));
     return { action: 'refused', line, lines: [line] };
   }
 }

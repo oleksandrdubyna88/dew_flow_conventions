@@ -98,6 +98,23 @@ test('A1: every retired lib is named on its own, a lib of another name is left a
   for (const name of RETIRED_LIBS) assert.ok(findings.some((finding) => finding.includes(`lib/${name} is retired`)), name);
 });
 
+test('A1: a consumer\'s own agent-models-*.mjs is not flagged, and each of the four retired libs, by its exact name, is', (t) => {
+  const repo = whole(t);
+  const lib = path.join(repo, '.claude/hooks/lib');
+  for (const own of ['agent-models-notes.mjs', 'agent-models-install-helper.mjs', 'agent-models-.mjs', 'agent-models-swap.test.mjs', 'agent-models-read.mjs.bak']) {
+    fs.writeFileSync(path.join(lib, own), '// a consumer\'s own file\n');
+  }
+  assert.deepEqual(adapterFindings(repo), [], 'a name that is not one of the four is never a finding');
+  for (const name of RETIRED_LIBS) {
+    const file = path.join(lib, name);
+    fs.writeFileSync(file, '// old\n');
+    const findings = adapterFindings(repo);
+    assert.equal(findings.length, 1, name);
+    assert.match(findings[0], new RegExp(`lib/${name.replace('.', '\\.')} is retired`));
+    fs.rmSync(file);
+  }
+});
+
 test('A1: the command line reports a retired lib and exits 1; a consumer without one exits 0', (t) => {
   const repo = whole(t);
   const run = () => spawnSync(process.execPath, [path.join(HERE, 'adapter-check.mjs'), repo], { encoding: 'utf8', timeout: 60_000, windowsHide: true });

@@ -20,6 +20,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { LINES, MARKETPLACE, PLUGIN_ID, anchorEntry } from '../settings/hooks/lib/mods-marketplace.mjs';
 import * as guard from '../settings/hooks/lib/user-guard-install.mjs';
 import { sandbox, symlinkOrSkip } from './lib/mods-marketplace-fixtures.mjs';
 import { ownedDir } from './lib/owned.mjs';
@@ -251,6 +252,210 @@ test('2.9 the guard as at HEAD: a fresh install creates settings.json by the ren
   assert.deepEqual(tmpFiles(r.dir), []);
 });
 
+// ---------------------------------------------------------------------------------------------------------------------
+// the registration: every refusal of `blockedReason` and of the read, one level up (moved from the retired installer's 2.18-2.27b)
+// ---------------------------------------------------------------------------------------------------------------------
+
+const IS_ROOT = process.getuid?.() === 0;
+const SHOWN = '~/.claude/settings.json';
+const refusedLine = reason => LINES.notRegistered(reason);
+/** The line of a settings write that failed: the lib's refusal with the system code, whatever the code is. */
+const assertWriteRefused = line => {
+  const head = LINES.notRegistered(`${SHOWN} could not be written (`);
+  assert.ok(line.startsWith(head) && /^\w+\)$/.test(line.slice(head.length)), line);
+};
+const LOOP_REASON = settings => `${settings} has more than 40 links (a loop, or a chain too long to open)`;
+
+/** `~/.claude/settings.json` → `dotfiles/mid.json` → `dotfiles/settings.json`, where only the links are made by the test. */
+function chain(t) {
+  const h = sandbox(t);
+  const dotfiles = path.join(h.root, 'dotfiles');
+  fs.mkdirSync(dotfiles);
+  fs.mkdirSync(h.claude, { recursive: true });
+  return { h, dotfiles, real: path.join(dotfiles, 'settings.json'), mid: path.join(dotfiles, 'mid.json') };
+}
+const backupsIn = dir => fs.readdirSync(dir).filter(name => name.includes('.bak-subagent-model-'));
+
+test('2.18 a chain of links is registered at its last target: every link stays, the mode and the backup follow the real file', { skip: !POSIX }, t => {
+  const c = chain(t);
+  fs.writeFileSync(c.real, '{"model":"x"}\n');
+  fs.chmodSync(c.real, 0o640);
+  if (!symlinkOrSkip(t, c.real, c.mid)) return;
+  fs.symlinkSync(c.mid, c.h.settings);
+  assert.equal(c.h.step().action, 'registered');
+  assert.equal(fs.lstatSync(c.h.settings).isSymbolicLink(), true);
+  assert.equal(fs.lstatSync(c.mid).isSymbolicLink(), true);
+  assert.deepEqual(json(c.real), { model: 'x', extraKnownMarketplaces: { [MARKETPLACE]: anchorEntry() }, enabledPlugins: { [PLUGIN_ID]: true } });
+  assert.equal(modeOf(c.real), 0o640);
+  const backups = backupsIn(c.dotfiles);
+  assert.equal(backups.length, 1, 'the backup is beside the real file');
+  assert.equal(modeOf(path.join(c.dotfiles, backups[0])), 0o640);
+  assert.deepEqual(backupsIn(c.h.claude), [], 'and not beside the first link');
+});
+
+test('2.19 a dangling chain is refused: nothing is created at its last target, no link is touched, and the next start registers once the file exists', t => {
+  const c = chain(t);
+  if (!symlinkOrSkip(t, c.real, c.mid)) return;
+  fs.symlinkSync(c.mid, c.h.settings);
+  const first = c.h.step();
+  assert.deepEqual([first.action, first.line], ['refused', refusedLine(`${SHOWN} is a link to a file that does not exist`)]);
+  assert.equal(fs.existsSync(c.real), false);
+  assert.deepEqual(fs.readdirSync(c.dotfiles), ['mid.json']);
+  assert.equal(fs.lstatSync(c.h.settings).isSymbolicLink(), true);
+  fs.writeFileSync(c.real, '{}\n');
+  assert.equal(c.h.step().action, 'registered');
+});
+
+test('2.20 a link loop is refused with its reason and no link is touched', t => {
+  const c = chain(t);
+  const loop = path.join(c.h.claude, 'loop.json');
+  if (!symlinkOrSkip(t, loop, c.h.settings)) return;
+  fs.symlinkSync(c.h.settings, loop);
+  const result = c.h.step();
+  assert.deepEqual([result.action, result.line], ['refused', refusedLine(LOOP_REASON(c.h.settings))]);
+  assert.equal(fs.lstatSync(c.h.settings).isSymbolicLink(), true);
+  assert.equal(fs.lstatSync(loop).isSymbolicLink(), true);
+});
+
+test('2.21 a chain of 41 links that ends in an existing file is refused like a loop and the file is byte-identical', t => {
+  const c = chain(t);
+  fs.writeFileSync(c.real, '{}\n');
+  const hops = Array.from({ length: 41 }, (_, i) => path.join(c.dotfiles, `l${i}`));
+  try {
+    hops.forEach((hop, i) => fs.symlinkSync(i + 1 < hops.length ? hops[i + 1] : c.real, hop));
+    fs.symlinkSync(hops[0], c.h.settings);
+  } catch (e) {
+    return t.skip(`symlinks are not permitted here (${e.code})`);
+  }
+  const result = c.h.step();
+  assert.deepEqual([result.action, result.line], ['refused', refusedLine(LOOP_REASON(c.h.settings))]);
+  assert.equal(fs.readFileSync(c.real, 'utf8'), '{}\n');
+});
+
+test('2.22 a link whose target goes through a missing folder and then ".." is refused and a decoy at the lexical place is untouched', t => {
+  const c = chain(t);
+  const decoy = path.join(c.h.claude, 'real.json');
+  fs.writeFileSync(decoy, '{"decoy":true}\n');
+  if (!symlinkOrSkip(t, 'missing/../real.json', c.h.settings)) return;
+  const result = c.h.step();
+  assert.deepEqual([result.action, result.line], ['refused', refusedLine(`${c.h.settings} is a link whose target goes through a folder that does not exist and then ".."`)]);
+  assert.equal(fs.readFileSync(decoy, 'utf8'), '{"decoy":true}\n');
+});
+
+test('2.23 a link re-pointed to another file with the same bytes between the resolve and the write is refused: neither file is written, no backup, and the next start registers the new one', t => {
+  const c = chain(t);
+  const a = path.join(c.dotfiles, 'a.json');
+  const b = path.join(c.dotfiles, 'b.json');
+  fs.writeFileSync(a, '{"model":"opus"}\n');
+  fs.writeFileSync(b, '{"model":"opus"}\n');
+  if (!symlinkOrSkip(t, a, c.h.settings)) return;
+  const result = c.h.step({ beforeWrite: () => { fs.rmSync(c.h.settings); fs.symlinkSync(b, c.h.settings); } });
+  assert.deepEqual([result.action, result.line], ['refused', refusedLine(LINES.changed('registering'))]);
+  assert.equal(fs.readFileSync(a, 'utf8'), '{"model":"opus"}\n', 'the old target was not written');
+  assert.equal(fs.readFileSync(b, 'utf8'), '{"model":"opus"}\n');
+  assert.deepEqual(backupsIn(c.dotfiles), []);
+  assert.equal(c.h.step().action, 'registered');
+  assert.equal(json(b).enabledPlugins[PLUGIN_ID], true);
+  assert.equal(fs.readFileSync(a, 'utf8'), '{"model":"opus"}\n');
+});
+
+test('2.25 a folder or a file that is not writable is refused before anything is written, for a file to create and for an existing one', { skip: IS_ROOT || !POSIX }, t => {
+  for (const existing of [false, true]) {
+    const h = sandbox(t);
+    fs.mkdirSync(h.claude, { recursive: true });
+    if (existing) h.writeSettings({ model: 'x' });
+    const before = h.readSettings();
+    fs.chmodSync(h.claude, 0o555);
+    try {
+      const result = h.step();
+      assert.deepEqual([result.action, result.line], ['refused', refusedLine(`the folder of ${SHOWN} is not writable (EACCES)`)], `existing: ${existing}`);
+      assert.deepEqual(h.readSettings(), before);
+      assert.deepEqual(fs.readdirSync(h.claude).filter(name => name !== 'settings.json'), []);
+    } finally {
+      fs.chmodSync(h.claude, 0o755);
+    }
+  }
+  // the file itself, in a folder that can be written
+  const file = sandbox(t);
+  file.writeSettings({ model: 'x' });
+  fs.chmodSync(file.settings, 0o444);
+  const result = file.step();
+  assert.deepEqual([result.action, result.line], ['refused', refusedLine(`${SHOWN} is not writable (EACCES)`)]);
+  assert.deepEqual(file.readSettings(), { model: 'x' });
+  assert.deepEqual(backupsIn(file.claude), [], 'no backup before a refused write');
+});
+
+test('2.25b a fresh machine: with no ~/.claude the nearest folder that exists must take the new one, and a home that cannot be written is refused by hand', { skip: IS_ROOT || !POSIX }, t => {
+  const h = sandbox(t);
+  assert.equal(fs.existsSync(h.claude), false);
+  fs.chmodSync(h.home, 0o555);
+  try {
+    const result = h.step();
+    assert.deepEqual([result.action, result.line], ['refused', refusedLine(`the folder of ${SHOWN} is not writable (EACCES)`)]);
+    assert.equal(fs.existsSync(h.claude), false);
+  } finally {
+    fs.chmodSync(h.home, 0o755);
+  }
+  assert.equal(h.step().action, 'registered', 'a writable home registers on the same fresh machine');
+});
+
+test('2.26 settings.json that is a folder, a link to a folder, or unreadable: one refusal each, nothing written, no backup', { skip: IS_ROOT || !POSIX }, t => {
+  const dir = sandbox(t);
+  fs.mkdirSync(dir.settings, { recursive: true });
+  assert.equal(dir.step().line, refusedLine(`${SHOWN} could not be read (EISDIR)`));
+  assert.deepEqual(fs.readdirSync(dir.settings), []);
+
+  const link = sandbox(t);
+  fs.mkdirSync(link.claude, { recursive: true });
+  const folder = path.join(link.root, 'folder');
+  fs.mkdirSync(folder);
+  if (!symlinkOrSkip(t, folder, link.settings)) return;
+  assert.equal(link.step().line, refusedLine(`${SHOWN} could not be read (EISDIR)`));
+  assert.deepEqual(fs.readdirSync(folder), []);
+
+  const locked = sandbox(t);
+  locked.writeSettings({ model: 'x' });
+  fs.chmodSync(locked.settings, 0o000);
+  try {
+    assert.equal(locked.step().line, refusedLine(`${SHOWN} could not be read (EACCES)`));
+    assert.deepEqual(backupsIn(locked.claude), []);
+  } finally {
+    fs.chmodSync(locked.settings, 0o644);
+  }
+});
+
+test('2.27 a creation whose write fails is refused: three starts leave no file and no backup, the line is said once, and the next start creates the file', t => {
+  const h = sandbox(t);
+  fs.mkdirSync(h.claude, { recursive: true });
+  const blocker = `${h.settings}.tmp-${process.pid}`;
+  fs.mkdirSync(blocker);
+  for (let run = 0; run < 3; run += 1) {
+    const result = h.step();
+    if (run === 0) {
+      assert.equal(result.action, 'refused');
+      assertWriteRefused(result.line);
+    } else {
+      assert.deepEqual([result.action, result.line], ['none', ''], `run ${run}: a refusal is said once`);
+    }
+  }
+  assert.equal(fs.existsSync(h.settings), false);
+  assert.deepEqual(backupsIn(h.claude), []);
+  fs.rmdirSync(blocker);
+  assert.equal(h.step().action, 'registered');
+});
+
+test('2.27b a folder that takes the settings name in the gap is a refusal, never a throw or an empty file: the folder is untouched, and the next start says it cannot read it', { skip: !POSIX }, t => {
+  const h = sandbox(t);
+  let calls = 0;
+  const result = withLinkSync(real => (from, to) => { calls += 1; fs.mkdirSync(to); return real(from, to); }, () => h.step());
+  assert.equal(calls, 1);
+  assert.equal(result.action, 'refused');
+  assertWriteRefused(result.line);
+  assert.equal(fs.statSync(h.settings).isDirectory(), true);
+  assert.deepEqual(fs.readdirSync(h.settings), []);
+  assert.deepEqual(tmpFiles(h.claude), []);
+  assert.equal(h.step().line, refusedLine(`${SHOWN} could not be read (EISDIR)`));
+});
 
 
 // ---------------------------------------------------------------------------------------------------------------------

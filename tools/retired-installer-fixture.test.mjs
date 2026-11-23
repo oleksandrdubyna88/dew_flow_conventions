@@ -56,3 +56,68 @@ test('F1: the hash check sees a changed byte and a changed line ending', () => {
   assert.notEqual(sha256(Buffer.concat([real, Buffer.from(' ')])), FROZEN['ensure-user-guard.mjs'], 'one added byte');
   assert.notEqual(sha256(Buffer.from(real.toString('utf8').replaceAll('\n', '\r\n'))), FROZEN['ensure-user-guard.mjs'], 'CRLF');
 });
+
+// ---------------------------------------------------------------------------------------------------------------------
+// F2: the fixture has one reader (the README says so)
+// ---------------------------------------------------------------------------------------------------------------------
+
+const TOOLS = path.join(REPO, 'tools');
+const ONLY_IMPORTER = 'tools/mods-marketplace-step.test.mjs';
+/** Every module specifier a text imports: `import … from 'x'`, `export … from 'x'`, `import 'x'`, `import('x')` and `require('x')`. */
+const SPECIFIERS = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)(['"`])([^'"`\n]+)\1/g;
+
+/** The files of a Map of repository path → text that import something inside the fixture folder; a specifier is resolved from its own file. */
+function importersOfFixture(files) {
+  const found = [];
+  for (const [file, text] of files) {
+    const from = path.dirname(path.join(REPO, file));
+    for (const [, , specifier] of text.matchAll(SPECIFIERS)) {
+      if (!specifier.startsWith('.')) continue;
+      const target = path.resolve(from, specifier);
+      if (target === FIXTURE || target.startsWith(`${FIXTURE}${path.sep}`)) found.push(file);
+    }
+  }
+  return [...new Set(found)].sort();
+}
+
+/** The script files under `tools/`, the fixture folder itself left out (its files import each other), as repository path → text. */
+function toolsScripts() {
+  const files = new Map();
+  for (const rel of fs.readdirSync(TOOLS, { recursive: true })) {
+    const full = path.join(TOOLS, rel);
+    if (!/\.(?:mjs|cjs|js|ts)$/.test(rel) || full.startsWith(`${FIXTURE}${path.sep}`) || !fs.statSync(full).isFile()) continue;
+    files.set(`tools/${rel.split(path.sep).join('/')}`, fs.readFileSync(full, 'utf8'));
+  }
+  return files;
+}
+
+test('F2: only tools/mods-marketplace-step.test.mjs imports the frozen step (the README says so): no other script under tools/ does', () => {
+  const scripts = toolsScripts();
+  assert.ok(scripts.size > 50, `the scan reads ${scripts.size} scripts`);
+  assert.deepEqual(importersOfFixture(scripts), [ONLY_IMPORTER]);
+});
+
+/** One line of source that imports `spec` the way `kind` says; kept apart from the specifiers so that this file holds no import of the fixture itself. */
+const RENDER = {
+  named: spec => `import { x } from '${spec}';\n`,
+  bare: spec => `import '${spec}';\n`,
+  dynamic: spec => `const m = await import('${spec}');\n`,
+  reexport: spec => `export * from '${spec}';\n`,
+  require: spec => `const m = require('${spec}');\n`,
+};
+const STEP = './fixtures/retired-installer/hooks/ensure-user-guard.mjs';
+
+test('F2: the scan finds the one real importer and every planted way of importing the fixture, and not a look-alike', () => {
+  const scripts = toolsScripts();
+  assert.deepEqual(importersOfFixture(new Map([[ONLY_IMPORTER, scripts.get(ONLY_IMPORTER)]])), [ONLY_IMPORTER], 'the known instance is found');
+  const planted = new Map([
+    ['tools/a.test.mjs', RENDER.named(STEP)],
+    ['tools/b.test.mjs', RENDER.dynamic('./fixtures/retired-installer/hooks/lib/agent-models-read.mjs')],
+    ['tools/lib/c.mjs', RENDER.reexport('../fixtures/retired-installer/hooks/ensure-user-guard.mjs')],
+    ['tools/d.test.mjs', RENDER.named('./fixtures/./other/../retired-installer/hooks/ensure-user-guard.mjs')],
+    ['tools/e.test.mjs', RENDER.require(STEP)],
+    ['tools/f.test.mjs', RENDER.bare('../tools/fixtures/retired-installer/hooks/ensure-user-guard.mjs')],
+    ['tools/g.test.mjs', RENDER.named('./fixtures/retired-installer-notes/x.mjs') + RENDER.named('retired-installer') + RENDER.named('./fixtures/other/x.mjs')],
+  ]);
+  assert.deepEqual(importersOfFixture(planted), ['tools/a.test.mjs', 'tools/b.test.mjs', 'tools/d.test.mjs', 'tools/e.test.mjs', 'tools/f.test.mjs', 'tools/lib/c.mjs']);
+});

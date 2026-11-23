@@ -141,9 +141,16 @@ target again (a difference in either answers "changed while registering", writte
 runs the backup only when a write follows, and writes atomically at the real file with the file's own mode. A missing file
 is created by a hard link, which fails when the name is taken: a file another writer created meanwhile is never replaced,
 and where hard links are not available nothing is created and the refusal names the code and says the filesystem cannot make
-the hard link; it is for a person to fix, because no later start can make the link. A chain of links is written at its last
-target and every link stays; a dangling chain, a loop, a chain of more than 40 links and an unwritable file or folder are
-refused for a person to fix. `tools/user-guard-road.test.mjs` holds these cases.
+the hard link. A chain of links is written at its last target: every link stays, and the mode and the backup are those of the
+real file, the backup beside it. Each of these is refused with its own line, nothing written and no backup: a dangling chain
+(the next start registers once the file exists), a loop, a chain of more than 40 links, a link whose target goes through a
+missing folder and then `..`, a link re-pointed between the resolve and the write, an existing file that is not writable, a
+folder that is not writable (the nearest folder that exists, when `~/.claude` is not made yet), a `settings.json` that is a
+folder, a link to a folder or a file that cannot be read, a creation whose write fails (said once; the next start tries again)
+and a folder that takes the name in the gap (never replaced; the next start says it cannot read it). A refusal is a line to
+the person and never a throw; an error nobody foresaw ends in the neutral line "the dew-flow-mods step could not run (code)".
+`tools/user-guard-road.test.mjs` holds each of these cases; every branch of `blockedReason` in the lib was removed once by
+hand and a case turned red.
 
 **The proof, then the retirement.** The old copy is retired only when the engine's own record shows that the mod is
 installed. The step reads, never writes, the engine's two files under the plugins root (`CLAUDE_CODE_PLUGIN_CACHE_DIR` when

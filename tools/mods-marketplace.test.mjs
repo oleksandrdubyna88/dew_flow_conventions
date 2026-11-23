@@ -1091,6 +1091,16 @@ test('ensureModsMarketplace never throws: a home that is a file, or holds an imp
   assert.equal(fs.existsSync(h.settings), false);
 });
 
+test('an error nobody foresaw is the neutral "could not run" line with its code, as the hook says it when the lib does not load; it never says the marketplace is not registered', t => {
+  const h = sandbox(t);
+  const clock = ensureModsMarketplace({ home: h.home, env: {}, now: () => { throw Object.assign(new Error('the clock failed'), { code: 'EBOOM' }); } });
+  assert.deepEqual([clock.action, clock.line, clock.lines], ['refused', 'agent-models: the dew-flow-mods step could not run (EBOOM)', ['agent-models: the dew-flow-mods step could not run (EBOOM)']]);
+  assert.equal(clock.line, LINES.couldNotRun('EBOOM'));
+  assert.ok(!/NOT registered|unexpected/.test(clock.line), clock.line);
+  const noCode = ensureModsMarketplace({ home: h.home, env: {}, now: () => { throw new Error('the clock failed'); } });
+  assert.equal(noCode.line, 'agent-models: the dew-flow-mods step could not run (the clock failed)', 'a code-less error names its message');
+});
+
 test('the step reads the tombstone by an exclusive create: a taken marker name is never replaced (a person\'s file that appeared with the engine\'s record)', t => {
   const h = sandbox(t);
   h.reg();
