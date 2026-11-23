@@ -168,10 +168,11 @@ lies inside the plugin cache, is a real directory, and holds a `.claude-plugin/p
    empty file, a folder, a link, other JSON) is the person's: nothing at all is written, not even the state file.
 3. 24 hours after step 1: **step 2.** The old folder is judged: a real directory of the user, a record that vouches for at
    least one file, every file the record names present with its recorded sha256, only files and folders inside, at most 500
-   entries. Then our entry leaves `env.CLAUDE_CODE_PLUGIN_DIRS` (other entries verbatim and in order; the key goes when the
-   value is empty), the folder is renamed aside and deleted, then its record and its reported file. Files the record does
-   not name go with the folder. A folder that fails the judgement is left with its entry and named once; a link is never
-   touched.
+   entries, and every entry accounted for. An entry is accounted for when it is a named file with a matching hash, a folder
+   that holds one, a top-level `tsconfig.json`, or anything under `.claude-plugin/types/`. Any other entry keeps the folder,
+   and it is named once. Then our entry leaves `env.CLAUDE_CODE_PLUGIN_DIRS` (other entries verbatim and in order; the key
+   goes when the value is empty), the folder is renamed aside and deleted, then its record and its reported file. A folder
+   that fails the judgement is left with its entry and named once; a link is never touched.
 
 `INLINE_ID` set to `true` by the person, a `conflict`, an `off` switch and a proof with a reason keep the old copy as it is.
 The tombstone is written on a machine with no old folder too. Interrupted runs finish at the next start: a kill after the
@@ -203,7 +204,7 @@ observed in the probe. A process of the same user can change a file between two 
 another program changes between the road's second read and its rename is replaced, as the guard's own write can be: no lock
 is shared with the host. `CLAUDE_CONFIG_DIR` is not read: the step writes under `os.homedir()`, as the guard step does.
 
-**What the consumers do.** A bump to this release deletes the four retired libs (`.claude/hooks/lib/agent-models-*.mjs`)
+**What the consumers do.** A bump to this release deletes the four retired libs (`.claude/hooks/lib/agent-models-{decide,read,swap,install}.mjs`)
 and copies `lib/mods-marketplace.mjs` with the new `ensure-user-guard.mjs`; `tools/adapter-check.mjs` names a retired lib
 that is still there ("retired — delete it") and demands the new lib byte for byte. The frozen copy of the old step in
 `tools/fixtures/retired-installer/` is not wired and is never copied to a consumer: it exists so a test can run the old step

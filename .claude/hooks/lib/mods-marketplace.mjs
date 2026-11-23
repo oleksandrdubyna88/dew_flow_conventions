@@ -494,6 +494,15 @@ class Outcome {
   }
 }
 
+/** True when the path names any entry, a dangling link included; "not a folder on the way" is not there, any other error counts as present. */
+function entryPresent(file) {
+  try {
+    return lstatOrNull(file) !== null;
+  } catch (e) {
+    return codeOf(e) !== 'ENOTDIR';
+  }
+}
+
 /** Runs one start. Throws on an unexpected error; `ensureModsMarketplace` turns that into a refusal. */
 function run(options) {
   const { home, env, now, uid, beforeWrite, beforeMarker, beforeRename, remove, stopAfter, sessionSource } = options;
@@ -504,7 +513,8 @@ function run(options) {
   const marker = mods === 'dir' ? readMarker(p.optout) : 'absent';
   if (marker === 'person') return skipped();
   // A link (or anything that is not a folder): the step never writes a tombstone through it, so any file there is the person's opt-out.
-  if (mods === 'bad' && fs.existsSync(p.optout)) return skipped();
+  // Present means any entry, a dangling link too (lstat does not follow it); a failed read counts as present.
+  if (mods === 'bad' && entryPresent(p.optout)) return skipped();
   const out = new Outcome(mods === 'bad' ? emptyState() : readState(p.state), when);
   const before = stateText(out.state);
 
@@ -656,7 +666,9 @@ function run(options) {
   else if (decision.action === 'left') out.tell('told', `left:${digestOf(decision.reason)}`, LINES.left(decision.reason));
   else if (decision.action === 'done') {
     // Only at a start: a resumed, cleared or compacted session can run on a process env from before step 2, and then the line may be false.
-    if (sessionSource === 'startup' && listsOldFolder(env?.[PLUGIN_DIRS_KEY], p, home)) out.tell('told', 'shell', LINES.shell());
+    if (sessionSource === 'startup') {
+      if (listsOldFolder(env?.[PLUGIN_DIRS_KEY], p, home)) out.tell('told', 'shell', LINES.shell());
+    } else if (Object.hasOwn(out.state.said, 'shell')) out.live.add('shell'); // a resumed session says nothing and keeps what an earlier start said
   } else if (decision.action === 'remove') {
     const result = removeOldCopy({ p, home, settings, decision, commit, beforeRename, remove, stopAfter, when, uid: uid() });
     if (result.stopped) return { action: 'none', line: '', lines: [] };

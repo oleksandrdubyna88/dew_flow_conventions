@@ -245,7 +245,7 @@ and its epics.
 
 The marketplace step (2026-11-23, `todo/PLAN_dew_flow_mods_E3.md`) has one test file per part, all with temporary homes
 made by `ownedDir` through `tools/lib/mods-marketplace-fixtures.mjs` (never `os.homedir()`, never the real `~/.claude`), and
-each case was run red before its code. `tools/mods-marketplace.test.mjs` (103 cases) runs `settings/hooks/lib/mods-marketplace.mjs`
+each case was run red before its code. `tools/mods-marketplace.test.mjs` (106 cases) runs `settings/hooks/lib/mods-marketplace.mjs`
 in process: the registration (R1–R9: no file, other keys kept in place with one backup, already registered, the person's
 `false`, a differing entry, refused shapes, the skips, a link), the proof and the retirement (M1–M9: no install record, an
 incomplete install in each way, a record naming another source, the whole proof writing the tombstone then `false`, a stop
@@ -266,8 +266,8 @@ that runs the suite must hold that commit (CI fetches full history for this). F2
 `tools/mods-marketplace-step.test.mjs` imports the fixture: it resolves every import, re-export, dynamic import and `require`
 under `tools/` and fails on any other file, and it finds each planted spelling. `.gitattributes` holds the folder at `eol=lf`, so
 the hashes are those of the raw bytes on every checkout; nothing folds a line ending. `tools/retired-names.test.mjs`
-(9 cases, A4, scan in `tools/lib/retired-names.mjs`) fails when one of four retired names (the mod's folder path in this
-repository with a slash or a backslash, in any letter case, and its split form (the two words as two quoted arguments of a path join), the old
+(10 cases, A4, scan in `tools/lib/retired-names.mjs`) fails when one of four retired names (the mod's folder path in this
+repository with a slash or a backslash, in any letter case, and its split form (the two words as two quoted arguments of a path join, on one line or on several), the old
 installer's released-version constant and its pins table; the list is `NAMES` there) is named in a tracked
 or new file outside the plan files, the frozen fixture, the E1 probe record and the places listed there with a reason; the
 person's own old folder spelled `~/.claude/mods/agent-models` and a path qualified by a commit hash of 7 to 40 hex digits are
@@ -296,8 +296,8 @@ cover `settings/hooks`, so the step has no quality-gate coverage; its coverage i
 not run (CI is `ubuntu-latest`; the step is skipped on win32). `fs.linkSync`, the creation of `settings.json` and of the
 tombstone, is run only on a filesystem with hard links, and a failure of it is injected. An existing `settings.json` that
 another program changes between the road's second read and its rename is replaced, as the guard's own write can be: no lock
-is shared with the host. Two sessions starting at once are serialised by the exclusive creates and the atomicity of `rename`,
-not by a lock.
+is shared with the host. Runs are not serialised: the exclusive creates stop a double create, and for an existing `settings.json` the last
+rename wins (no lock is shared with the host).
 
 `tools/effort-converge.test.mjs` (10 cases, 2026-10-14) covers the effort convergence (`effortProblems`,
 `convergeEffort`, `applyEffort`, `ensureEffort`) with temporary homes: all keys set, input never mutated, other keys and

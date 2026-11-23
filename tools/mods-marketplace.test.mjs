@@ -466,6 +466,22 @@ test('M1: registered with the old copy and no installed record, or a file with n
   assert.equal(fs.existsSync(h.optout), false);
 });
 
+test('M1b: the trusted known entry is there, but installed_plugins.json is missing, or holds no record for the id: not yet, no retirement, no line', t => {
+  const h = sandbox(t);
+  h.reg();
+  h.old('1.4.0');
+  h.engine('1.6.0', { cache: false, record: false });
+  assert.equal(fs.existsSync(h.installed), false);
+  const before = snapshot(h.home);
+  for (let n = 0; n < 2; n += 1) assert.deepEqual(silent(h.step()), ['none', ''], 'no installed_plugins.json');
+  assert.deepEqual(snapshot(h.home), before);
+  fs.writeFileSync(h.installed, JSON.stringify({ version: 2, plugins: { 'other@x': [{ scope: 'user', installPath: '/x', version: '1' }] } }));
+  const withFile = snapshot(h.home);
+  for (let n = 0; n < 2; n += 1) assert.deepEqual(silent(h.step()), ['none', ''], 'a record for another id only');
+  assert.deepEqual(snapshot(h.home), withFile);
+  assert.equal(fs.existsSync(h.optout), false);
+});
+
 /** The record file's text with `change` applied to the parsed document. */
 const editRecord = (h, change) => {
   const doc = asObject(fs.readFileSync(h.installed, 'utf8'));
@@ -824,6 +840,19 @@ test('M9b: the shell line is said only at a start (source startup): a resumed, c
   assert.deepEqual(silent(h.step({ env, sessionSource: 'resume' })), ['none', '']);
 });
 
+test('M9c: startup, then resume with the same env, then startup: the resume keeps the said line, so the third start says nothing', t => {
+  const h = sandbox(t, 'mods-marketplace-m9d');
+  h.reg();
+  h.engine('1.6.0');
+  h.retired(at(-48), '1.6.0');
+  const env = { CLAUDE_CODE_PLUGIN_DIRS: `/x${path.delimiter}${h.oldFolder}` };
+  const first = h.step({ env, sessionSource: 'startup' });
+  assert.deepEqual([first.action, h.linesOf(first)], ['told', [LINES.shell()]]);
+  assert.deepEqual(silent(h.step({ env, sessionSource: 'resume' })), ['none', '']);
+  assert.equal(Object.hasOwn(stateOf(h)?.said ?? {}, 'shell'), true, 'the resume keeps the record');
+  assert.deepEqual(silent(h.step({ env, sessionSource: 'startup' })), ['none', ''], 'said once');
+});
+
 test('U1: S5 with the engine at 1.6.0, then 1.6.1, then 1.6.1: silent (stored), updated 1.6.0 -> 1.6.1, silent', t => {
   const h = sandbox(t);
   h.reg();
@@ -934,6 +963,19 @@ test('X2: mods is a link that holds the person\'s agent-models.optout: skipped, 
   assert.deepEqual(snapshot(h.home), before, 'the home is untouched');
   assert.deepEqual(snapshot(elsewhere), beforeLinked, 'nothing was written through the link');
   assert.equal(fs.readFileSync(path.join(elsewhere, 'agent-models.optout'), 'utf8'), '{"mine":true}');
+});
+
+test('X2: mods is a link to a real folder that holds a dangling agent-models.optout link: skipped (the person\'s opt-out is there, even when it points nowhere), no settings.json written', t => {
+  const h = sandbox(t);
+  fs.mkdirSync(h.claude, { recursive: true });
+  const elsewhere = path.join(h.root, 'elsewhere');
+  fs.mkdirSync(elsewhere);
+  if (!symlinkOrSkip(t, path.join(h.root, 'nowhere'), path.join(elsewhere, 'agent-models.optout'))) return;
+  if (!symlinkOrSkip(t, elsewhere, h.mods)) return;
+  assert.equal(fs.existsSync(h.optout), false, 'the link dangles');
+  for (let n = 0; n < 2; n += 1) assert.deepEqual(silent(h.step({ now: () => at(25 * n) })), ['skipped', '']);
+  assert.equal(fs.existsSync(h.settings), false, 'no settings.json');
+  assert.deepEqual(fs.readdirSync(elsewhere), ['agent-models.optout']);
 });
 
 test('X3: a person\'s marker appears between the read of the marker and the tombstone: their bytes are kept, the settings untouched, and later starts write nothing', t => {

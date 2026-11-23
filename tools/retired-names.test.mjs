@@ -61,6 +61,14 @@ test('A4: the person\'s own old folder (~/.claude/mods/agent-models) and a commi
   assert.deepEqual(where(scanFiles(files({ 'tools/q.mjs': 'path.join(root, "mods/agent-models")\n.agents/conventions/mods/agent-models\n' }))), ['tools/q.mjs:1 mods/agent-models', 'tools/q.mjs:2 mods/agent-models']);
 });
 
+test('A4: the split form over two or three lines is a hit, with the line where it starts', () => {
+  const planted = files({
+    'tools/m.mjs': "const a = 1;\nconst p = path.join(home, '.claude', 'mods',\n  'agent-models');\n",
+    'tools/n.mjs': "x\nx\npath.join(\n  \"mods\"\n  ,\n  \"agent-models\");\n",
+  });
+  assert.deepEqual(where(scanFiles(planted)), ['tools/m.mjs:2 mods, agent-models', 'tools/n.mjs:4 mods, agent-models']);
+});
+
 test('A4: the split form of the folder, backslashes and other letter cases are hits, in both kinds of quote', () => {
   const planted = files({
     'tools/a.mjs': "const p = path.join(root, 'mods', 'agent-models', 'hooks');\n",
