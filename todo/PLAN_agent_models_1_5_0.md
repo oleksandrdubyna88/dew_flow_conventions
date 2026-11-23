@@ -2,7 +2,8 @@
 
 > Status: **APPROVED 2026-11-22 (epoch 1, by reviewers); stopped for re-review 2026-11-23** — the second change (1.2)
 > should have stopped the plan; it did not, and the build, two code rounds and a third change (1.3) followed. The
-> plan-lifecycle check of PR #187 found it. No merge of #187 until epoch 2 is approved. Scope: `mods/agent-models/` (one new hooks file, the band row, the limits line, version 1.5.0, the mod's own
+> plan-lifecycle check of PR #187 found it. Re-review written (below), narrowed and chosen by the owner; waits for its
+> document round and the epoch 2 line. No merge of #187 until epoch 2 is approved. Scope: `mods/agent-models/` (one new hooks file, the band row, the limits line, version 1.5.0, the mod's own
 > tests), the installer's file list and released-copy table in `settings/hooks/lib/agent-models-decide.mjs` (and its
 > `.claude/hooks` mirror), the new row of `tools/agent-models-pins.json`, the installer tests under `tools/`,
 > `research/module_tests.md`, then one `release` promotion and the pin bumps of the nine consumers. Parent:
@@ -42,6 +43,25 @@ follow-ups of [1.4.0](../research/PLAN_agent_models_1_4_0.md) § *Follow-ups*.
   (The second code round's accepted findings — a restore that lands after `session.end`, and the same text queued
   twice, told apart by a `queued` count on the pending value — only make the code do what this text already says: no
   older question, the newest submit wins. They are not changes.)
+
+### Re-review for epoch 2
+
+Narrowed: yes — the restore after `/resume` guesses the newest user message by text; the owner chose it 2026-11-23
+
+  (Why narrowed: the engine gives no origin on a transcript message, so the guess weakens the approved "never an
+  unrelated row" for that one case. The owner answered "Guess the newest" after the question consultants split —
+  consult `59018e5b`: one for no guess, one for the guess.)
+
+  The re-review: one coai consult (`5afcb566`), every change quoted; the whole plan revised (§ Design A rewritten to the
+  code as it stands, the test plan and Definition of Done to the 336 cases, Files and Build order completed); an Opus
+  judge sorted the done work. The consult found one defect the revised plan fixes (§ Design A, `missed`): a question
+  typed into a running turn and then sent again after it counted as a second copy and was never found.
+
+| Work | Where | Verdict | Action |
+|---|---|---|---|
+| b81073f build (answer.tsx, band row, weekly reset, 1.5.0, installer, pins) | pushed, unmerged | fits | kept; its three parts that 1.3 changed were fixed forward by d07bd3c |
+| d07bd3c code round 1 (`previous`, ordered submits, deep read, `session.end`, clock-minute tick) | pushed, unmerged | fits | kept |
+| b2e48bc code round 2 (restore guard, `queued`, newest copy with no boundary, typed test helpers) | pushed, unmerged | fits | kept |
 
 ## What the code and the engine do today (read 2026-11-22 at `42119f6`, Claude Code 2.1.330)
 
@@ -87,37 +107,47 @@ So: the transcript uuid is a working target, a far-off row is reached, and the t
 
 ### A. Know the last question before any press (new file `hooks/answer.tsx`, `types/index.d.ts`)
 
-- A new state value `lastQuestion: { uuid: string } | { pending: string; previous?: string } | null` in
-  `PluginState['agent-models']` (non-render hooks write it; it survives a hot reload, as `$.state` does). `previous`
-  is the uuid of the question before the pending one (change 1.3); it is the lookup boundary: a row at or before it is
-  never the pending question. The pending write is one `update` with no `await` before it, so submits are written in
-  their order and an older submit never overwrites a newer one.
-- `on('prompt.submit')`: when `e.origin` is the person's own (the Enter in this terminal or a bridge client — the
-  coder reads `PromptOrigin` and names the members), not `isMeta`, not a slash command, and `next(e)` did not drop it:
-  write `{ pending: <the entered text> }`, then read `$.session.messages({ last: 50 })` and find the newest user message
-  with no `toolResults` whose text equals it; found → `{ uuid }`. A submit of a notification, a peer or a plugin leaves
-  the value as it is. Two questions with the same text are told apart because the lookup runs at each submit and takes
-  the newest such message.
-- `on('turn.start')` and `on('turn.complete')`: while the value is `pending` (the prompt was queued behind a running
-  turn), try the lookup again; at `turn.complete` the lookup reads back past the newest 50 rows (up to the engine cap)
-  so a long answer does not hide the question. A message typed into a running turn that never becomes a user message
-  of its own (run 2) stays pending until the next submit; while pending, the press goes to `previous` (B).
-- `on('session.end')` writes `null` (a `/clear` raises no `session.start`, so an old uuid must not carry over).
-- `on('session.start')` (new session, `/resume`, reload): when the value is `null` — a resumed session or a session
-  from before 1.5.0 — take the newest transcript user message that has no `toolResults`, is not a compaction summary
-  (`This session is being continued from a previous conversation`) and is not empty after the mod's `cleanPrompts`
-  (which drops the engine's notification and peer wrappers); it reads the newest 200 rows first and the engine cap only
-  when none is found. A value already set is kept: a reload keeps the session. Text is compared after `cleanPrompts` on
-  both sides.
+- A state value `lastQuestion` in `PluginState['agent-models']` (`types/index.d.ts`), written by non-render hooks only;
+  it survives a hot reload, as `$.state` does; absent (a state from before 1.5.0) reads as `null`:
+  - `{ uuid }` — the question is found in the transcript;
+  - `{ pending, previous?, queued?, missed? }` — the person's text, not found yet. `previous` is the uuid of the question
+    before it: the press target while pending, and the lookup boundary (a row at or before it is never this question).
+    `queued` is how many copies of the same words, with the same `previous`, were already pending (a copy queued twice
+    before either is in the transcript). `missed: true` marks a pending question that a `turn.complete` did not find:
+    typed into that running turn, it never becomes a user message of its own (§ Probe, run 2);
+  - `null` — no question seen.
+- `on('prompt.submit')`, after `next(e)`: only when `e.origin.kind` is `composer` or `bridge`, not `isMeta`, not a slash
+  command and not dropped. First, with no `await` before it, ONE `update` writes `{ pending, previous, queued }` and
+  bumps a module `generation`: `previous` is the current uuid (or the current pending's `previous`); `queued` is the
+  current pending's `queued + 1` when it has the same clean text, the same `previous` and is not `missed`, else absent.
+  The change function writes only while its generation is the newest, and `update` retries on a version miss, so an
+  older submit never overwrites a newer one whatever order the writes land in. Then the lookup on
+  `$.session.messages({ last: LOOKUP_ROWS = 50 })`; found → `{ uuid }` (`settle` checks the text, `previous` and
+  `queued` of the value it replaces).
+- The lookup (`findQuestion`): user rows with no `toolResults`, compared after `cleanPrompts` on both sides (an empty
+  clean text matches nothing). With a boundary it takes the matches newer than `previous`, oldest first, at index
+  `queued`; with no boundary and no `queued`, the newest match.
+- `on('turn.start')` and `on('turn.complete')`: a pending value is looked up again. At `turn.complete`, when the 50 rows
+  found nothing, came back full and do not hold `previous`, it reads up to the engine cap (`ENTRY_CAP`), bounded by
+  `previous`. Still not found at `turn.complete`: the value becomes `missed` (it stays pending; `turn.start` keeps looking,
+  for a prompt that was queued and starts its own turn).
+- `on('session.end')` writes `null` and bumps the generation (a `/clear` raises no `session.start`, so an old uuid must
+  not carry over; a lookup or restore still in flight then writes nothing).
+- `on('session.start')` with `null` (a resume, or a session from before 1.5.0) — **narrowed, the owner's choice**: the
+  newest transcript user message with no `toolResults`, not a compaction summary (`This session is being continued
+  from a previous conversation`), not a peer wrapper (`<teammate-message`, `<agent-message`), and not empty after
+  `cleanPrompts` (which drops the engine's reminder and notification wrappers). It reads `RESTORE_ROWS = 200` first and
+  the engine cap only when those came back full and held none. It writes only when the value is still `null` and its
+  generation is still the newest. A value already set is kept: a reload keeps the session.
 - A failed or refused read or write leaves the value as it was; nothing throws out of a hook.
 
 ### B. The press (`hooks/answer.tsx`, `register.tsx`)
 
-- `pressLastAnswer(scroll, toast, question)`: pure apart from its two arguments, so the tests pass fakes (the harness
+- `pressLastAnswer(scroll, toast, question)`: no engine access but through its `scroll` and `toast` arguments, so the tests pass fakes (the harness
   cannot see a scroll target). With `{ uuid }` it calls `scroll({ to: { requestId: uuid }, block: 'start' })` at once —
   no `await` before it (run 3, D). `{}`: nothing more. `{ deny }`: a toast in plain words (`none scrolls` → "works in
   fullscreen only"; else `last answer: <deny>`). A rejection: a toast; the press never throws. With `pending` and a
-  `previous`: scroll to `previous`, the same way. With `pending` and no `previous`: a toast `last answer: your question
+  `previous` (missed or not): scroll to `previous`, the same way. With `pending` and no `previous`: a toast `last answer: your question
   is not in the transcript yet`. With `null`: a toast `last answer: no question yet`. No scroll in those two.
 - The draw reads `lastQuestion` (a read, never a write) and passes the value to the press.
 - The button `[ last answer ]`, `key="last-answer"`, colour `BUTTON_COLOR`, after `tasks (n)` in `accountRow`, in both
@@ -161,7 +191,7 @@ So: the transcript uuid is a working target, a far-off row is reached, and the t
 
 - The restore after a resume (value `null`) picks the newest user message by text alone: `SessionMessage` carries no
   origin (types `SessionMessage`), so a plain-text plugin or meta message after the owner's last question could be
-  taken. Revisit when the engine gives the origin on a transcript message.
+  taken (the owner accepted this, 2026-11-23). Revisit when the engine gives the origin on a transcript message.
 - The minute tick follows the clock minute, while each shown value turns at its own second offset: the text can lag up
   to one minute. A timer per value's own turn would remove it.
 - The viewer's account-row height is an estimate (a flex row with a non-shrinking email button); it only affects the
@@ -170,20 +200,23 @@ So: the transcript uuid is a working target, a far-off row is reached, and the t
 ## Files
 
 New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.ts` (row count), `hooks/limits.tsx`,
-`types/index.d.ts`, `.claude-plugin/plugin.json`; new `tests/answer.test.tsx`, the limits tests and fixtures;
+`types/index.d.ts`, `.claude-plugin/plugin.json`; new `tests/answer.test.tsx`, `tests/answer-race.test.tsx`,
+`tests/answer-fixtures.tsx`, `tests/week-reset.test.tsx`; the limits tests and fixtures (`limits-fixtures.tsx`,
+`limits.test.tsx`, `limits-race.test.tsx`, `reset.test.tsx`);
 `settings/hooks/lib/agent-models-decide.mjs` + `.claude/hooks/lib/agent-models-decide.mjs`;
 `tools/agent-models-pins.json`, `tools/agent-models-decide.test.mjs`, `tools/agent-models-install.test.mjs`,
-`tools/agent-models-pin.test.mjs`; `research/module_tests.md`.
+`tools/agent-models-pin.test.mjs`, `tools/agent-models-read.test.mjs`, `tools/agent-models-swap.test.mjs`,
+`tools/lib/agent-models-fixtures.mjs`; `research/module_tests.md`.
 
 ## Build order
 
-1. Plan round — done (proceed); changes 1.1 and 1.2 recorded.
-2. RED: the tests below, watched failing for the right reason.
-3. GREEN: A–B, then C, then D's installer part (Sonnet coder; Opus brief and review).
-4. Version, pin row, `RELEASED_MOD` + mirror. `npm ci --ignore-scripts`, `npm test`, `npm run check`,
-   `node --test tools/`, `claude plugin test mods/agent-models` green; `claude plugin validate` passes; `tsc` no new
-   error.
-5. Code round (coai `review_code` + an Opus review), fixes, PR, checks, threads, merge.
+1. Plan round — done (proceed, 2026-11-22); changes 1.1–1.3; stopped and re-reviewed for epoch 2 (this record).
+2. Build, two code rounds — done (b81073f, d07bd3c, b2e48bc; all `fits`).
+3. Epoch 2: the `missed` fix of § Design A (T22), RED first; the pins row and `RELEASED_MOD` follow the new hash.
+4. All checks: `npm ci --ignore-scripts`, `npm test`, `npm run check`, `node --test tools/`,
+   `claude plugin test mods/agent-models`, `claude plugin validate`, `tsc` no new error.
+5. A final code round over the whole branch (coai `review_code` with `again: true` and the revised plan + an Opus
+   review), fixes, PR #187 checks and threads, merge.
 6. Owner checks on the branch build; then ask the owner, promote `release`, nine pin bumps, merge each.
 7. Promote this plan to `research/`.
 
@@ -206,10 +239,32 @@ New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.t
 | T15 | Q settled as u1; Q typed again, not yet in the transcript; then u2 appears and `turn.start` runs; also after a simulated reload (module state fresh) | `{ pending: Q, previous: u1 }`, never u1; then u2 |
 | T16 | submits A then B with A's state work delayed | the value ends at B |
 | T17 | the question's turn has more than 50 rows before `turn.complete` | found at `turn.complete` |
-| T18 | `session.end` | value `null` |
-| W9 | the line open, the 5-hour reset unknown, 24 h 1 m to the weekly reset, the clock moves 2 min (no manual redraw) | the date, then `resets in 23h 59m` |
+| T7b | a subagent's turn events | the main question is not touched |
+| T8b | a question 200 rows back, value `null` at `session.start` | found with a read of the engine cap |
+| T8c | the restore: a question that starts with a tag; a notification; a peer wrapper | the question is taken; the other two are not |
 | T13 | the messages read throws in each hook | value unchanged, no throw |
+| T13b | a refused write of `lastQuestion` | nothing throws; the value as it was |
 | T14 | the viewer row count with a long email at 80 columns | the wrapped account row counted |
+| T15b | T15 after a reload: fresh module, stored value seeded | the stored `previous` is still the boundary |
+| T15c | a second submit while pending | it keeps the question before the first one as `previous` |
+| T16 | submits A then B with A's state work delayed | the value ends at B |
+| T17 | the question's turn has more than 50 rows before `turn.complete` | found at `turn.complete` |
+| T17b | the deep read; an older row with the same text before `previous` | not taken |
+| T18 | `session.end` while a submit's lookup is in flight | value `null` after the lookup lands |
+| T19 | `session.start`'s restore read is slow; `session.end` before it lands | value `null` |
+| T20 | the same text queued twice before either is in the transcript | the second settles on its own row |
+| T20b | T20 after a reload (stored `queued` seeded) | the stored count is still the index |
+| T20c | a different text, or a settled value | the count starts again |
+| T20d | a copy queued while a lookup is in flight | the lookup does not settle the newer copy on the older row |
+| T21 | `turn.complete`; the newest 50 rows hold `previous` | no read of the engine cap |
+| T21b | `turn.complete` with no `previous` | the deep read still runs |
+| T22 | Q settled as A's successor: A settled; Q typed into A's running turn (never its own row) and `turn.complete` runs; then Q is sent again after the turn and its row appears | `missed` after the turn; the second Q is not counted as a copy (`queued` absent) and settles on its row |
+| F1 | `findQuestion`: clean text on both sides; an empty clean text; no boundary with two copies | matches; none; the newest copy |
+| F2 | `newestQuestion`: a summary, wrappers, tool results, a tag the person typed | only the person's row |
+| W9 | the line open, the 5-hour reset unknown, 24 h 1 m to the weekly reset, the clock moves 2 min (no manual redraw) | the date, then `resets in 23h 59m` |
+| W9b | the drawn week reset | bare text, no colour |
+| W10 | an open line at the 24-hour mark | the date turns into the time left with no new fetch and no manual redraw |
+| W11 | an open line whose weekly reset has passed, the 5-hour reset unknown | fetches again, once a minute |
 | W1 | body with `seven_day.resets_at` `…Z` / `…+00:00` | `weekResetsAt` = the `Date.parse` value |
 | W2 | `seven_day.resets_at` null / absent / garbage / no offset | `weekResetsAt` null; `resets —` after `week` |
 | W3 | 4 days left (fixed fixture clock and time zone) | `week 83% left · resets Nov 27` (the date the fixture names) |
@@ -231,9 +286,13 @@ New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.t
 ## Definition of Done
 
 - [x] Plan round advanced (proceed, 2026-11-22); Opus plan review folded.
-- [x] Tests T1–T21, W1–W11, I1, R1 green (336 mod cases); RED seen first for each new case.
+- [x] Tests T1–T21b, F1–F2, W1–W11, I1, R1 green (336 mod cases); RED seen first for each new case.
+- [ ] Epoch 2: T22 RED, then green with the `missed` fix; all checks again.
 - [x] `npm test`, `npm run check`, `node --test tools/` green; `claude plugin validate` passes; `tsc` no new error (TypeScript 6.0.3 with the 2.1.330 engine types, run on a scratch copy: no new error; the base's own test-fixture errors — the shared band fixture lacks `isCollapsed` — remain).
 - [x] Code round advanced; Opus code review done; findings fixed or answered.
+- [ ] The re-review for epoch 2: consult, whole-plan revision, the Opus judge's sort, the document round and an Opus
+      plan review; epoch 2 approved by the owner (narrowed).
+- [ ] A final code round over the whole branch after the `missed` fix.
 - [ ] PR merged with green checks and no open thread.
 - [ ] Owner checks passed on the branch build; `release` promoted after the owner's word; nine pin bumps merged.
 - [ ] The installed mod on this WSL is 1.5.0 after a session start in a consumer.
