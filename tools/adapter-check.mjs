@@ -29,6 +29,8 @@ const REFERENCE = path.resolve(HERE, '..', 'settings');
 const SETTINGS = '.claude/settings.json';
 const ADAPTER = 'CLAUDE.md';
 const LEGACY = '.claude/rules';
+const RETIRED_LIB_DIR = '.claude/hooks/lib';
+const RETIRED_LIB = /^agent-models-.*\.mjs$/;
 
 const hookPath = (file) => `.claude/hooks/${file}`;
 
@@ -157,6 +159,24 @@ function hookFindings(repo, reference, files) {
 }
 
 /**
+ * A lib of the retired agent-models installer is still in the consumer.
+ *
+ * <p>The session step no longer installs the mod; it registers the `dew-flow-mods` marketplace
+ * (`lib/mods-marketplace.mjs`) and Claude Code installs the mod itself. A bump that only added the new
+ * lib would leave the four old ones beside it, dead code that nothing loads and nobody reads. They are
+ * not in the reference any more, so the missing-file check cannot see them; this finding does.
+ * Only the files of that folder are looked at: a name in a subfolder, or another extension, is the
+ * consumer's own.</p>
+ */
+function retiredFindings(repo) {
+  return listIn(repo, RETIRED_LIB_DIR, 'hook libs')
+    .filter((name) => RETIRED_LIB.test(name))
+    .sort()
+    .map((name) => `${RETIRED_LIB_DIR}/${name} is retired — delete it; the session step now registers the dew-flow-mods `
+      + 'marketplace and Claude Code installs the mod, so nothing loads this file');
+}
+
+/**
  * The two doors `rule-cli.mjs` refuses.
  *
  * <p>Reported here as well because THIS is the tool somebody runs when they wonder why a session has
@@ -208,6 +228,7 @@ export function adapterFindings(repo, reference = REFERENCE) {
   return [
     ...settingsFindings(root, wanted),
     ...hookFindings(root, hooks, files),
+    ...retiredFindings(root),
     ...refusedDoorFindings(root),
   ];
 }

@@ -97,82 +97,110 @@ when already converged, skipped under `SUBAGENT_MODEL_GUARD=off` and in this rep
 record: [PLAN_subagent_model_tiers.md](PLAN_subagent_model_tiers.md); its release to the consumers is recorded in
 [PLAN_subagent_model_tiers_rollout.md](PLAN_subagent_model_tiers_rollout.md).
 
-## The agent-models mod and its self-install (2026-11-11)
+## The marketplace step and the retirement of the old agent-models copy (2026-11-23)
 
-`mods/agent-models/` is a Claude Code mod shipped with the rules: a hooks module that draws one band above the prompt
-with a row per running subagent and its model, the signed-in account, a login button, a viewer of the person's own
-prompts in the session and a list of notes. It holds no secret. The session self-install copies it into the user's own
-`~/.claude/mods/agent-models` and registers that folder in `env.CLAUDE_CODE_PLUGIN_DIRS` of `~/.claude/settings.json`,
-so a session in a consumer loads it from the next start. The login-method step of the original installer is not part of
-this repository.
+The `agent-models` Claude Code mod (a band above the prompt with a row per running subagent and its model, the account and
+its limits, a login button, a viewer of the person's own prompts, a list of notes, a `last answer` button and pins) does not
+live in this repository. It lives in the public repository `dew_flow_mods`, a Claude Code plugin marketplace named
+`dew-flow-mods`, and Claude Code itself installs it and keeps it up to date. This repository ships only the session step
+that asks for that: it registers the marketplace and the plugin in the person's `~/.claude/settings.json`, and retires the
+copy that the earlier installer had put in `~/.claude/mods`. The design record is `todo/PLAN_dew_flow_mods.md` and its
+epic documents; the engine facts it rests on are in [dew_flow_mods_probe_E1.md](dew_flow_mods_probe_E1.md). The earlier
+installer (the mod in this repository, its pins table and the four `agent-models-*.mjs` libs) is in the history of
+[PLAN_agent_models_mod.md](PLAN_agent_models_mod.md) and its epics; a consumer pinned to a release before this one still
+runs it.
 
-Version 1.4.0 (2026-11-12, [PLAN_agent_models_1_4_0.md](PLAN_agent_models_1_4_0.md)) adds the time until the 5-hour
-limit resets to the limits line (`5h 2% left · resets in 1h 23m · week 42% left · Fable 55% left`; the time green under
-10 minutes, orange from 10 to 30, red over 30; it counts down while the line is open, a passed reset is a dash and is
-fetched again). The account read has ceilings (identity 5 s, the whole read 30 s → `account ? (read timed out)`; a
-known account is kept) and the 2 s tick retries an unread or unknown account about once a minute, so a resumed session
-is not left on a bare `account ?`.
+The step is `ensureModsMarketplaceStep` in `settings/hooks/ensure-user-guard.mjs`, the third step of the session start after
+the guard and effort, each inside `guardStep`, so a throw in one costs the others and the exit code nothing. Its code is
+`settings/hooks/lib/mods-marketplace.mjs`, loaded by a dynamic `import()` when the step runs, never a static import. A lib
+that does not load (a missing file, a syntax error) or throws is not swallowed: the step turns it into one refusal line
+with the error's code, said at every start while it lasts (nothing can record that it was said), and the guard and effort
+steps still run. The step is skipped, in this order, for `AGENT_MODELS_MOD=off` (trimmed, any case), for win32 (Windows is
+parked: the mod is not tested there), and for the conventions repository itself, which is decided on the project's own
+`.claude/hooks/subagent-model.mjs`, the file the guard step uses. It reads nothing from the project: a consumer's
+`.agents/conventions` is not looked at. `SUBAGENT_MODEL_GUARD=off` does not skip it. The lib imports only `node:` builtins
+and `./user-guard-install.mjs`, starts no child process, opens no connection and sets no timer, and reads no environment
+variable of its own: the caller passes the home and the environment, and `paths` builds every path it may read, write or
+delete. `SPEAKING` holds `installed`, `upgraded`, `refused`, `newer`, `repaired`, `converged`, `edited`, `registered`,
+`retired`, `removed`, `updated` and `told`.
 
-Only the released copy is installed. `RELEASED_MOD` in `settings/hooks/lib/agent-models-decide.mjs` is a version and the
-raw sha256 of each `MOD_FILES` entry; it equals the newest row of `tools/agent-models-pins.json`, and that row equals
-the files of `mods/agent-models` (tests fail when either drifts), and `.gitattributes` holds the folder at `eol=lf` so
-the raw bytes are the same on every checkout. `readSource` (`agent-models-read.mjs`) reads the source folder once and
-runs the released check on the bytes it returns; the copy writes only those bytes. A source that differs is refused
-naming the first file that differs (or the version), and nothing is copied.
+**Registration.** Only keys that are absent are written: `extraKnownMarketplaces["dew-flow-mods"]`, a git source at the
+`release` ref of the `dew_flow_mods` URL with `autoUpdate: true` (`anchorEntry()`, the one builder), and
+`enabledPlugins["agent-models@dew-flow-mods"]: true`. An entry equals the anchor only when its `source` has exactly the keys
+`source`, `url` and `ref` with those values. A `false` plugin switch is the person's and is never turned on (silent, and no
+retirement); a `dew-flow-mods` entry that differs from the anchor is left as it is and named once; an unparsable file, a file
+that is not an object, or an `env`, `extraKnownMarketplaces` or `enabledPlugins` that is not an object is refused with
+nothing written. A new top-level key goes last and every other member keeps its place. A missing `settings.json` is created
+holding only the two keys. **At most one settings write per start:** the first of the registration, step 1 and step 2 that
+applies.
 
-The step is `ensureAgentModelsMod` in `settings/hooks/ensure-user-guard.mjs`, the third step of the session start after
-the guard and effort, each inside `guardStep`, so a throw in one costs the others and the exit code nothing. The step is
-async: it loads the mod's four modules with a dynamic `import()` when it runs, never a static import, so a load failure
-(a missing sibling, a syntax error) is a silent skip of this step alone, and a call failure is a throw that `guardStep`
-isolates; both leave the guard and effort steps and the exit code as they are. The source
-is `<project>/.agents/conventions/mods/agent-models`, found from the project's `.claude/hooks/subagent-model.mjs`. It is
-skipped, in this order, for `AGENT_MODELS_MOD=off` (trimmed, any case), for win32 (the mod says Windows is not tested;
-macOS is not skipped and not tested either), for the conventions repository itself, for the
-`~/.claude/mods/agent-models.optout` marker and for a project without the mod folder (a submodule that is not
-initialised; silent). The reference test is made on the project's own hook path, the file the guard step uses, and never
-on the mod's folder: a consumer's `.agents/conventions` has this repository's layout, so a test on the mod would skip
-every consumer. `SUBAGENT_MODEL_GUARD=off` does not skip the step. `SPEAKING` holds `installed`, `upgraded`, `refused`,
-`newer`, `repaired`, `converged`, `edited` and `registered`.
+**The one road.** Every write of `settings.json` ends in `commitSettings` of `settings/hooks/lib/user-guard-install.mjs`,
+the road of the guard's three operations (install, repair, uninstall) and of this registration; the effort write
+(`writeConverged`) is separate and a recorded follow-up. It runs the test seam, reads the bytes again and resolves the write
+target again (a difference in either answers "changed while registering", written nothing, the next start tries again),
+runs the backup only when a write follows, and writes atomically at the real file with the file's own mode. A missing file
+is created by a hard link, which fails when the name is taken: a file another writer created meanwhile is never replaced,
+and where hard links are not available nothing is created and the refusal names the code and says the filesystem cannot make
+the hard link; it is for a person to fix, because no later start can make the link. A chain of links is written at its last
+target and every link stays; a dangling chain, a loop, a chain of more than 40 links and an unwritable file or folder are
+refused for a person to fix. `tools/user-guard-road.test.mjs` holds these cases.
 
-The copy (`agent-models-install.mjs`, its decisions in `agent-models-decide.mjs`, the swap in `agent-models-swap.mjs`)
-installs when the folder is missing and upgrades an older version by a rename swap, and never downgrades. The old folder
-is renamed aside, and when it holds a copy that differs from its install record it is kept as one
-`agent-models.replaced-<stamp>` folder (the older one is removed). The swap reads the version it moved aside: when that
-is newer than its own, another session start installed it a moment ago, so it goes back to its name, the staging folder
-is dropped and the registration goes on as for a lost race. The same when the version of that folder cannot be read now
-although the decision read one (it may be that newer copy, half seen); a folder that was already unreadable at the
-decision is a broken copy, which is what an upgrade replaces. When the put-back itself fails the line names the folder and
-says to rename it back by hand; until then a later start installs this repository's older copy and may remove the newer
-folder as a leftover (no marker guards that). A symlinked, foreign-owned or non-directory target is
-refused, never renamed or deleted through; staging and aside leftovers of an interrupted swap are removed at a later
-start once they are old enough.
+**The proof, then the retirement.** The old copy is retired only when the engine's own record shows that the mod is
+installed. The step reads, never writes, the engine's two files under the plugins root (`CLAUDE_CODE_PLUGIN_CACHE_DIR` when
+it is a non-empty string, else `~/.claude/plugins`): `known_marketplaces.json` must hold the `dew-flow-mods` entry equal to
+the anchor, and `installed_plugins.json` (version 2) must hold exactly one user-scope record for the plugin whose `installPath`
+lies inside the plugin cache, is a real directory, and holds a `.claude-plugin/plugin.json` of that name and version and no
+`.orphaned_at`. A shape the step does not know is "no proof", never a guess. The states, read from disk at every start:
 
-The registration ends in `commitSettings` of `settings/hooks/lib/user-guard-install.mjs`, the one road of the guard's three
-operations (install, repair, uninstall) and of the mod's registration; the effort write is separate (below). It runs the test seam, reads the bytes again
-and resolves the write target again (a difference in either is refused, or settled when the file now lists the
-folder), runs the backup only when a write follows, and writes atomically at the real file with the file's own mode. The
-value rule: the folder is appended once to a string of paths joined by `path.delimiter`; an entry equal to it after
-`normalise` and `~/` expansion means nothing to do; a non-string value or a non-object `env` is refused with nothing
-written; the first registration into an empty value carries the session's own variable over, because the settings
-value replaces the shell's. A missing `settings.json` is created holding only that key (so a session with the guard
-switched off still loads the mod), by a hard link, which fails when the name is taken: a file another writer created
-meanwhile is never replaced, and where hard links are not available nothing is created and the refusal names the code and
-says the filesystem cannot make the hard link: it is for a person to fix, because no later start can make the link. A
-chain of links is written at its last target and every link stays; a dangling chain is a retry and creates nothing; a
-loop, a chain of more than 40 links and an unwritable file or folder are refused for a person to fix. The effort
-convergence (`writeConverged`) keeps its own write and is not on this road (a recorded follow-up).
+1. Registered, proof not whole: nothing is touched. After three days with no install record the manual command
+   (`claude plugin install agent-models@dew-flow-mods`) is said once.
+2. Proof whole, `agent-models@inline` absent: **step 1.** The tombstone, a JSON file at
+   `~/.claude/mods/agent-models.optout` made by an exclusive create and read back, so that a session on an older pin, which
+   stops at that marker, does not install the mod again; then `enabledPlugins["agent-models@inline"] = false`, which stops the
+   old copy from hiding the marketplace copy. Only after the read-back says the marker is ours. A marker that is not ours (an
+   empty file, a folder, a link, other JSON) is the person's: nothing at all is written, not even the state file.
+3. 24 hours after step 1: **step 2.** The old folder is judged: a real directory of the user, a record that vouches for at
+   least one file, every file the record names present with its recorded sha256, only files and folders inside, at most 500
+   entries. Then our entry leaves `env.CLAUDE_CODE_PLUGIN_DIRS` (other entries verbatim and in order; the key goes when the
+   value is empty), the folder is renamed aside and deleted, then its record and its reported file. Files the record does
+   not name go with the folder. A folder that fails the judgement is left with its entry and named once; a link is never
+   touched.
 
-Every refusal and every registration line is said once. `agent-models.reported.json` in `~/.claude/mods` holds one
-`{ key, at }`, overwritten: an edited or newer copy is keyed on its state and the repository version, a symlinked target
-on its link text, any other refusal on `line:` and the digest of its line (the random part of a swap's staging and aside names and the stamp of a
-`replaced-` name left out), so a new reason, version or digest is a new line and the same one is silent, a retry refusal
-included. "Said once" is once each time a bad state is entered: a run that ends with no refusal (the copy none, installed,
-upgraded or only its record written, and the registration none or appended) forgets the record, so the same refusal after
-a fix is said again. An edited or newer copy keeps its record. A refusal before the mods folder is known good records only when that folder can
-be made, never through a symlink; otherwise the line stands at every start. A source that is not the released mod makes
-the step add the advice to run `git submodule update`, which names the layout and so lives in the step, not in the
-installer. There is no reminder after the first showing; a stale submodule is shown once, and the consumers' `pin-check`
-and `adapter-check` catch it in CI.
+`INLINE_ID` set to `true` by the person, a `conflict`, an `off` switch and a proof with a reason keep the old copy as it is.
+The tombstone is written on a machine with no old folder too. Interrupted runs finish at the next start: a kill after the
+tombstone, after the settings write or between the rename and the delete is swept.
+
+**What the person is told.** The lines are the constants of `LINES` in the lib, each said once per state entered (the store
+is `~/.claude/mods/dew-flow-mods.seen.json`, with `registeredAt`, `retiredAt`, `version` and a `said` map; an old-pin session
+deletes `agent-models.reported.json` at every clean start, so that file is not used): `registered`, `retired`, `removed`,
+`updated` (`agent-models updated 1.6.0 → 1.6.1 (dew_flow_mods release)`, silent at first sight), the `told` lines
+(`conflict`, `autoUpdateOff`, `inline-true`, a proof reason, `left`, the three-day wait, the shell's own variable still
+listing the removed folder) and the `refused` lines. A failed state write is tolerated: a line may repeat and a clock may
+start again, and a lost file never hastens step 2.
+
+**Trust.** Whatever the `release` ref of `dew_flow_mods` holds runs with the owner's permissions, outside any sandbox, in
+every interactive session on every machine that registered the marketplace, about ten minutes plus one restart after it
+moves. This repository keeps no hash or signature of the mod: a table here would need a conventions release for each mod
+version, which the move exists to end. The control is the gate on that ref in `dew_flow_mods` (`release` moves only by its
+`promote-release` workflow, from `main`, with the owner's approval in an environment; rulesets on `main`, `release` and
+the version tags), and what this repository adds is visibility: the `updated` line. The owner's approval is not a second
+person while every agent session holds the owner's login, and whoever controls the owner's account or an administration
+token can move `release`; that residual risk is written in the plan, section B, and is not removed by this step. Rollback is
+forward (revert on `main`, raise the version, promote); on one machine `claude plugin disable agent-models@dew-flow-mods`,
+which the step never turns on again.
+
+**What the step does not give.** It asks the engine to install; it never checks that the mod loaded (that is observed by
+hand in a new session). `.orphaned_at` and `CLAUDE_CODE_PLUGIN_CACHE_DIR` are from the engine's documentation and were not
+observed in the probe. A process of the same user can change a file between two of the step's reads: the re-read of
+`commitSettings` and the exclusive tombstone are for honest concurrent sessions only, and an existing `settings.json` that
+another program changes between the road's second read and its rename is replaced, as the guard's own write can be: no lock
+is shared with the host. `CLAUDE_CONFIG_DIR` is not read: the step writes under `os.homedir()`, as the guard step does.
+
+**What the consumers do.** A bump to this release deletes the four retired libs (`.claude/hooks/lib/agent-models-*.mjs`)
+and copies `lib/mods-marketplace.mjs` with the new `ensure-user-guard.mjs`; `tools/adapter-check.mjs` names a retired lib
+that is still there ("retired — delete it") and demands the new lib byte for byte. The frozen copy of the old step in
+`tools/fixtures/retired-installer/` is not wired and is never copied to a consumer: it exists so a test can run the old step
+against the same home as the new one, which proves that the tombstone stops an old-pin consumer.
 
 ## The plan-change-control rule and the change-ledger check (2026-10-29)
 
