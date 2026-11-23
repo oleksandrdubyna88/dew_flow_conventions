@@ -151,10 +151,12 @@ record), no `plugin.json`. Said once (`say`): a record file that is too big, doe
   retirement, said (when nothing can record it, the line stands at every start, as `agent-models-install.mjs:147-150`).
 - **`removable`** (step 2): `oldFolder` is a real directory by `lstat`, owned by `uid()`; `oldManifest` parses to an
   object whose `sha256` is an object with at least one key; every key is a relative path with no `..` part and names a
-  regular file with that sha256; the walk finds only files and folders and at most `MAX_FOLDER_ENTRIES`. Files the
-  record does not name are not judged and go with the folder, as the old upgrade did (Facts). Everything else is
-  `left` with its reason: a link, another owner, not a folder, no record, a named file missing or changed, a link
-  inside, too many entries, a `CLAUDE_CODE_PLUGIN_DIRS` that is not a string.
+  regular file with that sha256; the walk finds only files and folders and at most `MAX_FOLDER_ENTRIES`; and every
+  entry is accounted for — a named file, a folder holding one, a top-level `tsconfig.json`, or `.claude-plugin/types`
+  and what is under it (the engine's own generated files, Facts). Any other entry keeps the folder (code round,
+  2026-11-23: a person's own file there is never deleted). Everything else is `left` with its reason: a link, another
+  owner, not a folder, no record, a named file missing or changed, a link inside, too many entries, an unknown entry
+  (the first one named), a `CLAUDE_CODE_PLUGIN_DIRS` that is not a string.
 - **Sweeps (the in-flight states).** At S4 and S5 a `mods/agent-models.retired-*` real directory of our uid is removed
   (a kill between the rename and the delete), and `oldManifest` and `oldReported` with no `oldFolder` are deleted. A
   folder that stays when our entry is already gone is judged and removed the same way. A link is never touched.
@@ -228,7 +230,7 @@ Fixture words, all built by `tools/lib/mods-marketplace-fixtures.mjs` on an `own
 | M6b | S3 with `retiredAt` absent; unparsable; one hour in the future | the step, then +25 h | first: only `retiredAt` = now written; then step 2 |
 | M6c | S4, but the plugin now `false`; the `known` entry changed; `INLINE_ID` set to `true` | the step | nothing removed (the proof and the switches are read again at step 2) |
 | M7 | S4 with the old folder: a link (its target has files); owned by another uid (`uid` seam); a file; no record; a record key `../x`; a named file changed; a named file missing; a link inside; 501 entries; a variable that is a number | the step, twice | folder, link target, entry and record untouched; `told` once with the reason; `INLINE_ID` stays `false` |
-| M7b | S4, old(1.4.0) with the engine's extras and one more unnamed file | the step | removed whole (the record vouches for the named files) |
+| M7b | S4, old(1.4.0) with exactly the recorded files, `tsconfig.json` and `.claude-plugin/types/claude-code/index.d.ts`; then the same with `notes.txt`, and with an unknown nested folder | the step | only a fully accounted folder is removed; an unknown file keeps it, said once (the first unknown path named) |
 | M8 | reg + old + engine + `INLINE_ID: true`; the same with tomb and 25 h | the step, twice | no tombstone / no removal; `told` once |
 | M9 | S5 and the process's `env.CLAUDE_CODE_PLUGIN_DIRS` lists the old folder; the start that itself did step 2 | the step, twice | `told` once; the step-2 start says only `removed` |
 | U1 | S5, engine 1.6.0; then 1.6.1; then 1.6.1 | three starts | silent (stored); `updated 1.6.0 → 1.6.1`; silent |
@@ -317,7 +319,7 @@ and copies the new one). Every sentence about the old installer goes; a caveat t
    fixture and the parent text stands (decided by the caller, 2026-11-23).
 3. **`autoUpdate` is not part of the anchor** (R8); **step 2 reads the proof again** (M6c); **a missing engine
    marketplace record is "no proof"** (M3) — the stricter readings of the parent's "where it can be read". Recommended.
-4. **Unnamed files go with a vouched folder** (M7b); otherwise this machine's folder is never removed (owner check 1).
+4. **Only a fully accounted folder is removed** (M7b): every file is named by the record with its hash, or is the engine's own (`tsconfig.json` at the top, `.claude-plugin/types/` with its contents); an unknown file keeps the folder, said once (owner check 1).
 5. This document needs its `todo/README.md` row and the link from the parent's E3 line in the commit that adds it.
 
 ## Definition of Done (E3)

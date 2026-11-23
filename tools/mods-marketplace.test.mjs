@@ -185,7 +185,7 @@ test('readProof (X4): the engine alone, as the fixture builds it, is whole; ever
   assert.equal(readProof(paths(h.home, {}), h.readSettings()).whole, false, 'a plugin that is not true is no proof');
 });
 
-test('readOldFolder: missing, removable (the record vouches for every named file), and left with a reason for each way the folder is not what the record says', t => {
+test('readOldFolder: missing, removable (every file is named by the record with its hash, or is one of the engine\'s own), and left with a reason for each way the folder is not what the record says', t => {
   if (!posixOnly(t)) return;
   const h = sandbox(t);
   const p = () => paths(h.home, {});
@@ -193,8 +193,12 @@ test('readOldFolder: missing, removable (the record vouches for every named file
   assert.deepEqual(readOldFolder(p(), uid), { kind: 'missing' });
   h.old('1.4.0');
   assert.deepEqual(readOldFolder(p(), uid), { kind: 'removable' });
-  fs.writeFileSync(path.join(h.oldFolder, 'unnamed.txt'), 'x');
-  assert.equal(readOldFolder(p(), uid).kind, 'removable', 'a file the record does not name is not judged');
+  fs.writeFileSync(path.join(h.oldFolder, 'notes.txt'), 'mine');
+  const kept = readOldFolder(p(), uid);
+  assert.equal(kept.kind, 'left', 'a file the record does not name and the engine did not make keeps the folder');
+  assert.match(kept.reason, /notes\.txt/, 'the first unknown path is named');
+  fs.rmSync(path.join(h.oldFolder, 'notes.txt'));
+  assert.equal(readOldFolder(p(), uid).kind, 'removable', 'the engine\'s own files (tsconfig.json, .claude-plugin/types/**) are accounted for');
   const reason = (change, pattern) => {
     change();
     const found = readOldFolder(p(), uid);
@@ -717,6 +721,8 @@ const LEFT_CASES = [
     return symlinkOrSkip(h.t, other, path.join(h.oldFolder, 'inner'));
   }],
   ['501 entries', h => { for (let n = 0; n < 520; n += 1) fs.writeFileSync(path.join(h.oldFolder, `many-${n}`), 'x'); return true; }],
+  ['a person\'s own file (notes.txt)', h => { fs.writeFileSync(path.join(h.oldFolder, 'notes.txt'), 'mine'); return true; }],
+  ['an unknown nested folder', h => { fs.mkdirSync(path.join(h.oldFolder, 'more')); fs.writeFileSync(path.join(h.oldFolder, 'more', 'unnamed.txt'), 'x'); return true; }],
   ['a variable that is a number', h => { h.mergeSettings({ env: { CLAUDE_CODE_PLUGIN_DIRS: 7 } }); return true; }],
 ];
 
@@ -745,18 +751,17 @@ for (const [name, change, options = {}] of LEFT_CASES) {
   });
 }
 
-test('M7b: S4 with the old 1.4.0 copy, the engine\'s extras and one more unnamed file: removed whole, the record vouches for the named files', t => {
+test('M7b: S4 with exactly the recorded files, tsconfig.json and .claude-plugin/types/claude-code/index.d.ts: removed whole; only a fully accounted folder is removed', t => {
   const h = sandbox(t);
   h.reg();
   h.old('1.4.0');
-  fs.mkdirSync(path.join(h.oldFolder, 'more'), { recursive: true });
-  fs.writeFileSync(path.join(h.oldFolder, 'more', 'unnamed.txt'), 'x');
+  assert.ok(EXTRAS.includes('tsconfig.json') && EXTRAS.includes('.claude-plugin/types/claude-code/index.d.ts'));
+  assert.ok(fs.existsSync(path.join(h.oldFolder, '.claude-plugin', 'types', 'claude-code', 'index.d.ts')));
   h.engine('1.6.0');
   h.retired(at(-25), '1.6.0');
   const result = h.step();
   assert.deepEqual([result.action, h.linesOf(result)], ['removed', [LINES.removed()]]);
   assert.equal(fs.existsSync(h.oldFolder), false);
-  assert.ok(EXTRAS.length > 0);
 });
 
 test('M8: the inline plugin set to true (the person runs the folder copy): no tombstone, told once; with a tombstone and 25 h: no removal, told once', t => {
@@ -1132,7 +1137,8 @@ test('T1 (b): step 2 on a folder of 40 files and 400 KB, in process, takes under
   const h = sandbox(t);
   h.reg();
   h.old('1.4.0');
-  for (let n = 0; n < 40; n += 1) fs.writeFileSync(path.join(h.oldFolder, `bulk-${n}.bin`), Buffer.alloc(10 * 1024, n));
+  fs.mkdirSync(path.join(h.oldFolder, '.claude-plugin', 'types'), { recursive: true });
+  for (let n = 0; n < 40; n += 1) fs.writeFileSync(path.join(h.oldFolder, '.claude-plugin', 'types', `bulk-${n}.bin`), Buffer.alloc(10 * 1024, n));
   h.engine('1.6.0');
   h.retired(at(-25), '1.6.0');
   const started = performance.now();

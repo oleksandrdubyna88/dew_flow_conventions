@@ -295,7 +295,39 @@ function walkProblem(root) {
   return '';
 }
 
-/** What the record vouches for: `{ kind: 'missing' }`, `{ kind: 'removable' }`, or `{ kind: 'left', reason }`. Reads only; the bytes of named files are hashed. */
+/** The engine's own generated files in the old folder: a top-level tsconfig.json, and the folder .claude-plugin/types with everything under it. */
+const ENGINE_FILE = 'tsconfig.json';
+const ENGINE_FOLDER = '.claude-plugin/types';
+
+/**
+ * The first path in the folder (sorted, folders descended in order) that is neither named by the record nor one of the
+ * engine's own; '' when every entry is accounted for. A folder is accounted for when it holds a named file or is the engine's folder.
+ * The walk is already known to hold only files and folders (`walkProblem`), and the named files were hashed by the caller.
+ */
+function unknownEntry(root, named) {
+  const files = new Set();
+  const folders = new Set();
+  for (const relative of named) {
+    const parts = relative.split(/[\\/]/);
+    files.add(parts.join('/'));
+    for (let n = 1; n < parts.length; n += 1) folders.add(parts.slice(0, n).join('/'));
+  }
+  const visit = (dir, prefix) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
+      const relative = prefix === '' ? entry.name : `${prefix}/${entry.name}`;
+      const engine = relative === ENGINE_FOLDER || relative.startsWith(`${ENGINE_FOLDER}/`);
+      if (entry.isDirectory()) {
+        if (!engine && !folders.has(relative)) return relative;
+        const inner = visit(path.join(dir, entry.name), relative);
+        if (inner) return inner;
+      } else if (!(files.has(relative) || (engine && relative !== ENGINE_FOLDER) || relative === ENGINE_FILE)) return relative;
+    }
+    return '';
+  };
+  return visit(root, '');
+}
+
+/** What the record vouches for: `{ kind: 'missing' }`, `{ kind: 'removable' }`, or `{ kind: 'left', reason }`. Reads only; the bytes of named files are hashed. Only a fully accounted folder is removable: every file is named with its hash or is the engine's own. */
 export function readOldFolder(p, uid) {
   try {
     const stat = lstatOrNull(p.oldFolder);
@@ -317,7 +349,9 @@ export function readOldFolder(p, uid) {
       if (typeof digest !== 'string' || sha256(fs.readFileSync(path.join(p.oldFolder, relative))) !== digest) return left(`${relative} was changed after it was installed`);
     }
     const problem = walkProblem(p.oldFolder);
-    return problem ? left(problem) : { kind: 'removable' };
+    if (problem) return left(problem);
+    const unknown = unknownEntry(p.oldFolder, Object.keys(sums));
+    return unknown ? left(`it holds ${unknown}, which neither its install record nor the engine made`) : { kind: 'removable' };
   } catch (e) {
     return left(`it could not be read (${codeOf(e)})`);
   }

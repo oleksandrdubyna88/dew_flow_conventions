@@ -25,8 +25,8 @@ export const D = path.delimiter;
 
 /** The seven files of the 1.4.0 mod the old installer vouched for (names only: the bytes here are fixtures). */
 export const OLD_FILES = ['.claude-plugin/plugin.json', 'hooks/hooks.json', 'hooks/register.tsx', 'hooks/prompts.ts', 'hooks/tasks.tsx', 'hooks/limits.tsx', 'types/index.d.ts'];
-/** What the engine puts in the folder that the old record does not name. */
-export const EXTRAS = ['tsconfig.json', '.claude-plugin/types/x.d.ts'];
+/** What the engine puts in the folder that the old record does not name: a top-level tsconfig.json and the folder .claude-plugin/types with its contents (read on this machine, 2026-11-23). */
+export const EXTRAS = ['tsconfig.json', '.claude-plugin/types/claude-code/index.d.ts'];
 
 /** The folder a `readdirSync` entry sits in: `parentPath` from Node 20.12, `path` before it (the repository accepts Node 20+). */
 export const direntFolder = entry => entry.parentPath ?? entry.path;

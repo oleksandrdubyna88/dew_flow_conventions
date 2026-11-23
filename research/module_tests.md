@@ -245,7 +245,7 @@ and its epics.
 
 The marketplace step (2026-11-23, `todo/PLAN_dew_flow_mods_E3.md`) has one test file per part, all with temporary homes
 made by `ownedDir` through `tools/lib/mods-marketplace-fixtures.mjs` (never `os.homedir()`, never the real `~/.claude`), and
-each case was run red before its code. `tools/mods-marketplace.test.mjs` (101 cases) runs `settings/hooks/lib/mods-marketplace.mjs`
+each case was run red before its code. `tools/mods-marketplace.test.mjs` (103 cases) runs `settings/hooks/lib/mods-marketplace.mjs`
 in process: the registration (R1–R9: no file, other keys kept in place with one backup, already registered, the person's
 `false`, a differing entry, refused shapes, the skips, a link), the proof and the retirement (M1–M9: no install record, an
 incomplete install in each way, a record naming another source, the whole proof writing the tombstone then `false`, a stop
