@@ -11,6 +11,7 @@ import { cleanPrompts, reasonLine } from './prompts'
 
 export const PIN_LIMIT = 50
 export const TEXT_MAX = 60 // the cut of a pin's text and of the question's text, the ellipsis included
+export const PREFIX_MAX = 4096 // a block's text is read this far and no further: a streamed answer is drawn again on every chunk
 export const PIN_ICON = '\u{1F4CC}' // pinned: the picture
 export const PIN_ICON_OFF = '\u{1F4CC}︎' // not pinned: the text form, drawn in the grey of its Text where the terminal honours it
 export const PIN_COLOR = '#E3256B' // raspberry
@@ -36,15 +37,25 @@ export async function currentPins($: EngineInterface): Promise<readonly Pin[]> {
 
 // --- pure ---
 
-/** `text` as it is, or cut to `TEXT_MAX` characters (an ellipsis is the last one); a cut never splits a character. */
+/** `text` as it is, or cut to `TEXT_MAX` characters (an ellipsis is the last one); a cut never splits a character. Reads at most `TEXT_MAX + 1` characters. */
 export function cutText(text: string): string {
-  const chars = [...text]
-  return chars.length <= TEXT_MAX ? text : `${chars.slice(0, TEXT_MAX - 1).join('')}…`
+  let head = ''
+  let count = 0
+  for (const char of text) {
+    if (count === TEXT_MAX) return `${head}…` // a 61st character: the text is cut after the first 59
+    if (count < TEXT_MAX - 1) head += char
+    count += 1
+  }
+  return text
 }
 
-/** The first content line of a markdown block: blank lines and fence lines skipped, the line's marks dropped, spaces collapsed, cut. '' when none. */
+/**
+ * The first content line of a markdown block: blank lines and fence lines skipped, the line's marks dropped, spaces collapsed, cut. ''
+ * when none. Only the first `PREFIX_MAX` characters are read (a streamed answer is drawn again on every chunk): a first content line
+ * that starts past them gives ''.
+ */
 export function headLine(text: string): string {
-  for (const raw of text.split('\n')) {
+  for (const raw of text.slice(0, PREFIX_MAX).split('\n')) {
     const line = raw.trim()
     if (line === '' || FENCE.test(line)) continue
     const bare = line.replace(LINE_MARKS, '').replace(/\s+/g, ' ').trim()
@@ -53,9 +64,9 @@ export function headLine(text: string): string {
   return ''
 }
 
-/** What a pin of a block shows, or undefined when the block gets no pin: empty when clean, or an engine notice. */
+/** What a pin of a block shows, or undefined when the block gets no pin: empty when clean, or an engine notice. Reads the first `PREFIX_MAX` characters only (a reminder block that is not closed inside them is kept as text). */
 export function pinText(raw: string): string | undefined {
-  const clean = cleanPrompts([raw])[0]
+  const clean = cleanPrompts([raw.slice(0, PREFIX_MAX)])[0] // the prefix first: the clean-up and the split never meet the whole answer
   if (clean === undefined || NOTICE.test(clean)) return undefined
   const head = headLine(clean)
   return head === '' ? undefined : head
@@ -110,12 +121,20 @@ async function tell($: EngineInterface, text: string): Promise<void> {
   }
 }
 
-// `update` is the first call (no `await` before it). `dropped` is set by every run of the change function (`update` may run it again on a
-// version miss), so it is what the write that landed dropped; the toast comes after the write.
+let generation = 0 // bumped by a session end: a press that began before it is no writer of the pins any more (as answer.tsx's `generation`)
+
+// `update` is the first call (no `await` before it; `mine` is read before it). `dropped` is set by every run of the change function
+// (`update` may run it again on a version miss), so it is what the write that landed dropped; the toast comes after the write. A run
+// after a session end (a press whose write was late, then retried) returns the value as it is and drops nothing.
 async function change($: EngineInterface, next: (cur: readonly Pin[]) => { list: readonly Pin[]; dropped?: Pin }): Promise<void> {
   const run: { dropped?: Pin } = {}
+  const mine = generation
   try {
     await update($, pins, cur => {
+      if (mine !== generation) {
+        run.dropped = undefined
+        return cur
+      }
       const step = next(listOf(cur))
       run.dropped = step.dropped
       return step.list
@@ -138,6 +157,7 @@ export async function unpin($: EngineInterface, id: string): Promise<void> {
 
 /** At a session end (a `/clear` raises no `session.start`): no pins. Never rejects. */
 export async function clearPins($: EngineInterface): Promise<void> {
+  generation += 1 // before the write: a press still in flight stops writing
   try {
     await update($, pins, () => [])
   } catch {

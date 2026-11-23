@@ -121,6 +121,20 @@ the icon alone, with no `[ ]` frame (types: "a one-glyph label is then a control
   `▾`), `accountRowCells` (the label's drawn width with the arrow), the press tests move to the first list row.
 - No promotion and no bump (the owner's order above).
 
+## Follow-ups (code-round findings not taken; each would change the approved design)
+
+- A pin pressed while its answer still streams keeps the text shown at the press; refreshing it when the answer
+  finishes needs a state write outside a press. Today: unpin and pin again.
+- A refused write of the list flag shows nothing; the next press tries again. A toast for it is not built.
+- A refused `session.end` write of `pins` leaves old rows that toast a deny when pressed (session-scoped state; rare).
+- Each pin toggle redraws every answer row that reads `pins` (in-memory reads; the owner saw no lag); a per-row
+  subscription (`StateFamily`) if a long session shows lag.
+- The existing account test R4 (`tests/account-retry.test.tsx`, a timer test) fails about once in eight runs of
+  `claude plugin test`; it failed in the 1.5.0 build too (before any pin code), so it is not 1.6.0's. The mod tests do
+  not run in CI; a fix of its timing is a follow-up.
+- A first content line that starts past the first 4096 characters of an answer gives no pin (the bounded parse of the
+  final code round).
+
 ## Files
 
 New `mods/agent-models/hooks/pins.tsx`, `tests/pins.test.tsx` (and fixtures as needed); `hooks/answer.tsx`,
@@ -185,6 +199,6 @@ tests; `settings/hooks/lib/agent-models-decide.mjs` + `.claude/hooks/lib/agent-m
 - [ ] Plan round advanced; Opus plan review folded.
 - [x] Tests P1–P13 (with P5c–P5f), L1–L12 (with L4b, L8b), T10b, I1, R1 green (389 mod cases); RED seen first for each new case.
 - [x] All checks of build order 4 green (`tsc`: no new error in hooks/ or types/).
-- [ ] Code round advanced; Opus code review done; findings fixed or answered.
+- [x] Code round advanced; Opus code review done; findings fixed or answered (coai proceed twice; Opus: nothing above low).
 - [ ] PR merged with green checks and no open thread. No promotion (the owner's order).
 - [ ] Owner checks reported after the move; this plan promoted to `research/` with what shipped differently.

@@ -52,7 +52,7 @@ export const RELEASED_MOD = Object.freeze({
     'hooks/tasks.tsx': '52541431aad684757fac626a5c6d3231d7b633ff14d96efdc0d9dfbd0659e4cb',
     'hooks/limits.tsx': '764e1126be2cd9df4e16201177feb57482624795c7a36b12d3a7a68e883df366',
     'hooks/answer.tsx': 'f67b20f4d833b1aea0fa49ed943f9b8a2212887be935e42c1ff00b76fec06578',
-    'hooks/pins.tsx': '5b9d28eb7be43c7879ccc59979a55a3aad418803138e28576b6a54522100dbb5',
+    'hooks/pins.tsx': '1acb14aec894435c390bec8dec3d63d47d0d5fae387b2b489458e7fe069676e7',
     'types/index.d.ts': '0d3769c187c46f83bf51c130ae2184433ebcfa8052fb6c80a00d61ea5d5aeb31',
   }),
 });

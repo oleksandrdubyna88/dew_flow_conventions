@@ -1,7 +1,8 @@
 import { expect, test } from 'claude-code/testing'
 import type { UiScrollArgs, UiScrollResult } from 'claude-code'
 
-import { droppedPin, headLine, nextPins, PIN_LIMIT, pinPress, pinText, runPress } from '../hooks/pins'
+import { cutText, droppedPin, headLine, nextPins, PIN_LIMIT, pinPress, pinText, PREFIX_MAX, runPress } from '../hooks/pins'
+import { gate, macrotask } from './answer-fixtures'
 import { SURFACES } from './limits-fixtures'
 import {
   A, B, GREY, ICON_OFF, ICON_ON, iconOf, idOf, lastListOpen, lastPins, manyPins, MAIN_SCREEN, mountRow, pin, pinButton, pinWorld,
@@ -315,4 +316,65 @@ test('P13 two text blocks of one reply draw two icons and make two pins, each wi
   expect(lastPins(w)).toEqual([pin(B, 'And the result is above.')])
   await first.unmount()
   await second.unmount()
+})
+
+// --- late work and long answers (1.6.0 final fixes) ---
+
+test('P14 a press whose write is held while the session ends cannot bring the old session\'s pin back', async ($, on) => {
+  const w = pinWorld(on)
+  on('session.end', (_, e) => ({ sessionId: e.sessionId }))
+  const g = gate()
+  let held = 0
+  on('state.set', PINS_KEY, async (_, e, next) => {
+    held += 1
+    if (held === 1) await g.wait // the press's write only; the clear's write goes through
+    return next(e)
+  })
+  const ui = await mountRow($, A, { text: 'the old session' })
+  await ui.press({ key: `pin-${A}` }) // the handler is not awaited by the press: its write waits at the gate
+  for (let i = 0; i < 100 && held === 0; i += 1) await macrotask(5) // until the press's write is issued (and held)
+  expect(held, 'the press reached its write and waits there').toBe(1)
+  await $.session.end({ reason: 'clear', sessionId: 's1', resume: { id: 's1' } })
+  await spin()
+  expect(lastPins(w)).toEqual([])
+  g.release()
+  await spin()
+  await macrotask(20)
+  expect(lastPins(w), 'the late press did not add its pin back').toEqual([])
+})
+
+// A string that records every method the code calls on it: only `slice` may be called (the code reads a bounded prefix first).
+const watched = (text: string): { value: string; touched: string[]; slices: [number, number | undefined][] } => {
+  const touched: string[] = []
+  const slices: [number, number | undefined][] = []
+  const guard = new String(text) as String & Record<string, unknown>
+  for (const name of Object.getOwnPropertyNames(String.prototype)) {
+    const original: unknown = Reflect.get(String.prototype, name)
+    if (name === 'constructor' || name === 'length' || typeof original !== 'function') continue
+    Object.defineProperty(guard, name, {
+      value: (...args: unknown[]) => {
+        if (name === 'slice') slices.push([Number(args[0]), args[1] === undefined ? undefined : Number(args[1])])
+        else touched.push(name)
+        return Reflect.apply(original, text, args)
+      },
+    })
+  }
+  Object.defineProperty(guard, Symbol.iterator, { value: () => { touched.push('iterator'); return text[Symbol.iterator]() } })
+  return { value: guard as unknown as string, touched, slices }
+}
+
+test('P15 a 1 MB answer with a 200 KB first line gives the same label, and only a bounded prefix is read', () => {
+  const text = `${'x'.repeat(200_000)}\n${'y'.repeat(800_000)}`
+  expect(text.length).toBeGreaterThan(1_000_000)
+  const w = watched(text)
+  expect(pinText(w.value)).toBe(`${'x'.repeat(59)}…`)
+  expect(w.touched, 'nothing but slice is called on the full text').toEqual([])
+  expect(w.slices).toEqual([[0, PREFIX_MAX]])
+  expect(pinText(text)).toBe(`${'x'.repeat(59)}…`)
+  expect(PREFIX_MAX).toBeGreaterThanOrEqual(4096)
+  const lazy = watched('z'.repeat(PREFIX_MAX * 2))
+  expect(cutText(lazy.value)).toBe(`${'z'.repeat(59)}…`) // cutText never spreads a long string
+  expect(lazy.touched, 'cutText reads the string through its iterator only').toEqual(['iterator'])
+  expect(headLine(`\n\n${'a'.repeat(PREFIX_MAX + 10)}`)).toBe(`${'a'.repeat(59)}…`)
+  expect(pinText(`${'\n'.repeat(PREFIX_MAX)}late line`), 'a first line past the prefix gets no pin').toBeUndefined()
 })
