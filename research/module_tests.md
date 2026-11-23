@@ -237,7 +237,7 @@ manifest, is completed rather than taken for an edit. The code round of the same
 the hook and a stop after the manifest (the old bytes are its `previous`) are both completed even when the source has
 moved on, every install records `previous`, and a relative source path is checked for uncommitted changes (it named
 a pathspec under the `-C` folder that did not exist); the last three red on the first fix.
-The mod itself is tested by `claude plugin test mods/agent-models` (282 cases at 1.4.0, 341 at 1.5.0, not run by CI): 1.4.0 adds
+The mod itself is tested by `claude plugin test mods/agent-models` (282 cases at 1.4.0, 341 at 1.5.0, 380 at 1.6.0, not run by CI): 1.4.0 adds
 `tests/reset.test.tsx` (the reset time: parse, text, colour bands, the countdown write and redraw, a refused clock, a
 passed reset fetched again), `tests/account-ceiling.test.tsx` and `tests/account-retry.test.tsx` (the read ceilings,
 the generation, a result that lands as the ceiling fires, the tick retry with no clock, a session with no
@@ -255,8 +255,24 @@ manual redraw, also with the 5-hour reset unknown, a passed weekly reset fetched
 the clock minute, not the 5-hour minutes left). The week fixture dates are built from local noon, so the tests pass in any time zone (run with
 `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`). The longer limits line (79 characters) and the wider account row changed the literals and
 row counts of `limits`, `limits-race` and `reset` tests.
-The installer tests name eight files: a 1.4.0 copy upgrades to 1.5.0 with `hooks/answer.tsx` copied (`I1` in `agent-models-install.test.mjs`,
-`I8`–`I10` in `agent-models-decide.test.mjs`), and the 1.5.0 pin row carries the new file.
+1.6.0 adds `tests/pins.test.tsx`, `tests/answer-list.test.tsx` and `tests/pins-fixtures.tsx` (P1–P13, L1–L12, Q1–Q2, 39 cases): the pin text (first content
+line, heading, quote, list and fence marks dropped, cut to 60 characters with an ellipsis that is the 60th, a cut never splits a character, an
+engine notice or an empty block has none), the 50-pin cap (the 51st press drops the oldest), the grey frameless icon under each text block and the raspberry
+one when pinned on both surfaces, no icon on a summary block, an empty block, an engine notice, an id that is no transcript block's or the terminal's main
+screen, the draw that never writes state, a refused read (grey icon) and a refused write (a toast), the session end that clears the pins and closes the
+list, two blocks of one reply with two pins; the `last answer ▾`/`▴` button and the list under the account row (the question first, then the pins oldest
+first, each with an `x`; the first row's text is the clean first line of the question cut to 60, `(sending…)` after the text before a pending one,
+`last question` for a 1.5.0 value with no text, dim `no question yet` with no press), the tasks view, the message viewer and the list closing each
+other, no list on the main screen even when stored open, fifty pins drawn whole, a state stored before 1.6.0. The harness cannot see where the mod's own
+`$.ui.scroll` goes (it rejects with `no implementation for ui.scroll`, which the mod toasts), so a drawn press is seen by that toast under the row's own
+heading, and the target and the order of the call (before any `await`) are tested through `pressLastAnswer` and `pressPin` with fake scroll and toast
+functions. The 1.5.0 tests changed: the stored question now carries its `text` (and a pending one `previousText`), `newestQuestion` answers uuid and text,
+the button's label has the arrow (two cells wider, so the long-email fixture is 102 characters, to stay two rows), and the press test of
+the drawn button now opens the list.
+The installer tests name nine files: a 1.4.0 copy upgrades to 1.5.0 with `hooks/answer.tsx` copied (`I1` in `agent-models-install.test.mjs`,
+`I8`–`I10` in `agent-models-decide.test.mjs`), a 1.5.0 copy of eight files upgrades to 1.6.0 with `hooks/pins.tsx` copied, and a stray `hooks/pins.tsx`
+in the 1.5.0 target is not vouched for (`I14`, `I15` in the install file, `I11`–`I13` in the decide file), and the 1.5.0 and 1.6.0 pin rows carry
+the new files (the agent-models installer files hold 278 tests at 1.6.0, six more than at 1.5.0).
 
 The agent-models mod and its self-install (2026-11-11) have one test file per part, all with temporary homes and
 projects made by `ownedDir` through `tools/lib/agent-models-fixtures.mjs` (never `os.homedir()`, never the real

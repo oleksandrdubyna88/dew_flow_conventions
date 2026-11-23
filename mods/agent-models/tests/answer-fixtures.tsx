@@ -21,11 +21,12 @@ export const macrotask = (ms: number): Promise<void> =>
 /** The stored `lastQuestion` as the engine answered it: an unknown value checked field by field, never cast. */
 const lastQuestionOf = (v: unknown): LastQuestion => {
   if (typeof v !== 'object' || v === null) return null
-  if ('uuid' in v && typeof v.uuid === 'string') return { uuid: v.uuid }
+  if ('uuid' in v && typeof v.uuid === 'string') return { uuid: v.uuid, ...('text' in v && typeof v.text === 'string' ? { text: v.text } : {}) }
   if (!('pending' in v) || typeof v.pending !== 'string') return null
   return {
     pending: v.pending,
     ...('previous' in v && typeof v.previous === 'string' ? { previous: v.previous } : {}),
+    ...('previousText' in v && typeof v.previousText === 'string' ? { previousText: v.previousText } : {}),
   }
 }
 
