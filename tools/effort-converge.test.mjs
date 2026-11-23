@@ -32,12 +32,31 @@ function sandbox(t) {
   const read = () => fs.readFileSync(paths.settings, 'utf8');
   const backups = () => (fs.existsSync(paths.dir) ? fs.readdirSync(paths.dir).filter(f => f.includes('.bak-subagent-model-')) : []);
   const ensure = (env = {}) => ensureEffort({ home, source, env });
-  const run = (env = {}) => spawnSync(process.execPath, [ENTRY], {
-    encoding: 'utf8', input: '{}',
-    env: { ...process.env, HOME: home, USERPROFILE: home, CLAUDE_PROJECT_DIR: project, SUBAGENT_MODEL_GUARD: '', ...env },
+  // Sealed as tools/ensure-user-guard.test.mjs does: the marketplace step is off (tools/mods-marketplace-step.test.mjs holds it), and a
+  // plugin variable of the caller's own shell never reaches the hook.
+  const spawnEnv = (env = {}) => ({
+    ...process.env, HOME: home, USERPROFILE: home, CLAUDE_PROJECT_DIR: project, SUBAGENT_MODEL_GUARD: '', AGENT_MODELS_MOD: 'off',
+    CLAUDE_CODE_PLUGIN_DIRS: '', CLAUDE_CODE_PLUGIN_CACHE_DIR: '', ...env,
   });
-  return { home, project, source, paths, write, read, backups, ensure, run };
+  const run = (env = {}) => spawnSync(process.execPath, [ENTRY], { encoding: 'utf8', input: '{}', env: spawnEnv(env) });
+  return { home, project, source, paths, write, read, backups, ensure, run, spawnEnv };
 }
+
+test('the spawned hook is sealed from the caller\'s environment: the marketplace step is off and the plugin variables are cleared, whatever the test runner has set', t => {
+  const kept = ['AGENT_MODELS_MOD', 'CLAUDE_CODE_PLUGIN_CACHE_DIR', 'CLAUDE_CODE_PLUGIN_DIRS'].map(key => [key, process.env[key]]);
+  Object.assign(process.env, { AGENT_MODELS_MOD: 'on', CLAUDE_CODE_PLUGIN_CACHE_DIR: '/polluted/cache', CLAUDE_CODE_PLUGIN_DIRS: '/polluted/dirs' });
+  try {
+    const env = sandbox(t).spawnEnv();
+    assert.equal(env.AGENT_MODELS_MOD, 'off');
+    assert.equal(env.CLAUDE_CODE_PLUGIN_CACHE_DIR, '');
+    assert.equal(env.CLAUDE_CODE_PLUGIN_DIRS, '');
+  } finally {
+    for (const [key, value] of kept) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
 
 const converged = { effortLevel: 'high', modelSettings: { sonnet: HIGH, opus: HIGH, fable: HIGH } };
 

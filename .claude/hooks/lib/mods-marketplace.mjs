@@ -104,6 +104,7 @@ export const LINES = Object.freeze({
   notRegistered: reason => `agent-models: marketplace NOT registered: ${reason}`,
   notRetired: reason => `agent-models: old copy NOT retired: ${reason}`,
   notRemoved: reason => `agent-models: old copy NOT removed: ${reason}`,
+  deleteFailed: code => `the folder of the old copy, renamed aside, could not be deleted (${code}) — the next start tries again`,
 });
 
 /** The order of the lines of one start, and so of the action: the first kind present. */
@@ -458,13 +459,15 @@ class Outcome {
 
 /** Runs one start. Throws on an unexpected error; `ensureModsMarketplace` turns that into a refusal. */
 function run(options) {
-  const { home, env, now, uid, beforeWrite, beforeMarker, remove, stopAfter } = options;
+  const { home, env, now, uid, beforeWrite, beforeMarker, beforeRename, remove, stopAfter, sessionSource } = options;
   const p = paths(home, env);
   const when = now();
   const nowMs = when.getTime();
   const mods = modsKind(p.mods);
   const marker = mods === 'dir' ? readMarker(p.optout) : 'absent';
   if (marker === 'person') return skipped();
+  // A link (or anything that is not a folder): the step never writes a tombstone through it, so any file there is the person's opt-out.
+  if (mods === 'bad' && fs.existsSync(p.optout)) return skipped();
   const out = new Outcome(mods === 'bad' ? emptyState() : readState(p.state), when);
   const before = stateText(out.state);
 
@@ -615,19 +618,32 @@ function run(options) {
   if (decision.action === 'stamp') out.state.retiredAt = when.toISOString();
   else if (decision.action === 'left') out.tell('told', `left:${digestOf(decision.reason)}`, LINES.left(decision.reason));
   else if (decision.action === 'done') {
-    if (listsOldFolder(env?.[PLUGIN_DIRS_KEY], p, home)) out.tell('told', 'shell', LINES.shell());
+    // Only at a start: a resumed, cleared or compacted session can run on a process env from before step 2, and then the line may be false.
+    if (sessionSource === 'startup' && listsOldFolder(env?.[PLUGIN_DIRS_KEY], p, home)) out.tell('told', 'shell', LINES.shell());
   } else if (decision.action === 'remove') {
-    const result = removeOldCopy({ p, home, settings, decision, commit, remove, stopAfter, when, uid: uid() });
+    const result = removeOldCopy({ p, home, settings, decision, commit, beforeRename, remove, stopAfter, when, uid: uid() });
     if (result.stopped) return { action: 'none', line: '', lines: [] };
-    if (result.removed) out.add('removed', LINES.removed());
+    // "Removed" names the old copy: it is not said next to a refusal that says part of it is still there.
+    if (result.removed && !result.refusal) out.add('removed', LINES.removed());
     if (result.refusal) refused(LINES.notRemoved(result.refusal));
   }
   return finish();
 }
 
 /** Step 2: our entry leaves the variable, the old folder goes by a rename and a delete, then its record and reported file, and what a killed run left. */
-function removeOldCopy({ p, home, settings, decision, commit, remove, stopAfter, when, uid }) {
+function removeOldCopy({ p, home, settings, decision, commit, beforeRename, remove, stopAfter, when, uid }) {
   let removed = false;
+  let deleteFailure;
+  /** The delete of a folder renamed aside; a failure (a kill, a busy file) is kept to be said, and the sweep of the next start retries. */
+  const tryRemove = target => {
+    try {
+      remove(target);
+      return true;
+    } catch (e) {
+      deleteFailure ??= codeOf(e);
+      return false;
+    }
+  };
   try {
     if (decision.entry) {
       const done = commit(withoutOurEntry(settings, p, home));
@@ -642,50 +658,55 @@ function removeOldCopy({ p, home, settings, decision, commit, remove, stopAfter,
     }
     if (decision.folder) {
       const aside = path.join(p.mods, `${RETIRED_TAG}${when.getTime()}-${process.pid}`);
-      fs.renameSync(p.oldFolder, aside);
-      if (stopAfter === 'rename') return { stopped: true };
-      removed = true;
+      beforeRename();
+      let renamed = true;
       try {
-        remove(aside);
-      } catch {
-        // a kill or a busy file: the sweep of the next start deletes it
+        fs.renameSync(p.oldFolder, aside);
+      } catch (e) {
+        // Two starts at once: the other one took the folder already, and it says what it did; nothing is said here for it.
+        if (e?.code !== 'ENOENT') throw e;
+        renamed = false;
       }
-      if (stopAfter === 'folder') return { stopped: true };
+      if (renamed) {
+        if (stopAfter === 'rename') return { stopped: true };
+        if (tryRemove(aside)) removed = true;
+        if (stopAfter === 'folder') return { stopped: true };
+      }
     }
     if (decision.sweep) {
       for (const entry of readLeftovers(p, uid).retired) {
-        try {
-          remove(path.join(p.mods, entry));
-          removed = true;
-        } catch {
-          // a busy file: the next start tries again
-        }
+        if (tryRemove(path.join(p.mods, entry))) removed = true;
       }
       for (const file of [p.oldManifest, p.oldReported]) {
         if (!isFileAt(file)) continue;
-        fs.rmSync(file);
-        removed = true;
+        try {
+          fs.rmSync(file);
+          removed = true;
+        } catch (e) {
+          if (e?.code !== 'ENOENT') throw e; // two starts at once: the other one removed it
+        }
       }
     }
   } catch (e) {
     return { refusal: `a file could not be removed (${codeOf(e)})`, removed };
   }
-  return { removed };
+  return deleteFailure === undefined ? { removed } : { refusal: LINES.deleteFailed(deleteFailure), removed };
 }
 
 /**
  * One start of the step; never throws. `home` and `env` are the caller's; the other options are test seams: `now` (a Date), `uid`,
- * `beforeWrite` (called before each settings write, as the road's seam), `beforeMarker` (before the tombstone is created), `remove`
+ * `beforeWrite` (called before each settings write, as the road's seam), `beforeMarker` (before the tombstone is created), `beforeRename` (before the old folder is renamed aside), `remove`
  * (the delete of the folder renamed aside) and `stopAfter` (`'tombstone' | 'inline' | 'variable' | 'rename' | 'folder'`: the function
- * returns `none` right after that sub-step and writes nothing more, the disk state of a process killed there).
+ * returns `none` right after that sub-step and writes nothing more, the disk state of a process killed there). `sessionSource` is the
+ * SessionStart payload's `source`: the shell line is said only when it is `startup`.
  * Answers `{ action, line, lines }`; the action is the first of registered, retired, removed, updated, told, refused, else none or skipped.
  */
 export function ensureModsMarketplace({
-  home, env = {}, now = () => new Date(), uid = () => process.getuid?.(), beforeWrite = () => {}, beforeMarker = () => {},
-  remove = target => fs.rmSync(target, { recursive: true, force: false }), stopAfter,
+  home, env = {}, now = () => new Date(), uid = () => process.getuid?.(), beforeWrite = () => {}, beforeMarker = () => {}, beforeRename = () => {},
+  remove = target => fs.rmSync(target, { recursive: true, force: false }), stopAfter, sessionSource,
 } = {}) {
   try {
-    return run({ home, env, now, uid, beforeWrite, beforeMarker, remove, stopAfter });
+    return run({ home, env, now, uid, beforeWrite, beforeMarker, beforeRename, remove, stopAfter, sessionSource });
   } catch (e) {
     const line = LINES.notRegistered(`unexpected error (${codeOf(e)})`);
     return { action: 'refused', line, lines: [line] };

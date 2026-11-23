@@ -790,17 +790,33 @@ test('M9: S5 and the shell\'s own variable still lists the old folder: told once
   a.engine('1.6.0');
   a.retired(at(-48), '1.6.0');
   const env = { CLAUDE_CODE_PLUGIN_DIRS: `/x${path.delimiter}${a.oldFolder}` };
-  const first = a.step({ env });
+  const first = a.step({ env, sessionSource: 'startup' });
   assert.deepEqual([first.action, a.linesOf(first)], ['told', [LINES.shell()]]);
-  assert.deepEqual(silent(a.step({ env })), ['none', '']);
-  assert.deepEqual(silent(a.step({ env: {} })), ['none', ''], 'the variable is clean now');
+  assert.deepEqual(silent(a.step({ env, sessionSource: 'startup' })), ['none', '']);
+  assert.deepEqual(silent(a.step({ env: {}, sessionSource: 'startup' })), ['none', ''], 'the variable is clean now');
   const b = sandbox(t, 'mods-marketplace-m9b');
   b.reg();
   b.old('1.4.0');
   b.engine('1.6.0');
   b.retired(at(-25), '1.6.0');
-  const did = b.step({ env: { CLAUDE_CODE_PLUGIN_DIRS: b.oldFolder } });
+  const did = b.step({ env: { CLAUDE_CODE_PLUGIN_DIRS: b.oldFolder }, sessionSource: 'startup' });
   assert.deepEqual([did.action, b.linesOf(did)], ['removed', [LINES.removed()]]);
+});
+
+test('M9b: the shell line is said only at a start (source startup): a resumed, cleared or compacted session may run on the old value, and says nothing and keeps the line for the next start', t => {
+  const h = sandbox(t, 'mods-marketplace-m9c');
+  h.reg();
+  h.engine('1.6.0');
+  h.retired(at(-48), '1.6.0');
+  const env = { CLAUDE_CODE_PLUGIN_DIRS: `/x${path.delimiter}${h.oldFolder}` };
+  for (const sessionSource of ['resume', 'clear', 'compact', '', 'other', undefined]) {
+    assert.deepEqual(silent(h.step({ env, sessionSource })), ['none', ''], String(sessionSource));
+    assert.equal(Object.hasOwn(stateOf(h)?.said ?? {}, 'shell'), false, `not recorded as said: ${sessionSource}`);
+  }
+  const startup = h.step({ env, sessionSource: 'startup' });
+  assert.deepEqual([startup.action, h.linesOf(startup)], ['told', [LINES.shell()]]);
+  assert.deepEqual(silent(h.step({ env, sessionSource: 'startup' })), ['none', ''], 'said once');
+  assert.deepEqual(silent(h.step({ env, sessionSource: 'resume' })), ['none', '']);
 });
 
 test('U1: S5 with the engine at 1.6.0, then 1.6.1, then 1.6.1: silent (stored), updated 1.6.0 -> 1.6.1, silent', t => {
@@ -899,6 +915,22 @@ for (const kind of ['link', 'file']) {
   });
 }
 
+test('X2: mods is a link that holds the person\'s agent-models.optout: skipped, the home untouched (the marker is read through the link)', t => {
+  const h = sandbox(t);
+  h.reg();
+  h.engine('1.6.0');
+  const elsewhere = path.join(h.root, 'elsewhere');
+  fs.mkdirSync(elsewhere);
+  fs.writeFileSync(path.join(elsewhere, 'agent-models.optout'), '{"mine":true}');
+  if (!symlinkOrSkip(t, elsewhere, h.mods)) return;
+  const before = snapshot(h.home);
+  const beforeLinked = snapshot(elsewhere);
+  for (let n = 0; n < 2; n += 1) assert.deepEqual(silent(h.step({ now: () => at(25 * n) })), ['skipped', '']);
+  assert.deepEqual(snapshot(h.home), before, 'the home is untouched');
+  assert.deepEqual(snapshot(elsewhere), beforeLinked, 'nothing was written through the link');
+  assert.equal(fs.readFileSync(path.join(elsewhere, 'agent-models.optout'), 'utf8'), '{"mine":true}');
+});
+
 test('X3: a person\'s marker appears between the read of the marker and the tombstone: their bytes are kept, the settings untouched, and later starts write nothing', t => {
   const h = sandbox(t);
   h.reg();
@@ -989,20 +1021,53 @@ test('the sweep: a retired-* real folder of our uid is removed at S4; a link of 
   }
 });
 
-test('step 2 with the remove seam failing: no throw, no refusal, the folder stays renamed aside for the sweep, and the next start finishes it', t => {
+test('step 2 with the remove seam failing: no throw, the folder stays renamed aside for the sweep, and the next start finishes it', t => {
   const h = sandbox(t);
   h.reg();
   h.old('1.4.0');
   h.engine('1.6.0');
   h.retired(at(-25), '1.6.0');
   const result = h.step({ remove: () => { throw Object.assign(new Error('boom'), { code: 'EBUSY' }); } });
-  assert.deepEqual([result.action, h.linesOf(result)], ['removed', [LINES.removed()]], 'the entry went and the folder was renamed: that is said');
+  assert.equal(result.action, 'refused', 'the folder was not deleted: "removed" is not said, the failure is');
+  assert.deepEqual(h.linesOf(result), [LINES.notRemoved(LINES.deleteFailed('EBUSY'))]);
   assert.equal(fs.existsSync(h.oldFolder), false, 'renamed aside');
+  assert.equal(h.readSettings().env?.CLAUDE_CODE_PLUGIN_DIRS, undefined, 'the entry went');
   assert.equal(names(h.mods).some(n => n.includes('agent-models.retired-')), true);
   const next = h.step();
   assert.deepEqual(names(h.mods).filter(n => n.includes('agent-models.retired-')), []);
   assert.deepEqual([next.action, h.linesOf(next)], ['removed', [LINES.removed()]]);
   assert.equal(fs.existsSync(h.oldManifest), false);
+});
+
+test('step 2 with a delete that fails and no entry to remove: only the failure is said, once; the sweep of the next starts retries until it deletes, and then says removed', t => {
+  const h = sandbox(t);
+  h.reg();
+  h.old('1.4.0', { variable: false });
+  h.engine('1.6.0');
+  h.retired(at(-25), '1.6.0');
+  const failing = { remove: () => { throw Object.assign(new Error('boom'), { code: 'EACCES' }); } };
+  const first = h.step(failing);
+  assert.deepEqual([first.action, h.linesOf(first)], ['refused', [LINES.notRemoved(LINES.deleteFailed('EACCES'))]]);
+  assert.ok(!h.linesOf(first).includes(LINES.removed()));
+  assert.equal(names(h.mods).some(n => n.includes('agent-models.retired-')), true, 'the folder stays aside');
+  assert.deepEqual(silent(h.step(failing)), ['none', ''], 'said once while it holds');
+  const done = h.step();
+  assert.deepEqual([done.action, h.linesOf(done)], ['removed', [LINES.removed()]]);
+  assert.deepEqual(names(h.mods).filter(n => n.includes('agent-models.retired-')), []);
+  assert.deepEqual(Object.keys(stateOf(h).said ?? {}), [], 'the failure is no longer live: its record is pruned');
+});
+
+test('S4 with two starts at once: the other start took the folder between the read and the rename (ENOENT): no refusal and no line; nothing of the old copy is left', t => {
+  const h = sandbox(t);
+  h.reg();
+  h.old('1.4.0', { variable: false });
+  h.engine('1.6.0');
+  h.retired(at(-25), '1.6.0');
+  const result = h.step({ beforeRename: () => { fs.rmSync(h.oldFolder, { recursive: true }); fs.rmSync(h.oldManifest); } });
+  assert.deepEqual(silent(result), ['none', ''], 'no "NOT removed", no "removed"');
+  assert.equal(fs.existsSync(h.oldFolder), false);
+  assert.deepEqual(names(h.mods).filter(n => n.includes('agent-models.retired-')), []);
+  assert.deepEqual(silent(h.step()), ['none', '']);
 });
 
 test('ensureModsMarketplace never throws: a home that is a file, or holds an impossible path, answers with a result', t => {

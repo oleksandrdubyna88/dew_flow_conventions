@@ -158,6 +158,25 @@ test('the step in the hook calls the lib with the home and the env it was given,
   assert.deepEqual(h.readSettings().extraKnownMarketplaces[MARKETPLACE].source.ref, 'release');
 });
 
+test('M9c: the shell line follows the SessionStart source of the payload: said at startup, never at resume, clear, compact, an unknown source or no payload source', t => {
+  if (!onlyWhereTheStepRuns(t)) return;
+  const h = sandbox(t, 'mods-spawn');
+  const c = consumer(h);
+  h.reg();
+  h.engine('1.6.0');
+  h.retired(at(-48), '1.6.0');
+  const stale = { CLAUDE_CODE_PLUGIN_DIRS: h.oldFolder };
+  for (const input of ['{"source":"resume"}', '{"source":"clear"}', '{"source":"compact"}', '{"source":7}', '{}', 'not json']) {
+    const result = c.run(stale, { input });
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(!c.lines(result).includes(LINES.shell()), input);
+  }
+  const startup = c.run(stale, { input: '{"source":"startup"}' });
+  assert.equal(startup.status, 0, startup.stderr);
+  assert.deepEqual(c.lines(startup).filter(line => line === LINES.shell()), [LINES.shell()]);
+  assert.ok(!c.lines(c.run(stale, { input: '{"source":"startup"}' })).includes(LINES.shell()), 'said once');
+});
+
 test('the hook and the lib are byte-identical in .claude/hooks (adapter-check demands the copies)', () => {
   for (const rel of ['ensure-user-guard.mjs', path.join('lib', 'mods-marketplace.mjs'), path.join('lib', 'user-guard-install.mjs')]) {
     assert.deepEqual(fs.readFileSync(path.join(REPO, '.claude', 'hooks', rel)), fs.readFileSync(path.join(HOOKS_SOURCE, rel)), rel);
@@ -386,6 +405,11 @@ for (const [name, damage, reason] of LIB_FAILURES) {
     assert.deepEqual(c.lines(again), [modsStepRefusal(reason)], 'nothing can record it without the lib: the line stands at every start');
   });
 }
+
+test('W3: the refusal line says the step could not run, with the code, and never that the marketplace is not registered (it may be, on a machine registered before)', () => {
+  assert.equal(modsStepRefusal('ERR_MODULE_NOT_FOUND'), 'agent-models: the dew-flow-mods step could not run (ERR_MODULE_NOT_FOUND) — the old copy is left as it is; copy the hook files of the release again');
+  assert.ok(!modsStepRefusal('x').includes('NOT registered'));
+});
 
 test('the refusal line for a lib that cannot load names no path of the user and starts like the other lines of the step', () => {
   assert.ok(!modsStepRefusal('ERR_MODULE_NOT_FOUND').includes(os.homedir()));

@@ -169,9 +169,12 @@ export function ensureEffort({ home, source, env }) {
 
 const modSwitchedOff = env => String(env.AGENT_MODELS_MOD ?? '').trim().toLowerCase() === 'off';
 
-/** The line for a step that could not run (a lib that does not load, or one that throws); names the reason's code, never a path. */
+/**
+ * The line for a step that could not run (a lib that does not load, or one that throws); names the reason's code, never a path. It does
+ * not say the marketplace is not registered: on a machine registered before, it is.
+ */
 export const modsStepRefusal = reason =>
-  `agent-models: marketplace NOT registered: the step's code (lib/mods-marketplace.mjs) could not run (${reason}) — the old copy is left as it is; copy the hook files of the release again`;
+  `agent-models: the dew-flow-mods step could not run (${reason}) — the old copy is left as it is; copy the hook files of the release again`;
 
 /**
  * The marketplace lib, loaded only when the step runs (never as a static import: a load failure of the lib, a missing file or a syntax
@@ -190,14 +193,14 @@ async function loadModsMarketplace() {
  * Register the `dew-flow-mods` marketplace and retire the old agent-models copy (what it writes and when: `lib/mods-marketplace.mjs`).
  * The "is this the conventions repository" test is made on `source`, the project's `subagent-model.mjs` that the guard step uses. Skipped,
  * each writing nothing: `AGENT_MODELS_MOD=off`, win32 and the reference repository. `SUBAGENT_MODEL_GUARD=off` does NOT skip it.
- * `platform` is a test seam.
+ * `sessionSource` is the SessionStart payload's `source` (`startup`, `resume`, `clear`, `compact`); `platform` is a test seam.
  */
-export async function ensureModsMarketplaceStep({ home, source, env, platform = process.platform }) {
+export async function ensureModsMarketplaceStep({ home, source, env, sessionSource, platform = process.platform }) {
   if (modSwitchedOff(env) || platform === 'win32' || isReferenceRepository(source)) return skipped();
   const { lib, failure } = await loadModsMarketplace();
   if (lib === undefined) return { action: 'refused', line: modsStepRefusal(failure?.code ?? failure?.name ?? 'error') };
   try {
-    return lib.ensureModsMarketplace({ home, env });
+    return lib.ensureModsMarketplace({ home, env, sessionSource });
   } catch (error) {
     return { action: 'refused', line: modsStepRefusal(error?.code ?? error?.name ?? 'error') };
   }
@@ -228,15 +231,26 @@ function payloadCwd(text) {
   }
 }
 
+/** The payload's SessionStart `source`, or '' for anything that is not a JSON object carrying a string one. */
+function payloadSource(text) {
+  try {
+    const source = JSON.parse(text)?.source;
+    return typeof source === 'string' ? source : '';
+  } catch {
+    return '';
+  }
+}
+
 const SPEAKING = new Set(['installed', 'upgraded', 'refused', 'newer', 'repaired', 'converged', 'edited', 'registered', 'retired', 'removed', 'updated', 'told']);
 
 async function main() {
   try {
-    const cwd = payloadCwd(await readStdin());
+    const payload = await readStdin();
+    const cwd = payloadCwd(payload);
     const project = process.env.CLAUDE_PROJECT_DIR || cwd;
     if (!project) return;
     const source = path.join(project, '.claude', 'hooks', 'subagent-model.mjs');
-    const args = { home: os.homedir(), source, env: process.env };
+    const args = { home: os.homedir(), source, env: process.env, sessionSource: payloadSource(payload) };
     // Guard first: on a fresh machine it creates settings.json, which effort then converges and the marketplace step then registers in,
     // all in the same session.
     const lines = [await guardStep(ensureUserGuard, args), await guardStep(ensureEffort, args), await guardStep(ensureModsMarketplaceStep, args)].filter(Boolean);
