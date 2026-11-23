@@ -16,10 +16,12 @@
  *   S2 proof whole, `agent-models@inline` absent -> step 1: the tombstone (exclusive create, read back), then that
  *                                  switch set to false, then `retiredAt` stored                               -> S3
  *   S3 marker ours, inline false, less than 24 h since `retiredAt` -> nothing                                  -> S4
- *   S4 24 h or more             -> step 2: our entry leaves env.CLAUDE_CODE_PLUGIN_DIRS; the old folder, when its files equal its
- *                                  install record exactly, is recorded in the state file (`aside`: the name and the hashes), renamed
- *                                  aside and deleted (only that recorded aside, and only while it still equals the record), then its
- *                                  record and its reported file; any other folder is `left` with its entry, named once  -> S5
+ *   S4 24 h or more             -> step 2: the old folder, when its files equal its install record exactly, is recorded in the
+ *                                  state file (`aside`: the name and the hashes), renamed aside and deleted (only that recorded aside,
+ *                                  and only while it still equals the record); then our entry leaves env.CLAUDE_CODE_PLUGIN_DIRS;
+ *                                  then its record and its reported file. A folder that changed after the first judgement is refused
+ *                                  at the last one: its entry, record and reported file stay. Any other folder is `left` with its
+ *                                  entry, named once                                                                       -> S5
  *   S5 nothing of the old copy left -> the version line when the installed version changed; the shell warning
  * Nothing is written at all (not even the state file) when the person's own opt-out marker is there.
  */
@@ -747,8 +749,9 @@ function run(options) {
 }
 
 /**
- * Step 2: our entry leaves the variable; the old folder is recorded in the state file (`aside`: the name and the hashes of the install
- * record), renamed aside and deleted; then its record and reported file. Only a recorded aside is ever deleted, and each delete is
+ * Step 2: the old folder is recorded in the state file (`aside`: the name and the hashes of the install record), renamed aside and
+ * deleted; then our entry leaves the variable; then the record and the reported file. A recorded aside that is judged changed stops the
+ * step before the entry and the record are touched. Only a recorded aside is ever deleted, and each delete is
  * judged again first: a real folder of our uid whose files are still among the recorded ones. The hashes live in the state file and
  * not in the install record, because the record is deleted by this very step and must not be needed to finish it.
  */
@@ -781,17 +784,6 @@ function removeOldCopy({ p, home, settings, decision, folder, state, saveState, 
     return true;
   };
   try {
-    if (decision.entry) {
-      const done = commit(withoutOurEntry(settings, p, home));
-      if (done.refusal) return { refusal: done.refusal };
-      if (!done.written) {
-        const again = parseSettings(done.now);
-        const settled = decideRegistration(again).action === 'none' && !listsOldFolder(again.settings.env?.[PLUGIN_DIRS_KEY], p, home);
-        return settled ? { removed } : { refusal: LINES.changed('removing') };
-      }
-      removed = true;
-      if (stopAfter === 'variable') return { stopped: true };
-    }
     const earlier = state.aside;
     const earlierGone = !decision.aside || deleteAside(earlier);
     if (decision.folder && earlierGone) {
@@ -818,6 +810,20 @@ function removeOldCopy({ p, home, settings, decision, folder, state, saveState, 
         deleteAside(recorded);
         if (stopAfter === 'folder') return { stopped: true };
       }
+    }
+    // The last judgement of the aside decides what is kept: an aside refused as changed holds the entry, the record and the reported file
+    // (nothing of the old copy is cut away while a part of it is left); the entry leaves only after the folder work is done.
+    if (asideLeft) return { removed, asideLeft };
+    if (decision.entry) {
+      const done = commit(withoutOurEntry(settings, p, home));
+      if (done.refusal) return { refusal: done.refusal };
+      if (!done.written) {
+        const again = parseSettings(done.now);
+        const settled = decideRegistration(again).action === 'none' && !listsOldFolder(again.settings.env?.[PLUGIN_DIRS_KEY], p, home);
+        return settled ? { removed } : { refusal: LINES.changed('removing') };
+      }
+      removed = true;
+      if (stopAfter === 'variable') return { stopped: true };
     }
     if (decision.sweep) {
       for (const file of [p.oldManifest, p.oldReported]) {

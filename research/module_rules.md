@@ -170,17 +170,19 @@ lies inside the plugin cache, is a real directory, and holds a `.claude-plugin/p
    least one file, every file the record names present with its recorded sha256, only files and folders inside, at most 500
    entries, and the folder's files EQUAL the record: every entry is a named file with a matching hash or a folder that holds
    one, and no other entry is trusted, whatever its name or place (not `tsconfig.json`, not `.claude-plugin/types/**`: the
-   parent's "a symlinked, foreign-owned or edited folder is left with its entry and named once"). Then our entry leaves
-   `env.CLAUDE_CODE_PLUGIN_DIRS` (other entries verbatim and in order; the key goes when the value is empty), the folder is
+   parent's "a symlinked, foreign-owned or edited folder is left with its entry and named once"). Then the folder is
    recorded in the state file (`aside`: the name `agent-models.retired-<ms>-<pid>` and the record's hashes), renamed aside and
-   deleted, then its record and its reported file. A folder that fails the judgement is left with its entry and its record, and
+   deleted after it is judged once more; only after that our entry leaves `env.CLAUDE_CODE_PLUGIN_DIRS` (other entries
+   verbatim and in order; the key goes when the value is empty), then its record and its reported file. When the last
+   judgement refuses the aside (a file changed after the first judgement), the entry, the record and the reported file all
+   stay and the aside is named once. A folder that fails the judgement is left with its entry and its record, and
    named once with the first unknown path and how to remove it by hand once the person has checked it; a link is never touched.
 
 `INLINE_ID` set to `true` by the person, a `conflict`, an `off` switch and a proof with a reason keep the old copy as it is.
 The tombstone is written on a machine with no old folder too. Interrupted runs finish at the next start: a kill after the
-tombstone or after the settings write continues; a kill between the rename and the delete is finished by deleting the aside the
+tombstone, after step 1's settings write, or after the folder work continues; a kill between the rename and the delete is finished by deleting the aside the
 state file recorded, and only that one, after it is judged again (a real directory of the user, not a link, its files still among
-the recorded ones). A recorded aside to which a file was added is not deleted and is named once; any other
+the recorded ones). A recorded aside to which a file was added or in which a file was changed is not deleted and is named once, with the entry, the record and the reported file kept; any other
 `agent-models.retired-*` folder is never deleted (named once). A record whose rename never happened is cleared.
 
 **What the person is told.** The lines are the constants of `LINES` in the lib, each said once per state entered (the store

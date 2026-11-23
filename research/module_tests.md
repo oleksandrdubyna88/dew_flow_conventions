@@ -245,11 +245,11 @@ and its epics.
 
 The marketplace step (2026-11-23, `todo/PLAN_dew_flow_mods_E3.md`) has one test file per part, all with temporary homes
 made by `ownedDir` through `tools/lib/mods-marketplace-fixtures.mjs` (never `os.homedir()`, never the real `~/.claude`), and
-each case was run red before its code. `tools/mods-marketplace.test.mjs` (110 cases) runs `settings/hooks/lib/mods-marketplace.mjs`
+each case was run red before its code. `tools/mods-marketplace.test.mjs` (111 cases) runs `settings/hooks/lib/mods-marketplace.mjs`
 in process: the registration (R1–R9: no file, other keys kept in place with one backup, already registered, the person's
 `false`, a differing entry, refused shapes, the skips, a link), the proof and the retirement (M1–M9: no install record, an
 incomplete install in each way, a record naming another source, the whole proof writing the tombstone then `false`, a stop
-after each sub-step, the 24 hours, a folder that is edited or a link or foreign or holds one file more than its record, the engine's `tsconfig.json` and `.claude-plugin/types/**` included (M7, M7b), the person's `true`, the shell's own variable; the sweep: only the aside the state file recorded is deleted, after it is judged again, and a stranger of the same name shape, an aside with a file added, a link and a foreign owner are named and kept),
+after each sub-step, the 24 hours, a folder that is edited or a link or foreign or holds one file more than its record, the engine's `tsconfig.json` and `.claude-plugin/types/**` included (M7, M7b), the person's `true`, the shell's own variable; the sweep: only the aside the state file recorded is deleted, after it is judged again, and the entry leaves only after that delete; a file edited between the first judgement and the rename keeps the aside, the entry, the record and the reported file (M7e); and a stranger of the same name shape, an aside with a file added, a link and a foreign owner are named and kept),
 the lines said once (U1, W1), the lib's own limits (T1: no child process, network, worker or timer, and 40 files under one
 second) and its imports (A3: only `node:` builtins and `./user-guard-install.mjs`, every imported name an export of the guard
 core, one body per helper, `settings.json` only through `commitSettings`); each scan has a companion that finds a planted

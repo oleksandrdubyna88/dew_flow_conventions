@@ -1230,6 +1230,35 @@ test('step 2 with the remove seam failing: no throw, the folder stays renamed as
   assert.equal(fs.existsSync(h.oldManifest), false);
 });
 
+test('step 2: a file edited after the first judgement and before the rename: the aside is not deleted, and the entry, the record and the reported file all stay; the line names the folder as left', t => {
+  const h = sandbox(t);
+  h.reg();
+  h.old('1.4.0');
+  fs.writeFileSync(h.oldReported, '{}');
+  h.engine('1.6.0');
+  h.retired(at(-25), '1.6.0');
+  const settings = fs.readFileSync(h.settings, 'utf8');
+  const record = fs.readFileSync(h.oldManifest, 'utf8');
+  const first = h.step({ beforeRename: () => fs.appendFileSync(path.join(h.oldFolder, OLD_FILES[2]), '// mine\n') });
+  const name = h.readState().aside?.name;
+  assert.match(name, /^agent-models\.retired-\d+-\d+$/);
+  const aside = path.join(h.mods, name);
+  assert.equal(first.action, 'told', first.line);
+  const lines = h.linesOf(first);
+  assert.equal(lines.length, 1);
+  assert.ok(lines[0].includes(name) && /changed/.test(lines[0]) && /by hand/.test(lines[0]), lines[0]);
+  assert.ok(!lines.includes(LINES.removed()), 'removed is not said while a part of the old copy is kept');
+  assert.equal(fs.readFileSync(h.settings, 'utf8'), settings, 'the entry stays: settings.json was not written');
+  assert.equal(h.readSettings().env.CLAUDE_CODE_PLUGIN_DIRS, h.oldFolder);
+  assert.equal(fs.readFileSync(h.oldManifest, 'utf8'), record, 'the install record stays, as it was');
+  assert.equal(fs.existsSync(h.oldReported), true, 'the reported file stays');
+  assert.match(fs.readFileSync(path.join(aside, OLD_FILES[2]), 'utf8'), /\/\/ mine/, 'the edited aside is not deleted');
+  assert.deepEqual(silent(h.step()), ['none', ''], 'said once');
+  assert.equal(fs.readFileSync(h.settings, 'utf8'), settings);
+  assert.equal(fs.existsSync(h.oldManifest), true);
+  assert.equal(fs.existsSync(h.oldReported), true);
+});
+
 test('step 2 with a delete that fails and no entry to remove: only the failure is said, once; the sweep of the next starts retries until it deletes, and then says removed', t => {
   const h = sandbox(t);
   h.reg();
