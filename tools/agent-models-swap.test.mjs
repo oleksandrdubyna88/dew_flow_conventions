@@ -569,7 +569,7 @@ test('5b2: a complete copy at the target whose plugin.json cannot be READ at tha
 // 4.12 a NEWER copy that appears while the swap runs is put back, never replaced (the cadence consultation)
 // ---------------------------------------------------------------------------------------------------------------------
 
-/** What another session's complete install at `version` leaves at the target: the eight files and their install record. */
+/** What another session's complete install at `version` leaves at the target: the nine files and their install record. */
 function anotherSessionInstalls(s, version) {
   writeTree(s.t_.target, version);
   const files = Object.fromEntries(FILES.map(rel => [rel, s.installedBytes(rel)]));

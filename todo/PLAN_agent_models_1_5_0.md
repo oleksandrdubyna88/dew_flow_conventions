@@ -2,7 +2,7 @@
 
 > Status: **EPOCH 2 APPROVED 2026-11-23 by the owner (narrowed)**, after a stop for re-review the same day (the
 > second change, 1.2, should have stopped epoch 1; the plan-lifecycle check of PR #187 found it). The epoch 2
-> fix and the final code round are done; next: the merge of #187, then the owner checks on the branch build. Scope: `mods/agent-models/` (one new hooks file, the band row, the limits line, version 1.5.0, the mod's own
+> fix and the final code round are done; #187 merged 2026-11-23 (`53b0a33`). The release is held by the owner: 1.6.0 first, then the move to `dew_flow_mods` and one round of pin bumps there, then the owner's checks (change 2.1). Scope: `mods/agent-models/` (one new hooks file, the band row, the limits line, version 1.5.0, the mod's own
 > tests), the installer's file list and released-copy table in `settings/hooks/lib/agent-models-decide.mjs` (and its
 > `.claude/hooks` mirror), the new row of `tools/agent-models-pins.json`, the installer tests under `tools/`,
 > `research/module_tests.md`, then one `release` promotion and the pin bumps of the nine consumers. Parent:
@@ -68,6 +68,9 @@ Narrowed: yes — the resume guess, the press to the question before a pending o
 | plan-only commits 91cc7f5, 1c6f3e3, ba5c04d, 13eb0e5, 9bd7d8e | pushed, unmerged | fits | kept (plan text; this record supersedes their design text) |
 
 > Epoch 2 · approved 2026-11-23 · by owner · state: open
+
+- 2.1 · 2026-11-23 · owner · build-order, merge-conditions — the release waits: all the code first (1.6.0), then the move to
+  `dew_flow_mods` and one round of pin bumps there; the owner checks after the rollout, not on the branch build
 
 ## What the code and the engine do today (read 2026-11-22 at `42119f6`, Claude Code 2.1.330)
 
@@ -312,7 +315,7 @@ New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.t
 - [x] The re-review for epoch 2: consult, whole-plan revision, the Opus judge's sort, the document round and an Opus
       plan review; epoch 2 approved by the owner (narrowed).
 - [x] A final code round over the whole branch after the epoch 2 fix (coai proceed, two findings answered; Opus: nothing above low).
-- [ ] PR merged with green checks and no open thread.
-- [ ] Owner checks passed on the branch build; `release` promoted after the owner's word; nine pin bumps merged.
+- [x] PR merged with green checks and no open thread (#187, `53b0a33`, 2026-11-23).
+- [ ] Owner checks after the rollout (change 2.1); the rollout through `dew_flow_mods` and its pin bumps.
 - [ ] The installed mod on this WSL is 1.5.0 after a session start in a consumer.
 - [ ] This plan promoted to `research/` with what shipped differently.

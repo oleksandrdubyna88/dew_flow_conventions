@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine, Mounted } from 'claude-code/testing'
 import type { UiScrollArgs, UiScrollResult } from 'claude-code'
 
-import { accountRowCells, findQuestion, newestQuestion, pressLastAnswer } from '../hooks/answer'
+import { accountRowCells, findQuestion, firstRowPress, newestQuestion, pressLastAnswer } from '../hooks/answer'
 import { VIEWER_NOTE, viewerFixedRows } from '../hooks/prompts'
 import { tasksLabel } from '../hooks/tasks'
 import { TURN } from './account-fixtures'
@@ -32,7 +32,7 @@ for (const surface of SURFACES) {
     const closed = await keysOf(ui)
     expect(closed.indexOf('last-answer')).toBeGreaterThan(-1)
     expect(closed.indexOf('last-answer')).toBeGreaterThan(closed.indexOf('my-tasks'))
-    expect((await ui.find({ type: 'Button', key: 'last-answer' }))?.props.label).toBe('last answer')
+    expect((await ui.find({ type: 'Button', key: 'last-answer' }))?.props.label).toBe('last answer ▾')
     await ui.press({ key: 'my-messages' })
     await ui.redraw()
     const open = await keysOf(ui)
@@ -61,8 +61,8 @@ test('T3 a submit of the person finds its transcript message: lastQuestion is it
   await start($)
   s.rows = [...s.rows, question('Q', 'u1')] // typed after the session start
   await typed($, 'Q')
-  expect(valueOf(s)).toEqual({ uuid: 'u1' })
-  expect(s.writes).toEqual([{ uuid: 'u0' }, { pending: 'Q', previous: 'u0' }, { uuid: 'u1' }]) // the first is the session start's: the newest question then
+  expect(valueOf(s)).toEqual({ uuid: 'u1', text: 'Q' })
+  expect(s.writes).toEqual([{ uuid: 'u0', text: 'earlier' }, { pending: 'Q', previous: 'u0', previousText: 'earlier' }, { uuid: 'u1', text: 'Q' }]) // the first is the session start's: the newest question then
   expect(s.reads.at(-1)).toEqual({ last: 50 })
 })
 
@@ -71,7 +71,7 @@ test('T4 submits that are not the person\'s question change nothing', async ($, 
   await start($)
   s.rows = [question('base', 'ub')]
   await typed($, 'base')
-  expect(valueOf(s)).toEqual({ uuid: 'ub' })
+  expect(valueOf(s)).toEqual({ uuid: 'ub', text: 'base' })
   const before = s.writes.length
   s.rows = [...s.rows, question('note', 'u2'), question('peer', 'u3'), question('plug', 'u4'), question('meta', 'u5'), question('/compact', 'u6'), question('dropme', 'u7')]
   s.drop = 'dropme'
@@ -82,7 +82,7 @@ test('T4 submits that are not the person\'s question change nothing', async ($, 
   await typed($, '/compact', COMPOSER, { command: { name: 'compact', args: '' } })
   await typed($, 'dropme')
   expect(s.writes).toHaveLength(before)
-  expect(valueOf(s)).toEqual({ uuid: 'ub' })
+  expect(valueOf(s)).toEqual({ uuid: 'ub', text: 'base' })
 })
 
 test('T5 a bridge submit after a local one gives the bridge question', async ($, on) => {
@@ -90,10 +90,10 @@ test('T5 a bridge submit after a local one gives the bridge question', async ($,
   await start($)
   s.rows = [question('local', 'u1')]
   await typed($, 'local')
-  expect(valueOf(s)).toEqual({ uuid: 'u1' })
+  expect(valueOf(s)).toEqual({ uuid: 'u1', text: 'local' })
   s.rows = [...s.rows, answer('a1'), question('from the phone', 'u2')]
   await typed($, 'from the phone', { kind: 'bridge' })
-  expect(valueOf(s)).toEqual({ uuid: 'u2' })
+  expect(valueOf(s)).toEqual({ uuid: 'u2', text: 'from the phone' })
 })
 
 test('T6 the same text asked twice: the newer uuid', async ($, on) => {
@@ -101,27 +101,27 @@ test('T6 the same text asked twice: the newer uuid', async ($, on) => {
   await start($)
   s.rows = [question('Q', 'u1')]
   await typed($, 'Q')
-  expect(valueOf(s)).toEqual({ uuid: 'u1' })
+  expect(valueOf(s)).toEqual({ uuid: 'u1', text: 'Q' })
   s.rows = [...s.rows, answer('a1'), question('Q', 'u2')]
   await typed($, 'Q')
-  expect(valueOf(s)).toEqual({ uuid: 'u2' })
+  expect(valueOf(s)).toEqual({ uuid: 'u2', text: 'Q' })
 })
 
 test('T7 a queued submit is pending, then found at turn.start; another at turn.complete', async ($, on) => {
   const s = session(on, [question('first', 'u1')])
   await start($)
   await typed($, 'queued') // not in the transcript yet
-  expect(valueOf(s)).toEqual({ pending: 'queued', previous: 'u1' })
+  expect(valueOf(s)).toEqual({ pending: 'queued', previous: 'u1', previousText: 'first' })
   s.rows = [...s.rows, answer('a1'), question('queued', 'u2')]
   await $.turn.start({ text: 'queued', turnId: 't2' })
   await spin()
-  expect(valueOf(s)).toEqual({ uuid: 'u2' })
+  expect(valueOf(s)).toEqual({ uuid: 'u2', text: 'queued' })
   await typed($, 'queued again')
-  expect(valueOf(s)).toEqual({ pending: 'queued again', previous: 'u2' })
+  expect(valueOf(s)).toEqual({ pending: 'queued again', previous: 'u2', previousText: 'queued' })
   s.rows = [...s.rows, answer('a2'), question('queued again', 'u3')]
   await $.turn.complete(TURN)
   await spin()
-  expect(valueOf(s)).toEqual({ uuid: 'u3' })
+  expect(valueOf(s)).toEqual({ uuid: 'u3', text: 'queued again' })
 })
 
 test('T7b a subagent\'s turn.start never settles the pending question', async ($, on) => {
@@ -147,14 +147,14 @@ test('T8 a session start with no value takes the newest question, not a summary,
     toolRow('u4'),
   ])
   await start($)
-  expect(valueOf(s)).toEqual({ uuid: 'u1' })
+  expect(valueOf(s)).toEqual({ uuid: 'u1', text: 'the real question' })
   expect(s.reads, 'the newest 200 rows first; the engine cap only when none is a question').toEqual([{ last: 200 }])
 })
 
 test('T8b a question typed 200 rows back is found with a read of the engine cap', async ($, on) => {
   const s = session(on, [question('the real question', 'u1'), ...Array.from({ length: 250 }, (_, i) => answer(`a${i}`))])
   await start($)
-  expect(valueOf(s)).toEqual({ uuid: 'u1' })
+  expect(valueOf(s)).toEqual({ uuid: 'u1', text: 'the real question' })
   expect(s.reads).toEqual([{ last: 200 }, { last: 4096 }])
 })
 
@@ -167,7 +167,7 @@ test('T8c a question that starts with a tag is a question; a notification and a 
     question('<agent-message from="x">hi</agent-message>', 'u4'),
   ])
   await start($)
-  expect(valueOf(s)).toEqual({ uuid: 'u1' })
+  expect(valueOf(s)).toEqual({ uuid: 'u1', text: '<b>bold</b> why is this red?' })
 })
 
 test('T9 a session start with a value set (a reload) keeps it', async ($, on) => {
@@ -178,7 +178,7 @@ test('T9 a session start with a value set (a reload) keeps it', async ($, on) =>
   s.rows = [...s.rows, answer('a1'), question('a newer one', 'u9')]
   const before = s.writes.length
   await start($)
-  expect(valueOf(s)).toEqual({ uuid: 'u1' })
+  expect(valueOf(s)).toEqual({ uuid: 'u1', text: 'Q' })
   expect(s.writes).toHaveLength(before)
 })
 
@@ -189,17 +189,17 @@ test('T15 the same text typed again is never the old row: pending with previous,
   await start($)
   s.rows = [question('Q', 'u1')]
   await typed($, 'Q')
-  expect(valueOf(s)).toEqual({ uuid: 'u1' })
+  expect(valueOf(s)).toEqual({ uuid: 'u1', text: 'Q' })
   s.rows = [...s.rows, answer('a1')]
   await typed($, 'Q') // the second Q is not in the transcript yet; the first one is
-  expect(valueOf(s)).toEqual({ pending: 'Q', previous: 'u1' })
+  expect(valueOf(s)).toEqual({ pending: 'Q', previous: 'u1', previousText: 'Q' })
   await $.turn.complete(TURN)
   await spin()
-  expect(valueOf(s), 'a retry does not settle on the old row').toEqual({ pending: 'Q', previous: 'u1' })
+  expect(valueOf(s), 'a retry does not settle on the old row').toEqual({ pending: 'Q', previous: 'u1', previousText: 'Q' })
   s.rows = [...s.rows, question('Q', 'u2')]
   await $.turn.start({ text: 'Q', turnId: 't2' })
   await spin()
-  expect(valueOf(s)).toEqual({ uuid: 'u2' })
+  expect(valueOf(s)).toEqual({ uuid: 'u2', text: 'Q' })
 })
 
 test('T15b after a reload the stored previous is still the boundary (this module has no memory of it)', async ($, on) => {
@@ -212,16 +212,16 @@ test('T15b after a reload the stored previous is still the boundary (this module
   s.rows = [...s.rows, question('Q', 'u2')]
   await $.turn.start({ text: 'Q', turnId: 't3' })
   await spin()
-  expect(valueOf(s)).toEqual({ uuid: 'u2' })
+  expect(valueOf(s)).toEqual({ uuid: 'u2', text: 'Q' })
 })
 
 test('T15c a second submit while pending keeps the question before the first one', async ($, on) => {
   const s = session(on, [question('first', 'u1')])
   await start($)
   await typed($, 'second')
-  expect(valueOf(s)).toEqual({ pending: 'second', previous: 'u1' })
+  expect(valueOf(s)).toEqual({ pending: 'second', previous: 'u1', previousText: 'first' })
   await typed($, 'third')
-  expect(valueOf(s), 'previous is still the settled question').toEqual({ pending: 'third', previous: 'u1' })
+  expect(valueOf(s), 'previous is still the settled question').toEqual({ pending: 'third', previous: 'u1', previousText: 'first' })
 })
 
 // --- the lookup compares what the person typed ---
@@ -249,7 +249,7 @@ test('T23b findQuestion with a boundary and two copies after it takes the newest
 })
 
 test('newestQuestion drops a compaction summary, wrappers and tool results, not a tag the person typed', () => {
-  expect(newestQuestion([question('<b>hi</b>', 'u1'), question(SUMMARY, 'u2'), toolRow('u3')])).toBe('u1')
+  expect(newestQuestion([question('<b>hi</b>', 'u1'), question(SUMMARY, 'u2'), toolRow('u3')])).toEqual({ uuid: 'u1', text: '<b>hi</b>' })
   expect(newestQuestion([question('<agent-message from="x">y</agent-message>', 'u1')])).toBeUndefined()
 })
 
@@ -270,6 +270,15 @@ const fakes = (result: () => Promise<UiScrollResult> = async () => ({})) => {
     },
   }
 }
+
+test('T10b the first row presses by the question\'s uuid, or by the one before a pending question; never by its text', async () => {
+  expect(firstRowPress({ uuid: 'u1', text: 'u2' })).toEqual({ label: 'last answer', id: 'u1' })
+  expect(firstRowPress({ pending: 'u9', previous: 'u1', previousText: 'u2' })).toEqual({ label: 'last answer', id: 'u1' })
+  expect(firstRowPress({ pending: 'u9' }), 'a pending question with nothing before it has no target').toBeUndefined()
+  const f = fakes()
+  await pressLastAnswer(f.scroll, f.toast, { pending: 'Q', previous: 'u1', previousText: 'old' })
+  expect(f.scrolls).toEqual([{ to: { requestId: 'u1' }, block: 'start' }])
+})
 
 test('T10 a press with a uuid scrolls once, at once, with the requestId and block start', async () => {
   const f = fakes()
@@ -324,13 +333,15 @@ test('T12 a press while pending goes to the question before it; with none before
 })
 
 for (const surface of SURFACES) {
-  test(`T12b the drawn button toasts when there is no question yet (${surface})`, async ($, on) => {
+  test(`T12b the drawn button opens a list whose first row says there is no question yet, and toasts nothing (${surface})`, async ($, on) => {
     const s = session(on)
     await start($)
     const ui = await $.ui.mount({ ...BAND, surface, viewport: FULLSCREEN })
     await ui.press({ key: 'last-answer' })
     await spin()
-    expect(s.toasts).toEqual(['last answer: no question yet'])
+    await ui.redraw()
+    expect((await ui.find({ type: 'Text', text: '› no question yet' }))?.props.dimColor).toBe(true)
+    expect(s.toasts).toEqual([])
     await ui.unmount()
   })
 }
@@ -352,7 +363,7 @@ test('T13 a messages read that throws leaves the value and breaks nothing, in ea
   s.isBroken = false
   await $.turn.complete(TURN)
   await spin()
-  expect(valueOf(s)).toEqual({ uuid: 'u1' }) // and it recovers when the read works again
+  expect(valueOf(s)).toEqual({ uuid: 'u1', text: 'Q' }) // and it recovers when the read works again
 })
 
 test('T13b a refused write of lastQuestion breaks nothing and leaves the value as it was', async ($, on) => {
@@ -368,18 +379,18 @@ test('T13b a refused write of lastQuestion breaks nothing and leaves the value a
 
 // --- the viewer counts a wrapped account row ---
 
-const LONG = `${'long.name.'.repeat(10)}@example.com` // 110 characters
+const LONG = `${'long.nam.'.repeat(10)}@example.com` // 102 characters: with the other buttons it wraps to two rows at 80 columns, not three
 
 test('T14 the viewer counts the account row wrapped at its width, not as one row', () => {
   const short = accountRowCells({ account: 'dev@example.com', isKnown: true, isLoginPending: false, tasks: tasksLabel(0), isAnswerShown: true })
-  // [ dev@example.com ]  [ login ]  [ tasks (0) ]  [ last answer ]
-  expect(short).toBe(19 + 2 + 9 + 2 + 13 + 2 + 15)
+  // [ dev@example.com ]  [ login ]  [ tasks (0) ]  [ last answer ▾ ]
+  expect(short).toBe(19 + 2 + 9 + 2 + 13 + 2 + 17)
   expect(viewerFixedRows(80, false, undefined, undefined, VIEWER_NOTE, short)).toBe(viewerFixedRows(80, false, undefined))
   const long = accountRowCells({ account: LONG, isKnown: true, isLoginPending: false, tasks: tasksLabel(0), isAnswerShown: true })
-  expect(long).toBe(LONG.length + 4 + 2 + 9 + 2 + 13 + 2 + 15)
+  expect(long).toBe(LONG.length + 4 + 2 + 9 + 2 + 13 + 2 + 17)
   expect(viewerFixedRows(80, false, undefined, undefined, VIEWER_NOTE, long)).toBe(viewerFixedRows(80, false, undefined) + 1)
   const hidden = accountRowCells({ account: LONG, isKnown: true, isLoginPending: false, tasks: tasksLabel(0), isAnswerShown: false })
-  expect(hidden).toBe(long - 17) // no button, no gap
+  expect(hidden).toBe(long - 19) // no button, no gap
   expect(accountRowCells({ account: 'account ?', isKnown: false, isLoginPending: true, tasks: tasksLabel(3), isAnswerShown: false }))
     .toBe('account ?'.length + 2 + 9 + ' logging in…'.length + 2 + 13)
 })

@@ -34,7 +34,7 @@ function withUmask(mask, run) {
 // 4.2 install, upgrade, no-op, edited, newer
 // ---------------------------------------------------------------------------------------------------------------------
 
-test('a fresh home installs the eight files, writes the manifest last, registers the target and backs settings up once', t => {
+test('a fresh home installs the nine files, writes the manifest last, registers the target and backs settings up once', t => {
   const s = sandbox(t);
   s.writeSettings({ model: 'opus' });
   const r = s.ensure();
@@ -86,11 +86,11 @@ test('an older copy is replaced whole: extra files go with the old folder, the m
   assert.equal(s.readSettings(), settingsBefore);
 });
 
-test('I6: a 1.2.2 install written the five-file way (five files, five-key manifest) upgrades whole: not kept, no replaced- folder, eight files, an eight-key manifest', t => {
+test('I6: a 1.2.2 install written the five-file way (five files, five-key manifest) upgrades whole: not kept, no replaced- folder, nine files, a nine-key manifest', t => {
   const s = sandbox(t, { version: '1.3.0' });
   s.writeSettings(s.registered());
   const files = s.seedTarget({ version: '1.2.2' });
-  const later = ['hooks/tasks.tsx', 'hooks/limits.tsx', 'hooks/answer.tsx'];
+  const later = ['hooks/tasks.tsx', 'hooks/limits.tsx', 'hooks/answer.tsx', 'hooks/pins.tsx'];
   for (const rel of later) {
     fs.rmSync(path.join(s.t_.target, rel));
     delete files[rel];
@@ -111,26 +111,68 @@ test('I6: a 1.2.2 install written the five-file way (five files, five-key manife
   assert.equal(s.manifest().version, '1.3.0');
 });
 
-test('I1: a 1.4.0 install (seven files, a seven-key manifest) upgrades to 1.5.0: not kept, no replaced- folder, hooks/answer.tsx copied, an eight-key manifest', t => {
-  const s = sandbox(t, { version: '1.5.0' });
+test('I1: a 1.4.0 install (seven files, a seven-key manifest) upgrades to 1.6.0: not kept, no replaced- folder, hooks/answer.tsx and hooks/pins.tsx copied, a nine-key manifest', t => {
+  const s = sandbox(t, { version: '1.6.0' });
   s.writeSettings(s.registered());
   const files = s.seedTarget({ version: '1.4.0' });
-  fs.rmSync(path.join(s.t_.target, 'hooks/answer.tsx'));
-  delete files['hooks/answer.tsx'];
-  const seven = FILES.filter(rel => rel !== 'hooks/answer.tsx');
+  for (const rel of ['hooks/answer.tsx', 'hooks/pins.tsx']) {
+    fs.rmSync(path.join(s.t_.target, rel));
+    delete files[rel];
+  }
+  const seven = FILES.filter(rel => rel !== 'hooks/answer.tsx' && rel !== 'hooks/pins.tsx');
   fs.writeFileSync(s.t_.manifest, `${JSON.stringify({
     version: '1.4.0', source: '/somewhere', sha256: Object.fromEntries(seven.map(rel => [rel, sha(files[rel])])), installedAt: '2026-01-01T00:00:00.000Z', by: 'seed',
   }, null, 2)}\n`);
   assert.deepEqual(treeFiles(s.t_.target), [...seven].sort(), 'the seed holds exactly the seven files of 1.4.0');
-  assert.equal(FILES.length, 8);
+  assert.equal(FILES.length, 9);
   const r = s.ensure();
   assert.equal(r.action, 'upgraded');
-  assert.equal(r.line, upgradedLine('1.4.0', '1.5.0'));
+  assert.equal(r.line, upgradedLine('1.4.0', '1.6.0'));
   assert.deepEqual(s.listMods().filter(name => name.includes('agent-models.replaced-')), []);
   assert.deepEqual(treeFiles(s.t_.target), [...FILES].sort());
   assert.deepEqual(s.installedBytes('hooks/answer.tsx'), fs.readFileSync(s.sourceFile('hooks/answer.tsx')), 'the new file is copied');
   assert.deepEqual(Object.keys(s.manifest().sha256), FILES);
-  assert.equal(s.manifest().version, '1.5.0');
+  assert.equal(s.manifest().version, '1.6.0');
+});
+
+/** A 1.5.0 install: the eight files that release held (no hooks/pins.tsx) and an eight-key manifest. */
+function seedEight(s) {
+  const files = s.seedTarget({ version: '1.5.0' });
+  fs.rmSync(path.join(s.t_.target, 'hooks/pins.tsx'));
+  delete files['hooks/pins.tsx'];
+  const eight = FILES.filter(rel => rel !== 'hooks/pins.tsx');
+  fs.writeFileSync(s.t_.manifest, `${JSON.stringify({
+    version: '1.5.0', source: '/somewhere', sha256: Object.fromEntries(eight.map(rel => [rel, sha(files[rel])])), installedAt: '2026-01-01T00:00:00.000Z', by: 'seed',
+  }, null, 2)}\n`);
+  assert.deepEqual(treeFiles(s.t_.target), [...eight].sort(), 'the seed holds exactly the eight files of 1.5.0');
+  return eight;
+}
+
+test('I14: a 1.5.0 install (eight files, an eight-key manifest) upgrades to 1.6.0: not kept, no replaced- folder, hooks/pins.tsx copied, a nine-key manifest', t => {
+  const s = sandbox(t, { version: '1.6.0' });
+  s.writeSettings(s.registered());
+  const eight = seedEight(s);
+  assert.equal(eight.length, 8);
+  const r = s.ensure();
+  assert.equal(r.action, 'upgraded');
+  assert.equal(r.line, upgradedLine('1.5.0', '1.6.0'));
+  assert.deepEqual(s.listMods().filter(name => name.includes('agent-models.replaced-')), []);
+  assert.deepEqual(treeFiles(s.t_.target), [...FILES].sort());
+  assert.deepEqual(s.installedBytes('hooks/pins.tsx'), fs.readFileSync(s.sourceFile('hooks/pins.tsx')), 'the new file is copied');
+  assert.deepEqual(Object.keys(s.manifest().sha256), FILES);
+  assert.equal(s.manifest().version, '1.6.0');
+});
+
+test('I15: a stray hooks/pins.tsx in the 1.5.0 target is not what the eight-key record vouched for: the copy is kept aside, the new one installed', t => {
+  const s = sandbox(t, { version: '1.6.0' });
+  s.writeSettings(s.registered());
+  seedEight(s);
+  fs.writeFileSync(path.join(s.t_.target, 'hooks/pins.tsx'), 'somebody put this here');
+  const r = s.ensure();
+  assert.equal(r.action, 'upgraded');
+  assert.equal(r.line, upgradedLine('1.5.0', '1.6.0', replacedName()));
+  assert.deepEqual(s.installedBytes('hooks/pins.tsx'), fs.readFileSync(s.sourceFile('hooks/pins.tsx')), 'the stray file is replaced by the release\'s');
+  assert.equal(s.listMods().filter(name => name.includes('agent-models.replaced-')).length, 1);
 });
 
 test('an older AND edited copy is replaced, and the line says where the differing copy was kept (A3)', t => {

@@ -12,7 +12,7 @@ import * as decide from '../settings/hooks/lib/agent-models-decide.mjs';
 import { readSource, readTarget } from '../settings/hooks/lib/agent-models-read.mjs';
 import { FILES, escaped, fixtureBytes, fixtureReleased, sandbox, sha, symlinkOrSkip, writeTree } from './lib/agent-models-fixtures.mjs';
 
-test('readSource reads the eight files once and keeps the plugin.json bytes it parsed, and a read that passed holds only a version and files', t => {
+test('readSource reads the nine files once and keeps the plugin.json bytes it parsed, and a read that passed holds only a version and files', t => {
   const s = sandbox(t);
   const read = readSource(s.source, { released: fixtureReleased('1.2.3') });
   assert.deepEqual(Object.keys(read), ['version', 'files']);
@@ -79,14 +79,14 @@ const rewrite = (s, rel, change) => {
   return bytes;
 };
 
-test('3.8 readSource reads each of the eight files exactly once, in MOD_FILES order, never lists the folder, and returns the very Buffers it read', t => {
+test('3.8 readSource reads each of the nine files exactly once, in MOD_FILES order, never lists the folder, and returns the very Buffers it read', t => {
   const s = sandbox(t);
   const reads = t.mock.method(fs, 'readFileSync');
   const lists = t.mock.method(fs, 'readdirSync');
   const read = readSource(s.source, { released: RELEASED });
   const mine = reads.mock.calls.filter(call => String(call.arguments[0]).startsWith(s.source));
   assert.equal(read.error, undefined);
-  assert.equal(mine.length, FILES.length, 'eight reads under the source: a spy that saw nothing fails here');
+  assert.equal(mine.length, FILES.length, 'nine reads under the source: a spy that saw nothing fails here');
   assert.deepEqual(mine.map(call => call.arguments[0]), FILES.map(rel => s.sourceFile(rel)));
   mine.forEach((call, i) => assert.strictEqual(read.files.get(FILES[i]), call.result, FILES[i]));
   assert.equal(lists.mock.callCount(), 0);
@@ -203,7 +203,7 @@ test('3.19 an identity that is missing or malformed refuses, it never passes: nu
 
 test('3.19c an identity with a key outside MOD_FILES refuses, as the manifest check does: the key set must equal MOD_FILES exactly', t => {
   const s = sandbox(t);
-  const extraDigest = sha(Buffer.from('an eighth file'));
+  const extraDigest = sha(Buffer.from('a tenth file'));
   const extra = { ...RELEASED, sha256: { ...RELEASED.sha256, 'hooks/extra.tsx': extraDigest } };
   assert.match(extraDigest, /^[0-9a-f]{64}$/, 'the extra digest is a valid one, so only the extra key can refuse');
   assert.equal(readSource(s.source, { released: RELEASED }).error, undefined, 'the same tree is released under the identity without the extra key');
