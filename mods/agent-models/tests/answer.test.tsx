@@ -7,7 +7,7 @@ import { VIEWER_NOTE, viewerFixedRows } from '../hooks/prompts'
 import { tasksLabel } from '../hooks/tasks'
 import { TURN } from './account-fixtures'
 import { BAND, SURFACES, answerWith, MEASURED, text as drawnText, world } from './limits-fixtures'
-import { answer, COMPOSER, held, KEY, question, session, spin, submitOf, SUMMARY, toolRow, typed, valueOf } from './answer-fixtures'
+import { answer, COMPOSER, held, KEY, question, session, spin, SUMMARY, toolRow, typed, valueOf } from './answer-fixtures'
 
 // The `last answer` button (1.5.0): the band row, the lookup of the owner's last question (a transcript message's uuid kept in
 // state at the person's submit), the press. The harness cannot see where a transcript scroll goes, so the press is tested through
@@ -224,70 +224,6 @@ test('T15c a second submit while pending keeps the question before the first one
   expect(valueOf(s), 'previous is still the settled question').toEqual({ pending: 'third', previous: 'u1' })
 })
 
-test('T16 two submits where the first one\'s write is slow: the value ends at the second', async ($, on) => {
-  const s = session(on, [question('earlier', 'u0')])
-  let release: () => void = () => undefined
-  const gate = new Promise<void>(resolve => {
-    release = resolve
-  })
-  let isHeld = false
-  on('state.set', KEY, async (_, e, next) => {
-    if (!isHeld && JSON.stringify(e.value).includes('"A"')) {
-      isHeld = true
-      await gate // A's write waits
-    }
-    return next(e)
-  })
-  await start($)
-  s.rows = [...s.rows, question('A', 'u1'), question('B', 'u2')]
-  await $.prompt.submit(submitOf('A'))
-  await $.prompt.submit(submitOf('B'))
-  await spin()
-  release()
-  await spin()
-  await spin()
-  const value = await held($, s)
-  expect(value, 'B is the last question').toEqual({ uuid: 'u2' })
-})
-
-test('T17 a question with a long answer after it is found at turn.complete, not at turn.start', async ($, on) => {
-  const s = session(on, [question('earlier', 'u0')])
-  await start($)
-  s.rows = [...s.rows, question('Q', 'u1'), ...Array.from({ length: 60 }, (_, i) => answer(`a${i}`))]
-  await typed($, 'Q') // the newest 50 rows are all answers
-  expect(valueOf(s)).toEqual({ pending: 'Q', previous: 'u0' })
-  await $.turn.start({ text: 'Q', turnId: 't2' })
-  await spin()
-  expect(valueOf(s)).toEqual({ pending: 'Q', previous: 'u0' })
-  expect(s.reads.every(r => r.last !== 4096), 'turn.start reads the newest 50 only').toBe(true)
-  await $.turn.complete(TURN)
-  await spin()
-  expect(valueOf(s)).toEqual({ uuid: 'u1' })
-  expect(s.reads.at(-1)).toEqual({ last: 4096 })
-})
-
-test('T17b the deep read stops at previous: an older row with the same text is not taken', async ($, on) => {
-  const s = session(on, [question('Q', 'u0')])
-  await start($)
-  s.rows = [...s.rows, ...Array.from({ length: 60 }, (_, i) => answer(`a${i}`))]
-  await typed($, 'Q') // the new Q is not in the transcript; u0 is the question before it
-  await $.turn.complete(TURN)
-  await spin()
-  expect(valueOf(s)).toEqual({ pending: 'Q', previous: 'u0' })
-})
-
-test('T18 a session end clears the value; a lookup that lands after it writes nothing', async ($, on) => {
-  const s = session(on)
-  await start($)
-  s.rows = [question('Q', 'u1')]
-  await typed($, 'Q')
-  expect(valueOf(s)).toEqual({ uuid: 'u1' })
-  await $.session.end({ reason: 'clear', sessionId: 's1', resume: { id: 's1' } })
-  await spin()
-  expect(valueOf(s)).toBeNull()
-  expect(await held($, s)).toBeNull()
-})
-
 // --- the lookup compares what the person typed ---
 
 test('findQuestion compares the clean text on both sides, and never matches an empty one', () => {
@@ -297,6 +233,12 @@ test('findQuestion compares the clean text on both sides, and never matches an e
   expect(findQuestion(rows, '<system-reminder>only a reminder</system-reminder>')).toBeUndefined()
   expect(findQuestion([question('<system-reminder>x</system-reminder>', 'u3')], '<system-reminder>y</system-reminder>')).toBeUndefined()
   expect(findQuestion(rows, '   ')).toBeUndefined()
+})
+
+test('findQuestion with no boundary takes the newest copy of the text, not an older one in the window', () => {
+  const rows = [question('Q', 'u1'), question('other', 'u2'), question('Q', 'u3')]
+  expect(findQuestion(rows, 'Q')).toBe('u3')
+  expect(findQuestion(rows, 'Q', 'u1')).toBe('u3') // with a boundary: the one copy newer than it
 })
 
 test('newestQuestion drops a compaction summary, wrappers and tool results, not a tag the person typed', () => {

@@ -10,6 +10,26 @@ import { base, identities, identityOf, ok, spin, statusRuns } from './account-fi
 
 export { spin }
 
+/** A real macrotask wait (the lib has no timer types, so the timer is read off `globalThis` and checked, never cast). */
+export const macrotask = (ms: number): Promise<void> =>
+  new Promise<void>(resolve => {
+    const later: unknown = Reflect.get(globalThis, 'setTimeout')
+    if (typeof later === 'function') later(resolve, ms)
+    else resolve()
+  })
+
+/** The stored `lastQuestion` as the engine answered it: an unknown value checked field by field, never cast. */
+const lastQuestionOf = (v: unknown): LastQuestion => {
+  if (typeof v !== 'object' || v === null) return null
+  if ('uuid' in v && typeof v.uuid === 'string') return { uuid: v.uuid }
+  if (!('pending' in v) || typeof v.pending !== 'string') return null
+  return {
+    pending: v.pending,
+    ...('previous' in v && typeof v.previous === 'string' ? { previous: v.previous } : {}),
+    ...('queued' in v && typeof v.queued === 'number' ? { queued: v.queued } : {}),
+  }
+}
+
 export const KEY = { plugin: 'agent-models', key: 'lastQuestion' } as const
 export const COMPOSER: PromptOrigin = { kind: 'composer' }
 export const SUMMARY = 'This session is being continued from a previous conversation that ran out of context.'
@@ -36,25 +56,31 @@ export type Session = {
   toasts: string[]
   seed: LastQuestion | undefined // a value the session already holds (a hot reload kept it): read until the first write
   read: LastQuestion // what the newest read of the state value answered (see `held`)
+  hold: { last: number; wait: Promise<void> } | undefined // while set, the next messages read of that many rows waits (see `gate`)
 }
 
 /** A session whose transcript, `lastQuestion` writes and toasts the test sees. `$.session.start` is called by the test. */
 export const session = (on: On, rows: SessionMessage[] = []): Session => {
-  const s: Session = { rows, isBroken: false, drop: undefined, reads: [], writes: [], toasts: [], seed: undefined, read: null }
+  const s: Session = { rows, isBroken: false, drop: undefined, reads: [], writes: [], toasts: [], seed: undefined, read: null, hold: undefined }
   base(on)
   identities(on, [() => identityOf('dev@example.com')])
   statusRuns(on, () => ok(JSON.stringify({ loggedIn: false })))
   on('prompt.submit', (_, e) => (e.text === s.drop ? { drop: 'refused' } : { text: e.text }))
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
-  on('session.messages', (_, e) => {
+  on('session.messages', async (_, e) => {
     s.reads.push({ last: e.last })
+    const held = s.hold?.last === e.last ? s.hold : undefined
+    if (held !== undefined) {
+      s.hold = undefined // one read only
+      await held.wait
+    }
     if (s.isBroken) throw new Error('no transcript')
     const all = s.rows
     return { value: e.last === undefined ? all : all.slice(-e.last) }
   })
   on('state.get', KEY, async (_, e, next) => {
     const result = s.seed !== undefined && s.writes.length === 0 ? { value: { value: s.seed, version: 0 } } : await next(e)
-    s.read = result.value?.value ?? null
+    s.read = lastQuestionOf(result.value?.value)
     return result
   })
   on('session.end', (_, e) => ({ sessionId: e.sessionId }))
@@ -67,6 +93,15 @@ export const session = (on: On, rows: SessionMessage[] = []): Session => {
     return { value: undefined }
   })
   return s
+}
+
+/** A promise the test opens later: a handler that awaits `wait` holds its call until `release()`. */
+export const gate = (): { wait: Promise<void>; release: () => void } => {
+  let release: () => void = () => undefined
+  const wait = new Promise<void>(resolve => {
+    release = resolve
+  })
+  return { wait, release: () => release() }
 }
 
 // The value the mod holds: its last write (only the mod writes `lastQuestion`; the harness has no `$.state`); null before the first.

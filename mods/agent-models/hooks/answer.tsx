@@ -32,19 +32,24 @@ const isQuestionRow = (m: SessionMessage): m is SessionMessage & { uuid: string 
   m.role === 'user' && (m.toolResults?.length ?? 0) === 0 && typeof m.uuid === 'string'
 
 /**
- * The uuid of the newest user row whose clean text is `text`, looking back no further than the row `notBefore` (that row and the
- * older ones are an earlier question: the same words asked again are not found until they are in the transcript); undefined if none.
+ * The uuid of a user row whose clean text is `text`, among the rows newer than the row `notBefore` (that row and the older ones are
+ * an earlier question: the same words asked again are not found until they are in the transcript). The matching rows are taken in
+ * transcript order, oldest first, and the answer is the one at index `queued` (0: the first copy; a person who queued the same
+ * words twice gets the second copy with 1); undefined while there are fewer.
  */
-export function findQuestion(rows: readonly SessionMessage[], text: string, notBefore?: string): string | undefined {
+export function findQuestion(rows: readonly SessionMessage[], text: string, notBefore?: string, queued = 0): string | undefined {
   const wanted = cleanPrompts([text])[0] // both sides are compared clean; a text that is empty when clean matches nothing
   if (wanted === undefined) return undefined
+  const found: string[] = [] // newest first
   for (let i = rows.length - 1; i >= 0; i -= 1) {
     const row = rows[i]
     if (row === undefined) continue
-    if (notBefore !== undefined && row.uuid === notBefore) return undefined
-    if (isQuestionRow(row) && cleanPrompts([row.text])[0] === wanted) return row.uuid
+    if (notBefore !== undefined && row.uuid === notBefore) break
+    if (isQuestionRow(row) && cleanPrompts([row.text])[0] === wanted) found.push(row.uuid)
   }
-  return undefined
+  // With a boundary every match is a copy submitted after it: the oldest is the first queued one. With none, older copies of the
+  // same words can be in the window, so the newest is the question.
+  return notBefore === undefined && queued === 0 ? found[0] : found[found.length - 1 - queued]
 }
 
 /** The uuid of the newest row the person typed: not a tool result, a compaction summary or a notification or peer wrapper (a tag the person typed is fine). */
@@ -117,26 +122,38 @@ async function recentRows($: EngineInterface, last: number): Promise<readonly Se
 const previousOf = (cur: LastQuestion): { previous?: string } =>
   cur === null ? {} : 'uuid' in cur ? { previous: cur.uuid } : cur.previous === undefined ? {} : { previous: cur.previous }
 
-// The pending question becomes its uuid, only while it is still that pending question (same text, same `previous`).
-async function settle($: EngineInterface, pending: { pending: string; previous?: string }, uuid: string): Promise<void> {
-  await update($, lastQuestion, cur => (cur !== null && 'pending' in cur && cur.pending === pending.pending && cur.previous === pending.previous ? { uuid } : cur))
+// The same words typed again while they are still pending are the next copy: the lookup takes the row at index `queued`.
+const queuedOf = (cur: LastQuestion, entered: string): { queued?: number } => {
+  if (cur === null || !('pending' in cur)) return {}
+  const [was, now] = cleanPrompts([cur.pending, entered])
+  return was !== undefined && was === now ? { queued: (cur.queued ?? 0) + 1 } : {}
+}
+
+type Pending = { pending: string; previous?: string; queued?: number }
+
+// The pending question becomes its uuid, only while it is still that pending question (same text, same `previous`, same `queued`).
+async function settle($: EngineInterface, pending: Pending, uuid: string): Promise<void> {
+  await update($, lastQuestion, cur => (
+    cur !== null && 'pending' in cur && cur.pending === pending.pending && cur.previous === pending.previous && cur.queued === pending.queued ? { uuid } : cur
+  ))
 }
 
 /**
  * After `next(e)` of a `prompt.submit`: a prompt the person typed (here or through the bridge) becomes the last question. A
  * notification, a peer, a plugin, a meta prompt, a slash command and a dropped prompt leave the value as it is. The value is
  * `pending` (with the question before it as `previous`) while the text is not in the transcript (queued behind a running turn,
- * or typed into one). The pending write is the first thing here, with no `await` before it, so submits write in their order; a
- * write that a newer submit overtook (it retries on a version miss) keeps the newer value. Never rejects.
+ * or typed into one). The pending write is the first thing here, with no `await` before it, so submits start in their order;
+ * the writes may land out of order, and the value is still the newest submit's: the change function checks the generation, and
+ * `update` runs it again on a version miss. Never rejects.
  */
 export async function noteSubmit($: EngineInterface, e: PromptSubmitInput, result: PromptSubmitResult): Promise<void> {
   try {
     if (result.drop !== undefined || e.command !== undefined || e.isMeta === true || !PERSON_ORIGINS.has(e.origin.kind)) return
     const entered = result.text
     const mine = (generation += 1)
-    const written = await update($, lastQuestion, cur => (mine === generation ? { pending: entered, ...previousOf(cur) } : cur))
+    const written = await update($, lastQuestion, cur => (mine === generation ? { pending: entered, ...previousOf(cur), ...queuedOf(cur, entered) } : cur))
     if (mine !== generation || written === null || !('pending' in written)) return // a newer submit (or a session end) owns the value
-    const uuid = findQuestion(await recentRows($, LOOKUP_ROWS), entered, written.previous)
+    const uuid = findQuestion(await recentRows($, LOOKUP_ROWS), entered, written.previous, written.queued)
     if (uuid !== undefined && mine === generation) await settle($, written, uuid)
   } catch {
     // a refused read or write: the value stays as it was; the next submit or turn tries again
@@ -145,16 +162,18 @@ export async function noteSubmit($: EngineInterface, e: PromptSubmitInput, resul
 
 /**
  * At `turn.start` and `turn.complete`: a pending question (it was queued) is looked for again, never at or before its `previous`.
- * `isDeep` (the turn's end): when the newest rows do not hold it, a longer read reaches back to the engine cap, so a long answer
- * does not hide the question. Never rejects.
+ * `isDeep` (the turn's end): when the newest rows do not hold it and do not reach back to `previous` (a long answer is in between),
+ * a longer read reaches the engine cap. Never rejects.
  */
 export async function retryPending($: EngineInterface, isDeep: boolean): Promise<void> {
   try {
     const cur = await read($, lastQuestion)
     if (cur === null || !('pending' in cur)) return
     const recent = await recentRows($, LOOKUP_ROWS)
-    let uuid = findQuestion(recent, cur.pending, cur.previous)
-    if (uuid === undefined && isDeep && recent.length >= LOOKUP_ROWS) uuid = findQuestion(await recentRows($, ENTRY_CAP), cur.pending, cur.previous)
+    let uuid = findQuestion(recent, cur.pending, cur.previous, cur.queued)
+    // a longer read only when the newest rows may hide the question: they do not reach back to `previous`
+    const reachesPrevious = cur.previous !== undefined && recent.some(row => row.uuid === cur.previous)
+    if (uuid === undefined && isDeep && recent.length >= LOOKUP_ROWS && !reachesPrevious) uuid = findQuestion(await recentRows($, ENTRY_CAP), cur.pending, cur.previous, cur.queued)
     if (uuid !== undefined) await settle($, cur, uuid)
   } catch {
     // the next turn tries again
@@ -163,12 +182,13 @@ export async function retryPending($: EngineInterface, isDeep: boolean): Promise
 
 /** At a session start with no value (a resume, or a session from before 1.5.0): the newest question of the transcript. Never rejects. */
 export async function restoreQuestion($: EngineInterface): Promise<void> {
+  const mine = generation // a session end (or a submit) during the reads below owns the value
   try {
     if ((await read($, lastQuestion)) !== null) return // a reload keeps the session: the value stays
     const recent = await recentRows($, RESTORE_ROWS)
     let uuid = newestQuestion(recent)
     if (uuid === undefined && recent.length >= RESTORE_ROWS) uuid = newestQuestion(await recentRows($, ENTRY_CAP))
-    if (uuid !== undefined) await update($, lastQuestion, cur => (cur === null ? { uuid } : cur))
+    if (uuid !== undefined) await update($, lastQuestion, cur => (cur === null && mine === generation ? { uuid } : cur))
   } catch {
     // the transcript is not readable yet; the first submit sets the value
   }

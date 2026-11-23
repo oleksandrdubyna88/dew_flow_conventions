@@ -237,16 +237,16 @@ manifest, is completed rather than taken for an edit. The code round of the same
 the hook and a stop after the manifest (the old bytes are its `previous`) are both completed even when the source has
 moved on, every install records `previous`, and a relative source path is checked for uncommitted changes (it named
 a pathspec under the `-C` folder that did not exist); the last three red on the first fix.
-The mod itself is tested by `claude plugin test mods/agent-models` (282 cases at 1.4.0, 328 at 1.5.0, not run by CI): 1.4.0 adds
+The mod itself is tested by `claude plugin test mods/agent-models` (282 cases at 1.4.0, 336 at 1.5.0, not run by CI): 1.4.0 adds
 `tests/reset.test.tsx` (the reset time: parse, text, colour bands, the countdown write and redraw, a refused clock, a
 passed reset fetched again), `tests/account-ceiling.test.tsx` and `tests/account-retry.test.tsx` (the read ceilings,
 the generation, a result that lands as the ceiling fires, the tick retry with no clock, a session with no
 `session.start`), with `tests/account-fixtures.tsx`.
-1.5.0 adds `tests/answer.test.tsx` with `tests/answer-fixtures.tsx` (T1–T18: the `last answer` button in both viewer states and its absence on the
+1.5.0 adds `tests/answer.test.tsx` and `tests/answer-race.test.tsx` with `tests/answer-fixtures.tsx` (T1–T21b: the `last answer` button in both viewer states and its absence on the
 terminal's main screen; the lookup of the owner's last question at a person's submit; a queued submit that is `pending` with the question before it
 as `previous` until `turn.start` or `turn.complete` (which reads back to the engine cap, stopping at `previous`), the same text typed again, also
-after a reload that kept only the stored value, two submits whose first write is slow, a session start with no value (200 rows, then the engine cap;
-a tag the person typed is a question, a notification and a peer wrapper are not), a session end that clears the value; the press through
+after a reload that kept only the stored value, two submits whose first write is slow, the same words queued twice (the pending value counts the copies in `queued`; the second copy settles on its own row, also after a reload, and a lookup that read the older count does not settle the newer one), the deep read made only when the newest 50 rows do not reach back to `previous`, a session start with no value (200 rows, then the engine cap;
+a tag the person typed is a question, a notification and a peer wrapper are not), a session end that clears the value, also while a submit's transcript read or a session start's restore read is held (the restore must not write after the end); the press through
 `pressLastAnswer` with fake scroll and toast functions, because the harness cannot see a transcript scroll target, a scroll that is called before
 the press yields, and a press while pending that goes to `previous`; a throwing or refused read and write that leaves the value; the viewer's
 row count with a wrapped account row) and `tests/week-reset.test.tsx` (W1–W11: the weekly reset time on the limits line, its date from 24 hours

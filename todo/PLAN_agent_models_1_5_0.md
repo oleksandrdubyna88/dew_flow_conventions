@@ -1,6 +1,6 @@
 # PLAN — agent-models mod 1.5.0: a `last answer` button, and the weekly reset time on the limits line
 
-> Status: **APPROVED, 2026-11-22 (epoch 1, by reviewers); three changes since (1.1 owner scope, 1.2 probe, 1.3 code round).** Code round fixes
+> Status: **APPROVED, 2026-11-22 (epoch 1, by reviewers); three changes since (1.1 owner scope, 1.2 probe, 1.3 code round). Code rounds done** (coai proceed twice, two Opus reviews, all findings fixed or answered); PR
 > next. Scope: `mods/agent-models/` (one new hooks file, the band row, the limits line, version 1.5.0, the mod's own
 > tests), the installer's file list and released-copy table in `settings/hooks/lib/agent-models-decide.mjs` (and its
 > `.claude/hooks` mirror), the new row of `tools/agent-models-pins.json`, the installer tests under `tools/`,
@@ -36,6 +36,9 @@ follow-ups of [1.4.0](../research/PLAN_agent_models_1_4_0.md) § *Follow-ups*.
   toast — a message typed into a running turn never becomes a user message of its own, so the button lost the turn's
   question; `previous` is also the persisted lookup boundary (a reload kept only the text); `session.end` clears the
   value; the limits line ticks on the clock minute, not on the 5-hour time (§ Design A–C)
+  (The second code round's accepted findings — a restore that lands after `session.end`, and the same text queued
+  twice, told apart by a `queued` count on the pending value — only make the code do what this text already says: no
+  older question, the newest submit wins. They are not changes.)
 
 ## What the code and the engine do today (read 2026-11-22 at `42119f6`, Claude Code 2.1.330)
 
@@ -151,6 +154,16 @@ So: the transcript uuid is a working target, a far-off row is reached, and the t
   check blocks the rollout. Then the owner is asked about in-flight consumer releases and the open-PR counts, one
   `release` promotion, a pin bump in each of the nine consumers.
 
+## Follow-ups (not built here; findings of the code rounds that were not taken)
+
+- The restore after a resume (value `null`) picks the newest user message by text alone: `SessionMessage` carries no
+  origin (types `SessionMessage`), so a plain-text plugin or meta message after the owner's last question could be
+  taken. Revisit when the engine gives the origin on a transcript message.
+- The minute tick follows the clock minute, while each shown value turns at its own second offset: the text can lag up
+  to one minute. A timer per value's own turn would remove it.
+- The viewer's account-row height is an estimate (a flex row with a non-shrinking email button); it only affects the
+  "(scroll for more)" header.
+
 ## Files
 
 New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.ts` (row count), `hooks/limits.tsx`,
@@ -215,9 +228,9 @@ New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.t
 ## Definition of Done
 
 - [x] Plan round advanced (proceed, 2026-11-22); Opus plan review folded.
-- [ ] Tests T1–T18, W1–W9, I1, R1 green; RED seen first for each new case.
-- [ ] `npm test`, `npm run check`, `node --test tools/` green; `claude plugin validate` passes; `tsc` no new error.
-- [ ] Code round advanced; Opus code review done; findings fixed or answered.
+- [x] Tests T1–T21, W1–W11, I1, R1 green (336 mod cases); RED seen first for each new case.
+- [x] `npm test`, `npm run check`, `node --test tools/` green; `claude plugin validate` passes; `tsc` no new error (TypeScript 6.0.3 with the 2.1.330 engine types, run on a scratch copy: no new error; the base's own test-fixture errors — the shared band fixture lacks `isCollapsed` — remain).
+- [x] Code round advanced; Opus code review done; findings fixed or answered.
 - [ ] PR merged with green checks and no open thread.
 - [ ] Owner checks passed on the branch build; `release` promoted after the owner's word; nine pin bumps merged.
 - [ ] The installed mod on this WSL is 1.5.0 after a session start in a consumer.
