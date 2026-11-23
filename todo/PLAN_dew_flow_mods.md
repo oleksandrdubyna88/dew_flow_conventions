@@ -24,6 +24,10 @@
   (consult 8cf29f8f); no LICENSE now (consult d35086f4); the tenth consumer, yes (consult 32fe914d). Nothing was
   rejected.)
 
+- 1.1 · 2026-11-23 · owner · dod — O4 (a fork PR refused) is recorded as not observed live: a personal account
+  cannot fork its own repository; the blocking settings are read back instead (no `pull_request_target`, the key only
+  in the `release` environment, deployments from `main` only); the owner's choice after the consultants were out
+
 ## Goal (the owner's words, 2026-11-23, translated from Russian)
 
 1. "Move this mod's code into a separate repo, dew_flow_mods, and change the conventions so it is installed from
@@ -345,7 +349,7 @@ Each consumer: the gitlink, the `.claude/hooks` copies, four deleted libs.
 | G10 | a dispatch from a branch | refused by the workflow |
 | O1, O2 | on GitHub, once: a hand push to `release` with the owner's login; a force push or deletion of `release`; a hand creation, update or deletion of a version tag | all refused |
 | O3 | the promotion's push with the deploy key, after the approval | accepted; the compare URL was printed before the approval |
-| O4, O5 | a fork PR; a push to `main` | no secret and no write; refused |
+| O4, O5 | a fork PR; a push to `main` | O4: not observed live (change 1.1) — the settings that block it read back; O5: refused |
 | O6 | a workflow on a pushed branch pushes `release` with its own token, then asks for the `release` environment | both refused |
 | O7 | the approval API called with the login agent sessions hold | recorded as it is: refused under the identity of Q3; accepted with today's login, which is then the written risk |
 
@@ -399,6 +403,11 @@ repository is new and under it); the tenth consumer (consult 32fe914d); the lice
 - **Q2:** "Yes, apply them" — create the public repository and apply the rulesets, the deploy key and the `release`
   environment from data with read-back.
 - **Licence:** "MIT" (see § C).
+- **Q3, revisited after the E2 gate spec (2026-11-23):** "Click as procedure for now" — the owner keeps the `gh`
+  login agent sessions use, and accepts in writing that the per-promotion click stops mistakes, not a misbehaving
+  agent session (the Definition of Done's "or the owner's written acceptance is cited"; O7 is recorded as accepted with
+  today's login). The agent identity (a GitHub App, consult d86774ca) is deferred with this question and revisited
+  later. Both consultants had advised a login agents cannot reach (consult eee6b83b).
 
 ## Definition of Done
 
