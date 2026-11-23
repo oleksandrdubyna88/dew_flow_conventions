@@ -43,6 +43,8 @@ export const MAX_FOLDER_ENTRIES = 500;
 const MAX_MARKER_BYTES = 4096;
 const PLUGIN_DIRS_KEY = 'CLAUDE_CODE_PLUGIN_DIRS';
 const RETIRED_TAG = 'agent-models.retired-';
+/** Exactly what the step's own rename writes: `agent-models.retired-<milliseconds>-<pid>`; a look-alike name is never ours. */
+const RETIRED_ASIDE = /^agent-models\.retired-\d+-\d+$/;
 const SHOWN_SETTINGS = '~/.claude/settings.json';
 const SHOWN_MODS = '~/.claude/mods';
 const SHOWN_OLD = '~/.claude/mods/agent-models';
@@ -333,7 +335,7 @@ function readLeftovers(p, uid) {
   const retired = [];
   try {
     for (const entry of fs.readdirSync(p.mods, { withFileTypes: true })) {
-      if (!entry.name.startsWith(RETIRED_TAG) || !entry.isDirectory()) continue;
+      if (!RETIRED_ASIDE.test(entry.name) || !entry.isDirectory()) continue;
       if (uid === undefined || lstatOrNull(path.join(p.mods, entry.name))?.uid === uid) retired.push(entry.name);
     }
   } catch {

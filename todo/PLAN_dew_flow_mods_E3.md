@@ -56,10 +56,11 @@ The four `agent-models-*.mjs` libs and their other tests stay until 3.2; after 3
 ### The step in `ensure-user-guard.mjs`
 
 ```js
-export async function ensureModsMarketplaceStep({ home, source, env, platform = process.platform }) {
+export async function ensureModsMarketplaceStep({ home, source, env, sessionSource, platform = process.platform }) {
   if (modSwitchedOff(env) || platform === 'win32' || isReferenceRepository(source)) return skipped();
-  const lib = await loadModsMarketplace();          // dynamic import('./lib/mods-marketplace.mjs'); null on any load failure
-  return lib === null ? skipped() : lib.ensureModsMarketplace({ home, env });
+  const { lib, failure } = await loadModsMarketplace();   // dynamic import('./lib/mods-marketplace.mjs'); the failure is returned, never swallowed
+  if (lib === undefined) return refusal(failure);          // 'agent-models: the dew-flow-mods step could not run (<code>)', repeated at each start; the guard and effort steps still run
+  try { return lib.ensureModsMarketplace({ home, env, sessionSource }); } catch (error) { return refusal(error); }   // a throw inside: the same refusal line
 }
 ```
 
@@ -276,7 +277,7 @@ Models: spec Fable (this document); code and tests Sonnet; review Opus; fixes So
   road in `user-guard-install.mjs`, the `writeAtomic` scan, U+FEFF) and the road cases of
   `tools/agent-models-register.test.mjs` move to `tools/user-guard-road.test.mjs`, pointed at `mods-marketplace.mjs`
   where they named the installer. The comments at `user-guard-install.mjs:194` and `:482` name the new caller.
-- **The frozen fixture stays**, guarded: a test holds the sha256 of its thirteen code files (red on a changed byte),
+- **The frozen fixture stays**, guarded: a test holds the sha256 of its six code files (the fixture's six files as of `c598a11`) (red on a changed byte),
   and only `tools/mods-marketplace-step.test.mjs` imports from it. **`adapter-check`** (`tools/adapter-check.mjs:143-157`)
   gains a finding for a file `agent-models-*.mjs` in a consumer's `.claude/hooks/lib` ("retired — delete it");
   `tools/adapter-check.test.mjs:66-67` name `lib/mods-marketplace.mjs`.

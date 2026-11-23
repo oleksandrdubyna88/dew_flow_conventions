@@ -1004,6 +1004,11 @@ test('the sweep: a retired-* real folder of our uid is removed at S4; a link of 
   h.retired(at(-25), '1.6.0');
   fs.mkdirSync(path.join(h.mods, 'agent-models.retired-1-2'), { recursive: true });
   fs.writeFileSync(path.join(h.mods, 'agent-models.retired-1-2', 'x'), 'x');
+  const lookalikes = ['agent-models.retired-manual-backup', 'agent-models.retired-123', 'agent-models.retired-1-2-x'];
+  for (const name of lookalikes) {
+    fs.mkdirSync(path.join(h.mods, name), { recursive: true });
+    fs.writeFileSync(path.join(h.mods, name, 'keep.txt'), 'keep');
+  }
   const target = path.join(h.root, 'keep');
   fs.mkdirSync(target);
   fs.writeFileSync(path.join(target, 'f'), 'x');
@@ -1013,6 +1018,7 @@ test('the sweep: a retired-* real folder of our uid is removed at S4; a link of 
   const result = h.step();
   assert.deepEqual([result.action, h.linesOf(result)], ['removed', [LINES.removed()]]);
   assert.equal(fs.existsSync(path.join(h.mods, 'agent-models.retired-1-2')), false);
+  for (const name of lookalikes) assert.equal(fs.readFileSync(path.join(h.mods, name, 'keep.txt'), 'utf8'), 'keep', `${name} survives: it is not the step's own aside`);
   assert.equal(fs.existsSync(h.oldManifest), false);
   assert.equal(fs.existsSync(h.oldReported), false);
   if (linked) {
