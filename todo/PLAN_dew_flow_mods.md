@@ -442,12 +442,12 @@ one document, written by Opus when the epic starts.
 - **E1 — the short probe.** Goal: the engine behaviour that decides the source form and the retirement is seen on one
   machine before anything is built on it. Stories: 1.1 V1–V3 and V8 in a scratch config folder with a throwaway
   repository; 1.2 the decision record. Depends on: nothing. Done when: the results file is merged. No cornerstone.
-- **E2 — the new repository and its gate.** Goal: `dew_flow_mods` holds 1.6.0 and nothing reaches `release` but
+- **E2 — the new repository and its gate** ([stories](PLAN_dew_flow_mods_E2.md), [gate spec](PLAN_dew_flow_mods_E2_gate.md)). Goal: `dew_flow_mods` holds 1.6.0 and nothing reaches `release` but
   through the gate. Stories: 2.1 the copy, the layout, CI, the family mount; **2.2 the release gate — cornerstone**
   (the tool, the version and layout gates, the deploy key and the environment, the rulesets, O1–O7); 2.3 the first
   promotion, the tag, the README, then V4–V7, V9, V10 with 1.6.1. Depends on: E1, 1.6.0 merged, Q1–Q3. Done when: C1,
   G1–G10, O1–O7, the observations recorded.
-- **E3 — conventions: the registration step replaces the installer.** Stories: **3.1 the step and the retirement —
+- **E3 — conventions: the registration step replaces the installer** ([stories](PLAN_dew_flow_mods_E3.md)). Stories: **3.1 the step and the retirement —
   cornerstone** (it writes the trust anchor into user settings and retires a folder in `~/.claude` on every
   machine); 3.2 the removal, the frozen fixture and `adapter-check`; 3.3 the docs. Depends on: E1, E2. Done when:
   R1–A4, merged, not promoted.
