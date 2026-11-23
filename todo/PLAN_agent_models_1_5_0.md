@@ -46,22 +46,27 @@ follow-ups of [1.4.0](../research/PLAN_agent_models_1_4_0.md) § *Follow-ups*.
 
 ### Re-review for epoch 2
 
-Narrowed: yes — the restore after `/resume` guesses the newest user message by text; the owner chose it 2026-11-23
+Narrowed: yes — the resume guess, the press to the question before a pending one, a one-minute lag; the owner chose the first
 
-  (Why narrowed: the engine gives no origin on a transcript message, so the guess weakens the approved "never an
-  unrelated row" for that one case. The owner answered "Guess the newest" after the question consultants split —
-  consult `59018e5b`: one for no guess, one for the guess.)
+  (What is narrowed against epoch 1's approved text: (1) the restore after `/resume` guesses the newest user message by
+  text — the engine gives no origin on a transcript message — so "never an unrelated row" is weaker for that case; the
+  owner answered "Guess the newest" on 2026-11-23 after the question consultants split, consult `59018e5b`; (2) while
+  a question is pending the press goes to the question before it, where the approved text toasted and never went to
+  an older question (change 1.3: a text typed into a running turn never gets a row, and the toast left the turn's
+  question unreachable); (3) the weekly time turns at the 24-hour mark up to one minute late (the clock-minute tick of
+  change 1.3). Items 2 and 3 go to the owner with the epoch 2 approval.)
 
-  The re-review: one coai consult (`5afcb566`), every change quoted; the whole plan revised (§ Design A rewritten to the
-  code as it stands, the test plan and Definition of Done to the 336 cases, Files and Build order completed); an Opus
-  judge sorted the done work. The consult found one defect the revised plan fixes (§ Design A, `missed`): a question
-  typed into a running turn and then sent again after it counted as a second copy and was never found.
+  The re-review: coai consults `5afcb566` (every change quoted) and `90c1d068` (the lookup design); the whole plan
+  revised (§ Design A rewritten to the code, then simplified: `queued` dropped; the test plan and Definition of Done to
+  the 336 cases; Files and Build order completed); an Opus judge sorted the done work; the coai document round
+  (proceed, two findings taken) and an Opus plan review (its findings folded).
 
 | Work | Where | Verdict | Action |
 |---|---|---|---|
 | b81073f build (answer.tsx, band row, weekly reset, 1.5.0, installer, pins) | pushed, unmerged | fits | kept; its three parts that 1.3 changed were fixed forward by d07bd3c |
 | d07bd3c code round 1 (`previous`, ordered submits, deep read, `session.end`, clock-minute tick) | pushed, unmerged | fits | kept |
-| b2e48bc code round 2 (restore guard, `queued`, newest copy with no boundary, typed test helpers) | pushed, unmerged | fits | kept |
+| b2e48bc code round 2 (restore guard, `queued`, newest copy with no boundary, typed test helpers) | pushed, unmerged | fits | kept, but its `queued` count is cut: fixed forward in epoch 2 (no history rewrite) |
+| plan-only commits 91cc7f5, 1c6f3e3, ba5c04d, 13eb0e5, 9bd7d8e | pushed, unmerged | fits | kept (plan text; this record supersedes their design text) |
 
 ## What the code and the engine do today (read 2026-11-22 at `42119f6`, Claude Code 2.1.330)
 
@@ -110,27 +115,27 @@ So: the transcript uuid is a working target, a far-off row is reached, and the t
 - A state value `lastQuestion` in `PluginState['agent-models']` (`types/index.d.ts`), written by non-render hooks only;
   it survives a hot reload, as `$.state` does; absent (a state from before 1.5.0) reads as `null`:
   - `{ uuid }` — the question is found in the transcript;
-  - `{ pending, previous?, queued?, missed? }` — the person's text, not found yet. `previous` is the uuid of the question
-    before it: the press target while pending, and the lookup boundary (a row at or before it is never this question).
-    `queued` is how many copies of the same words, with the same `previous`, were already pending (a copy queued twice
-    before either is in the transcript). `missed: true` marks a pending question that a `turn.complete` did not find:
-    typed into that running turn, it never becomes a user message of its own (§ Probe, run 2);
+  - `{ pending, previous? }` — the person's text, not found yet. `previous` is the uuid of the question before it: the
+    press target while pending, and the lookup boundary (a row at or before it is never this question);
   - `null` — no question seen.
+  (Epoch 2 drops b2e48bc's `queued` count: it waited for a second row when the first copy was typed into a running
+  turn, which never gets a row of its own, so a re-send after the turn was never found — the re-review consult's
+  defect. A `missed` flag was weighed and dropped as racy; re-settling a found question on a newer same-text row was
+  weighed and dropped, as it could jump to a row a plugin sent — consult `90c1d068`.)
 - `on('prompt.submit')`, after `next(e)`: only when `e.origin.kind` is `composer` or `bridge`, not `isMeta`, not a slash
-  command and not dropped. First, with no `await` before it, ONE `update` writes `{ pending, previous, queued }` and
-  bumps a module `generation`: `previous` is the current uuid (or the current pending's `previous`); `queued` is the
-  current pending's `queued + 1` when it has the same clean text, the same `previous` and is not `missed`, else absent.
-  The change function writes only while its generation is the newest, and `update` retries on a version miss, so an
-  older submit never overwrites a newer one whatever order the writes land in. Then the lookup on
-  `$.session.messages({ last: LOOKUP_ROWS = 50 })`; found → `{ uuid }` (`settle` checks the text, `previous` and
-  `queued` of the value it replaces).
+  command and not dropped. First, with no `await` before it, ONE `update` writes `{ pending, previous }` and bumps a
+  module `generation`: `previous` is the current uuid, or the current pending's `previous`. The change function writes
+  only while its generation is the newest, and `update` retries on a version miss, so an older submit never overwrites
+  a newer one whatever order the writes land in. Then the lookup on `$.session.messages({ last: LOOKUP_ROWS = 50 })`;
+  found → `{ uuid }` (`settle` writes only while the value is still that pending text with that `previous`).
 - The lookup (`findQuestion`): user rows with no `toolResults`, compared after `cleanPrompts` on both sides (an empty
-  clean text matches nothing). With a boundary it takes the matches newer than `previous`, oldest first, at index
-  `queued`; with no boundary and no `queued`, the newest match.
-- `on('turn.start')` and `on('turn.complete')`: a pending value is looked up again. At `turn.complete`, when the 50 rows
-  found nothing, came back full and do not hold `previous`, it reads up to the engine cap (`ENTRY_CAP`), bounded by
-  `previous`. Still not found at `turn.complete`: the value becomes `missed` (it stays pending; `turn.start` keeps looking,
-  for a prompt that was queued and starts its own turn).
+  clean text matches nothing); the NEWEST match newer than `previous` (scanning newest first, stopping at `previous`);
+  with no boundary, the newest match. A found `{ uuid }` never moves. Known limit: the same words queued twice before
+  either has a row settle on the first copy (the same question, its earlier answer).
+- `on('turn.start')` and `on('turn.complete')`: a pending value is looked up again, under the generation check (a
+  lookup started before a `session.end` writes nothing). At `turn.complete`, when the 50 rows found nothing, came back
+  full and do not hold `previous`, it reads up to the engine cap (`ENTRY_CAP`), bounded by `previous`. A text typed into
+  a running turn is never found and stays pending until the next submit; meanwhile the press goes to `previous`.
 - `on('session.end')` writes `null` and bumps the generation (a `/clear` raises no `session.start`, so an old uuid must
   not carry over; a lookup or restore still in flight then writes nothing).
 - `on('session.start')` with `null` (a resume, or a session from before 1.5.0) — **narrowed, the owner's choice**: the
@@ -147,7 +152,7 @@ So: the transcript uuid is a working target, a far-off row is reached, and the t
   cannot see a scroll target). With `{ uuid }` it calls `scroll({ to: { requestId: uuid }, block: 'start' })` at once —
   no `await` before it (run 3, D). `{}`: nothing more. `{ deny }`: a toast in plain words (`none scrolls` → "works in
   fullscreen only"; else `last answer: <deny>`). A rejection: a toast; the press never throws. With `pending` and a
-  `previous` (missed or not): scroll to `previous`, the same way. With `pending` and no `previous`: a toast `last answer: your question
+  `previous`: scroll to `previous`, the same way. With `pending` and no `previous`: a toast `last answer: your question
   is not in the transcript yet`. With `null`: a toast `last answer: no question yet`. No scroll in those two.
 - The draw reads `lastQuestion` (a read, never a write) and passes the value to the press.
 - The button `[ last answer ]`, `key="last-answer"`, colour `BUTTON_COLOR`, after `tasks (n)` in `accountRow`, in both
@@ -212,13 +217,16 @@ New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.t
 
 1. Plan round — done (proceed, 2026-11-22); changes 1.1–1.3; stopped and re-reviewed for epoch 2 (this record).
 2. Build, two code rounds — done (b81073f, d07bd3c, b2e48bc; all `fits`).
-3. Epoch 2: the `missed` fix of § Design A (T22), RED first; the pins row and `RELEASED_MOD` follow the new hash.
-4. All checks: `npm ci --ignore-scripts`, `npm test`, `npm run check`, `node --test tools/`,
+3. The re-review's own rounds (the coai document round, an Opus plan review), then the owner approves epoch 2
+   (narrowed) and its line is written. Nothing below starts before that.
+4. Epoch 2: § Design A as revised — `queued` dropped, the newest-match lookup, the generation check in the retry (T20, T22–T24), RED first; the pins row and
+   `RELEASED_MOD` follow the new hash.
+5. All checks: `npm ci --ignore-scripts`, `npm test`, `npm run check`, `node --test tools/`,
    `claude plugin test mods/agent-models`, `claude plugin validate`, `tsc` no new error.
-5. A final code round over the whole branch (coai `review_code` with `again: true` and the revised plan + an Opus
+6. A final code round over the whole branch (coai `review_code` with `again: true` and the revised plan + an Opus
    review), fixes, PR #187 checks and threads, merge.
-6. Owner checks on the branch build; then ask the owner, promote `release`, nine pin bumps, merge each.
-7. Promote this plan to `research/`.
+7. Owner checks on the branch build; then ask the owner, promote `release`, nine pin bumps, merge each.
+8. Promote this plan to `research/`.
 
 ## Test plan (`claude plugin test mods/agent-models`; installer tests by `node --test`)
 
@@ -230,21 +238,21 @@ New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.t
 | T4 | submits of a notification, a peer, a plugin; an `isMeta` submit; a slash command; a dropped submit | value unchanged |
 | T5 | a bridge submit after a local one | the bridge question's uuid |
 | T6 | `Q` asked twice (two user messages with that text) | the newer uuid |
-| T7 | submit queued: not in the transcript at submit, present at `turn.start` | `pending`, then `{ uuid }` |
+| T7 | submit queued: not in the transcript at submit, present at `turn.start` (another one at `turn.complete`) | `pending`, then `{ uuid }` |
 | T8 | `session.start` with `null`: transcript ends with a summary, a `<task-notification…>`, a tool result, before them a question | the question's uuid |
 | T9 | `session.start` with a value set (reload) | the value is kept |
 | T10 | press with `{ uuid }` (fake scroll) | scroll called once, synchronously in the press, with `{ requestId: uuid }`, `block: 'start'` |
 | T11 | press: scroll answers `{ deny: 'none scrolls' }`; another deny; a rejection | the fullscreen toast; `last answer: <deny>`; a toast, no throw |
 | T12 | press with `pending` + `previous`; `pending` alone; `null` | scroll to `previous`; a toast, no scroll; a toast, no scroll |
+| T12b | the drawn button pressed (not only `pressLastAnswer`) | the toast reaches the engine |
 | T15 | Q settled as u1; Q typed again, not yet in the transcript; then u2 appears and `turn.start` runs; also after a simulated reload (module state fresh) | `{ pending: Q, previous: u1 }`, never u1; then u2 |
-| T16 | submits A then B with A's state work delayed | the value ends at B |
-| T17 | the question's turn has more than 50 rows before `turn.complete` | found at `turn.complete` |
 | T7b | a subagent's turn events | the main question is not touched |
 | T8b | a question 200 rows back, value `null` at `session.start` | found with a read of the engine cap |
 | T8c | the restore: a question that starts with a tag; a notification; a peer wrapper | the question is taken; the other two are not |
 | T13 | the messages read throws in each hook | value unchanged, no throw |
 | T13b | a refused write of `lastQuestion` | nothing throws; the value as it was |
 | T14 | the viewer row count with a long email at 80 columns | the wrapped account row counted |
+| T14b | `accountRowCells` with and without the button, a pending login | the cells the row draws |
 | T15b | T15 after a reload: fresh module, stored value seeded | the stored `previous` is still the boundary |
 | T15c | a second submit while pending | it keeps the question before the first one as `previous` |
 | T16 | submits A then B with A's state work delayed | the value ends at B |
@@ -252,15 +260,15 @@ New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.t
 | T17b | the deep read; an older row with the same text before `previous` | not taken |
 | T18 | `session.end` while a submit's lookup is in flight | value `null` after the lookup lands |
 | T19 | `session.start`'s restore read is slow; `session.end` before it lands | value `null` |
-| T20 | the same text queued twice before either is in the transcript | the second settles on its own row |
-| T20b | T20 after a reload (stored `queued` seeded) | the stored count is still the index |
-| T20c | a different text, or a settled value | the count starts again |
-| T20d | a copy queued while a lookup is in flight | the lookup does not settle the newer copy on the older row |
 | T21 | `turn.complete`; the newest 50 rows hold `previous` | no read of the engine cap |
 | T21b | `turn.complete` with no `previous` | the deep read still runs |
-| T22 | Q settled as A's successor: A settled; Q typed into A's running turn (never its own row) and `turn.complete` runs; then Q is sent again after the turn and its row appears | `missed` after the turn; the second Q is not counted as a copy (`queued` absent) and settles on its row |
-| F1 | `findQuestion`: clean text on both sides; an empty clean text; no boundary with two copies | matches; none; the newest copy |
-| F2 | `newestQuestion`: a summary, wrappers, tool results, a tag the person typed | only the person's row |
+| T20 | the same text queued twice before either has a row | the first copy settles; the second does not move it (known limit) |
+| T22 | A settled; Q typed into A's running turn (never its own row); `turn.complete`; then Q sent again and its row appears | settles on the re-sent row; no wait for a second copy |
+| T22b | T22 after a reload (stored value seeded) | the same |
+| T23 | no question settled in this session; an older row with the same text in the window | the newest match |
+| T24 | a `turn.start` lookup in flight; `session.end`; the lookup lands | value `null` |
+| F1 | (test names `findQuestion …`) `findQuestion`: clean text on both sides; an empty clean text; no boundary with two copies | matches; none; the newest copy |
+| F2 | (test name `newestQuestion …`) `newestQuestion`: a summary, wrappers, tool results, a tag the person typed | only the person's row |
 | W9 | the line open, the 5-hour reset unknown, 24 h 1 m to the weekly reset, the clock moves 2 min (no manual redraw) | the date, then `resets in 23h 59m` |
 | W9b | the drawn week reset | bare text, no colour |
 | W10 | an open line at the 24-hour mark | the date turns into the time left with no new fetch and no manual redraw |
@@ -281,13 +289,15 @@ New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.t
 - Ask a question that gets a long answer, scroll away, press `last answer`: the question is at the top of the window
   and the answer under it.
 - The same after a hot reload of the mod, and after `/resume` of an older session.
+- Paste a long text (and, once, an image) as a question, then press: the button reaches it (the lookup matches the
+  transcript text against the submitted text; write down what happens).
 - The limits line shows `resets <date>` after `week`, or `resets in …h …m` when the week resets within a day.
 
 ## Definition of Done
 
 - [x] Plan round advanced (proceed, 2026-11-22); Opus plan review folded.
 - [x] Tests T1–T21b, F1–F2, W1–W11, I1, R1 green (336 mod cases); RED seen first for each new case.
-- [ ] Epoch 2: T22 RED, then green with the `missed` fix; all checks again.
+- [ ] Epoch 2: T20, T22, T22b, T23, T24 RED, then green with `queued` dropped, the newest-match lookup and the generation check in the retry; all checks again.
 - [x] `npm test`, `npm run check`, `node --test tools/` green; `claude plugin validate` passes; `tsc` no new error (TypeScript 6.0.3 with the 2.1.330 engine types, run on a scratch copy: no new error; the base's own test-fixture errors — the shared band fixture lacks `isCollapsed` — remain).
 - [x] Code round advanced; Opus code review done; findings fixed or answered.
 - [ ] The re-review for epoch 2: consult, whole-plan revision, the Opus judge's sort, the document round and an Opus
