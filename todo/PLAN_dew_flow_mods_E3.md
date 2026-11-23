@@ -39,7 +39,8 @@ merged, not promoted. Depends on: E1 ([the probe](../research/dew_flow_mods_prob
   false` frees the marketplace copy for every new start (`:157`, `:163-166`). Keys a hook writes are seen by the NEXT
   start (`:134-137`). A `-p` run never installs (`:231-233`).
 - **This machine today** (read only): the old folder is 1.4.0 with a record of seven files and also holds `tsconfig.json`
-  and `.claude-plugin/types/**`, which the record does not name; `env.CLAUDE_CODE_PLUGIN_DIRS` names the folder.
+  and `.claude-plugin/types/**`, which the record does not name; `env.CLAUDE_CODE_PLUGIN_DIRS` names the folder. Under the
+  parent's step 2 (feature review, 2026-11-23) such a folder is `left`: the engine's own files are not trusted by name or path.
 
 ## Story 3.1 — the step and the retirement (cornerstone, `model: fable`)
 
@@ -136,7 +137,7 @@ record), no `plugin.json`. Said once (`say`): a record file that is too big, doe
 | **S1** registered, proof not whole | nothing is touched. `registeredAt` is stored at first sight; after `INSTALL_WAIT_MS` the manual command is said once | S2 when the engine installed |
 | **S2** proof whole, `INLINE_ID` absent | **step 1**: marker absent → `writeAtomic(optout, tombstoneBytes(now()), 0o644, { replace: false })`, then `readMarker` must say `ours` (else stop: a person's marker appeared); then the settings write that adds `enabledPlugins[INLINE_ID] = false`; then `retiredAt` is stored | S3 |
 | **S3** marker ours, `INLINE_ID` false, proof whole, `now − retiredAt < STEP2_DELAY_MS` | nothing (`retiredAt` absent, unreadable or in the future: set to `now`; it can only delay) | S4 at a later start |
-| **S4** as S3, 24 h or more | **step 2**: judge the folder (`readOldFolder`). `removable` or `missing`: the settings write that takes our entry out of `env.CLAUDE_CODE_PLUGIN_DIRS` (other entries verbatim and in order; the key goes when the value is empty; `env` stays), then `rename(oldFolder, mods/agent-models.retired-<ms>-<pid>)`, `remove` it, then delete `oldManifest` and `oldReported`. `left`: folder, entry and record stay, named once | S5 |
+| **S4** as S3, 24 h or more | **step 2**: judge the folder (`readOldFolder`). `removable` or `missing`: the settings write that takes our entry out of `env.CLAUDE_CODE_PLUGIN_DIRS` (other entries verbatim and in order; the key goes when the value is empty; `env` stays), then the aside is recorded in the state file (`aside: { name: "agent-models.retired-<ms>-<pid>", sha256: <the install record's map> }`, written before the rename), `rename(oldFolder, mods/<name>)`, `remove` it after judging it again, then delete `oldManifest` and `oldReported`. `left`: folder, entry and record stay, named once, with how to remove the folder by hand | S5 |
 | **S5** nothing of the old copy left | the version line when the installed version changed; the shell warning (M9) | — |
 
 - **Stops, at any state, writing nothing at all** (not even the state file): the switch, win32, the reference
@@ -149,17 +150,27 @@ record), no `plugin.json`. Said once (`say`): a record file that is too big, doe
   "dew-flow-mods", "at": "<ISO>", "note": "<who wrote it and why>" }`. A filesystem that cannot make the hard link
   (`isHardLinkFailure`, `user-guard-install.mjs:207`), or a `mods` that is a link or not a folder: no tombstone, no
   retirement, said (when nothing can record it, the line stands at every start, as `agent-models-install.mjs:147-150`).
-- **`removable`** (step 2): `oldFolder` is a real directory by `lstat`, owned by `uid()`; `oldManifest` parses to an
-  object whose `sha256` is an object with at least one key; every key is a relative path with no `..` part and names a
-  regular file with that sha256; the walk finds only files and folders and at most `MAX_FOLDER_ENTRIES`; and every
-  entry is accounted for — a named file, a folder holding one, a top-level `tsconfig.json`, or `.claude-plugin/types`
-  and what is under it (the engine's own generated files, Facts). Any other entry keeps the folder (code round,
-  2026-11-23: a person's own file there is never deleted). Everything else is `left` with its reason: a link, another
-  owner, not a folder, no record, a named file missing or changed, a link inside, too many entries, an unknown entry
-  (the first one named), a `CLAUDE_CODE_PLUGIN_DIRS` that is not a string.
-- **Sweeps (the in-flight states).** At S4 and S5 a `mods/agent-models.retired-*` real directory of our uid is removed
-  (a kill between the rename and the delete), and `oldManifest` and `oldReported` with no `oldFolder` are deleted. A
-  folder that stays when our entry is already gone is judged and removed the same way. A link is never touched.
+- **`removable`** (step 2): the folder's files EQUAL its install record, exactly (the parent: "the folder, its manifest and
+  its reported file are deleted, when the folder's files equal its install record"). `oldFolder` is a real directory by
+  `lstat`, owned by `uid()`; `oldManifest` parses to an object whose `sha256` is an object with at least one key; every key
+  is a relative path with no `..` part and names a regular file with that sha256; the walk finds only files and folders and at
+  most `MAX_FOLDER_ENTRIES`; and every entry is accounted for as a named file or as a folder that holds one. NO other entry is
+  trusted, whatever its name or place: not `tsconfig.json`, not `.claude-plugin/types/**` (the first round of 3.1 trusted them
+  by path; the feature review, 2026-11-23, took that out: it went further than the parent). Everything else is `left` with its
+  reason: a link, another owner, not a folder, no record, a named file missing or changed, a link inside, too many entries, a
+  file the installer did not write (the first one named), a `CLAUDE_CODE_PLUGIN_DIRS` that is not a string. The `left` line
+  tells the person to remove the folder by hand once they have checked it. A `left` folder keeps its entry in
+  `CLAUDE_CODE_PLUGIN_DIRS` and its record: the parent's "left with its entry". After the person removes the folder, the next
+  start deletes the entry and the record.
+- **Sweeps (the in-flight states).** The step deletes ONLY the aside it recorded. Before the rename, `aside` (the name and the
+  install record's `sha256` map, kept in `dew-flow-mods.seen.json`; the hashes are kept there because the record file is
+  deleted by this very step, and a kill must not leave an aside nothing can judge) is stored. A start finds the recorded
+  aside: absent (the delete was done, or the rename never happened) clears the record; a real directory of our uid, not a
+  link, whose files are still among the recorded ones (a file may be gone from a delete cut short; none may be added or
+  changed) is deleted, and the record cleared; anything else is NOT deleted, named once with the first unknown path, and the
+  record stays (the person removes it by hand). A recorded name that is not of the shape `agent-models.retired-<ms>-<pid>`
+  reads as absent. Any other `agent-models.retired-*` real directory of our uid (an aside of an older build, or the person's
+  own) is never deleted, and is named once. `oldManifest` and `oldReported` with no `oldFolder` are still deleted.
 
 ### What the person is told (`LINES`; each state said once, never twice)
 
@@ -184,8 +195,8 @@ a failed write is tolerated (a line repeats, a clock starts again). Keys: `confl
 
 | Surface | Size | Who retires it | Interrupted |
 |---|---|---|---|
-| `mods/dew-flow-mods.seen.json` | under 1 KB; `said` has at most the eight key families | kept forever, overwritten | a lost file restarts a clock; it never hastens step 2 |
-| `mods/agent-models.retired-<ms>-<pid>` | the old folder, about 0.3 MB, for milliseconds | step 2 itself | the sweep at the next start |
+| `mods/dew-flow-mods.seen.json` | under 1 KB (about 1.5 KB while an `aside` with its seven hashes is recorded); `said` has at most the eight key families | kept forever, overwritten | a lost file restarts a clock; it never hastens step 2; a lost `aside` leaves the folder named once, never deleted |
+| `mods/agent-models.retired-<ms>-<pid>` | the old folder, about 0.3 MB, for milliseconds | step 2 itself | the next start deletes it, when it is the recorded aside and still equals its record |
 | `settings.json.bak-subagent-model-*` | at most three more files of the settings' size per machine (registration, step 1, step 2) | nobody, as today (`user-guard-install.mjs:226-236`); kept | `backupOnce` adds none on a retry |
 | the old folder when it is `left`, or while the plugin is `off` | 0.3 MB | the person; named once | — |
 | `tools/fixtures/retired-installer/` | 104 KB in the repository | kept while a consumer can pin a release that ships the old step; its removal is a later plan | — |
@@ -199,8 +210,8 @@ two of our reads: the re-read of `commitSettings` and the exclusive tombstone ar
 ### Test scenarios (Given / When / Then; each RED before its code)
 
 Fixture words, all built by `tools/lib/mods-marketplace-fixtures.mjs` on an `ownedDir` home (never `os.homedir()`):
-**old(v)** = the old folder with the files its record names, the matching record, the engine's extras (`tsconfig.json`,
-`.claude-plugin/types/x.d.ts`) and `env.CLAUDE_CODE_PLUGIN_DIRS` naming it; **reg** = the two keys built by
+**old(v)** = the old folder with the files its record names, the matching record, and `env.CLAUDE_CODE_PLUGIN_DIRS` naming it
+(with `extras: true`, also the engine's files `tsconfig.json` and `.claude-plugin/types/x.d.ts`); **reg** = the two keys built by
 `anchorEntry()`; **engine(v)** = the `known` entry, the cache folder with `plugin.json` v, the record; **tomb** =
 `tombstoneBytes`; the clock is the `now` seam (no test reads the real clock; times are `NOW ± n` hours). "Untouched" =
 `snapshot(home)` equal before and after (bytes and mtime). "The step" = `ensureModsMarketplace` in process.
@@ -225,12 +236,14 @@ Fixture words, all built by `tools/lib/mods-marketplace-fixtures.mjs` on an `own
 | M5p | the frozen project (a consumer-shaped folder: the frozen `hooks/` as `.claude/hooks`, the seven 1.4.0 mod files read by `git show c598a11:mods/agent-models/<file>` into the temp folder as `.agents/conventions/mods/agent-models`), no marker, an empty home | the FROZEN step | it installs 1.4.0 and registers the folder — the control: the fixture is not rejected |
 | M5a | M4 with `stopAfter: 'tombstone'` | the frozen step, then the step | frozen: `skipped`, home untouched; then `INLINE_ID` false and the one `retired` line |
 | M5b | M4 with `stopAfter: 'inline'` | the frozen step, then the step at +1 h and at +25 h | frozen: untouched; +1 h: `retiredAt` stored, silent; +25 h: step 2 |
-| M5c–e | S4 with `stopAfter` `'variable'`, `'rename'`, `'folder'` | the frozen step, then the step | frozen: untouched, no folder comes back; the step finishes: no entry, no folder, no `retired-*`, no record, no reported file; `removed` said once over the two runs |
+| M5c–e | S4 with `stopAfter` `'variable'`, `'rename'`, `'folder'` | the frozen step, then the step | frozen: untouched, no folder comes back; the step finishes: no entry, no folder, no `retired-*`, no record, no reported file, no `aside` in the state; `removed` said once over the two runs |
 | M6 | S3 with `retiredAt` = now − 23 h 59 min; then now − 24 h; the variable `/a:<old>:/b`, then `~/.claude/mods/agent-models` alone | the step | before: untouched. After: `/a:/b` (alone: the key gone, `env` kept); folder, record, reported file gone; marker and state kept; `removed` |
 | M6b | S3 with `retiredAt` absent; unparsable; one hour in the future | the step, then +25 h | first: only `retiredAt` = now written; then step 2 |
 | M6c | S4, but the plugin now `false`; the `known` entry changed; `INLINE_ID` set to `true` | the step | nothing removed (the proof and the switches are read again at step 2) |
 | M7 | S4 with the old folder: a link (its target has files); owned by another uid (`uid` seam); a file; no record; a record key `../x`; a named file changed; a named file missing; a link inside; 501 entries; a variable that is a number | the step, twice | folder, link target, entry and record untouched; `told` once with the reason; `INLINE_ID` stays `false` |
-| M7b | S4, old(1.4.0) with exactly the recorded files, `tsconfig.json` and `.claude-plugin/types/claude-code/index.d.ts`; then the same with `notes.txt`, and with an unknown nested folder | the step | only a fully accounted folder is removed; an unknown file keeps it, said once (the first unknown path named) |
+| M7b | S4, old(1.4.0) with exactly the recorded files; then old(1.4.0, extras) = the same with `tsconfig.json` and `.claude-plugin/types/claude-code/index.d.ts`; then the same with `notes.txt`, and with an unknown nested folder | the step | only a folder whose files equal its record is removed. The extras folder, `notes.txt` and the unknown folder are `left`, with the entry and the record, said once, the first unknown path named, and the line says how to remove it by hand |
+| M7c | S4 with a same-uid `agent-models.retired-123-456` the step never created (and look-alike names, and a link of that shape) | the step, twice | none is deleted; each real folder of the shape is named once; the record and the reported file are still deleted |
+| M7d | S4 with `stopAfter: 'rename'` (the aside is recorded in the state, the rename done, the delete not); then the same with a file added to the aside, with a file of it changed, with the aside replaced by a link, with another uid, and with a recorded name that is not an aside's | the step | the first is finished at the next start and the record cleared; every other is NOT deleted (a link's target is untouched), the aside is named once with the first unknown path and its record stays; a recorded name of another shape reads as absent; a record written before a rename that never happened is cleared and the old folder is removed |
 | M8 | reg + old + engine + `INLINE_ID: true`; the same with tomb and 25 h | the step, twice | no tombstone / no removal; `told` once |
 | M9 | S5 and the process's `env.CLAUDE_CODE_PLUGIN_DIRS` lists the old folder; the start that itself did step 2 | the step, twice | `told` once; the step-2 start says only `removed` |
 | U1 | S5, engine 1.6.0; then 1.6.1; then 1.6.1 | three starts | silent (stored); `updated 1.6.0 → 1.6.1`; silent |
@@ -319,7 +332,7 @@ and copies the new one). Every sentence about the old installer goes; a caveat t
    fixture and the parent text stands (decided by the caller, 2026-11-23).
 3. **`autoUpdate` is not part of the anchor** (R8); **step 2 reads the proof again** (M6c); **a missing engine
    marketplace record is "no proof"** (M3) — the stricter readings of the parent's "where it can be read". Recommended.
-4. **Only a fully accounted folder is removed** (M7b): every file is named by the record with its hash, or is the engine's own (`tsconfig.json` at the top, `.claude-plugin/types/` with its contents); an unknown file keeps the folder, said once (owner check 1).
+4. **Only a folder whose files equal its install record is removed** (M7b): every file is named by the record with its hash and nothing else is there; the engine's own `tsconfig.json` and `.claude-plugin/types/**` are NOT trusted by path (the first round did; the feature review of 2026-11-23 followed the parent instead); any other file keeps the folder with its entry, said once with the first unknown path and how to remove it by hand (owner check 1).
 5. This document needs its `todo/README.md` row and the link from the parent's E3 line in the commit that adds it.
 
 ## Definition of Done (E3)

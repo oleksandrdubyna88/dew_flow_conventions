@@ -185,20 +185,40 @@ test('readProof (X4): the engine alone, as the fixture builds it, is whole; ever
   assert.equal(readProof(paths(h.home, {}), h.readSettings()).whole, false, 'a plugin that is not true is no proof');
 });
 
-test('readOldFolder: missing, removable (every file is named by the record with its hash, or is one of the engine\'s own), and left with a reason for each way the folder is not what the record says', t => {
+test('readOldFolder: missing, removable (the folder\'s files equal the install record exactly), and left with a reason for each way the folder is not what the record says', t => {
   if (!posixOnly(t)) return;
   const h = sandbox(t);
   const p = () => paths(h.home, {});
   const uid = process.getuid();
   assert.deepEqual(readOldFolder(p(), uid), { kind: 'missing' });
   h.old('1.4.0');
-  assert.deepEqual(readOldFolder(p(), uid), { kind: 'removable' });
+  const whole = readOldFolder(p(), uid);
+  assert.equal(whole.kind, 'removable');
+  assert.deepEqual(Object.keys(whole.sums).sort(), [...OLD_FILES].sort(), 'the answer carries the hashes the delete is judged by later');
   fs.writeFileSync(path.join(h.oldFolder, 'notes.txt'), 'mine');
   const kept = readOldFolder(p(), uid);
-  assert.equal(kept.kind, 'left', 'a file the record does not name and the engine did not make keeps the folder');
+  assert.equal(kept.kind, 'left', 'a file the record does not name keeps the folder');
   assert.match(kept.reason, /notes\.txt/, 'the first unknown path is named');
+  assert.match(kept.reason, /did not write/, 'the installer did not write it');
   fs.rmSync(path.join(h.oldFolder, 'notes.txt'));
-  assert.equal(readOldFolder(p(), uid).kind, 'removable', 'the engine\'s own files (tsconfig.json, .claude-plugin/types/**) are accounted for');
+  assert.equal(readOldFolder(p(), uid).kind, 'removable');
+  // The parent: "a symlinked, foreign-owned or edited folder is left". The engine's own files are not trusted by name or path.
+  fs.writeFileSync(path.join(h.oldFolder, 'tsconfig.json'), '{}');
+  const config = readOldFolder(p(), uid);
+  assert.equal(config.kind, 'left', 'tsconfig.json is not named by the record');
+  assert.match(config.reason, /tsconfig\.json/);
+  fs.rmSync(path.join(h.oldFolder, 'tsconfig.json'));
+  fs.mkdirSync(path.join(h.oldFolder, '.claude-plugin', 'types', 'claude-code'), { recursive: true });
+  fs.writeFileSync(path.join(h.oldFolder, '.claude-plugin', 'types', 'claude-code', 'index.d.ts'), '// types');
+  const types = readOldFolder(p(), uid);
+  assert.equal(types.kind, 'left', '.claude-plugin/types/** is not named by the record');
+  assert.match(types.reason, /\.claude-plugin\/types/, 'the first unknown path is named');
+  fs.rmSync(path.join(h.oldFolder, '.claude-plugin', 'types'), { recursive: true });
+  const empty = path.join(h.oldFolder, 'hooks', 'empty-folder');
+  fs.mkdirSync(empty);
+  assert.equal(readOldFolder(p(), uid).kind, 'left', 'a folder is only a container of named files');
+  fs.rmdirSync(empty);
+  assert.equal(readOldFolder(p(), uid).kind, 'removable');
   const reason = (change, pattern) => {
     change();
     const found = readOldFolder(p(), uid);
@@ -243,7 +263,7 @@ test('decideRetirement and decideRemoval: the table of the state machine as pure
   const retired = { action: 'retired' };
   const days = n => n * 24 * HOUR;
   const now = NOW.getTime();
-  const rest = { listed: true, folder: { kind: 'removable' }, leftovers: { retired: [], manifest: true, reported: false } };
+  const rest = { listed: true, folder: { kind: 'removable' }, leftovers: { manifest: true, reported: false } };
   assert.equal(decideRemoval({ retirement: { action: 'stop' }, retiredAt: now - days(2), now, ...rest }).action, 'none');
   for (const retiredAt of [null, now + HOUR, Number.NaN]) assert.equal(decideRemoval({ retirement: retired, retiredAt, now, ...rest }).action, 'stamp', String(retiredAt));
   assert.equal(decideRemoval({ retirement: retired, retiredAt: now - days(1) + 60 * 1000, now, ...rest }).action, 'wait');
@@ -253,10 +273,13 @@ test('decideRetirement and decideRemoval: the table of the state machine as pure
   assert.deepEqual([left.action, left.reason], ['left', 'why']);
   const missing = decideRemoval({ retirement: retired, retiredAt: now - days(1), now, ...rest, folder: { kind: 'missing' }, listed: false });
   assert.deepEqual([missing.action, missing.sweep], ['remove', true], 'a record with no folder is deleted');
-  const nothing = { listed: false, folder: { kind: 'missing' }, leftovers: { retired: [], manifest: false, reported: false } };
+  const nothing = { listed: false, folder: { kind: 'missing' }, leftovers: { manifest: false, reported: false } };
   assert.equal(decideRemoval({ retirement: retired, retiredAt: now - days(1), now, ...nothing }).action, 'done', 'S5');
-  const sweep = decideRemoval({ retirement: retired, retiredAt: now - days(1), now, ...nothing, leftovers: { retired: ['agent-models.retired-1-2'], manifest: false, reported: false } });
-  assert.equal(sweep.action, 'remove');
+  const aside = decideRemoval({ retirement: retired, retiredAt: now - days(1), now, ...nothing, leftovers: { aside: { kind: 'removable' }, manifest: false, reported: false } });
+  assert.deepEqual([aside.action, aside.aside], ['remove', true], 'the recorded aside is deleted');
+  const kept = decideRemoval({ retirement: retired, retiredAt: now - days(1), now, ...rest, leftovers: { aside: { kind: 'left', name: 'agent-models.retired-1-2', reason: 'why' }, manifest: true, reported: false } });
+  assert.deepEqual([kept.action, kept.name, kept.reason], ['asideLeft', 'agent-models.retired-1-2', 'why'], 'a recorded aside that is not what was recorded stops the step: nothing is deleted');
+  assert.equal(decideRemoval({ retirement: retired, retiredAt: now - days(1), now, ...nothing, leftovers: { aside: undefined, manifest: false, reported: false } }).action, 'done');
 });
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -767,17 +790,33 @@ for (const [name, change, options = {}] of LEFT_CASES) {
   });
 }
 
-test('M7b: S4 with exactly the recorded files, tsconfig.json and .claude-plugin/types/claude-code/index.d.ts: removed whole; only a fully accounted folder is removed', t => {
-  const h = sandbox(t);
+test('M7b: S4 with exactly the recorded files: removed whole; the same with tsconfig.json and .claude-plugin/types/claude-code/index.d.ts (the engine\'s own files): left, the first unknown path named once, entry and record stay', t => {
+  const exact = sandbox(t, 'mods-marketplace-m7b1');
+  exact.reg();
+  exact.old('1.4.0');
+  exact.engine('1.6.0');
+  exact.retired(at(-25), '1.6.0');
+  const result = exact.step();
+  assert.deepEqual([result.action, exact.linesOf(result)], ['removed', [LINES.removed()]]);
+  assert.equal(fs.existsSync(exact.oldFolder), false);
+
+  const h = sandbox(t, 'mods-marketplace-m7b2');
   h.reg();
-  h.old('1.4.0');
+  h.old('1.4.0', { extras: true });
   assert.ok(EXTRAS.includes('tsconfig.json') && EXTRAS.includes('.claude-plugin/types/claude-code/index.d.ts'));
   assert.ok(fs.existsSync(path.join(h.oldFolder, '.claude-plugin', 'types', 'claude-code', 'index.d.ts')));
   h.engine('1.6.0');
   h.retired(at(-25), '1.6.0');
-  const result = h.step();
-  assert.deepEqual([result.action, h.linesOf(result)], ['removed', [LINES.removed()]]);
-  assert.equal(fs.existsSync(h.oldFolder), false);
+  const before = h.frozen();
+  const first = h.step();
+  assert.equal(first.action, 'told', first.line);
+  const lines = h.linesOf(first);
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /\.claude-plugin\/types/, 'the first unknown path is named');
+  assert.match(lines[0], /by hand/, 'the line says how to remove it');
+  assert.deepEqual(silent(h.step()), ['none', ''], 'said once');
+  assert.deepEqual(h.frozen(), before, 'the folder, its record and the variable stay');
+  assert.equal(h.readSettings().env.CLAUDE_CODE_PLUGIN_DIRS, h.oldFolder, 'the entry stays with the folder');
 });
 
 test('M8: the inline plugin set to true (the person runs the folder copy): no tombstone, told once; with a tombstone and 25 h: no removal, told once', t => {
@@ -1044,15 +1083,27 @@ for (const stopAfter of ['variable', 'rename', 'folder']) {
   });
 }
 
-test('the sweep: a retired-* real folder of our uid is removed at S4; a link of that name is never touched; a record and a reported file with no old folder are deleted', t => {
+/** The aside a step 2 killed right after its rename leaves: the home, the aside\'s name (read from the state file) and its path. */
+function interruptedAt(h, change = () => {}) {
+  h.reg();
+  h.old('1.4.0', { variable: false });
+  h.engine('1.6.0');
+  h.retired(at(-25), '1.6.0');
+  assert.deepEqual(silent(h.step({ stopAfter: 'rename' })), ['none', '']);
+  const recorded = h.readState().aside;
+  assert.ok(recorded, 'the aside is in the state file before the rename');
+  const aside = path.join(h.mods, recorded.name);
+  change(aside);
+  return { name: recorded.name, aside, recorded };
+}
+
+test('the sweep (a): a same-uid retired-* folder that step 2 never created survives a start 24 h after step 1; it is named once and never deleted; a link of that name and look-alike names are never touched', t => {
   const h = sandbox(t);
   h.reg();
   h.engine('1.6.0');
   h.retired(at(-25), '1.6.0');
-  fs.mkdirSync(path.join(h.mods, 'agent-models.retired-1-2'), { recursive: true });
-  fs.writeFileSync(path.join(h.mods, 'agent-models.retired-1-2', 'x'), 'x');
-  const lookalikes = ['agent-models.retired-manual-backup', 'agent-models.retired-123', 'agent-models.retired-1-2-x'];
-  for (const name of lookalikes) {
+  const strangers = ['agent-models.retired-123-456', 'agent-models.retired-1-2', 'agent-models.retired-manual-backup', 'agent-models.retired-123', 'agent-models.retired-1-2-x'];
+  for (const name of strangers) {
     fs.mkdirSync(path.join(h.mods, name), { recursive: true });
     fs.writeFileSync(path.join(h.mods, name, 'keep.txt'), 'keep');
   }
@@ -1063,14 +1114,101 @@ test('the sweep: a retired-* real folder of our uid is removed at S4; a link of 
   fs.writeFileSync(h.oldManifest, '{}');
   fs.writeFileSync(h.oldReported, '{}');
   const result = h.step();
-  assert.deepEqual([result.action, h.linesOf(result)], ['removed', [LINES.removed()]]);
-  assert.equal(fs.existsSync(path.join(h.mods, 'agent-models.retired-1-2')), false);
-  for (const name of lookalikes) assert.equal(fs.readFileSync(path.join(h.mods, name, 'keep.txt'), 'utf8'), 'keep', `${name} survives: it is not the step's own aside`);
-  assert.equal(fs.existsSync(h.oldManifest), false);
+  assert.deepEqual([result.action, h.linesOf(result)], ['removed', [LINES.removed(), LINES.stray('agent-models.retired-1-2'), LINES.stray('agent-models.retired-123-456')]]);
+  for (const name of strangers) assert.equal(fs.readFileSync(path.join(h.mods, name, 'keep.txt'), 'utf8'), 'keep', `${name} survives: it is not the step's own aside`);
+  assert.equal(fs.existsSync(h.oldManifest), false, 'the record and the reported file are still cleaned');
   assert.equal(fs.existsSync(h.oldReported), false);
+  assert.deepEqual(silent(h.step()), ['none', ''], 'named once');
   if (linked) {
     assert.equal(fs.lstatSync(path.join(h.mods, 'agent-models.retired-9-9')).isSymbolicLink(), true);
     assert.deepEqual(fs.readdirSync(target), ['f']);
+  }
+});
+
+test('the sweep (b): step 2 killed after the rename (aside recorded, delete not done) is finished at the next start; the record names the aside and the hashes; it is cleared after the delete', t => {
+  const h = sandbox(t);
+  const { name, aside, recorded } = interruptedAt(h);
+  assert.match(name, /^agent-models\.retired-\d+-\d+$/);
+  assert.deepEqual(Object.keys(recorded).sort(), ['name', 'sha256']);
+  assert.deepEqual(Object.keys(recorded.sha256).sort(), [...OLD_FILES].sort(), 'the install record\'s hashes are kept in the state, so the manifest is not needed');
+  assert.equal(fs.existsSync(h.oldFolder), false, 'renamed');
+  assert.equal(fs.statSync(aside).isDirectory(), true);
+  const next = h.step();
+  assert.deepEqual([next.action, h.linesOf(next)], ['removed', [LINES.removed()]]);
+  assert.equal(fs.existsSync(aside), false);
+  assert.equal(fs.existsSync(h.oldManifest), false);
+  assert.equal(h.readState().aside, undefined, 'cleared after the delete');
+  assert.deepEqual(silent(h.step()), ['none', '']);
+});
+
+test('the sweep (b2): the aside is recorded before the rename: killed between the record and the rename, the old folder is still there, and the next start clears the record and removes the folder', t => {
+  const h = sandbox(t);
+  h.reg();
+  h.old('1.4.0', { variable: false });
+  h.engine('1.6.0');
+  h.retired(at(-25), '1.6.0');
+  // the disk of a process killed after the record and before the rename: the folder is still there
+  h.writeState({ retiredAt: at(-25).toISOString(), version: '1.6.0', aside: { name: 'agent-models.retired-5-6', sha256: { 'hooks/hooks.json': sha('x') } } });
+  const next = h.step();
+  assert.deepEqual([next.action, h.linesOf(next)], ['removed', [LINES.removed()]]);
+  assert.equal(fs.existsSync(h.oldFolder), false);
+  assert.equal(h.readState().aside, undefined);
+});
+
+test('the sweep (c): a file added to the recorded aside after the interruption: nothing is deleted, the aside is named once with the first unknown path; the record stays; removing the file by hand lets the next start finish', t => {
+  const h = sandbox(t);
+  const { name, aside } = interruptedAt(h, folder => fs.writeFileSync(path.join(folder, 'notes.txt'), 'mine'));
+  const before = snapshot(aside);
+  const first = h.step();
+  assert.equal(first.action, 'told', first.line);
+  const lines = h.linesOf(first);
+  assert.equal(lines.length, 1);
+  assert.ok(lines[0].includes(name) && /notes\.txt/.test(lines[0]), lines[0]);
+  assert.match(lines[0], /by hand/);
+  assert.deepEqual(snapshot(aside), before, 'not one byte of the aside changed');
+  assert.equal(fs.existsSync(h.oldManifest), true, 'the record stays: nothing is cleaned while the aside is held');
+  assert.deepEqual(silent(h.step()), ['none', ''], 'named once');
+  assert.equal(h.readState().aside.name, name, 'still recorded');
+  fs.rmSync(path.join(aside, 'notes.txt'));
+  const done = h.step();
+  assert.deepEqual([done.action, h.linesOf(done)], ['removed', [LINES.removed()]]);
+  assert.equal(fs.existsSync(aside), false);
+});
+
+test('the sweep (d): a recorded aside that was edited, linked, owned by another uid, or whose name is not the step\'s own is never deleted', t => {
+  if (!posixOnly(t)) return;
+  const edited = sandbox(t, 'mm-sweep-d1');
+  const e = interruptedAt(edited, folder => fs.appendFileSync(path.join(folder, OLD_FILES[2]), '// mine\n'));
+  assert.match(edited.linesOf(edited.step())[0], /changed/);
+  assert.equal(fs.existsSync(e.aside), true);
+
+  const linked = sandbox(t, 'mm-sweep-d2');
+  const l = interruptedAt(linked);
+  const target = path.join(linked.root, 'target');
+  fs.mkdirSync(target);
+  fs.writeFileSync(path.join(target, 'f'), 'x');
+  fs.renameSync(l.aside, `${target}-moved`);
+  if (symlinkOrSkip(t, target, l.aside)) {
+    assert.match(linked.linesOf(linked.step())[0], /link/);
+    assert.deepEqual(fs.readdirSync(target), ['f'], 'the target of the link is untouched');
+    assert.ok(fs.readdirSync(`${target}-moved`).length > 0);
+  }
+
+  const foreign = sandbox(t, 'mm-sweep-d3');
+  const f = interruptedAt(foreign);
+  assert.match(foreign.linesOf(foreign.step({ uid: () => process.getuid() + 1 }))[0], /another user|uid/);
+  assert.equal(fs.existsSync(f.aside), true);
+
+  for (const [index, bad] of ['../outside', 'agent-models', 'agent-models.retired-x-1', '/tmp/x'].entries()) {
+    const h = sandbox(t, `mm-sweep-d4${index}`);
+    h.reg();
+    h.engine('1.6.0');
+    h.retired(at(-25), '1.6.0');
+    fs.mkdirSync(path.join(h.mods, 'agent-models'), { recursive: true });
+    fs.writeFileSync(path.join(h.mods, 'agent-models', 'keep.txt'), 'keep');
+    h.writeState({ retiredAt: at(-25).toISOString(), version: '1.6.0', aside: { name: bad, sha256: { 'keep.txt': sha('keep') } } });
+    h.step();
+    assert.equal(fs.readFileSync(path.join(h.mods, 'agent-models', 'keep.txt'), 'utf8'), 'keep', `a recorded name ${bad} is not an aside: not followed`);
   }
 });
 
@@ -1179,8 +1317,14 @@ test('T1 (b): step 2 on a folder of 40 files and 400 KB, in process, takes under
   const h = sandbox(t);
   h.reg();
   h.old('1.4.0');
-  fs.mkdirSync(path.join(h.oldFolder, '.claude-plugin', 'types'), { recursive: true });
-  for (let n = 0; n < 40; n += 1) fs.writeFileSync(path.join(h.oldFolder, '.claude-plugin', 'types', `bulk-${n}.bin`), Buffer.alloc(10 * 1024, n));
+  fs.mkdirSync(path.join(h.oldFolder, 'bulk'), { recursive: true });
+  const record = JSON.parse(fs.readFileSync(h.oldManifest, 'utf8'));
+  for (let n = 0; n < 40; n += 1) {
+    const bytes = Buffer.alloc(10 * 1024, n);
+    fs.writeFileSync(path.join(h.oldFolder, 'bulk', `bulk-${n}.bin`), bytes);
+    record.sha256[`bulk/bulk-${n}.bin`] = sha(bytes);
+  }
+  fs.writeFileSync(h.oldManifest, JSON.stringify(record));
   h.engine('1.6.0');
   h.retired(at(-25), '1.6.0');
   const started = performance.now();
