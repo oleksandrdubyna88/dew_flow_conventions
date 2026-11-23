@@ -1,14 +1,15 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
-import type { Account, AgentRow, LimitsView, Login, Tasks, Viewer } from '../types'
+import type { Account, AgentRow, LastQuestion, LimitsView, Login, Tasks, Viewer } from '../types'
 import {
   accountLabel, ACTIVE, BUTTON_COLOR, capNote, clampIndex, CLOSE_COLOR, closeViewer, currentAccount, currentPrompts, currentViewer,
   isAccountFresh, isAccountReading, isLoginPending, LOG_NOTE, LOGIN_CEILING_MS, LOGIN_COLOR, movePage, nowOrZero, openViewer, readAccount,
   readAccountOnDraw, reasonLine, refusalNote, retryAccount, settledLogin, textRows, toRow, VIEWER_NOTE, viewerFixedRows,
 } from './prompts'
 import { accountButton, currentLimits, emailOf, isLimitsShown, limitsClock, limitsRow, limitsText, tickLimits, watchLimitsMinute } from './limits'
-import { closeTasks, currentTasks, tasksButton, tasksView } from './tasks'
+import { closeTasks, currentTasks, tasksButton, tasksLabel, tasksView } from './tasks'
+import { accountRowCells, answerButton, clearQuestion, currentLastQuestion, isAnswerShown, noteSubmit, restoreQuestion, retryPending } from './answer'
 
 const models = atom({ plugin: 'agent-models', key: 'models' } as const, {} as Record<string, string>)
 const rows = atom({ plugin: 'agent-models', key: 'rows' } as const, [] as AgentRow[])
@@ -185,6 +186,8 @@ type Page = {
   tasks: Tasks
   limits: LimitsView
   limitsNow: number | null // the draw's clock read for the open limits line; null when none was asked or it was refused
+  question: LastQuestion // what the last answer button scrolls to
+  hasAnswerButton: boolean // false on the terminal's main screen, where no transcript scroll works
 }
 
 // The prompt is drawn whole; the band scrolls a taller tree itself, so the header only says so.
@@ -194,7 +197,9 @@ const pageRows = ($: EngineInterface, e: RenderEvent, page: Page) => {
   const index = clampIndex(view.index, texts.length)
   const prompt = texts[index] ?? ''
   const note = view.isFromLog ? LOG_NOTE : VIEWER_NOTE
-  const fixed = viewerFixedRows(props.bodyColumns, view.isCapped, page.login.reason, limitsText(page.limits, emailOf(page.account), page.limitsNow), note)
+  const { text, isKnown } = accountLabel(page.account)
+  const accountCells = accountRowCells({ account: text, isKnown, isLoginPending: page.isLoginPending, tasks: tasksLabel(page.tasks.items.length), isAnswerShown: page.hasAnswerButton })
+  const fixed = viewerFixedRows(props.bodyColumns, view.isCapped, page.login.reason, limitsText(page.limits, emailOf(page.account), page.limitsNow), note, accountCells)
   const used = agentCount + fixed + textRows(prompt, props.bodyColumns)
   const more = used > props.maxRows ? ' (scroll for more)' : ''
   return (
@@ -208,8 +213,9 @@ const pageRows = ($: EngineInterface, e: RenderEvent, page: Page) => {
   )
 }
 
-// The account row: [ messages ]  <account>  [ login ]  [ tasks (n) ] while the viewer is closed (`lead` is the messages
-// button), <account>  [ login ]  [ tasks (n) ] above an open viewer. The signed-in <account> is a button: a press opens the
+// The account row: [ messages ]  <account>  [ login ]  [ tasks (n) ]  [ last answer ] while the viewer is closed (`lead` is the
+// messages button), <account>  [ login ]  [ tasks (n) ]  [ last answer ] above an open viewer. `last answer` (1.5.0, hooks/answer.tsx) is
+// left out on the terminal's main screen, where no transcript scroll works. The signed-in <account> is a button: a press opens the
 // limits line under the row (its numbers coloured by what is left, with a red Close beside it). Then the last login refusal, and the tasks view (never drawn beside the viewer: each opener
 // closes the other).
 const accountRow = ($: EngineInterface, e: RenderEvent, page: Page, lead?: ReturnType<typeof openButton>) => {
@@ -228,6 +234,8 @@ const accountRow = ($: EngineInterface, e: RenderEvent, page: Page, lead?: Retur
         {page.isLoginPending && <Text dimColor>{' logging in…'}</Text>}
         <Text>{'  '}</Text>
         {tasksButton($, e, page.tasks, () => closeViewer($))}
+        {page.hasAnswerButton ? <Text>{'  '}</Text> : null}
+        {page.hasAnswerButton ? answerButton($, e, page.question) : null}
       </Box>
       {limitsRow($, e, page.limits, emailOf(page.account), page.limitsNow)}
       {page.login.reason !== undefined && <Text dimColor>{refusalNote(page.login.reason)}</Text>}
@@ -274,6 +282,7 @@ export const register: Register = on => {
     if (!isAccountReading()) {
       void readAccount($) // not awaited: the session starts as fast as before; a read already running (the draw's) is not queued twice
     }
+    void restoreQuestion($) // not awaited either: with no value (a resume) the newest question of the transcript
     return result
   })
 
@@ -281,7 +290,27 @@ export const register: Register = on => {
     const result = await next(e)
     if (e.agentId === undefined) {
       void refreshAccountIfStale($) // a subagent's end never reads
+      void retryPending($, true) // a question queued behind this turn is in the transcript now, maybe far back past a long answer
     }
+    return result
+  })
+
+  on('turn.start', async ($, e, next) => {
+    const result = await next(e)
+    if (e.agentId === undefined) {
+      void retryPending($, false) // the queued question's own turn begins: it is a transcript message now
+    }
+    return result
+  })
+
+  on('session.end', async ($, e, next) => {
+    await clearQuestion($) // before the end step: the exit shares one short bound
+    return next(e)
+  })
+
+  on('prompt.submit', async ($, e, next) => {
+    const result = await next(e)
+    void noteSubmit($, e, result) // not awaited: a slow transcript read never delays the prompt; it never rejects
     return result
   })
 
@@ -313,13 +342,14 @@ export const register: Register = on => {
       return next(e)
     }
     const below = await next(e) // the rest of the chain draws under our band, never instead of it
-    const [list, view, acc, state, taskList, limitsView] = await Promise.all([
+    const [list, view, acc, state, taskList, limitsView, question] = await Promise.all([
       read($, rows),
       currentViewer($),
       currentAccount($),
       read($, login),
       currentTasks($),
       currentLimits($),
+      currentLastQuestion($),
     ])
     const texts = view.isOpen ? await currentPrompts($) : [] // the prompts of a whole session are read only while they are shown
     void readAccountOnDraw($, acc) // not awaited: a draw is never delayed; it reads only an unread or a stale unknown account
@@ -341,6 +371,8 @@ export const register: Register = on => {
       tasks: taskList,
       limits: limitsView,
       limitsNow,
+      question,
+      hasAnswerButton: isAnswerShown(e.viewport),
     }
     const { Box } = $.ui.resolve(e)
     return (

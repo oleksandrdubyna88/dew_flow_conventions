@@ -70,7 +70,7 @@ test('--print prints the row of the folder it is given as JSON, and the live fol
   assert.deepEqual(JSON.parse(out.stdout), printRow(LIVE));
 });
 
-test('--print of a 1.2.x folder prints the five files that release held, not the two introduced later', t => {
+test('--print of a 1.2.x folder prints the five files that release held, not the three introduced later', t => {
   const dir = path.join(ownedDir(t, 'agent-models-pin-old'), 'mod');
   writeTree(dir, '1.2.1');
   const row = printRow(dir)['1.2.1'];
@@ -78,6 +78,16 @@ test('--print of a 1.2.x folder prints the five files that release held, not the
   assert.deepEqual(Object.keys(row), MOD_FILES.filter(rel => decide.INTRODUCED[rel] === undefined));
   assert.equal(Object.hasOwn(row, 'hooks/tasks.tsx'), false);
   assert.equal(Object.hasOwn(row, 'hooks/limits.tsx'), false);
+  assert.equal(Object.hasOwn(row, 'hooks/answer.tsx'), false);
+});
+
+test('--print of a 1.4.x folder prints the seven files that release held, not hooks/answer.tsx (introduced at 1.5.0)', t => {
+  const dir = path.join(ownedDir(t, 'agent-models-pin-14'), 'mod');
+  writeTree(dir, '1.4.0');
+  const row = printRow(dir)['1.4.0'];
+  assert.equal(Object.keys(row).length, 7);
+  assert.equal(Object.hasOwn(row, 'hooks/answer.tsx'), false);
+  assert.equal(Object.hasOwn(row, 'hooks/limits.tsx'), true);
 });
 
 /** The files a release of `version` holds: MOD_FILES minus those introduced after it (derived, never retyped). */
@@ -86,7 +96,7 @@ const filesOf = version => MOD_FILES.filter(rel => {
   return introduced === undefined || decide.compareVersions(decide.parseVersion(version), introduced) >= 0;
 });
 
-test('I7: the committed table: every row is the files its release held, with a sha256 each; the first release and 1.3.0 are there', () => {
+test('I7: the committed table: every row is the files its release held, with a sha256 each; the first release, 1.3.0 and 1.5.0 are there', () => {
   assert.ok(Object.hasOwn(PINS, '1.0.0'), 'rows are only ever added');
   for (const [version, row] of Object.entries(PINS)) {
     assert.match(version, /^\d+\.\d+\.\d+$/);
@@ -94,6 +104,8 @@ test('I7: the committed table: every row is the files its release held, with a s
     for (const hash of Object.values(row)) assert.match(hash, /^[0-9a-f]{64}$/);
   }
   assert.ok(Object.hasOwn(PINS, '1.3.0'), 'the release that introduced hooks/tasks.tsx has its row');
+  assert.ok(Object.hasOwn(PINS, '1.5.0'), 'the release that introduced hooks/answer.tsx has its row');
+  assert.ok(Object.hasOwn(PINS['1.5.0'], 'hooks/answer.tsx') && !Object.hasOwn(PINS['1.4.0'], 'hooks/answer.tsx'), 'the new file is in the 1.5.0 row only');
 });
 
 test('1l: the live folder mods/agent-models matches its committed row (red after a change until its row is added)', () => {
@@ -108,7 +120,7 @@ test('3.2 the newest row is the highest version by compareVersions, not the last
   assert.equal(newestVersion({ '1.9.0': row, '1.10.0': row, '1.2.0': row }), '1.10.0');
 });
 
-test('3.3 RELEASED_MOD is the newest row of the committed pin table: its version, its seven digests, in MOD_FILES order', () => {
+test('3.3 RELEASED_MOD is the newest row of the committed pin table: its version, its eight digests, in MOD_FILES order', () => {
   assert.ok(decide.RELEASED_MOD, 'agent-models-decide.mjs exports RELEASED_MOD');
   const { RELEASED_MOD } = decide;
   assert.equal(RELEASED_MOD.version, newestVersion(PINS));

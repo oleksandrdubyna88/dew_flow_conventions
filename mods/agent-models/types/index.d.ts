@@ -63,15 +63,27 @@ export type Tasks = {
 }
 
 /**
- * What the mod keeps of the usage answer: three "% left" numbers (0-100, whole), the server's label, and (1.4.0) the moment the
- * 5-hour window resets. NOTHING else.
+ * What the mod keeps of the usage answer: three "% left" numbers (0-100, whole), the server's label, the moment the 5-hour window
+ * resets (1.4.0) and the moment the weekly window resets (1.5.0). NOTHING else.
  */
 export type Limits = {
   fiveHour: number | null
   week: number | null
   model: { label: string; left: number } | null // the `weekly_scoped` entry named Fable; null when the answer has none
   fiveHourResetsAt: number | null // epoch ms of `five_hour.resets_at` (ISO 8601 with an offset); null when absent or not that. The text is made at draw time
+  /** Epoch ms of `seven_day.resets_at`, read like `fiveHourResetsAt`. A value stored by 1.4.0 has none: read it as null (a dash). */
+  weekResetsAt: number | null
 }
+
+/**
+ * The owner's last question (1.5.0), what the `last answer` button scrolls to: `uuid` is the transcript message's id (known before any
+ * press, so the press scrolls without waiting); `pending` is the text of a question submitted but not yet found in the transcript
+ * (queued behind a running turn, or typed into a running turn), and `previous` is the uuid of the question before it: the press goes
+ * there (it is the question being answered now) and the lookup never goes back past it; the lookup takes the newest row with the same
+ * text newer than `previous`. null: no question seen yet. Absent in a state stored before 1.5.0: read it as null. A `queued` field that a
+ * 1.5.0 candidate stored is ignored.
+ */
+export type LastQuestion = { uuid: string } | { pending: string; previous?: string } | null
 
 /**
  * The limits line under the account row. `email`: the account the line was opened for (a line is drawn only while the signed-in
@@ -91,8 +103,9 @@ declare module 'claude-code' {
       login: Login
       tasks: Tasks
       limits: LimitsView
-      /** The minute the open limits line drew (null: a dash). Only its change matters: it draws the band again as the time runs down. */
+      /** The clock minute (epoch ms / 60000, floored) of the open limits line's tick; null: the clock was refused. Only its change matters: it draws the band again as the times run down. */
       limitsMinute: number | null
+      lastQuestion: LastQuestion
     }
   }
 }

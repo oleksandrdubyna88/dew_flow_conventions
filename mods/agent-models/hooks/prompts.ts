@@ -210,12 +210,17 @@ export const LIMITS_CLOSE_LABEL = 'Close'
 export const LIMITS_GAP = 2 // the limits row's columnGap
 // The limits line wraps BESIDE its Close button: the terminal Button is a Box that never shrinks (`[ Close ]`, 9 cells).
 const LIMITS_CLOSE_CELLS = `[ ${LIMITS_CLOSE_LABEL} ]`.length + LIMITS_GAP
-const FIXED_ROWS = 3 // the account row, the header and the page buttons; every note below is counted at its wrapped height
+const FIXED_ROWS = 2 // the header and the page buttons; the account row (it wraps) and every note below are counted at their wrapped height
 
-/** Rows of the open viewer beside the agent rows and the prompt: the three fixed rows and each note, wrapped at `columns`; the open limits line is counted beside its Close button, which never shrinks. */
-export function viewerFixedRows(columns: number, isCapped: boolean, reason: string | undefined, limitsText?: string, note: string = VIEWER_NOTE): number {
+/**
+ * Rows of the open viewer beside the agent rows and the prompt: the two fixed rows, the account row (`accountCells` wide: it wraps with a long email;
+ * 0 counts one row) and each note, wrapped at `columns`; the open limits line is counted beside its Close button, which never shrinks.
+ * The account row's height is an estimate (a flex row with a non-shrinking email Button) and only moves the `(scroll for more)` header.
+ */
+export function viewerFixedRows(columns: number, isCapped: boolean, reason: string | undefined, limitsText?: string, note: string = VIEWER_NOTE, accountCells = 0): number {
   return (
     FIXED_ROWS +
+    Math.max(1, Math.ceil(accountCells / Math.max(1, columns))) +
     (limitsText === undefined ? 0 : textRows(limitsText, Math.max(1, columns - LIMITS_CLOSE_CELLS))) +
     textRows(note, columns) +
     (isCapped ? textRows(capNote, columns) : 0) +

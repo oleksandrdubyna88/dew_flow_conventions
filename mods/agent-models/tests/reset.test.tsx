@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import { limitsFromBody, limitsLine, limitsText } from '../hooks/limits'
 import { viewerFixedRows } from '../hooks/prompts'
-import { answerWith, BAND, CLOCK_START, l1At, L1, measured, MEASURED, ownClock, pressLimits, RESETS_AT, spin, SURFACES, text, window, world } from './limits-fixtures'
+import { answerWith, BAND, CLOCK_START, l1At, L1, measured, MEASURED, ownClock, pressLimits, RESETS_AT, spin, SURFACES, text, WEEK_RESETS_AT, window, world } from './limits-fixtures'
 
 // The 5-hour reset time of the limits line (1.4.0): the parser keeps one more value, the line says `resets in 1h 23m`, the value is
 // coloured by the whole minutes left, it counts down while the line is open and a passed reset fetches again.
@@ -14,7 +14,7 @@ const RED = '#ef4444'
 const bodyWith = (resetsAt: unknown) => JSON.stringify(measured({ five_hour: { ...window(13), resets_at: resetsAt } }))
 const numbers = { fiveHour: 87, week: 74, model: { label: 'Fable', left: 82 } }
 /** The measured line when `left` ms remain until the fixture's reset. */
-const lineLeft = (left: number) => limitsLine({ ...numbers, fiveHourResetsAt: RESETS_AT }, RESETS_AT - left)
+const lineLeft = (left: number) => limitsLine({ ...numbers, fiveHourResetsAt: RESETS_AT, weekResetsAt: WEEK_RESETS_AT }, RESETS_AT - left)
 type Drawn = { children?: unknown[] }
 /** The Texts of their own inside a drawn line: what each one says. */
 const ownTexts = (line: Drawn | undefined) =>
@@ -37,11 +37,11 @@ test('A2 a resets_at that is null, absent, a number, garbage or has no offset is
 })
 
 test('A2b the parser keeps four values and nothing else', () => {
-  expect(Object.keys(limitsFromBody(MEASURED) ?? {})).toEqual(['fiveHour', 'week', 'model', 'fiveHourResetsAt'])
+  expect(Object.keys(limitsFromBody(MEASURED) ?? {})).toEqual(['fiveHour', 'week', 'model', 'fiveHourResetsAt', 'weekResetsAt'])
 })
 
 test('A3 83 minutes left: the line says resets in 1h 23m between the 5h and the week part', () => {
-  expect(lineLeft(83 * MIN)).toBe('5h 87% left · resets in 1h 23m · week 74% left · Fable 82% left')
+  expect(lineLeft(83 * MIN)).toBe('5h 87% left · resets in 1h 23m · week 74% left · resets Nov 14 · Fable 82% left')
   expect(lineLeft(83 * MIN + 59_999)).toBe(L1) // whole minutes: 83 min 59.999 s still shows 1h 23m
 })
 
@@ -51,21 +51,21 @@ test('A4 the text of the time: 1h 0m, 59m, 1m, <1m, then a dash from the reset o
 })
 
 test('A6 no reset time known: resets in a dash', () => {
-  expect(limitsLine({ ...numbers, fiveHourResetsAt: null }, RESETS_AT)).toBe(l1At('—'))
+  expect(limitsLine({ ...numbers, fiveHourResetsAt: null, weekResetsAt: WEEK_RESETS_AT }, RESETS_AT)).toBe(l1At('—'))
 })
 
 test('A6b a clock that was refused (now null) says a dash, never a time from 0', () => {
-  expect(limitsLine({ ...numbers, fiveHourResetsAt: RESETS_AT }, null)).toBe(l1At('—'))
+  expect(limitsLine({ ...numbers, fiveHourResetsAt: RESETS_AT, weekResetsAt: WEEK_RESETS_AT }, null)).toBe(l1At('—', 'resets —'))
 })
 
 test('A9a the open line is counted with the same now: a time is longer than a dash', () => {
-  const view = { isOpen: true, email: 'a@b', fetchedAt: 0, isFailed: false, value: { ...numbers, fiveHourResetsAt: RESETS_AT } }
+  const view = { isOpen: true, email: 'a@b', fetchedAt: 0, isFailed: false, value: { ...numbers, fiveHourResetsAt: RESETS_AT, weekResetsAt: WEEK_RESETS_AT } }
   const shown = limitsText(view, 'a@b', RESETS_AT - 83 * MIN)
   const dashed = limitsText(view, 'a@b', null)
   expect(shown).toBe(L1)
-  expect(dashed).toBe(l1At('—'))
-  // at 41 columns the line wraps in 41 - 11 = 30: 63 characters take 3 rows, 58 take 2
-  expect(viewerFixedRows(41, false, undefined, shown)).toBe(viewerFixedRows(41, false, undefined, dashed) + 1)
+  expect(dashed).toBe(l1At('—', 'resets —'))
+  // at 46 columns the line wraps in 46 - 11 = 35: 79 characters take 3 rows, 69 take 2 (compared for the line alone: the account row is the same)
+  expect(viewerFixedRows(46, false, undefined, shown)).toBe(viewerFixedRows(46, false, undefined, dashed) + 1)
 })
 
 // --- drawn ---
@@ -123,7 +123,9 @@ test('A7 the open line counts down: the draw reads limitsMinute, a minute is wri
   expect(reads, 'the draw of the open line subscribes to the minute').toBeGreaterThan(0)
   const before = reads
   await w.clock.advance(MIN) // 83 min 59 s left at the press, 82 min 59 s a minute later
-  expect(writes, 'one write a minute, none for the 28 ticks between').toEqual([83, 82])
+  // 1.5.0: the key is the clock minute (it ticks the week text too, even with no 5-hour reset); 1.4.0 wrote the minutes left (83, 82)
+  const clockMinute = Math.floor(CLOCK_START / MIN)
+  expect(writes, 'one write a minute, none for the 28 ticks between').toEqual([clockMinute, clockMinute + 1])
   expect(reads, 'the write drew the reader again').toBeGreaterThan(before)
   await ui.redraw()
   expect(await text(ui, l1At('1h 22m'))).toBeDefined()
@@ -152,13 +154,13 @@ test('A8 a closed line writes no minute and neither its draw nor the tick asks t
   await ui.unmount()
 })
 
-// agents 0 + fixed 3 + the limits line 3 rows (63 characters in 41 - 11 = 30) + the note (118 characters in 41: 3 rows) + `hello` 1 = 10;
-// a dash instead of the time (58 characters) is 2 rows, which would make 9
-for (const [maxRows, header] of [[10, 'Message 1 / 1'], [9, 'Message 1 / 1 (scroll for more)']] as const) {
+// agents 0 + fixed 2 + the account row 2 (62 cells in 46) + the limits line 3 rows (79 characters in 46 - 11 = 35) + the note (118 characters in 46: 3 rows) + `hello` 1 = 11;
+// a dash instead of the times (69 characters) is 2 rows, which would make 10
+for (const [maxRows, header] of [[11, 'Message 1 / 1'], [10, 'Message 1 / 1 (scroll for more)']] as const) {
   test(`A9 the viewer counts the longer limits line with the draw now: at ${maxRows} rows the header says "${header}"`, async ($, on) => {
     on('session.messages', () => ({ value: [{ role: 'user', text: 'hello', toolUses: [] }] }))
     await world($, on, answerWith(200, MEASURED))
-    const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 41, maxRows }, surface: 'terminal' })
+    const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 46, maxRows }, surface: 'terminal' })
     await pressLimits(ui)
     await ui.press({ key: 'my-messages' })
     await ui.redraw()
@@ -177,7 +179,7 @@ test('A10 a refused clock at the draw says a dash and no colour, never a time fr
   expect(await text(ui, L1)).toBeDefined()
   clk.isRefused = true
   await ui.redraw()
-  const line = await ui.find({ type: 'Text', text: l1At('—') })
+  const line = await ui.find({ type: 'Text', text: l1At('—', 'resets —') })
   expect(line, 'the line is drawn with a dash').toBeDefined()
   expect(ownTexts(line)).toEqual(['87%', '74%', '82%'])
   await ui.unmount()
@@ -228,7 +230,7 @@ test('A13 a pending login and an open limits line ask the clock once per draw; a
   clk.nowCalls = 0
   await ui.redraw()
   expect(clk.nowCalls).toBe(1)
-  expect(await text(ui, l1At('—'))).toBeDefined()
+  expect(await text(ui, l1At('—', 'resets —'))).toBeDefined()
   expect((await ui.find({ type: 'Button', key: 'login' }))?.props.dimColor, 'a refused clock reads 0: the login stays pending').toBe(true)
   await ui.unmount()
 })

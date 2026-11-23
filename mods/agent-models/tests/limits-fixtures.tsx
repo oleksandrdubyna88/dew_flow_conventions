@@ -21,12 +21,13 @@ export const scoped = (name: string, percent: unknown) => ({
   kind: 'weekly_scoped', group: 'weekly', percent, severity: 'ok', resets_at: '2026-11-14T00:00:00Z', is_active: true,
   scope: { model: { display_name: name }, surface: {} },
 })
-export const window = (utilization: unknown) => ({
-  utilization, resets_at: '2026-11-10T22:00:00Z', limit_dollars: 5, used_dollars: 1, remaining_dollars: 4, locked_reason: null,
+export const WEEK_AT = new Date(2026, 10, 14, 12, 0).toISOString() // the fixture week's `resets_at`: Nov 14, noon in the machine's own zone, so its local date is Nov 14 in any zone
+export const window = (utilization: unknown, resetsAt: unknown = '2026-11-10T22:00:00Z') => ({
+  utilization, resets_at: resetsAt, limit_dollars: 5, used_dollars: 1, remaining_dollars: 4, locked_reason: null,
 })
 export const measured = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   five_hour: window(13),
-  seven_day: window(26),
+  seven_day: window(26, WEEK_AT),
   seven_day_oauth_apps: null, seven_day_opus: null, seven_day_sonnet: null, seven_day_cowork: null, seven_day_omelette: null,
   limits: [
     { kind: 'session', group: 'session', percent: 13, severity: 'ok', resets_at: 'x', scope: null, is_active: true },
@@ -41,14 +42,15 @@ export const measured = (over: Record<string, unknown> = {}): Record<string, unk
 })
 export const MEASURED = JSON.stringify(measured())
 export const RESETS_AT = Date.parse('2026-11-10T22:00:00Z') // the fixture window's `resets_at`
+export const WEEK_RESETS_AT = Date.parse(WEEK_AT)
 export const CLOCK_START = RESETS_AT - (83 * 60_000 + 59_000) // the shown minute is 83 until 59 s have passed
-// The MEASURED line with the 5-hour reset time `reset` (`1h 23m`, `1h 22m`, `—` …).
-export const l1At = (reset: string) => `5h 87% left · resets in ${reset} · week 74% left · Fable 82% left`
+// The MEASURED line with the 5-hour reset time `reset` (`1h 23m`, `1h 22m`, `—` …); the week's reset is the date (1.5.0).
+export const l1At = (reset: string, week = 'resets Nov 14') => `5h 87% left · resets in ${reset} · week 74% left · ${week} · Fable 82% left`
 export const L1 = l1At('1h 23m')
-export const NONE = '5h — · resets in — · week — · Fable —'
+export const NONE = '5h — · resets in — · week — · resets — · Fable —'
 // 69 / 35 / 8 left: one number in each colour band (green over 60, orange 10-60, red under 10).
-export const COLOURED = JSON.stringify(measured({ five_hour: window(31), seven_day: window(65), limits: [scoped('Fable', 92)] }))
-export const LC = '5h 69% left · resets in 1h 23m · week 35% left · Fable 8% left'
+export const COLOURED = JSON.stringify(measured({ five_hour: window(31), seven_day: window(65, WEEK_AT), limits: [scoped('Fable', 92)] }))
+export const LC = '5h 69% left · resets in 1h 23m · week 35% left · resets Nov 14 · Fable 8% left'
 
 export const ok = (stdout: string): ProcessRunResult => ({ exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false })
 export const spin = async () => {
