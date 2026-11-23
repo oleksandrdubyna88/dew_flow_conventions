@@ -1,6 +1,9 @@
 # PLAN — dew_flow_mods, E4: the one round
 
-> Status: **plan only, nothing implemented yet, 2026-11-23.** Scope: the switch on this WSL machine with the real
+> Status: **4.1 DONE on this machine, 2026-11-23** — the install start, `retired` at start 2, `@dew-flow-mods` 1.6.0
+> loading from start 3, an old-pin checkout writing nothing; the record is
+> [research/dew_flow_mods_probe_E1.md § E4.1](../research/dew_flow_mods_probe_E1.md). State S1 below is the state
+> before the switch, kept as the rollback baseline. Next: 4.2. Scope: the switch on this WSL machine with the real
 > `~/.claude`, seen through one unmerged consumer branch (4.1); the pre-checks, ONE `release` promotion of this
 > repository and ten bump PRs (4.2); `POST_DEPLOY.md`, the owner checks and the promotion of three plans (4.3). Stories
 > of epic E4 of [PLAN_dew_flow_mods.md](PLAN_dew_flow_mods.md) (§ *Build order* steps 6–8, § *Epics* E4). No change
@@ -175,7 +178,8 @@ feature findings — Opus; each bump — a Sonnet coder, one at a time; each bum
 - **`POST_DEPLOY.md`** (three items, `:9-13`; cap twelve). The trigger question is yes: the mod's source on the
   owner's installation is not visible to any build. New item 4: "the agent-models mod does not load from dew-flow-mods
   on the owner's machine" — a read-only `node -e` over `~/.claude` (the record whole, the cache `plugin.json` version
-  equal to the record, `agent-models@inline` `false`); `auto`. Then run items 1–4 with `post-deploy-check.mjs --target`
+  equal to the record, `agent-models@inline` `false`, and `agent-models@dew-flow-mods` `true` — a disabled plugin is
+  not loaded); `auto`. Then run items 1–4 with `post-deploy-check.mjs --target`
   against r9700 `main` at its bump, and write the stamp (date, target, pin). Sonnet writes, Opus reviews.
 - **The owner checks** (the parent's `:369-380` and the two mod plans'), after the bumps, on this machine:
   1. A start in any bumped consumer: the band has the `last answer` button (1.5.0) and the pin icon and list (1.6.0);
