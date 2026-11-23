@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
-import type { Account, AgentRow, LastQuestion, LimitsView, Login, Tasks, Viewer } from '../types'
+import type { Account, AgentRow, LastQuestion, LimitsView, Login, Pin, Tasks, Viewer } from '../types'
 import {
   accountLabel, ACTIVE, BUTTON_COLOR, capNote, clampIndex, CLOSE_COLOR, closeViewer, currentAccount, currentPrompts, currentViewer,
   isAccountFresh, isAccountReading, isLoginPending, LOG_NOTE, LOGIN_CEILING_MS, LOGIN_COLOR, movePage, nowOrZero, openViewer, readAccount,
@@ -9,7 +9,11 @@ import {
 } from './prompts'
 import { accountButton, currentLimits, emailOf, isLimitsShown, limitsClock, limitsRow, limitsText, tickLimits, watchLimitsMinute } from './limits'
 import { closeTasks, currentTasks, tasksButton, tasksLabel, tasksView } from './tasks'
-import { accountRowCells, answerButton, clearQuestion, currentLastQuestion, isAnswerShown, noteSubmit, restoreQuestion, retryPending } from './answer'
+import {
+  accountRowCells, answerButton, answerList, clearAnswerList, clearQuestion, closeAnswerList, currentAnswerListOpen, currentLastQuestion, isAnswerShown,
+  noteSubmit, restoreQuestion, retryPending,
+} from './answer'
+import { clearPins, currentPins, pinnedRow } from './pins'
 
 const models = atom({ plugin: 'agent-models', key: 'models' } as const, {} as Record<string, string>)
 const rows = atom({ plugin: 'agent-models', key: 'rows' } as const, [] as AgentRow[])
@@ -131,10 +135,23 @@ const agentRows = ($: EngineInterface, list: readonly AgentRow[], e: RenderEvent
   ))
 }
 
+// The three openers (the message viewer, the tasks view, the `last answer` list) close the other two: never open together. Each closer
+// runs ALL its closes, whatever one of them does (a refused write of one view's state must not leave the other open); none rejects.
+const settled = (closes: readonly Promise<unknown>[]): Promise<void> => Promise.allSettled(closes).then(() => undefined)
+async function closeForViewer($: EngineInterface): Promise<void> {
+  await settled([closeTasks($), closeAnswerList($)])
+}
+async function closeForTasks($: EngineInterface): Promise<void> {
+  await settled([closeViewer($), closeAnswerList($)])
+}
+async function closeForList($: EngineInterface): Promise<void> {
+  await settled([closeViewer($), closeTasks($)])
+}
+
 const openButton = ($: EngineInterface, e: RenderEvent, isLoading = false) => {
   const { Button, Text } = $.ui.resolve(e)
   return (
-    <Button key="my-messages" label="messages" dimColor={isLoading} onPress={() => void openViewer($, () => closeTasks($))}>
+    <Button key="my-messages" label="messages" dimColor={isLoading} onPress={() => void openViewer($, () => closeForViewer($))}>
       <Text color={BUTTON_COLOR}>messages</Text>
     </Button>
   )
@@ -186,7 +203,9 @@ type Page = {
   tasks: Tasks
   limits: LimitsView
   limitsNow: number | null // the draw's clock read for the open limits line; null when none was asked or it was refused
-  question: LastQuestion // what the last answer button scrolls to
+  question: LastQuestion // what the last answer list's first row scrolls to
+  pins: readonly Pin[] // the rows after it
+  isAnswerListOpen: boolean
   hasAnswerButton: boolean // false on the terminal's main screen, where no transcript scroll works
 }
 
@@ -213,11 +232,12 @@ const pageRows = ($: EngineInterface, e: RenderEvent, page: Page) => {
   )
 }
 
-// The account row: [ messages ]  <account>  [ login ]  [ tasks (n) ]  [ last answer ] while the viewer is closed (`lead` is the
-// messages button), <account>  [ login ]  [ tasks (n) ]  [ last answer ] above an open viewer. `last answer` (1.5.0, hooks/answer.tsx) is
-// left out on the terminal's main screen, where no transcript scroll works. The signed-in <account> is a button: a press opens the
-// limits line under the row (its numbers coloured by what is left, with a red Close beside it). Then the last login refusal, and the tasks view (never drawn beside the viewer: each opener
-// closes the other).
+// The account row: [ messages ]  <account>  [ login ]  [ tasks (n) ]  [ last answer ▾ ] while the viewer is closed (`lead` is the
+// messages button), <account>  [ login ]  [ tasks (n) ]  [ last answer ▾ ] above an open viewer. `last answer` (hooks/answer.tsx) is
+// left out on the terminal's main screen, where no transcript scroll works; its list (the last question, then the pins) opens under
+// the row. The signed-in <account> is a button: a press opens the limits line under the row (its numbers coloured by what is left,
+// with a red Close beside it). Then the last login refusal, and the tasks view or the list (never drawn beside the viewer: each
+// opener closes the other two).
 const accountRow = ($: EngineInterface, e: RenderEvent, page: Page, lead?: ReturnType<typeof openButton>) => {
   const { Box, Button, Text } = $.ui.resolve(e)
   const { text, isKnown } = accountLabel(page.account) // the whole email: the band wraps, it never cuts
@@ -233,13 +253,14 @@ const accountRow = ($: EngineInterface, e: RenderEvent, page: Page, lead?: Retur
         </Button>
         {page.isLoginPending && <Text dimColor>{' logging in…'}</Text>}
         <Text>{'  '}</Text>
-        {tasksButton($, e, page.tasks, () => closeViewer($))}
+        {tasksButton($, e, page.tasks, () => closeForTasks($))}
         {page.hasAnswerButton ? <Text>{'  '}</Text> : null}
-        {page.hasAnswerButton ? answerButton($, e, page.question) : null}
+        {page.hasAnswerButton ? answerButton($, e, page.isAnswerListOpen, () => closeForList($)) : null}
       </Box>
       {limitsRow($, e, page.limits, emailOf(page.account), page.limitsNow)}
       {page.login.reason !== undefined && <Text dimColor>{refusalNote(page.login.reason)}</Text>}
       {page.tasks.isOpen && !page.view.isOpen ? tasksView($, e, page.tasks) : null}
+      {page.hasAnswerButton && page.isAnswerListOpen && !page.view.isOpen ? answerList($, e, page.question, page.pins) : null}
     </Box>
   )
 }
@@ -304,7 +325,7 @@ export const register: Register = on => {
   })
 
   on('session.end', async ($, e, next) => {
-    await clearQuestion($) // before the end step: the exit shares one short bound
+    await Promise.all([clearQuestion($), clearPins($), clearAnswerList($)]) // before the end step: the exit shares one short bound
     return next(e)
   })
 
@@ -331,6 +352,9 @@ export const register: Register = on => {
     return result
   })
 
+  // Claude's text answers: the pin icon under each block (hooks/pins.tsx). The draw only reads the pins.
+  on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => pinnedRow($, e, await next(e)))
+
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     refreshNow = () => tick($)
     if (ticking === undefined && drawTicking === undefined) {
@@ -342,7 +366,7 @@ export const register: Register = on => {
       return next(e)
     }
     const below = await next(e) // the rest of the chain draws under our band, never instead of it
-    const [list, view, acc, state, taskList, limitsView, question] = await Promise.all([
+    const [list, view, acc, state, taskList, limitsView, question, pinList, isAnswerListOpen] = await Promise.all([
       read($, rows),
       currentViewer($),
       currentAccount($),
@@ -350,6 +374,8 @@ export const register: Register = on => {
       currentTasks($),
       currentLimits($),
       currentLastQuestion($),
+      currentPins($),
+      currentAnswerListOpen($),
     ])
     const texts = view.isOpen ? await currentPrompts($) : [] // the prompts of a whole session are read only while they are shown
     void readAccountOnDraw($, acc) // not awaited: a draw is never delayed; it reads only an unread or a stale unknown account
@@ -372,6 +398,8 @@ export const register: Register = on => {
       limits: limitsView,
       limitsNow,
       question,
+      pins: pinList,
+      isAnswerListOpen,
       hasAnswerButton: isAnswerShown(e.viewport),
     }
     const { Box } = $.ui.resolve(e)
