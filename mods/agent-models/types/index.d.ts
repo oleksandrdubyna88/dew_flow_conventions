@@ -79,10 +79,11 @@ export type Limits = {
  * The owner's last question (1.5.0), what the `last answer` button scrolls to: `uuid` is the transcript message's id (known before any
  * press, so the press scrolls without waiting); `pending` is the text of a question submitted but not yet found in the transcript
  * (queued behind a running turn, or typed into a running turn), and `previous` is the uuid of the question before it: the press goes
- * there (it is the question being answered now) and the lookup never goes back past it. `queued`: how many copies of the same words are already pending before this one (absent: none), so the lookup takes the row at that index among the matching rows newer than `previous`; null: no question seen yet. Absent in a state
- * stored before 1.5.0: read it as null.
+ * there (it is the question being answered now) and the lookup never goes back past it; the lookup takes the newest row with the same
+ * text newer than `previous`. null: no question seen yet. Absent in a state stored before 1.5.0: read it as null. A `queued` field that a
+ * 1.5.0 candidate stored is ignored.
  */
-export type LastQuestion = { uuid: string } | { pending: string; previous?: string; queued?: number } | null
+export type LastQuestion = { uuid: string } | { pending: string; previous?: string } | null
 
 /**
  * The limits line under the account row. `email`: the account the line was opened for (a line is drawn only while the signed-in

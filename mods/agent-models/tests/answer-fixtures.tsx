@@ -26,7 +26,6 @@ const lastQuestionOf = (v: unknown): LastQuestion => {
   return {
     pending: v.pending,
     ...('previous' in v && typeof v.previous === 'string' ? { previous: v.previous } : {}),
-    ...('queued' in v && typeof v.queued === 'number' ? { queued: v.queued } : {}),
   }
 }
 
@@ -69,14 +68,14 @@ export const session = (on: On, rows: SessionMessage[] = []): Session => {
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   on('session.messages', async (_, e) => {
     s.reads.push({ last: e.last })
+    const answered = e.last === undefined ? s.rows : s.rows.slice(-e.last) // the answer is fixed when the read is issued, as a real read's is
     const held = s.hold?.last === e.last ? s.hold : undefined
     if (held !== undefined) {
       s.hold = undefined // one read only
       await held.wait
     }
     if (s.isBroken) throw new Error('no transcript')
-    const all = s.rows
-    return { value: e.last === undefined ? all : all.slice(-e.last) }
+    return { value: answered }
   })
   on('state.get', KEY, async (_, e, next) => {
     const result = s.seed !== undefined && s.writes.length === 0 ? { value: { value: s.seed, version: 0 } } : await next(e)

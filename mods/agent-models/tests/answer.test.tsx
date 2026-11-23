@@ -241,6 +241,13 @@ test('findQuestion with no boundary takes the newest copy of the text, not an ol
   expect(findQuestion(rows, 'Q', 'u1')).toBe('u3') // with a boundary: the one copy newer than it
 })
 
+test('T23b findQuestion with a boundary and two copies after it takes the newest copy', () => {
+  const rows = [question('Q', 'u0'), question('Q', 'u1'), answer('a1'), question('Q', 'u2')]
+  expect(findQuestion(rows, 'Q', 'u0')).toBe('u2')
+  expect(findQuestion(rows, 'Q', 'u2')).toBeUndefined() // nothing newer than the boundary
+  expect(findQuestion(rows, '<system-reminder>x</system-reminder>', 'u0')).toBeUndefined()
+})
+
 test('newestQuestion drops a compaction summary, wrappers and tool results, not a tag the person typed', () => {
   expect(newestQuestion([question('<b>hi</b>', 'u1'), question(SUMMARY, 'u2'), toolRow('u3')])).toBe('u1')
   expect(newestQuestion([question('<agent-message from="x">y</agent-message>', 'u1')])).toBeUndefined()

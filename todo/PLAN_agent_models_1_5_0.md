@@ -268,6 +268,10 @@ New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.t
 | T22b | T22 after a reload (stored value seeded) | the same |
 | T23 | no question settled in this session; an older row with the same text in the window | the newest match |
 | T24 | a `turn.start` lookup in flight; `session.end`; the lookup lands | value `null` |
+| T23b | `findQuestion` with a boundary and two copies after it | the newest copy |
+| T24b | an old session's lookup in flight; `session.end`; a new same-text submit; the old lookup lands | it writes nothing (generation check) |
+| T20b | a stored value that still carries `queued` (a pre-epoch-2 candidate) | the field is ignored; the re-send settles |
+| T20d | a retry in flight when a newer submit lands | it writes nothing; the value stays at the newer submit |
 | F1 | (test names `findQuestion …`) `findQuestion`: clean text on both sides; an empty clean text; no boundary with two copies | matches; none; the newest copy |
 | F2 | (test name `newestQuestion …`) `newestQuestion`: a summary, wrappers, tool results, a tag the person typed | only the person's row |
 | W9 | the line open, the 5-hour reset unknown, 24 h 1 m to the weekly reset, the clock moves 2 min (no manual redraw) | the date, then `resets in 23h 59m` |
@@ -298,7 +302,7 @@ New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.t
 
 - [x] Plan round advanced (proceed, 2026-11-22); Opus plan review folded.
 - [x] Tests T1–T21b, F1–F2, W1–W11, I1, R1 green (336 mod cases); RED seen first for each new case.
-- [ ] Epoch 2: T20, T22, T22b, T23, T24 RED, then green with `queued` dropped, the newest-match lookup and the generation check in the retry; all checks again.
+- [x] Epoch 2: T20, T20b, T22, T22b, T23b, T24b RED, then green with `queued` dropped, the newest-match lookup and the generation check in the retry (T23, T24, T20d were already green: kept as regression tests); 341 cases; all checks again.
 - [x] `npm test`, `npm run check`, `node --test tools/` green; `claude plugin validate` passes; `tsc` no new error (TypeScript 6.0.3 with the 2.1.330 engine types, run on a scratch copy: no new error; the base's own test-fixture errors — the shared band fixture lacks `isCollapsed` — remain).
 - [x] Code round advanced; Opus code review done; findings fixed or answered.
 - [x] The re-review for epoch 2: consult, whole-plan revision, the Opus judge's sort, the document round and an Opus

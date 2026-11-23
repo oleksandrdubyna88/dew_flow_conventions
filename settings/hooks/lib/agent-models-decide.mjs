@@ -49,8 +49,8 @@ export const RELEASED_MOD = Object.freeze({
     'hooks/prompts.ts': '04e203f2e7f6675065c8e0269978ce92f4ca2529a940f09d91fb89244e853ccf',
     'hooks/tasks.tsx': '52541431aad684757fac626a5c6d3231d7b633ff14d96efdc0d9dfbd0659e4cb',
     'hooks/limits.tsx': '764e1126be2cd9df4e16201177feb57482624795c7a36b12d3a7a68e883df366',
-    'hooks/answer.tsx': 'a71f485f86c3cf43b46bc0595f817f4f43eb7ac84fe008f7c58c7bb1354183c7',
-    'types/index.d.ts': 'bebc5e441892b0f491ea0e1dabcb8fe36bd778ed2f6b5767c8647950f93a2fde',
+    'hooks/answer.tsx': 'c5ce8ea32013ecf92a573a004c0e9abb6c24db6613a3e86763c3c8401a4fa671',
+    'types/index.d.ts': 'd4e7190d2218999b89744575e6f2583bc845063e49e9f747bc92aa1e79061cfa',
   }),
 });
 export const OPTOUT_FILE = 'agent-models.optout';

@@ -94,52 +94,31 @@ test('T19 a session start whose restore read is slow, then a session end: the va
   expect(await held($, s)).toBeNull()
 })
 
-test('T20 the same text queued twice: the second settles on its own row, not the first one\'s', async ($, on) => {
-  const s = session(on)
+test('T20 the same text queued twice before either has a row: the first copy settles, a later second row does not move it', async ($, on) => {
+  const s = session(on, [question('first', 'u0')])
   await start($)
-  s.rows = [question('Q', 'u1')]
   await typed($, 'Q')
-  expect(valueOf(s)).toEqual({ uuid: 'u1' })
-  s.rows = [...s.rows, answer('a1')] // a turn runs: both copies below wait behind it
-  await typed($, 'Q')
-  expect(valueOf(s)).toEqual({ pending: 'Q', previous: 'u1' })
-  await typed($, 'Q')
-  expect(valueOf(s)).toEqual({ pending: 'Q', previous: 'u1', queued: 1 })
-  s.rows = [...s.rows, question('Q', 'u2')] // the first copy is in the transcript, the second is not
+  await typed($, 'Q  ') // the same clean text again: no copy count, the value keeps its shape
+  expect(valueOf(s)).toEqual({ pending: 'Q  ', previous: 'u0' })
+  s.rows = [...s.rows, question('Q', 'u1')] // the first copy is in the transcript, the second is not
   await $.turn.start({ text: 'Q', turnId: 't2' })
   await spin()
-  expect(valueOf(s), 'u2 is the first copy: the second one is still waiting').toEqual({ pending: 'Q', previous: 'u1', queued: 1 })
-  s.rows = [...s.rows, answer('a2'), question('Q', 'u3')]
+  expect(valueOf(s), 'u1 is the first copy: it settles at once').toEqual({ uuid: 'u1' })
+  s.rows = [...s.rows, answer('a1'), question('Q', 'u2')]
   await $.turn.complete(TURN)
   await spin()
-  expect(valueOf(s)).toEqual({ uuid: 'u3' })
+  expect(valueOf(s), 'the second row appearing later does not move it').toEqual({ uuid: 'u1' })
 })
 
-test('T20b after a reload the stored queued count is still the index (this module has no memory of it)', async ($, on) => {
+test('T20b a stored value that still carries a queued count (a 1.5.0 candidate) reads fine: the field is ignored', async ($, on) => {
   const s = session(on, [question('Q', 'u1'), answer('a1'), question('Q', 'u2')])
-  s.seed = { pending: 'Q', previous: 'u1', queued: 1 }
+  s.seed = Object.assign({ pending: 'Q', previous: 'u1' }, { queued: 1 }) // a stored value, not a literal of the type
   await $.turn.start({ text: 'Q', turnId: 't2' })
   await spin()
-  expect(s.writes, 'one copy only: nothing settles').toEqual([])
-  s.rows = [...s.rows, answer('a2'), question('Q', 'u3')]
-  await $.turn.complete(TURN)
-  await spin()
-  expect(valueOf(s)).toEqual({ uuid: 'u3' })
+  expect(valueOf(s), 'one copy newer than previous settles: no wait for a second').toEqual({ uuid: 'u2' })
 })
 
-test('T20c a different text or a settled value starts the count again', async ($, on) => {
-  const s = session(on, [question('first', 'u1')])
-  await start($)
-  await typed($, 'Q')
-  await typed($, 'Q')
-  expect(valueOf(s)).toEqual({ pending: 'Q', previous: 'u1', queued: 1 })
-  await typed($, 'other')
-  expect(valueOf(s), 'other words: no queued').toEqual({ pending: 'other', previous: 'u1' })
-  await typed($, 'other  ')
-  expect(valueOf(s), 'the same clean text counts').toEqual({ pending: 'other  ', previous: 'u1', queued: 1 })
-})
-
-test('T20d a copy queued while a lookup is in flight: the lookup\'s answer does not settle the newer count', async ($, on) => {
+test('T20d a retry still in flight when a newer submit lands writes nothing of its own', async ($, on) => {
   const s = session(on, [question('first', 'u1')])
   await start($)
   await typed($, 'Q')
@@ -149,11 +128,88 @@ test('T20d a copy queued while a lookup is in flight: the lookup\'s answer does 
   const reads = s.reads.length
   await $.turn.complete(TURN)
   for (let i = 0; i < 100 && s.reads.length === reads; i += 1) await macrotask(5) // the retry's read is issued (and held)
-  await typed($, 'Q') // a second copy: the retry read the value before it
-  expect(valueOf(s)).toEqual({ pending: 'Q', previous: 'u1', queued: 1 })
+  const written = s.writes.length
+  await typed($, 'other') // a newer submit: the retry's answer is for the older one
+  expect(valueOf(s)).toEqual({ pending: 'other', previous: 'u1' })
   g.release()
   await spin()
-  expect(valueOf(s), 'u2 is the first copy; the value now waits for the second').toEqual({ pending: 'Q', previous: 'u1', queued: 1 })
+  expect(s.writes.slice(written).every(w => w !== null && 'pending' in w && w.pending === 'other'), 'only the newer submit wrote').toBe(true)
+  expect(valueOf(s)).toEqual({ pending: 'other', previous: 'u1' })
+})
+
+test('T22 a question typed into a running turn never gets a row; sent again after the turn, its row settles it', async ($, on) => {
+  const s = session(on)
+  await start($)
+  s.rows = [question('A', 'u1')]
+  await typed($, 'A')
+  expect(valueOf(s)).toEqual({ uuid: 'u1' })
+  s.rows = [...s.rows, answer('a1')] // A's turn runs
+  await typed($, 'Q') // typed into the running turn: it will never be a message of its own
+  expect(valueOf(s)).toEqual({ pending: 'Q', previous: 'u1' })
+  await $.turn.complete(TURN)
+  await spin()
+  expect(valueOf(s), 'not found: still pending, the press goes to A').toEqual({ pending: 'Q', previous: 'u1' })
+  s.rows = [...s.rows, answer('a2')]
+  await typed($, 'Q') // sent again when the turn is over
+  s.rows = [...s.rows, question('Q', 'u2')]
+  await $.turn.start({ text: 'Q', turnId: 't2' })
+  await spin()
+  expect(valueOf(s), 'the re-sent row settles it: no wait for a second copy').toEqual({ uuid: 'u2' })
+})
+
+test('T22b T22 after a reload: a fresh module with the stored pending value settles on the re-sent row', async ($, on) => {
+  const s = session(on, [question('A', 'u1'), answer('a1'), answer('a2')])
+  s.seed = { pending: 'Q', previous: 'u1' } // what the first Q left in the stored state
+  await typed($, 'Q') // sent again; this module has no memory of the first one
+  s.rows = [...s.rows, question('Q', 'u2')]
+  await $.turn.start({ text: 'Q', turnId: 't2' })
+  await spin()
+  expect(valueOf(s)).toEqual({ uuid: 'u2' })
+})
+
+test('T23 no question settled in this session: an older row with the same text in the window and the new row give the newest', async ($, on) => {
+  const s = session(on, [question('Q', 'u0'), answer('a0'), question('other', 'u1'), question('Q', 'u2')])
+  await typed($, 'Q') // no session.start: nothing restored, the value was null
+  expect(valueOf(s)).toEqual({ uuid: 'u2' })
+})
+
+test('T24 a turn.start lookup held in flight, then a session end: the value stays null after the lookup lands', async ($, on) => {
+  const s = session(on, [question('first', 'u1')])
+  await start($)
+  await typed($, 'Q')
+  s.rows = [...s.rows, question('Q', 'u2')]
+  const g = gate()
+  s.hold = { last: LOOKUP_ROWS, wait: g.wait }
+  const reads = s.reads.length
+  await $.turn.start({ text: 'Q', turnId: 't2' })
+  for (let i = 0; i < 100 && s.reads.length === reads; i += 1) await macrotask(5) // the retry's read is issued (and held)
+  await $.session.end({ reason: 'clear', sessionId: 's1', resume: { id: 's1' } })
+  await spin()
+  expect(valueOf(s)).toBeNull()
+  g.release()
+  await spin()
+  expect(valueOf(s), 'the lookup that lands after the end writes nothing').toBeNull()
+  expect(await held($, s)).toBeNull()
+})
+
+test('T24b the same, and the same words typed in the new session: the old lookup does not settle them on an old row', async ($, on) => {
+  const s = session(on)
+  await start($)
+  await typed($, 'Q') // no row yet, no question before it: pending with no previous
+  expect(valueOf(s)).toEqual({ pending: 'Q' })
+  s.rows = [question('Q', 'old-row')]
+  const g = gate()
+  s.hold = { last: LOOKUP_ROWS, wait: g.wait } // the retry reads (and holds) the old session's transcript
+  const reads = s.reads.length
+  await $.turn.start({ text: 'Q', turnId: 't2' })
+  for (let i = 0; i < 100 && s.reads.length === reads; i += 1) await macrotask(5)
+  await $.session.end({ reason: 'clear', sessionId: 's1', resume: { id: 's1' } })
+  s.rows = [] // the new session's transcript is empty
+  await typed($, 'Q') // the same words, nothing before them: the same shape as the old pending value
+  expect(valueOf(s)).toEqual({ pending: 'Q' })
+  g.release()
+  await spin()
+  expect(valueOf(s), 'the old session\'s row is never the new session\'s question').toEqual({ pending: 'Q' })
 })
 
 test('T21 the deep read is made only when the newest rows do not hold previous', async ($, on) => {
