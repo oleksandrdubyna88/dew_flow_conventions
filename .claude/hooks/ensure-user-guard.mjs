@@ -28,13 +28,15 @@
  * (`ensureEffort`; one line when it changed something). Only `SUBAGENT_MODEL_GUARD=off` and the conventions
  * repository itself skip it; the `subagent-model.optout` marker deliberately does not (high everywhere).</p>
  *
- * <p><b>Agent-models mod.</b> Third (`ensureAgentModelsMod`): the released mod at `<project>/.agents/conventions/mods/agent-models`
- * is copied into `~/.claude/mods` and registered in `settings.json` (created when missing; `lib/agent-models-install.mjs`).
- * Skipped, in order: `AGENT_MODELS_MOD=off`, win32, the conventions repository (decided on the project's own hook path, never on
- * the mod's folder), the `agent-models.optout` marker, a project without the mod; `SUBAGENT_MODEL_GUARD=off` does not skip it.
- * Every refusal is said once; a mod that is not the released one adds the advice to run `git submodule update`.
- * The step loads the mod's modules with a dynamic `import()` when it runs (the step is async), so a module that fails to load (missing,
- * a syntax error) skips that step in silence and never costs the guard or effort step; `main` runs each step inside `guardStep`.</p>
+ * <p><b>Mods marketplace.</b> Third (`ensureModsMarketplaceStep`, the code in `lib/mods-marketplace.mjs`): registers the `dew-flow-mods`
+ * plugin marketplace and the plugin `agent-models@dew-flow-mods` in `~/.claude/settings.json` (only the keys that are absent; Claude Code
+ * itself installs and updates the mod), and, once the engine's own install record proves the mod is installed, retires the old copy in
+ * `~/.claude/mods` in two steps: a tombstone in `agent-models.optout` and `agent-models@inline` set to false, then, 24 hours later, the
+ * old folder and its `CLAUDE_CODE_PLUGIN_DIRS` entry removed. It reads nothing from the project. Skipped, in order: `AGENT_MODELS_MOD=off`,
+ * win32, the conventions repository (decided on the project's own hook path); the person's own opt-out marker is judged inside the lib.
+ * `SUBAGENT_MODEL_GUARD=off` does not skip it. The lib is loaded with a dynamic `import()` when the step runs (the step is async), so a
+ * lib that fails to load never costs the guard or effort step: the failure becomes a refusal line with the reason, at every start while it
+ * lasts (nothing can record that it was said), and `main` runs each step inside `guardStep`.</p>
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -167,38 +169,38 @@ export function ensureEffort({ home, source, env }) {
 
 const modSwitchedOff = env => String(env.AGENT_MODELS_MOD ?? '').trim().toLowerCase() === 'off';
 
+/** The line for a step that could not run (a lib that does not load, or one that throws); names the reason's code, never a path. */
+export const modsStepRefusal = reason =>
+  `agent-models: marketplace NOT registered: the step's code (lib/mods-marketplace.mjs) could not run (${reason}) — the old copy is left as it is; copy the hook files of the release again`;
+
 /**
- * The mod's installer, loaded only when the step runs (never as a static import: a load failure of any of its four modules, a
- * missing sibling or a syntax error, would end the whole hook before `main` and cost the guard and effort steps too). A load failure
- * is a silent skip of the mod step: the modules that could say it, or record it in the reported file, are the ones that did not load.
+ * The marketplace lib, loaded only when the step runs (never as a static import: a load failure of the lib, a missing file or a syntax
+ * error, would end the whole hook before `main` and cost the guard and effort steps too). A failure is returned, never swallowed: the
+ * step turns it into a refusal line (the dew_flow_mods review, 2026-11-23).
  */
-async function loadInstaller() {
+async function loadModsMarketplace() {
   try {
-    return await import('./lib/agent-models-install.mjs');
-  } catch {
-    return null;
+    return { lib: await import('./lib/mods-marketplace.mjs') };
+  } catch (error) {
+    return { failure: error };
   }
 }
 
-const STALE_SUBMODULE_ADVICE = ' — the .agents/conventions submodule does not hold the pinned release; run git submodule update (said once)';
-
 /**
- * Install or upgrade the agent-models mod in `~/.claude/mods` and register it in `settings.json` (what it copies and writes:
- * `lib/agent-models-install.mjs`). The mod is the project's pinned submodule. The "is this the conventions repository" test is
- * made on `source`, the project's `subagent-model.mjs` that the guard step uses, never on the mod's folder: a consumer's
- * `.agents/conventions` holds that repository's layout, so testing it would skip the step in every consumer. Skipped, each
- * writing nothing: `AGENT_MODELS_MOD=off`, win32, the reference repository, the `agent-models.optout` marker and a project
- * without the mod folder (the submodule is not initialised). `SUBAGENT_MODEL_GUARD=off` does NOT skip it. `platform` is a test seam.
+ * Register the `dew-flow-mods` marketplace and retire the old agent-models copy (what it writes and when: `lib/mods-marketplace.mjs`).
+ * The "is this the conventions repository" test is made on `source`, the project's `subagent-model.mjs` that the guard step uses. Skipped,
+ * each writing nothing: `AGENT_MODELS_MOD=off`, win32 and the reference repository. `SUBAGENT_MODEL_GUARD=off` does NOT skip it.
+ * `platform` is a test seam.
  */
-export async function ensureAgentModelsMod({ home, source, env, platform = process.platform }) {
+export async function ensureModsMarketplaceStep({ home, source, env, platform = process.platform }) {
   if (modSwitchedOff(env) || platform === 'win32' || isReferenceRepository(source)) return skipped();
-  const installer = await loadInstaller();
-  if (installer === null) return skipped();
-  const { ensureAgentModels, modTargets } = installer;
-  const mod = path.resolve(path.dirname(source), '..', '..', '.agents', 'conventions', 'mods', 'agent-models');
-  if (fs.existsSync(modTargets(home).optout) || !fs.existsSync(mod)) return skipped();
-  const result = ensureAgentModels({ home, source: mod, inheritedPluginDirs: env.CLAUDE_CODE_PLUGIN_DIRS });
-  return result.unreleased && result.line ? { ...result, line: result.line + STALE_SUBMODULE_ADVICE } : result;
+  const { lib, failure } = await loadModsMarketplace();
+  if (lib === undefined) return { action: 'refused', line: modsStepRefusal(failure?.code ?? failure?.name ?? 'error') };
+  try {
+    return lib.ensureModsMarketplace({ home, env });
+  } catch (error) {
+    return { action: 'refused', line: modsStepRefusal(error?.code ?? error?.name ?? 'error') };
+  }
 }
 
 /** The raw stdin text, abandoned after a deadline when the caller never closes the pipe. */
@@ -226,7 +228,7 @@ function payloadCwd(text) {
   }
 }
 
-const SPEAKING = new Set(['installed', 'upgraded', 'refused', 'newer', 'repaired', 'converged', 'edited', 'registered']);
+const SPEAKING = new Set(['installed', 'upgraded', 'refused', 'newer', 'repaired', 'converged', 'edited', 'registered', 'retired', 'removed', 'updated', 'told']);
 
 async function main() {
   try {
@@ -235,9 +237,9 @@ async function main() {
     if (!project) return;
     const source = path.join(project, '.claude', 'hooks', 'subagent-model.mjs');
     const args = { home: os.homedir(), source, env: process.env };
-    // Guard first: on a fresh machine it creates settings.json, which effort then converges and the mod then registers itself in,
+    // Guard first: on a fresh machine it creates settings.json, which effort then converges and the marketplace step then registers in,
     // all in the same session.
-    const lines = [await guardStep(ensureUserGuard, args), await guardStep(ensureEffort, args), await guardStep(ensureAgentModelsMod, args)].filter(Boolean);
+    const lines = [await guardStep(ensureUserGuard, args), await guardStep(ensureEffort, args), await guardStep(ensureModsMarketplaceStep, args)].filter(Boolean);
     if (lines.length) process.stdout.write(`${JSON.stringify({ systemMessage: lines.join('\n') })}\n`);
   } catch {
     // Fail open: a self-install must never cost a session its start.

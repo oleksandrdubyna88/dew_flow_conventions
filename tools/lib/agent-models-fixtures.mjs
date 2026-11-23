@@ -12,7 +12,11 @@ import path from 'node:path';
 
 import * as mod from '../../settings/hooks/lib/agent-models-install.mjs';
 import { MOD_FILES } from '../../settings/hooks/lib/agent-models-decide.mjs';
+import { direntFolder, snapshot, symlinkOrSkip } from './mods-marketplace-fixtures.mjs';
 import { ownedDir } from './owned.mjs';
+
+// `snapshot`, `direntFolder` and `symlinkOrSkip` moved to `mods-marketplace-fixtures.mjs` (3.1); this library re-exports them until the installer is removed (3.2).
+export { direntFolder, snapshot, symlinkOrSkip };
 
 /** The nine files of the mod, taken from the installer's own list, never typed a second time. */
 export const FILES = [...MOD_FILES];
@@ -59,21 +63,6 @@ export function writeTree(dir, version, overrides = {}) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, overrides[rel] ?? fixtureBytes(rel, version));
   }
-}
-
-/** The folder a `readdirSync` entry sits in: `parentPath` from Node 20.12, `path` before it (the repository accepts Node 20+). */
-export const direntFolder = entry => entry.parentPath ?? entry.path;
-
-/** Every file under `dir` → { bytes (hex), mtimeMs }; the record a "nothing was touched" test compares. */
-export function snapshot(dir) {
-  const out = {};
-  if (!fs.existsSync(dir)) return out;
-  for (const entry of fs.readdirSync(dir, { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile()) continue;
-    const file = path.join(direntFolder(entry), entry.name);
-    out[path.relative(dir, file)] = { bytes: fs.readFileSync(file).toString('hex'), mtimeMs: fs.statSync(file).mtimeMs };
-  }
-  return out;
 }
 
 /** UTF-16 code-unit order, as a bare sort() gives, written out (Sonar S2871); the order of tools/leftovers-check.mjs. */
@@ -130,16 +119,6 @@ export function sandbox(t, { version = '1.2.3' } = {}) {
     ensure: (opts = {}) => mod.ensureAgentModels({ home, source, by: 'test', now: () => NOW, released: fixtureReleased(version), ...opts }),
   };
   return s;
-}
-
-export function symlinkOrSkip(t, target, link) {
-  try {
-    fs.symlinkSync(target, link);
-    return true;
-  } catch (e) {
-    t.skip(`symlinks are not permitted here (${e.code})`);
-    return false;
-  }
 }
 
 /** A rename seam that records every call and lets `fail(callNumber, from, to)` throw before delegating. */
