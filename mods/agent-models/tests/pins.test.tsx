@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import type { UiScrollArgs, UiScrollResult } from 'claude-code'
 
-import { headLine, nextPins, PIN_LIMIT, pinText, pressPin } from '../hooks/pins'
+import { droppedPin, headLine, nextPins, PIN_LIMIT, pinPress, pinText, runPress } from '../hooks/pins'
 import { SURFACES } from './limits-fixtures'
 import {
   A, B, GREY, ICON_OFF, ICON_ON, iconOf, idOf, lastListOpen, lastPins, manyPins, MAIN_SCREEN, mountRow, pin, pinButton, pinWorld,
@@ -88,33 +88,50 @@ test('P5 the 51st pin drops the oldest', () => {
   expect(nextPins(full.slice(0, 49), pin(idOf(999), 'newest'))[0]).toEqual(full[0])
 })
 
+test('P5f droppedPin names the oldest only when a new pin meets a full list', () => {
+  const full = manyPins(PIN_LIMIT)
+  expect(droppedPin(full, pin(idOf(999), 'new'))).toEqual(full[0])
+  expect(droppedPin(full, full[7] ?? pin(idOf(999), 'x')), 'an unpin is no drop').toBeUndefined()
+  expect(droppedPin(full.slice(0, 49), pin(idOf(999), 'new'))).toBeUndefined()
+  expect(droppedPin([], pin(A, 'one'))).toBeUndefined()
+})
+
 // --- the press helper ---
 
 test('L4a a press on a pin scrolls once, at once, to its id with block start', async () => {
   const f = fakes()
-  const pressing = pressPin(f.scroll, f.toast, A)
+  const pressing = runPress(f.scroll, f.toast, pinPress(pin(A, 'words of the pin')))
   expect(f.scrolls, 'the scroll is called before the press yields').toEqual([{ to: { requestId: A }, block: 'start' }])
   await pressing
   expect(f.scrolls).toHaveLength(1)
   expect(f.toasts).toEqual([])
 })
 
+test('L4b a pin row presses by the pin\'s id, never its text, and with the label pin', async () => {
+  const mine = pin(A, 'words of the pin')
+  expect(pinPress(mine)).toEqual({ label: 'pin', id: A })
+  expect(pinPress(pin(B, A)), 'a text that looks like an id is not the target').toEqual({ label: 'pin', id: B })
+  const f = fakes()
+  await runPress(f.scroll, f.toast, pinPress(mine))
+  expect(f.scrolls).toEqual([{ to: { requestId: A }, block: 'start' }])
+})
+
 test('L12a a refused or failed scroll is told in a toast and never thrown', async () => {
   const none = fakes(async () => ({ deny: 'none scrolls' }))
-  await pressPin(none.scroll, none.toast, A)
+  await runPress(none.scroll, none.toast, pinPress(pin(A, 'words of the pin')))
   expect(none.toasts).toEqual(['pin: works in fullscreen only'])
   const gone = fakes(async () => ({ deny: 'no such row' }))
-  await pressPin(gone.scroll, gone.toast, A)
+  await runPress(gone.scroll, gone.toast, pinPress(pin(A, 'words of the pin')))
   expect(gone.toasts).toEqual(['pin: no such row'])
   const broken = fakes(async () => {
     throw new Error('boom')
   })
-  await pressPin(broken.scroll, broken.toast, A)
+  await runPress(broken.scroll, broken.toast, pinPress(pin(A, 'words of the pin')))
   expect(broken.toasts).toEqual(['pin: boom'])
   const thrown = fakes(() => {
     throw new Error('sync boom')
   })
-  await pressPin(thrown.scroll, thrown.toast, A)
+  await runPress(thrown.scroll, thrown.toast, pinPress(pin(A, 'words of the pin')))
   expect(thrown.toasts).toEqual(['pin: sync boom'])
 })
 
@@ -203,6 +220,40 @@ test('P5b the 51st press drops the oldest pin', async ($, on) => {
   expect(pins).toHaveLength(50)
   expect(pins[0]).toEqual(pin(idOf(2), 'answer 2'))
   expect(pins.at(-1)).toEqual(pin(idOf(999), 'the fifty-first'))
+  await ui.unmount()
+})
+
+test('P5c the 51st press drops the oldest pin AND a toast names it, after the write has landed', async ($, on) => {
+  const w = pinWorld(on)
+  seededPins(on, manyPins(PIN_LIMIT))
+  const ui = await mountRow($, idOf(999), { text: 'the fifty-first' })
+  await pressPinIcon(ui, idOf(999))
+  expect(lastPins(w)?.some(p => p.id === idOf(1)), 'the oldest is dropped').toBe(false)
+  expect(w.toasts).toEqual(['pin: oldest pin removed — answer 1'])
+  expect(w.writesAtToast, 'the toast follows the write').toEqual([1])
+  await ui.unmount()
+})
+
+test('P5d no oldest-pin toast while the list has room, and none on an unpin', async ($, on) => {
+  const w = pinWorld(on)
+  seededPins(on, manyPins(PIN_LIMIT - 1))
+  const ui = await mountRow($, idOf(999), { text: 'the fiftieth' })
+  await pressPinIcon(ui, idOf(999)) // 50 pins: full, nothing dropped
+  expect(lastPins(w)).toHaveLength(50)
+  await pressPinIcon(ui, idOf(999)) // unpinned
+  expect(lastPins(w)).toHaveLength(49)
+  expect(w.toasts).toEqual([])
+  await ui.unmount()
+})
+
+test('P5e a refused write of the 51st pin tells the refusal only, never an oldest-pin toast', async ($, on) => {
+  const w = pinWorld(on)
+  seededPins(on, manyPins(PIN_LIMIT))
+  on('state.set', PINS_KEY, () => ({ deny: 'refused' }))
+  const ui = await mountRow($, idOf(999), { text: 'the fifty-first' })
+  await pressPinIcon(ui, idOf(999))
+  expect(w.toasts).toHaveLength(1)
+  expect(w.toasts[0]?.startsWith('pin: oldest pin removed')).toBe(false)
   await ui.unmount()
 })
 

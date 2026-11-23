@@ -135,18 +135,17 @@ const agentRows = ($: EngineInterface, list: readonly AgentRow[], e: RenderEvent
   ))
 }
 
-// The three openers (the message viewer, the tasks view, the `last answer` list) close the other two: never open together.
+// The three openers (the message viewer, the tasks view, the `last answer` list) close the other two: never open together. Each closer
+// runs ALL its closes, whatever one of them does (a refused write of one view's state must not leave the other open); none rejects.
+const settled = (closes: readonly Promise<unknown>[]): Promise<void> => Promise.allSettled(closes).then(() => undefined)
 async function closeForViewer($: EngineInterface): Promise<void> {
-  await closeTasks($)
-  await closeAnswerList($)
+  await settled([closeTasks($), closeAnswerList($)])
 }
 async function closeForTasks($: EngineInterface): Promise<void> {
-  await closeViewer($)
-  await closeAnswerList($)
+  await settled([closeViewer($), closeAnswerList($)])
 }
 async function closeForList($: EngineInterface): Promise<void> {
-  await closeViewer($)
-  await closeTasks($)
+  await settled([closeViewer($), closeTasks($)])
 }
 
 const openButton = ($: EngineInterface, e: RenderEvent, isLoading = false) => {

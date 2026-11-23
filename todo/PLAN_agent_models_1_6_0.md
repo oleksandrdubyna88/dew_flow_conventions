@@ -33,6 +33,8 @@ session, reordering pins, the move to `dew_flow_mods` (its own plan, next).
   closing each other, a frameless icon, the notice blocks, the markdown first line — and the probe's second run are
   the baseline this epoch was approved on. Rejected with reasons in the round: service blocks as AssistantMessage,
   pins surviving into another session.)
+- 1.1 · 2026-11-23 · reviewer · approach — the code round: a 51st pin still drops the oldest, and a toast now names the
+  dropped pin (`pin: oldest pin removed — <text>`), so no pin disappears unseen (test P5c)
 
 ## What the code and the engine do today (read 2026-11-23 at `53b0a33`, Claude Code 2.1.330)
 
@@ -145,6 +147,7 @@ tests; `settings/hooks/lib/agent-models-decide.mjs` + `.claude/hooks/lib/agent-m
 | P3 | `isSummary` block; a block empty after `cleanPrompts`; `isFullscreen: false` | `next(e)` unchanged, no icon |
 | P4 | a press on the icon, then again | `pins` gains `{ id, text }`, then loses it; the text is the first clean line, cut to 60 with `…` |
 | P5 | 51 pins | the oldest dropped |
+| P5c | the 51st pin | a toast names the dropped pin (change 1.1) |
 | P6 | the render hook | never writes `$.state` |
 | P7 | a refused read; a refused write | the grey icon; a toast; no throw |
 | P8 | `session.end` | `pins` `[]` |
@@ -180,8 +183,8 @@ tests; `settings/hooks/lib/agent-models-decide.mjs` + `.claude/hooks/lib/agent-m
 ## Definition of Done
 
 - [ ] Plan round advanced; Opus plan review folded.
-- [ ] Tests P1–P13, L1–L12, I1, R1 green; RED seen first for each new case.
-- [ ] All checks of build order 4 green.
+- [x] Tests P1–P13 (with P5c–P5f), L1–L12 (with L4b, L8b), T10b, I1, R1 green (389 mod cases); RED seen first for each new case.
+- [x] All checks of build order 4 green (`tsc`: no new error in hooks/ or types/).
 - [ ] Code round advanced; Opus code review done; findings fixed or answered.
 - [ ] PR merged with green checks and no open thread. No promotion (the owner's order).
 - [ ] Owner checks reported after the move; this plan promoted to `research/` with what shipped differently.

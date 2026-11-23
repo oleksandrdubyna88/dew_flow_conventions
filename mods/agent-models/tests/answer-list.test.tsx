@@ -164,6 +164,29 @@ test('L8 the list, the tasks view and the message viewer close each other', asyn
   await ui.unmount()
 })
 
+// A refused write of one view's state must not leave another view open: each opener runs ALL its closes, whatever one of them does.
+for (const [name, denied, steps] of [
+  ['the list opening, the viewer\'s write refused: the tasks view still closes', 'viewer', ['my-tasks', 'last-answer']],
+  ['the tasks view opening, the viewer\'s write refused: the list still closes', 'viewer', ['last-answer', 'my-tasks']],
+  ['the viewer opening, the tasks view\'s write refused: the list still closes', 'tasks', ['last-answer', 'my-messages']],
+] as const) {
+  test(`L8b ${name}`, async ($, on) => {
+    await setup($, on)
+    on('state.set', { plugin: 'agent-models', key: denied }, () => ({ deny: 'refused' }))
+    await start($)
+    const ui = await band($)
+    const isTasks = async () => (await ui.find({ type: 'Button', key: 'tasks-close' })) !== undefined
+    const isList = async () => (await labelOf(ui, 'last-answer')) === 'last answer ▴'
+    for (const key of steps) await press(ui, key)
+    const last = steps.at(-1)
+    const open = [await isList(), await isTasks()]
+    if (last === 'last-answer') expect(open, 'only the list is open').toEqual([true, false])
+    else if (last === 'my-tasks') expect(open, 'only the tasks view is open').toEqual([false, true])
+    else expect(await isList(), 'the list is closed by the viewer\'s opener').toBe(false)
+    await ui.unmount()
+  })
+}
+
 test('L9 on the terminal main screen no button and no list, even when the list is stored open', async ($, on) => {
   await setup($, on)
   seededList(on, true)

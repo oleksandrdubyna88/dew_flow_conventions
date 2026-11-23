@@ -42,6 +42,7 @@ export type Write = { key: string; value: unknown }
 export type PinWorld = {
   writes: Write[] // every state write of the mod, in order
   toasts: string[]
+  writesAtToast: number[] // how many state writes had been seen when each toast arrived
 }
 
 /**
@@ -51,7 +52,7 @@ export type PinWorld = {
  * `no implementation for ui.scroll`, which the mod toasts (`SCROLL_REJECTED`), so a press that reached the scroll is seen by that toast.
  */
 export const pinWorld = (on: On, isToasting = true): PinWorld => {
-  const w: PinWorld = { writes: [], toasts: [] }
+  const w: PinWorld = { writes: [], toasts: [], writesAtToast: [] }
   on('ui.render', { component: 'AssistantMessage' }, ($, e) => {
     const { Text } = $.ui.resolve(e)
     return <Text key="engine-row">{e.props.text}</Text>
@@ -63,6 +64,7 @@ export const pinWorld = (on: On, isToasting = true): PinWorld => {
   if (isToasting) {
     on('ui.toast', (_, e) => {
       w.toasts.push(e.text)
+      w.writesAtToast.push(w.writes.length)
       return { value: undefined }
     })
   }

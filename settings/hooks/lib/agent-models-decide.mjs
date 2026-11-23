@@ -47,12 +47,12 @@ export const RELEASED_MOD = Object.freeze({
   sha256: Object.freeze({
     '.claude-plugin/plugin.json': '6acb6c0c5578a8757a584eaf51ba197958546bf0a01204a9a5f39dfb3d9c65d1',
     'hooks/hooks.json': 'd842d789476d67282d0f04b7e5fdc68a3d981ccec65dd79cfa2d11eed13fb828',
-    'hooks/register.tsx': '7b904218d5e661283b96f3a7f151d3002d87cc7349f6f0707ac9e1299392a270',
+    'hooks/register.tsx': '58f6952c4441d2e3db0822679e6252ce2093b747dbcf94d29d7ed7444ead9c08',
     'hooks/prompts.ts': '04e203f2e7f6675065c8e0269978ce92f4ca2529a940f09d91fb89244e853ccf',
     'hooks/tasks.tsx': '52541431aad684757fac626a5c6d3231d7b633ff14d96efdc0d9dfbd0659e4cb',
     'hooks/limits.tsx': '764e1126be2cd9df4e16201177feb57482624795c7a36b12d3a7a68e883df366',
-    'hooks/answer.tsx': 'a2f63aba9ff5a24fb2ab9c6a67c1cd9e48086e73d6059c9574390cf5aaf21a24',
-    'hooks/pins.tsx': '67c6bac13d85e040b6c0d552f92d787c50c63b485d0f5ea5a0134f910b20f6bc',
+    'hooks/answer.tsx': 'f67b20f4d833b1aea0fa49ed943f9b8a2212887be935e42c1ff00b76fec06578',
+    'hooks/pins.tsx': '5b9d28eb7be43c7879ccc59979a55a3aad418803138e28576b6a54522100dbb5',
     'types/index.d.ts': '0d3769c187c46f83bf51c130ae2184433ebcfa8052fb6c80a00d61ea5d5aeb31',
   }),
 });

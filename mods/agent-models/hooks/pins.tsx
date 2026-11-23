@@ -85,31 +85,55 @@ export async function scrollToRow(scroll: (args: UiScrollArgs) => Promise<UiScro
   }
 }
 
-/** A press on a pin's row of the list: the scroll to its block (the pin stays whatever the engine says). */
-export async function pressPin(scroll: (args: UiScrollArgs) => Promise<UiScrollResult>, toast: (text: string) => void, id: string): Promise<void> {
-  return scrollToRow(scroll, toast, 'pin', id)
+/** What a drawn press scrolls to: the row `id`, told in a toast headed `label` when the scroll is refused. */
+export type ScrollPress = { readonly label: string; readonly id: string }
+
+/** The press on a pin's row of the list: the pin's block (its id, never its text); the pin stays whatever the engine says. */
+export const pinPress = (pin: Pin): ScrollPress => ({ label: 'pin', id: pin.id })
+
+/** Runs a drawn press: `scrollToRow` with the press's target. The scroll is called before this yields. */
+export function runPress(scroll: (args: UiScrollArgs) => Promise<UiScrollResult>, toast: (text: string) => void, press: ScrollPress): Promise<void> {
+  return scrollToRow(scroll, toast, press.label, press.id)
 }
 
-async function change($: EngineInterface, next: (cur: readonly Pin[]) => readonly Pin[]): Promise<void> {
+/** The pin a press on `pin` drops: the oldest, when `pin` is new to a full list; undefined otherwise. */
+export function droppedPin(cur: readonly Pin[], pin: Pin): Pin | undefined {
+  return cur.length >= PIN_LIMIT && !cur.some(p => p.id === pin.id) ? cur[0] : undefined
+}
+
+/** What a press tells in a toast; the toast is a no-op when it is refused too (nothing is left to tell). */
+async function tell($: EngineInterface, text: string): Promise<void> {
   try {
-    await update($, pins, cur => next(listOf(cur)))
-  } catch (error) {
-    try {
-      await $.ui.toast(`pin: ${reasonLine(error)}`)
-    } catch {
-      // the toast is refused too: nothing is left to tell
-    }
+    await $.ui.toast(text)
+  } catch {
+    // the toast is refused: nothing is left to tell
   }
 }
 
-/** A press on the icon under a block: pins it, or unpins it. A refused write is a toast. */
+// `update` is the first call (no `await` before it). `dropped` is set by every run of the change function (`update` may run it again on a
+// version miss), so it is what the write that landed dropped; the toast comes after the write.
+async function change($: EngineInterface, next: (cur: readonly Pin[]) => { list: readonly Pin[]; dropped?: Pin }): Promise<void> {
+  const run: { dropped?: Pin } = {}
+  try {
+    await update($, pins, cur => {
+      const step = next(listOf(cur))
+      run.dropped = step.dropped
+      return step.list
+    })
+  } catch (error) {
+    return tell($, `pin: ${reasonLine(error)}`)
+  }
+  if (run.dropped !== undefined) await tell($, `pin: oldest pin removed — ${run.dropped.text}`)
+}
+
+/** A press on the icon under a block: pins it, or unpins it; a 51st pin drops the oldest and a toast names it. A refused write is a toast. */
 export async function togglePin($: EngineInterface, pin: Pin): Promise<void> {
-  await change($, cur => nextPins(cur, pin))
+  await change($, cur => ({ list: nextPins(cur, pin), dropped: droppedPin(cur, pin) }))
 }
 
 /** A press on the `x` of a pin's row. */
 export async function unpin($: EngineInterface, id: string): Promise<void> {
-  await change($, cur => cur.filter(p => p.id !== id))
+  await change($, cur => ({ list: cur.filter(p => p.id !== id) }))
 }
 
 /** At a session end (a `/clear` raises no `session.start`): no pins. Never rejects. */

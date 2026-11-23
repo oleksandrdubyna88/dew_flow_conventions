@@ -9,7 +9,8 @@ import type { EngineInterface, PromptSubmitInput, PromptSubmitResult, SessionMes
 
 import type { LastQuestion, Pin } from '../types'
 import { BUTTON_COLOR, CLOSE_COLOR, cleanPrompts, ENTRY_CAP } from './prompts'
-import { cutText, PIN_COLOR, PIN_ICON, pressPin, scrollToRow, unpin } from './pins'
+import type { ScrollPress } from './pins'
+import { cutText, PIN_COLOR, PIN_ICON, pinPress, runPress, unpin } from './pins'
 
 export const ANSWER_LABEL = 'last answer'
 export const ANSWER_KEY = 'last-answer'
@@ -105,10 +106,15 @@ export function accountRowCells(row: { account: string; isKnown: boolean; isLogi
  */
 export async function pressLastAnswer(scroll: (args: UiScrollArgs) => Promise<UiScrollResult>, toast: (text: string) => void, question: LastQuestion): Promise<void> {
   if (question === null) return toast('last answer: no question yet')
-  // A pending question is not in the transcript yet: the question before it is the one being answered now.
-  const target = 'uuid' in question ? question.uuid : question.previous
-  if (target === undefined) return toast('last answer: your question is not in the transcript yet')
-  return scrollToRow(scroll, toast, 'last answer', target)
+  const press = firstRowPress(question)
+  if (press === undefined) return toast('last answer: your question is not in the transcript yet')
+  return runPress(scroll, toast, press)
+}
+
+/** The press on the list's first row: the question's uuid, or (a pending question is not in the transcript yet) the question before it; undefined when there is none. */
+export function firstRowPress(question: Exclude<LastQuestion, null>): ScrollPress | undefined {
+  const id = 'uuid' in question ? question.uuid : question.previous
+  return id === undefined ? undefined : { label: 'last answer', id }
 }
 
 /** What the first row says: the settled question's text; a pending one's press goes to the question before it, so it says that one's text and that the new one is on its way. */
@@ -164,7 +170,7 @@ function pinRow($: EngineInterface, e: RenderEvent, pin: Pin) {
   const { Box, Button, Text } = $.ui.resolve(e)
   return (
     <Box key={`pin-row-${pin.id}`}>
-      <Button key={`pin-go-${pin.id}`} label={`${PIN_ICON} ${pin.text}`} onPress={() => void pressPin(args => $.ui.scroll(args), text => $.ui.toast(text), pin.id)}>
+      <Button key={`pin-go-${pin.id}`} label={`${PIN_ICON} ${pin.text}`} onPress={() => void runPress(args => $.ui.scroll(args), text => $.ui.toast(text), pinPress(pin))}>
         <Text color={PIN_COLOR}>{PIN_ICON}</Text>
         <Text color={BUTTON_COLOR}>{` ${pin.text}`}</Text>
       </Button>

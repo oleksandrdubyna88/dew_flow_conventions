@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine, Mounted } from 'claude-code/testing'
 import type { UiScrollArgs, UiScrollResult } from 'claude-code'
 
-import { accountRowCells, findQuestion, newestQuestion, pressLastAnswer } from '../hooks/answer'
+import { accountRowCells, findQuestion, firstRowPress, newestQuestion, pressLastAnswer } from '../hooks/answer'
 import { VIEWER_NOTE, viewerFixedRows } from '../hooks/prompts'
 import { tasksLabel } from '../hooks/tasks'
 import { TURN } from './account-fixtures'
@@ -270,6 +270,15 @@ const fakes = (result: () => Promise<UiScrollResult> = async () => ({})) => {
     },
   }
 }
+
+test('T10b the first row presses by the question\'s uuid, or by the one before a pending question; never by its text', async () => {
+  expect(firstRowPress({ uuid: 'u1', text: 'u2' })).toEqual({ label: 'last answer', id: 'u1' })
+  expect(firstRowPress({ pending: 'u9', previous: 'u1', previousText: 'u2' })).toEqual({ label: 'last answer', id: 'u1' })
+  expect(firstRowPress({ pending: 'u9' }), 'a pending question with nothing before it has no target').toBeUndefined()
+  const f = fakes()
+  await pressLastAnswer(f.scroll, f.toast, { pending: 'Q', previous: 'u1', previousText: 'old' })
+  expect(f.scrolls).toEqual([{ to: { requestId: 'u1' }, block: 'start' }])
+})
 
 test('T10 a press with a uuid scrolls once, at once, with the requestId and block start', async () => {
   const f = fakes()
