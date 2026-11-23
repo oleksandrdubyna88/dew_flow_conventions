@@ -1212,22 +1212,61 @@ test('the sweep (d): a recorded aside that was edited, linked, owned by another 
   }
 });
 
-test('step 2 with the remove seam failing: no throw, the folder stays renamed aside for the sweep, and the next start finishes it', t => {
+test('step 2 with the remove seam failing: no throw, nothing of the old copy is cut away (entry, record, reported file, state.aside stay), and the next start with the failure gone finishes it', t => {
   const h = sandbox(t);
   h.reg();
   h.old('1.4.0');
+  fs.writeFileSync(h.oldReported, '{}');
   h.engine('1.6.0');
   h.retired(at(-25), '1.6.0');
-  const result = h.step({ remove: () => { throw Object.assign(new Error('boom'), { code: 'EBUSY' }); } });
+  const settings = fs.readFileSync(h.settings, 'utf8');
+  const record = fs.readFileSync(h.oldManifest, 'utf8');
+  const failing = { remove: () => { throw Object.assign(new Error('boom'), { code: 'EBUSY' }); } };
+  const result = h.step(failing);
   assert.equal(result.action, 'refused', 'the folder was not deleted: "removed" is not said, the failure is');
   assert.deepEqual(h.linesOf(result), [LINES.notRemoved(LINES.deleteFailed('EBUSY'))]);
   assert.equal(fs.existsSync(h.oldFolder), false, 'renamed aside');
-  assert.equal(h.readSettings().env?.CLAUDE_CODE_PLUGIN_DIRS, undefined, 'the entry went');
-  assert.equal(names(h.mods).some(n => n.includes('agent-models.retired-')), true);
+  assert.equal(fs.readFileSync(h.settings, 'utf8'), settings, 'settings.json was not written');
+  assert.equal(h.readSettings().env?.CLAUDE_CODE_PLUGIN_DIRS, h.oldFolder, 'the entry stays while the aside is not deleted');
+  assert.equal(fs.readFileSync(h.oldManifest, 'utf8'), record, 'the install record stays');
+  assert.equal(fs.existsSync(h.oldReported), true, 'the reported file stays');
+  const kept = h.readState().aside;
+  assert.ok(kept, 'state.aside stays, so the next start retries by the recorded hashes');
+  assert.equal(fs.existsSync(path.join(h.mods, kept.name)), true);
+  assert.deepEqual(silent(h.step(failing)), ['none', ''], 'said once while it holds');
   const next = h.step();
   assert.deepEqual(names(h.mods).filter(n => n.includes('agent-models.retired-')), []);
   assert.deepEqual([next.action, h.linesOf(next)], ['removed', [LINES.removed()]]);
+  assert.equal(h.readSettings().env?.CLAUDE_CODE_PLUGIN_DIRS, undefined, 'the entry went after the folder work');
   assert.equal(fs.existsSync(h.oldManifest), false);
+  assert.equal(fs.existsSync(h.oldReported), false);
+  assert.equal(h.readState().aside, undefined);
+});
+
+test('step 2: a recorded file deleted after the first judgement and before the rename: the fresh aside is judged strictly, so it is refused; the entry, the record, the reported file and state.aside stay; named once', t => {
+  const h = sandbox(t);
+  h.reg();
+  h.old('1.4.0');
+  fs.writeFileSync(h.oldReported, '{}');
+  h.engine('1.6.0');
+  h.retired(at(-25), '1.6.0');
+  const settings = fs.readFileSync(h.settings, 'utf8');
+  const record = fs.readFileSync(h.oldManifest, 'utf8');
+  const first = h.step({ beforeRename: () => fs.rmSync(path.join(h.oldFolder, OLD_FILES[2])) });
+  const name = h.readState().aside?.name;
+  assert.match(name, /^agent-models\.retired-\d+-\d+$/);
+  const aside = path.join(h.mods, name);
+  assert.equal(first.action, 'told', first.line);
+  const lines = h.linesOf(first);
+  assert.equal(lines.length, 1);
+  assert.ok(lines[0].includes(name) && lines[0].includes(OLD_FILES[2]) && /missing/.test(lines[0]), lines[0]);
+  assert.ok(!lines.includes(LINES.removed()));
+  assert.equal(fs.existsSync(aside), true, 'the aside is not deleted');
+  assert.equal(fs.readFileSync(h.settings, 'utf8'), settings, 'settings.json was not written');
+  assert.equal(h.readSettings().env.CLAUDE_CODE_PLUGIN_DIRS, h.oldFolder, 'the entry stays');
+  assert.equal(fs.readFileSync(h.oldManifest, 'utf8'), record, 'the install record stays');
+  assert.equal(fs.existsSync(h.oldReported), true, 'the reported file stays');
+  assert.equal(h.readState().aside?.name, name, 'still recorded');
 });
 
 test('step 2: a file edited after the first judgement and before the rename: the aside is not deleted, and the entry, the record and the reported file all stay; the line names the folder as left', t => {

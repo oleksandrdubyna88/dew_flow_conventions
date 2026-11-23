@@ -387,16 +387,18 @@ const isFileAt = file => {
 /**
  * The aside the state file recorded: `{ kind: 'missing' }` (nothing there: the delete was done, or the rename never happened),
  * `{ kind: 'removable' }` (a real folder of our uid whose files are still among the recorded ones) or `{ kind: 'left', name, reason }`.
+ * `partial` (the default, for an aside of an earlier start whose delete may have been cut short) lets a recorded file be absent; a fresh aside, renamed
+ * in this same run, is judged with `partial` false: every recorded file present with its hash, nothing else.
  * `recorded` is `{ name, sha256 }` as `readState` checked it, or undefined. The name was matched against `RETIRED_ASIDE` when the
  * state was read, so the path is a child of `mods` and no other.
  */
-function readAside(p, recorded, uid) {
+function readAside(p, recorded, uid, partial = true) {
   if (recorded === undefined) return undefined;
   const dir = path.join(p.mods, recorded.name);
   try {
     const problem = folderProblem(dir, uid);
     if (problem) return problem.kind === 'left' ? { ...problem, name: recorded.name } : problem;
-    const judged = judgeFiles(dir, recorded.sha256, true);
+    const judged = judgeFiles(dir, recorded.sha256, partial);
     return judged.kind === 'left' ? { ...judged, name: recorded.name } : judged;
   } catch (e) {
     return { kind: 'left', name: recorded.name, reason: `it could not be read (${codeOf(e)})` };
@@ -769,9 +771,13 @@ function removeOldCopy({ p, home, settings, decision, folder, state, saveState, 
       return false;
     }
   };
-  /** Judges the recorded aside again and deletes it only when it is still the recorded folder; true when it is gone and the record is cleared. */
-  const deleteAside = recorded => {
-    const verdict = readAside(p, recorded, uid);
+  /**
+   * Judges the recorded aside again and deletes it only when it is still the recorded folder; true when it is gone and the record is cleared.
+   * `strict`: the aside was renamed in this run, so a recorded file that is missing is a change, not an interrupted delete.
+   * On false (refused or not deleted) the caller stops before the settings write, and the record keeps the aside for the next start.
+   */
+  const deleteAside = (recorded, strict = false) => {
+    const verdict = readAside(p, recorded, uid, !strict);
     if (verdict.kind === 'left') {
       asideLeft = verdict;
       return false;
@@ -807,13 +813,15 @@ function removeOldCopy({ p, home, settings, decision, folder, state, saveState, 
       }
       if (renamed) {
         if (stopAfter === 'rename') return { stopped: true };
-        deleteAside(recorded);
+        deleteAside(recorded, true);
         if (stopAfter === 'folder') return { stopped: true };
       }
     }
     // The last judgement of the aside decides what is kept: an aside refused as changed holds the entry, the record and the reported file
     // (nothing of the old copy is cut away while a part of it is left); the entry leaves only after the folder work is done.
     if (asideLeft) return { removed, asideLeft };
+    // A delete that failed (this run's aside or an earlier one) stops the step too: no settings write, the record, the reported file and state.aside stay.
+    if (deleteFailure !== undefined) return { refusal: LINES.deleteFailed(deleteFailure), removed };
     if (decision.entry) {
       const done = commit(withoutOurEntry(settings, p, home));
       if (done.refusal) return { refusal: done.refusal };
@@ -839,7 +847,7 @@ function removeOldCopy({ p, home, settings, decision, folder, state, saveState, 
   } catch (e) {
     return { refusal: `a file could not be removed (${codeOf(e)})`, removed, asideLeft };
   }
-  return deleteFailure === undefined ? { removed, asideLeft } : { refusal: LINES.deleteFailed(deleteFailure), removed, asideLeft };
+  return { removed, asideLeft };
 }
 
 /**

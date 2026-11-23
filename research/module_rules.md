@@ -182,8 +182,10 @@ lies inside the plugin cache, is a real directory, and holds a `.claude-plugin/p
 The tombstone is written on a machine with no old folder too. Interrupted runs finish at the next start: a kill after the
 tombstone, after step 1's settings write, or after the folder work continues; a kill between the rename and the delete is finished by deleting the aside the
 state file recorded, and only that one, after it is judged again (a real directory of the user, not a link, its files still among
-the recorded ones). A recorded aside to which a file was added or in which a file was changed is not deleted and is named once, with the entry, the record and the reported file kept; any other
-`agent-models.retired-*` folder is never deleted (named once). A record whose rename never happened is cleared.
+the recorded ones). A recorded aside to which a file was added or in which a file was changed is not deleted and is named once, with the entry, the record and the reported file kept; a delete that
+fails keeps the entry, the record, the reported file and the aside's record too (the next start retries). The aside renamed in the same run is judged strictly (every recorded file present with its hash, nothing else); a file missing from it is refused like a changed one. Only a real directory named
+`agent-models.retired-<ms>-<pid>` (digits) owned by the current uid (when known) that is not the recorded aside is named once; no unrecorded folder is ever deleted, and other names
+(for example `agent-models.retired-manual-backup`) are neither deleted nor named. A record whose rename never happened is cleared.
 
 **What the person is told.** The lines are the constants of `LINES` in the lib, each said once per state entered (the store
 is `~/.claude/mods/dew-flow-mods.seen.json`, with `registeredAt`, `retiredAt`, `version`, the `aside` while step 2 holds one and a `said` map; an old-pin session

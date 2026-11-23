@@ -1,3 +1,4 @@
+| M7f | S4 with a record and a reported file; (a) a recorded file of the old folder is deleted in `beforeRename`; (b) the `remove` seam throws, then the next start with the seam fixed | the step, twice | (a) the fresh aside is judged strictly: refused and kept, `settings.json` not written, the record, the reported file and `state.aside` stay, `told` once; (b) the same stop: entry, record, reported file and `state.aside` stay, the failure is said once, and the next start deletes the aside, takes the entry out, deletes the record and the reported file |
 # Tool scenario tests
 
 Run `npm ci --ignore-scripts`, `npm test`, then `npm run check` at repository root.
@@ -245,7 +246,7 @@ and its epics.
 
 The marketplace step (2026-11-23, `todo/PLAN_dew_flow_mods_E3.md`) has one test file per part, all with temporary homes
 made by `ownedDir` through `tools/lib/mods-marketplace-fixtures.mjs` (never `os.homedir()`, never the real `~/.claude`), and
-each case was run red before its code. `tools/mods-marketplace.test.mjs` (111 cases) runs `settings/hooks/lib/mods-marketplace.mjs`
+each case was run red before its code. `tools/mods-marketplace.test.mjs` (112 cases) runs `settings/hooks/lib/mods-marketplace.mjs`
 in process: the registration (R1–R9: no file, other keys kept in place with one backup, already registered, the person's
 `false`, a differing entry, refused shapes, the skips, a link), the proof and the retirement (M1–M9: no install record, an
 incomplete install in each way, a record naming another source, the whole proof writing the tombstone then `false`, a stop
