@@ -29,7 +29,8 @@ function sandbox(t, sourceVersion = 2) {
   };
   const run = (env = {}, input = '{}') => spawnSync(process.execPath, [ENTRY], {
     encoding: 'utf8', input,
-    env: { ...process.env, HOME: home, USERPROFILE: home, CLAUDE_PROJECT_DIR: project, SUBAGENT_MODEL_GUARD: '', ...env },
+    // The marketplace step is not what these cases are about (tools/mods-marketplace-step.test.mjs holds it): it is switched off here.
+    env: { ...process.env, HOME: home, USERPROFILE: home, CLAUDE_PROJECT_DIR: project, SUBAGENT_MODEL_GUARD: '', AGENT_MODELS_MOD: 'off', ...env },
   });
   // The fake sources of these tests are 'released' for the test: the pair is taken from the source as it is now.
   const releasedNow = () => {

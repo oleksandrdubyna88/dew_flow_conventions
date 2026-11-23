@@ -204,6 +204,7 @@ of skipping it is a commit that breaks a rule written precisely because breaking
 | `wsl_care` | mounted at `.agents/conventions` on `release` (the migrated layout); its CI runs `pin-check` and `adapter-check` — found 2026-10-13 |
 | `dew_flow_vscode_kit` | mounted at `.agents/conventions` on `release` (the migrated layout) — found 2026-10-13 |
 | `dew_flow_amd_r9700_tuning_ai` | bash + Python, public — the R9700 vLLM tuning toolkit; mounted at `.agents/conventions` on `release` (pinned at 5863c60), test-leftovers token `r9700` — joined 2026-11-02 |
+| `dew_flow_mods` | Node + TypeScript, public — the Claude Code plugin marketplace of the family (`dew-flow-mods`, the `agent-models` mod); mounted at `.agents/conventions` on `release`. The session step here registers it in a person's `~/.claude/settings.json`; it moves its `release` ref only by its own gated `promote-release`, so a mod change needs no pin bump here — joined 2026-11-23 |
 
 A new repository joins with one `git submodule add` — see [ROLLOUT.md](ROLLOUT.md).
 

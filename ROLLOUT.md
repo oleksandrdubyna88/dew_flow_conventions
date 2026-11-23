@@ -140,6 +140,14 @@ For later updates run `git submodule update --remote <mount>`, run the checks, s
 and open a bump pull request. `--remote` goes to `release` because `.gitmodules` says so. Never use
 remote HEAD as a missing-instruction fallback.
 
+A bump to the release that ships the marketplace step (`settings/hooks/lib/mods-marketplace.mjs`) changes the adapter files of
+the consumer, not only the gitlink: copy `settings/hooks/ensure-user-guard.mjs` byte for byte to `.claude/hooks/ensure-user-guard.mjs`, and
+`settings/hooks/lib/user-guard-install.mjs` and the new `settings/hooks/lib/mods-marketplace.mjs` byte for byte into
+`.claude/hooks/lib/`, and **delete** the four retired libs
+`.claude/hooks/lib/agent-models-{decide,read,swap,install}.mjs` (the reference no longer holds them, so only
+`tools/adapter-check.mjs` finds one left: it names each as retired and exits 1). The consumer's own `.agents/conventions` no longer
+carries the mod; nothing reads it from there.
+
 One trap on an existing clone: `git submodule update --remote` reads `submodule.<name>.branch` from
 **`.git/config` first**, and `git submodule sync` copies the url but NOT the branch. A clone made
 before this rollout therefore keeps following the default branch while CI names `release`. Fix it

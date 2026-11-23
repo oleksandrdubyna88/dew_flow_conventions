@@ -305,7 +305,7 @@ Each consumer: the gitlink, the `.claude/hooks` copies, four deleted libs.
    then V4–V7, V9 and V10 against the real repository, with a second promotion (1.6.1, a small real change).
 5. E3: the step (RED tests first, from the Fable spec), then the removal, `adapter-check`, the docs. `npm test`,
    `npm run check`. Code round (coai `review_code` and an Opus review), PR, checks, threads, merge. No promotion yet.
-6. E4.1: one consumer branch, unmerged, on this machine with the real `~/.claude`: the whole switch, seen — including the first install of `agent-models@dew-flow-mods` while `CLAUDE_CODE_PLUGIN_DIRS` still names the old copy (this machine's state): the `installed_plugins.json` record, the cache folder, then the marketplace copy loading after step 1; a missing record or folder stops the story with the install path written down.
+6. E4.1: one consumer branch, unmerged, on this machine with the real `~/.claude`: the whole switch, seen — including the first install of `agent-models@dew-flow-mods` while `CLAUDE_CODE_PLUGIN_DIRS` still names the old copy (this machine's state): the `installed_plugins.json` record, the cache folder, then the marketplace copy loading after step 1; record at each interactive start the user install record, its cache manifest, the inline switch and the plugin actually loaded (the record comes one start late, and an empty record at the install start is expected, as in `research/dew_flow_mods_probe_E1.md`); stop the story, with the install path written down, only if the record never becomes whole within three interactive starts after the install start.
 7. E4.2: the pre-checks (in-flight consumer releases, the open-PR counts, `git log c598a11..main` read), ONE
    promotion here, then the bumps: `dew_flow_benchmark` and `dew_flow_mcp` before `dew_flow_rag_qln`
    (`README.md:68-73`), then the others and `dew_flow_mods`. Checks present and green on each head sha before a merge.
@@ -442,12 +442,12 @@ one document, written by Opus when the epic starts.
 - **E1 — the short probe.** Goal: the engine behaviour that decides the source form and the retirement is seen on one
   machine before anything is built on it. Stories: 1.1 V1–V3 and V8 in a scratch config folder with a throwaway
   repository; 1.2 the decision record. Depends on: nothing. Done when: the results file is merged. No cornerstone.
-- **E2 — the new repository and its gate.** Goal: `dew_flow_mods` holds 1.6.0 and nothing reaches `release` but
+- **E2 — the new repository and its gate** ([stories](PLAN_dew_flow_mods_E2.md), [gate spec](PLAN_dew_flow_mods_E2_gate.md)). Goal: `dew_flow_mods` holds 1.6.0 and nothing reaches `release` but
   through the gate. Stories: 2.1 the copy, the layout, CI, the family mount; **2.2 the release gate — cornerstone**
   (the tool, the version and layout gates, the deploy key and the environment, the rulesets, O1–O7); 2.3 the first
   promotion, the tag, the README, then V4–V7, V9, V10 with 1.6.1. Depends on: E1, 1.6.0 merged, Q1–Q3. Done when: C1,
   G1–G10, O1–O7, the observations recorded.
-- **E3 — conventions: the registration step replaces the installer.** Stories: **3.1 the step and the retirement —
+- **E3 — conventions: the registration step replaces the installer** ([stories](PLAN_dew_flow_mods_E3.md)). Stories: **3.1 the step and the retirement —
   cornerstone** (it writes the trust anchor into user settings and retires a folder in `~/.claude` on every
   machine); 3.2 the removal, the frozen fixture and `adapter-check`; 3.3 the docs. Depends on: E1, E2. Done when:
   R1–A4, merged, not promoted.

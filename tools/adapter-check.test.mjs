@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -55,7 +55,7 @@ test('a missing hook and missing settings are both named, with what to do', (t) 
   const hooks = fs.readdirSync(path.join(REFERENCE, 'hooks'), { recursive: true })
     .filter((file) => file.endsWith('.mjs') && !file.endsWith('.test.mjs'));
 
-  assert.ok(hooks.length >= 7, `the reference lists ${hooks.length} hook files`);
+  assert.ok(hooks.length >= 6, `the reference lists ${hooks.length} hook files`);
   assert.equal(findings.length, 1 + hooks.length);
   assert.match(findings.join('\n'), /\.claude\/settings\.json is missing/);
   assert.match(findings.join('\n'), /\.claude\/hooks\/load-instructions\.mjs is missing/);
@@ -63,8 +63,70 @@ test('a missing hook and missing settings are both named, with what to do', (t) 
   assert.match(findings.join('\n'), /\.claude\/hooks\/subagent-model\.mjs is missing/);
   assert.match(findings.join('\n'), /\.claude\/hooks\/ensure-user-guard\.mjs is missing/);
   assert.match(findings.join('\n'), /\.claude\/hooks\/lib\/user-guard-install\.mjs is missing/);
-  assert.match(findings.join('\n'), /\.claude\/hooks\/lib\/agent-models-decide\.mjs is missing/);
-  assert.match(findings.join('\n'), /\.claude\/hooks\/lib\/agent-models-read\.mjs is missing/);
+  // A2: the step's lib is the one the reference names now, and no retired installer lib is asked for any more.
+  assert.match(findings.join('\n'), /\.claude\/hooks\/lib\/mods-marketplace\.mjs is missing/);
+  assert.doesNotMatch(findings.join('\n'), /agent-models-/);
+});
+
+const RETIRED_LIBS = ['agent-models-decide.mjs', 'agent-models-read.mjs', 'agent-models-swap.mjs', 'agent-models-install.mjs'];
+
+test('A1: a consumer that still holds a retired installer lib is told to delete it; a consumer with none has no such finding', (t) => {
+  const repo = whole(t);
+  assert.deepEqual(adapterFindings(repo), [], 'none: clean');
+
+  fs.writeFileSync(path.join(repo, '.claude/hooks/lib/agent-models-swap.mjs'), '// the old installer\n');
+  const findings = adapterFindings(repo);
+
+  assert.equal(findings.length, 1);
+  assert.match(findings[0], /\.claude\/hooks\/lib\/agent-models-swap\.mjs is retired/);
+  assert.match(findings[0], /delete it/);
+  assert.match(findings[0], /dew-flow-mods/, 'it says what replaced the installer');
+});
+
+test('A1: every retired lib is named on its own, a lib of another name is left alone, and a retired name in a subfolder is not a lib', (t) => {
+  const repo = whole(t);
+  const lib = path.join(repo, '.claude/hooks/lib');
+  for (const name of RETIRED_LIBS) fs.writeFileSync(path.join(lib, name), '// old\n');
+  fs.writeFileSync(path.join(lib, 'agent-models.md'), 'not a lib\n');
+  fs.writeFileSync(path.join(lib, 'my-agent-models-notes.mjs'), '// a consumer\'s own file\n');
+  fs.mkdirSync(path.join(lib, 'sub'));
+  fs.writeFileSync(path.join(lib, 'sub/agent-models-x.mjs'), '// beyond the lib folder\n');
+
+  const findings = adapterFindings(repo);
+
+  assert.equal(findings.length, RETIRED_LIBS.length);
+  for (const name of RETIRED_LIBS) assert.ok(findings.some((finding) => finding.includes(`lib/${name} is retired`)), name);
+});
+
+test('A1: a consumer\'s own agent-models-*.mjs is not flagged, and each of the four retired libs, by its exact name, is', (t) => {
+  const repo = whole(t);
+  const lib = path.join(repo, '.claude/hooks/lib');
+  for (const own of ['agent-models-notes.mjs', 'agent-models-install-helper.mjs', 'agent-models-.mjs', 'agent-models-swap.test.mjs', 'agent-models-read.mjs.bak']) {
+    fs.writeFileSync(path.join(lib, own), '// a consumer\'s own file\n');
+  }
+  assert.deepEqual(adapterFindings(repo), [], 'a name that is not one of the four is never a finding');
+  for (const name of RETIRED_LIBS) {
+    const file = path.join(lib, name);
+    fs.writeFileSync(file, '// old\n');
+    const findings = adapterFindings(repo);
+    assert.equal(findings.length, 1, name);
+    assert.match(findings[0], new RegExp(`lib/${name.replace('.', '\\.')} is retired`));
+    fs.rmSync(file);
+  }
+});
+
+test('A1: the command line reports a retired lib and exits 1; a consumer without one exits 0', (t) => {
+  const repo = whole(t);
+  const run = () => spawnSync(process.execPath, [path.join(HERE, 'adapter-check.mjs'), repo], { encoding: 'utf8', timeout: 60_000, windowsHide: true });
+
+  const clean = run();
+  assert.equal(clean.status, 0, clean.stdout);
+
+  fs.writeFileSync(path.join(repo, '.claude/hooks/lib/agent-models-decide.mjs'), '// old\n');
+  const dirty = run();
+  assert.equal(dirty.status, 1);
+  assert.match(dirty.stdout, /1 finding/);
+  assert.match(dirty.stdout, /agent-models-decide\.mjs is retired/);
 });
 
 test('a hook copy that has drifted is caught — that is the whole reason this tool exists', (t) => {

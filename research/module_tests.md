@@ -237,88 +237,67 @@ manifest, is completed rather than taken for an edit. The code round of the same
 the hook and a stop after the manifest (the old bytes are its `previous`) are both completed even when the source has
 moved on, every install records `previous`, and a relative source path is checked for uncommitted changes (it named
 a pathspec under the `-C` folder that did not exist); the last three red on the first fix.
-The mod itself is tested by `claude plugin test mods/agent-models` (282 cases at 1.4.0, 341 at 1.5.0, 391 at 1.6.0, not run by CI): 1.4.0 adds
-`tests/reset.test.tsx` (the reset time: parse, text, colour bands, the countdown write and redraw, a refused clock, a
-passed reset fetched again), `tests/account-ceiling.test.tsx` and `tests/account-retry.test.tsx` (the read ceilings,
-the generation, a result that lands as the ceiling fires, the tick retry with no clock, a session with no
-`session.start`), with `tests/account-fixtures.tsx`.
-1.5.0 adds `tests/answer.test.tsx` and `tests/answer-race.test.tsx` with `tests/answer-fixtures.tsx` (T1–T24b: the `last answer` button in both viewer states and its absence on the
-terminal's main screen; the lookup of the owner's last question at a person's submit; a queued submit that is `pending` with the question before it
-as `previous` until `turn.start` or `turn.complete` (which reads back to the engine cap, stopping at `previous`), the same text typed again, also
-after a reload that kept only the stored value, two submits whose first write is slow, the same words queued twice (no copy count: the first copy settles, a later second row does not move it), a question typed into a running turn that never gets a row and is sent again (it settles on the re-sent row, also after a reload; a stored `queued` field of a 1.5.0 candidate is ignored), the newest matching row with or without a boundary, a turn lookup still in flight when the session ends or a newer submit lands (it writes nothing, also when the same words are typed in the new session), the deep read made only when the newest 50 rows do not reach back to `previous`, a session start with no value (200 rows, then the engine cap;
-a tag the person typed is a question, a notification and a peer wrapper are not), a session end that clears the value, also while a submit's transcript read or a session start's restore read is held (the restore must not write after the end); the press through
-`pressLastAnswer` with fake scroll and toast functions, because the harness cannot see a transcript scroll target, a scroll that is called before
-the press yields, and a press while pending that goes to `previous`; a throwing or refused read and write that leaves the value; the viewer's
-row count with a wrapped account row) and `tests/week-reset.test.tsx` (W1–W11: the weekly reset time on the limits line, its date from 24 hours
-on and its time left under that, a dash, a value stored by 1.4.0 with no `weekResetsAt`, the turn from a date into hours with no new fetch and no
-manual redraw, also with the 5-hour reset unknown, a passed weekly reset fetched again). The tick key is the clock minute (`reset.test.tsx` A7 expects
-the clock minute, not the 5-hour minutes left). The week fixture dates are built from local noon, so the tests pass in any time zone (run with
-`TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`). The longer limits line (79 characters) and the wider account row changed the literals and
-row counts of `limits`, `limits-race` and `reset` tests.
-1.6.0 adds `tests/pins.test.tsx`, `tests/answer-list.test.tsx` and `tests/pins-fixtures.tsx` (P1–P15, L1–L12, Q1–Q2, 49 cases): the pin text (first content
-line, heading, quote, list and fence marks dropped, cut to 60 characters with an ellipsis that is the 60th, a cut never splits a character, an
-engine notice or an empty block has none), the 50-pin cap (the 51st press drops the oldest and a toast names it, `P5c`–`P5f`), the grey frameless icon under each text block and the raspberry
-one when pinned on both surfaces, no icon on a summary block, an empty block, an engine notice, an id that is no transcript block's or the terminal's main
-screen, the draw that never writes state, a refused read (grey icon) and a refused write (a toast), the session end that clears the pins and closes the
-list, two blocks of one reply with two pins, a press whose write is held while the session ends (it cannot bring the old pin back, `P14`), a 1 MB answer read only to a 4096-character prefix (`P15`: a watched string, only `slice` is called on it); the `last answer ▾`/`▴` button and the list under the account row (the question first, then the pins oldest
-first, each with an `x`; the first row's text is the clean first line of the question cut to 60, `(sending…)` after the text before a pending one,
-`last question` for a 1.5.0 value with no text, dim `no question yet` with no press), the tasks view, the message viewer and the list closing each
-other (also when one view's write is refused: each opener runs all its closes, `L8b`), no list on the main screen even when stored open, fifty pins drawn whole, a state stored before 1.6.0. The harness cannot see where the mod's own
-`$.ui.scroll` goes (it rejects with `no implementation for ui.scroll`, which the mod toasts), so a drawn press is seen by that toast under the row's own
-heading, and the target and the order of the call (before any `await`) are tested through `pressLastAnswer` and `runPress` with fake scroll and toast
-functions, and the row's target (the pin's id, the question's uuid or the one before a pending question) through the pure `pinPress` and `firstRowPress` (`L4b`, `T10b`). The 1.5.0 tests changed: the stored question now carries its `text` (and a pending one `previousText`), `newestQuestion` answers uuid and text,
-the button's label has the arrow (two cells wider, so the long-email fixture is 102 characters, to stay two rows), and the press test of
-the drawn button now opens the list.
-The installer tests name nine files: a 1.4.0 copy upgrades to 1.5.0 with `hooks/answer.tsx` copied (`I1` in `agent-models-install.test.mjs`,
-`I8`–`I10` in `agent-models-decide.test.mjs`), a 1.5.0 copy of eight files upgrades to 1.6.0 with `hooks/pins.tsx` copied, and a stray `hooks/pins.tsx`
-in the 1.5.0 target is not vouched for (`I14`, `I15` in the install file, `I11`–`I13` in the decide file), and the 1.5.0 and 1.6.0 pin rows carry
-the new files (the agent-models installer files hold 278 tests at 1.6.0, six more than at 1.5.0).
+The `agent-models` mod and its tests are not here. The mod moved to the public repository `dew_flow_mods` (its own
+`claude plugin test`, its gate and its CI); the tests of the earlier installer (`agent-models-*.test.mjs`, the pins table,
+the extractor test) were removed with the installer, and what they said about the shared settings core was kept in
+`tools/user-guard-road.test.mjs` (below). Their history is in the plans [PLAN_agent_models_mod.md](PLAN_agent_models_mod.md)
+and its epics.
 
-The agent-models mod and its self-install (2026-11-11) have one test file per part, all with temporary homes and
-projects made by `ownedDir` through `tools/lib/agent-models-fixtures.mjs` (never `os.homedir()`, never the real
-`~/.claude`), and each case was run red before its change. `tools/agent-models-decide.test.mjs` covers the pure
-decisions (version arithmetic, the copy and registration decisions, the released check) with no file read.
-`tools/agent-models-read.test.mjs` covers `readSource` and `readTarget`: what a refused source or an unreadable target
-names. `tools/agent-models-pin.test.mjs` covers the pin table: a change to a mod file without a new version is red, the
-live `mods/agent-models` equals its committed row, and `RELEASED_MOD` equals the newest row.
-`tools/agent-models-extract.test.mjs` runs the mod's session-log extractor with node over fixture logs.
-`tools/agent-models-imports.test.mjs` reads the installer modules as text: what each may import, no second body of a
-helper `user-guard-install.mjs` exports, no read of the source folder outside `readSource`, every write of `settings.json`
-through `commitSettings` (the guard's three operations and the mod's registration; the effort write, `writeConverged`, is
-separate and a recorded follow-up), and no `writeAtomic(` call naming `settings` anywhere in the four agent-models modules
-or `user-guard-install.mjs` but that one; each scan has a companion that it still finds a known instance.
+The marketplace step (2026-11-23, `todo/PLAN_dew_flow_mods_E3.md`) has one test file per part, all with temporary homes
+made by `ownedDir` through `tools/lib/mods-marketplace-fixtures.mjs` (never `os.homedir()`, never the real `~/.claude`), and
+each case was run red before its code. `tools/mods-marketplace.test.mjs` (106 cases) runs `settings/hooks/lib/mods-marketplace.mjs`
+in process: the registration (R1–R9: no file, other keys kept in place with one backup, already registered, the person's
+`false`, a differing entry, refused shapes, the skips, a link), the proof and the retirement (M1–M9: no install record, an
+incomplete install in each way, a record naming another source, the whole proof writing the tombstone then `false`, a stop
+after each sub-step, the 24 hours, a folder that is edited or a link or foreign, the person's `true`, the shell's own variable),
+the lines said once (U1, W1), the lib's own limits (T1: no child process, network, worker or timer, and 40 files under one
+second) and its imports (A3: only `node:` builtins and `./user-guard-install.mjs`, every imported name an export of the guard
+core, one body per helper, `settings.json` only through `commitSettings`); each scan has a companion that finds a planted
+instance. `tools/mods-marketplace-step.test.mjs` (27 cases) runs the hook step in `ensure-user-guard.mjs` (the skips in
+their order, the lib that fails to load becoming a refusal line while the guard and effort steps still run, the copy of the
+hook and of the lib in `.claude/hooks` equal byte for byte) and the spawned hook on one home for several starts (S1, S2, W2). It
+also plays the FROZEN old step (`tools/fixtures/retired-installer/`, below) against the same home: the control M5p proves the
+frozen step still installs the 1.4.0 mod and registers its folder, and M5a and M5b cut the new step off after the tombstone and
+after the settings write, then check that the old step installs nothing and the next start finishes without a second line.
 
-`tools/agent-models-swap.test.mjs`, `tools/agent-models-install.test.mjs` and `tools/agent-models-refusals.test.mjs`
-cover the copy: install, upgrade, no-op, an edited copy, a newer copy (also put back when another start installed it
-during the swap), the leftovers, each failure of the swap and its roll-back, the install record, a copy that writes only
-the bytes the released check saw (the source is changed after the read), and the refusal lines with their retry or
-fix-by-hand tail (a filesystem without hard links is by hand, an aside whose version cannot be read is put back).
-`tools/agent-models-register.test.mjs` covers the registration and the road under it: a created
-`settings.json`, a file or link that appears in the gap, a filesystem without hard links, a re-pointed link with equal
-bytes, a chain, a dangling chain and a loop, unwritable and unreadable files, and the guard's own install doing what it
-did before the road existed. `tools/agent-models-report.test.mjs` covers the said-once lines: every refusal, an edited
-and a newer copy, the reset by an install and by any run that ends with no refusal (the same refusal after a fix is said
-again), a `replaced-` folder named in a refusal, and that the reported file stays one file of `{ key, at }` under 1 KB.
-`tools/agent-models-step.test.mjs` runs the step as a session start does: a consumer-shaped project whose
-`.claude/hooks/` is a copy of `settings/hooks/` (the real released guard) and whose
-`.agents/conventions/mods/agent-models` is a copy of `mods/agent-models`, with the project's own
-`ensure-user-guard.mjs` spawned. It covers one line per step and nothing on the second run, each skip in its order (a
-project with this repository's layout is skipped; a consumer whose `.agents/conventions` has that layout is not),
-`SUBAGENT_MODEL_GUARD=off` still loading the mod, a throwing installer and a mod module that does not load (a missing
-sibling, a syntax error) leaving the guard and effort lines, a project
-without the mod, the carried-over session value, a stale or edited project copy refused once with the advice to update
-the submodule, and a copy another installer left giving no line.
+`tools/retired-installer-fixture.test.mjs` (5 cases, F1 and F2) holds the sha256 of the six code files of the frozen copy as they
+were released in `c598a11`, fails on one changed byte or line ending, and reads the same bytes from git history, so the clone
+that runs the suite must hold that commit (CI fetches full history for this). F2 holds the README's word that only
+`tools/mods-marketplace-step.test.mjs` imports the fixture: it resolves every import, re-export, dynamic import and `require`
+under `tools/` and fails on any other file, and it finds each planted spelling. `.gitattributes` holds the folder at `eol=lf`, so
+the hashes are those of the raw bytes on every checkout; nothing folds a line ending. `tools/retired-names.test.mjs`
+(10 cases, A4, scan in `tools/lib/retired-names.mjs`) fails when one of four retired names (the mod's folder path in this
+repository with a slash or a backslash, in any letter case, and its split form (the two words as two quoted arguments of a path join, on one line or on several), the old
+installer's released-version constant and its pins table; the list is `NAMES` there) is named in a tracked
+or new file outside the plan files, the frozen fixture, the E1 probe record and the places listed there with a reason; the
+person's own old folder spelled `~/.claude/mods/agent-models` and a path qualified by a commit hash of 7 to 40 hex digits are
+data of the new step, not hits (`HEAD:`, a branch name and `$HOME/.claude/` are). It finds a planted hit of each name. `tools/adapter-check.test.mjs` names the new lib as missing in a bare repository (A2)
+and each of the four retired libs (`agent-models-install`, `-decide`, `-read` and `-swap` `.mjs`) in a consumer's `.claude/hooks/lib`, one
+finding for each, on the command line with exit 1; a consumer's own `agent-models-notes.mjs` is not a finding (A1).
 
-What these files do not prove. The installer is run against a temporary home, not against a Claude Code session that
-loads the mod: that the band is drawn is seen by hand, in a new session after an install. CI does not run the mod's own
-`.tsx` tests in `mods/agent-models/tests` (`claude plugin test` needs the `claude` CLI, and so does `claude plugin
-validate`); they are run by hand when the mod changes. Sonar's `sonar.sources=tools` covers neither `settings/hooks` nor
-`mods`, so the installer and the mod have no quality-gate coverage; their coverage is these tests alone. Windows and
-macOS were not run (CI is `ubuntu-latest`; the step is skipped on win32). `fs.linkSync`, the creation of
-`settings.json`, is run only on a filesystem with hard links. An existing `settings.json` that another program changes
-between the road's second read and its rename is replaced, as the guard's own write can be: no lock is shared with the
-host. Two sessions starting at once are serialised by the exclusive staging name, the atomicity of `rename` and the put-back,
-not by a lock.
+`tools/user-guard-road.test.mjs` (30 cases) holds what was tested of the settings core before the installer went: the road
+called directly (a created file with the umask's mode, a file or a link that appears in the gap, a filesystem without hard
+links, the re-check of the bytes and of the resolved target, an existing file replaced and keeping its mode, `settingsFileOf`
+for a chain, a dangling chain and a loop, `writeAtomic` with `replace: false`, and the guard's own install doing what it did
+before the road existed), the same refusals at the registration of the marketplace (no hard link, a file that appears in the
+gap or after the re-check, a chain of links written at its last target with the backup beside it, a dangling chain, a loop, 41
+links, a missing folder and `..`, a re-pointed link, a file or a folder that is not writable, a fresh machine whose home is not
+writable, a `settings.json` that is a folder or cannot be read, a creation whose write fails, a folder that takes the name in
+the gap; every branch of `blockedReason` in the lib was removed once by hand and a case turned red), and the scans: only `commitSettings` calls the road's two parts, the registration imports
+`commitSettings` and calls it once with `replace: false`, no `writeAtomic(` call naming `settings` outside the effort write, and
+no U+FEFF in a hook module. Each scan has a companion that finds a known or planted instance.
+
+What these files do not prove. The step is run against a temporary home, not against a Claude Code session: that the engine
+installs the mod after the step registers it, and that the mod loads in a session, are seen by hand (the E1 probe recorded
+the engine's behaviour, and the first install beside an active folder copy is a check of the rollout, not of these tests).
+The engine's record files are fixtures built from the probe, not written by a real engine, so a change of their shape in a
+later Claude Code is not seen here: the step then finds "no proof" and retires nothing. Sonar's `sonar.sources=tools` does not
+cover `settings/hooks`, so the step has no quality-gate coverage; its coverage is these tests alone. Windows and macOS were
+not run (CI is `ubuntu-latest`; the step is skipped on win32). `fs.linkSync`, the creation of `settings.json` and of the
+tombstone, is run only on a filesystem with hard links, and a failure of it is injected. An existing `settings.json` that
+another program changes between the road's second read and its rename is replaced, as the guard's own write can be: no lock
+is shared with the host. Runs are not serialised: the exclusive creates stop a double create, and for an existing `settings.json` the last
+rename wins (no lock is shared with the host).
 
 `tools/effort-converge.test.mjs` (10 cases, 2026-10-14) covers the effort convergence (`effortProblems`,
 `convergeEffort`, `applyEffort`, `ensureEffort`) with temporary homes: all keys set, input never mutated, other keys and
