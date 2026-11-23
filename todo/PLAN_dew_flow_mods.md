@@ -148,7 +148,7 @@ The step writes exactly this, and only what is absent:
 - **Never overwrite.** A `dew-flow-mods` entry that differs is the person's edit: left alone, said once, and no
   retirement. `enabledPlugins` `false` for the plugin, or an explicit `true` for `agent-models@inline`, is the person's
   switch: left alone. Two consumers on different pins can then never flip a value back and forth.
-- **Trust prompts**: user-settings entries need no folder trust (docs); observed in V8. **Windows**: the step skips
+- **Trust prompts**: no prompt of its own for a user-settings marketplace entry; the ordinary folder-trust dialog of the working folder comes first, and an interactive install waits for it (observed in V8). **Windows**: the step skips
   win32 as today; the new README gives the manual commands. **How many session starts the switch takes** is measured
   in E1 and written into the owner checks.
 
@@ -285,7 +285,7 @@ install command.
 ## Files
 
 New repository: section C, and `todo/PLAN_from_conventions.md` (its side of this plan, cited by path). Here: section
-D, `tools/mods-marketplace.test.mjs`, `tools/mods-marketplace-step.test.mjs`, `research/RESULTS_dew_flow_mods_probe.md`,
+D, `tools/mods-marketplace.test.mjs`, `tools/mods-marketplace-step.test.mjs`, `research/dew_flow_mods_probe_E1.md`,
 the stories documents `todo/PLAN_dew_flow_mods_E1.md` … `_E4.md` (each written when its epic starts), `todo/README.md`.
 Each consumer: the gitlink, the `.claude/hooks` copies, four deleted libs.
 
@@ -301,7 +301,7 @@ Each consumer: the gitlink, the `.claude/hooks` copies, four deleted libs.
    then V4–V7, V9 and V10 against the real repository, with a second promotion (1.6.1, a small real change).
 5. E3: the step (RED tests first, from the Fable spec), then the removal, `adapter-check`, the docs. `npm test`,
    `npm run check`. Code round (coai `review_code` and an Opus review), PR, checks, threads, merge. No promotion yet.
-6. E4.1: one consumer branch, unmerged, on this machine with the real `~/.claude`: the whole switch, seen.
+6. E4.1: one consumer branch, unmerged, on this machine with the real `~/.claude`: the whole switch, seen — including the first install of `agent-models@dew-flow-mods` while `CLAUDE_CODE_PLUGIN_DIRS` still names the old copy (this machine's state): the `installed_plugins.json` record, the cache folder, then the marketplace copy loading after step 1; a missing record or folder stops the story with the install path written down.
 7. E4.2: the pre-checks (in-flight consumer releases, the open-PR counts, `git log c598a11..main` read), ONE
    promotion here, then the bumps: `dew_flow_benchmark` and `dew_flow_mcp` before `dew_flow_rag_qln`
    (`README.md:68-73`), then the others and `dew_flow_mods`. Checks present and green on each head sha before a merge.
@@ -349,14 +349,14 @@ Each consumer: the gitlink, the `.claude/hooks` copies, four deleted libs.
 | O6 | a workflow on a pushed branch pushes `release` with its own token, then asks for the `release` environment | both refused |
 | O7 | the approval API called with the login agent sessions hold | recorded as it is: refused under the identity of Q3; accepted with today's login, which is then the written risk |
 
-**The engine, observed** (results in `research/RESULTS_dew_flow_mods_probe.md` with what was NOT checked):
+**The engine, observed** (results in `research/dew_flow_mods_probe_E1.md` with what was NOT checked):
 
 | # | When | Question | Expected |
 |---|---|---|---|
 | V1 | E1 | the two keys alone in user settings, a relative-path entry; then `git-subdir` | whether it installs with no command or needs `/reload-plugins` or an install; what `installed_plugins.json` records |
 | V2 | E1 | keys written by a SessionStart hook | the session that picks them up is counted |
 | V3 | E1 | the old folder and the marketplace copy together; then `agent-models@inline` `false`; then `--settings` with `true`; a running session and a `-p` child that inherited the variable | the old copy wins; the marketplace copy loads, in which session; the folder copy loads again; both keep working while the folder exists |
-| V8 | E1 | prompts | no trust dialog; a `-p` run loads the hooks |
+| V8 | E1 | prompts | no prompt of its own for the marketplace; the ordinary folder-trust dialog is allowed (the install waits for it); a `-p` run loads the hooks |
 | V4, V5 | E2 | a start with no network; no SSH to GitHub | the mod loads from the cache; the HTTPS URL clones, time measured |
 | V6 | E2 | 1.6.1 promoted | an interactive session gets it within about ten minutes of the first message, the next launch runs it; a `-p` session does not update |
 | V7 | E2 | `release` moved, same version | no update (why G5 exists) |
