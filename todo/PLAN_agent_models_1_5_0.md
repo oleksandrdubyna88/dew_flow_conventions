@@ -1,9 +1,8 @@
 # PLAN — agent-models mod 1.5.0: a `last answer` button, and the weekly reset time on the limits line
 
-> Status: **APPROVED 2026-11-22 (epoch 1, by reviewers); stopped for re-review 2026-11-23** — the second change (1.2)
-> should have stopped the plan; it did not, and the build, two code rounds and a third change (1.3) followed. The
-> plan-lifecycle check of PR #187 found it. Re-review written (below), narrowed and chosen by the owner; waits for its
-> document round and the epoch 2 line. No merge of #187 until epoch 2 is approved. Scope: `mods/agent-models/` (one new hooks file, the band row, the limits line, version 1.5.0, the mod's own
+> Status: **EPOCH 2 APPROVED 2026-11-23 by the owner (narrowed)**, after a stop for re-review the same day (the
+> second change, 1.2, should have stopped epoch 1; the plan-lifecycle check of PR #187 found it). Next: the epoch 2
+> fix (§ Build order 4), a final code round, the merge of #187, the owner checks. Scope: `mods/agent-models/` (one new hooks file, the band row, the limits line, version 1.5.0, the mod's own
 > tests), the installer's file list and released-copy table in `settings/hooks/lib/agent-models-decide.mjs` (and its
 > `.claude/hooks` mirror), the new row of `tools/agent-models-pins.json`, the installer tests under `tools/`,
 > `research/module_tests.md`, then one `release` promotion and the pin bumps of the nine consumers. Parent:
@@ -24,7 +23,7 @@ follow-ups of [1.4.0](../research/PLAN_agent_models_1_4_0.md) § *Follow-ups*.
 
 ## Plan changes
 
-> Epoch 1 · approved 2026-11-22 · by reviewers · state: stopped
+> Epoch 1 · approved 2026-11-22 · by reviewers · state: closed
 
   (The plan round's five accepted findings — no fallback to an unrelated row, repeated text, a bridge question after
   a local one, a check of a candidate build before the rollout, the npm checks — are the baseline this epoch was
@@ -67,6 +66,8 @@ Narrowed: yes — the resume guess, the press to the question before a pending o
 | d07bd3c code round 1 (`previous`, ordered submits, deep read, `session.end`, clock-minute tick) | pushed, unmerged | fits | kept |
 | b2e48bc code round 2 (restore guard, `queued`, newest copy with no boundary, typed test helpers) | pushed, unmerged | fits | kept, but its `queued` count is cut: fixed forward in epoch 2 (no history rewrite) |
 | plan-only commits 91cc7f5, 1c6f3e3, ba5c04d, 13eb0e5, 9bd7d8e | pushed, unmerged | fits | kept (plan text; this record supersedes their design text) |
+
+> Epoch 2 · approved 2026-11-23 · by owner · state: open
 
 ## What the code and the engine do today (read 2026-11-22 at `42119f6`, Claude Code 2.1.330)
 
@@ -300,7 +301,7 @@ New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.t
 - [ ] Epoch 2: T20, T22, T22b, T23, T24 RED, then green with `queued` dropped, the newest-match lookup and the generation check in the retry; all checks again.
 - [x] `npm test`, `npm run check`, `node --test tools/` green; `claude plugin validate` passes; `tsc` no new error (TypeScript 6.0.3 with the 2.1.330 engine types, run on a scratch copy: no new error; the base's own test-fixture errors — the shared band fixture lacks `isCollapsed` — remain).
 - [x] Code round advanced; Opus code review done; findings fixed or answered.
-- [ ] The re-review for epoch 2: consult, whole-plan revision, the Opus judge's sort, the document round and an Opus
+- [x] The re-review for epoch 2: consult, whole-plan revision, the Opus judge's sort, the document round and an Opus
       plan review; epoch 2 approved by the owner (narrowed).
 - [ ] A final code round over the whole branch after the `missed` fix.
 - [ ] PR merged with green checks and no open thread.
