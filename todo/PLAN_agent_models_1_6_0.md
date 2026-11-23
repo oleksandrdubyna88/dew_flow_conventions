@@ -1,6 +1,6 @@
 # PLAN — agent-models mod 1.6.0: pins on Claude's answers, and a list under the `last answer` button
 
-> Status: **DRAFT, 2026-11-23.** Plan round not run yet. Scope: `mods/agent-models/` (a pin icon under each of
+> Status: **APPROVED 2026-11-23 (epoch 1, by reviewers); build next.** Scope: `mods/agent-models/` (a pin icon under each of
 > Claude's text answers, the `last answer` button opening a list, version 1.6.0, the mod's own tests), the installer's
 > released-copy table in `settings/hooks/lib/agent-models-decide.mjs` (and its `.claude/hooks` mirror) and the new row
 > of `tools/agent-models-pins.json`, `research/module_tests.md`. **No `release` promotion and no consumer bump here**:
@@ -24,6 +24,16 @@ Then, after a live probe in this session (§ *Probe*):
 Not in this plan: pins on the owner's own messages or on tool rows (the owner excluded them), pins that outlive the
 session, reordering pins, the move to `dew_flow_mods` (its own plan, next).
 
+## Plan changes
+
+> Epoch 1 · approved 2026-11-23 · by reviewers · state: open
+
+  (The plan round's accepted findings — coai: verify one id per block, keep a long list reachable; the Opus
+  review: probe the ids first, the atom in pins.tsx, the first list row's text, the 1.5.0 test changes, the openers
+  closing each other, a frameless icon, the notice blocks, the markdown first line — and the probe's second run are
+  the baseline this epoch was approved on. Rejected with reasons in the round: service blocks as AssistantMessage,
+  pins surviving into another session.)
+
 ## What the code and the engine do today (read 2026-11-23 at `53b0a33`, Claude Code 2.1.330)
 
 - The `last answer` button is `answerButton` (`mods/agent-models/hooks/answer.tsx`), drawn by `accountRow`
@@ -40,54 +50,79 @@ session, reordering pins, the move to `dew_flow_mods` (its own plan, next).
 
 ### Probe (2026-11-23, the throw-away dev mod `id-probe` in this session, fullscreen)
 
-A `📌` button under every `UserMessage`, `AssistantMessage` and `ToolUse` row, pins listed in the band, a press on a
-listed pin scrolling to its row (`block: 'start'`), a red `x` removing it. Then, by the owner's words above: no word,
-an icon only — grey `📌︎` (`#808080`) unpinned, raspberry `📌` (`#E3256B`) pinned, a press toggling; only under
+Run 1 — a `📌` button under every `UserMessage`, `AssistantMessage` and `ToolUse` row, pins listed in the band, a press
+on a listed pin scrolling to its row (`block: 'start'`), a red `x` removing it. Then, by the owner's words above: no
+word, an icon only — grey `📌︎` (`#808080`) unpinned, raspberry `📌` (`#E3256B`) pinned, a press toggling; only under
 `AssistantMessage` rows that are not `isSummary` and not empty; pins in `$.state`. The owner: "everything works fast".
-The engine draws a Button's label inside `[ ]`.
+
+Run 2 — every `AssistantMessage` draw recorded (`requestId`, `isSummary`, text head, draw count) against
+`$.session.messages({ last: 30 })`: each text block has its own `requestId`, also two blocks of one reply around a tool
+row (`9124a10e-…-000000000000`, `b3080f52-…-000000000000`); the id is the block's transcript uuid with its last 12
+hex digits zeroed, and it stays the same through the streaming draws (2–9 draws each, no `placeholder` id, unlike a
+fresh `UserMessage`); summary blocks have ids of their own and `isSummary: true`. The pin button with `plain` draws
+the icon alone, with no `[ ]` frame (types: "a one-glyph label is then a control by itself").
 
 ## Design
 
 ### A. Pins (`hooks/pins.tsx`, new; `types/index.d.ts`)
 
 - A state value `pins: readonly Pin[]` in `PluginState['agent-models']`, `Pin = { id: string; text: string }`: `id` the
-  row's `requestId`, `text` the block's first line after the mod's `cleanPrompts`, cut to 60 characters (with `…`).
-  Absent (a state from before 1.6.0) reads as `[]`. At most 50 pins: a 51st press drops the oldest. Written only by
-  press handlers and `session.end` (which writes `[]`, as the `lastQuestion` value is cleared there).
-- `on('ui.render', { component: 'AssistantMessage' })`: when `e.props.isSummary !== true`, the clean text is not empty
-  and `e.viewport?.isFullscreen !== false`, the hook returns `[await next(e), pin icon]` in a column; otherwise
-  `next(e)` as it is. The icon reads `pins` (a read, never a write): pinned → `📌` in `#E3256B`; not pinned →
-  `📌︎` in `#808080`. A press toggles the row's pin (`update`, no await before it). A failed read draws the grey
-  icon; a failed write is a toast; nothing throws.
+  row's `requestId` (§ Probe run 2: one per block, stable while streaming); an id that is not uuid-shaped (e.g.
+  `placeholder`) gets no icon. `text`: the block's first content line after `cleanPrompts`, with markdown marks
+  (`#`, `>`, list markers, a fence line) dropped, cut to 60 characters (with `…`). Absent (a state from before
+  1.6.0) reads as `[]`. At most 50 pins: a 51st press drops the oldest. Written only by press handlers and
+  `session.end` (which writes `[]`).
+- The atom is declared in `pins.tsx`, the only file that writes or reads it (the engine reads `read($, x)` only for an
+  atom written in the same file); `pins.tsx` exports function declarations — `currentPins($)`, `togglePin($, pin)`,
+  `unpin($, id)`, `clearPins($)`, the render hook body — and `register.tsx` registers the hook (`hooks.json` names
+  only `register.tsx`).
+- `on('ui.render', { component: 'AssistantMessage' })`: when `e.props.isSummary !== true`, the clean text is not empty,
+  it is not an engine notice (`API Error`, `No response requested.`) and `e.viewport?.isFullscreen !== false`, the hook
+  returns `[await next(e), pin icon]` in a column; otherwise `next(e)` as it is. The icon is a `plain` Button (no
+  frame): pinned → `📌` in `#E3256B`; not pinned → `📌︎` in `#808080`. A press toggles the row's pin (`update`, no
+  await before it). The draw only reads `pins`; a failed read draws the grey icon; a failed write is a toast; nothing
+  throws.
+- Known limit: after a hot reload the rows drawn before it are not drawn again until they scroll into view or change
+  (1.5.0 § Probe run 2), so their icon can lag; a toggle in the list redraws every row that reads `pins`.
 
 ### B. The list under the `last answer` button (`hooks/answer.tsx`, `register.tsx`)
 
-- A state value `answerListOpen: boolean` (absent → `false`), written only by the button's press.
+- A state value `answerListOpen: boolean` (absent → `false`), written only by the button's press and by the openers of
+  the other views; `session.end` writes `false`.
+- The list, the tasks view and the message viewer close each other, as the tasks view and the viewer do today
+  (`register.tsx`, "each opener closes the other"): the list never sits beside the viewer, so `viewerFixedRows` does not
+  change. The band scrolls a tree taller than `maxRows` itself (`n more` row), so a long list stays reachable.
 - The button `[ last answer ▾ ]` (closed) / `[ last answer ▴ ]` (open): a press toggles the list; it no longer scrolls
-  by itself.
+  by itself (the owner: "must open and show a list"; one press became two — an owner check).
 - The open list, under the account row, one row each:
-  1. Always first: `› <the last question's text>`, a press is today's `pressLastAnswer` (the same targets, toasts and
-     synchronous scroll). With no question: `› no question yet` (dim, no press).
-  2. Then the pins, oldest first: `📌 <text>` (raspberry icon, the text in `BUTTON_COLOR`), a press scrolls to the
-     pin's row (`block: 'start'`, no `await` before the scroll; a deny or rejection is a toast), then a red `x` that
-     unpins it.
+  1. Always first: `› <text>` — the text of the row the press really goes to: the settled question's text, or while a
+     question is pending, the text of `previous` with ` (sending…)` after it; a press is `pressLastAnswer` (the same
+     targets, toasts and synchronous scroll). With no question: `› no question yet` (dim, no press). A stored 1.5.0
+     value without text shows `› last question`.
+  2. Then the pins, oldest first: a raspberry `📌` and the pin's text (`BUTTON_COLOR`); a press scrolls to the pin's row
+     (`block: 'start'`, no `await` before the scroll; a deny or rejection is a toast; the pin stays); then a red `x`
+     that unpins it.
   The list stays open after a scroll (the owner can jump between pins); the button closes it. It is drawn only when
   the button is (fullscreen).
-- The last question's text for the first row: `lastQuestion` keeps the question's text from 1.6.0 on (`{ uuid, text }`
-  when settled; the pending value already has it); a stored 1.5.0 `{ uuid }` without text shows `› last question`.
-- The viewer's fixed row count adds the open list's rows (1 + the number of pins), each counted at its width.
+- The text for the first row: `lastQuestion` gains the clean question text (first line, cut to 60) — settled
+  `{ uuid, text }`, pending `{ pending, previous?, previousText? }`; `newestQuestion` (the restore) returns the text too.
+  `settle` keeps comparing the pending fields only.
 
 ### C. Version and installer
 
 - `plugin.json` `1.6.0`, its description names the pins and the list. `MOD_FILES` gains `hooks/pins.tsx` with
-  `INTRODUCED['hooks/pins.tsx'] = [1, 6, 0]` (both `decide.mjs` copies); the `1.6.0` pins row (nine files) and
-  `RELEASED_MOD` become that row; the installer tests that name the list are updated; a 1.5.0 copy upgrades.
+  `INTRODUCED['hooks/pins.tsx'] = [1, 6, 0]` (both `decide.mjs` copies, and the "eight files" wording there and in
+  `tools/agent-models-decide.test.mjs` becomes nine); the `1.6.0` pins row (nine files) and `RELEASED_MOD` become that
+  row; the installer tests that name the list are updated, with the upgrade of an 8-file 1.5.0 copy and a stray
+  `hooks/pins.tsx` in the target; `research/module_tests.md` ("eight files").
+- The 1.5.0 tests that change: the exact `toEqual({ uuid })` asserts (now `{ uuid, text }`), T1's exact label (now with
+  `▾`), `accountRowCells` (the label's drawn width with the arrow), the press tests move to the first list row.
 - No promotion and no bump (the owner's order above).
 
 ## Files
 
 New `mods/agent-models/hooks/pins.tsx`, `tests/pins.test.tsx` (and fixtures as needed); `hooks/answer.tsx`,
-`hooks/register.tsx`, `hooks/prompts.ts` (row count), `types/index.d.ts`, `.claude-plugin/plugin.json`, the answer
+`hooks/register.tsx` (the AssistantMessage hook, the openers closing each other), `types/index.d.ts`, `.claude-plugin/plugin.json`, the answer
 tests; `settings/hooks/lib/agent-models-decide.mjs` + `.claude/hooks/lib/agent-models-decide.mjs`;
 `tools/agent-models-pins.json` and the installer tests that name the file list; `research/module_tests.md`.
 
@@ -121,21 +156,31 @@ tests; `settings/hooks/lib/agent-models-decide.mjs` + `.claude/hooks/lib/agent-m
 | L5 | a press on `x` | the pin removed; the list redraws without it; the icon under its row turns grey |
 | L6 | no question yet | `› no question yet`, dim, no press |
 | L7 | the list stays open after a scroll; the button closes it | as stated |
-| L8 | the viewer row count with the list open (two pins, a long question) | the list rows counted at their width |
+| L8 | the list open, then the tasks view or the message viewer opened; and the reverse | each opener closes the other |
 | L9 | `isFullscreen: false` | no button, no list |
+| L10 | the first row while a question is pending (with `previous`) | the text of `previous` with ` (sending…)`; the press goes to `previous` |
+| L11 | 50 pins, the list open | every pin row drawn; the band scrolls it (no throw, nothing cut by the mod) |
+| L12 | a pin whose row is gone (the scroll is denied) | a toast; the pin stays |
+| P10 | a block whose `requestId` is not uuid-shaped (`placeholder`) | no icon |
+| P11 | an engine notice block (`API Error…`, `No response requested.`) | no icon |
+| P12 | a block starting with a heading, a quote, a list or a fence | the pin text is the first content line without the marks |
+| P13 | two text blocks of one reply | two icons, two pins, each scrolls to its own block |
 | I1 | installer: `MOD_FILES` has nine files; a 1.5.0 copy upgrades to 1.6.0 | `hooks/pins.tsx` copied; the pins row = HEAD files = `RELEASED_MOD` |
-| R1 | the existing 341 mod tests (the button's press now opens the list: the 1.5.0 press tests move to the first list row) and `node --test tools/` | pass |
+| R1 | the existing 341 mod tests, with the changes named in § C, and `node --test tools/` | pass |
 
 ## Owner checks (after the move and the pin bumps, by the owner's order)
 
 - Pin two answers (grey → raspberry), open the `last answer` list: the last question first, then the two pins; each
   scrolls to its row; `x` unpins (the icon turns grey at once).
-- Tool rows, service rows and the owner's own messages have no icon.
+- Tool rows, service rows and the owner's own messages have no icon; the icon has no `[ ]` frame.
+- The button now needs two presses to reach the last question (open, then the first row): acceptable?
+- `/clear` empties the list; a long resumed session shows no lag when a pin is toggled.
+- After a hot reload, older answers get their icon when they scroll into view (known limit).
 
 ## Definition of Done
 
 - [ ] Plan round advanced; Opus plan review folded.
-- [ ] Tests P1–P9, L1–L9, I1, R1 green; RED seen first for each new case.
+- [ ] Tests P1–P13, L1–L12, I1, R1 green; RED seen first for each new case.
 - [ ] All checks of build order 4 green.
 - [ ] Code round advanced; Opus code review done; findings fixed or answered.
 - [ ] PR merged with green checks and no open thread. No promotion (the owner's order).
