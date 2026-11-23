@@ -1,8 +1,8 @@
 # PLAN — agent-models mod 1.5.0: a `last answer` button, and the weekly reset time on the limits line
 
 > Status: **EPOCH 2 APPROVED 2026-11-23 by the owner (narrowed)**, after a stop for re-review the same day (the
-> second change, 1.2, should have stopped epoch 1; the plan-lifecycle check of PR #187 found it). Next: the epoch 2
-> fix (§ Build order 4), a final code round, the merge of #187, the owner checks. Scope: `mods/agent-models/` (one new hooks file, the band row, the limits line, version 1.5.0, the mod's own
+> second change, 1.2, should have stopped epoch 1; the plan-lifecycle check of PR #187 found it). The epoch 2
+> fix and the final code round are done; next: the merge of #187, then the owner checks on the branch build. Scope: `mods/agent-models/` (one new hooks file, the band row, the limits line, version 1.5.0, the mod's own
 > tests), the installer's file list and released-copy table in `settings/hooks/lib/agent-models-decide.mjs` (and its
 > `.claude/hooks` mirror), the new row of `tools/agent-models-pins.json`, the installer tests under `tools/`,
 > `research/module_tests.md`, then one `release` promotion and the pin bumps of the nine consumers. Parent:
@@ -132,7 +132,9 @@ So: the transcript uuid is a working target, a far-off row is reached, and the t
 - The lookup (`findQuestion`): user rows with no `toolResults`, compared after `cleanPrompts` on both sides (an empty
   clean text matches nothing); the NEWEST match newer than `previous` (scanning newest first, stopping at `previous`);
   with no boundary, the newest match. A found `{ uuid }` never moves. Known limit: the same words queued twice before
-  either has a row settle on the first copy (the same question, its earlier answer).
+  either has a row settle on the first copy (the same question, its earlier answer). Known limit: a re-sent text whose
+  `turn.start` retry settles before the submit's own write leaves the value pending at the right row's boundary; the
+  press still goes to that row (`previous`), and each `turn.complete` may read deep until the next submit.
 - `on('turn.start')` and `on('turn.complete')`: a pending value is looked up again, under the generation check (a
   lookup started before a `session.end` writes nothing). At `turn.complete`, when the 50 rows found nothing, came back
   full and do not hold `previous`, it reads up to the engine cap (`ENTRY_CAP`), bounded by `previous`. A text typed into
@@ -200,6 +202,8 @@ So: the transcript uuid is a working target, a far-off row is reached, and the t
   taken (the owner accepted this, 2026-11-23). Revisit when the engine gives the origin on a transcript message.
 - The minute tick follows the clock minute, while each shown value turns at its own second offset: the text can lag up
   to one minute. A timer per value's own turn would remove it.
+- A refused transcript read at a session start leaves no restored question until the next submit (the toast says
+  there is no question yet). A retry of the restore at turn events would remove it (final code round, not taken).
 - The viewer's account-row height is an estimate (a flex row with a non-shrinking email button); it only affects the
   "(scroll for more)" header.
 
@@ -307,7 +311,7 @@ New `mods/agent-models/hooks/answer.tsx`; `hooks/register.tsx`, `hooks/prompts.t
 - [x] Code round advanced; Opus code review done; findings fixed or answered.
 - [x] The re-review for epoch 2: consult, whole-plan revision, the Opus judge's sort, the document round and an Opus
       plan review; epoch 2 approved by the owner (narrowed).
-- [ ] A final code round over the whole branch after the `missed` fix.
+- [x] A final code round over the whole branch after the epoch 2 fix (coai proceed, two findings answered; Opus: nothing above low).
 - [ ] PR merged with green checks and no open thread.
 - [ ] Owner checks passed on the branch build; `release` promoted after the owner's word; nine pin bumps merged.
 - [ ] The installed mod on this WSL is 1.5.0 after a session start in a consumer.
