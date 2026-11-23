@@ -1,7 +1,8 @@
 # PLAN — agent-models mod 1.5.0: a `last answer` button, and the weekly reset time on the limits line
 
-> Status: **APPROVED, 2026-11-22 (epoch 1, by reviewers); three changes since (1.1 owner scope, 1.2 probe, 1.3 code round). Code rounds done** (coai proceed twice, two Opus reviews, all findings fixed or answered); PR
-> next. Scope: `mods/agent-models/` (one new hooks file, the band row, the limits line, version 1.5.0, the mod's own
+> Status: **APPROVED 2026-11-22 (epoch 1, by reviewers); stopped for re-review 2026-11-23** — the second change (1.2)
+> should have stopped the plan; it did not, and the build, two code rounds and a third change (1.3) followed. The
+> plan-lifecycle check of PR #187 found it. No merge of #187 until epoch 2 is approved. Scope: `mods/agent-models/` (one new hooks file, the band row, the limits line, version 1.5.0, the mod's own
 > tests), the installer's file list and released-copy table in `settings/hooks/lib/agent-models-decide.mjs` (and its
 > `.claude/hooks` mirror), the new row of `tools/agent-models-pins.json`, the installer tests under `tools/`,
 > `research/module_tests.md`, then one `release` promotion and the pin bumps of the nine consumers. Parent:
@@ -22,15 +23,17 @@ follow-ups of [1.4.0](../research/PLAN_agent_models_1_4_0.md) § *Follow-ups*.
 
 ## Plan changes
 
-> Epoch 1 · approved 2026-11-22 · by reviewers · state: open
+> Epoch 1 · approved 2026-11-22 · by reviewers · state: stopped
 
   (The plan round's five accepted findings — no fallback to an unrelated row, repeated text, a bridge question after
   a local one, a check of a candidate build before the rollout, the npm checks — are the baseline this epoch was
   approved on.)
 - 1.1 · 2026-11-22 · owner · scope — the weekly reset time on the limits line (§ Design D, tests W1–W8)
-- 1.2 · 2026-11-22 · probe · approach — the target is the transcript message's uuid kept in `$.state` at the person's
+- 1.2 · 2026-11-22 · agent · approach — the target is the transcript message's uuid kept in `$.state` at the person's
   submit, not a list of drawn rows: after a hot reload the older rows are not drawn again, so a row list is empty
   (§ *Probe*, run 2); with it the Opus review's findings are folded in (§ Design A–C)
+  (This second change should have stopped the plan. It was written with the source word `probe`, which the check
+  cannot read, so the count stayed at one; the source is the agent's probe. Entry 1.3 came during the missed stop.)
 - 1.3 · 2026-11-23 · reviewer · approach — the code round (coai + Opus): a pending question keeps the question before
   it (`previous`) in `$.state`; a press while pending goes to `previous` (the question being answered now), not a
   toast — a message typed into a running turn never becomes a user message of its own, so the button lost the turn's
