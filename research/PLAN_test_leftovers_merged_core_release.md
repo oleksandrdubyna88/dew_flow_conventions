@@ -1,7 +1,7 @@
 # PLAN — Test leftovers, the merged core: what is left before PR #82 merges and the release is promoted
 
 > Status: **IMPLEMENTED, 2026-11-04.** R1–R5, R7 and the Darwin path of the C# helper are done. R6, the consumer migration, is
-> handed over to [the rollout plan](../todo/PLAN_test_leftovers_rollout.md), which is its open tail; R6's box here is ticked
+> handed over to [the rollout plan](PLAN_test_leftovers_rollout.md), which is its open tail; R6's box here is ticked
 > together with that plan's final completion record, once the rollout plan's other Definition of Done conditions hold
 > (§ *Epoch 2*, item 3). Epoch 2 was
 > approved by the owner on 2026-11-04, after the late-recorded stop and the re-review (narrowed).
@@ -34,11 +34,11 @@
 > [PLAN_test_leftovers_merged_core.md](PLAN_test_leftovers_merged_core.md) — the machine barrier on every machine that
 > builds or tests this repository (`research/security/machines.md`), the merge of PR #82, the private sibling's side of the
 > merged core's Definition of Done, the ONE promotion of `release`, and the consumer migration of
-> [PLAN_test_leftovers_rollout.md](../todo/PLAN_test_leftovers_rollout.md). It edits no tool and no rule text.
+> [PLAN_test_leftovers_rollout.md](PLAN_test_leftovers_rollout.md). It edits no tool and no rule text.
 >
 > Related docs: [PLAN_test_leftovers_merged_core.md](PLAN_test_leftovers_merged_core.md) (the build, promoted 2026-10-27, with its
 > deviations), [PLAN_test_leftovers_E1.md](PLAN_test_leftovers_E1.md) (the contract the build revised),
-> [PLAN_test_leftovers_rollout.md](../todo/PLAN_test_leftovers_rollout.md) (the consumer epics, R6),
+> [PLAN_test_leftovers_rollout.md](PLAN_test_leftovers_rollout.md) (the consumer epics, R6),
 > [PLAN_test_leftovers_merged_core_followups.md](../todo/PLAN_test_leftovers_merged_core_followups.md) (F1–F13, none of which blocks this plan),
 > [research/security/machines.md](security/machines.md) (the barrier record), [common/test-leftovers.md](../common/test-leftovers.md).
 >
@@ -142,7 +142,7 @@ migration is the rollout plan's goal.
 |---|---|---|
 | The tools, the rule texts, the scan, the vectors, the reviews and the security pass | [the merged-core plan](PLAN_test_leftovers_merged_core.md) (promoted) | Nothing here edits them; a defect found while running R1–R5 is a new commit on PR #82's branch or a follow-up, never a story here |
 | The findings the security pass parked, the stub-docker gaps, the Windows run | [the follow-ups plan](../todo/PLAN_test_leftovers_merged_core_followups.md) F1–F13 | None blocks R1–R6. F9 (the Windows run) is the evidence for a Windows machine's janitor switch; R2 only records that machine's barrier |
-| The consumers' resources, ports, pin bumps | [the rollout plan](../todo/PLAN_test_leftovers_rollout.md) epics E2–E7 | R6 is its two-stage rule; this plan carries the order, the rollout plan carries each epic's content — **superseded 2026-11-04 (§ *Epoch 2*): R6 is handed over; the order and the merge conditions are the rollout plan's** |
+| The consumers' resources, ports, pin bumps | [the rollout plan](PLAN_test_leftovers_rollout.md) epics E2–E7 | R6 is its two-stage rule; this plan carries the order, the rollout plan carries each epic's content — **superseded 2026-11-04 (§ *Epoch 2*): R6 is handed over; the order and the merge conditions are the rollout plan's** |
 | The plan-change rule and its ledger check (#86, merged after #82) | [the plan-change-control plan](PLAN_plan_change_control.md) (promoted) | Rides in R5's one promotion — no change to R5's what, when or done-when; owner decision 2026-10-29 |
 
 Order: R1 and R2 (parallel), R3, R4 (parallel with R1–R3 for its copy part), R5, R6. Disjoint: nothing here edits a consumer repository.
@@ -164,7 +164,7 @@ consultants `e40c6313` and `5e6e52c5` were asked first whether to promote and ho
 - **Done:** R1–R5 (the barrier records, PR #82, the private sibling's confirmation, `release` at `115bbf8`), R7 (`release` at
   `105d53c`, every consumer's pin bump) and the Darwin path of the C# helper (dew_flow_mcp #59). Entries 1.4–1.6 are the
   owner's decisions of 2026-11-01 that added them; all three are built and recorded.
-- **R6 is handed over** to [the rollout plan](../todo/PLAN_test_leftovers_rollout.md). Its content (E2–E7), its order and its
+- **R6 is handed over** to [the rollout plan](PLAN_test_leftovers_rollout.md). Its content (E2–E7), its order and its
   merge conditions have lived there since that plan's epoch 2 (2026-11-01). This plan kept only a pointer and the owner's
   three decisions of 2026-10-31 (entries 1.1–1.3), which the rollout plan records as its entries 1.2–1.4 and took as its
   decisions 4 and 5. From epoch 2 this plan has no work of its own to do: R6's box stays open only to be ticked with the
@@ -322,14 +322,14 @@ operator commands (work autonomously, consultants first) were followed; there is
 
 ### R6 — The consumer migration
 
-> **Handed over 2026-11-04 (§ *Epoch 2*).** The open tail of this plan lives in [the rollout plan](../todo/PLAN_test_leftovers_rollout.md);
+> **Handed over 2026-11-04 (§ *Epoch 2*).** The open tail of this plan lives in [the rollout plan](PLAN_test_leftovers_rollout.md);
 > its barrier order is read as that plan's merge condition (b): where the text below says "every sweep-only stage before
 > any producer stage", the operative order is (b) (code gate finding 2). The records below stay as written, and two of
 > them are known to be wrong: the records of 2026-10-31 call the stage A of coai and of rag_qln empty, but that scan missed
 > coai's age-only `coai-` sweep (retired by coai #940) and rag_qln's `qlntest_*` drop (E7's stage A, open) — the rollout
 > plan, § *Epoch 3*, item 3 (b).
 
-- **What.** The epics E2–E7 of [the rollout plan](../todo/PLAN_test_leftovers_rollout.md), in two stages: every consumer's SWEEP-ONLY stage (its
+- **What.** The epics E2–E7 of [the rollout plan](PLAN_test_leftovers_rollout.md), in two stages: every consumer's SWEEP-ONLY stage (its
   owner-blind sweeps replaced or disabled as a committed, merged change; no owner-form producer) lands before ANY producer stage (pin bump,
   rename and helper/guard port in ONE commit). A sweep-only stage needs no release and may be prepared before R5.
 - **Why.** An owner-form producer beside an owner-blind sweeper is the failure of the Symptom.

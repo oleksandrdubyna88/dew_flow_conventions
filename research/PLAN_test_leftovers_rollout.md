@@ -1,6 +1,8 @@
 # PLAN — every consumer's tests name what they leave behind `testsToDelete-…`
 
-> Status: **epoch 12 open (2026-11-17), approved by the owner (`Narrowed: yes`); 1 change (12.1, 2026-11-18: S6 merges with every whole suite green, the runs without an own `TMPDIR`, the host's dotnet packs back to 10.0.14), so the next accepted change is the twelfth full stop.** Next: E6's stories and S6's brief take 12.1, the owner downgrades the packs, then S6's plan gate. *Was:* "0 changes, so the next accepted change counts as 12.1. Next: the E6 stories amendment PR, the E7 amendment, S6's brief rework and base runs." (The owner answered item 7 the same day: question 1 approved as written, question (a) yes; question (b) stays for S6's merge.)
+> Status: **IMPLEMENTED in part, and CLOSED by the owner 2026-11-24 — what is done and what is not: § *Closure*.** E1–E5 are done; E6 is done but for S7; E7 is done but for S2; the feature reviews were not run.
+>
+> Was: **epoch 12 open (2026-11-17), approved by the owner (`Narrowed: yes`); 1 change (12.1, 2026-11-18: S6 merges with every whole suite green, the runs without an own `TMPDIR`, the host's dotnet packs back to 10.0.14), so the next accepted change is the twelfth full stop.** Next: E6's stories and S6's brief take 12.1, the owner downgrades the packs, then S6's plan gate. *Was:* "0 changes, so the next accepted change counts as 12.1. Next: the E6 stories amendment PR, the E7 amendment, S6's brief rework and base runs." (The owner answered item 7 the same day: question 1 approved as written, question (a) yes; question (b) stays for S6's merge.)
 >
 > Was: **epoch 11 STOPPED for re-review (2026-11-17); the re-review is written (§ *Epoch 12*, 2026-11-17, `Narrowed: yes`); no new code on any epic until epoch 12 opens by the owner.** Entry 11.2 (E6.S6's two runner lines go to the language-comparison plan) was the eleventh full stop. The revision: S6 merges with those two C# `raw-temp` findings on an approved standing list of exactly two and with policy-ab-quick's three named pre-existing failures, and S7 now also waits for the language-comparison plan's disposition of the two lines with the repository guard clean (items 4.1, 4.6; the record for epoch 3 is the precedent); every remaining story's *Files* become bounded folders plus the docs a grep at its base finds, its line lists and counts are observations at a SHA, and its *Done when* reads "zero unexplained findings of both guards in scope; each remaining one an individually approved, listed exception", with what still counts as a change listed (item 8.1); the `minigit-bench` and `lang-explore` whole suites start the system interpreter, which no allowance covers (item 7, question (a)). Re-review consult `59b325a3`. The Opus judge sorted epoch 11's work (`82c5a4b`: 11 fit, 3 cut by a fix forward, 2 outside, nothing reverted); after it, row E6-m was widened to the pre-existing failures S6's base runs record (benchmark #222's body: lang-explore 10 of 991, lang-bench 1 of 2394 on `main`), and every whole run takes an owned `TMPDIR`. The plan gate read the operative extract of `7254d77` and `06225b48` (session `10853099`, `proceed`): G1 and G3 accepted and folded into row E6-m (both runs complete, executed and skipped tests reconciled by name; a timing-list test that passed at base and fails at head goes by the S5 list's rule), G2 rejected (alias-safe `BENCH_PILOT_OUT` is built, #221). An independent Opus review (of `7c22aa1` and benchmark `7dcdffd9`) said "do not approve as written", and "approve with fixes" once B1 and B2 are fixed: both are folded, with S-1 to S-9 and N-1 to N-4 (the record's review note): row E6-m's standing failures are EXACTLY policy-ab-quick's three and the base lists the owner confirms within benchmark #222's counts (lang-explore ≤ 10, lang-bench ≤ 1, minigit-bench 0), the S5 timing list approves nothing, and the owned `TMPDIR` may keep only F2's named makers' entries. A second plan-gate round (`a0abb03e`, `proceed`, one reviewer answered) found that S6's claimed folders under `~` and `/var/tmp` are never swept after a kill; declared as one bounded exception (the Narrowed line, item 1's *Goal*, item 4.6 (3)). Next: the owner's approval and answers (item 7); epoch 12 opens `by owner`, at 0 changes. *Was:* "Next: the owner's approval and answers (item 7)"; before it, "Next: an independent Opus review, then the owner's approval and answers (item 7)"; before it, "Next: the plan gate on the operative extract, then the owner's approval and answers (item 7)"; before it, "Next: the Opus judge's verdicts (the record's table), the plan gate on the operative extract, the owner's approval and answer".
 >
@@ -107,9 +109,79 @@
 > Related: [common/test-leftovers.md](../common/test-leftovers.md) (the core),
 > [common/test-leftovers-detail.md](../common/test-leftovers-detail.md) (the detail; where the two differ the detail
 > decides), [common/testing.md](../common/testing.md),
-> [PLAN_test_leftovers_merged_core_release.md](../research/PLAN_test_leftovers_merged_core_release.md) (R1–R7, the owner decisions),
-> [PLAN_test_leftovers_merged_core_followups.md](PLAN_test_leftovers_merged_core_followups.md) (F1–F22),
-> [research/PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) (the contract as built).
+> [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md) (R1–R7, the owner decisions),
+> [PLAN_test_leftovers_merged_core_followups.md](../todo/PLAN_test_leftovers_merged_core_followups.md) (F1–F22),
+> [research/PLAN_test_leftovers_merged_core.md](PLAN_test_leftovers_merged_core.md) (the contract as built).
+
+## Closure (2026-11-24)
+
+The owner closed this plan on 2026-11-24 ("закрывай план, что сделано, что нет и доставляй в мейн"). No more work is
+done under it. An item under *Not done* that is taken up later gets a plan of its own; it does not reopen this one. The
+ledger stays as it is (epoch 12, one entry): closing adds no entry, as with the coai auto follow-ups plan closed the same
+day. The stories documents in `dew_flow_benchmark` (E6) and `dew_flow_rag_qln` (E7) are promoted with this plan, each in
+its own pull request.
+
+**Done**
+
+- **E1 (this repository):** the contract and its refinement (`common/test-leftovers.md` and its detail companion), the
+  merged core (#82) and its release plan (R1–R5, R7); the shipped Node helper `tools/lib/owned.mjs`, the guard
+  `tools/leftovers-check.mjs` and the start-of-run sweep `tools/lib/leftovers-sweep.mjs`, released and pinned in all
+  nine consumers.
+- **E2 (`dew_flow_creds_for_devs`):** complete 2026-11-10.
+- **E3 (`dew_flow_mcp`):** #58 (`4feb245`, 2026-10-31).
+- **E4 (`dew_flow_sidecar_rust`):** #64 (`5478109`, 2026-10-31).
+- **E5 (`dew_flow_connect_other_ais`):** complete 2026-11-12 (the E5.S7 drain, #977–#985).
+- **F41, F41-b, F42, F42-c, F45, F46:** done.
+- **E6 (`dew_flow_benchmark`), S1–S6:** S1 #205, S2 #207 (`84d4953e`), S3 #219, S4 #221, S5 #223, S6 #234 (`17224bf3`,
+  2026-11-19). At S6's head both guards are clean in `spikes/` (Node 87 → 2, default profile 3 → 2, the C# copy 16 → 4)
+  and the four spike suites ran whole with no failure (policy-ab-quick 159, minigit-bench 1316, lang-explore 1042,
+  lang-bench 2604 tests), as entry 12.1 asked. On S6's way, #232 (`4e30c5b9`) made every box on the distribution's
+  dotnet show only the pinned SDK, on a host that now holds SDK 11.0.100 beside 10.0.114 (benchmark's
+  `PLAN_minigit_stack_bench_E2.md` amendment D-9). The stories were amended by #220 and #225.
+- **E7 (`dew_flow_rag_qln`), S1 and S3–S5:** S1 built; S3–S5 #125 (`3ca58f43`); the stories amended by #128, #132 and
+  #133; the benchmark pin by #129–#131 and #136.
+- **This repository's record:** twelve epochs with their re-reviews (#180 opened epoch 12) and entry 12.1 (#181).
+
+**Not done**
+
+- **E6.S7** (benchmark: both guards on in CI and the docs; row E6-g; the Definition of Done's item 3 for benchmark).
+  It never started, because its prerequisites are not met. Checked 2026-11-24 on benchmark `main` `ed472384`:
+  - `todo/PLAN_bench_test_leftovers_followups.md` has built nothing (its status line, read whole), so D7's S1 and S2 are
+    not there;
+  - `todo/PLAN_lang_comparison_v2.md` holds no disposition of `spikes/lang-bench/runner/run_samples.py:35` and `:306`
+    (`git grep run_samples.py:35`: no line).
+
+  Benchmark's C# copy of the guard therefore stays at 4 on `main`: the two § 3a `research/` lines and those two runner
+  lines. `http/README.md:32-33`, S7's site, stays as it is.
+- **E7.S2** (rag_qln: the shared store's ownership and its live stores; the Definition of Done's items 1 and 2 for those
+  stores). It never started: its plan gate waits for the owner's live-store observations (§ *Epoch 9* item 7), which
+  were not given. Checked on rag_qln `main` `3160a668`: E7's status line says "S2 is not".
+- **The feature reviews** (§ *Epoch 8* item 5, the LAST step of the build order). None was run. E2's has been held by
+  coai's `call_human` since 2026-11-10; its state was not re-read on 2026-11-24.
+- **R6** of [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md), handed to this plan
+  as its open tail, stays unticked.
+- **The Definition of Done** keeps items 1, 2, 3 and 7 open for exactly the two stories above. Its other rows stand as
+  § *Epoch 12* item 1's table writes them.
+- **Question (b)** of § *Epoch 12* item 7, the runner hand-off at S6's merge: not answered. S6 merged without it.
+- **Found by E6.S6, not fixed** (each recorded in benchmark's S6 brief):
+  - minigit-bench's `test/heldout-archive.test.mjs:30` assumes umask 0022;
+  - lang-bench's exec layer rightly refuses a group-writable run parent;
+  - so a whole run under umask 0002 (a `systemd-run --user` unit's default) shows 52 reds;
+  - the scoring pin's two known limits (benchmark `research/module_minigit_bench.md`).
+- **Not this plan's:** F32 and every other open item of
+  [PLAN_test_leftovers_merged_core_followups.md](../todo/PLAN_test_leftovers_merged_core_followups.md) stay open there.
+
+**Deviations**
+
+- **Twelve epochs and eleven full stops** in the 41 days from 2026-10-14 to 2026-11-24. The re-review found the root
+  cause, recorded in § *Epoch 12* item 1.
+- **E6.S6's merge condition** moved from approved standing-failure lists to no standing failure (entry 12.1). S6's head
+  runs differed from its brief's § 7 in two ways:
+  - lang-explore ran at 4 workers, not 8: the kernel's OOM killer stopped two runs at 8 while the host's swap was full;
+  - the umask was set to 0022 explicitly, as the base runs had it.
+- **SDK 11 on the host** (the owner, 2026-11-18/19) was met by a change to another plan's instrument (#232, benchmark's
+  E2 amendment D-9), not to this plan.
+- **The promotion came before the feature reviews**, by the owner's word, although the build order put them first.
 
 ## Plan changes
 
@@ -1256,14 +1328,14 @@ not read again here. The details: § *Epoch 8* item 3.3.
 
 ## The merged core revises E1 first (2026-10-21)
 
-The plan [PLAN_test_leftovers_merged_core.md](../research/PLAN_test_leftovers_merged_core.md) (IMPLEMENTED 2026-10-27, promoted to `research/`) revises the contract E1 builds, so the consumer
+The plan [PLAN_test_leftovers_merged_core.md](PLAN_test_leftovers_merged_core.md) (IMPLEMENTED 2026-10-27, promoted to `research/`) revises the contract E1 builds, so the consumer
 epics now wait for ITS release, not for E1's. What it left open — S0 on every machine, the merge of PR #82, the private sibling's side and the ONE release —
-is in [PLAN_test_leftovers_merged_core_release.md](../research/PLAN_test_leftovers_merged_core_release.md); its R5 is the release and its R6 is the two-stage migration below. Named on both sides:
+is in [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md); its R5 is the release and its R6 is the two-stage migration below. Named on both sides:
 
 | Item | Built by | This plan's part |
 |---|---|---|
 | The contract text, helper, sweep, janitor and guard in their owner-scoped form | the merged-core plan | E2–E7 consume its one release (R5 of the remainder plan); E1's stories document was promoted by it as IMPLEMENTED on 2026-10-27 — **superseded 2026-11-01: there were two releases (R5 `115bbf8`, R7 `105d53c`) and E5 needs a third (the `raw-temp` baseline rule); every consumer is pinned at `105d53c`, and a pin bump merges alone, so a further release costs each consumer one standalone PR, not a re-port** |
-| The machine barrier, the merge of PR #82, the private sibling's side and the ONE release | [the remainder plan](../research/PLAN_test_leftovers_merged_core_release.md) R1–R5 | E2–E7 start no producer stage before R5; their sweep-only stages need no release |
+| The machine barrier, the merge of PR #82, the private sibling's side and the ONE release | [the remainder plan](PLAN_test_leftovers_merged_core_release.md) R1–R5 | E2–E7 start no producer stage before R5; their sweep-only stages need no release |
 | The per-consumer rename, port and pin bump | epics E2–E7 here | Each epic splits into a sweep-only stage (its owner-blind sweeps replaced or disabled, no owner-form producer) and a producer stage (pin bump + rename + helper/guard port in one commit — **superseded by decision 4 (the pin bump merges alone) and decision 6 (one PR or a gated stack)**); all sweep-only stages land before any producer stage; the barrier checklist of the merged-core plan runs per machine before the first producer |
 
 Order: the merged core first, then R1–R5 of the remainder plan, then the epics below. Disjoint: neither edits a consumer repository.
@@ -1276,7 +1348,7 @@ recorded or merged (the barrier). The stories documents of E3 (dew_flow_mcp #53)
 against E1; an Opus delta check against `115bbf8` found the name, the creation order, the claim record, liveness, the sweep and the guard changed, so
 both are re-split before any producer code. The entries below still say E1 and `testsToDelete-<repo>-…`: read them through
 `common/test-leftovers.md` at `115bbf8` (`testsToDelete-<owner>-<repo>-…`). Three owner decisions of 2026-10-31 apply to every port, recorded in
-[R6 of the remainder plan](../research/PLAN_test_leftovers_merged_core_release.md): a pin bump may merge alone; a Windows kernel owner needs the profile AND the
+[R6 of the remainder plan](PLAN_test_leftovers_merged_core_release.md): a pin bump may merge alone; a Windows kernel owner needs the profile AND the
 owner SID; the `owner-blind` class in C# and Rust flags any bare-prefix literal outside the helper's file. E6 and E7.S3 wait for E3's merged producer
 stage, not for "E3.S2".
 
@@ -1783,7 +1855,7 @@ plan's.
 1. **P1 — the owner's Windows barrier record.** OPEN. It blocks the first producer MERGE of E2 and of E5. Until it is
    recorded, Windows evidence for E5 comes from the `windows-latest` CI leg only; no E5 branch runs its C# suites on the
    Windows side of an unrecorded machine.
-   *[2026-11-04: CLOSED by the owner's written statement, P1's second option (§ *Epoch 2*, question 2): the owner's Windows machine does not build or test E2's and E5's repositories for now, so merge condition (c) is met for that machine; its barrier stays closed. Recorded in [research/security/machines.md](../research/security/machines.md). The same record re-attests the operator's WSL machine: open for every place the developer account can read; its condition (c) waits for one administrator scan of two root-only places.]*
+   *[2026-11-04: CLOSED by the owner's written statement, P1's second option (§ *Epoch 2*, question 2): the owner's Windows machine does not build or test E2's and E5's repositories for now, so merge condition (c) is met for that machine; its barrier stays closed. Recorded in [research/security/machines.md](security/machines.md). The same record re-attests the operator's WSL machine: open for every place the developer account can read; its condition (c) waits for one administrator scan of two root-only places.]*
 2. **F3** — merged (#116), not released. Released and pinned before the first Node compliance declaration (§ *Epoch 3*,
    item 4). It is NOT released alone: it rides the ONE release that carries F24 (item 5) [interim gate, finding 3].
 3. **NEW — F24, the baseline proof rule** (a conventions follow-up; the next free number of the follow-ups plan; owner:
@@ -2777,7 +2849,7 @@ runner of a release (`windows-11-arm`) is not measured.
 - **The conventions tree.** F27 merged as #133 (`e45ad11`), by the peer session, outside this plan's epics.
 - **The owner's open item is unchanged:** merge condition (c), the WSL administrator scan.
   *[2026-11-06: DONE. The owner ran it: none found, 266 files read, nothing unreadable. Recorded in
-  [research/security/machines.md](../research/security/machines.md). Condition (c) is met for the WSL machine, and row (c) of
+  [research/security/machines.md](security/machines.md). Condition (c) is met for the WSL machine, and row (c) of
   § *Epoch 6* item 3 is read as met. This is the condition coming true as written, not a plan change; epoch 7's count stays 0.]*
 
 **Goal.** The goal of § *Epoch 6* stands word for word, with **one more bounded exception** (the owner approves it with
@@ -2796,7 +2868,7 @@ above. Nothing else of the list changes.
 As § *Epoch 6* item 2, with these states: item 2's release and pin steps are DONE, and the second F24 check's Node half
 is DONE (issuecomment-6656216417), its C# half to be posted from S6's record. (c) stays OPEN. F30 stays not a
 prerequisite, deadline 2026-11-19.
-*[2026-11-06: (c) is DONE, item 1's note and [research/security/machines.md](../research/security/machines.md). The sentence above is the state at approval.]*
+*[2026-11-06: (c) is DONE, item 1's note and [research/security/machines.md](security/machines.md). The sentence above is the state at approval.]*
 
 ### 3. Merge conditions
 
@@ -4899,7 +4971,7 @@ core (coai's budget is 90 KB since `RuleFiles.cs:181`; the canaries were re-meas
   *Epoch 4 (2026-11-03):* F3 is merged (#116, `605e3e6`) and not yet released. F24 is new: the baseline proof rule
   accepts a process-wide gate that enforces containment before discovery; it is released and pinned before E5's S6
   (§ Epoch 4, items 2 and 5).
-- **Repository:** `dew_flow_conventions`. **Stories:** [research/PLAN_test_leftovers_E1.md](../research/PLAN_test_leftovers_E1.md) (IMPLEMENTED).
+- **Repository:** `dew_flow_conventions`. **Stories:** [research/PLAN_test_leftovers_E1.md](PLAN_test_leftovers_E1.md) (IMPLEMENTED).
 - **Goal.** `common/test-leftovers.md` says what every consumer's helper, guard and tests must do; it carries
   decision 2 (shared stores exempt only when named where configured, reuse intentional, reset serialized;
   databases inside a disposable Testcontainers container exempt for the container's lifetime), the

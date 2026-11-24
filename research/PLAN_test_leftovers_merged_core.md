@@ -12,7 +12,7 @@
 > Related docs: [PLAN_test_leftovers_E1.md](PLAN_test_leftovers_E1.md) (the contract this one revises — promoted to
 > `research/` together with this plan, 2026-10-27), [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md)
 > (the remainder plan: what this one left open), [PLAN_test_leftovers_merged_core_followups.md](../todo/PLAN_test_leftovers_merged_core_followups.md)
-> (the findings parked by the security pass), [PLAN_test_leftovers_rollout.md](../todo/PLAN_test_leftovers_rollout.md) (the consumer
+> (the findings parked by the security pass), [PLAN_test_leftovers_rollout.md](PLAN_test_leftovers_rollout.md) (the consumer
 > epics, which now wait for THE RELEASE and split into two stages), [rule-ownership.md](../common/rule-ownership.md).
 >
 > This rule text is shared byte for byte with a private sibling rule repository that serves a second family of
@@ -47,7 +47,7 @@ first producer. The tools of this repository are the reference every consumer po
 | Item | Built by | The other plan's part |
 |---|---|---|
 | The rule text, the owned-resource helper, the sweep, the janitor and the guard (the contract itself) | [PLAN_test_leftovers_E1.md](PLAN_test_leftovers_E1.md) built the first version; **this plan revises it** | E1's stories keep their first form; both documents were promoted to `research/` together on 2026-10-27, this one recorded as E1's revision |
-| Renaming each consumer's resources, ports of the helper, sweep and guard, consumer pin bumps | [PLAN_test_leftovers_rollout.md](../todo/PLAN_test_leftovers_rollout.md) epics E2–E7 | They wait for the ONE release the remainder plan ends with (its R5); each epic splits into a sweep-only stage and a producer stage (pin bump + rename + helper/guard port in one commit), all sweep-only stages before any producer stage (its R6) |
+| Renaming each consumer's resources, ports of the helper, sweep and guard, consumer pin bumps | [PLAN_test_leftovers_rollout.md](PLAN_test_leftovers_rollout.md) epics E2–E7 | They wait for the ONE release the remainder plan ends with (its R5); each epic splits into a sweep-only stage and a producer stage (pin bump + rename + helper/guard port in one commit), all sweep-only stages before any producer stage (its R6) |
 | The machine barrier before the first owner-form producer | this plan built the scan and the checklist (§ *Barrier checklist*); [the remainder plan](PLAN_test_leftovers_merged_core_release.md) runs it (R1, R2) | Each consumer epic runs it per machine before its first owner-form producer |
 | S0 on every machine, the PR's merge, the private sibling's side of the Definition of Done, S7 (the one promotion of `release`) | [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md) R1–R5 | This plan keeps the build and its reviews; it records the machine it has and points at the remainder for every other item. Nothing is built twice: the remainder plan edits no tool |
 | The findings the security pass parked, the stub-docker gaps, the Windows run | [PLAN_test_leftovers_merged_core_followups.md](../todo/PLAN_test_leftovers_merged_core_followups.md) F1–F9 | None of them blocks the release |

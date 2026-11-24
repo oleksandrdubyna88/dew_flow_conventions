@@ -195,7 +195,7 @@ them, so that a consumer can land its guard with every other class at zero and d
 | The rule text, the Node guard's baseline pass, shrink check and tests, the release, the pin bumps' order | this plan | — |
 | The baseline FILE, the proof tests, the wrappers that pass the baseline, the drain | `dew_flow_connect_other_ais · todo/PLAN_test_leftovers_E5.md` D6, S3 sc. 2, S6, S7 | reads the released form — ONE file at the root, each scope naming its guard (`node` for `src_vs_code/src/test/`, `csharp` for the C# suites); its producer PR waits for the pin bump to the release this plan ships (D8 condition 5) |
 | A shared C# baseline reader beside the byte-identical scanner | `dew_flow_mcp` (the template every C# consumer copies) — recommended below, its own plan there | this plan fixes the file format, the named-guard rule and the behaviours its tests must show |
-| Which consumers use it | the rollout plan `todo/PLAN_test_leftovers_rollout.md` (E5 yes; E2 declined; E6, E7 may) | this plan changes no consumer |
+| Which consumers use it | the rollout plan `research/PLAN_test_leftovers_rollout.md` (E5 yes; E2 declined; E6, E7 may) | this plan changes no consumer |
 
 Order: this plan's rule and guard, then its release, then coai's pin bump, then coai's producer PR. Disjoint: nothing
 here edits a consumer, and nothing in coai edits the rule.

@@ -3,7 +3,7 @@
 > Status: **IMPLEMENTED, 2026-11-16.** #171 merged (`b1746499`), `release` promoted to it, the pin bump merged in all nine consumers (benchmark #216, mcp #82, sidecar_rust #81, vscode_kit #35, wsl_care #199, creds #372, amd_r9700 #37, rag_qln #121, coai #1004). Deviation: entry 1.1 (the provisions live in the companion rule `common/test-leftovers-exemptions.md`, loaded by the detail's `depends`; the detail's body is unchanged). The C# half, F42, merged as mcp #81.
 >
 > Was: Status: **epoch 1 open, 2026-11-16: built and through its gates — plan gate `a4ec9471` (proceed, five findings folded in), code gate two rounds (proceed; three findings accepted, one rejected as a false positive with a run), an independent Opus review (nine points applied); entry 1.1 (the companion rule). PR open; the release (a promotion with nine pin bumps) follows the merge.** Branch `fix/f41-container-scoped` from `main` `739affe`. Parent:
-> `todo/PLAN_test_leftovers_rollout.md` § *Epoch 9* item 4.2 and row F41-a; the follow-up F41 in
+> `research/PLAN_test_leftovers_rollout.md` § *Epoch 9* item 4.2 and row F41-a; the follow-up F41 in
 > `todo/PLAN_test_leftovers_merged_core_followups.md`. One PR, docs and code. The release (a promotion with pin bumps in
 > all nine consumers, allowed by the owner on 2026-11-16 after a fresh check for releases in flight) is a separate step
 > after the merge. The C# template's half is F42, in mcp.
