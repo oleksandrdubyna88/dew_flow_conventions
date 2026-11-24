@@ -1469,7 +1469,7 @@ This repository's own tests obey `common/test-leftovers.md` and its companion `c
 record as it was written. What is not done — the machine barrier on every machine, the merge, the private sibling's side and the
 release — was `todo/PLAN_test_leftovers_merged_core_release.md`, promoted on 2026-11-04 (the barrier on the owner's Windows machine is
 still closed, and the sibling's confirmation holds at `2602416` only, F26) as
-`research/PLAN_test_leftovers_merged_core_release.md`; its open tail, the consumer migration, is `todo/PLAN_test_leftovers_rollout.md`.
+`research/PLAN_test_leftovers_merged_core_release.md`; its open tail, the consumer migration, was `research/PLAN_test_leftovers_rollout.md` (closed 2026-11-24).
 
 ### The code as it is (2026-10-27)
 

@@ -1,7 +1,7 @@
 # PLAN — Test leftovers, E1: the contract, its refinement, and this repository's own tools
 
 > Status: **IMPLEMENTED, 2026-10-15** (merged in #77, 2c96f83); promoted 2026-10-27 with the merged core. Stories of epic E1 of
-> [PLAN_test_leftovers_rollout.md](../todo/PLAN_test_leftovers_rollout.md) (§ *Epics*, E1). Scope: `common/test-leftovers.md`
+> [PLAN_test_leftovers_rollout.md](PLAN_test_leftovers_rollout.md) (§ *Epics*, E1). Scope: `common/test-leftovers.md`
 > (+ its record in `research/rule-bodies.json`), a Node owned-resource helper and a start-of-run sweep under
 > `tools/lib/`, the guard `tools/leftovers-check.mjs`, `tools/run-tests.mjs`, the shipped janitor `tools/janitor.sh`
 > with its test, the 34 `mkdtemp` sites and the four worktree sites in `tools/*.test.mjs`, and one release.

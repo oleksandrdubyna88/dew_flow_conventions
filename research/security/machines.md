@@ -54,7 +54,7 @@ private folder under the user's own profile, and the janitor stays `--dry-run` t
 [the follow-ups plan](../../todo/PLAN_test_leftovers_merged_core_followups.md); `JANITOR_WINDOWS_E2E_GREEN` is not set).
 
 **Owner statement, 2026-11-04 (temporary):** this machine does not build or test E2's and E5's repositories (the rollout's wave 2)
-for now. P1 of the rollout plan ([PLAN_test_leftovers_rollout.md](../../todo/PLAN_test_leftovers_rollout.md), § 7, question 2)
+for now. P1 of the rollout plan ([PLAN_test_leftovers_rollout.md](../PLAN_test_leftovers_rollout.md), § 7, question 2)
 offers two ways to meet merge condition (c) for this machine: the scan and the checklist, OR a written statement that the
 machine no longer builds or tests those repositories. This is the second way, so **P1 is closed and condition (c) is met for
 this machine for E2 and E5**: a machine that does not run their suites cannot be hit by their producers. The barrier itself is
