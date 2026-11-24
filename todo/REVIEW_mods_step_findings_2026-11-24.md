@@ -26,8 +26,9 @@ word: coai #1044 (five threads) and creds #390 (six threads). Line numbers are o
 | R8 | The person's own opt-out marker is read once at the start (`:570-571`). If it replaces our tombstone during the run, step 2 still renames and deletes. Read the marker again before the state write and the rename. | `:570-571`, step 2 from `:754` | creds |
 | R9 | Two starts at once can both read the old folder. The second can overwrite the first one's recorded `aside`, get `ENOENT`, clear the record and remove the settings entry and the records. Graded "heavy lift". | the state write before the rename `:595`, step 2 from `:754` | creds |
 
-R7, R8 and R9 are about step 2, the only step that deletes. Each one needs a person to act during a run, or two starts
-in the same seconds. Nothing was deleted on the one machine that ran step 1 (E4.1); its step 2 is due after
+R7, R8 and R9 are about step 2, the only step that deletes. R7 needs a run cut short after the rename aside and a
+recorded file deleted before the next start (no action during a run is needed); R8 needs the person to act during a
+run; R9 needs two starts in the same seconds. Nothing was deleted on the one machine that ran step 1 (E4.1); its step 2 is due after
 2026-11-24 17:04 UTC and is an owner check.
 
 ## Open items the plans named (carried here before they move to `research/`)
