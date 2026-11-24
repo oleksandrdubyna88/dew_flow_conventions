@@ -237,6 +237,35 @@ The probe confirms the plan's choices, so the plan does not change:
 Still to observe in E2 against the real repository (they need GitHub or a logged-in session): V4–V7, V9, V10, the
 HTTPS clone time, the timed auto-update after the first message.
 
+## E4.1 — the switch on the real ~/.claude (2026-11-23)
+
+Claude Code 2.1.330, this WSL machine, the owner at the keyboard. `dew_flow_mods` `release` and the tag
+`agent-models--v1.6.0` at `cf28dad` (promotion 1, approved by the owner). The step ran from a local canary branch of
+`dew_flow_amd_r9700_tuning_ai` that pins conventions `4405544` by hand (never pushed).
+
+**The boundary check** (the consultant's): with only the gitlink moved, `adapter-check` was red with exactly seven
+findings (two drifted copies, `lib/mods-marketplace.mjs` missing, four retired libs); after the three hook copies and
+the four deletions it was `OK`. `pin-check` was red `STALE` on that branch only, as expected.
+
+**Before the click** the machine was already in state S1: the two registration keys had been written once at
+14:04:34Z by an agent's probe during the E3 build (a hand run with the real home, outside the test sandbox — recorded
+as a process defect; nothing else changed, the old copy kept loading). The baseline for a rollback was taken before
+start 1.
+
+| Start | The step said | Install record (`installed_plugins.json`) | Inline switch | Loaded |
+|---|---|---|---|---|
+| 1, install start (canary, trust accepted) | nothing (S1) | absent; the marketplace cloned at `cf28dad`, the cache holds 1.6.0 | absent | `@inline` 1.4.0 |
+| 2 (canary) | `retired`: "the new copy loads from the next session" | user scope, 1.6.0, `gitCommitSha` `cf28dad`, the cache folder present, not orphaned | `false`; our tombstone written and read back; the variable entry kept (step 2 after 24 h) | `@inline` 1.4.0 (loaded before the step ran) |
+| 3 (canary) | nothing — steady state | whole | `false` | **`@dew-flow-mods` 1.6.0** (the owner: "works perfectly") |
+| 4, an old-pin checkout (`dew_flow_mods`, conventions `c598a11`) | the old step wrote nothing (the tombstone) | whole | `false` | **`@dew-flow-mods` 1.6.0** |
+
+Against the baseline, the only settings member the step changed at retirement was `enabledPlugins["agent-models@inline"]`
+(`undefined` → `false`); the registration keys were already present. The E1 timing held exactly: the record came one
+start after the install start, and the copy switched one start after `retired`. No rollback was needed.
+
+**Not observed yet:** step 2 (the variable entry and the old folder removed, from 24 hours after 17:04:44Z) — owner
+check 1 of E4.3; the timed auto-update of a later promotion (V6); the HTTPS clone time (V5).
+
 ## V6 — a later release reaches an installed machine with no pin bump (2026-11-24)
 
 `dew_flow_mods` promotion 2 (approved by the owner) moved `release` and the new tag `agent-models--v1.6.1` to

@@ -451,7 +451,7 @@ one document, written by Opus when the epic starts.
   cornerstone** (it writes the trust anchor into user settings and retires a folder in `~/.claude` on every
   machine); 3.2 the removal, the frozen fixture and `adapter-check`; 3.3 the docs. Depends on: E1, E2. Done when:
   R1–A4, merged, not promoted.
-- **E4 — the one round.** Stories: 4.1 one consumer branch on this machine, the real old installer included; 4.2 the
+- **E4 — the one round** ([stories](PLAN_dew_flow_mods_E4.md)). Stories: 4.1 one consumer branch on this machine, the real old installer included; 4.2 the
   pre-checks, the promotion, the bumps in order; 4.3 `POST_DEPLOY.md`, the owner checks, the three plans promoted.
   Depends on: E3. Done when: the Definition of Done. No cornerstone.
 
