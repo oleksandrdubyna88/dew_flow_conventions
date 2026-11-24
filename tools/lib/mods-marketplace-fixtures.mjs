@@ -25,7 +25,7 @@ export const D = path.delimiter;
 
 /** The seven files of the 1.4.0 mod the old installer vouched for (names only: the bytes here are fixtures). */
 export const OLD_FILES = ['.claude-plugin/plugin.json', 'hooks/hooks.json', 'hooks/register.tsx', 'hooks/prompts.ts', 'hooks/tasks.tsx', 'hooks/limits.tsx', 'types/index.d.ts'];
-/** What the engine puts in the folder that the old record does not name: a top-level tsconfig.json and the folder .claude-plugin/types with its contents (read on this machine, 2026-11-23). */
+/** What the engine puts in the folder that the old record does not name: a top-level tsconfig.json and the folder .claude-plugin/types with its contents (read on this machine, 2026-11-23). The step does not trust them: a folder holding them is left (`old(v, { extras: true })`). */
 export const EXTRAS = ['tsconfig.json', '.claude-plugin/types/claude-code/index.d.ts'];
 
 /** The folder a `readdirSync` entry sits in: `parentPath` from Node 20.12, `path` before it (the repository accepts Node 20+). */
@@ -99,7 +99,7 @@ export function sandbox(t, what = 'mods-marketplace') {
     /** The tombstone the step writes, at `when` (a Date). */
     tomb: (when = NOW) => write(s.optout, tombstoneBytes(when)),
     /** The old copy at version `v`: the files its record names, the record, the engine's extras and the variable that lists it. */
-    old: (v = '1.4.0', { variable = true, extras = true, settings = true } = {}) => {
+    old: (v = '1.4.0', { variable = true, extras = false, settings = true } = {}) => {
       const files = {};
       for (const rel of OLD_FILES) {
         files[rel] = Buffer.from(rel === '.claude-plugin/plugin.json' ? `${JSON.stringify({ name: 'agent-models', version: v })}\n` : `// old ${v} ${rel}\n`);

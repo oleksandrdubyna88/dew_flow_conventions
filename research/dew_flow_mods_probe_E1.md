@@ -265,3 +265,16 @@ start after the install start, and the copy switched one start after `retired`. 
 
 **Not observed yet:** step 2 (the variable entry and the old folder removed, from 24 hours after 17:04:44Z) — owner
 check 1 of E4.3; the timed auto-update of a later promotion (V6); the HTTPS clone time (V5).
+
+## V6 — a later release reaches an installed machine with no pin bump (2026-11-24)
+
+`dew_flow_mods` promotion 2 (approved by the owner) moved `release` and the new tag `agent-models--v1.6.1` to
+`7ec72a0` (1.6.1: the manifest names its author). Before it, this machine had `agent-models@dew-flow-mods` 1.6.0
+(`cf28dad`) installed; the consumer pins were `c598a11` (r9700 and mcp read on GitHub).
+
+The owner opened an interactive session, sent one message and kept it open, then started a new session. Read after
+it: the install record says **1.6.1**, `gitCommitSha` `7ec72a0`, `lastUpdated` 2026-11-24T08:38:22Z, `installPath`
+`cache/dew-flow-mods/agent-models/1.6.1` (the 1.6.0 cache folder kept beside it, as the engine does); no command was
+run; the consumer pins are still `c598a11`. So a mod update reaches a machine with no consumer pin bump — the goal of
+the move. Not observed separately: the update notice's exact time after the first message (the owner reported the
+result, not the notice).
