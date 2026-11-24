@@ -119,26 +119,32 @@ The owner closed this plan on 2026-11-24 ("закрывай план, что с�
 done under it. An item under *Not done* that is taken up later gets a plan of its own; it does not reopen this one. The
 ledger stays as it is (epoch 12, one entry): closing adds no entry, as with the coai auto follow-ups plan closed the same
 day. The stories documents in `dew_flow_benchmark` (E6) and `dew_flow_rag_qln` (E7) are promoted with this plan, each in
-its own pull request.
+its own pull request. Delivered to `main` by three pull requests: this closure (dew_flow_conventions, the one carrying
+this text), benchmark #246 (E6's stories document and S6's brief) and rag_qln #138 (E7's stories document); each is
+merged only after its checks pass.
 
 **Done**
 
 - **E1 (this repository):** the contract and its refinement (`common/test-leftovers.md` and its detail companion), the
-  merged core (#82) and its release plan (R1–R5, R7); the shipped Node helper `tools/lib/owned.mjs`, the guard
+  merged core (#82) and its release plan (R1–R5, R7; `release` at `115bbf8` for R5 and `105d53c` for R7, each with
+  every consumer's pin bump); the shipped Node helper `tools/lib/owned.mjs`, the guard
   `tools/leftovers-check.mjs` and the start-of-run sweep `tools/lib/leftovers-sweep.mjs`, released and pinned in all
   nine consumers.
-- **E2 (`dew_flow_creds_for_devs`):** complete 2026-11-10.
+- **E2 (`dew_flow_creds_for_devs`):** complete 2026-11-10 — creds #294, #310, #311, #329, #330.
 - **E3 (`dew_flow_mcp`):** #58 (`4feb245`, 2026-10-31).
 - **E4 (`dew_flow_sidecar_rust`):** #64 (`5478109`, 2026-10-31).
-- **E5 (`dew_flow_connect_other_ais`):** complete 2026-11-12 (the E5.S7 drain, #977–#985).
-- **F41, F41-b, F42, F42-c, F45, F46:** done.
+- **E5 (`dew_flow_connect_other_ais`):** complete 2026-11-12 — coai #945 (the producer) and the S7 drain #977, #979,
+  #980, #981, #984, #985.
+- **F41, F41-b, F42, F42-c, F45, F46:** done (their pull requests are in § *Epoch 11* item 1's table and § *Epoch 12*
+  item 2 point 1).
 - **E6 (`dew_flow_benchmark`), S1–S6:** S1 #205, S2 #207 (`84d4953e`), S3 #219, S4 #221, S5 #223, S6 #234 (`17224bf3`,
   2026-11-19). At S6's head both guards are clean in `spikes/` (Node 87 → 2, default profile 3 → 2, the C# copy 16 → 4)
   and the four spike suites ran whole with no failure (policy-ab-quick 159, minigit-bench 1316, lang-explore 1042,
   lang-bench 2604 tests), as entry 12.1 asked. On S6's way, #232 (`4e30c5b9`) made every box on the distribution's
   dotnet show only the pinned SDK, on a host that now holds SDK 11.0.100 beside 10.0.114 (benchmark's
   `PLAN_minigit_stack_bench_E2.md` amendment D-9). The stories were amended by #220 and #225.
-- **E7 (`dew_flow_rag_qln`), S1 and S3–S5:** S1 built; S3–S5 #125 (`3ca58f43`); the stories amended by #128, #132 and
+- **E7 (`dew_flow_rag_qln`), S1 and S3–S5:** S1 built (its record is rag_qln's `research/module_tests.md`; no pull
+  request of its own is named in this plan); S3–S5 #125 (`3ca58f43`); the stories amended by #128, #132 and
   #133; the benchmark pin by #129–#131 and #136.
 - **This repository's record:** twelve epochs with their re-reviews (#180 opened epoch 12) and entry 12.1 (#181).
 
@@ -146,23 +152,32 @@ its own pull request.
 
 - **E6.S7** (benchmark: both guards on in CI and the docs; row E6-g; the Definition of Done's item 3 for benchmark).
   It never started, because its prerequisites are not met. Checked 2026-11-24 on benchmark `main` `ed472384`:
-  - `todo/PLAN_bench_test_leftovers_followups.md` has built nothing (its status line, read whole), so D7's S1 and S2 are
-    not there;
-  - `todo/PLAN_lang_comparison_v2.md` holds no disposition of `spikes/lang-bench/runner/run_samples.py:35` and `:306`
-    (`git grep run_samples.py:35`: no line).
+  - `todo/PLAN_bench_test_leftovers_followups.md`'s status line says "plan only, nothing implemented yet" (read
+    whole); its S1 and S2, D7's prerequisites, were not looked for in code;
+  - `todo/PLAN_lang_comparison_v2.md` holds no disposition of `spikes/lang-bench/runner/run_samples.py:35` and `:306`:
+    `git grep run_samples` over it and its `_E*` stories documents finds five lines (`:669`, `:1146`, `:1149`, `:1319`,
+    `:1433`), each about the runner as a workspace tool, none about its two `mkdtemp` sites or entry 11.2.
 
   Benchmark's C# copy of the guard therefore stays at 4 on `main`: the two § 3a `research/` lines and those two runner
   lines. `http/README.md:32-33`, S7's site, stays as it is.
 - **E7.S2** (rag_qln: the shared store's ownership and its live stores; the Definition of Done's items 1 and 2 for those
-  stores). It never started: its plan gate waits for the owner's live-store observations (§ *Epoch 9* item 7), which
-  were not given. Checked on rag_qln `main` `3160a668`: E7's status line says "S2 is not".
-- **The feature reviews** (§ *Epoch 8* item 5, the LAST step of the build order). None was run. E2's has been held by
-  coai's `call_human` since 2026-11-10; its state was not re-read on 2026-11-24.
+  stores). It never started: its plan gate waits for the owner's live-store observations (§ *Epoch 9* item 7). Checked
+  on rag_qln `main` `3160a668`: E7's status line says "S2 is not" and that rows E7-b, E7-c and E7-f are "blocked on the
+  owner's observations"; no other place where the owner might have given them was searched.
+- **The feature reviews** (§ *Epoch 8* item 5, the LAST step of the build order). None is recorded in this plan as
+  run. E2's was held by coai's `call_human` from 2026-11-10; neither its state nor any other epic's review was looked up
+  in coai on 2026-11-24, so a review run outside this plan's record is not excluded.
 - **R6** of [PLAN_test_leftovers_merged_core_release.md](PLAN_test_leftovers_merged_core_release.md), handed to this plan
   as its open tail, stays unticked.
-- **The Definition of Done** keeps items 1, 2, 3 and 7 open for exactly the two stories above. Its other rows stand as
-  § *Epoch 12* item 1's table writes them.
-- **Question (b)** of § *Epoch 12* item 7, the runner hand-off at S6's merge: not answered. S6 merged without it.
+- **The Definition of Done** keeps four items open for exactly the two stories above; its other rows stand as § *Epoch 12*
+  item 1's table writes them:
+  - item 1, tests, scripts and CI create only owner-form resources or a documented exemption (E6.S7, E7.S2);
+  - item 2, no container without `--rm` or an always-run cleanup (`http/README.md:32-33`, S7's; E7's live stores, S2's);
+  - item 3, a structural test per repository at zero (benchmark's switch-on, S7's);
+  - item 7, every prep or rename story recorded its invocation inventory (S7, S2).
+- **Question (b)** of § *Epoch 12* item 7: if the language-comparison plan has not recorded the hand-off of the two
+  runner lines (`run_samples.py:35`, `:306`) by S6's merge, the owner decides — wait, or a coordinated re-pin of
+  `runner/` carrying a rule §7 marker on the two lines. Not answered; S6 merged without it, and the two lines stand.
 - **Found by E6.S6, not fixed** (in benchmark: the umask in the S6 brief, the pin in its module document):
   - minigit-bench's `test/heldout-archive.test.mjs:30` assumes umask 0022;
   - lang-bench's exec layer rightly refuses a group-writable run parent;
