@@ -16,8 +16,12 @@
  *   S2 proof whole, `agent-models@inline` absent -> step 1: the tombstone (exclusive create, read back), then that
  *                                  switch set to false, then `retiredAt` stored                               -> S3
  *   S3 marker ours, inline false, less than 24 h since `retiredAt` -> nothing                                  -> S4
- *   S4 24 h or more             -> step 2: our entry leaves env.CLAUDE_CODE_PLUGIN_DIRS, the old folder is renamed aside
- *                                  and deleted, then its record and its reported file; or `left`, named once  -> S5
+ *   S4 24 h or more             -> step 2: the old folder, when its files equal its install record exactly, is recorded in the
+ *                                  state file (`aside`: the name and the hashes), renamed aside and deleted (only that recorded aside,
+ *                                  and only while it still equals the record); then our entry leaves env.CLAUDE_CODE_PLUGIN_DIRS;
+ *                                  then its record and its reported file. A folder that changed after the first judgement is refused
+ *                                  at the last one: its entry, record and reported file stay. Any other folder is `left` with its
+ *                                  entry, named once                                                                       -> S5
  *   S5 nothing of the old copy left -> the version line when the installed version changed; the shell warning
  * Nothing is written at all (not even the state file) when the person's own opt-out marker is there.
  */
@@ -43,7 +47,7 @@ export const MAX_FOLDER_ENTRIES = 500;
 const MAX_MARKER_BYTES = 4096;
 const PLUGIN_DIRS_KEY = 'CLAUDE_CODE_PLUGIN_DIRS';
 const RETIRED_TAG = 'agent-models.retired-';
-/** Exactly what the step's own rename writes: `agent-models.retired-<milliseconds>-<pid>`; a look-alike name is never ours. */
+/** Exactly what the step's own rename writes: `agent-models.retired-<milliseconds>-<pid>`; a look-alike name is never ours, and a name of this shape is deleted only when the state file recorded it. */
 const RETIRED_ASIDE = /^agent-models\.retired-\d+-\d+$/;
 const SHOWN_SETTINGS = '~/.claude/settings.json';
 const SHOWN_MODS = '~/.claude/mods';
@@ -99,7 +103,9 @@ export const LINES = Object.freeze({
   autoUpdateOff: () => `agent-models: auto-update of ${MARKETPLACE} is off in ${SHOWN_SETTINGS} — the mod changes only when you run: claude plugin update ${PLUGIN_ID} (said once)`,
   inlineTrue: () => `agent-models: ${INLINE_ID} is switched on in ${SHOWN_SETTINGS} (you run the folder copy) — the old copy in ${SHOWN_OLD} stays and is not retired (said once)`,
   proof: reason => `agent-models: the old copy is not retired: ${reason} (said once)`,
-  left: reason => `agent-models: the old copy ${SHOWN_OLD} stays: ${reason} — its ${PLUGIN_DIRS_KEY} entry and its record stay too (said once)`,
+  left: reason => `agent-models: the old copy ${SHOWN_OLD} stays: ${reason} — its ${PLUGIN_DIRS_KEY} entry and its record stay too; when you have checked it and no longer need it, remove ${SHOWN_OLD} by hand (said once)`,
+  asideLeft: (name, reason) => `agent-models: the old copy, renamed aside by an earlier start as ${SHOWN_MODS}/${name}, is not deleted: ${reason}; when you have checked it and no longer need it, remove ${SHOWN_MODS}/${name} by hand (said once)`,
+  stray: name => `agent-models: ${SHOWN_MODS}/${name} looks like an old copy renamed aside, but this step did not record it, so it is not deleted; when you have checked it, remove it by hand (said once)`,
   wait: () => `agent-models: Claude Code has not installed the mod from ${MARKETPLACE} yet — run: claude plugin install ${PLUGIN_ID} (said once)`,
   shell: () => `agent-models: this session's ${PLUGIN_DIRS_KEY} still lists ${SHOWN_OLD}, which is removed — take it out of your shell profile (said once)`,
   changed: what => `${SHOWN_SETTINGS} changed while ${what}; nothing of ours was written to it — the next start tries again`,
@@ -295,14 +301,11 @@ function walkProblem(root) {
   return '';
 }
 
-/** The engine's own generated files in the old folder: a top-level tsconfig.json, and the folder .claude-plugin/types with everything under it. */
-const ENGINE_FILE = 'tsconfig.json';
-const ENGINE_FOLDER = '.claude-plugin/types';
-
 /**
- * The first path in the folder (sorted, folders descended in order) that is neither named by the record nor one of the
- * engine's own; '' when every entry is accounted for. A folder is accounted for when it holds a named file or is the engine's folder.
- * The walk is already known to hold only files and folders (`walkProblem`), and the named files were hashed by the caller.
+ * The first path in the folder (sorted, folders descended in order) that the record does not name; '' when the folder holds
+ * exactly the named files. A folder is accounted for only as a container of a named file: no other entry is trusted, whatever
+ * its name or place (not `tsconfig.json`, not `.claude-plugin/types/**`). The walk is already known to hold only files and
+ * folders (`walkProblem`), and the named files were hashed by the caller.
  */
 function unknownEntry(root, named) {
   const files = new Set();
@@ -315,43 +318,59 @@ function unknownEntry(root, named) {
   const visit = (dir, prefix) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
       const relative = prefix === '' ? entry.name : `${prefix}/${entry.name}`;
-      const engine = relative === ENGINE_FOLDER || relative.startsWith(`${ENGINE_FOLDER}/`);
       if (entry.isDirectory()) {
-        if (!engine && !folders.has(relative)) return relative;
+        if (!folders.has(relative)) return relative;
         const inner = visit(path.join(dir, entry.name), relative);
         if (inner) return inner;
-      } else if (!(files.has(relative) || (engine && relative !== ENGINE_FOLDER) || relative === ENGINE_FILE)) return relative;
+      } else if (!files.has(relative)) return relative;
     }
     return '';
   };
   return visit(root, '');
 }
 
-/** What the record vouches for: `{ kind: 'missing' }`, `{ kind: 'removable' }`, or `{ kind: 'left', reason }`. Reads only; the bytes of named files are hashed. Only a fully accounted folder is removable: every file is named with its hash or is the engine's own. */
+/** The folder itself: `{ kind: 'missing' }`, a `left` answer (a link, not a folder, another owner), or null when it is a real folder of ours. */
+function folderProblem(dir, uid) {
+  const stat = lstatOrNull(dir);
+  if (stat === null) return { kind: 'missing' };
+  if (stat.isSymbolicLink()) return left('it is a link, and a link is never deleted through');
+  if (!stat.isDirectory()) return left('it is not a folder');
+  if (uid !== undefined && stat.uid !== uid) return left(`it belongs to another user (uid ${stat.uid})`);
+  return null;
+}
+
+/**
+ * Whether the files of `dir` equal `sums` (the install record's `sha256`: relative path -> digest): every regular file is named with
+ * its hash and nothing else is there. `partial` lets a named file be absent (a folder whose delete was cut short: fewer files than
+ * the record is still nothing but the record's). `{ kind: 'removable' }` or `{ kind: 'left', reason }`. Reads only.
+ */
+function judgeFiles(dir, sums, partial) {
+  if (!isObject(sums) || Object.keys(sums).length === 0) return left('its install record names no file');
+  for (const [relative, digest] of Object.entries(sums)) {
+    const parts = relative.split(/[\\/]/);
+    if (path.isAbsolute(relative) || parts.some(part => part === '' || part === '..')) return left(`its install record names ${JSON.stringify(relative)}, which is not a path inside the folder`);
+    const file = lstatOrNull(path.join(dir, relative));
+    if (file === null && partial) continue;
+    if (file === null) return left(`${relative}, named by its install record, is missing`);
+    if (!file.isFile()) return left(`${relative}, named by its install record, is not a regular file`);
+    if (typeof digest !== 'string' || sha256(fs.readFileSync(path.join(dir, relative))) !== digest) return left(`${relative} was changed after it was installed`);
+  }
+  const problem = walkProblem(dir);
+  if (problem) return left(problem);
+  const unknown = unknownEntry(dir, Object.keys(sums));
+  return unknown ? left(`it holds files the installer did not write (${unknown})`) : { kind: 'removable' };
+}
+
+/** What the record vouches for: `{ kind: 'missing' }`, `{ kind: 'removable', sums }`, or `{ kind: 'left', reason }`. Reads only; the bytes of named files are hashed. Removable only when the folder's files equal the install record exactly. */
 export function readOldFolder(p, uid) {
   try {
-    const stat = lstatOrNull(p.oldFolder);
-    if (stat === null) return { kind: 'missing' };
-    if (stat.isSymbolicLink()) return left('it is a link, and a link is never deleted through');
-    if (!stat.isDirectory()) return left('it is not a folder');
-    if (uid !== undefined && stat.uid !== uid) return left(`it belongs to another user (uid ${stat.uid})`);
+    const problem = folderProblem(p.oldFolder, uid);
+    if (problem) return problem;
     const record = readRecord(p.oldManifest);
     if (record.missing) return left('it has no install record (agent-models.installed.json)');
     if (record.say) return left(`its install record cannot be used: ${record.say}`);
-    const sums = record.value.sha256;
-    if (!isObject(sums) || Object.keys(sums).length === 0) return left('its install record names no file');
-    for (const [relative, digest] of Object.entries(sums)) {
-      const parts = relative.split(/[\\/]/);
-      if (path.isAbsolute(relative) || parts.some(part => part === '' || part === '..')) return left(`its install record names ${JSON.stringify(relative)}, which is not a path inside the folder`);
-      const file = lstatOrNull(path.join(p.oldFolder, relative));
-      if (file === null) return left(`${relative}, named by its install record, is missing`);
-      if (!file.isFile()) return left(`${relative}, named by its install record, is not a regular file`);
-      if (typeof digest !== 'string' || sha256(fs.readFileSync(path.join(p.oldFolder, relative))) !== digest) return left(`${relative} was changed after it was installed`);
-    }
-    const problem = walkProblem(p.oldFolder);
-    if (problem) return left(problem);
-    const unknown = unknownEntry(p.oldFolder, Object.keys(sums));
-    return unknown ? left(`it holds ${unknown}, which neither its install record nor the engine made`) : { kind: 'removable' };
+    const judged = judgeFiles(p.oldFolder, record.value.sha256, false);
+    return judged.kind === 'removable' ? { kind: 'removable', sums: { ...record.value.sha256 } } : judged;
   } catch (e) {
     return left(`it could not be read (${codeOf(e)})`);
   }
@@ -365,18 +384,44 @@ const isFileAt = file => {
   }
 };
 
-/** What an interrupted step 2 may have left: `retired-*` real folders of our uid, and a record and a reported file. */
-function readLeftovers(p, uid) {
-  const retired = [];
+/**
+ * The aside the state file recorded: `{ kind: 'missing' }` (nothing there: the delete was done, or the rename never happened),
+ * `{ kind: 'removable' }` (a real folder of our uid whose files are still among the recorded ones) or `{ kind: 'left', name, reason }`.
+ * `partial` (the default, for an aside of an earlier start whose delete may have been cut short) lets a recorded file be absent; a fresh aside, renamed
+ * in this same run, is judged with `partial` false: every recorded file present with its hash, nothing else.
+ * `recorded` is `{ name, sha256 }` as `readState` checked it, or undefined. The name was matched against `RETIRED_ASIDE` when the
+ * state was read, so the path is a child of `mods` and no other.
+ */
+function readAside(p, recorded, uid, partial = true) {
+  if (recorded === undefined) return undefined;
+  const dir = path.join(p.mods, recorded.name);
+  try {
+    const problem = folderProblem(dir, uid);
+    if (problem) return problem.kind === 'left' ? { ...problem, name: recorded.name } : problem;
+    const judged = judgeFiles(dir, recorded.sha256, partial);
+    return judged.kind === 'left' ? { ...judged, name: recorded.name } : judged;
+  } catch (e) {
+    return { kind: 'left', name: recorded.name, reason: `it could not be read (${codeOf(e)})` };
+  }
+}
+
+/** Real folders of our uid named like the step's own aside but not the recorded one: named once, never deleted. */
+function readStrays(p, uid, recordedName) {
+  const strays = [];
   try {
     for (const entry of fs.readdirSync(p.mods, { withFileTypes: true })) {
-      if (!RETIRED_ASIDE.test(entry.name) || !entry.isDirectory()) continue;
-      if (uid === undefined || lstatOrNull(path.join(p.mods, entry.name))?.uid === uid) retired.push(entry.name);
+      if (!RETIRED_ASIDE.test(entry.name) || entry.name === recordedName || !entry.isDirectory()) continue;
+      if (uid === undefined || lstatOrNull(path.join(p.mods, entry.name))?.uid === uid) strays.push(entry.name);
     }
   } catch {
     // no mods folder, or one that cannot be listed: nothing is left that we can name
   }
-  return { retired, manifest: isFileAt(p.oldManifest), reported: isFileAt(p.oldReported) };
+  return strays.sort();
+}
+
+/** What an interrupted step 2 may have left: the recorded aside's verdict, strangers named like it, and a record and a reported file. */
+function readLeftovers(p, uid, recorded) {
+  return { aside: readAside(p, recorded, uid), strays: readStrays(p, uid, recorded?.name), manifest: isFileAt(p.oldManifest), reported: isFileAt(p.oldReported) };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -396,17 +441,20 @@ export function decideRetirement({ marker, registration, inline, proof }) {
 
 /**
  * What step 2 does. `retiredAt` and `now` are milliseconds (`retiredAt` null when absent or unreadable); `listed` says our entry is
- * in env.CLAUDE_CODE_PLUGIN_DIRS; `folder` is `readOldFolder`'s answer; `leftovers` is `{ retired, manifest, reported }`.
+ * in env.CLAUDE_CODE_PLUGIN_DIRS; `folder` is `readOldFolder`'s answer; `leftovers` is `{ aside, manifest, reported }` (`aside` is
+ * `readAside`'s answer: a recorded aside that is not what was recorded stops the step, and nothing is deleted).
  */
 export function decideRemoval({ retirement, retiredAt, now, listed, folder, leftovers }) {
   if (retirement.action !== 'retired') return { action: 'none' };
   if (!Number.isFinite(retiredAt) || retiredAt > now) return { action: 'stamp' };
   if (now - retiredAt < STEP2_DELAY_MS) return { action: 'wait' };
+  if (leftovers.aside?.kind === 'left') return { action: 'asideLeft', name: leftovers.aside.name, reason: leftovers.aside.reason };
   if (folder.kind === 'left') return { action: 'left', reason: folder.reason };
   const removeFolder = folder.kind === 'removable';
-  const sweep = leftovers.retired.length > 0 || leftovers.manifest || leftovers.reported;
-  if (!listed && !removeFolder && !sweep) return { action: 'done' };
-  return { action: 'remove', entry: listed, folder: removeFolder, sweep };
+  const aside = leftovers.aside?.kind === 'removable';
+  const sweep = leftovers.manifest || leftovers.reported;
+  if (!listed && !removeFolder && !aside && !sweep) return { action: 'done' };
+  return { action: 'remove', entry: listed, folder: removeFolder, aside, sweep };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -416,6 +464,14 @@ export function decideRemoval({ retirement, retiredAt, now, listed, folder, left
 const timeText = value => (typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : undefined);
 const emptyState = () => ({ said: {} });
 
+/** The recorded aside, checked: a name of exactly the shape of the step's own rename (so a child of `mods`, never a path) and a map of paths to digests; anything else reads as absent. */
+function asideOf(value) {
+  if (!isObject(value) || typeof value.name !== 'string' || !RETIRED_ASIDE.test(value.name) || !isObject(value.sha256)) return undefined;
+  const entries = Object.entries(value.sha256);
+  if (entries.length === 0 || entries.length > MAX_FOLDER_ENTRIES || !entries.every(([, digest]) => typeof digest === 'string')) return undefined;
+  return { name: value.name, sha256: Object.fromEntries(entries) };
+}
+
 /** The state file, each field checked when read: anything that is not what it should be reads as absent. */
 function readState(file) {
   try {
@@ -424,7 +480,7 @@ function readState(file) {
     const value = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (!isObject(value)) return emptyState();
     const said = isObject(value.said) ? Object.fromEntries(Object.entries(value.said).filter(([, at]) => typeof at === 'string')) : {};
-    return { registeredAt: timeText(value.registeredAt), retiredAt: timeText(value.retiredAt), version: typeof value.version === 'string' ? value.version : undefined, said };
+    return { registeredAt: timeText(value.registeredAt), retiredAt: timeText(value.retiredAt), version: typeof value.version === 'string' ? value.version : undefined, aside: asideOf(value.aside), said };
   } catch {
     return emptyState();
   }
@@ -434,6 +490,7 @@ const stateText = state => JSON.stringify({
   ...(state.registeredAt === undefined ? {} : { registeredAt: state.registeredAt }),
   ...(state.retiredAt === undefined ? {} : { retiredAt: state.retiredAt }),
   ...(state.version === undefined ? {} : { version: state.version }),
+  ...(state.aside === undefined ? {} : { aside: state.aside }),
   ...(Object.keys(state.said).length === 0 ? {} : { said: state.said }),
 });
 
@@ -516,7 +573,7 @@ function run(options) {
   // Present means any entry, a dangling link too (lstat does not follow it); a failed read counts as present.
   if (mods === 'bad' && entryPresent(p.optout)) return skipped();
   const out = new Outcome(mods === 'bad' ? emptyState() : readState(p.state), when);
-  const before = stateText(out.state);
+  let before = stateText(out.state);
 
   /** Prune what is no longer live, store the state when it changed, and answer. A failed write is tolerated: a line then repeats. */
   const finish = () => {
@@ -534,6 +591,11 @@ function run(options) {
       }
     }
     return out.result();
+  };
+  /** Stores the state now, before an act that a kill must not leave unrecorded (the rename aside). Throws when the write fails. */
+  const saveState = () => {
+    writeAtomic(p.state, `${stateText(out.state)}\n`, 0o644);
+    before = stateText(out.state);
   };
   const refused = line => out.tell('refused', `refused:${digestOf(line)}`, line);
 
@@ -659,31 +721,47 @@ function run(options) {
   const envValue = settings.env?.[PLUGIN_DIRS_KEY];
   let folder = readOldFolder(p, uid());
   if (folder.kind === 'removable' && envValue !== undefined && typeof envValue !== 'string') folder = left(`${PLUGIN_DIRS_KEY} in ${SHOWN_SETTINGS} is not a string`);
+  const leftovers = readLeftovers(p, uid(), out.state.aside);
+  if (leftovers.aside?.kind === 'missing') out.state.aside = undefined; // the delete was done, or the rename never happened: nothing is there to delete
   const decision = decideRemoval({
-    retirement, retiredAt: Date.parse(out.state.retiredAt ?? ''), now: nowMs, listed: listsOldFolder(envValue, p, home), folder, leftovers: readLeftovers(p, uid()),
+    retirement, retiredAt: Date.parse(out.state.retiredAt ?? ''), now: nowMs, listed: listsOldFolder(envValue, p, home), folder, leftovers,
   });
+  if (!['none', 'stamp', 'wait'].includes(decision.action)) {
+    for (const name of leftovers.strays) out.tell('told', `stray:${name}`, LINES.stray(name));
+  }
   if (decision.action === 'stamp') out.state.retiredAt = when.toISOString();
   else if (decision.action === 'left') out.tell('told', `left:${digestOf(decision.reason)}`, LINES.left(decision.reason));
+  else if (decision.action === 'asideLeft') out.tell('told', `aside-left:${digestOf(`${decision.name} ${decision.reason}`)}`, LINES.asideLeft(decision.name, decision.reason));
   else if (decision.action === 'done') {
     // Only at a start: a resumed, cleared or compacted session can run on a process env from before step 2, and then the line may be false.
     if (sessionSource === 'startup') {
       if (listsOldFolder(env?.[PLUGIN_DIRS_KEY], p, home)) out.tell('told', 'shell', LINES.shell());
     } else if (Object.hasOwn(out.state.said, 'shell')) out.live.add('shell'); // a resumed session says nothing and keeps what an earlier start said
   } else if (decision.action === 'remove') {
-    const result = removeOldCopy({ p, home, settings, decision, commit, beforeRename, remove, stopAfter, when, uid: uid() });
+    const result = removeOldCopy({
+      p, home, settings, decision, folder, state: out.state, saveState, commit, beforeRename, remove, stopAfter, when, uid: uid(),
+    });
     if (result.stopped) return { action: 'none', line: '', lines: [] };
     // "Removed" names the old copy: it is not said next to a refusal that says part of it is still there.
     if (result.removed && !result.refusal) out.add('removed', LINES.removed());
+    if (result.asideLeft) out.tell('told', `aside-left:${digestOf(`${result.asideLeft.name} ${result.asideLeft.reason}`)}`, LINES.asideLeft(result.asideLeft.name, result.asideLeft.reason));
     if (result.refusal) refused(LINES.notRemoved(result.refusal));
   }
   return finish();
 }
 
-/** Step 2: our entry leaves the variable, the old folder goes by a rename and a delete, then its record and reported file, and what a killed run left. */
-function removeOldCopy({ p, home, settings, decision, commit, beforeRename, remove, stopAfter, when, uid }) {
+/**
+ * Step 2: the old folder is recorded in the state file (`aside`: the name and the hashes of the install record), renamed aside and
+ * deleted; then our entry leaves the variable; then the record and the reported file. A recorded aside that is judged changed stops the
+ * step before the entry and the record are touched. Only a recorded aside is ever deleted, and each delete is
+ * judged again first: a real folder of our uid whose files are still among the recorded ones. The hashes live in the state file and
+ * not in the install record, because the record is deleted by this very step and must not be needed to finish it.
+ */
+function removeOldCopy({ p, home, settings, decision, folder, state, saveState, commit, beforeRename, remove, stopAfter, when, uid }) {
   let removed = false;
   let deleteFailure;
-  /** The delete of a folder renamed aside; a failure (a kill, a busy file) is kept to be said, and the sweep of the next start retries. */
+  let asideLeft;
+  /** The delete of a folder renamed aside; a failure (a kill, a busy file) is kept to be said, and the next start retries. */
   const tryRemove = target => {
     try {
       remove(target);
@@ -693,7 +771,57 @@ function removeOldCopy({ p, home, settings, decision, commit, beforeRename, remo
       return false;
     }
   };
+  /**
+   * Judges the recorded aside again and deletes it only when it is still the recorded folder; true when it is gone and the record is cleared.
+   * `strict`: the aside was renamed in this run, so a recorded file that is missing is a change, not an interrupted delete.
+   * On false (refused or not deleted) the caller stops before the settings write, and the record keeps the aside for the next start.
+   */
+  const deleteAside = (recorded, strict = false) => {
+    const verdict = readAside(p, recorded, uid, !strict);
+    if (verdict.kind === 'left') {
+      asideLeft = verdict;
+      return false;
+    }
+    if (verdict.kind === 'removable') {
+      if (!tryRemove(path.join(p.mods, recorded.name))) return false;
+      removed = true;
+    }
+    if (state.aside?.name === recorded.name) state.aside = undefined;
+    return true;
+  };
   try {
+    const earlier = state.aside;
+    const earlierGone = !decision.aside || deleteAside(earlier);
+    if (decision.folder && earlierGone) {
+      const recorded = { name: `${RETIRED_TAG}${when.getTime()}-${process.pid}`, sha256: folder.sums };
+      beforeRename();
+      state.aside = recorded;
+      try {
+        saveState();
+      } catch (e) {
+        state.aside = decision.aside ? earlier : undefined;
+        return { refusal: `the state file could not be written (${codeOf(e)}), so the old folder was not renamed`, removed };
+      }
+      let renamed = true;
+      try {
+        fs.renameSync(p.oldFolder, path.join(p.mods, recorded.name));
+      } catch (e) {
+        // Two starts at once: the other one took the folder already, and it says what it did; nothing is said here for it.
+        if (e?.code !== 'ENOENT') throw e;
+        renamed = false;
+        state.aside = undefined;
+      }
+      if (renamed) {
+        if (stopAfter === 'rename') return { stopped: true };
+        deleteAside(recorded, true);
+        if (stopAfter === 'folder') return { stopped: true };
+      }
+    }
+    // The last judgement of the aside decides what is kept: an aside refused as changed holds the entry, the record and the reported file
+    // (nothing of the old copy is cut away while a part of it is left); the entry leaves only after the folder work is done.
+    if (asideLeft) return { removed, asideLeft };
+    // A delete that failed (this run's aside or an earlier one) stops the step too: no settings write, the record, the reported file and state.aside stay.
+    if (deleteFailure !== undefined) return { refusal: LINES.deleteFailed(deleteFailure), removed };
     if (decision.entry) {
       const done = commit(withoutOurEntry(settings, p, home));
       if (done.refusal) return { refusal: done.refusal };
@@ -705,27 +833,7 @@ function removeOldCopy({ p, home, settings, decision, commit, beforeRename, remo
       removed = true;
       if (stopAfter === 'variable') return { stopped: true };
     }
-    if (decision.folder) {
-      const aside = path.join(p.mods, `${RETIRED_TAG}${when.getTime()}-${process.pid}`);
-      beforeRename();
-      let renamed = true;
-      try {
-        fs.renameSync(p.oldFolder, aside);
-      } catch (e) {
-        // Two starts at once: the other one took the folder already, and it says what it did; nothing is said here for it.
-        if (e?.code !== 'ENOENT') throw e;
-        renamed = false;
-      }
-      if (renamed) {
-        if (stopAfter === 'rename') return { stopped: true };
-        if (tryRemove(aside)) removed = true;
-        if (stopAfter === 'folder') return { stopped: true };
-      }
-    }
     if (decision.sweep) {
-      for (const entry of readLeftovers(p, uid).retired) {
-        if (tryRemove(path.join(p.mods, entry))) removed = true;
-      }
       for (const file of [p.oldManifest, p.oldReported]) {
         if (!isFileAt(file)) continue;
         try {
@@ -737,9 +845,9 @@ function removeOldCopy({ p, home, settings, decision, commit, beforeRename, remo
       }
     }
   } catch (e) {
-    return { refusal: `a file could not be removed (${codeOf(e)})`, removed };
+    return { refusal: `a file could not be removed (${codeOf(e)})`, removed, asideLeft };
   }
-  return deleteFailure === undefined ? { removed } : { refusal: LINES.deleteFailed(deleteFailure), removed };
+  return { removed, asideLeft };
 }
 
 /**
