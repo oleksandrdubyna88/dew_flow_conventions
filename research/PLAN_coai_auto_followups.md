@@ -1,6 +1,6 @@
 # coai policy `auto` — the four follow-ups of the gate-words release
 
-> Status: **CLOSED, 2026-11-24 — what is done and what is not: § *Closure*.** Before that: **IMPLEMENTED, 2026-11-19.** #185 merged (`c598a11`); `release` promoted to
+> Status: **IMPLEMENTED, 2026-11-19; CLOSED 2026-11-24 — what is done and what is not: § *Closure*.** #185 merged (`c598a11`); `release` promoted to
 > `c598a11bdc5069e0db852395377d4001d9db8dc2`; the pin bump merged in all nine consumers; the coai extension 0.89.2
 > (snippet v20) published to the Marketplace; post-deploy item 3 met with both native CLIs (§ *Results*).
 >
