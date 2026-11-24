@@ -163,7 +163,7 @@ its own pull request.
 - **The Definition of Done** keeps items 1, 2, 3 and 7 open for exactly the two stories above. Its other rows stand as
   § *Epoch 12* item 1's table writes them.
 - **Question (b)** of § *Epoch 12* item 7, the runner hand-off at S6's merge: not answered. S6 merged without it.
-- **Found by E6.S6, not fixed** (each recorded in benchmark's S6 brief):
+- **Found by E6.S6, not fixed** (in benchmark: the umask in the S6 brief, the pin in its module document):
   - minigit-bench's `test/heldout-archive.test.mjs:30` assumes umask 0022;
   - lang-bench's exec layer rightly refuses a group-writable run parent;
   - so a whole run under umask 0002 (a `systemd-run --user` unit's default) shows 52 reds;
