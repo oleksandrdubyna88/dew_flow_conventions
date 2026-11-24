@@ -119,7 +119,7 @@ The owner closed this plan on 2026-11-24 ("закрывай план, что с�
 done under it. An item under *Not done* that is taken up later gets a plan of its own; it does not reopen this one. The
 ledger stays as it is (epoch 12, one entry): closing adds no entry, as with the coai auto follow-ups plan closed the same
 day. The stories documents in `dew_flow_benchmark` (E6) and `dew_flow_rag_qln` (E7) are promoted with this plan, each in
-its own pull request. Delivered to `main` by three pull requests: this closure (dew_flow_conventions, the one carrying
+its own pull request. Delivered to `main` by three pull requests: this closure (dew_flow_conventions #195, the one carrying
 this text), benchmark #246 (E6's stories document and S6's brief) and rag_qln #138 (E7's stories document); each is
 merged only after its checks pass.
 
