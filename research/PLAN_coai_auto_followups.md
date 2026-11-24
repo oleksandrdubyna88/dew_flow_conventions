@@ -275,4 +275,8 @@ Found after the plan moved to `research/`; none changes a result above.
   snippet is titled `fix(extension)` (`dew_flow_connect_other_ais · research/module_extension.md` § *A pin bump that
   regenerates the snippet must be a releasing commit*).
 - **The decided P2 question, said once more for the reader of the gate-words plan:** the owner had left it open; it was
-  settled by the question consultants (coai `68babd70…`, both rows for option C) and the owner was not asked.
+  settled by the question consultants (coai question-consultation id `68babd70…`, both answering rows for option C) and
+  the owner was not asked. Option C: a plan round that ended `not_reviewed` under `auto` opens epoch 1 `by nobody`, a
+  counting baseline and never an approval, so the one change and the full stop still count; the reasons and the rule text
+  are in § *P2 — the decision* above and in [common/plan-change-control.md](../common/plan-change-control.md) § *How it
+  is counted*.
