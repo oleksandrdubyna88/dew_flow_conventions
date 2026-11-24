@@ -258,3 +258,21 @@ and the new clause and not the old one; tag `extension-v0.89.2` (`8ff658d5`); `r
 
 **Open.** None of this plan's. The `held-gate` and `auto-gate` fixtures still measure Claude only (`behaviourSmoke` drives
 no other CLI), as test plan § *The live run* says.
+
+### After the promotion (#186, 2026-11-19; added 2026-11-24)
+
+Found after the plan moved to `research/`; none changes a result above.
+
+- **A timing test reddened the promotion's suite.** `raw-temp-baseline.test.mjs` 22b ("150,000 entries of one site …
+  in a couple of seconds") failed once in `npm test` at 5.9 s under a load average of about 24 from parallel sessions, and
+  its file passed alone (52 of 52). Its neighbour 22c is a known flake of the same kind; neither was changed.
+- **The coai extension in the owner's WSL window did not update itself.** It ran 0.87.0 on 2026-11-19 while 0.89.1 was
+  out (so the *Auto* choice was missing from the menu), and 0.89.1 on 2026-11-24 with 0.89.2 out for five days; both were
+  installed by hand. The first hand install failed (`UtilAcceptVsock … accept4 failed 110` from the WSL `code` CLI); the
+  second worked. The cause was not investigated; it is recorded on the coai side
+  (`dew_flow_connect_other_ais · research/PLAN_auto_never_asks_a_person.md` § *After the promotion*).
+- **The coai release lesson is now a coai rule of thumb**, not only a deviation here: a pin bump that regenerates the
+  snippet is titled `fix(extension)` (`dew_flow_connect_other_ais · research/module_extension.md` § *A pin bump that
+  regenerates the snippet must be a releasing commit*).
+- **The decided P2 question, said once more for the reader of the gate-words plan:** the owner had left it open; it was
+  settled by the question consultants (coai `68babd70…`, both rows for option C) and the owner was not asked.
