@@ -11,6 +11,8 @@ consumer belongs in that repository's own `todo/`.
 
 Product audit: [REVIEW_product_audit_2026-09-09.md](REVIEW_product_audit_2026-09-09.md) — nine findings in the checking tools and the Claude Code rules payload, with evidence and proposed fixes.
 
+dew-flow-mods step: [REVIEW_mods_step_findings_2026-11-24.md](REVIEW_mods_step_findings_2026-11-24.md) — nine CodeRabbit findings on the session step after its release (three about step 2's delete) and five open items carried from the dew_flow_mods plans.
+
 | Plan | What it delivers |
 |---|---|
 | [PLAN_shared_rules_claude_codex.md](PLAN_shared_rules_claude_codex.md) | One canonical policy for Claude Code and Codex: AGENTS bootstrap, CLAUDE import, neutral submodule, shared rule selection and the migration of every consumer; S1/S2 shipped, six of nine repositories on the neutral layout; stopped for re-review 2026-11-09 (two build-order changes), revised whole the same day: the fixed consumer order becomes a selection rule, creds is story 3.C with its acceptance checklist; waits for the Opus judge and the plan round before epoch 2 |
