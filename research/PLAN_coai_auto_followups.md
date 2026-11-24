@@ -1,6 +1,6 @@
 # coai policy `auto` — the four follow-ups of the gate-words release
 
-> Status: **IMPLEMENTED, 2026-11-19.** #185 merged (`c598a11`); `release` promoted to
+> Status: **CLOSED, 2026-11-24 — what is done and what is not: § *Closure*.** Before that: **IMPLEMENTED, 2026-11-19.** #185 merged (`c598a11`); `release` promoted to
 > `c598a11bdc5069e0db852395377d4001d9db8dc2`; the pin bump merged in all nine consumers; the coai extension 0.89.2
 > (snippet v20) published to the Marketplace; post-deploy item 3 met with both native CLIs (§ *Results*).
 >
@@ -280,3 +280,36 @@ Found after the plan moved to `research/`; none changes a result above.
   counting baseline and never an approval, so the one change and the full stop still count; the reasons and the rule text
   are in § *P2 — the decision* above and in [common/plan-change-control.md](../common/plan-change-control.md) § *How it
   is counted*.
+
+## Closure (2026-11-24)
+
+The plan is closed: no more work is done under it. An item under *Not done* that is taken up later gets a plan of its
+own; it does not reopen this one. The ledger stays as it is (epoch 1, one entry); no entry is added.
+
+**Done**
+
+- `smoke-rules --task <task>` and `--only <id>` (#185), with the read-beyond-`--only` check CodeRabbit asked for;
+  `POST_DEPLOY.md` item 3 says when to use them.
+- The `auto-gate` behaviour fixture, and behaviour runs that load no MCP server (entry 1.1): red on the old rules at
+  moment 1, green on the new.
+- `coai-feature` v5: a blocking `good_enough` finding at the cap is verified like any other.
+- P2: an epoch `by nobody` for a plan round that ended `not_reviewed`, in `plan-change-control` and `plan-ledger.mjs`,
+  and the interim re-review path open to such a branch.
+- `release` `c598a11`, nine pin bumps, the coai extension 0.89.2 (snippet v20).
+- Post-deploy item 3 met at coai `8ff658d5` with Claude and Codex; the gate-words plan's partly-met box is met.
+- The findings after the promotion are recorded here (§ *After the promotion*) and in coai (#1040).
+
+**Not done**
+
+- **Codex in the behaviour checks.** `held-gate` and `auto-gate` drive Claude only; `behaviourSmoke` runs no other CLI.
+- **The `auto-gate` caps are not measured.** The fixture still says `measured: false`, with the caps copied from
+  `held-gate` (2 USD, 300 s), although the plan said they stay so only "until the live run measures them". The live runs
+  cost 0.27–0.94 USD each; nobody wrote that into the fixture.
+- **A partial read beyond `--only` is not caught.** `readBeyondOnly` lists a complete resolver read or a direct Read of an
+  unnamed rule; a truncated resolver read of one is not listed.
+- **A selected rule larger than what a host keeps of one output** (the coai repository's `common.test-leftovers-detail`,
+  32,126 B) cannot be shown read by any native run; item 3 says so, and the rule is covered by its body record and tests
+  only.
+- **The timing tests 22b and 22c** of `raw-temp-baseline.test.mjs` still fail under heavy load; neither was changed.
+- **Why the coai extension did not update itself** in the owner's WSL window was not investigated (coai's
+  `research/PLAN_auto_never_asks_a_person.md` § *Closure*).
